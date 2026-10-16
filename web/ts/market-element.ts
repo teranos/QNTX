@@ -60,7 +60,7 @@ export interface StaandInfo {
     walks: StandWalk[];
 }
 
-const ELEMENT_ID = 'market-element';
+export const ELEMENT_ID = 'market-element';
 
 // A friendly name to prefill the slug with — a market stall by another word.
 // The form offers an unused one and lets you type anything instead.
@@ -536,6 +536,9 @@ function showRefusal(root: HTMLElement, err: unknown): void {
     box.style.padding = EDGE;
     root.appendChild(box);
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/staands'] as const;
 
 export function createMarketElement(): Element {
     return {

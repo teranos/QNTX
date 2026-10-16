@@ -1535,6 +1535,9 @@ function createSections(root: HTMLElement): void {
     root.appendChild(content);
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/embeddings/info'] as const;
+
 export function createEmbeddingsElement() {
     return {
         id: 'embeddings-element',

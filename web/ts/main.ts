@@ -452,7 +452,8 @@ async function init(): Promise<void> {
     // This ensures the run is ready to receive elements
     tray.init();
 
-    registerDefaultElements(hasCanvas);
+    // The restore below skips what tray.has, so the node is answered first.
+    await registerDefaultElements(hasCanvas);
 
     // Restore minimized elements from persisted state
     const minimizedIds = hasCanvas ? uiState.getMinimizedWindows() : [];

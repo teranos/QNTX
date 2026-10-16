@@ -1376,6 +1376,9 @@ function filterPlugins(searchText: string): void {
     });
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/plugins'] as const;
+
 /**
  * Create a Element definition for the plugin panel
  */

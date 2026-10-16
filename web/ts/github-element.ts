@@ -88,7 +88,7 @@ export interface GitHubWebhook {
     url: string;
 }
 
-const ELEMENT_ID = 'github-element';
+export const ELEMENT_ID = 'github-element';
 
 // server/node_records.go DefaultRunnerPath; the node sends it too, this is for a path it left empty.
 const DEFAULT_RUNNER_PATH = '/opt/actions-runner';
@@ -395,6 +395,9 @@ export async function load(node: HTMLElement, namespaces: HTMLElement, actions: 
         if (webhook) webhook.innerHTML = '';
     }
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/github'] as const;
 
 export function createGitHubElement(): Element {
     return {

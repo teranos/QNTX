@@ -895,6 +895,9 @@ function renderPredicateDetail(container: HTMLElement, detail: PredicateDetail):
     container.innerHTML = `<div style="padding: 4px 0 4px 12px; border-left: 2px solid #334155; margin: 2px 0 4px 4px; word-break: break-word; overflow-wrap: break-word;">${rows.join('')}</div>`;
 }
 
+// Who this is for: whoever reaches these (audience.ts). It draws what /ws sends.
+export const needs = ['/ws'] as const;
+
 export function createDbElement(): Element {
     return {
         id: 'database-element',

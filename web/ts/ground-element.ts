@@ -914,6 +914,9 @@ function followNode(body: HTMLElement, scene: GroundScene): void {
     following = setInterval(() => { if (body.isConnected && !document.hidden) ask(); }, ASK_EVERY_MS);
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/am/ground', '/api/transcripts'] as const;
+
 export function createGroundElement(): Element {
     return {
         id: ELEMENT_ID,

@@ -3,9 +3,12 @@ package server
 import (
 	"context"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 )
 
@@ -33,11 +36,20 @@ func (s *QNTXServer) iSignum() sigil.Signum {
 					Answer: "protocol.Standing",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/i/standing"},
 				},
+				{
+					Name: "reaches",
+					Does: "Of the paths asked, the ones the person asking reaches: the gate's own answer, path by path. The table itself is never answered.",
+					Takes: []*protocol.Param{{Name: "paths", Required: true,
+						Says: "The paths asked about, as the reach table names them, separated by commas."}},
+					Answer: "protocol.Reaches",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/i/reaches"},
+				},
 			},
 		},
 		Answers: map[string]sigil.Answer{
 			"standing": s.iStanding,
 			"step":     s.iStep,
+			"reaches":  s.iReaches,
 		},
 	}
 }
@@ -64,6 +76,57 @@ func (s *QNTXServer) iStep(ctx context.Context, sent sigil.Sent) (any, *protocol
 		return nil, refusedAs(status, err)
 	}
 	return &protocol.Standing{Namespace: namespace}, nil
+}
+
+// iReaches is, of the paths asked, the ones the gate lets the person asking through.
+func (s *QNTXServer) iReaches(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	// The gate's admission, not iAdmitted: a node with no login admits as ROOT (gate).
+	admitted, gated := auth.AdmissionFrom(ctx)
+	if !gated {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this sigil was asked without a gate"}
+	}
+	var asked []string
+	for _, path := range strings.Split(sent["paths"], ",") {
+		path = strings.TrimSpace(path)
+		// A path starts at /, as every line in server/reach names one.
+		if !strings.HasPrefix(path, "/") {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "paths", Says: "paths names " + strconv.Quote(path) + ", which is no path"}
+		}
+		asked = append(asked, path)
+	}
+	bound := map[string][]heldBy{}
+	for _, signum := range s.checkedSigna() {
+		for _, held := range signum.GetSigils() {
+			path := held.GetHttp().GetPath()
+			bound[path] = append(bound[path], heldBy{signum: signum.GetName(), sigil: held})
+		}
+	}
+	reached := []string{}
+	for _, path := range asked {
+		sigils, sigilPath := bound[path]
+		if sigilPath && s.reachesASigil(admitted, sigils) || !sigilPath && s.reachesTheRow(admitted, path) {
+			reached = append(reached, path)
+		}
+	}
+	return &protocol.Reaches{Paths: reached}, nil
+}
+
+// reachesASigil is the gate's answer on a path sigils are bound to: each is
+// asked as its own gate asks it (reachingOver), and one reached is enough.
+func (s *QNTXServer) reachesASigil(admitted auth.Admission, sigils []heldBy) bool {
+	for _, held := range sigils {
+		if reaching, anyone := s.reachingOver(reach.OverHTTP, held); anyone || reaching.Admits(admitted) {
+			return true
+		}
+	}
+	return false
+}
+
+// reachesTheRow is the gate's answer on any other path: its own row, and a
+// path no line names is ROOT's alone.
+func (s *QNTXServer) reachesTheRow(admitted auth.Admission, path string) bool {
+	reaching, anyone := s.served.Reaching(path)
+	return anyone || reaching.Admits(admitted)
 }
 
 // iAdmitted is who is asking. A node with no login has no person to answer

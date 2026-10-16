@@ -72,6 +72,9 @@ const theNodeInPi: RootAgent = {
         .then(answer => answer.transcript),
 };
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/pi'] as const;
+
 export function createPiElement(): Element {
     return {
         id: ELEMENT_ID,

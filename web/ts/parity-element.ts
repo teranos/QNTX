@@ -253,6 +253,9 @@ function failed(container: HTMLElement, what: string, err: unknown): void {
     container.appendChild(el('div', 'element-error', `${what}: ${err instanceof Error ? err.message : String(err)}`));
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/parity/follows'] as const;
+
 export function createParityElement(): Element {
     return {
         id: ELEMENT_ID,

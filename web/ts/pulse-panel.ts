@@ -54,13 +54,15 @@ let activeQueueCleanupTimer: ReturnType<typeof setTimeout> | null = null;
 let tooltipCleanup: (() => void) | null = null;
 let cachedActiveQueue: import('./pulse/active-queue.ts').ActiveQueueResult | null = null;
 
-// Eagerly prefetch schedule data so it's ready before panel opens
-listScheduledJobs().then(result => {
-    result.forEach(job => jobs.set(job.id, job));
-}).catch((err: unknown) => {
-    // The panel refetches on open; the prefetch failing is still a fact.
-    log.warn(SEG.PULSE, 'Schedule prefetch failed; the panel will fetch on open:', err);
-});
+// Prefetch schedule data so it's ready before the panel opens, for a viewer it is added for.
+function prefetchSchedules(): void {
+    listScheduledJobs().then(result => {
+        result.forEach(job => jobs.set(job.id, job));
+    }).catch((err: unknown) => {
+        // The panel refetches on open; the prefetch failing is still a fact.
+        log.warn(SEG.PULSE, 'Schedule prefetch failed; the panel will fetch on open:', err);
+    });
+}
 
 function getActionContext(): JobActionContext {
     return {
@@ -234,10 +236,14 @@ function handleDaemonStatusUpdate(e: Event): void {
     }
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/pulse/schedules', '/api/pulse/jobs'] as const;
+
 /**
  * Create a Element definition for the pulse panel
  */
 export function createPulseElement(): Element {
+    prefetchSchedules();
     return {
         id: 'pulse-element',
         title: 'Pulse',

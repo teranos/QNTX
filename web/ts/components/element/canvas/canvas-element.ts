@@ -26,6 +26,9 @@ import { getElementTypeBySavedSymbol } from '../element-registry';
 import { uiState } from '../../../state/ui';
 import { buildCanvasWorkspace } from './canvas-workspace-builder';
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/canvas'] as const;
+
 /**
  * Factory function to create a Canvas element
  */

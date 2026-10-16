@@ -33,7 +33,7 @@ export interface UserRecord {
     created_at: number;
 }
 
-const ELEMENT_ID = 'users-element';
+export const ELEMENT_ID = 'users-element';
 
 /** What the ROOT User is called before they say otherwise (ADR-031). */
 const ROOT_NAME = 'root';
@@ -184,6 +184,9 @@ export function renderInviteLink(container: HTMLElement, invited?: () => void): 
         log.error(SEG.UI, '[UsersElement] the node did not say who is looking', err);
     });
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/auth/users', '/auth/invitations'] as const;
 
 export function createUsersElement(): Element {
     return {
