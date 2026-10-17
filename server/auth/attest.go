@@ -59,6 +59,8 @@ const (
 	PredicateEnabled = "token:enabled"
 	// A client moved to another namespace, and every connector with it.
 	PredicateMoved = "token:moved"
+	// The passkey at home made the App's key a client at its door.
+	PredicateEnrolled = "client:enrolled"
 )
 
 // Predicates for what happens to the node itself rather than to whoever is

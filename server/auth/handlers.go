@@ -328,6 +328,8 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	h.joinDeviceKey(admittedAs, ownerDID)
 
 	// The half-admission is spent here, so one laye signature buys one device.
+	// The key it was proved with is kept for the App's enrolment.
+	layeKey := p.pending.did
 	h.spend(p, w)
 
 	// Resolved once, here, so no request after this has to scan for it. The
@@ -347,17 +349,32 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		"owner":    ownerDID,
 	})
 	h.logger.Infow("WebAuthn credential registered and session created", "admitted_as", admittedAs)
-	h.writeJSON(w, http.StatusOK, h.finished(w, r, token, admittedAs))
+	h.answerFinished(w, r, token, admittedAs, layeKey)
 }
 
 // finished is what a passkey ceremony answers. A browser that came from a door
 // is also told where to take the session it just earned.
-func (h *Handler) finished(w http.ResponseWriter, r *http.Request, token, admittedAs string) map[string]any {
+func (h *Handler) finished(w http.ResponseWriter, r *http.Request, token, admittedAs, layeKey string) (map[string]any, error) {
 	answer := map[string]any{"status": "ok"}
-	if back := h.sentHome(w, r, token, admittedAs); back != "" {
+	back, err := h.sentHome(w, r, token, admittedAs, layeKey)
+	if err != nil {
+		return nil, err
+	}
+	if back != "" {
 		answer["return"] = back
 	}
-	return answer
+	return answer, nil
+}
+
+// answerFinished writes what a passkey ceremony answers. The session already
+// stands; an App that could not be enrolled is said, not dropped.
+func (h *Handler) answerFinished(w http.ResponseWriter, r *http.Request, token, admittedAs, layeKey string) {
+	answer, err := h.finished(w, r, token, admittedAs, layeKey)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "signed in, and the App was not enrolled: "+err.Error())
+		return
+	}
+	h.writeJSON(w, http.StatusOK, answer)
 }
 
 func (h *Handler) handleLoginBegin(w http.ResponseWriter, r *http.Request) {
@@ -529,7 +546,9 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A half-admission from laye is spent by the device that answers it.
+	// A half-admission from laye is spent by the device that answers it. The
+	// key it was proved with is kept for the App's enrolment.
+	layeKey := p.pending.did
 	h.spend(p, w)
 
 	// Resolved once, here, so no request after this has to scan for it.
@@ -547,7 +566,7 @@ func (h *Handler) handleLoginFinish(w http.ResponseWriter, r *http.Request) {
 		"device":   "asserted",
 	})
 	h.logger.Infow("WebAuthn authentication successful", "admitted_as", admittedAs)
-	h.writeJSON(w, http.StatusOK, h.finished(w, r, token, admittedAs))
+	h.answerFinished(w, r, token, admittedAs, layeKey)
 }
 
 // createdAsExpected holds a registration to what the library leaves to the

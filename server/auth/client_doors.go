@@ -29,6 +29,9 @@ type Client struct {
 	Origin *url.URL
 	// Node is a peer nodes.peers declares by its did:key.
 	Node bool
+	// App is a key a person's App signs in with, enrolled by the passkey at
+	// home. It signs as its key the way a node does, and is never carried to.
+	App bool
 }
 
 // clientByDID is the live client this DID names, or false. A revoked or
@@ -40,6 +43,9 @@ type Client struct {
 func (h *Handler) clientByDID(did string) (Client, bool) {
 	if node, declared := h.nodes[did]; declared {
 		return node, true
+	}
+	if app, enrolled := h.appClient(did); enrolled {
+		return app, true
 	}
 	if h.tokens == nil || did == "" {
 		return Client{}, false
