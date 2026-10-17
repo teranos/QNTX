@@ -135,6 +135,29 @@ async function onScreen(page: Page, id: string): Promise<void> {
     expect(edges.right, `${id} ends right of its screen: ${JSON.stringify(edges)}`).toBeLessThanOrEqual(edges.screen + 1);
 }
 
+/** Every node of the element stands inside it, or is named with how far it reaches past. */
+async function inside(page: Page, id: string): Promise<void> {
+    const past = await page.locator(`[data-element-id="${id}"]`).evaluate((element) => {
+        const edge = element.getBoundingClientRect();
+        const reaching = Array.from(element.querySelectorAll<HTMLElement>('*')).filter((node) => {
+            const r = node.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) return false;
+            return r.left < edge.left - 1 || r.right > edge.right + 1 || node.scrollWidth > node.clientWidth + 1;
+        });
+        const innermost = reaching.filter((node) => !reaching.some((other) => other !== node && node.contains(other)));
+        const dead = element.querySelector('[data-too-wide]');
+        return [
+            ...innermost.map((node) => {
+                const r = node.getBoundingClientRect();
+                const text = (node.textContent ?? '').trim().slice(0, 32);
+                return `${node.tagName.toLowerCase()}${node.className ? `.${String(node.className).split(' ').join('.')}` : ''} "${text}" ${Math.round(r.left - edge.left)}..${Math.round(r.right - edge.left)} in ${Math.round(edge.width)}, scrolls ${node.scrollWidth} in ${node.clientWidth}`;
+            }),
+            ...(dead ? [`dropped dead: ${(dead as HTMLElement).dataset.tooWide}`] : []),
+        ];
+    });
+    expect(past, `${id} has content that is not reachable`).toEqual([]);
+}
+
 test.describe('Nothing in an element is wider than it', () => {
     let wire: Wire;
 
@@ -162,6 +185,7 @@ test.describe('Nothing in an element is wider than it', () => {
             expect(wire.missing, 'every call an element makes on opening is answered from browser/fixtures').toEqual([]);
             await page.evaluate((id) => window.specimens!.fits(id), id);
             await onScreen(page, id);
+            await inside(page, id);
         });
     }
 
@@ -171,6 +195,7 @@ test.describe('Nothing in an element is wider than it', () => {
         expect(wire.missing, 'every call the User window makes on opening is answered from browser/fixtures').toEqual([]);
         await page.evaluate((id) => window.specimens!.fits(id), `user-element-${TIM.id}`);
         await onScreen(page, `user-element-${TIM.id}`);
+        await inside(page, `user-element-${TIM.id}`);
     });
 });
 
@@ -227,6 +252,73 @@ test.describe('Nothing in an element is wider than it, or than its screen, when 
             await quiet(page, wire);
             await page.evaluate((id) => window.specimens!.fits(id), id);
             await onScreen(page, id);
+            await inside(page, id);
+        });
+    }
+});
+
+// "AND MAIL IS AN OFFENDING ELEMENT, SO THE CI SHOULD POINT IT OUT"
+// "IF AN ELEMENT REGRESSES IT SHOULD FAIL"
+// Nobody picks what the node says here: every word it answers with is long.
+
+/** Unbroken by spaces, as an id, a hash or a path is. */
+const UNBROKEN = 'AS-CLEANAPI-MAILTEMP-CLEANAPI-XEV3IP7S'.repeat(4);
+
+/** A word the page reads as a word, not a key: an id, a level, a time or a path stays as the fixture has it. */
+function lengthens(word: string): boolean {
+    return word.includes(' ') && !word.startsWith('/') && !word.startsWith('http') && Number.isNaN(Date.parse(word));
+}
+
+function lengthened(value: unknown): unknown {
+    if (typeof value === 'string') return lengthens(value) ? `${value} ${UNBROKEN}` : value;
+    if (Array.isArray(value)) return value.map(lengthened);
+    if (value !== null && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, lengthened(inner)]));
+    }
+    return value;
+}
+
+test.describe('Nothing in an element is wider than it when every word the node says is long', () => {
+    let wire: Wire;
+
+    test.beforeEach(async ({ page }) => {
+        wire = { missing: [], inflight: 0, answered: 0 };
+        await page.route((url) => !isStatic(url.pathname), async (route) => {
+            const url = new URL(route.request().url());
+            if (url.pathname === '/i/reaches' || route.request().method() !== 'GET') {
+                await answer(route, wire);
+                return;
+            }
+            wire.inflight += 1;
+            try {
+                const file = fixtureOf(url.pathname);
+                let body: string;
+                try {
+                    body = await readFile(file, 'utf8');
+                } catch (err: unknown) {
+                    wire.missing.push(`GET ${url.pathname} (no fixture at ${file})`);
+                    await route.fulfill({ status: 404, body: `no fixture at ${file}: ${err instanceof Error ? err.message : String(err)}` });
+                    return;
+                }
+                await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(lengthened(JSON.parse(body))) });
+            } finally {
+                wire.inflight -= 1;
+                wire.answered += 1;
+            }
+        });
+        await page.goto('/');
+        await page.waitForFunction(() => window.specimens !== undefined);
+    });
+
+    for (const id of ELEMENTS) {
+        test(`${id}, long`, async ({ page }) => {
+            await page.evaluate((id) => window.specimens!.open(id), id);
+            const element = page.locator(`[data-element-id="${id}"]`);
+            await expect.poll(() => element.evaluate((el) => (el as HTMLElement).dataset.form), { message: `${id} is still a dot` }).not.toBe('dot');
+            await expect.poll(() => element.evaluate((el) => el.classList.contains('morphing'))).toBe(false);
+            await quiet(page, wire);
+            await onScreen(page, id);
+            await inside(page, id);
         });
     }
 });
