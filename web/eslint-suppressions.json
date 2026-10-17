@@ -116,7 +116,7 @@
   },
   "ts/components/button.ts": {
     "no-restricted-syntax": {
-      "count": 7
+      "count": 6
     }
   },
   "ts/components/doughnut.ts": {

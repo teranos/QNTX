@@ -9,9 +9,8 @@
 // and every mail sent or refused. Nothing here sends.
 
 import type { Element } from '@teranos/elements';
-import { createTable, tray } from '@teranos/elements';
+import { createTable, tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
 import { stacked } from './table-cell';
 
@@ -388,11 +387,11 @@ function reportControl(onSent: () => void): HTMLDivElement {
     control.className = 'element-actions';
     const said = document.createElement('span');
     said.className = 'element-pill-when';
-    const button = createPrimaryButton('Send the weekly report now', async () => {
+    const button = pressFrom({ id: 'mail-report-send', title: 'Send the weekly report now', does: async () => {
         const r = await apiJson<ReportSent>('/api/mail/report', { method: 'POST' });
         said.textContent = reportSentLine(r);
         onSent();
-    });
+    } });
     control.appendChild(button.element);
     control.appendChild(said);
     return control;

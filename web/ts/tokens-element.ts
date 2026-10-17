@@ -7,9 +7,8 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { createTable, tray } from '@teranos/elements';
+import { createTable, tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createGhostButton } from './components/button';
 import { openTokenMintElement } from './token-mint-element';
 import { openTokenElement } from './token-element';
 import { log, SEG } from './logger';
@@ -233,21 +232,19 @@ function renderMintLink(container: HTMLElement, listContainer: HTMLElement): voi
 
     // A plus, because there is one thing to add here and its name is the row
     // it becomes. The palette says the same with a symbol and no words.
-    const mint = createGhostButton('+', async () => {
+    const mint = pressFrom({ id: 'tokens-mint', title: '+', does: async () => {
         // The list hears about the token rather than waiting to be asked.
         openTokenMintElement(() => { void refreshList(listContainer); });
-    });
+    } });
     mint.element.title = 'mint a token';
     mint.element.setAttribute('aria-label', 'Mint a token');
-    mint.element.style.lineHeight = '1';
-    mint.element.style.padding = '4px 10px';
     container.appendChild(mint.element);
 
     // "i want to see the + but it needs to be grayed out and on hover it needs to say this"
     person().then(who => {
         if (who.via !== 'token') return;
         const why = 'only a session mints a token, and this page reaches the node as a token';
-        mint.setDisabled(true, why);
+        mint.hold(why);
         // A disabled button can get no hover of its own, so the row around it says it too.
         container.title = why;
     }).catch((err: unknown) => {

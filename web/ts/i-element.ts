@@ -14,9 +14,8 @@ import { apiFetch } from './client';
 import { I } from './sym';
 import { escapeHtml } from './html-utils';
 import { log, SEG } from './logger.ts';
-import { createGhostButton } from './components/button.ts';
 import { person, personSection, personSwitch, personUnbecome, type Person } from './self-person.ts';
-import { tray } from '@teranos/elements';
+import { tray, pressFrom } from '@teranos/elements';
 import { openTokensElement, ELEMENT_ID as TOKENS_ID } from './tokens-element.ts';
 import { openRolesElement, ELEMENT_ID as ROLES_ID } from './roles-element.ts';
 import { openUsersElement, ELEMENT_ID as USERS_ID } from './users-element.ts';
@@ -118,7 +117,7 @@ function renderI(): void {
     // A way to an element is offered when the tray holds it, which is when the node said the viewer reaches it.
     for (const way of WAYS) {
         if (!tray.has(way.id)) continue;
-        actions.appendChild(createGhostButton(way.label, async () => way.open()).element);
+        actions.appendChild(pressFrom({ id: `i-way-${way.label}`, title: way.label, does: async () => way.open() }).element);
     }
 
     // ROOT being somebody gets back to itself here (ADR-031).

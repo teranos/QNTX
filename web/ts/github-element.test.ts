@@ -163,7 +163,7 @@ describe('Jenny: turning the runner on where there is none', () => {
         await flush();
 
         expect(sent).toEqual({ path: '/api/github/runner', body: { path: '/srv/none', enabled: 'true' } });
-        expect(container.querySelector('.qntx-btn-error-box')?.textContent).toBe('no runner at /srv/none: .runner is missing');
+        expect(container.querySelector('[data-press-said]')?.textContent).toBe('no runner at /srv/none: .runner is missing');
         expect(reloaded).toBe(false);
     });
 });

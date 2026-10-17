@@ -9,9 +9,8 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { createTable, tableCell, tray } from '@teranos/elements';
+import { createTable, tableCell, tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createGhostButton, createPrimaryButton } from './components/button';
 import { el } from './html-utils';
 import { jsonBody } from './http-utils';
 import { log, SEG } from './logger';
@@ -325,7 +324,7 @@ function renderComposer(container: HTMLElement, listContainer: HTMLElement, k: K
     };
     kind.addEventListener('change', () => { s.kind = kind.value as Kind; drawSlots(); });
 
-    const attest = createPrimaryButton('Attest', async () => {
+    const attest = pressFrom({ id: 'roles-attest', title: 'Attest', does: async () => {
         const made = s.kind === 'GRANT' ? composeAll(s, implied) : compose(s);
         if ('missing' in made) throw new Error(`the line is missing ${made.missing}`);
         const lines = 'lines' in made ? made.lines : [made.line];
@@ -334,7 +333,7 @@ function renderComposer(container: HTMLElement, listContainer: HTMLElement, k: K
         }
         container.hidden = true;
         await refreshList(listContainer);
-    });
+    } });
 
     row.append(kind, slotsBox, attest.element);
     container.append(sentence, row, impliedBox);
@@ -367,7 +366,7 @@ export function createRolesElement(): Element {
             composer.hidden = true;
             const notes = el('div');
             const said = (message: string) => { notes.appendChild(errorBox(message)); };
-            const open = createGhostButton('+', async () => {
+            const open = pressFrom({ id: 'roles-compose', title: '+', does: async () => {
                 notes.innerHTML = '';
                 if (!composer.hidden) {
                     composer.hidden = true;
@@ -375,7 +374,7 @@ export function createRolesElement(): Element {
                 }
                 renderComposer(composer, listContainer, await known(said));
                 composer.hidden = false;
-            });
+            } });
             open.element.title = 'write a line';
             open.element.setAttribute('aria-label', 'Write a line');
             open.element.style.lineHeight = '1';

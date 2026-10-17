@@ -171,13 +171,6 @@
     gap: 12px;
 }
 
-.canvas-birth-symbol.qntx-btn {
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    font-size: var(--font-size-lg);
-}
-
 .canvas-birth-form {
     display: flex;
     align-items: center;
@@ -210,35 +203,6 @@
 
 .canvas-birth-name:focus {
     border-color: var(--text-on-dark-tertiary);
-}
-
-.canvas-birth-plus.qntx-btn {
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    font-size: var(--font-size-lg);
-}
-
-/* "button becomes green and shimmers, 2nd click actually creates it": the
-   system button's confirming state, in success, with the shimmer. */
-.canvas-birth-plus.qntx-btn-confirming {
-    color: #0b1a0f;
-    border-color: #4ade80;
-    background: linear-gradient(110deg, #4ade80 0%, #86efac 40%, #4ade80 60%, #86efac 100%);
-    background-size: 200% 100%;
-    animation: canvas-birth-shimmer 1.2s linear infinite;
-}
-
-@keyframes canvas-birth-shimmer {
-    from { background-position: 200% 0; }
-    to { background-position: 0 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .canvas-birth-plus.qntx-btn-confirming {
-        animation: none;
-        background: #4ade80;
-    }
 }
 
 /* A disabled canvas, opened on purpose: "also desaturated view". */

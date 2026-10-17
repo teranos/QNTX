@@ -12,7 +12,7 @@
 
 import { apiFetch } from './client';
 import { escapeHtml } from './html-utils';
-import { Button } from './components/button.ts';
+import { pressFrom } from '@teranos/elements';
 
 /** One provider account joined to a User. No binding, no token, no secret. */
 export interface PersonAccount {
@@ -86,21 +86,21 @@ async function flip(verb: 'disable' | 'enable'): Promise<void> {
  */
 export function personSwitch(who: Person | null, refused: string, reload: () => Promise<void>): HTMLElement | null {
     if (who) {
-        return new Button({
-            label: 'Switch off',
-            variant: 'danger',
-            confirmation: { label: 'Switch off this User' },
-            onClick: async () => {
+        return pressFrom({
+            id: 'self-switch-off',
+            title: 'Switch off',
+            again: 'this User is switched off',
+            does: async () => {
                 await flip('disable');
                 await reload();
             },
         }).element;
     }
     if (refused.includes(SWITCHED_OFF)) {
-        return new Button({
-            label: 'Reawaken',
-            variant: 'primary',
-            onClick: async () => {
+        return pressFrom({
+            id: 'self-reawaken',
+            title: 'Reawaken',
+            does: async () => {
                 await flip('enable');
                 await reload();
             },
@@ -115,10 +115,10 @@ export function personSwitch(who: Person | null, refused: string, reload: () => 
  */
 export function personUnbecome(who: Person | null): HTMLElement | null {
     if (!who?.becoming_by) return null;
-    return new Button({
-        label: 'Back to ROOT',
-        variant: 'primary',
-        onClick: async () => {
+    return pressFrom({
+        id: 'self-back-to-root',
+        title: 'Back to ROOT',
+        does: async () => {
             const response = await apiFetch('/i/unbecome', { method: 'POST', headers: { Accept: 'application/json' } });
             if (!response.ok) {
                 throw new Error(await refusal(response));

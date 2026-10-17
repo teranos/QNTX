@@ -142,7 +142,7 @@ describe('a folder is bound by clicking', () => {
         click(container, 'Confirm');
         await flush();
         expect(sent).toBeNull();
-        click(container, 'Confirm again to bind');
+        click(container, 'Confirm');
         await flush();
         expect(sent).toEqual({ path: '/api/vault/bind', body: { name: 'abcd', place: 'Course Material', repo: 'abcd-nl/clean', path: 'docs/adr' } });
     });
@@ -190,7 +190,7 @@ describe('a bound folder is unbound', () => {
         click(container, 'Unbind');
         await flush();
         expect(sent).toBeNull();
-        click(container, 'Confirm again to unbind');
+        click(container, 'Unbind');
         await flush();
         expect(sent).toEqual({ path: '/api/vault/unbind', body: { name: 'abcd', place: 'ABCD' } });
     });
@@ -242,7 +242,7 @@ describe('a bound folder sends to a branch only when told to', () => {
         click(container, 'Send to this branch');
         await flush();
         expect(sent).toBeNull();
-        click(container, 'Confirm again to send');
+        click(container, 'Send to this branch');
         await flush();
         expect(sent).toEqual({ path: '/api/vault/send', body: { name: 'abcd', place: 'ABCD', branch: 'obsidian-abcd' } });
     });

@@ -11,10 +11,9 @@
 // event; a stand writes only under staand:*, so nothing here sets a predicate.
 
 import type { Element } from '@teranos/elements';
-import { tray, buttonFrom } from '@teranos/elements';
+import { tray, buttonFrom, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { backendUrl } from './client/url';
-import { createPrimaryButton, createDangerButton, createGhostButton } from './components/button';
 import { tooltip } from './components/tooltip';
 import { kindOf } from './namespaces-view';
 import { standActivity, standElementId } from './stand-activity-element';
@@ -326,7 +325,7 @@ export function renderStandDetail(
 ): void {
     container.replaceChildren();
 
-    const back = createGhostButton('← Stands', onBack);
+    const back = pressFrom({ id: 'market-back', title: '← Stands', does: onBack });
     container.appendChild(back.element);
 
     const title = document.createElement('div');
@@ -391,9 +390,9 @@ export function renderStandDetail(
     foot.style.borderTop = '1px solid ' + LINE;
     foot.style.display = 'flex';
     foot.style.justifyContent = 'flex-end';
-    const del = createDangerButton('Delete', 'Confirm delete', async () => {
+    const del = pressFrom({ id: 'market-delete', title: 'Delete', again: 'the stand is deleted', irrevocable: true, does: async () => {
         await onDelete();
-    });
+    } });
     foot.appendChild(del.element);
     container.appendChild(foot);
 }
@@ -455,14 +454,14 @@ export function buildCreateForm(
     slug.style.padding = '3px 4px';
     form.appendChild(slug);
 
-    const create = createPrimaryButton('Create', async () => {
+    const create = pressFrom({ id: 'market-create', title: 'Create', does: async () => {
         const market = ns.value;
         const g = slug.value.trim();
         if (market === '' || g === '') {
             throw new Error('a stand needs a namespace and a slug');
         }
         await onCreate(market, g);
-    });
+    } });
     create.element.style.marginLeft = '8px';
     form.appendChild(create.element);
 

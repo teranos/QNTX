@@ -16,7 +16,8 @@ import { log, SEG } from './logger';
 import { Subcanvas } from './sym';
 import { openCanvas, openCanvasKey, openOnceKey, standingNamespace } from './standing';
 import { go } from './address';
-import { Button, buttonPlaceholder, hydrateButtons, type HydrateConfig } from './components/button';
+import { pressFrom, type Press } from '@teranos/elements';
+import { pressPlace, placePresses } from './components/press-places';
 import {
     createCanvas, disableCanvas, disownCanvas, enableCanvas, inviteOwner, listCanvases,
     nukeCanvas, type CanvasRow,
@@ -114,35 +115,32 @@ function ownerHtml(c: CanvasRow): string {
     return c.owner_views.map(o => `<span class="canvas-owner">${escapeHtml(o.name)}</span>`).join('');
 }
 
-// The acts a row offers, as the system's buttons. Their ids are hydrated.
-function rowActs(c: CanvasRow, buttons: HydrateConfig): string {
+// The acts a row offers, as presses, put in their places once the row is in.
+function rowActs(c: CanvasRow, presses: Record<string, Press>): string {
     const acts: string[] = [];
     const id = c.id;
-    const place = (act: string, label: string, config: Omit<HydrateConfig[string], 'label'>) => {
-        const buttonId = `${act}-${id}`;
-        // className on the config, not the placeholder: the button redraws
-        // its classes on every state change, from its config.
-        buttons[buttonId] = { label, size: 'small', className: 'canvas-act', ...config };
-        acts.push(buttonPlaceholder(buttonId, label));
+    const place = (press: Press) => {
+        presses[press.id] = press;
+        acts.push(pressPlace(press.id, 'canvas-act'));
     };
     if (c.disabled_by === '') {
-        place('disable', 'disable', { variant: 'danger', confirmation: { label: 'disable?' }, onClick: () => act(() => disableCanvas(id)) });
+        place({ id: `disable-${id}`, title: 'disable', again: 'the canvas is disabled', does: () => act(() => disableCanvas(id)) });
     } else {
-        place('enable', 'enable', { variant: 'default', onClick: () => act(() => enableCanvas(id)) });
+        place({ id: `enable-${id}`, title: 'enable', does: () => act(() => enableCanvas(id)) });
         if (privileged()) {
-            place('disown', 'unown', { variant: 'warning', confirmation: { label: 'unown?' }, onClick: () => act(() => disownCanvas(id)) });
+            place({ id: `disown-${id}`, title: 'unown', again: 'nobody owns it', does: () => act(() => disownCanvas(id)) });
             // "a canvas can be nuked when disabled, like we do with namespaces themselves."
-            place('nuke', 'nuke', { variant: 'danger', confirmation: { label: 'nuke, for good?' }, onClick: () => act(() => nukeCanvas(id)) });
+            place({ id: `nuke-${id}`, title: 'nuke', again: 'gone, for good', irrevocable: true, does: () => act(() => nukeCanvas(id)) });
         }
     }
     if (c.kind === 'user' && (c.mine || privileged())) {
-        place('invite', 'invite…', { variant: 'default', onClick: () => withAsk('the e-mail of the User to invite', email => inviteOwner(id, email)) });
+        place({ id: `invite-${id}`, title: 'invite…', does: () => withAsk('the e-mail of the User to invite', email => inviteOwner(id, email)) });
     }
     return acts.join('');
 }
 
 // A canvas is a card: what it is called, whose it is, its state, its acts.
-function cardHtml(c: CanvasRow, buttons: HydrateConfig): string {
+function cardHtml(c: CanvasRow, presses: Record<string, Press>): string {
     const open = openCanvas() === c.id || (openCanvas() === '' && c.kind === 'namespace');
     const state = c.disabled_by ? `disabled by ${escapeHtml(c.disabled_by)}` : (open ? 'open' : '');
     return `
@@ -154,26 +152,23 @@ function cardHtml(c: CanvasRow, buttons: HydrateConfig): string {
             <div class="canvas-card-kind">${c.kind === 'namespace' ? 'the namespace\'s' : 'a User\'s'}</div>
             <div class="canvas-card-owners">${ownerHtml(c)}</div>
             <div class="canvas-card-state">${state}</div>
-            <div class="canvas-card-actions">${rowActs(c, buttons)}</div>
+            <div class="canvas-card-actions">${rowActs(c, presses)}</div>
         </div>`;
 }
 
-function birthHtml(buttons: HydrateConfig): string {
+function birthHtml(presses: Record<string, Press>): string {
     const may = nextBirth();
     if (!may) return '';
     if (!birth) {
-        buttons.birth = {
-            label: may.label, icon: Subcanvas, markOnly: true, size: 'large', className: 'canvas-birth-symbol',
-            onClick: () => { birth = may.kind; render(); },
-        };
-        return buttonPlaceholder('birth', Subcanvas);
+        presses.birth = { id: 'birth', title: may.label, mark: Subcanvas, does: () => { birth = may.kind; render(); } };
+        return pressPlace('birth', 'canvas-birth-symbol');
     }
     // "press once to check, button becomes green and shimmers, 2nd click
-    // actually creates it" — the system's two-stage button, in success.
+    // actually creates it": the press's two stages; a canvas made can be undone, so armed it stays white.
     const kind = birth;
-    buttons.plus = {
-        label: '+', variant: 'success', className: 'canvas-birth-plus', confirmation: { label: '+', timeout: 8000 },
-        onClick: async () => {
+    presses.plus = {
+        id: 'plus', title: '+', again: 'the canvas is made', armedForMs: 8000,
+        does: async () => {
             const name = body?.querySelector<HTMLInputElement>('.canvas-birth-name')?.value.trim() ?? '';
             if (name === '') throw new Error('a canvas is named');
             const made = await createCanvas(name, kind);
@@ -185,24 +180,24 @@ function birthHtml(buttons: HydrateConfig): string {
         <div class="canvas-birth-form" data-kind="${kind}">
             <span class="canvas-birth-symbol pressed">${Subcanvas}</span>
             <input class="canvas-birth-name" type="text" placeholder="name ${escapeHtml(may.label)}" autocomplete="off" spellcheck="false">
-            ${buttonPlaceholder('plus', '+')}
+            ${pressPlace('plus', 'canvas-birth-plus')}
         </div>`;
 }
 
 function render(): void {
     if (!body) return;
-    const buttons: HydrateConfig = {};
+    const presses: Record<string, Press> = {};
     const said = failure === '' ? '' : `<div class="namespace-page-failure">${escapeHtml(failure)}</div>`;
     const rows = canvases.length === 0
         ? '<div class="canvas-none">no canvas here yet</div>'
-        : canvases.map(c => cardHtml(c, buttons)).join('');
+        : canvases.map(c => cardHtml(c, presses)).join('');
     body.innerHTML = `
         <h2 class="namespace-page-name">${escapeHtml(who && who.standing !== '' ? who.standing : 'you stand in no namespace')}</h2>
         <div class="canvas-list">${rows}</div>
         <input class="canvas-ask" type="text" placeholder="an e-mail, for invite…" autocomplete="off" spellcheck="false">
-        <div class="canvas-birth">${birthHtml(buttons)}</div>
+        <div class="canvas-birth">${birthHtml(presses)}</div>
         ${said}`;
-    hydrateButtons(body, buttons);
+    placePresses(body, presses);
     if (birth) body.querySelector<HTMLInputElement>('.canvas-birth-name')?.focus();
 }
 
@@ -282,7 +277,8 @@ export function initNamespacePage(person: Person | null, rows: CanvasRow[], agai
     top.className = 'namespace-page-top';
     const whoBlock = document.querySelector<HTMLElement>('#header .who');
     if (whoBlock) top.append(whoBlock);
-    const out = new Button({ label: '[<]', ariaLabel: 'the door', variant: 'ghost', size: 'small', className: 'namespace-page-out', onClick: () => { standAtTheDoor(); } });
+    const out = pressFrom({ id: 'namespace-page-out', title: 'the door', mark: '[<]', does: () => { standAtTheDoor(); } });
+    out.element.classList.add('namespace-page-out');
     top.append(out.element);
 
     body = document.createElement('div');

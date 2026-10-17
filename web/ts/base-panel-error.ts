@@ -9,7 +9,7 @@
  */
 
 import { CSS, DATA, setLoading } from './css-classes.ts';
-import { Button } from './components/button.ts';
+import { pressFrom } from '@teranos/elements';
 import { log, SEG } from './logger.ts';
 import { extractHttpStatus } from './http-utils.ts';
 
@@ -102,12 +102,7 @@ export function createRichErrorState(
 
     // Retry button if callback provided
     if (onRetry) {
-        const retryBtn = new Button({
-            label: 'Retry',
-            onClick: onRetry,
-            variant: 'default'
-        });
-        container.appendChild(retryBtn.element);
+        container.appendChild(pressFrom({ id: 'panel-error-retry', title: 'Retry', does: onRetry }).element);
     }
 
     return container;
@@ -136,12 +131,7 @@ export function createErrorState(
     container.appendChild(messageEl);
 
     if (onRetry) {
-        const retryBtn = new Button({
-            label: 'Retry',
-            onClick: onRetry,
-            variant: 'default'
-        });
-        container.appendChild(retryBtn.element);
+        container.appendChild(pressFrom({ id: 'panel-error-retry', title: 'Retry', does: onRetry }).element);
     }
 
     return container;

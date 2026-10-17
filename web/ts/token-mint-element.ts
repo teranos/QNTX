@@ -5,9 +5,8 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createPrimaryButton } from './components/button';
 import { ordered, type Namespace } from './namespaces-view';
 import { person } from './self-person';
 import { openTokenElement } from './token-element';
@@ -262,7 +261,7 @@ export function renderMint(content: HTMLElement): void {
         );
     });
 
-    const mint = createPrimaryButton('Mint token', async () => {
+    const mint = pressFrom({ id: 'token-mint', title: 'Mint token', does: async () => {
         refusal.textContent = '';
         try {
             const named = label.value.trim();
@@ -289,7 +288,7 @@ export function renderMint(content: HTMLElement): void {
             refusal.textContent = e instanceof Error ? e.message : String(e);
             throw e;
         }
-    });
+    } });
 
     narrowing.push(labelled('Namespace', namespace));
     returning.push(labelled('Return address', returnAddress));
