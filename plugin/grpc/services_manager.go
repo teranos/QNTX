@@ -550,6 +550,11 @@ func (m *ServicesManager) SetPluginStores(plugins services.PluginStores) {
 	m.fetchSrv.SetPluginStores(plugins)
 }
 
+// SetPluginNames hands the mail service which plugin each token the node handed out is for.
+func (m *ServicesManager) SetPluginNames(plugins services.PluginNames) {
+	m.mailSrv.SetPluginNames(plugins)
+}
+
 // SetCallers hands the schedule service the callers of the calls plugins are
 // answering, so a schedule created during one remembers who created it and
 // where.

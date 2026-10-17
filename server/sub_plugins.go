@@ -81,6 +81,8 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	// A plugin whose record names a namespace reads and writes there (ADR-046).
 	servicesManager.SetPluginStores(s.storeOfPlugin)
+	// And mails as that plugin, and no other.
+	servicesManager.SetPluginNames(s.pluginOfToken)
 
 	// "a schedule remembers who created it and where", and each run goes there.
 	servicesManager.SetCallers(s.callerOf)
