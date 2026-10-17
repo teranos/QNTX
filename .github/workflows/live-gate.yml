@@ -1,0 +1,143 @@
+{
+  "jobs": {
+    "live": {
+      "name": "Every element, live, can be reached whole",
+      "permissions": {
+        "contents": "read"
+      },
+      "runs-on": "${{ fromJSON(inputs.runs_on) }}",
+      "steps": [
+        {
+          "name": "Checkout QNTX",
+          "uses": "actions/checkout@v4",
+          "with": {
+            "ref": "${{ inputs.branch }}",
+            "repository": "teranos/QNTX"
+          }
+        },
+        {
+          "id": "commit",
+          "name": "The commit this run speaks of",
+          "run": "echo \"sha=$(git rev-parse HEAD)\" >> \"$GITHUB_OUTPUT\""
+        },
+        {
+          "name": "Setup Rust",
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "targets": "wasm32-unknown-unknown"
+          }
+        },
+        {
+          "name": "Cache Rust dependencies",
+          "uses": "swatinem/rust-cache@v2"
+        },
+        {
+          "name": "Setup wasm-pack",
+          "uses": "jetli/wasm-pack-action@v0.4.0",
+          "with": {
+            "version": "v0.13.1"
+          }
+        },
+        {
+          "name": "Build WASM modules",
+          "run": "make ats laye"
+        },
+        {
+          "name": "Setup Bun",
+          "uses": "oven-sh/setup-bun@v2",
+          "with": {
+            "bun-version": "latest"
+          }
+        },
+        {
+          "name": "Install dependencies",
+          "run": "cd web && bun install"
+        },
+        {
+          "name": "Chromium and WebKit, as the pinned @playwright/test wants them",
+          "run": "cd web && bunx playwright install --with-deps chromium webkit"
+        },
+        {
+          "continue-on-error": true,
+          "env": {
+            "CI": "1",
+            "QNTX_GATE_API": "${{ inputs.api }}",
+            "QNTX_GATE_ORIGIN": "${{ inputs.origin }}",
+            "QNTX_GATE_TOKEN": "${{ secrets.gate_token }}"
+          },
+          "id": "gate",
+          "name": "The branch's page, answered live by the node as its CI user, on Pixel 7, iPhone 15 and desktop",
+          "run": "cd web && bunx playwright test -c browser live.browser.ts"
+        },
+        {
+          "id": "app",
+          "if": "always()",
+          "name": "The App that says the verdict on QNTX",
+          "uses": "actions/create-github-app-token@v1",
+          "with": {
+            "app-id": "${{ secrets.app_id }}",
+            "owner": "teranos",
+            "private-key": "${{ secrets.app_private_key }}",
+            "repositories": "QNTX"
+          }
+        },
+        {
+          "env": {
+            "GH_TOKEN": "${{ steps.app.outputs.token }}",
+            "RUN": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "SHA": "${{ steps.commit.outputs.sha }}",
+            "STATE": "${{ steps.gate.outcome == 'success' && 'success' || 'failure' }}"
+          },
+          "if": "always()",
+          "name": "The verdict, on the QNTX commit",
+          "run": "if [ \"$STATE\" = success ]; then SAID='every element, live, can be reached whole'; else SAID='an element live on the node has content that cannot be reached: see the run'; fi\ngh api \"repos/teranos/QNTX/statuses/$SHA\" -f state=\"$STATE\" -f context=live -f description=\"$SAID\" -f target_url=\"$RUN\"\n"
+        },
+        {
+          "if": "steps.gate.outcome != 'success'",
+          "name": "Red",
+          "run": "echo 'the live gate named what cannot be reached, above'; exit 1"
+        }
+      ]
+    }
+  },
+  "name": "live gate",
+  "on": {
+    "workflow_call": {
+      "inputs": {
+        "api": {
+          "description": "The node the page asks, as https://api.<node>",
+          "required": true,
+          "type": "string"
+        },
+        "branch": {
+          "default": "main",
+          "description": "QNTX branch whose page is held to the node",
+          "required": false,
+          "type": "string"
+        },
+        "origin": {
+          "description": "The node's own web origin, which its socket answers",
+          "required": true,
+          "type": "string"
+        },
+        "runs_on": {
+          "default": "\"ubuntu-latest\"",
+          "description": "Runner labels as JSON",
+          "required": false,
+          "type": "string"
+        }
+      },
+      "secrets": {
+        "app_id": {
+          "required": true
+        },
+        "app_private_key": {
+          "required": true
+        },
+        "gate_token": {
+          "required": true
+        }
+      }
+    }
+  }
+}
