@@ -187,11 +187,15 @@ export function drawClaude(body: HTMLElement, node: NodeAgent = theNode, every: 
             who.title = is.allow.length > 0 ? `Allowed without being asked: ${is.allow.join(', ')}` : 'Nothing is allowed without being asked';
             // A harness with no permission modes, Pi, has nothing to choose here.
             mode.hidden = is.permission_modes.length === 0;
-            // am.toml that gives no mode leaves the choice here, and none is made for the speaker.
-            if (!is.permission_mode && !mode.hidden) mode.appendChild(choice('', 'permission mode'));
             // "claude element 'dontask' doesnt make sense there"
-            for (const name of is.permission_modes) if (name !== 'dontAsk') mode.appendChild(choice(name, name));
-            mode.value = is.permission_mode;
+            const offered = is.permission_modes.filter(name => name !== 'dontAsk');
+            // am.toml that gives no mode, or one not offered here (dontAsk), leaves the choice here,
+            // and none is made for the speaker: what is said runs in the node's own. Without this
+            // the choice showed nothing at all.
+            const ownMode = offered.includes(is.permission_mode) ? is.permission_mode : '';
+            if (!ownMode && !mode.hidden) mode.appendChild(choice('', 'permission mode'));
+            for (const name of offered) mode.appendChild(choice(name, name));
+            mode.value = ownMode;
             reading = is.session;
             if (reading) void read();
             else session.textContent = 'Nothing has been said to it yet.';
