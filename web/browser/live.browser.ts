@@ -130,6 +130,11 @@ async function unreachable(page: Page, id: string): Promise<string[]> {
         const reaching = Array.from(element.querySelectorAll<HTMLElement>('*')).filter((node) => {
             // An icon's paths are drawn inside its svg, whatever their own geometry: the svg is what is measured.
             if (node.tagName.toLowerCase() !== 'svg' && node.closest('svg') !== null) return false;
+            // What is clipped to nothing is kept for a screen reader and hidden from sight on purpose
+            // (Elements' forms/panel.ts): it is not content a person is meant to reach by looking.
+            for (let at: HTMLElement | null = node; at && at !== element; at = at.parentElement) {
+                if (getComputedStyle(at).clip === 'rect(0px, 0px, 0px, 0px)') return false;
+            }
             const r = node.getBoundingClientRect();
             if (r.width === 0 && r.height === 0) return false;
             return r.left < edge.left - 1 || r.right > edge.right + 1 || node.scrollWidth > node.clientWidth + 1;
