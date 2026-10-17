@@ -6,45 +6,34 @@ Status: Proposed
 "the feature i am imagining is called comet"
 
 "if QNTX is heaven"
-
 "and ground is here, as in earth"
+"Comets are what slowly creates a body in space, 
+like earth, right?"
 
-"Comets is what slowly creates a body in earth, like space, right?"
+- The node builds ground, and the build lands on the machine ground runs on. 
+- [[ADR-027-Permissions]] 27-2 waits on this. 
+	- 2026-10-16: but actually, i think some work was done there, perhaps check
 
-- The node builds ground, and the build lands on the machine ground runs on.
-  ADR-027 27-2 waits on this.
+- Normally, ground is compiled where it executes:
+	- `make install`
+	- GitHub Releases
+- Its SessionStart asks GitHub for the latest tag once a day and tells the session when a newer one exists.
 
-## The flip
+## Per each ground project's repo
 
-"instead of remembering to run make install for ground, i want to flip the model"
+"Tailored to that repository ground `project` .pbt specifies,
 
-"optionally"
+It has CTFE-able material, 
+for example: 
+- filename paths for the `control`:
+	- mentioned a file, didn't read it, please read it
 
-- ground is built where it runs: `make install`, or a binary from GitHub
-  Releases (teranos/ground README). Its SessionStart asks GitHub for the latest
-  tag once a day and tells the session when a newer one exists (ground
-  source/checks.d).
-- The latest release is v0.19.1, 2026-06-30. The operator's machine runs
-  v0.19.1-439-g4ec8488.
+We can still have super fast hooks.
+Even faster when the builds are done by QNTX as Comet
+"
 
-## Per project
-
-"i want a coment per project essentially"
-
-"or like, a generalised project, like universal ground"
-
-"that is normal ground"
-
-"btu also, tailed to the repo ground, wich has more CTFE'able material potentially"
-
-"so we can still have super fast hooks, and actually even faster when the builds are done by QNTX"
-
-- ground compiles one file, .ctfe/sand. wind folds it from three places on the
-  operator's disk: ground's own controls/, controls/local/, and each declared
-  project's controls/ with that project's `git ls-files` (ground tools/wind.d).
-- controls/local on the operator's machine holds 31 pbt files today: the qntx
-  block with the node's URL and the token's path, seven projects by absolute
-  path, permissions, org and sentry.
+- ground compiles one file, .ctfe/sand. wind folds it from three places on the operator's disk: ground's own controls/, controls/local/, and each declared project's controls/ with that project's `git ls-files` (ground tools/wind.d).
+- controls/local on the operator's machine holds 31 pbt files today: the qntx block with the node's URL and the token's path, seven projects by absolute path, permissions, org and sentry.
 
 ## The builder
 
