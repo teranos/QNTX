@@ -13,6 +13,12 @@ in
 {
   name = "TypeScript";
 
+  # A newer push to the same ref makes this run's answer stale.
+  concurrency = {
+    group = "\${{ github.workflow }}-\${{ github.ref }}";
+    cancel-in-progress = true;
+  };
+
   on = {
     pull_request.paths = tsPaths ++ [
       "web/eslint.config.js"

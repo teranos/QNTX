@@ -23,6 +23,12 @@ in
 {
   name = "Build CI Image";
 
+  # A newer push to the same ref makes this run's image stale.
+  concurrency = {
+    group = "\${{ github.workflow }}-\${{ github.ref }}";
+    cancel-in-progress = true;
+  };
+
   on = {
     push.paths = [
       "ci/**"
