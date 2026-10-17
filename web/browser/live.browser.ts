@@ -38,6 +38,8 @@ const ASKED_FOR_MS = 30_000;
 interface Wire {
     inflight: number;
     answered: number;
+    /** What the node refused, as method, path and status, since the element now opening began. */
+    refused: string[];
 }
 
 /** Asks the node, as the CI user. What would write is refused here and named. */
@@ -63,6 +65,7 @@ async function ask(route: Route, wire: Wire, writes: string[], stalled: string[]
             await route.fulfill({ status: 504, body: `${method} ${url.pathname}: the node did not answer in ${ASKED_FOR_MS}ms` });
             return;
         }
+        if (answer.status() >= 400) wire.refused.push(`${method} ${url.pathname} ${answer.status()}`);
         await route.fulfill({ response: answer });
     } finally {
         wire.inflight -= 1;
@@ -161,13 +164,10 @@ async function unreachable(page: Page, id: string): Promise<string[]> {
             const line = `${node.tagName.toLowerCase()}${classes} ${Math.round(r.left - edge.left)}..${Math.round(r.right - edge.left)} in ${Math.round(edge.width)}, scrolls ${node.scrollWidth} in ${node.clientWidth} [${laid}]`;
             said.set(line, (said.get(line) ?? 0) + 1);
         }
-        // A refusal drawn where the content would be: what it holds was never measured, and the node said no.
-        const refused = element.querySelectorAll('.element-error').length;
         return [
             ...off,
             ...Array.from(said, ([line, times]) => times > 1 ? `${line} (×${times})` : line),
             ...(dead ? [`dropped dead: ${dead.dataset.tooWide}`] : []),
-            ...(refused > 0 ? [`drew a refusal${refused > 1 ? ` (×${refused})` : ''}`] : []),
         ];
     });
 }
@@ -178,7 +178,7 @@ test('every element, live, can be reached whole', async ({ page }) => {
     expect(ORIGIN, 'QNTX_GATE_ORIGIN names no web origin: the node\'s socket answers none').not.toBe('');
     test.setTimeout(15 * 60_000);
 
-    const wire: Wire = { inflight: 0, answered: 0 };
+    const wire: Wire = { inflight: 0, answered: 0, refused: [] };
     const writes: string[] = [];
     const stalled: string[] = [];
     const stats = await databaseStatsAsked();
@@ -226,6 +226,7 @@ test('every element, live, can be reached whole', async ({ page }) => {
     for (const { id, open } of opens) {
         console.log(`opening ${id}`);
         try {
+            wire.refused = [];
             await open();
             const element = page.locator(`[data-element-id="${id}"]`);
             // As long as the wire is waited on: a simulated iPhone opens an element slower than the default allows.
@@ -233,7 +234,8 @@ test('every element, live, can be reached whole', async ({ page }) => {
             await expect.poll(() => element.evaluate((el) => el.classList.contains('morphing')), { message: `${id} is still opening`, timeout: QUIET_FOR_MS }).toBe(false);
             // An element that asks the node all the time is never quiet: it is measured once the wait is over.
             await quiet(page, wire);
-            const past = await unreachable(page, id);
+            // What the node refused while it opened: what that call would have drawn was never measured.
+            const past = [...await unreachable(page, id), ...new Set(wire.refused.map((call) => `the node refused ${call}`))];
             if (past.length > 0) bad[id] = past;
         } catch (err: unknown) {
             // One that never stands is named with the rest, and the next one still opens.
