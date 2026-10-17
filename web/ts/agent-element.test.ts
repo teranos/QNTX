@@ -83,7 +83,9 @@ describe('Agent - Tim', () => {
         await settled();
         expect(body.querySelector('.agent-begin')).toBeNull();
         expect(body.querySelector('.claude-say')).not.toBeNull();
-        expect(body.querySelector('.claude-who')?.textContent).toContain('did:key:z6MkAgentOfPond');
+        // "No need to show did key to user": who answers is said by its model.
+        expect(body.querySelector('.claude-who')?.textContent).toContain('claude-opus-5-5');
+        expect(body.querySelector('.claude-who')?.textContent).not.toContain('did:key');
     });
 });
 

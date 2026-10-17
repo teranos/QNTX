@@ -68,7 +68,8 @@ describe.skipIf(!USE_JSDOM)('Pi element', () => {
         await settled();
 
         const who = body.querySelector('.claude-who')!.textContent ?? '';
-        expect(who).toContain(piAm.did);
+        // "No need to show did key to user"
+        expect(who).not.toContain(piAm.did);
         expect(who).toContain('anthropic/claude-sonnet-4.6');
         expect(who).toContain('low');
         expect(body.querySelector<HTMLSelectElement>('.claude-mode')!.hidden).toBe(true);

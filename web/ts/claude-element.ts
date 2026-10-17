@@ -183,7 +183,8 @@ export function drawClaude(body: HTMLElement, node: NodeAgent = theNode, every: 
 
     node.am()
         .then(is => {
-            who.textContent = [is.did, is.model, is.effort, is.not_ready].filter(Boolean).join('  ');
+            // "No need to show did key to user"
+            who.textContent = [is.model, is.effort, is.not_ready].filter(Boolean).join('  ');
             who.title = is.allow.length > 0 ? `Allowed without being asked: ${is.allow.join(', ')}` : 'Nothing is allowed without being asked';
             // A harness with no permission modes, Pi, has nothing to choose here.
             mode.hidden = is.permission_modes.length === 0;
