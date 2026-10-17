@@ -192,7 +192,7 @@ func endedUnanswered(stream string) error {
 	if len(kept) > stderrKept {
 		kept = kept[len(kept)-stderrKept:]
 	}
-	return errors.Wrapf(ended(stream), "Claude Code ended with no result, saying: %s", kept)
+	return errors.WithSecondaryError(errors.Newf("Claude Code ended with no result, saying: %s", kept), ended(stream))
 }
 
 // ended removes a stream read to its end, and what was kept beside it.
