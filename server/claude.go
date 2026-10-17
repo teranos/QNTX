@@ -57,6 +57,8 @@ type rootAgent struct {
 type agentSpec struct {
 	Model, Effort, Mode string
 	Allow               []string
+	// Apart is whether its turns run apart from the node's process.
+	Apart bool
 	// TokenRef is a reference to a Claude plan token, or empty for an agent on
 	// its own sign-in (claude login).
 	TokenRef string
@@ -64,7 +66,7 @@ type agentSpec struct {
 
 // specOf is how am.toml says the Node Agent runs in Claude Code.
 func specOf(root appcfg.NodeAgentConfig) agentSpec {
-	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef}
+	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef, Apart: root.Apart}
 }
 
 // in is the agent's session in h.
@@ -288,13 +290,18 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			said := claudecode.Said{
 				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
 				Says: t.says, Model: named.Model, Effort: named.Effort, Token: plan,
-				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
+				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env, Apart: named.Apart,
 			}
 			if s.ownURL != "" {
 				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
 			}
 			answer, err := said.Run(s.ctx, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
 			if err != nil {
+				// The node stopping leaves the turn to the node that comes
+				// next, which reads it on from its stream to how it ends.
+				if nodeErr := s.ctx.Err(); nodeErr != nil {
+					return nil, errors.WithSecondaryError(errors.Wrap(nodeErr, "the node stopped while the turn ran, and the next node reads it on"), err)
+				}
 				t.write(t.writes.rowsOf(claudecode.Message{Type: "result", Subtype: "no_result", IsError: true, Result: err.Error()}, t.now()))
 				return nil, err
 			}
