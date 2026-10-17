@@ -89,8 +89,8 @@
             "STATE": "${{ steps.gate.outcome == 'success' && 'success' || 'failure' }}"
           },
           "if": "always()",
-          "name": "The verdict, on the QNTX commit",
-          "run": "if [ \"$STATE\" = success ]; then SAID='every element, live, can be reached whole'; else SAID='an element live on the node has content that cannot be reached: see the run'; fi\ngh api \"repos/teranos/QNTX/statuses/$SHA\" -f state=\"$STATE\" -f context=live -f description=\"$SAID\" -f target_url=\"$RUN\"\n"
+          "name": "The verdict, sent to QNTX, which says it on the commit (live-verdict.yml)",
+          "run": "if [ \"$STATE\" = success ]; then SAID='every element, live, can be reached whole'; else SAID='an element live on the node has content that cannot be reached: see the run'; fi\njq -n --arg sha \"$SHA\" --arg state \"$STATE\" --arg said \"$SAID\" --arg run \"$RUN\" '{event_type: \"live-verdict\", client_payload: {sha: $sha, state: $state, said: $said, run: $run}}' | gh api repos/teranos/QNTX/dispatches --input -\n"
         },
         {
           "if": "steps.gate.outcome != 'success'",
