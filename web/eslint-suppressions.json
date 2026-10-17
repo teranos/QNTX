@@ -774,14 +774,9 @@
       "count": 1
     }
   },
-  "ts/roles-compose.ts": {
-    "no-restricted-syntax": {
-      "count": 20
-    }
-  },
   "ts/roles-element.ts": {
     "no-restricted-syntax": {
-      "count": 12
+      "count": 3
     }
   },
   "ts/search-view.ts": {
@@ -901,7 +896,7 @@
   },
   "ts/token-element.ts": {
     "no-restricted-syntax": {
-      "count": 35
+      "count": 28
     }
   },
   "ts/token-mint-element.ts": {
