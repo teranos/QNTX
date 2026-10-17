@@ -4,8 +4,8 @@
  * serves it, with the specimens bundle (ts/specimens.ts) in main's place.
  */
 
-// Nothing here answers the API. The gate does, from fixtures/, so every call
-// an element makes is one the gate answered or one it names as missing.
+// Nothing here answers the API. The live gate asks the node for every call an
+// element makes (live.browser.ts); a test that holds its own answers gives them.
 
 import { extname, join } from 'path';
 
@@ -67,7 +67,7 @@ Bun.serve({
             return new Response(file, { headers: { 'Content-Type': TYPES[extname(path)] ?? 'application/octet-stream' } });
         }
 
-        return new Response(`${req.method} ${path}: no node stands behind the specimens page, the gate answers the API from browser/fixtures`, { status: 404 });
+        return new Response(`${req.method} ${path}: no node stands behind the specimens page; the test that opened it answers the API`, { status: 404 });
     },
 });
 

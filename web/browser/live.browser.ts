@@ -161,10 +161,13 @@ async function unreachable(page: Page, id: string): Promise<string[]> {
             const line = `${node.tagName.toLowerCase()}${classes} ${Math.round(r.left - edge.left)}..${Math.round(r.right - edge.left)} in ${Math.round(edge.width)}, scrolls ${node.scrollWidth} in ${node.clientWidth} [${laid}]`;
             said.set(line, (said.get(line) ?? 0) + 1);
         }
+        // A refusal drawn where the content would be: what it holds was never measured, and the node said no.
+        const refused = element.querySelectorAll('.element-error').length;
         return [
             ...off,
             ...Array.from(said, ([line, times]) => times > 1 ? `${line} (×${times})` : line),
             ...(dead ? [`dropped dead: ${dead.dataset.tooWide}`] : []),
+            ...(refused > 0 ? [`drew a refusal${refused > 1 ? ` (×${refused})` : ''}`] : []),
         ];
     });
 }
@@ -209,10 +212,21 @@ test('every element, live, can be reached whole', async ({ page }) => {
     const ids = await page.evaluate(() => window.specimens!.ids());
 
     const bad: Record<string, string[]> = {};
-    for (const id of ids) {
+    // Every element the tray offers, then the User window on the first User the node lists, as Users opens it.
+    const opens: Array<{ id: string; open: () => Promise<void> }> = ids.map((id) => ({
+        id, open: async () => { await page.evaluate((id) => window.specimens!.open(id), id); },
+    }));
+    const first = await page.evaluate(async () => {
+        const users = await (await fetch('/auth/users')).json() as Array<{ id: string; display_name: string; level: string; created_at: number }>;
+        return users[0] ?? null;
+    });
+    if (first !== null) {
+        opens.push({ id: `user-element-${first.id}`, open: async () => { await page.evaluate((u) => window.specimens!.openUser(u), first); } });
+    }
+    for (const { id, open } of opens) {
         console.log(`opening ${id}`);
         try {
-            await page.evaluate((id) => window.specimens!.open(id), id);
+            await open();
             const element = page.locator(`[data-element-id="${id}"]`);
             // As long as the wire is waited on: a simulated iPhone opens an element slower than the default allows.
             await expect.poll(() => element.evaluate((el) => (el as HTMLElement).dataset.form), { message: `${id} is still a dot`, timeout: QUIET_FOR_MS }).not.toBe('dot');
@@ -230,5 +244,6 @@ test('every element, live, can be reached whole', async ({ page }) => {
     await page.goto('about:blank');
     expect.soft(stalled, 'the node did not answer these').toEqual([]);
     expect.soft(writes, 'an element opening tried to write to the node').toEqual([]);
-    expect(bad, `${Object.keys(bad).length} of ${ids.length} elements have content that cannot be reached`).toEqual({});
+    expect(first, 'the node lists no User: the User window has nobody to open on').not.toBeNull();
+    expect(bad, `${Object.keys(bad).length} of ${opens.length} elements have content that cannot be reached`).toEqual({});
 });

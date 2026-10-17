@@ -65,7 +65,7 @@
           "env": {
             "CI": "1"
           },
-          "name": "Every element on a phone and on a desktop: nothing in it wider than it",
+          "name": "The browser tests that hold their own answers; the live gate runs where the node is deployed",
           "run": "cd web && bun run test:browser --grep-invert live"
         },
         {
