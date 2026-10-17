@@ -159,49 +159,6 @@ table.element-table th {
     color: var(--age-old);
 }
 
-/* The composer: one line's slots on one row, and the sentence above it. */
-.roles-compose {
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-}
-
-.roles-compose-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-}
-
-/* Each slot is its own width, never the row's: the window stylesheet gives
-   .input flex: 1, and a who that grew to the row broke the sentence. */
-.roles-compose-row .input,
-.roles-compose-row select.input,
-.roles-compose-row span > .input {
-    flex: 0 0 auto;
-    width: 11em;
-    min-width: 0;
-    font-size: var(--font-size-sm);
-    padding: 3px 6px;
-}
-
-.roles-compose-row > span {
-    display: inline-flex;
-    flex: 0 0 auto;
-}
-
-.roles-compose-row select.input {
-    width: auto;
-}
-
-.roles-compose-word {
-    color: var(--text-on-dark-tertiary);
-    white-space: nowrap;
-}
-
-.roles-compose-sentence {
-    padding: 4px 0;
-}
-
 /* GitHub (ADR-043): the runner's page is outside QNTX, and underlined as such. */
 .github-element-content a {
     color: inherit;

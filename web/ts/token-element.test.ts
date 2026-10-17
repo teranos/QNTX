@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { issuedBy, linesFor, namespacesField, renderIssued, rolesText, saidLine, type TokenInfo } from './token-element';
+import { issuedBy, namespacesField, renderIssued, rolesText, saidLine, type TokenInfo } from './token-element';
 
 function token(): TokenInfo {
     return {
@@ -11,24 +11,6 @@ function token(): TokenInfo {
         created_at: '2026-09-14T00:43:56Z',
     };
 }
-
-// "yes the label is the token's name": the grant names the label, in every
-// namespace the token names, and nothing on it is the DID.
-test('the grant names the token by its label in every namespace it names', () => {
-    const t = { ...token(), namespaces: ['clean', 'pond'] };
-    expect(linesFor(t, 'DATAPUNT')).toEqual([
-        { subjects: ['pond-sensor'], predicates: ['role:granted', 'DATAPUNT'], contexts: ['clean'] },
-        { subjects: ['pond-sensor'], predicates: ['role:granted', 'DATAPUNT'], contexts: ['pond'] },
-    ]);
-    expect(JSON.stringify(linesFor(t, 'DATAPUNT'))).not.toContain('did:key');
-});
-
-// The grant's context is the namespace exactly as the token's record spells
-// it, since that is the string the node reads the token's roles by.
-test('the grant names the namespace as the token spells it', () => {
-    const t = { ...token(), namespaces: ['Clean'] };
-    expect(linesFor(t, 'DATAPUNT')[0].contexts).toEqual(['Clean']);
-});
 
 // What a token wrote is read out loud, one line each, and a DID in it is its
 // last eight so the line stays a line.
