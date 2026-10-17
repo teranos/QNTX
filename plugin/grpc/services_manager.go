@@ -543,11 +543,12 @@ func (m *ServicesManager) SetCallStores(calls services.CallStores) {
 	m.atsStore.SetCallStores(calls)
 }
 
-// SetPluginStores hands the ATS store and fetch services the stores of the
+// SetPluginStores hands the ATS store, fetch and mail services the stores of the
 // namespaces plugins stand in, by the tokens the node handed them (ADR-046).
 func (m *ServicesManager) SetPluginStores(plugins services.PluginStores) {
 	m.atsStore.SetPluginStores(plugins)
 	m.fetchSrv.SetPluginStores(plugins)
+	m.mailSrv.SetPluginStores(plugins)
 }
 
 // SetCallers hands the schedule service the callers of the calls plugins are

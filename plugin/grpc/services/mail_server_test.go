@@ -331,6 +331,36 @@ func TestAMailTheTransportRefusedIsAttestedAsFailed(t *testing.T) {
 	assert.Empty(t, attested(t, store, PredicateMailSent))
 }
 
+// A plugin standing in a namespace reaches the node's services with the token
+// minted for it there (ADR-046), and the mail service is one of them: on q
+// cleanAPI's template was refused on every start, and Mail could not read it.
+func TestAPluginsOwnTokenKeepsItsTemplateAndMailsFromIt(t *testing.T) {
+	box := &sentBox{}
+	s, _ := wiredMail(t, box, tim)
+	s.SetPluginStores(standingIn("cleanAPI-token", &namedStore{name: "clean"}))
+
+	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
+		AuthToken: "cleanAPI-token", Source: "garden", Name: "harvest-ready",
+		Template: &protocol.MailTemplate{Subject: "Ready", Bodies: []*protocol.MailTemplateBody{TemplateText("Pick.")}},
+	})
+	require.NoError(t, err)
+	require.True(t, set.Success, set.Error)
+
+	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
+		AuthToken: "cleanAPI-token", Source: "garden", UserId: "UStim", Template: "harvest-ready",
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Success, resp.Error)
+	require.Len(t, box.sent, 1)
+
+	stranger, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
+		AuthToken: "stranger", Source: "garden", Name: "harvest-ready",
+		Template: &protocol.MailTemplate{Subject: "Ready", Bodies: []*protocol.MailTemplateBody{TemplateText("Pick.")}},
+	})
+	require.NoError(t, err)
+	assert.False(t, stranger.Success)
+}
+
 func TestAWrongTokenSendsNothing(t *testing.T) {
 	box := &sentBox{}
 	s, _ := wiredMail(t, box, tim)
