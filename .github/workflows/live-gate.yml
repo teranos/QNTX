@@ -67,7 +67,7 @@
           },
           "id": "gate",
           "name": "The branch's page, answered live by the node as its CI user, on Pixel 7, iPhone 15 and desktop",
-          "run": "cd web && bunx playwright test -c browser live.browser.ts"
+          "run": "cd web && bunx playwright test -c browser live.browser.ts --workers 1"
         },
         {
           "id": "app",

@@ -70,6 +70,24 @@ async function ask(route: Route, wire: Wire, writes: string[], stalled: string[]
     }
 }
 
+/** The node holds back a socket asked for too often (429): asked again after this long, this many times. */
+const SOCKET_WAIT_MS = 10_000;
+const SOCKET_TRIES = 3;
+
+async function databaseStatsAsked(): Promise<string> {
+    let last: unknown;
+    for (let tried = 1; tried <= SOCKET_TRIES; tried++) {
+        try {
+            return await databaseStats();
+        } catch (err: unknown) {
+            last = err;
+            if (!(err instanceof Error) || !err.message.includes('429')) throw err;
+            await new Promise((done) => setTimeout(done, SOCKET_WAIT_MS * tried));
+        }
+    }
+    throw new Error(`the socket refused ${SOCKET_TRIES} times: ${last instanceof Error ? last.message : String(last)}`);
+}
+
 /** What the node's socket says of its database when asked, as it says it to the page (server/client.go). */
 function databaseStats(): Promise<string> {
     return new Promise((done, fail) => {
@@ -139,12 +157,17 @@ test('every element, live, can be reached whole', async ({ page }) => {
     const wire: Wire = { inflight: 0, answered: 0 };
     const writes: string[] = [];
     const stalled: string[] = [];
-    const stats = await databaseStats();
+    const stats = await databaseStatsAsked();
     // The page reads the socket's word at a path (ts/specimens.ts); it is given what the socket said.
     await page.route((url) => url.pathname === '/ws/database_stats', (route) => route.fulfill({ contentType: 'application/json', body: stats }));
     await page.route((url) => !isStatic(url.pathname) && url.pathname !== '/ws/database_stats', (route) => ask(route, wire, writes, stalled));
+    // Why a page did not stand, by what refused it and what threw: paths and statuses, never what was answered.
     const said: string[] = [];
-    page.on('console', (message) => { if (message.type() === 'error') said.push(message.text().split('\n')[0]!.slice(0, 200)); });
+    page.on('console', (message) => { if (message.type() === 'error') said.push(`console: ${message.text().split('\n')[0]!.slice(0, 200)}`); });
+    page.on('pageerror', (err) => { said.push(`threw: ${err.message.split('\n')[0]!.slice(0, 200)}`); });
+    page.on('response', (response) => {
+        if (response.status() >= 400) said.push(`${response.request().method()} ${new URL(response.url()).pathname} ${response.status()}`);
+    });
     await page.goto('/');
     await expect.poll(() => page.evaluate(() => window.specimens !== undefined), { message: `the page did not stand: ${said.join(' | ')}`, timeout: 60_000 }).toBe(true);
     await quiet(page, wire);
