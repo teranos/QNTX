@@ -142,6 +142,9 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	if err := s.nameNodeAgent(home); err != nil {
 		return err
 	}
+	// The Node Agent's turns run apart from the node from its boot on: "on a
+	// redeploy NODE agent would still be alive" (#1256).
+	s.nodeAgentApart = true
 	// The session is held from here, before anything can be said to it, until
 	// the turns the node's last process left are read on.
 	agent := s.nodeAgent

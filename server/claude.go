@@ -57,8 +57,6 @@ type rootAgent struct {
 type agentSpec struct {
 	Model, Effort, Mode string
 	Allow               []string
-	// Apart is whether its turns run apart from the node's process.
-	Apart bool
 	// TokenRef is a reference to a Claude plan token, or empty for an agent on
 	// its own sign-in (claude login).
 	TokenRef string
@@ -66,7 +64,7 @@ type agentSpec struct {
 
 // specOf is how am.toml says the Node Agent runs in Claude Code.
 func specOf(root appcfg.NodeAgentConfig) agentSpec {
-	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef, Apart: root.Apart}
+	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef}
 }
 
 // in is the agent's session in h.
@@ -290,7 +288,10 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			said := claudecode.Said{
 				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
 				Says: t.says, Model: named.Model, Effort: named.Effort, Token: plan,
-				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env, Apart: named.Apart,
+				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
+				// "on a redeploy NODE agent would still be alive, which is the
+				// intended state, rather than being killed mid-turn" (#1256).
+				Apart: s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,
 			}
 			if s.ownURL != "" {
 				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
