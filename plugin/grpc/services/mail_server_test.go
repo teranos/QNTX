@@ -337,28 +337,38 @@ func TestAMailTheTransportRefusedIsAttestedAsFailed(t *testing.T) {
 func TestAPluginsOwnTokenKeepsItsTemplateAndMailsFromIt(t *testing.T) {
 	box := &sentBox{}
 	s, _ := wiredMail(t, box, tim)
-	s.SetPluginStores(standingIn("cleanAPI-token", &namedStore{name: "clean"}))
+	s.SetPluginNames(func(token string) (string, bool) {
+		if token == "garden-token" {
+			return "garden", true
+		}
+		return "", false
+	})
 
 	set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
-		AuthToken: "cleanAPI-token", Source: "garden", Name: "harvest-ready",
+		AuthToken: "garden-token", Source: "garden", Name: "harvest-ready",
 		Template: &protocol.MailTemplate{Subject: "Ready", Bodies: []*protocol.MailTemplateBody{TemplateText("Pick.")}},
 	})
 	require.NoError(t, err)
 	require.True(t, set.Success, set.Error)
 
 	resp, err := s.Send(context.Background(), &protocol.SendMailRequest{
-		AuthToken: "cleanAPI-token", Source: "garden", UserId: "UStim", Template: "harvest-ready",
+		AuthToken: "garden-token", Source: "garden", UserId: "UStim", Template: "harvest-ready",
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Success, resp.Error)
 	require.Len(t, box.sent, 1)
 
-	stranger, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
-		AuthToken: "stranger", Source: "garden", Name: "harvest-ready",
-		Template: &protocol.MailTemplate{Subject: "Ready", Bodies: []*protocol.MailTemplateBody{TemplateText("Pick.")}},
-	})
-	require.NoError(t, err)
-	assert.False(t, stranger.Success)
+	for _, refused := range []struct{ token, source string }{
+		{"stranger", "garden"},
+		{"garden-token", "orchard"},
+	} {
+		set, err := s.SetTemplate(context.Background(), &protocol.SetMailTemplateRequest{
+			AuthToken: refused.token, Source: refused.source, Name: "harvest-ready",
+			Template: &protocol.MailTemplate{Subject: "Ready", Bodies: []*protocol.MailTemplateBody{TemplateText("Pick.")}},
+		})
+		require.NoError(t, err)
+		assert.False(t, set.Success, "%s set a template as %s", refused.token, refused.source)
+	}
 }
 
 func TestAWrongTokenSendsNothing(t *testing.T) {
