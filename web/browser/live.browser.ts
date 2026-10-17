@@ -74,9 +74,10 @@ async function ask(route: Route, wire: Wire, writes: string[], stalled: string[]
 const BOOT_TRIES = 3;
 const BOOT_WAIT_MS = 30_000;
 
-/** The node holds back a socket asked for too often (429): asked again after this long, this many times. */
-const SOCKET_WAIT_MS = 10_000;
-const SOCKET_TRIES = 3;
+/** A socket held back (429) or answered by a restarting node's gateway (502, 503, 504): asked again after this long, this many times. */
+const SOCKET_WAIT_MS = 15_000;
+const SOCKET_TRIES = 4;
+const SOCKET_AGAIN = ['429', '502', '503', '504'];
 
 async function databaseStatsAsked(): Promise<string> {
     let last: unknown;
@@ -85,7 +86,7 @@ async function databaseStatsAsked(): Promise<string> {
             return await databaseStats();
         } catch (err: unknown) {
             last = err;
-            if (!(err instanceof Error) || !err.message.includes('429')) throw err;
+            if (!(err instanceof Error) || !SOCKET_AGAIN.some((status) => err.message.includes(status))) throw err;
             await new Promise((done) => setTimeout(done, SOCKET_WAIT_MS * tried));
         }
     }
