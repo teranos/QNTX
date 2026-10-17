@@ -266,11 +266,17 @@ const UNBROKEN = 'AS-CLEANAPI-MAILTEMP-CLEANAPI-XEV3IP7S'.repeat(4);
 
 /** A word the page reads as a word, not a key: an id, a level, a time or a path stays as the fixture has it. */
 function lengthens(word: string): boolean {
-    return word.includes(' ') && !word.startsWith('/') && !word.startsWith('http') && Number.isNaN(Date.parse(word));
+    return (word.includes(' ') || word.includes('@') || word.includes('.')) && !word.startsWith('/') && !word.startsWith('http') && Number.isNaN(Date.parse(word));
 }
+
+// A node that has run a while counts in thousands and millions, not the fixtures' tens: Database
+// dropped dead on q on its counts, which the fixtures' 140 attestations never drew.
+const MANY = 1_000_003;
 
 function lengthened(value: unknown): unknown {
     if (typeof value === 'string') return lengthens(value) ? `${value} ${UNBROKEN}` : value;
+    // A time in seconds or milliseconds stays a time.
+    if (typeof value === 'number') return Number.isInteger(value) && value > 0 && value < 1_000_000_000 ? value * MANY : value;
     if (Array.isArray(value)) return value.map(lengthened);
     if (value !== null && typeof value === 'object') {
         return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, lengthened(inner)]));
