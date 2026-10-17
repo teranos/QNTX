@@ -40,11 +40,6 @@ type NodeAgentConfig struct {
 	// Code's own names for them.
 	Mode  string   `mapstructure:"permission_mode"`
 	Allow []string `mapstructure:"allow"`
-	// Apart is whether each turn runs in a systemd scope of its own, so the
-	// node stopping is not the turn stopping (ADR-048: "An agent's work
-	// outlives the request that brought it"). It takes a node run by systemd,
-	// as root.
-	Apart bool `mapstructure:"apart"`
 	// Pi is the other harness it runs in, from the Pi element (ADR-048).
 	Pi PiConfig `mapstructure:"pi"`
 }

@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/teranos/QNTX/internal/agentenv"
@@ -44,9 +46,9 @@ type Said struct {
 	// Env is what the session's environment holds beyond what this sets, each
 	// NAME=value. What the session runs inherits it.
 	Env []string
-	// Apart is whether the process runs in a systemd scope of its own, so the
-	// node stopping is not the turn stopping: "An agent's work outlives the
-	// request that brought it" (ADR-048).
+	// Apart is whether the process runs apart from the node's: in a systemd
+	// scope of its own where systemd keeps the node, and in a process group of
+	// its own elsewhere, so the node stopping is not the turn stopping.
 	Apart bool
 }
 
@@ -182,11 +184,17 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 
 	binary, argv := s.Binary, args
 	if s.Apart {
-		unit := "qntx-turn-" + strings.TrimSuffix(filepath.Base(stream), streamExt)
-		binary, argv = "systemd-run", append([]string{"--scope", "--quiet", "--collect", "--unit", unit, s.Binary}, args...)
+		scope, systemd, err := systemdScope("qntx-turn-" + strings.TrimSuffix(filepath.Base(stream), streamExt))
+		if err != nil {
+			return Answer{}, err
+		}
+		if systemd {
+			binary, argv = "systemd-run", append(append(scope, s.Binary), args...)
+		}
 	}
 	cmd := exec.Command(binary, argv...)
 	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = work, env, out, said
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: s.Apart}
 	if err := cmd.Start(); err != nil {
 		return Answer{}, errors.Wrapf(err, "could not start %s", binary)
 	}
@@ -239,4 +247,26 @@ func (s Said) writeMCP() (string, []string, error) {
 		return "", nil, errors.Wrapf(err, "could not write %s", path)
 	}
 	return path, bearers, nil
+}
+
+// systemdScope is how systemd-run puts a process in a scope of its own named
+// unit, and whether systemd keeps this machine's processes: a node whose
+// processes systemd keeps stops with every one in its cgroup.
+func systemdScope(unit string) ([]string, bool, error) {
+	booted, err := os.Stat("/run/systemd/system")
+	if os.IsNotExist(err) {
+		return []string{}, false, nil
+	}
+	if err != nil {
+		return []string{}, false, errors.Wrap(err, "whether systemd keeps this machine's processes did not read")
+	}
+	me, err := user.Current()
+	if err != nil {
+		return []string{}, false, errors.Wrap(err, "who runs the node did not read")
+	}
+	scope := []string{"--scope", "--quiet", "--collect", "--unit", unit}
+	if me.Username != "root" {
+		scope = append([]string{"--user"}, scope...)
+	}
+	return scope, booted.IsDir(), nil
 }
