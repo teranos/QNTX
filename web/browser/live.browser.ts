@@ -70,6 +70,10 @@ async function ask(route: Route, wire: Wire, writes: string[], stalled: string[]
     }
 }
 
+/** How often, and how far apart, a page refused by a restarting node is stood up again. */
+const BOOT_TRIES = 3;
+const BOOT_WAIT_MS = 30_000;
+
 /** The node holds back a socket asked for too often (429): asked again after this long, this many times. */
 const SOCKET_WAIT_MS = 10_000;
 const SOCKET_TRIES = 3;
@@ -168,8 +172,21 @@ test('every element, live, can be reached whole', async ({ page }) => {
     page.on('response', (response) => {
         if (response.status() >= 400) said.push(`${response.request().method()} ${new URL(response.url()).pathname} ${response.status()}`);
     });
-    await page.goto('/');
-    await expect.poll(() => page.evaluate(() => window.specimens !== undefined), { message: `the page did not stand: ${said.join(' | ')}`, timeout: 60_000 }).toBe(true);
+    // A node restarting answers its gateway's 502, 503 or 504 for a while: the page is stood up again
+    // after a wait. Anything else that refuses it, or a node still down after the last try, is said.
+    let stood = false;
+    for (let tried = 1; tried <= BOOT_TRIES && !stood; tried++) {
+        said.length = 0;
+        await page.goto('/');
+        stood = await page.waitForFunction(() => window.specimens !== undefined, null, { timeout: 60_000 }).then(() => true, () => false);
+        const restarting = said.some((line) => line.endsWith(' 502') || line.endsWith(' 503') || line.endsWith(' 504'));
+        if (!stood && !restarting) break;
+        if (!stood && tried < BOOT_TRIES) await new Promise((done) => setTimeout(done, BOOT_WAIT_MS));
+    }
+    if (!stood) {
+        await page.goto('about:blank');
+        throw new Error(`the page did not stand: ${said.join(' | ') || 'nothing was refused and nothing threw'}`);
+    }
     await quiet(page, wire);
     const ids = await page.evaluate(() => window.specimens!.ids());
 
