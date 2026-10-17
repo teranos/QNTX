@@ -119,7 +119,8 @@ describe('Claude - Tim', () => {
         const stop = drawClaude(body, node());
         await settled();
         const mode = body.querySelector<HTMLSelectElement>('.claude-mode')!;
-        expect([...mode.options].map(o => o.value)).toEqual(MODES.filter(m => m !== 'dontAsk'));
+        // The modes, not the "permission mode" that stands for the node's own (Spike).
+        expect([...mode.options].map(o => o.value).filter(Boolean)).toEqual(MODES.filter(m => m !== 'dontAsk'));
         stop();
     });
 
@@ -155,6 +156,22 @@ describe('Claude - Spike', () => {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
         return;
     }
+
+    // "The two red X indicates inefficient use of space": the node runs dontAsk, which is not
+    // offered, and the choice showed nothing at all.
+    test('a node running in a mode not offered: the choice says what it is, and sends none', async () => {
+        const body = document.createElement('div');
+        const asked = node();
+        const stop = drawClaude(body, asked);
+        await settled();
+        const mode = body.querySelector<HTMLSelectElement>('.claude-mode')!;
+        expect(mode.selectedIndex).toBeGreaterThanOrEqual(0);
+        expect(mode.options[mode.selectedIndex].textContent).toBe('permission mode');
+        say(body, 'how long has the box been up?');
+        await settled();
+        expect(asked.sent).toEqual([['how long has the box been up?', '']]);
+        stop();
+    });
 
     // Spike: nothing typed is nothing said.
     test('an empty box sends nothing', async () => {
