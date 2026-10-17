@@ -65,7 +65,8 @@ async function ask(route: Route, wire: Wire, writes: string[], stalled: string[]
             await route.fulfill({ status: 504, body: `${method} ${url.pathname}: the node did not answer in ${ASKED_FOR_MS}ms` });
             return;
         }
-        if (answer.status() >= 400) wire.refused.push(`${method} ${url.pathname} ${answer.status()}`);
+        // A 404 is the node saying nothing is there, which is absence, not a refusal (CLAUDE.md, nil is nil).
+        if (answer.status() >= 400 && answer.status() !== 404) wire.refused.push(`${method} ${url.pathname} ${answer.status()}`);
         await route.fulfill({ response: answer });
     } finally {
         wire.inflight -= 1;
