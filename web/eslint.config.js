@@ -98,6 +98,19 @@ const NO_RAW_TABLE = [
     { selector: "CallExpression[callee.name='createTable'][arguments.1.type='ArrayExpression'][arguments.1.elements.length=2]", message: 'a record, a label beside its value, is record() from ts/table-cell.ts: its labels never break inside a word.' },
 ];
 
+// "i want it to not compile when shit like this happens"
+// A control is @teranos/elements': pressFrom, its switch, its fields. One drawn here stops the build.
+const CONTROL_IS_ELEMENTS = "a control is @teranos/elements': pressFrom for a button, and its switch and fields. QNTX does not draw a control.";
+const NO_RAW_CONTROL = [
+    ...['button', 'input', 'select', 'textarea'].map((tag) => ({
+        selector: `CallExpression[callee.property.name='createElement'][arguments.0.value='${tag}']`,
+        message: CONTROL_IS_ELEMENTS,
+    })),
+    { selector: "Literal[value=/<(button|input|select|textarea)[\\s>]/]", message: CONTROL_IS_ELEMENTS },
+    { selector: "TemplateElement[value.raw=/<(button|input|select|textarea)[\\s>]/]", message: CONTROL_IS_ELEMENTS },
+    { selector: "ImportDeclaration[source.value=/components\\/button/]", message: CONTROL_IS_ELEMENTS },
+];
+
 // "if it overflows width, hard fail, die"
 // What makes content wider than its element, as far as the code says it: a line held unbroken.
 const WIDTH = "WIDTH: a line held unbroken is wider than a phone (@teranos/elements drops the element dead). Let it wrap: pre-wrap, pre-line or normal.";
@@ -151,7 +164,7 @@ export default [
             'no-empty': 'error',
             'no-restricted-globals': ['error', ...BANNED_GLOBALS],
             'no-restricted-imports': ['error', NO_SHOW_TOAST],
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -172,14 +185,14 @@ export default [
         // client/ is where apiFetch lives.
         files: ['ts/client/**/*.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
         // These load a .wasm binary by URL.
         files: ['ts/laye.ts', 'ts/ats-wasm.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -187,7 +200,7 @@ export default [
         // reports every answer to the connectivity manager.
         files: ['ts/liveness.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -198,7 +211,7 @@ export default [
         // "i want tooltip to be propagated more"
         files: ['ts/market-element.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_FONT_SIZE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE, ...NO_FIXED_WIDTH],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
 ];
