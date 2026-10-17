@@ -141,7 +141,12 @@ async function unreachable(page: Page, id: string): Promise<string[]> {
         for (const node of innermost) {
             const r = node.getBoundingClientRect();
             const classes = typeof node.className === 'string' && node.className !== '' ? `.${node.className.split(' ').filter((c) => c !== '').join('.')}` : '';
-            const line = `${node.tagName.toLowerCase()}${classes} ${Math.round(r.left - edge.left)}..${Math.round(r.right - edge.left)} in ${Math.round(edge.width)}, scrolls ${node.scrollWidth} in ${node.clientWidth}`;
+            // How it is laid out, so the name says why as well as where: its own box, and what holds it.
+            const own = getComputedStyle(node);
+            const holder = node.parentElement ? getComputedStyle(node.parentElement) : null;
+            const laid = `${own.display} ${own.position} ws=${own.whiteSpace} w=${own.width} minw=${own.minWidth} flex=${own.flex}` +
+                (holder ? ` | in ${holder.display}${holder.display.includes('grid') ? ` cols=${holder.gridTemplateColumns}` : ''} ws=${holder.whiteSpace}` : '');
+            const line = `${node.tagName.toLowerCase()}${classes} ${Math.round(r.left - edge.left)}..${Math.round(r.right - edge.left)} in ${Math.round(edge.width)}, scrolls ${node.scrollWidth} in ${node.clientWidth} [${laid}]`;
             said.set(line, (said.get(line) ?? 0) + 1);
         }
         return [
