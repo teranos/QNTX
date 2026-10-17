@@ -139,7 +139,17 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	}
 	// Every agent the node runs is kept beside ROOT's (ADR-048).
 	s.agentsDir = filepath.Dir(home)
-	return s.nameNodeAgent(home)
+	if err := s.nameNodeAgent(home); err != nil {
+		return err
+	}
+	// The session is held from here, before anything can be said to it, until
+	// the turns the node's last process left are read on.
+	agent := s.nodeAgent
+	in := agent.in(s.claudeHarness())
+	in.turn <- struct{}{}
+	effort := s.deps.cfg.Agent.Root.Effort
+	s.wg.Go("agent.follow", func() { s.followLeftTurns(agent, in, effort) })
+	return nil
 }
 
 // nameNodeAgent makes the Node Agent this node's: a key of its own from the
