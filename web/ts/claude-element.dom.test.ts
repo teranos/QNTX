@@ -88,12 +88,13 @@ describe('Claude - Tim', () => {
     }
 
     // Tim: opening it says who answers, before anything is said.
-    test('it says who it is and how it runs', async () => {
+    // "No need to show did key to user"
+    test('it says how it runs, and not its did', async () => {
         const body = document.createElement('div');
         const stop = drawClaude(body, node());
         await settled();
         const who = body.querySelector('.claude-who')?.textContent ?? '';
-        expect(who).toContain('did:key:z6MkqViDuPd5');
+        expect(who).not.toContain('did:key');
         expect(who).toContain('claude-opus-5-5');
         expect(who).toContain('low');
         stop();
