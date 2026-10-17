@@ -163,11 +163,11 @@ function birthHtml(presses: Record<string, Press>): string {
         presses.birth = { id: 'birth', title: may.label, mark: Subcanvas, does: () => { birth = may.kind; render(); } };
         return pressPlace('birth', 'canvas-birth-symbol');
     }
-    // "press once to check, button becomes green and shimmers, 2nd click
-    // actually creates it": the press's two stages; a canvas made can be undone, so armed it stays white.
+    // "press once to check, button becomes green and shimmers, 2nd click actually creates it"
+    // A press that creates.
     const kind = birth;
     presses.plus = {
-        id: 'plus', title: '+', again: 'the canvas is made', armedForMs: 8000,
+        id: 'plus', title: '+', again: 'the canvas is made', creates: true, armedForMs: 8000,
         does: async () => {
             const name = body?.querySelector<HTMLInputElement>('.canvas-birth-name')?.value.trim() ?? '';
             if (name === '') throw new Error('a canvas is named');
