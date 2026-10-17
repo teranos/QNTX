@@ -177,14 +177,15 @@ test('every element, live, can be reached whole', async ({ page }) => {
     page.on('response', (response) => {
         if (response.status() >= 400) said.push(`${response.request().method()} ${new URL(response.url()).pathname} ${response.status()}`);
     });
-    // A node restarting answers its gateway's 502, 503 or 504 for a while: the page is stood up again
-    // after a wait. Anything else that refuses it, or a node still down after the last try, is said.
+    // A node restarting answers its gateway's 502, 503 or 504 for a while, and a slow node turns its
+    // heaviest token away with a 429 until it lifts (server/auth/shed.go): the page is stood up again
+    // after a wait. Anything else that refuses it, or a node still refusing after the last try, is said.
     let stood = false;
     for (let tried = 1; tried <= BOOT_TRIES && !stood; tried++) {
         said.length = 0;
         await page.goto('/');
         stood = await page.waitForFunction(() => window.specimens !== undefined, null, { timeout: 60_000 }).then(() => true, () => false);
-        const restarting = said.some((line) => line.endsWith(' 502') || line.endsWith(' 503') || line.endsWith(' 504'));
+        const restarting = said.some((line) => line.endsWith(' 429') || line.endsWith(' 502') || line.endsWith(' 503') || line.endsWith(' 504'));
         if (!stood && !restarting) break;
         if (!stood && tried < BOOT_TRIES) await new Promise((done) => setTimeout(done, BOOT_WAIT_MS));
     }
