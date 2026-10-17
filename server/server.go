@@ -36,6 +36,7 @@ type QNTXServer struct {
 	// its doors, and the health of the file underneath. What a namespace keeps
 	// is the namespace's, and is reached through it.
 	nodeDB              *sql.DB
+	nodeAgentApart      bool                  // The Node Agent's turns run apart from this process; set as the agent subsystem boots
 	startedAt           time.Time             // When this process began answering; zero until New runs
 	dbPath              string                // Database file path (for display in banner)
 	logPath             string                // File log path (for banner)

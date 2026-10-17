@@ -81,28 +81,8 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	t.in.answering.Store(&turnInSession{session: session})
 	defer t.in.answering.Store(nil)
 
-	// The session is the agent's to write down, signed as itself. A row that
-	// does not land is said with the answer and never stops the turn.
 	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: t.effort}
-	unwritten := ""
-	write := func(rows []*types.As, err error) {
-		if err == nil {
-			for _, row := range rows {
-				if err = agent.signer.Sign(row); err != nil {
-					break
-				}
-				if err = store.CreateAttestation(row); err != nil {
-					break
-				}
-			}
-		}
-		if err != nil {
-			s.logger.Errorw("a row of the agent's session was not written", "agent", agent.did, "session", session, "harness", t.called, "error", err)
-			if unwritten == "" {
-				unwritten = err.Error()
-			}
-		}
-	}
+	write, unwritten := s.sessionRows(agent, store, session, t.called)
 	// The Node Agent's git is its own (ADR-048, Its git). A namespace agent has
 	// none: nothing of it is written for one yet.
 	var itsGit []string
@@ -115,7 +95,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	write([]*types.As{told}, err)
 
 	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
-		unwritten: func() string { return unwritten }})
+		unwritten: unwritten})
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: t.called + " did not answer: " + err.Error()}
 	}
@@ -125,6 +105,32 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 		}
 	}
 	return answer, nil
+}
+
+// sessionRows writes rows of agent's session down in store. The session is the
+// agent's to write down, signed as itself. A row that does not land is said by
+// unwritten, as of the rows written so far, and never stops the turn.
+func (s *QNTXServer) sessionRows(agent *rootAgent, store ats.AttestationStore, session, harness string) (write func([]*types.As, error), unwritten func() string) {
+	why := ""
+	write = func(rows []*types.As, err error) {
+		if err == nil {
+			for _, row := range rows {
+				if err = agent.signer.Sign(row); err != nil {
+					break
+				}
+				if err = store.CreateAttestation(row); err != nil {
+					break
+				}
+			}
+		}
+		if err != nil {
+			s.logger.Errorw("a row of the agent's session was not written", "agent", agent.did, "session", session, "harness", harness, "error", err)
+			if why == "" {
+				why = err.Error()
+			}
+		}
+	}
+	return write, func() string { return why }
 }
 
 // sessionStoreOf is where an agent's session is written: system for ROOT's,
