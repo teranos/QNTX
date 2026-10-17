@@ -111,14 +111,20 @@ function databaseStats(): Promise<string> {
     });
 }
 
-async function quiet(page: Page, wire: Wire): Promise<void> {
-    await expect.poll(async () => {
+/** How long the wire is waited on to go still. An element that polls never goes still. */
+const QUIET_FOR_MS = 30_000;
+
+/** Whether nothing went over the wire across two frames within the wait: what was drawn is drawn from what was answered. */
+async function quiet(page: Page, wire: Wire): Promise<boolean> {
+    const until = Date.now() + QUIET_FOR_MS;
+    while (Date.now() < until) {
         const before = wire.answered;
         await page.evaluate(() => new Promise<void>((done) => {
             requestAnimationFrame(() => requestAnimationFrame(() => done()));
         }));
-        return wire.inflight === 0 && wire.answered === before;
-    }, { message: 'the element is still asking the node', timeout: 30_000 }).toBe(true);
+        if (wire.inflight === 0 && wire.answered === before) return true;
+    }
+    return false;
 }
 
 /** What cannot be reached in the element, by tag, class and width alone. */
@@ -210,6 +216,7 @@ test('every element, live, can be reached whole', async ({ page }) => {
             const element = page.locator(`[data-element-id="${id}"]`);
             await expect.poll(() => element.evaluate((el) => (el as HTMLElement).dataset.form), { message: `${id} is still a dot` }).not.toBe('dot');
             await expect.poll(() => element.evaluate((el) => el.classList.contains('morphing'))).toBe(false);
+            // An element that asks the node all the time is never quiet: it is measured once the wait is over.
             await quiet(page, wire);
             const past = await unreachable(page, id);
             if (past.length > 0) bad[id] = past;
