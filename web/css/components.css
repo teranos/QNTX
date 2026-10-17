@@ -238,36 +238,6 @@
 .qntx-btn-loading {
     cursor: wait;
 }
-
-.qntx-btn-confirming {
-    animation: qntx-btn-pulse 0.6s ease-in-out infinite;
-}
-
-@keyframes qntx-btn-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
-
-/* Confirmation state colors
- * TODO: Confirming is visually indistinct from danger — just a pulse animation
- * on the same red. Needs its own color identity to communicate "are you sure?"
- * separately from "this is destructive." */
-.qntx-btn-danger.qntx-btn-confirming {
-    background: #ff4757;
-    border-color: #ff4757;
-}
-
-.qntx-btn-warning.qntx-btn-confirming {
-    background: #ffc107;
-    border-color: #ffc107;
-}
-
-.qntx-btn-ghost.qntx-btn-confirming {
-    color: #e8a040;
-    background: transparent;
-    border-color: transparent;
-}
-
 /* Focus state */
 .qntx-btn:focus-visible {
     outline: 2px solid #666;

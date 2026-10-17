@@ -10,10 +10,9 @@
 // the Actions runner. Asked on open and after each press; nothing polls.
 
 import type { Element } from '@teranos/elements';
-import { createTable, tray } from '@teranos/elements';
+import { createTable, tray, pressFrom } from '@teranos/elements';
 import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
-import { Button } from './components/button';
 import { refusal } from './self-person';
 import { log, SEG } from './logger';
 import { stacked } from './table-cell';
@@ -177,19 +176,19 @@ export function renderNode(container: HTMLElement, status: GitHubStatus, reload:
     const actions = document.createElement('div');
     actions.className = 'element-actions';
     const flip = status.enabled
-        ? new Button({
-            label: 'Disable GitHub on the node',
-            variant: 'danger',
-            confirmation: { label: 'Disable for every namespace' },
-            onClick: async () => {
+        ? pressFrom({
+            id: 'github-node-disable',
+            title: 'Disable GitHub on the node',
+            again: 'GitHub is off for every namespace',
+            does: async () => {
                 await send('/api/github/node', { enabled: 'false' });
                 await reload();
             },
         })
-        : new Button({
-            label: 'Enable GitHub on the node',
-            variant: 'primary',
-            onClick: async () => {
+        : pressFrom({
+            id: 'github-node-enable',
+            title: 'Enable GitHub on the node',
+            does: async () => {
                 await send('/api/github/node', { enabled: 'true' });
                 await reload();
             },
@@ -223,35 +222,34 @@ export function renderWebhook(container: HTMLElement, status: GitHubStatus, relo
     const shown = document.createElement('div');
     const actions = document.createElement('div');
     actions.className = 'element-actions';
-    const move = new Button({
-        label: 'Set the path',
-        variant: 'ghost',
-        onClick: async () => {
+    const move = pressFrom({
+        id: 'github-webhook-path',
+        title: 'Set the path',
+        does: async () => {
             await send('/api/github/webhook/path', { path: path.value.trim() });
             await reload();
         },
     });
     actions.appendChild(move.element);
-    const generate = new Button({
-        label: active ? 'Generate a new secret' : 'Generate the secret',
-        variant: active ? 'ghost' : 'primary',
-        ...(active ? { confirmation: { label: 'Replace the secret GitHub holds' } } : {}),
-        onClick: async () => {
-            const response = await apiFetch('/api/github/webhook', jsonBody('POST', {}));
-            if (!response.ok) throw new Error(await refusal(response));
-            const made = await response.json() as GitHubWebhook;
-            await reload();
-            const again = container.querySelector('.github-webhook-shown');
-            if (!again) return;
-            const madeURL = document.createElement('code');
-            madeURL.textContent = made.url;
-            again.appendChild(row('URL:', madeURL));
-            const secret = document.createElement('code');
-            secret.textContent = made.secret;
-            again.appendChild(row('Secret:', secret));
-            again.appendChild(said('Shown this once: set both in the App’s webhook settings.'));
-        },
-    });
+    const generating = async () => {
+        const response = await apiFetch('/api/github/webhook', jsonBody('POST', {}));
+        if (!response.ok) throw new Error(await refusal(response));
+        const made = await response.json() as GitHubWebhook;
+        await reload();
+        const again = container.querySelector('.github-webhook-shown');
+        if (!again) return;
+        const madeURL = document.createElement('code');
+        madeURL.textContent = made.url;
+        again.appendChild(row('URL:', madeURL));
+        const secret = document.createElement('code');
+        secret.textContent = made.secret;
+        again.appendChild(row('Secret:', secret));
+        again.appendChild(said('Shown this once: set both in the App’s webhook settings.'));
+    };
+    // The secret GitHub holds cannot be had back once it is replaced.
+    const generate = active
+        ? pressFrom({ id: 'github-webhook-secret', title: 'Generate a new secret', again: 'the secret GitHub holds is replaced', irrevocable: true, does: generating })
+        : pressFrom({ id: 'github-webhook-secret', title: 'Generate the secret', does: generating });
     actions.appendChild(generate.element);
     s.appendChild(actions);
     shown.className = 'github-webhook-shown';
@@ -305,10 +303,10 @@ export function renderFrom(container: HTMLElement, served: string[], namespaces:
     const sources = new Map(namespaces.map(ns => [ns.namespace, ns.source]));
     for (const name of served.filter(n => n !== 'system')) {
         const fromSystem = sources.get(name) === 'system';
-        const press = new Button({
-            label: fromSystem ? 'Its own GitHub' : 'System’s GitHub',
-            variant: fromSystem ? 'ghost' : 'primary',
-            onClick: async () => {
+        const press = pressFrom({
+            id: `github-from-${name}`,
+            title: fromSystem ? 'Its own GitHub' : 'System’s GitHub',
+            does: async () => {
                 await send('/api/github/from', { namespace: name, from: fromSystem ? 'namespace' : 'system' });
                 await reload();
             },
@@ -361,10 +359,10 @@ export function renderActions(container: HTMLElement, runner: GitHubRunner, relo
 
     const actions = document.createElement('div');
     actions.className = 'element-actions';
-    const toggle = new Button({
-        label: runner.enabled ? 'Turn the runner off' : 'Turn the runner on',
-        variant: runner.enabled ? 'ghost' : 'primary',
-        onClick: async () => {
+    const toggle = pressFrom({
+        id: 'github-runner',
+        title: runner.enabled ? 'Turn the runner off' : 'Turn the runner on',
+        does: async () => {
             await send('/api/github/runner', { path: path.value.trim(), enabled: String(!runner.enabled) });
             await reload();
         },

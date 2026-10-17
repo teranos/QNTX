@@ -10,7 +10,7 @@ import { formatRelativeTime, escapeHtml, formatDuration } from '../html-utils.ts
 import type { RichError } from '../base-panel-error.ts';
 import { extractHttpStatus } from '../http-utils.ts';
 import { buildTooltipText } from '../components/tooltip.ts';
-import { buttonPlaceholder } from '../components/button.ts';
+import { pressPlace } from '../components/press-places';
 import { createTable, tableCell } from '@teranos/elements';
 
 /**
@@ -150,7 +150,6 @@ export function renderJobTable(jobs: ScheduledJobResponse[], state: PulsePanelSt
     // "TABLES BEING MAX 4 col": the expand toggle is the job's own, the
     // interval is under the state, and the last run under the next.
     const table = createTable('pulse-schedule', ['Job', 'State', 'Next', 'Actions'], jobs.map(job => {
-        const isActive = job.state === 'active';
         const nextRun = formatRelativeTime(job.next_run_at);
         const lastRun = job.last_run_at ? formatRelativeTime(job.last_run_at) : '—';
         const isExpanded = state.expandedJobs.has(job.id);
@@ -183,9 +182,9 @@ export function renderJobTable(jobs: ScheduledJobResponse[], state: PulsePanelSt
                 markupCell('pulse-table-time', `<div class="has-tooltip" data-tooltip="${nextRunTooltip}">${nextRun}</div>
                     <div class="element-under has-tooltip" data-tooltip="${lastRunTooltip}">last ${lastRun}</div>`),
                 markupCell('', `<span class="pulse-table-actions">
-                    ${buttonPlaceholder(`force-trigger-${job.id}`, '▶')}
-                    ${buttonPlaceholder(`toggle-state-${job.id}`, isActive ? '⏸' : '▶')}
-                    ${buttonPlaceholder(`delete-${job.id}`, '✕')}
+                    ${pressPlace(`force-trigger-${job.id}`)}
+                    ${pressPlace(`toggle-state-${job.id}`)}
+                    ${pressPlace(`delete-${job.id}`)}
                 </span>`),
             ] as const,
         };

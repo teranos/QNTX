@@ -172,7 +172,7 @@ describe('Spike: the node refuses', () => {
         press(content, '.plugin-add-check');
         await flush();
 
-        expect(content.querySelector('.qntx-btn-error-box')?.textContent).toBe(why);
+        expect(content.querySelector('[data-press-said]')?.textContent).toBe(why);
         expect(content.querySelector('.plugin-add-confirm')).toBeNull();
         expect(asked.find(a => a.method === 'POST' && a.path === '/api/plugins')).toBeUndefined();
     });
@@ -207,7 +207,7 @@ describe('Spike: the node refuses', () => {
         press(content, '.plugin-add-confirm');
         await flush();
 
-        expect(content.querySelector('.qntx-btn-error-box')?.textContent).toBe(`plugin garden is already added, from ${REPO}`);
+        expect(content.querySelector('[data-press-said]')?.textContent).toBe(`plugin garden is already added, from ${REPO}`);
         expect(content.querySelector<HTMLInputElement>('.plugin-add-repo')?.value).toBe(REPO);
         expect(content.querySelectorAll('.plugin-card').length).toBe(1);
     });

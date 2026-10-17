@@ -10,9 +10,8 @@
 // nobody else's. The first address is the one mail goes to (ADR-041).
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { Button, createDangerButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
 import { record } from './table-cell';
@@ -60,7 +59,7 @@ function addForm(onAdded: () => void): HTMLDivElement {
     phone.type = 'tel';
     phone.placeholder = 'phone number';
     phone.className = 'user-add-phone';
-    const add = createPrimaryButton('Add to my record', async () => {
+    const add = pressFrom({ id: 'user-record-add', title: 'Add to my record', does: async () => {
         const typedEmail = email.value.trim();
         const typedPhone = phone.value.trim();
         if (!typedEmail && !typedPhone) {
@@ -70,7 +69,7 @@ function addForm(onAdded: () => void): HTMLDivElement {
         email.value = '';
         phone.value = '';
         onAdded();
-    });
+    } });
     form.appendChild(email);
     form.appendChild(phone);
     form.appendChild(add.element);
@@ -89,17 +88,17 @@ function switchOn(u: UserRecord, onSwitched: () => void): HTMLElement {
     const actions = document.createElement('div');
     actions.className = 'element-actions';
     if (u.disabled_by) {
-        const on = createPrimaryButton('Switch on', async () => {
+        const on = pressFrom({ id: `user-switch-on-${u.id}`, title: 'Switch on', does: async () => {
             await flip(u.id, 'enable');
             onSwitched();
-        });
+        } });
         actions.appendChild(on.element);
         return actions;
     }
-    const off = createDangerButton('Switch off', 'Confirm switch off', async () => {
+    const off = pressFrom({ id: `user-switch-off-${u.id}`, title: 'Switch off', again: `${nameOf(u)} is switched off`, does: async () => {
         await flip(u.id, 'disable');
         onSwitched();
-    });
+    } });
     actions.appendChild(off.element);
     return actions;
 }
@@ -149,13 +148,13 @@ function levelForm(u: UserRecord, onSet: () => void): HTMLElement {
         choice.appendChild(option);
     }
     choice.value = u.level;
-    const set = createDangerButton('Set level', `Set the level of ${nameOf(u)}`, async () => {
+    const set = pressFrom({ id: `user-level-${u.id}`, title: 'Set level', again: `the level of ${nameOf(u)} is set`, does: async () => {
         if (choice.value === u.level) {
             throw new Error(`${nameOf(u)} is ${u.level} already`);
         }
         await setLevel(u.id, choice.value);
         onSet();
-    });
+    } });
     form.appendChild(choice);
     form.appendChild(set.element);
     return form;
@@ -193,11 +192,11 @@ export function renderUser(container: HTMLElement, u: UserRecord, own: boolean, 
     if (becomable(u, viewerIsRoot)) {
         const actions = document.createElement('div');
         actions.className = 'element-actions';
-        actions.appendChild(new Button({
-            label: `Become ${nameOf(u)}`,
-            variant: 'danger',
-            confirmation: { label: `Their sessions end, and their tokens stop until you are ROOT again` },
-            onClick: () => become(u),
+        actions.appendChild(pressFrom({
+            id: `user-become-${u.id}`,
+            title: `Become ${nameOf(u)}`,
+            again: 'their sessions end, and their tokens stop until you are ROOT again',
+            does: () => become(u),
         }).element);
         container.appendChild(actions);
     }

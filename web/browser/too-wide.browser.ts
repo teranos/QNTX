@@ -125,6 +125,16 @@ async function settled(page: Page, id: string, wire: Wire): Promise<void> {
     expect(refused, `${id} drew what the fixtures answered as a refusal, or is still loading`).toEqual([]);
 }
 
+/** The element stands whole on its screen: both edges, measured here, whatever Elements' version checks. */
+async function onScreen(page: Page, id: string): Promise<void> {
+    const edges = await page.locator(`[data-element-id="${id}"]`).evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return { left: Math.round(r.left), right: Math.round(r.right), screen: window.innerWidth };
+    });
+    expect(edges.left, `${id} starts left of its screen: ${JSON.stringify(edges)}`).toBeGreaterThanOrEqual(-1);
+    expect(edges.right, `${id} ends right of its screen: ${JSON.stringify(edges)}`).toBeLessThanOrEqual(edges.screen + 1);
+}
+
 test.describe('Nothing in an element is wider than it', () => {
     let wire: Wire;
 
@@ -151,6 +161,7 @@ test.describe('Nothing in an element is wider than it', () => {
             await opened(page, id, wire);
             expect(wire.missing, 'every call an element makes on opening is answered from browser/fixtures').toEqual([]);
             await page.evaluate((id) => window.specimens!.fits(id), id);
+            await onScreen(page, id);
         });
     }
 
@@ -159,5 +170,63 @@ test.describe('Nothing in an element is wider than it', () => {
         await settled(page, `user-element-${TIM.id}`, wire);
         expect(wire.missing, 'every call the User window makes on opening is answered from browser/fixtures').toEqual([]);
         await page.evaluate((id) => window.specimens!.fits(id), `user-element-${TIM.id}`);
+        await onScreen(page, `user-element-${TIM.id}`);
     });
+});
+
+// "i cant even use the mail element on desktop"
+// The fixtures answer every call, so a refusal was never drawn here: the Mail window grew past the
+// screen on what the node refused it, which no fixture said. Here the node refuses everything.
+
+/** What a node in trouble answers: a 500 whose body is long, one line, and unbroken by spaces for long stretches. */
+const REFUSAL = JSON.stringify({
+    id: 'ERR-1792245572313-2',
+    error: 'the mail templates could not be read: template record AS-CLEANAPI-MAILTEMP-CLEANAPI-XEV3IP7S was kept before a template\'s bodies were named: the plugin sets it again',
+    detail: Array.from({ length: 16 }, (_, i) => `github.com/teranos/QNTX/server/handlers.go:${100 + i}`).join(','),
+});
+
+test.describe('Nothing in an element is wider than it, or than its screen, when the node refuses everything', () => {
+    let wire: Wire;
+    // The page stands on its fixtures; from then on, every element it opens is refused.
+    let refusing: boolean;
+
+    test.beforeEach(async ({ page }) => {
+        wire = { missing: [], inflight: 0, answered: 0 };
+        refusing = false;
+        await page.route((url) => !isStatic(url.pathname), async (route) => {
+            if (!refusing) {
+                await answer(route, wire);
+                return;
+            }
+            const url = new URL(route.request().url());
+            wire.inflight += 1;
+            try {
+                if (url.pathname === '/i/reaches') {
+                    const asked = (url.searchParams.get('paths') ?? '').split(',').filter((path) => path !== '');
+                    await route.fulfill({ json: { paths: asked } });
+                    return;
+                }
+                await route.fulfill({ status: 500, contentType: 'application/json', body: REFUSAL });
+            } finally {
+                wire.inflight -= 1;
+                wire.answered += 1;
+            }
+        });
+        await page.goto('/');
+        await page.waitForFunction(() => window.specimens !== undefined);
+        await quiet(page, wire);
+        refusing = true;
+    });
+
+    for (const id of ELEMENTS) {
+        test(`${id}, refused`, async ({ page }) => {
+            await page.evaluate((id) => window.specimens!.open(id), id);
+            const element = page.locator(`[data-element-id="${id}"]`);
+            await expect.poll(() => element.evaluate((el) => (el as HTMLElement).dataset.form), { message: `${id} is still a dot` }).not.toBe('dot');
+            await expect.poll(() => element.evaluate((el) => el.classList.contains('morphing'))).toBe(false);
+            await quiet(page, wire);
+            await page.evaluate((id) => window.specimens!.fits(id), id);
+            await onScreen(page, id);
+        });
+    }
 });

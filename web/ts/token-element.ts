@@ -5,9 +5,8 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createButton, createDangerButton, createGhostButton } from './components/button';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 import { spawnAttestationAsWindow } from './components/element/attestation-element';
 import { jsonBody } from './http-utils';
@@ -219,7 +218,7 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
     held.textContent = rolesText(t);
 
     // A failure is the button's own: it throws, and the button says.
-    const add = createGhostButton('+', async () => {
+    const add = pressFrom({ id: `token-grant-${t.id}`, title: '+', does: async () => {
         if (wrap.querySelector('select')) return;
         const roles = await rolesTheLinesName();
         const holds = new Set((t.namespaces || []).flatMap(ns => t.roles?.[ns] ?? []));
@@ -253,7 +252,7 @@ function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
         });
         wrap.appendChild(pick);
         pick.focus();
-    });
+    } });
     add.element.title = 'grant a role';
     add.element.setAttribute('aria-label', 'Grant a role');
     add.element.style.lineHeight = '1';
@@ -531,20 +530,21 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     actions.style.flexWrap = 'wrap';
 
     if (t.revoked_at) {
-        const enable = createButton({
-            label: 'Enable',
-            variant: 'secondary',
-            onClick: async () => {
+        const enable = pressFrom({
+            id: `token-enable-${t.id}`,
+            title: 'Enable',
+            does: async () => {
                 await enableToken(t.id);
                 await redraw(container, t.id);
             },
         });
         actions.appendChild(enable.element);
     } else {
-        const revoke = createDangerButton('Revoke', 'Confirm revoke', async () => {
+        // Revoked, it can be enabled again: white even armed.
+        const revoke = pressFrom({ id: `token-revoke-${t.id}`, title: 'Revoke', again: 'the token stops working', does: async () => {
             await revokeToken(t.id);
             await redraw(container, t.id);
-        });
+        } });
         actions.appendChild(revoke.element);
     }
 
