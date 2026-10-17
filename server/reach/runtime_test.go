@@ -156,9 +156,9 @@ func TestARoleOnARuntimeLineIsInTheRow(t *testing.T) {
 	assert.Equal(t, []string{"WORKER"}, rows["/pond"].reach.Roles())
 }
 
-// A runtime line for a path the const names adds roles to that row. The
-// levels the const granted stay.
-func TestARuntimeLineAddsToAConstRow(t *testing.T) {
+// A runtime line for a path the tablet names adds roles to that row. The
+// levels the tablet granted stay.
+func TestARuntimeLineAddsToATabletRow(t *testing.T) {
 	rows, err := readReaches("REACH is '/pond' of ROOT SUPER")
 	require.NoError(t, err)
 	addRuntime(rows, Runtime{Lines: []Line{{Paths: []string{"/pond"}, Roles: []string{"WORKER"}, At: time.Now()}}})
@@ -218,9 +218,9 @@ func TestARootRuntimeLineOutranksALaterOne(t *testing.T) {
 	assert.Equal(t, []string{"WORKER"}, rows["/pond"].reach.Roles(), "somebody's revoke beat ROOT's grant")
 }
 
-// The const table reads as before with no runtime lines at all.
-func TestTheConstTableReadsAloneWithNoRuntime(t *testing.T) {
-	rows, err := readReaches(reachTable)
+// The tablet reads as before with no runtime lines at all.
+func TestTheTabletReadsAloneWithNoRuntime(t *testing.T) {
+	rows, err := readReaches(tablet)
 	require.NoError(t, err)
 	before := len(rows)
 	addRuntime(rows, Runtime{})
