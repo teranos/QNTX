@@ -340,7 +340,13 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// A token the flow issued through a client is the person who said yes
 		// at the passkey: "my oauth should hjust have that permission". It is
 		// admitted the way their session is, level and roles asked now.
-		if grant.ClientDID != "" {
+		//
+		// Unless nobody said yes: a token the client_credentials grant issued
+		// is the client's own (RFC 6749 §4.4), written at TOKEN, and TOKEN is
+		// no person's level. It falls through and is admitted as the token it
+		// is — narrowed by what lines grant its label, never by what the
+		// person who minted the door may do.
+		if grant.ClientDID != "" && grant.Level != LevelToken {
 			return h.admittedAsThePerson(*grant), true
 		}
 		// What kind of token this is was decided when it was minted, so it is
@@ -353,6 +359,10 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			UserID:      grant.MintedByUser,
 			DisplayName: grant.MintedByDisplayName,
 			Grant:       grant,
+			// Empty on a token nothing issued through a client. A client's own
+			// token names the client here, so a connector is still known to be
+			// one (ADR-038) when it comes for itself.
+			ClientDID: grant.ClientDID,
 		}
 		// A token holds roles by its label, its name, so a grant is one kind of
 		// line whether it names a person or a program. In every namespace the

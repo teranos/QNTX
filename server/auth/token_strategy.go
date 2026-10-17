@@ -45,6 +45,12 @@ type TokenSession struct {
 	// Namespace is the door the client was minted at (ADR-032), which is
 	// where the token acts.
 	Namespace string `json:"namespace"`
+	// ClientItself is the client asking on its own behalf (RFC 6749 §4.4):
+	// nobody said yes at a passkey, so the token is the client's and not a
+	// person's. MintedBy is still the person who minted the door, which is
+	// the token's provenance and what revoking them reaches — but what the
+	// token may do is a token's, never theirs.
+	ClientItself bool `json:"client_itself,omitempty"`
 }
 
 // Clone is the whole session rather than the half a promoted method copies.

@@ -288,6 +288,14 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 	if level == "" {
 		return errors.WithStack(fosite.ErrAccessDenied.WithHintf("%s is no longer admitted, so no token speaks for them", session.MintedBy))
 	}
+	// RFC 6749 §4.4: the client asked on its own behalf and nobody said yes
+	// at a passkey, so the token is not the person's. It is a bearer of the
+	// kind any program holds — what it reaches is what lines grant its label,
+	// never what whoever minted the door may do. The person is still asked
+	// after, just above: struck out of am.toml, their client's tokens stop.
+	if session.ClientItself {
+		level = LevelToken
+	}
 	var expiresAt *time.Time
 	if until := session.GetExpiresAt(fosite.AccessToken); !until.IsZero() {
 		expiresAt = &until
@@ -518,11 +526,15 @@ func clientFor(found Client) *fosite.DefaultClient {
 			ResponseTypes: []string{"code"},
 		}
 	}
+	// client_credentials is the client asking for a token on its own behalf
+	// (RFC 6749 §4.4), with the same secret and no person in it. A node is
+	// left out: it is sent codes for the people it sends here, and a token
+	// for itself is not something it has ever asked for.
 	return &fosite.DefaultClient{
 		ID:            found.DID,
 		Secret:        []byte(found.DID),
 		RedirectURIs:  []string{found.ReturnAddress},
-		GrantTypes:    []string{"authorization_code", "refresh_token"},
+		GrantTypes:    []string{"authorization_code", "refresh_token", "client_credentials"},
 		ResponseTypes: []string{"code"},
 	}
 }
@@ -533,11 +545,15 @@ func clientFor(found Client) *fosite.DefaultClient {
 // token the client was minted as, and a DID is form-urlencoded first because
 // it carries colons and Basic auth splits on the first one.
 //
-// Two grants arrive here. grant_type=authorization_code brings the code, the
+// Three grants arrive here. grant_type=authorization_code brings the code, the
 // redirect_uri it was sent to and the PKCE code_verifier: the person has just
 // said yes at the passkey. grant_type=refresh_token brings a refresh token
 // and no person at all — the yes already given, spent again within the thirty
-// days it lasts (RFC 6749 §6).
+// days it lasts (RFC 6749 §6). grant_type=client_credentials brings nothing
+// but the secret: the client asking for a token of its own, for itself, with
+// no person anywhere in it (RFC 6749 §4.4). It is handed no refresh token,
+// because it needs none — it has the secret, and asking again is this same
+// request (§4.4.3).
 //
 // fosite does the exchange and the store writes the token down with the DID
 // the session carries. The answer is the token QNTX already hands out:
@@ -575,6 +591,17 @@ func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
 		provider.WriteAccessError(ctx, w, request, err)
 		return
 	}
+	// The client asking for itself: fosite has authenticated it and granted
+	// nothing to carry, so what the token says is read off the client's own
+	// record here, before the strategy mints anything.
+	if request.GetGrantTypes().ExactOne(clientCredentialsGrant) {
+		if err := h.asTheClient(request); err != nil {
+			h.logger.Infow("Token request refused",
+				"client", request.GetClient().GetID(), "grant", clientCredentialsGrant, "error", err)
+			provider.WriteAccessError(ctx, w, request, err)
+			return
+		}
+	}
 	response, err := provider.NewAccessResponse(ctx, request)
 	if err != nil {
 		// fosite's error reads as its RFC code alone, and the reason is in the
@@ -587,11 +614,43 @@ func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if session, ok := request.GetSession().(*TokenSession); ok {
-		h.logger.Infow("A code was exchanged for a token",
+		said := "A code was exchanged for a token"
+		if session.ClientItself {
+			said = "A client was given a token of its own"
+		}
+		h.logger.Infow(said,
 			"client", request.GetClient().GetID(), "did", session.DID, "minted_by", session.MintedBy,
 			"namespace", session.Namespace)
 	}
 	provider.WriteAccessResponse(ctx, w, request, response)
+}
+
+// clientCredentialsGrant is RFC 6749 §4.4's grant_type.
+const clientCredentialsGrant = "client_credentials"
+
+// asTheClient fills the session for a client_credentials request. No person
+// said yes, so there is none to carry: what the token says is the client's
+// own record. Where it acts is the door the client was minted at, the same
+// as a token the flow issues for a person; who answers for it is whoever
+// minted that door, which is the provenance every token here carries and
+// what striking them out of am.toml reaches.
+//
+// What it may do is settled in the store (CreateAccessTokenSession): a
+// token's, never the minter's.
+func (h *Handler) asTheClient(request fosite.AccessRequester) error {
+	session, err := tokenSessionOf(request)
+	if err != nil {
+		return errors.WithStack(fosite.ErrServerError.WithWrap(err).WithDebug(err.Error()))
+	}
+	client, ok := h.clientByDID(request.GetClient().GetID())
+	if !ok {
+		return errors.WithStack(fosite.ErrInvalidClient.WithHintf("the client %s no longer answers", request.GetClient().GetID()))
+	}
+	session.Subject = client.DID
+	session.ClientItself = true
+	session.MintedBy = client.MintedBy
+	session.Namespace = client.Namespace
+	return nil
 }
 
 // handleAuthorize is a client sending somebody home. fosite reads the

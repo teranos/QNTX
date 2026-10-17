@@ -29,7 +29,7 @@ func TestTheAuthorizationServerDocumentNamesTheDoors(t *testing.T) {
 	assert.Equal(t, []string{"code"}, doc.ResponseTypesSupported)
 	// Every grant, because a client reads this to learn what the node does and
 	// one left out is a grant nothing will ever ask for.
-	assert.Equal(t, []string{"authorization_code", "refresh_token"}, doc.GrantTypesSupported)
+	assert.Equal(t, []string{"authorization_code", "refresh_token", "client_credentials"}, doc.GrantTypesSupported)
 	assert.Equal(t, []string{"S256"}, doc.CodeChallengeMethodsSupported)
 	// A node signs as its did:key, and nothing else signs here.
 	assert.ElementsMatch(t, []string{"client_secret_basic", "client_secret_post", "private_key_jwt"}, doc.TokenEndpointAuthMethodsSupported)

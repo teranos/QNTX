@@ -100,29 +100,21 @@ func TestANodeNotDeclaredIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, asking(h, did, assertion(t, key, did, nodeOrigin+tokenPath, "one", time.Now().Add(time.Minute))))
 }
 
-// No client asks for a token of its own, a node or an app.
-func TestNoClientGetsATokenOfItsOwn(t *testing.T) {
-	h, store, appDID := authorizingHandler(t)
+// An app asks for a token of its own (RFC 6749 §4.4); a node does not. It is
+// sent codes for the people it sends here, and has never asked for itself.
+func TestANodeGetsNoTokenOfItsOwn(t *testing.T) {
+	h, _, _ := authorizingHandler(t)
 	key, nodeDID := otherNode(t)
 	require.NoError(t, h.DeclarePeer(peerName, nodeDID, NamespaceDefault, elsewhereOrigin, elsewhereOrigin))
-
-	app := url.Values{}
-	app.Set("grant_type", "client_credentials")
-	r := httptest.NewRequest(http.MethodPost, tokenPath, strings.NewReader(app.Encode()))
-	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	r.SetBasicAuth(url.QueryEscape(appDID), url.QueryEscape(clientSecret(t, store, appDID)))
-	w := httptest.NewRecorder()
-	h.handleToken(w, r)
-	assert.NotEqual(t, http.StatusOK, w.Code, w.Body.String())
 
 	node := url.Values{}
 	node.Set("grant_type", "client_credentials")
 	node.Set("client_id", nodeDID)
 	node.Set("client_assertion_type", clientAssertionType)
 	node.Set("client_assertion", assertion(t, key, nodeDID, nodeOrigin+tokenPath, "one", time.Now().Add(time.Minute)))
-	r = httptest.NewRequest(http.MethodPost, tokenPath, strings.NewReader(node.Encode()))
+	r := httptest.NewRequest(http.MethodPost, tokenPath, strings.NewReader(node.Encode()))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	w = httptest.NewRecorder()
+	w := httptest.NewRecorder()
 	h.handleToken(w, r)
 	assert.NotEqual(t, http.StatusOK, w.Code, w.Body.String())
 }
