@@ -80,6 +80,8 @@ export function createPiElement(): Element {
         id: ELEMENT_ID,
         title: 'Pi',
         symbol: Pi,
+        // Pi is said to as Claude is: it opens at what was said last.
+        opensAt: 'end',
         renderContent: () => {
             const body = document.createElement('div');
             body.className = 'content-area claude';

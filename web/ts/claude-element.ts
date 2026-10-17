@@ -3,7 +3,7 @@
 // What it is and why is ADR-048's; this draws what the claude signum answers.
 
 import type { Element } from '@teranos/elements';
-import { preventDrag, tray } from '@teranos/elements';
+import { declareSay, preventDrag, tray } from '@teranos/elements';
 import { apiJson } from './client';
 import { log, SEG } from './logger.ts';
 import { Claude } from './sym';
@@ -105,6 +105,8 @@ export function drawClaude(body: HTMLElement, node: NodeAgent = theNode, every: 
     send.textContent = 'Say';
     const form = part('div', 'claude-say');
     form.append(mode, says, send);
+    // "the inputfield take up the entire bottom of the screen for chat elements like claude or pi"
+    declareSay(says);
     // What is typed and pressed here is not a drag of the element.
     preventDrag(form);
     preventDrag(session);
@@ -219,6 +221,8 @@ export function createClaudeElement(): Element {
         id: ELEMENT_ID,
         title: 'Claude',
         symbol: Claude,
+        // "claude element should not start at top when opening requiring user to scroll down every single time"
+        opensAt: 'end',
         renderContent: () => {
             const body = part('div', 'content-area claude claude-brand');
             drawClaude(body);
