@@ -119,7 +119,7 @@ func follow(ctx context.Context, stream string, runs func() bool, each func(Mess
 		if readErr == nil {
 			var m Message
 			// A line that is not a message is nothing the stream promised.
-			if json.Unmarshal(partial, &m) == nil {
+			if unmarshalErr := json.Unmarshal(partial, &m); unmarshalErr == nil {
 				answered = answered || answerFrom(&answer, m)
 				each(m)
 			}
