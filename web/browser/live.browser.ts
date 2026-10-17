@@ -214,8 +214,9 @@ test('every element, live, can be reached whole', async ({ page }) => {
         try {
             await page.evaluate((id) => window.specimens!.open(id), id);
             const element = page.locator(`[data-element-id="${id}"]`);
-            await expect.poll(() => element.evaluate((el) => (el as HTMLElement).dataset.form), { message: `${id} is still a dot` }).not.toBe('dot');
-            await expect.poll(() => element.evaluate((el) => el.classList.contains('morphing'))).toBe(false);
+            // As long as the wire is waited on: a simulated iPhone opens an element slower than the default allows.
+            await expect.poll(() => element.evaluate((el) => (el as HTMLElement).dataset.form), { message: `${id} is still a dot`, timeout: QUIET_FOR_MS }).not.toBe('dot');
+            await expect.poll(() => element.evaluate((el) => el.classList.contains('morphing')), { message: `${id} is still opening`, timeout: QUIET_FOR_MS }).toBe(false);
             // An element that asks the node all the time is never quiet: it is measured once the wait is over.
             await quiet(page, wire);
             const past = await unreachable(page, id);
