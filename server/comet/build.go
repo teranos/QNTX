@@ -129,7 +129,12 @@ func (b Builder) ground(ctx context.Context, work, platform, sand, of, kept stri
 			return err
 		}
 	}
-	if platform != native {
+	if _, linux := linuxTargets[platform]; linux && platform != native {
+		if err := b.buildLinux(ctx, src, env, platform); err != nil {
+			return err
+		}
+	}
+	if _, darwin := darwinTargets[platform]; darwin {
 		if err := b.buildDarwin(ctx, src, env, platform); err != nil {
 			return err
 		}
@@ -225,6 +230,74 @@ func (b Builder) buildDarwin(ctx context.Context, src string, env []string, plat
 		{"shell", "--inputs-from", src, "nixpkgs#lld_21", "-c", "ld64.lld", "-arch", target.arch,
 			"-platform_version", "macos", "14.0", "14.0", "-syslibroot", stubs.SDK, "-o", "ground", "ground.o",
 			"-lSystem", "-lobjc", "-lsqlite3", "-lcurl", "-lpthread", "-lm", stubs.Git2},
+	}
+	for _, args := range steps {
+		if err := b.step(ctx, src, env, args); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// linuxTargets are the Linux platforms a comet is linked for on another Linux: LDC's triple and the
+// dynamic loader glibc names for it.
+var linuxTargets = map[string]struct{ triple, loader string }{
+	"aarch64-linux": {"aarch64-linux-gnu", "ld-linux-aarch64.so.1"},
+	"x86_64-linux":  {"x86_64-linux-gnu", "ld-linux-x86-64.so.2"},
+}
+
+// buildLinux builds ground in src for a Linux platform the node does not run: LDC compiles for its
+// triple, and ld.lld links against that platform's glibc, sqlite, curl, libgit2 and libgcc, fetched
+// from the binary cache at ground's pin and built nowhere.
+func (b Builder) buildLinux(ctx context.Context, src string, env []string, platform string) error {
+	target := linuxTargets[platform]
+	stamp := []byte(time.Now().UTC().Format("2006-01-02T15:04:05Z") + "\n")
+	if err := os.WriteFile(filepath.Join(src, ".builddate"), stamp, 0o644); err != nil {
+		return errors.Wrapf(err, "failed to write the build date in %s", src)
+	}
+	sources, err := Sources(src)
+	if err != nil {
+		return err
+	}
+	libs := filepath.Join(src, ".comet-libs")
+	if err := os.MkdirAll(libs, 0o755); err != nil {
+		return errors.Wrapf(err, "failed to make %s", libs)
+	}
+	held := map[string]string{}
+	for _, lib := range []string{"glibc.out", "sqlite.out", "curl.out", "libgit2.lib", "gcc.cc"} {
+		link := filepath.Join(libs, lib)
+		if err := b.step(ctx, src, env, []string{"build", "--out-link", link, "--max-jobs", "0", "--system", platform,
+			"--inputs-from", src, "nixpkgs#" + lib}); err != nil {
+			return errors.Wrapf(err, "%s for %s is not in the binary cache at ground's pin", lib, platform)
+		}
+		path, err := filepath.EvalSymlinks(link)
+		if err != nil {
+			return errors.Wrapf(err, "the %s nix fetched was not read at %s", lib, link)
+		}
+		held[lib] = path
+	}
+	found, err := filepath.Glob(filepath.Join(held["gcc.cc"], "lib", "gcc", "*", "*", "libgcc.a"))
+	if err != nil || len(found) != 1 {
+		return errors.Newf("one libgcc.a is under %s/lib/gcc for %s, and %d were found", held["gcc.cc"], platform, len(found))
+	}
+	libgcc := filepath.Dir(found[0])
+	glibc := filepath.Join(held["glibc.out"], "lib")
+	paths := []string{glibc, filepath.Join(held["sqlite.out"], "lib"), filepath.Join(held["curl.out"], "lib"), filepath.Join(held["libgit2.lib"], "lib")}
+	link := []string{"shell", "--inputs-from", src, "nixpkgs#lld_21", "-c", "ld.lld", "-o", "ground",
+		"-dynamic-linker", filepath.Join(glibc, target.loader),
+		filepath.Join(glibc, "crt1.o"), filepath.Join(glibc, "crti.o"), filepath.Join(libgcc, "crtbegin.o"), "ground.o",
+		"-rpath", strings.Join(paths, ":")}
+	for _, p := range append(paths, libgcc) {
+		link = append(link, "-L"+p)
+	}
+	link = append(link, "-lsqlite3", "-lcurl", "-lgit2", "-lpthread", "-lm", "-ldl", "-lrt", "-lc", "-lgcc",
+		filepath.Join(libgcc, "crtend.o"), filepath.Join(glibc, "crtn.o"))
+	steps := [][]string{
+		b.inGround(src, "make", "wind"),
+		b.inGround(src, "tools/wind"),
+		b.inGround(src, append([]string{"ldc2", "-betterC", "--lowmem", "-mtriple=" + target.triple, "-O", "-release",
+			"-I=source", "-J=.", "-c", "--singleobj", "-of=ground.o"}, sources...)...),
+		link,
 	}
 	for _, args := range steps {
 		if err := b.step(ctx, src, env, args); err != nil {

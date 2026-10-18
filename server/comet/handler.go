@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,8 +79,13 @@ func (h Handler) Start(n Name) error {
 	if err != nil {
 		return err
 	}
-	// A Darwin comet built on the box links Apple's stubs (ADR-050, The stubs).
-	if n.Platform != native {
+	// A Darwin comet built on the box links Apple's stubs (ADR-050, The stubs); another Linux
+	// links what the binary cache holds for it, on a Linux node.
+	_, linux := linuxTargets[n.Platform]
+	if linux && n.Platform != native && !strings.HasSuffix(native, "-linux") {
+		return errors.Newf("this node builds %s natively, and links another Linux only from a Linux", native)
+	}
+	if _, darwin := darwinTargets[n.Platform]; darwin && n.Platform != native {
 		stubs, err := Stubs(n.Platform)
 		if err != nil {
 			return errors.Wrapf(err, "this node builds %s natively, and a comet for %s links Apple's stubs", native, n.Platform)
