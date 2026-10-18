@@ -46,7 +46,8 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s to build the agent's ground in", work)
 	}
-	return b.ground(ctx, work, platform, AgentDeclaration(filepath.Join(home, "work"), url), "agent:"+filepath.Base(home), AgentGround(home))
+	sand := map[string]string{"comet.pbt": AgentDeclaration(filepath.Join(home, "work"), url)}
+	return b.ground(ctx, work, platform, sand, "agent:"+filepath.Base(home), AgentGround(home))
 }
 
 // agentBuilds is what each agent's last ground build came to, by its home, until one stands.

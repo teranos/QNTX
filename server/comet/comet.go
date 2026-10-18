@@ -24,8 +24,24 @@ import (
 // Platforms are the systems ground's flake names, as ground names the one it was built for.
 var Platforms = map[string]bool{"x86_64-linux": true, "aarch64-linux": true, "x86_64-darwin": true, "aarch64-darwin": true}
 
-// Name is one comet: a repository, for one platform.
-type Name struct{ Owner, Repo, Platform string }
+// Name is one comet: a repository, for one platform, carrying one machine's controls.
+// Machine is the owner/repo whose controls/ hold that machine's pbt: each machine's are in its own repository.
+type Name struct{ Owner, Repo, Platform, Machine string }
+
+// MachineOf is the owner/repo a person named as the machine a comet carries the controls of.
+func MachineOf(named string) (string, error) {
+	refused := errors.Newf("%q names no machine: a machine is the owner/repo whose controls/ hold its pbt, as machine={owner}/{repo}", named)
+	if strings.Count(named, "/") != 1 || strings.HasPrefix(named, "/") || strings.HasSuffix(named, "/") || strings.ContainsAny(named, " ?#") {
+		return "", refused
+	}
+	for _, part := range strings.Split(named, "/") {
+		// A name that is only dots climbs out of where the machine is unpacked.
+		if strings.Trim(part, ".") != part {
+			return "", refused
+		}
+	}
+	return named, nil
+}
 
 // Key is the comet as its path names it: owner/repo/platform.
 func (n Name) Key() string { return n.Owner + "/" + n.Repo + "/" + n.Platform }
@@ -158,7 +174,13 @@ func Names(dir string) ([]Name, error) {
 	for _, path := range found {
 		platform := filepath.Dir(path)
 		repo := filepath.Dir(platform)
-		names = append(names, Name{Owner: filepath.Base(filepath.Dir(repo)), Repo: filepath.Base(repo), Platform: filepath.Base(platform)})
+		n := Name{Owner: filepath.Base(filepath.Dir(repo)), Repo: filepath.Base(repo), Platform: filepath.Base(platform)}
+		machine, err := os.ReadFile(path + ".machine")
+		if err != nil {
+			return nil, errors.Wrapf(err, "the comet at %s does not say which machine's controls it carries", path)
+		}
+		n.Machine = string(machine)
+		names = append(names, n)
 	}
 	return names, nil
 }

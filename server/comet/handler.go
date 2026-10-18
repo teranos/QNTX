@@ -62,6 +62,13 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodPost {
+		// "A person configures controls; the model is on the enforced side of them"
+		machine, err := MachineOf(r.URL.Query().Get("machine"))
+		if err != nil {
+			h.Refuse(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		n.Machine = machine
 		if err := h.Start(n); err != nil {
 			h.Refuse(w, http.StatusUnprocessableEntity, err.Error())
 			return

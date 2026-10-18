@@ -65,12 +65,57 @@ func (b Builder) buildIn(ctx context.Context, n Name, work string) error {
 	if err != nil {
 		return err
 	}
+	// "we can maintain the pbt for the ground comets that impact this laptop on l"
+	machineOwner, machineRepo, named := strings.Cut(n.Machine, "/")
+	if !named {
+		return errors.Newf("the comet of %s names no machine as owner/repo: %q", n.Key(), n.Machine)
+	}
+	machine := filepath.Join(work, "machine")
+	machineRev, err := b.unpack(ctx, Source{Owner: machineOwner, Repo: machineRepo}, work, machine)
+	if err != nil {
+		return err
+	}
+	sand, err := machineSand(machine, n.Machine)
+	if err != nil {
+		return err
+	}
+	sand["comet.pbt"] = Declaration(checkout, n.Owner, n.Repo)
 	kept, err := Path(n)
 	if err != nil {
 		return err
 	}
-	of := n.Owner + "/" + n.Repo + "@" + short(rev)
-	return errors.Wrapf(b.ground(ctx, work, n.Platform, Declaration(checkout, n.Owner, n.Repo), of, kept), "the comet of %s did not build", n.Key())
+	of := n.Owner + "/" + n.Repo + "@" + short(rev) + " " + n.Machine + "@" + short(machineRev)
+	if err := b.ground(ctx, work, n.Platform, sand, of, kept); err != nil {
+		return errors.Wrapf(err, "the comet of %s did not build", n.Key())
+	}
+	return errors.Wrapf(os.WriteFile(kept+".machine", []byte(n.Machine), 0o644), "the comet of %s was kept, and the machine it carries was not written beside it", n.Key())
+}
+
+// machineSand is each pbt in the machine repository's controls/, by the name it lands under in
+// ground's controls/local: a machine's controls are the ones that stay on it. Its qntx.pbt names
+// the node the comet reports to and lands from, so a machine without one is no machine.
+func machineSand(machine, named string) (map[string]string, error) {
+	node := filepath.Join(machine, "controls", "qntx.pbt")
+	info, err := os.Stat(node)
+	if err != nil {
+		return nil, errors.Wrapf(err, "%s holds no controls/qntx.pbt, so it names no node for its comet", named)
+	}
+	if info.IsDir() {
+		return nil, errors.Newf("%s's controls/qntx.pbt is a directory, where the node is named in a file", named)
+	}
+	found, err := filepath.Glob(filepath.Join(machine, "controls", "*.pbt"))
+	if err != nil {
+		return nil, errors.Wrapf(err, "the controls of %s were not listed", named)
+	}
+	sand := map[string]string{}
+	for _, path := range found {
+		pbt, err := os.ReadFile(path)
+		if err != nil {
+			return nil, errors.Wrapf(err, "the control %s of %s was not read", path, named)
+		}
+		sand["machine-"+filepath.Base(path)] = string(pbt)
+	}
+	return sand, nil
 }
 
 // short is a rev as git describe names one.
@@ -99,7 +144,7 @@ func (b Builder) unpack(ctx context.Context, source Source, work, dir string) (s
 
 // ground builds ground's main in work with sand beside its own controls, for platform, and keeps
 // it at kept with its digest beside it. of names what the sand was built from, for its version.
-func (b Builder) ground(ctx context.Context, work, platform, sand, of, kept string) error {
+func (b Builder) ground(ctx context.Context, work, platform string, sand map[string]string, of, kept string) error {
 	src := filepath.Join(work, "ground")
 	groundRev, err := b.unpack(ctx, Ground, work, src)
 	if err != nil {
@@ -112,8 +157,10 @@ func (b Builder) ground(ctx context.Context, work, platform, sand, of, kept stri
 	if err := os.MkdirAll(local, 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s", local)
 	}
-	if err := os.WriteFile(filepath.Join(local, "comet.pbt"), []byte(sand), 0o644); err != nil {
-		return errors.Wrapf(err, "failed to write the comet's sand in %s", local)
+	for name, pbt := range sand {
+		if err := os.WriteFile(filepath.Join(local, name), []byte(pbt), 0o644); err != nil {
+			return errors.Wrapf(err, "failed to write the comet's %s in %s", name, local)
+		}
 	}
 	if err := os.Mkdir(filepath.Join(work, "tmp"), 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make the comet's temp directory in %s", work)

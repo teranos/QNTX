@@ -257,7 +257,7 @@ const SCRY_IS = 'Scry is local inference through llama.cpp with Metal, a plugin 
 const COMET_UNSEEN = 'The comet does not exist yet. Ground is built where it runs, by make install, or fetched from GitHub Releases. This node names no comets.';
 
 // What stays unknown once the node names them.
-const COMET_SEEN = 'The node builds a comet when POST /comet/{owner}/{repo}/{platform} asks, and again each time its main moves; a head pressed here opens the comet and starts none. Which comet a session runs is not read here.';
+const COMET_SEEN = 'The node builds a comet when POST /comet/{owner}/{repo}/{platform}?machine={owner}/{repo} asks, carrying that machine\'s controls, and again each time its main moves; a head pressed here opens the comet and starts none. Which comet a session runs is not read here.';
 
 // How far down its thread each star hangs: neighbours hang far apart, so what
 // is written under one never reaches the next.

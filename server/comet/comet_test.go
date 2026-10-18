@@ -34,6 +34,7 @@ func TestAmGroundNamesEachCometTheNodeKeeps(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
 	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
 	require.NoError(t, KeepDigest(kept))
+	require.NoError(t, os.WriteFile(kept+".machine", []byte("abcd-nl/l"), 0o644))
 	// A build still landing is not a comet yet.
 	require.NoError(t, os.WriteFile(kept+".new", []byte("half"), 0o755))
 
@@ -120,7 +121,7 @@ func TestACometForAPlatformWithoutItsStubsIsRefusedWithWhy(t *testing.T) {
 		other = "x86_64-linux"
 	}
 	got := httptest.NewRecorder()
-	handler().ServeHTTP(got, httptest.NewRequest(http.MethodPost, "/comet/abcd-nl/grove/"+other, nil))
+	handler().ServeHTTP(got, httptest.NewRequest(http.MethodPost, "/comet/abcd-nl/grove/"+other+"?machine=abcd-nl/l", nil))
 	assert.Equal(t, http.StatusUnprocessableEntity, got.Code)
 	assert.Contains(t, got.Body.String(), "this node builds "+native+" natively")
 }
@@ -157,19 +158,48 @@ func TestGroundsSourcesAreItsModulesAndNoneOfItsTests(t *testing.T) {
 	assert.Equal(t, []string{"source/main.d", "source/ritual/run.d"}, sources)
 }
 
+// "A person configures controls; the model is on the enforced side of them"
+func TestACometCarriesTheControlsOfTheMachineAPersonNamed(t *testing.T) {
+	named, err := MachineOf("abcd-nl/l")
+	require.NoError(t, err)
+	assert.Equal(t, "abcd-nl/l", named)
+	for _, refused := range []string{"", "abcd-nl", "abcd-nl/", "/l", "abcd-nl/l/more", "../l", "abcd-nl/l?x"} {
+		_, err := MachineOf(refused)
+		assert.Error(t, err, refused)
+	}
+
+	machine := t.TempDir()
+	_, err = machineSand(machine, "abcd-nl/l")
+	assert.ErrorContains(t, err, "holds no controls/qntx.pbt")
+	require.NoError(t, os.MkdirAll(filepath.Join(machine, "controls"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(machine, "controls", "qntx.pbt"), []byte("qntx {\n  url: \"http://127.0.0.1:8780\"\n}\n"), 0o644))
+	sand, err := machineSand(machine, "abcd-nl/l")
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"machine-qntx.pbt": "qntx {\n  url: \"http://127.0.0.1:8780\"\n}\n"}, sand)
+
+	// A comet that does not say which machine it carries is not rebuilt as if it carried none.
+	dir := t.TempDir()
+	kept := filepath.Join(dir, "abcd-nl", "grove", "x86_64-linux", "ground")
+	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+	_, err = Names(dir)
+	assert.ErrorContains(t, err, "does not say which machine")
+}
+
 func TestAPushRebuildsTheCometsItMoves(t *testing.T) {
 	dir := t.TempDir()
 	for _, key := range []string{"abcd-nl/grove/x86_64-linux", "abcd-nl/grove/aarch64-darwin", "abcd-nl/other/x86_64-linux"} {
 		kept := filepath.Join(dir, filepath.FromSlash(key), "ground")
 		require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
 		require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+		require.NoError(t, os.WriteFile(kept+".machine", []byte("abcd-nl/l"), 0o644))
 	}
 	kept, err := Names(dir)
 	require.NoError(t, err)
 	require.Len(t, kept, 3)
 
 	grove := MovedBy(kept, "abcd-nl/grove", "master", "master")
-	assert.ElementsMatch(t, []Name{{"abcd-nl", "grove", "x86_64-linux"}, {"abcd-nl", "grove", "aarch64-darwin"}}, grove)
+	assert.ElementsMatch(t, []Name{{"abcd-nl", "grove", "x86_64-linux", "abcd-nl/l"}, {"abcd-nl", "grove", "aarch64-darwin", "abcd-nl/l"}}, grove)
 	// A branch that is not the project's default moves nothing.
 	assert.Empty(t, MovedBy(kept, "abcd-nl/grove", "a-branch", "master"))
 	// Ground's main moves every comet, since every comet is built from it.
