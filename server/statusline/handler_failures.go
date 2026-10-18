@@ -50,9 +50,6 @@ func NewHandlerFailureLog() *HandlerFailureLog {
 
 // record appends a failure, dropping the oldest once the log is full.
 func (l *HandlerFailureLog) Record(f HandlerFailure) {
-	if l == nil {
-		return
-	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.failures = append(l.failures, f)
@@ -63,9 +60,6 @@ func (l *HandlerFailureLog) Record(f HandlerFailure) {
 
 // since returns the failures inside the window, newest first.
 func (l *HandlerFailureLog) Since(window time.Duration) []HandlerFailure {
-	if l == nil {
-		return nil
-	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	cutoff := time.Now().Add(-window).UnixMilli()

@@ -55,9 +55,6 @@ func NewNewsLog() *NewsLog { return &NewsLog{left: map[string]int64{}} }
 
 // leave puts one item on the row. The same id twice is the newer one once.
 func (l *NewsLog) Leave(n News) {
-	if l == nil {
-		return
-	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	n.AtMs = time.Now().UnixMilli()
@@ -78,9 +75,6 @@ func (l *NewsLog) Leave(n News) {
 
 // drop takes an item off the row before its hold: what it said is over.
 func (l *NewsLog) Drop(id string) {
-	if l == nil {
-		return
-	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for i := range l.items {
@@ -93,7 +87,7 @@ func (l *NewsLog) Drop(id string) {
 
 // since is what is on the row for one caller now, oldest first.
 func (l *NewsLog) Since(caller string, nowMs int64) []News {
-	if l == nil || caller == "" {
+	if caller == "" {
 		return nil
 	}
 	l.mu.Lock()
@@ -111,7 +105,7 @@ func (l *NewsLog) Since(caller string, nowMs int64) []News {
 // the row or past its hold, and how many conclusions it left for them since
 // this process began. The log is bounded, so the count can pass what it holds.
 func (l *NewsLog) LeftFor(caller string) ([]News, int64) {
-	if l == nil || caller == "" {
+	if caller == "" {
 		return nil, 0
 	}
 	l.mu.Lock()
@@ -128,9 +122,6 @@ func (l *NewsLog) LeftFor(caller string) ([]News, int64) {
 
 // ByID is one item for one caller, held or not.
 func (l *NewsLog) ByID(caller, id string) (News, bool) {
-	if l == nil {
-		return News{}, false
-	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, n := range l.items {

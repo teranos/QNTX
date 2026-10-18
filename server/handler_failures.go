@@ -8,9 +8,6 @@ import (
 
 // noteHandlerFailure records one failed handler execution for the row.
 func (s *QNTXServer) noteHandlerFailure(f statusline.HandlerFailure) {
-	if s == nil || s.handlerFailures == nil {
-		return
-	}
 	if f.AtMs == 0 {
 		f.AtMs = time.Now().UnixMilli()
 	}

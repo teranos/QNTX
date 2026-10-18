@@ -19,7 +19,7 @@ const alice = "https://mastodon.example/@alice"
 func newsRow(l *NewsLog) *StatusLineHandler {
 	h := NewStatusLineHandler(nil, nil, nil,
 		func() storage.Watchers { return nil },
-		func() *HandlerFailureLog { return nil }, nil)
+		func() *HandlerFailureLog { return NewHandlerFailureLog() }, nil)
 	h.News = func() *NewsLog { return l }
 	return h
 }

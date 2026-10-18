@@ -91,7 +91,7 @@ func TestAWaitIsNeverCountedAsLeft(t *testing.T) {
 func TestWhatLeftTheRowIsStillSaid(t *testing.T) {
 	l := statusline.NewNewsLog()
 	l.Leave(statusline.News{ID: "p-0:old", For: alice, Item: statusline.StatusItem{Name: "ci", Note: "success main", Symbol: statusline.SymbolWell}, UntilMs: time.Now().Add(-time.Hour).UnixMilli()})
-	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l, handlerFailures: statusline.NewHandlerFailureLog()}
 
 	answer, refused := s.amGround(auth.WithAdmission(context.Background(), tokenCaller("did:key:alice")), sigil.Sent{})
 	require.Nil(t, refused)
@@ -104,7 +104,7 @@ func TestWhatLeftTheRowIsStillSaid(t *testing.T) {
 func TestAmGroundForNobody(t *testing.T) {
 	l := statusline.NewNewsLog()
 	left(l, statusline.News{ID: "p-1", For: alice, Item: statusline.StatusItem{Name: "ci", Symbol: statusline.SymbolWell}})
-	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l, handlerFailures: statusline.NewHandlerFailureLog()}
 
 	answer, refused := s.amGround(context.Background(), sigil.Sent{})
 	require.Nil(t, refused)
@@ -145,7 +145,7 @@ func TestAmGroundSaysWhatUgPosted(t *testing.T) {
 	for _, as := range rows {
 		require.NoError(t, store.CreateAttestation(as))
 	}
-	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: statusline.NewNewsLog(), handlerFailures: statusline.NewHandlerFailureLog(), held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
 	asked := rootRequest(httptest.NewRequest(http.MethodGet, "/am/ground", nil))
 
 	answer, refused := s.amGround(sigil.WithCaller(context.Background(), asked), sigil.Sent{})

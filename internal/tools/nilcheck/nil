@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2599 in 374 files.
+# 2588 in 375 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # server/a2a_route.go: 2, an extended card lacking what the spec requires is refused, as the public card is (a2a_card.go); and a node running without auth has no handler, so it declares no peers.
@@ -312,6 +312,7 @@
 2	server/github_deliveries.go
 1	server/github_parity.go
 3	server/github_webhook.go
+3	server/handler_failures.go
 7	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
@@ -327,6 +328,7 @@
 2	server/namespaces/named.go
 15	server/namespaces/universe.go
 4	server/node_records.go
+14	server/node_stats.go
 11	server/operational_watchdog.go
 5	server/parity/apiwords.go
 1	server/parity/claudecode.go
@@ -371,12 +373,11 @@
 13	server/signa.go
 56	server/staand.go
 9	server/standing_observer.go
-4	server/statusline/asks.go
+2	server/statusline/asks.go
 3	server/statusline/carousel.go
-16	server/statusline/handler_failures.go
+9	server/statusline/handler_failures.go
 28	server/statusline/handlers.go
-12	server/statusline/news.go
-14	server/node_stats.go
+7	server/statusline/news.go
 1	server/statusline/plugin_frames.go
 7	server/statusline/plugin_row.go
 5	server/statusline/watchers.go
