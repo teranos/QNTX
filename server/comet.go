@@ -103,7 +103,8 @@ func (s *QNTXServer) HandleComet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.Method {
-	case http.MethodGet:
+	// HEAD is ground asking whether its comet moved: the digest, and none of the bytes.
+	case http.MethodGet, http.MethodHead:
 		path, err := cometPath(owner, repo)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
@@ -132,7 +133,7 @@ func (s *QNTXServer) HandleComet(w http.ResponseWriter, r *http.Request) {
 		})
 		w.WriteHeader(http.StatusAccepted)
 	default:
-		writeError(w, http.StatusMethodNotAllowed, r.Method+" /comet/"+owner+"/"+repo+": a comet is read with GET and built with POST")
+		writeError(w, http.StatusMethodNotAllowed, r.Method+" /comet/"+owner+"/"+repo+": a comet is read with GET, its digest with HEAD, and built with POST")
 	}
 }
 

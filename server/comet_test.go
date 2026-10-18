@@ -5,6 +5,8 @@ package server
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -45,6 +47,33 @@ func TestAmGroundNamesEachCometTheNodeKeeps(t *testing.T) {
 	none, err := heldComets(filepath.Join(dir, "nothing"))
 	require.NoError(t, err)
 	assert.Empty(t, none)
+}
+
+func TestACometIsServedWithItsDigestAndAskedForByIt(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	kept := filepath.Join(home, ".qntx", "comets", "abcd-nl", "grove", "ground")
+	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+	sum := sha256.Sum256([]byte("a comet"))
+	s := &QNTXServer{}
+
+	got := httptest.NewRecorder()
+	s.HandleComet(got, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove", nil))
+	assert.Equal(t, http.StatusOK, got.Code)
+	assert.Equal(t, hex.EncodeToString(sum[:]), got.Header().Get("X-Comet-Digest"))
+	assert.Equal(t, "a comet", got.Body.String())
+
+	// Asking whether it moved costs a header, not the binary.
+	head := httptest.NewRecorder()
+	s.HandleComet(head, httptest.NewRequest(http.MethodHead, "/comet/abcd-nl/grove", nil))
+	assert.Equal(t, http.StatusOK, head.Code)
+	assert.Equal(t, hex.EncodeToString(sum[:]), head.Header().Get("X-Comet-Digest"))
+	assert.Empty(t, head.Body.String())
+
+	none := httptest.NewRecorder()
+	s.HandleComet(none, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/other", nil))
+	assert.Equal(t, http.StatusNotFound, none.Code)
 }
 
 func TestCometSandIsGroundsControlsAndTheProjectsAlone(t *testing.T) {
