@@ -214,6 +214,11 @@ func TestAnAgentRunsUnderGroundOnceItsGroundAndSettingsStand(t *testing.T) {
 	assert.True(t, stop[1].AsyncRewake)
 }
 
+// "That is how the node knows which ground a session runs, and so which comet landed."
+func TestACometsRowsSayWhichRevsItWasBuiltFrom(t *testing.T) {
+	assert.Equal(t, "comet a798533 sbvh-nl/grove@2f81471\n", Version("a798533c1f2e3d4c5b6a7980", "sbvh-nl/grove@"+short("2f8147100aa")))
+}
+
 func TestTheAgentsSandIsItsWorkAndTheNode(t *testing.T) {
 	assert.Equal(t, "project {\n  path: \"/a/work\"\n}\n\nqntx {\n  url: \"http://127.0.0.1:8772\"\n}\n", AgentDeclaration("/a/work", "http://127.0.0.1:8772"))
 }

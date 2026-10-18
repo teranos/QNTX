@@ -61,39 +61,52 @@ func (b Builder) Build(ctx context.Context, n Name) error {
 // buildIn builds the comet in work and keeps it.
 func (b Builder) buildIn(ctx context.Context, n Name, work string) error {
 	checkout := filepath.Join(work, "project")
-	if err := b.unpack(ctx, Source{Owner: n.Owner, Repo: n.Repo}, work, checkout); err != nil {
+	rev, err := b.unpack(ctx, Source{Owner: n.Owner, Repo: n.Repo}, work, checkout)
+	if err != nil {
 		return err
 	}
 	kept, err := Path(n)
 	if err != nil {
 		return err
 	}
-	return errors.Wrapf(b.ground(ctx, work, n.Platform, Declaration(checkout, n.Owner, n.Repo), kept), "the comet of %s did not build", n.Key())
+	of := n.Owner + "/" + n.Repo + "@" + short(rev)
+	return errors.Wrapf(b.ground(ctx, work, n.Platform, Declaration(checkout, n.Owner, n.Repo), of, kept), "the comet of %s did not build", n.Key())
 }
 
-// unpack is source at its latest, unpacked into dir.
-func (b Builder) unpack(ctx context.Context, source Source, work, dir string) error {
+// short is a rev as git describe names one.
+func short(rev string) string { return rev[:min(len(rev), 7)] }
+
+// Version is what a comet's rows carry after ground in their source column: which ground's main
+// and which project rev it was built from, so the node knows which comet landed (ADR-050, Landing).
+func Version(groundRev, of string) string { return "comet " + short(groundRev) + " " + of + "\n" }
+
+// unpack is source at its latest, unpacked into dir, and that rev.
+func (b Builder) unpack(ctx context.Context, source Source, work, dir string) (string, error) {
 	rev, err := b.Node.Latest(ctx, source)
 	if err != nil {
-		return errors.Wrapf(err, "the latest of %s was not read", source.String())
+		return "", errors.Wrapf(err, "the latest of %s was not read", source.String())
 	}
 	tarball := dir + ".tar.gz"
 	if err := b.Node.Fetch(ctx, source, rev, tarball); err != nil {
-		return err
+		return "", err
 	}
 	if err := os.Mkdir(dir, 0o755); err != nil {
-		return errors.Wrapf(err, "failed to make %s", dir)
+		return "", errors.Wrapf(err, "failed to make %s", dir)
 	}
-	return errors.Wrapf(b.Node.Run(ctx, work, nil, "tar", "-xzf", tarball, "--strip-components=1", "-C", dir),
+	return rev, errors.Wrapf(b.Node.Run(ctx, work, nil, "tar", "-xzf", tarball, "--strip-components=1", "-C", dir),
 		"failed to unpack %s at %s", source.String(), rev)
 }
 
 // ground builds ground's main in work with sand beside its own controls, for platform, and keeps
-// it at kept with its digest beside it.
-func (b Builder) ground(ctx context.Context, work, platform, sand, kept string) error {
+// it at kept with its digest beside it. of names what the sand was built from, for its version.
+func (b Builder) ground(ctx context.Context, work, platform, sand, of, kept string) error {
 	src := filepath.Join(work, "ground")
-	if err := b.unpack(ctx, Ground, work, src); err != nil {
+	groundRev, err := b.unpack(ctx, Ground, work, src)
+	if err != nil {
 		return err
+	}
+	if err := os.WriteFile(filepath.Join(src, ".version"), []byte(Version(groundRev, of)), 0o644); err != nil {
+		return errors.Wrapf(err, "failed to write the comet's version in %s", src)
 	}
 	local := filepath.Join(src, "controls", "local")
 	if err := os.MkdirAll(local, 0o755); err != nil {
