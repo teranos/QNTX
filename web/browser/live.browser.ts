@@ -173,6 +173,37 @@ async function unreachable(page: Page, id: string): Promise<string[]> {
     });
 }
 
+// "claude element should not start at top when opening requiring user to scroll down every single time"
+
+// "the inputfield take up the entire bottom of the screen for chat elements like claude or pi"
+
+/** Where what was said last, or the field it is said from, is not where Elements puts it, on what the node holds. */
+async function misheld(page: Page, id: string): Promise<string[]> {
+    return page.locator(`[data-element-id="${id}"]`).evaluate((element) => {
+        const said: string[] = [];
+        const el = element as HTMLElement;
+        if (el.dataset.opensAt === 'end') {
+            const scroller = el.querySelector<HTMLElement>('[data-scroller="declared"]') ?? el.querySelector<HTMLElement>(':scope > [data-scroller="body"]');
+            if (scroller === null) said.push('opens at its end, and has no scroller to hold it there');
+            else {
+                const short = Math.round(scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop);
+                if (short > 2) said.push(`opens ${short}px short of its end, in ${scroller.clientHeight} of ${scroller.scrollHeight}`);
+            }
+            const second = el.querySelectorAll('[data-scroller="undeclared"]').length;
+            if (second > 0) said.push(`opens at its end, and ${second} more ${second === 1 ? 'thing scrolls' : 'things scroll'} in it`);
+        }
+        const field = el.querySelector<HTMLElement>('[data-say]');
+        const row = field?.parentElement;
+        if (field && row) {
+            const f = field.getBoundingClientRect();
+            const r = row.getBoundingClientRect();
+            if (f.width <= r.width - 16) said.push(`its field is ${Math.round(f.width)} wide in a row of ${Math.round(r.width)}`);
+            if (f.bottom <= r.bottom - 8) said.push(`its field ends ${Math.round(r.bottom - f.bottom)}px above the bottom of its row`);
+        }
+        return said;
+    });
+}
+
 test('every element, live, can be reached whole', async ({ page }) => {
     expect(API, 'QNTX_GATE_API names no node: the live gate has nothing to ask').not.toBe('');
     expect(TOKEN, 'QNTX_GATE_TOKEN is empty: the live gate has no user').not.toBe('');
@@ -236,7 +267,7 @@ test('every element, live, can be reached whole', async ({ page }) => {
             // An element that asks the node all the time is never quiet: it is measured once the wait is over.
             await quiet(page, wire);
             // What the node refused while it opened: what that call would have drawn was never measured.
-            const past = [...await unreachable(page, id), ...new Set(wire.refused.map((call) => `the node refused ${call}`))];
+            const past = [...await unreachable(page, id), ...await misheld(page, id), ...new Set(wire.refused.map((call) => `the node refused ${call}`))];
             if (past.length > 0) bad[id] = past;
         } catch (err: unknown) {
             // One that never stands is named with the rest, and the next one still opens.

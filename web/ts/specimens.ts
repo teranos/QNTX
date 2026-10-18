@@ -29,7 +29,7 @@ export interface Specimens {
     open(id: string): void;
     /** Throws, in the package's words, when anything in the element is wider than it. */
     fits(id: string): void;
-    /** The User window, opened from Users, on a User the fixtures hold. */
+    /** The User window, opened from Users, on a User the node lists. */
     openUser(u: UserRecord): void;
 }
 

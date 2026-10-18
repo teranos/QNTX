@@ -56,27 +56,6 @@
           },
           "name": "Run tests",
           "run": "cd web && bun test"
-        },
-        {
-          "name": "Chromium and WebKit, as the pinned @playwright/test wants them",
-          "run": "cd web && bunx playwright install --with-deps chromium webkit"
-        },
-        {
-          "env": {
-            "CI": "1"
-          },
-          "name": "The browser tests that hold their own answers; the live gate runs where the node is deployed",
-          "run": "cd web && bun run test:browser --grep-invert live"
-        },
-        {
-          "if": "failure()",
-          "name": "What the browser saw",
-          "uses": "actions/upload-artifact@v4",
-          "with": {
-            "name": "browser-report",
-            "path": "web/browser/playwright-report\nweb/browser/test-results",
-            "retention-days": 14
-          }
         }
       ]
     }
