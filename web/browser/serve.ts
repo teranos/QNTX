@@ -5,7 +5,7 @@
  */
 
 // Nothing here answers the API. The live gate asks the node for every call an
-// element makes (live.browser.ts); a test that holds its own answers gives them.
+// element makes (live.browser.ts).
 
 import { extname, join } from 'path';
 
@@ -67,7 +67,7 @@ Bun.serve({
             return new Response(file, { headers: { 'Content-Type': TYPES[extname(path)] ?? 'application/octet-stream' } });
         }
 
-        return new Response(`${req.method} ${path}: no node stands behind the specimens page; the test that opened it answers the API`, { status: 404 });
+        return new Response(`${req.method} ${path}: no node stands behind the specimens page; the live gate asks the node for it`, { status: 404 });
     },
 });
 
