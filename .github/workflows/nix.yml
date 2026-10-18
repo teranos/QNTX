@@ -40,40 +40,6 @@
         }
       }
     },
-    "build-docs": {
-      "if": "!(github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbvh-qntx[bot]' && github.head_ref == 'docs-pr')",
-      "runs-on": "ubuntu-latest",
-      "steps": [
-        {
-          "name": "Checkout repository",
-          "uses": "actions/checkout@v5"
-        },
-        {
-          "name": "Install Nix",
-          "uses": "cachix/install-nix-action@v30",
-          "with": {
-            "extra_nix_config": "experimental-features = nix-command flakes\n"
-          }
-        },
-        {
-          "name": "Setup Cachix",
-          "uses": "cachix/cachix-action@v14",
-          "with": {
-            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
-            "name": "qntx"
-          }
-        },
-        {
-          "name": "Build and validate docs",
-          "run": "nix build --show-trace .#checks.x86_64-linux.docs-site-builds\nnix build --show-trace .#checks.x86_64-linux.docs-site-links\n"
-        },
-        {
-          "if": "github.ref == 'refs/heads/main'",
-          "name": "Push to Cachix",
-          "run": "nix build .#docs-site --print-out-paths --no-link | cachix push qntx"
-        }
-      ]
-    },
     "build-go": {
       "if": "!(github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbvh-qntx[bot]' && github.head_ref == 'docs-pr')",
       "runs-on": "${{ matrix.os }}",
@@ -166,10 +132,6 @@
       "paths": [
         "**.nix",
         "flake.lock",
-        "docs/**",
-        "**.go",
-        "go.mod",
-        "go.sum",
         ".github/workflows/nix.yml"
       ]
     },

@@ -203,7 +203,6 @@
         "go.mod",
         "go.sum",
         "internal/tools/nilcheck/**",
-        "**/*.rs",
         ".github/workflows/go.yml"
       ]
     },
