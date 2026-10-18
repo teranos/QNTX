@@ -244,17 +244,18 @@ test('every element, live, can be reached whole', async ({ page }) => {
     const ids = await page.evaluate(() => window.specimens!.ids());
 
     const bad: Record<string, string[]> = {};
-    // Every element the tray offers, then the User window on the first User the node lists, as Users opens it.
+    // Every element the tray offers, then the User window on every User the node lists, as Users opens it:
+    // a full DID or a long email is one User's, not the first's.
     const opens: Array<{ id: string; open: () => Promise<void> }> = ids.map((id) => ({
         id, open: async () => { await page.evaluate((id) => window.specimens!.open(id), id); },
     }));
-    const first = await page.evaluate(async () => {
-        const users = await (await fetch('/auth/users')).json() as Array<{ id: string; display_name: string; level: string; created_at: number }>;
-        return users[0] ?? null;
-    });
-    if (first !== null) {
-        opens.push({ id: `user-element-${first.id}`, open: async () => { await page.evaluate((u) => window.specimens!.openUser(u), first); } });
+    const users = await page.evaluate(async () =>
+        await (await fetch('/auth/users')).json() as Array<{ id: string; display_name: string; level: string; created_at: number }>);
+    for (const user of users) {
+        opens.push({ id: `user-element-${user.id}`, open: async () => { await page.evaluate((u) => window.specimens!.openUser(u), user); } });
     }
+    // Each one may wait out the wire and its opening (QUIET_FOR_MS each), on top of the page standing.
+    test.setTimeout(15 * 60_000 + opens.length * 3 * QUIET_FOR_MS);
     for (const { id, open } of opens) {
         console.log(`opening ${id}`);
         try {
@@ -278,6 +279,6 @@ test('every element, live, can be reached whole', async ({ page }) => {
     await page.goto('about:blank');
     expect.soft(stalled, 'the node did not answer these').toEqual([]);
     expect.soft(writes, 'an element opening tried to write to the node').toEqual([]);
-    expect(first, 'the node lists no User: the User window has nobody to open on').not.toBeNull();
+    expect(users.length, 'the node lists no User: the User window has nobody to open on').toBeGreaterThan(0);
     expect(bad, `${Object.keys(bad).length} of ${opens.length} elements have content that cannot be reached`).toEqual({});
 });
