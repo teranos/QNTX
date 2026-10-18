@@ -126,7 +126,7 @@ func rootAsksAm(s *QNTXServer, name string, sent sigil.Sent) (*protocol.Namespac
 	return askingAm(s, "https://example.org/root", auth.LevelRoot, nil, name, sent)
 }
 
-var sonnetGarden = sigil.Sent{"namespace": "garden", "model": "claude-sonnet-5-5", "effort": "medium", "permission_mode": "dontAsk", "allow": "Read, mcp__qntx"}
+var sonnetGarden = sigil.Sent{"namespace": "garden", "harness": "claude", "model": "claude-sonnet-5-5", "effort": "medium", "permission_mode": "dontAsk", "allow": "Read, mcp__qntx"}
 
 // "The Namespace agent is a common Agent of the Namespace it's opted into."
 // Opting in is a line in the namespace's own store, and the agent it names is
@@ -186,11 +186,11 @@ func TestEachNamespaceAndModelIsItsOwnAgent(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	garden, refused := rootAsksAm(s, "set", sonnetGarden)
 	require.Nil(t, refused)
-	orchard, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "orchard", "model": "claude-sonnet-5-5", "effort": "medium", "permission_mode": "dontAsk"})
+	orchard, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "orchard", "harness": "claude", "model": "claude-sonnet-5-5", "effort": "medium", "permission_mode": "dontAsk"})
 	require.Nil(t, refused)
 	assert.NotEqual(t, garden.GetAgent().GetDid(), orchard.GetAgent().GetDid())
 
-	opus, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "model": "claude-opus-5-5", "effort": "high", "permission_mode": "dontAsk"})
+	opus, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "harness": "claude", "model": "claude-opus-5-5", "effort": "high", "permission_mode": "dontAsk"})
 	require.Nil(t, refused)
 	assert.NotEqual(t, garden.GetAgent().GetDid(), opus.GetAgent().GetDid(), "a different model is a different agent")
 	assert.Equal(t, "claude-opus-5-5", opus.GetAgent().GetModel())
@@ -259,6 +259,41 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 	assert.Equal(t, "how long has the box been up?", whole.GetTranscript().GetTurns()[0].GetText())
 }
 
+// "I want Pi to also serv the function of namespace agent alongside Claude
+// code namespace agent": a namespace holds an AGENT line in each harness, the
+// one in Pi an agent of its own, and the one in Claude Code stands.
+func TestANamespaceOptsIntoAnAgentInPiAlongsideClaudeCode(t *testing.T) {
+	s, _, in := runningNamespaceAgents(t)
+	claude, refused := rootAsksAm(s, "set", sonnetGarden)
+	require.Nil(t, refused)
+
+	pi, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "harness": "pi", "model": "anthropic/claude-opus-4.6", "thinking": "low"})
+	require.Nil(t, refused)
+	holds(t, s.agentsSignum(), "set", pi)
+	assert.Equal(t, "garden", pi.GetNamespace())
+	assert.Equal(t, "anthropic/claude-opus-4.6", pi.GetPi().GetModel())
+	assert.Equal(t, "low", pi.GetPi().GetThinking())
+	assert.NotEmpty(t, pi.GetPi().GetDid())
+	assert.NotEqual(t, claude.GetAgent().GetDid(), pi.GetPi().GetDid(), "the agent in Pi is an agent of its own")
+	assert.NotEqual(t, s.nodeAgent.did, pi.GetPi().GetDid(), "the agent in Pi is not the Node Agent")
+
+	var harnesses []string
+	for _, row := range in.store["garden"].rows {
+		if slices.Contains(row.Subjects, "AGENT") {
+			harnesses = append(harnesses, row.Predicates...)
+		}
+	}
+	assert.ElementsMatch(t, []string{"claude", "pi"}, harnesses)
+
+	am, refused := rootAsksAm(s, "am", sigil.Sent{"namespace": "garden"})
+	require.Nil(t, refused)
+	assert.Equal(t, claude.GetAgent().GetDid(), am.GetAgent().GetDid(), "the agent in Claude Code stands")
+
+	_, refused = rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "harness": "pi", "model": "anthropic/claude-opus-4.6"})
+	require.NotNil(t, refused)
+	assert.Equal(t, "thinking", refused.Param)
+}
+
 // "shared amongst anyone who has REACH on it": who acts in the namespace
 // speaks to it; who does not finds no such namespace.
 func TestANamespaceAgentIsReachedByWhoActsInTheNamespace(t *testing.T) {
@@ -297,11 +332,11 @@ func TestWhoSetsANamespacesAgent(t *testing.T) {
 	require.Nil(t, refused)
 	assert.Equal(t, gardener, am.GetSetBy())
 
-	super, refused := askingAm(s, "https://example.org/super", auth.LevelSuper, nil, "set", sigil.Sent{"namespace": "orchard", "model": "claude-sonnet-5-5", "effort": "low", "permission_mode": "dontAsk"})
+	super, refused := askingAm(s, "https://example.org/super", auth.LevelSuper, nil, "set", sigil.Sent{"namespace": "orchard", "harness": "claude", "model": "claude-sonnet-5-5", "effort": "low", "permission_mode": "dontAsk"})
 	require.Nil(t, refused)
 	assert.Equal(t, "https://example.org/super", super.GetSetBy())
 
-	_, refused = askingAm(s, gardener, auth.LevelUser, []string{"garden"}, "set", sigil.Sent{"namespace": "garden", "effort": "low", "permission_mode": "dontAsk"})
+	_, refused = askingAm(s, gardener, auth.LevelUser, []string{"garden"}, "set", sigil.Sent{"namespace": "garden", "harness": "claude", "effort": "low", "permission_mode": "dontAsk"})
 	require.NotNil(t, refused)
 	assert.Equal(t, "model", refused.Param, "the agent is the model named, and nothing stands in for it")
 }

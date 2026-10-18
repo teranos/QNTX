@@ -964,15 +964,17 @@ func (x *PiAm) GetNotReady() string {
 }
 
 // NamespaceAgentAm is what agents am and agents set answer: the namespace's
-// agent, who opted the namespace into it, and who it is in Claude Code.
+// agent, who opted the namespace into it, and who it is in Claude Code or in Pi.
 type NamespaceAgentAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The namespace it stands in.
 	Namespace string `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	// Who opted the namespace into it.
 	SetBy string `protobuf:"bytes,2,opt,name=set_by,json=setBy,proto3" json:"set_by,omitempty"`
-	// Who the agent is and how it runs.
-	Agent         *ClaudeAm `protobuf:"bytes,3,opt,name=agent,proto3" json:"agent,omitempty"`
+	// Who the agent is and how it runs, in Claude Code.
+	Agent *ClaudeAm `protobuf:"bytes,3,opt,name=agent,proto3" json:"agent,omitempty"`
+	// Who the agent is and how it runs, in Pi.
+	Pi            *PiAm `protobuf:"bytes,4,opt,name=pi,proto3" json:"pi,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1024,6 +1026,13 @@ func (x *NamespaceAgentAm) GetSetBy() string {
 func (x *NamespaceAgentAm) GetAgent() *ClaudeAm {
 	if x != nil {
 		return x.Agent
+	}
+	return nil
+}
+
+func (x *NamespaceAgentAm) GetPi() *PiAm {
+	if x != nil {
+		return x.Pi
 	}
 	return nil
 }
@@ -1654,11 +1663,12 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x02pi\x18\a \x01(\tR\x02pi\x12\x1d\n" +
 	"\n" +
 	"pi_version\x18\b \x01(\tR\tpiVersion\x12\x1b\n" +
-	"\tnot_ready\x18\t \x01(\tR\bnotReady\"q\n" +
+	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\x91\x01\n" +
 	"\x10NamespaceAgentAm\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x15\n" +
 	"\x06set_by\x18\x02 \x01(\tR\x05setBy\x12(\n" +
-	"\x05agent\x18\x03 \x01(\v2\x12.protocol.ClaudeAmR\x05agent\"~\n" +
+	"\x05agent\x18\x03 \x01(\v2\x12.protocol.ClaudeAmR\x05agent\x12\x1e\n" +
+	"\x02pi\x18\x04 \x01(\v2\x0e.protocol.PiAmR\x02pi\"~\n" +
 	"\aFollows\x12\x1c\n" +
 	"\treference\x18\x01 \x01(\tR\treference\x12/\n" +
 	"\acolumns\x18\x02 \x03(\v2\x15.protocol.CorrespondsR\acolumns\x12$\n" +
@@ -1737,16 +1747,17 @@ var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	2,  // 4: protocol.Transcripts.transcripts:type_name -> protocol.Transcript
 	2,  // 5: protocol.SessionTranscript.transcript:type_name -> protocol.Transcript
 	8,  // 6: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
-	12, // 7: protocol.Follows.columns:type_name -> protocol.Corresponds
-	13, // 8: protocol.Follows.folds:type_name -> protocol.Fold
-	15, // 9: protocol.Sigil.takes:type_name -> protocol.Param
-	16, // 10: protocol.Sigil.gives:type_name -> protocol.Field
-	17, // 11: protocol.Sigil.http:type_name -> protocol.Endpoint
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	9,  // 7: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
+	12, // 8: protocol.Follows.columns:type_name -> protocol.Corresponds
+	13, // 9: protocol.Follows.folds:type_name -> protocol.Fold
+	15, // 10: protocol.Sigil.takes:type_name -> protocol.Param
+	16, // 11: protocol.Sigil.gives:type_name -> protocol.Field
+	17, // 12: protocol.Sigil.http:type_name -> protocol.Endpoint
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }

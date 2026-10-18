@@ -33,7 +33,7 @@ func servingGardens(t *testing.T) (*QNTXServer, map[auth.Level]string) {
 	srv.held.SetOpener(in)
 	root := auth.Admitted(auth.LevelRoot)
 	root.Identity = "https://example.org/root"
-	require.NoError(t, srv.setAgentLine(root, "garden", agentSpec{Model: "claude-sonnet-5-5", Effort: "medium", Mode: "dontAsk", Allow: []string{}}))
+	require.NoError(t, srv.setAgentLine(root, "garden", agentLineClaude, claudeLine(agentSpec{Model: "claude-sonnet-5-5", Effort: "medium", Mode: "dontAsk", Allow: []string{}})))
 	return srv, tokens
 }
 

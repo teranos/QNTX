@@ -32,6 +32,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
@@ -45,6 +46,7 @@ import (
 const (
 	agentLineSubject = "AGENT"
 	agentLineClaude  = "claude"
+	agentLinePi      = "pi"
 )
 
 // agentPurpose is what a namespace agent's key and token are derived from the
@@ -140,22 +142,27 @@ func oneText(as map[string]any, attribute, subject, id, name string) (string, er
 	return held, nil
 }
 
-// setAgentLine writes the namespace's agent whole, as whoever set it.
-func (s *QNTXServer) setAgentLine(admitted auth.Admission, namespace string, spec agentSpec) error {
+// setAgentLine writes the namespace's agent in harness whole, as whoever set it.
+func (s *QNTXServer) setAgentLine(admitted auth.Admission, namespace, harness string, attributes map[string]any) error {
 	store, err := s.held.Write(admitted, namespace)
 	if err != nil {
 		return errors.Wrapf(err, "no store to write the %s line of %s in", agentLineSubject, namespace)
 	}
-	id, err := identity.GenerateASUIDWithRetry("AS", agentLineSubject, agentLineClaude, namespace, store.AttestationExists)
+	id, err := identity.GenerateASUIDWithRetry("AS", agentLineSubject, harness, namespace, store.AttestationExists)
 	if err != nil {
 		return errors.Wrapf(err, "failed to name the %s line of %s", agentLineSubject, namespace)
 	}
 	at := time.Now()
 	return errors.Wrapf(store.CreateAttestation(&types.As{
-		ID: id, Subjects: []string{agentLineSubject}, Predicates: []string{agentLineClaude}, Contexts: []string{namespace},
+		ID: id, Subjects: []string{agentLineSubject}, Predicates: []string{harness}, Contexts: []string{namespace},
 		Actors: []string{admitted.Identity}, Timestamp: at, CreatedAt: at, Source: "agent",
-		Attributes: map[string]any{"model": spec.Model, "effort": spec.Effort, "permission_mode": spec.Mode, "allow": anyOf(spec.Allow)},
-	}), "the %s line of %s was not written", agentLineSubject, namespace)
+		Attributes: attributes,
+	}), "the %s line of %s in %s was not written", agentLineSubject, namespace, harness)
+}
+
+// claudeLine is what the AGENT line of an agent in Claude Code says.
+func claudeLine(spec agentSpec) map[string]any {
+	return map[string]any{"model": spec.Model, "effort": spec.Effort, "permission_mode": spec.Mode, "allow": anyOf(spec.Allow)}
 }
 
 // anAsking is one call on the agents signum: who asked, and the namespace they
@@ -315,10 +322,12 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 					Name: "set",
 					Does: "Opts the namespace into an agent: the model it is, and how it runs. Set by the namespace's owner, ROOT or SUPER. A different model is a different agent.",
 					Takes: with(
-						&protocol.Param{Name: "model", Required: true, Says: "The Claude model it is, by its full name."},
-						&protocol.Param{Name: "effort", Required: true, Says: "The effort it runs at: low, medium, high, xhigh or max."},
-						&protocol.Param{Name: "permission_mode", Required: true, OneOf: appcfg.PermissionModes, Says: "The permission mode it runs in when whoever speaks names none."},
-						&protocol.Param{Name: "allow", Says: "The tools it may use without being asked, by Claude Code's own names, comma-separated."},
+						&protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi}, Says: "The harness it runs in: claude for Claude Code, pi for Pi. A namespace holds an agent in each."},
+						&protocol.Param{Name: "model", Required: true, Says: "The model it is: Claude's full name in Claude Code, the id the gateway knows it as in Pi."},
+						&protocol.Param{Name: "effort", Says: "In Claude Code, the effort it runs at: low, medium, high, xhigh or max."},
+						&protocol.Param{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs in when whoever speaks names none."},
+						&protocol.Param{Name: "allow", Says: "In Claude Code, the tools it may use without being asked, by Claude Code's own names, comma-separated."},
+						&protocol.Param{Name: "thinking", OneOf: appcfg.ThinkingLevels, Says: "In Pi, the thinking level it runs at."},
 					),
 					Answer: "protocol.NamespaceAgentAm",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at},
@@ -366,23 +375,66 @@ func (s *QNTXServer) agentsSet(ctx context.Context, sent sigil.Sent) (any, *prot
 	if refused := s.maySetAgent(admitted, namespace); refused != nil {
 		return nil, refused
 	}
-	spec := agentSpec{Model: strings.TrimSpace(sent["model"]), Effort: strings.TrimSpace(sent["effort"]), Mode: sent["permission_mode"], Allow: []string{}}
-	if spec.Model == "" {
-		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "model", Says: "model is required: the agent is the model named, and nothing stands in for it"}
+	model, err := named.TextOf("model", strings.TrimSpace(sent["model"]))
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "model", Says: err.Error() + ": the agent is the model named, and nothing stands in for it"}
 	}
-	if spec.Effort == "" {
-		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "effort", Says: "effort is required"}
+	switch sent["harness"] {
+	case agentLineClaude:
+		return s.setClaudeAgent(ctx, sent, admitted, namespace, model.String())
+	case agentLinePi:
+		return s.setPiAgent(sent, admitted, namespace, model.String())
 	}
+	return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "harness is claude or pi, and " + sent["harness"] + " is neither"}
+}
+
+// setClaudeAgent opts the namespace into its agent in Claude Code.
+func (s *QNTXServer) setClaudeAgent(ctx context.Context, sent sigil.Sent, admitted auth.Admission, namespace, model string) (any, *protocol.Refusal) {
+	effort, err := named.TextOf("effort", strings.TrimSpace(sent["effort"]))
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "effort", Says: err.Error() + ": an agent in Claude Code runs at the effort named"}
+	}
+	mode, err := named.TextOf("permission_mode", sent["permission_mode"])
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "permission_mode", Says: err.Error() + ": an agent in Claude Code runs in the permission mode named"}
+	}
+	spec := agentSpec{Model: model, Effort: effort.String(), Mode: mode.String(), Allow: []string{}}
 	for _, tool := range strings.Split(sent["allow"], ",") {
 		if tool = strings.TrimSpace(tool); tool != "" {
 			spec.Allow = append(spec.Allow, tool)
 		}
 	}
-	if err := s.setAgentLine(admitted, namespace, spec); err != nil {
+	if err := s.setAgentLine(admitted, namespace, agentLineClaude, claudeLine(spec)); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	s.logger.Infow("a namespace opted into an agent", "namespace", namespace, "model", spec.Model, "by", admitted.Identity)
+	s.logger.Infow("a namespace opted into an agent", "namespace", namespace, "harness", agentLineClaude, "model", spec.Model, "by", admitted.Identity)
 	return s.agentsAm(ctx, sent)
+}
+
+// setPiAgent opts the namespace into its agent in Pi: "I want Pi to also serv
+// the function of namespace agent alongside Claude code namespace agent".
+func (s *QNTXServer) setPiAgent(sent sigil.Sent, admitted auth.Admission, namespace, model string) (any, *protocol.Refusal) {
+	thinking, err := named.TextOf("thinking", sent["thinking"])
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "thinking", Says: err.Error() + ": an agent in Pi runs at the thinking level named"}
+	}
+	node, err := named.Pointed("this node's key, which the agent of "+namespace+" is derived from,", s.nodeDID)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	home, err := s.agentHome(namespace, model)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	agent, err := theAgent(node.PrivateKey, agentPurpose(namespace, model), home)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + namespace + " in Pi has no key of its own: " + err.Error()}
+	}
+	if err := s.setAgentLine(admitted, namespace, agentLinePi, map[string]any{"model": model, "thinking": thinking.String()}); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	s.logger.Infow("a namespace opted into an agent", "namespace", namespace, "harness", agentLinePi, "model", model, "by", admitted.Identity)
+	return &protocol.NamespaceAgentAm{Namespace: namespace, SetBy: admitted.Identity, Pi: &protocol.PiAm{Did: agent.did, Model: model, Thinking: thinking.String()}}, nil
 }
 
 func (s *QNTXServer) agentsAm(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {

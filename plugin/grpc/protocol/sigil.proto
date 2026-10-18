@@ -183,14 +183,16 @@ message PiAm {
 }
 
 // NamespaceAgentAm is what agents am and agents set answer: the namespace's
-// agent, who opted the namespace into it, and who it is in Claude Code.
+// agent, who opted the namespace into it, and who it is in Claude Code or in Pi.
 message NamespaceAgentAm {
   // The namespace it stands in.
   string namespace = 1;
   // Who opted the namespace into it.
   string set_by = 2;
-  // Who the agent is and how it runs.
+  // Who the agent is and how it runs, in Claude Code.
   ClaudeAm agent = 3;
+  // Who the agent is and how it runs, in Pi.
+  PiAm pi = 4;
 }
 
 // Follows says which column of a reference each of a signum's fields is. The
