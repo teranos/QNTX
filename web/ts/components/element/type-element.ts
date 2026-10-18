@@ -152,8 +152,6 @@ export function createTypeElement(item: Element): HTMLElement {
 
     const color = group?.color || TYPE_COLOR;
 
-    // .symbol via the package — thread-line snapping and spine
-    // anchoring locate elements by that class
     const symbolEl = item.symbolElement ? settleSymbolSpan(item.symbolElement) : createSymbolSpan(Type);
     Object.assign(symbolEl.style, { fontWeight: 'bold', color });
     titleBar.appendChild(symbolEl);

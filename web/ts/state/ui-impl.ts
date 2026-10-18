@@ -122,9 +122,6 @@ export interface UIStateData {
     // Canvas melded compositions (for composition persistence)
     canvasCompositions: CompositionState[];
 
-    // Canvas navigational threads (spines)
-    canvasSpines: { id: string; color: string; nodes: string[] }[];
-
     // Canvas pan offset and zoom scale (for canvas navigation)
     canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
 
@@ -156,7 +153,6 @@ interface PersistedUIState {
     minimizedWindows: string[];
     canvasElements: CanvasElementState[];
     canvasCompositions: CompositionState[];
-    canvasSpines: { id: string; color: string; nodes: string[] }[];
     canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
 }
 
@@ -185,7 +181,6 @@ function createDefaultState(): UIStateData {
         minimizedWindows: [],
         canvasElements: [],
         canvasCompositions: [],
-        canvasSpines: [],
         canvasPan: {},
         embeddings: {
             info: null,
@@ -499,24 +494,6 @@ export class UIState {
     }
 
     // ========================================================================
-    // Canvas Spines (Navigational Threads) Management
-    // ========================================================================
-
-    getCanvasSpines(): { id: string; color: string; nodes: string[] }[] {
-        return this.state.canvasSpines;
-    }
-
-    addCanvasSpine(spine: { id: string; color: string; nodes: string[] }): void {
-        const updated = [...this.state.canvasSpines, spine];
-        this.update('canvasSpines', updated);
-    }
-
-    removeCanvasSpine(id: string): void {
-        const updated = this.state.canvasSpines.filter(s => s.id !== id);
-        this.update('canvasSpines', updated);
-    }
-
-    // ========================================================================
     // Canvas Pan Management
     // ========================================================================
 
@@ -662,7 +639,6 @@ export class UIState {
             minimizedWindows: this.state.minimizedWindows,
             canvasElements: this.state.canvasElements,
             canvasCompositions: this.state.canvasCompositions,
-            canvasSpines: this.state.canvasSpines,
             canvasPan: this.state.canvasPan,
             // Don't persist: panels (should start closed)
         };
@@ -694,7 +670,6 @@ export class UIState {
             minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,
             canvasElements: persisted.canvasElements ?? defaultState.canvasElements,
             canvasCompositions: persisted.canvasCompositions ?? defaultState.canvasCompositions,
-            canvasSpines: persisted.canvasSpines ?? defaultState.canvasSpines,
             canvasPan: persisted.canvasPan ?? defaultState.canvasPan,
         };
     }

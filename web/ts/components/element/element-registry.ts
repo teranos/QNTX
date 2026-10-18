@@ -21,7 +21,6 @@ import { createSigmaElement } from './sigma-element';
 import { createTypeElement } from './type-element';
 import { createTripletElement } from './triplet-element';
 import { createResultElement } from './result-element';
-import { createThreadElement } from './thread-element';
 import { createTranscriptElement } from './transcript-element';
 
 export interface ElementTypeEntry {
@@ -66,7 +65,6 @@ const ELEMENT_TYPES: ElementTypeEntry[] = [
     { symbol: Sigma,    className: 'canvas-sigma-element',       title: 'Sigma',       label: 'Sigma',     render: createSigmaElement },
     { symbol: Type,     className: 'canvas-type-element',        title: 'Type',        label: 'Type',      render: createTypeElement },
     { symbol: 'stream', className: 'canvas-stream-element',      title: 'Stream',      label: 'Stream',    render: (g) => createResultElement(g) },
-    { symbol: '\u303D', className: 'canvas-thread-element',     title: 'Thread',      label: 'Thread',    render: createThreadElement },
     { symbol: Transcript, className: 'canvas-transcript-element', title: 'Transcript', label: 'Transcript', render: createTranscriptElement },
 ];
 

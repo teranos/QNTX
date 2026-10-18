@@ -37,8 +37,7 @@ export async function createPluginElement(
         logLabel: 'PluginElement',
     });
 
-    // Custom title bar with expand button — .symbol via the package so
-    // thread-line snapping and spine anchoring can find this element
+    // Custom title bar with expand button
     const symbol = createSymbolSpan(def.symbol);
     Object.assign(symbol.style, { fontWeight: 'bold', color: '#adbcc1' });
     const titleText = el('span', {

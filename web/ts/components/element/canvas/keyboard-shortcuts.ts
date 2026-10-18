@@ -36,7 +36,6 @@ export function setupKeyboardShortcuts(
     onResetView: () => void,
     onNavigate: (direction: Direction) => void,
     onEnterElement: () => void,
-    onThreadNavigate: (direction: Direction) => boolean,
 ): AbortController {
     const controller = new AbortController();
 
@@ -45,22 +44,7 @@ export function setupKeyboardShortcuts(
         // Only fire for the active (connected, topmost) workspace
         if (!_container.isConnected) return;
 
-        // Arrow keys — thread navigation when selected element is on a spine;
-        // falls through to spatial navigation otherwise. onThreadNavigate
-        // returns true if it handled the key.
-        const arrowMap: Record<string, Direction> = {
-            ArrowLeft: 'left', ArrowDown: 'down', ArrowUp: 'up', ArrowRight: 'right',
-        };
-        const arrowDir = arrowMap[e.key];
-        if (arrowDir) {
-            e.preventDefault();
-            if (!onThreadNavigate(arrowDir)) {
-                onNavigate(arrowDir);
-            }
-            return;
-        }
-
-        // h/j/k/l — directional element navigation (spatial only)
+        // h/j/k/l — directional element navigation
         const dirMap: Record<string, Direction> = { h: 'left', j: 'down', k: 'up', l: 'right' };
         const dir = dirMap[e.key];
         if (dir) {

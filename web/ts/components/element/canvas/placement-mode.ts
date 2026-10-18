@@ -14,8 +14,6 @@ import { createCursorElement, attachCursorToMouse, prepareCursorForPlacement } f
 import { log, SEG } from '../../../logger';
 
 export interface PlacementOptions {
-    /** Apply color to the cursor element (e.g., thread color) */
-    cursorColor?: string;
     /** Called when placement ends (place or cancel) for external cleanup */
     onExit?: () => void;
 }
@@ -123,11 +121,6 @@ export function enterPlacementMode(
         : createCursorElement(entry.symbol, entry.label);
     if (!existingElement) document.body.appendChild(cursorItem);
     const cleanupCursorMove = attachCursorToMouse(cursorItem);
-
-    // Apply cursor color if specified (e.g., thread color)
-    if (options?.cursorColor) {
-        cursorItem.style.color = options.cursorColor;
-    }
 
     // Ax segment glow: all triplet values light up when carrying an ax cursor
     const isAx = entry.label === 'AX';

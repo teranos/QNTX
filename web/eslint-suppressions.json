@@ -196,12 +196,12 @@
   },
   "ts/components/element/canvas/canvas-pan.ts": {
     "no-restricted-syntax": {
-      "count": 8
+      "count": 7
     }
   },
   "ts/components/element/canvas/canvas-workspace-builder.ts": {
     "no-restricted-syntax": {
-      "count": 39
+      "count": 34
     }
   },
   "ts/components/element/canvas/keyboard-shortcuts.ts": {
@@ -227,31 +227,6 @@
   "ts/components/element/canvas/spawn-menu.ts": {
     "no-restricted-syntax": {
       "count": 12
-    }
-  },
-  "ts/components/element/canvas/spine-renderer.ts": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
-  "ts/components/element/canvas/thread-extend.test.ts": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
-  "ts/components/element/canvas/thread-line.test.ts": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
-  "ts/components/element/canvas/thread-line.ts": {
-    "no-restricted-syntax": {
-      "count": 8
-    }
-  },
-  "ts/components/element/canvas/thread-navigation.ts": {
-    "no-restricted-syntax": {
-      "count": 5
     }
   },
   "ts/components/element/connectivity-element.ts": {
@@ -402,11 +377,6 @@
   "ts/components/element/subcanvas-element.ts": {
     "no-restricted-syntax": {
       "count": 7
-    }
-  },
-  "ts/components/element/thread-element.ts": {
-    "no-restricted-syntax": {
-      "count": 9
     }
   },
   "ts/components/element/token-popup.ts": {
@@ -851,7 +821,7 @@
   },
   "ts/state/ui-impl.ts": {
     "no-restricted-syntax": {
-      "count": 12
+      "count": 11
     }
   },
   "ts/status-indicators.ts": {

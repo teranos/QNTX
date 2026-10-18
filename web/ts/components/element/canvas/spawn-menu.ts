@@ -14,26 +14,13 @@ import {
     type ElementTypeEntry,
     getAllElementTypes,
     getSpawnableElements,
-    getElementTypeBySymbol,
     getCommandEntry,
     getMatchingCommandNames,
     getCommandLabel,
 } from '../element-registry';
 import { showMenuScrim, removeScrim, enterPlacementMode } from './placement-mode';
 import { commitCursorPlacement } from '@teranos/elements';
-import { enterThreadBuildingMode } from './thread-line';
-import { getThreadColor } from '../thread-element';
-import { addSpine } from './spine-renderer';
 
-/** Part Alternation Mark — thread/spine symbol */
-const THREAD_SYMBOL = '\u303D'; // 〽
-
-/** Thread entry shown when right-clicking an element symbol */
-function getSymbolContextEntries(): ElementTypeEntry[] {
-    const entry = getElementTypeBySymbol(THREAD_SYMBOL);
-    if (!entry) return [];
-    return [{ ...entry, spawnMenuOrder: 0 }];
-}
 
 /** Whether the spawn menu is currently open */
 let spawnMenuOpen = false;
@@ -61,7 +48,6 @@ const ELEMENT_DESCRIPTIONS: Record<string, { desc: string; hint?: string }> = {
     'Prompt':    { desc: 'AI prompt with context', hint: 'Attach attestations as grounding' },
     'Note':      { desc: 'Freeform text note', hint: 'Select text → convert to prompt' },
     'Subcanvas': { desc: 'Nested canvas workspace', hint: 'Infinite depth' },
-    'Thread':    { desc: 'Navigational thread', hint: 'Connect elements into a path' },
 };
 
 function buildContextReveal(entry: ElementTypeEntry): string {
@@ -84,8 +70,7 @@ export function showSpawnMenu(
     mouseY: number,
     canvas: HTMLElement,
     items: Element[],
-    canvasId: string = 'canvas-workspace',
-    symbolContext: HTMLElement | null = null
+    canvasId: string = 'canvas-workspace'
 ): void {
     // Remove any existing menu
     const existingMenu = document.querySelector('.canvas-spawn-menu');
@@ -140,36 +125,6 @@ export function showSpawnMenu(
         btnElement.remove();
         removeMenu(true);
 
-        // Thread building mode: click symbols to build path, click empty canvas to finish
-        if (symbolContext && entry.symbol === THREAD_SYMBOL) {
-            const threadColor = getThreadColor(0);
-            spawnMenuOpen = false;
-            enterThreadBuildingMode(symbolContext, threadColor, (result) => {
-                // Place 〽 element at click position
-                const cont = canvas.parentElement!;
-                const contRect = cont.getBoundingClientRect();
-                const t = getTransform(canvasId);
-                const px = Math.round((result.placeX - contRect.left - t.panX) / t.scale);
-                const py = Math.round((result.placeY - contRect.top - t.panY) / t.scale);
-
-                // Spawn 〽 — reuse the cursor element so the needle keeps DOM identity
-                spawnElement(px, py, canvas, items, canvasId, entry, result.cursorElement, undefined, result.symbolElement).then((threadElementId) => {
-                    const allNodes = [...result.nodeIds, threadElementId];
-                    const spine = {
-                        id: `spine-${crypto.randomUUID()}`,
-                        color: threadColor,
-                        nodes: allNodes,
-                    };
-                    addSpine(canvasId, canvas, spine);
-                    uiState.addCanvasSpine(spine);
-                }).catch((err: unknown) => log.error(SEG.ELEMENT, '[SpawnMenu] thread element spawn failed:', err));
-            }, () => {
-                // Cancelled
-            });
-            return;
-        }
-
-        // Standard placement mode for all other element types
         enterPlacementMode(entry, canvas, (clientX, clientY, cursorElement, cursorRect, symbolElement, content) => {
             const cont = canvas.parentElement!;
             const contRect = cont.getBoundingClientRect();
@@ -180,15 +135,10 @@ export function showSpawnMenu(
         }, btnElement);
     };
 
-    // Collect spawnable entries — context-aware:
-    // Right-click on element symbol: show thread actions (〽)
-    // Right-click on canvas background: show element types
-    const entries = symbolContext
-        ? getSymbolContextEntries()
-        : [
-            ...getSpawnableElements(),
-            ...getAllElementTypes().filter(g => g.className.includes('canvas-plugin-element') || g.publishedName !== undefined)
-        ];
+    const entries = [
+        ...getSpawnableElements(),
+        ...getAllElementTypes().filter(g => g.className.includes('canvas-plugin-element') || g.publishedName !== undefined)
+    ];
 
     // Assign each element a vertical list position with per-element float phase
     interface FloatNode {
