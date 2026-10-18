@@ -50,8 +50,7 @@ refuses a token however ROOT the token is, and a session that names nobody. The 
 the line is the route the human logged in by.
 
 The node merges as the App's installation where the repository is (ADR-043),
-at the head the human saw: GitHub refuses a merge whose `sha` moved. The
-merge is written down by the human.
+at the head the human saw: GitHub refuses a merge whose `sha` moved. The merge is written down by the human.
 
 ## The PR story
 
@@ -72,10 +71,3 @@ NO."
 - Merge again: merges now.
 - Don't merge while a merge waits: cancels it. Again: definitely no.
 
-## Not here
-
-- Jev's confidence on a merge: "the percentage doesn't make sense" there.
-- A press from the element that already stood when the page opened: the card
-  starts undecided and says what stands in its context.
-- The second approval: "everyone get's their own mail address, and they get
-  it via ROOT approval" (ADR-047), and anything an agent asks. Out of scope.
