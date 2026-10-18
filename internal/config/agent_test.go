@@ -135,7 +135,7 @@ model  = "claude-opus-5-5"
 effort = "low"
 
 [agent.root.pi]
-model    = "anthropic/claude-sonnet-4.6"
+model    = "anthropic/claude-opus-4.6"
 thinking = "low"
 gateway  = "openrouter-qntx"
 `)
@@ -144,7 +144,7 @@ gateway  = "openrouter-qntx"
 		t.Fatalf("LoadFromFile = %v", err)
 	}
 	pi := cfg.Agent.Root.Pi
-	if !pi.Named() || pi.Model != "anthropic/claude-sonnet-4.6" || pi.Thinking != "low" || pi.Gateway != "openrouter-qntx" {
+	if !pi.Named() || pi.Model != "anthropic/claude-opus-4.6" || pi.Thinking != "low" || pi.Gateway != "openrouter-qntx" {
 		t.Errorf("Pi loaded as %+v", pi)
 	}
 	if err := cfg.Validate(); err != nil {
@@ -156,7 +156,7 @@ gateway  = "openrouter-qntx"
 func TestNodeAgentPiNamedByHalfIsRefused(t *testing.T) {
 	for want, body := range map[string]string{
 		"both or neither":        "[agent.root.pi]\nmodel = \"m\"\n",
-		"agent.root.pi.thinking": "[agent.root.pi]\nmodel = \"m\"\ngateway = \"g\"\nthinking = \"loud\"\n",
+		"agent.root.pi.thinking": "[agent.root.pi]\nmodel = \"claude-opus-5-5\"\ngateway = \"g\"\nthinking = \"loud\"\n",
 	} {
 		cfg, err := LoadFromFile(writeConfig(t, "[agent.root]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n"+body))
 		if err != nil {
@@ -164,6 +164,27 @@ func TestNodeAgentPiNamedByHalfIsRefused(t *testing.T) {
 		}
 		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("Validate = %v, want it to say %s", err, want)
+		}
+	}
+}
+
+// "any model that isn't Opus or Fable shouldn't be allowed to be NODE agent"
+func TestNodeAgentOtherThanOpusOrFableIsRefused(t *testing.T) {
+	for want, body := range map[string]string{
+		"agent.root.model":    "[agent.root]\nmodel = \"claude-sonnet-5-5\"\neffort = \"low\"\n",
+		"agent.root.pi.model": "[agent.root]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n[agent.root.pi]\nmodel = \"openai/gpt-oss-120b\"\ngateway = \"g\"\n",
+	} {
+		cfg, err := LoadFromFile(writeConfig(t, body))
+		if err != nil {
+			t.Fatalf("LoadFromFile = %v", err)
+		}
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("Validate = %v, want it to refuse %s", err, want)
+		}
+	}
+	for _, model := range []string{"claude-opus-5-5", "claude-fable-5-1", "anthropic/claude-opus-4.6"} {
+		if !NodeAgentModel(model) {
+			t.Errorf("NodeAgentModel(%q) = false, want true", model)
 		}
 	}
 }
