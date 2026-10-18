@@ -14,14 +14,14 @@ import (
 // The table the node ships with reads. It is parsed at startup, and a node
 // whose table does not read does not start.
 func TestTheTableReads(t *testing.T) {
-	_, err := readReaches(reachTable)
+	_, err := readReaches(tablet)
 	require.NoError(t, err)
 }
 
 // A path is case-sensitive and an attestation subject is not. The parser
 // uppercases subjects, so a line has to give back the path as written.
 func TestAPathKeepsItsCase(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 
 	_, said := granted["/.well-known/did.json"]
@@ -33,7 +33,7 @@ func TestAPathKeepsItsCase(t *testing.T) {
 // revokes and switches nothing is the handler's session gate, held by the
 // auth package's own tests.
 func TestSuperReachesTokensAndUsers(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 
 	for _, path := range []string{"/auth/tokens", "/auth/tokens/", "/auth/users", "/auth/users/"} {
@@ -46,7 +46,7 @@ func TestSuperReachesTokensAndUsers(t *testing.T) {
 
 // SUPER owns namespaces and creates them (ADR-027).
 func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 
 	// The list and the making of one, then the switch on one and its ending.
@@ -68,7 +68,7 @@ func TestTheTableSaysWhoReachesTheNamespaces(t *testing.T) {
 // may act on is the canvas's owners' to say (element/handlers). A token is a
 // machine, and draws no canvas.
 func TestTheCanvasIsReachedByWhoeverTheNamespaceIsFor(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 
 	for _, path := range []string{
@@ -88,7 +88,7 @@ func TestTheCanvasIsReachedByWhoeverTheNamespaceIsFor(t *testing.T) {
 // Emptying default is the one place data leaves, so SUPER reaching the rest of
 // the namespace routes must not carry it here.
 func TestTheTableKeepsNukingToRoot(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 
 	row, said := granted["/api/namespaces/default/nuke"]
@@ -101,7 +101,7 @@ func TestTheTableKeepsNukingToRoot(t *testing.T) {
 // Logging in cannot ask you to be logged in, and that is a line rather than an
 // absence of one.
 func TestTheCeremonyIsGrantedToAnyone(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 
 	for _, path := range []string{"/auth/login", "/auth/login/begin", "/auth/laye/verify", "/auth/elsewhere", "/auth/elsewhere/back"} {
@@ -114,7 +114,7 @@ func TestTheCeremonyIsGrantedToAnyone(t *testing.T) {
 // A node asking about a token holds no session. Unlined, introspection was
 // ROOT's and no node could ever ask.
 func TestANodeAsksWithoutASession(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 
 	row, said := granted["/auth/introspect"]
@@ -125,7 +125,7 @@ func TestANodeAsksWithoutASession(t *testing.T) {
 // Whoever is logged in may see the User the node resolved them to, and a
 // stranger gets the table's refusal rather than a 200 with nothing in it.
 func TestWhoeverIsLoggedInReachesTheirOwnUser(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 
 	row, said := granted["/i/"]
@@ -141,7 +141,7 @@ func TestWhoeverIsLoggedInReachesTheirOwnUser(t *testing.T) {
 // signum rather than a path, so it is about its sigils over every surface and
 // goes on no mux (ReachingSigil, routesIn).
 func TestASignumIsNamedForSuper(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 
 	row, said := granted["datapunt"]
@@ -154,7 +154,7 @@ func TestASignumIsNamedForSuper(t *testing.T) {
 // SUPER brought plugins up and down through the '/api/plugins/' prefix line.
 // The actions are sigils now, and SUPER reaches them by name.
 func TestSuperReachesThePluginActions(t *testing.T) {
-	granted, err := readReaches(reachTable)
+	granted, err := readReaches(tablet)
 	require.NoError(t, err)
 	served := &Served{}
 	served.rows.Store(&granted)

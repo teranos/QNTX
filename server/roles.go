@@ -73,8 +73,8 @@ func (r roleLines) WordLines() ([]auth.WordLine, error) {
 }
 
 // runtime is the store's reach lines, read for every Open and Reopen. The
-// const table is the floor; these add roles to it, and PUBLIC_REGISTRATION. A line is found by its
-// subject, REACH, the way the const's lines are about REACH: its predicates
+// tablet is the floor; these add roles to it, and PUBLIC_REGISTRATION. A line is found by its
+// subject, REACH, the way the tablet's lines are about REACH: its predicates
 // are the paths and its contexts are the roles. A line the store holds that
 // the reach package will not read is said and skipped: a bad line in the store
 // is not a reason for the node to serve nothing.
@@ -83,14 +83,14 @@ func (s *QNTXServer) runtime() reach.Runtime {
 	if s.authHandler != nil {
 		runtime.IsRoot = s.authHandler.IsRoot
 	}
-	// A backend that keeps no system store keeps no lines: the const serves
+	// A backend that keeps no system store keeps no lines: the tablet serves
 	// alone, and that is not an error to say.
 	if !s.held.KeepsSystem() {
 		return runtime
 	}
 	store, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
-		s.logger.Errorw("the store's reach lines were not read; the const table serves alone",
+		s.logger.Errorw("the store's reach lines were not read; the tablet serves alone",
 			"error", err)
 		return runtime
 	}
@@ -99,7 +99,7 @@ func (s *QNTXServer) runtime() reach.Runtime {
 		Limit:    ats.EveryRow,
 	})
 	if err != nil {
-		s.logger.Errorw("the store's reach lines were not read; the const table serves alone",
+		s.logger.Errorw("the store's reach lines were not read; the tablet serves alone",
 			"error", err)
 		return runtime
 	}

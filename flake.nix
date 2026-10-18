@@ -309,6 +309,20 @@
           subPackages = [ "cmd/qntx" ];
         };
 
+        # "It should be private, owned by the node's deployment repository"
+        # A line naming a path this QNTX does not answer stops the node at start,
+        # so it stops the build here instead.
+        withTablet = tablet: qntx.overrideAttrs (old: {
+          preBuild = old.preBuild + ''
+            cp ${tablet} server/reach/tablet-of-reach
+          '';
+          checkPhase = ''
+            runHook preCheck
+            go test -tags "${builtins.concatStringsSep "," old.tags}" -run '^TestEveryLineNamesSomethingTheNodeAnswers$' ./server
+            runHook postCheck
+          '';
+        });
+
         mkQNTXImage = arch: pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx";
           tag = "latest";
@@ -515,6 +529,9 @@
           # Docker image checks are Linux-only
           qntx-image = QNTXImage; # Ensure QNTX image builds
         };
+
+        # A deployment's build: QNTX.lib.${system}.withTablet ./tablet-of-reach
+        lib = { inherit withTablet; };
 
         # Formatter for 'nix fmt'
         formatter = pkgs.nixpkgs-fmt;

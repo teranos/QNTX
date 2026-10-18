@@ -2,7 +2,7 @@ package watcher
 
 // What every namespace watches before anybody makes a watcher.
 //
-// The same relation server/reach's const table has to the reach lines in a
+// The same relation server/reach's tablet has to the reach lines in a
 // store: this is what this build of QNTX is, so it is on every node, it comes
 // back on an empty database, and no route takes a row away. A stored watcher
 // naming one of these ids does not shadow it.
