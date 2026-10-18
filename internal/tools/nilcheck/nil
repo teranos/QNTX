@@ -154,7 +154,7 @@
 6	internal/access/users.go
 3	internal/admission/admission.go
 5	internal/claudecode/login.go
-12	internal/claudecode/run.go
+8	internal/claudecode/run.go
 7	internal/config/am.go
 2	internal/config/environ.go
 3	internal/config/introspection.go

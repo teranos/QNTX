@@ -128,7 +128,7 @@ func TestASessionMayDoWhatItWasAllowedAndTheRestIsSaid(t *testing.T) {
 	binary, ran := standIn(t, stream, 0, "")
 	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "write it", Model: "m", Effort: "low", Mode: "dontAsk",
 		Allow: []string{"Bash", "Read", "mcp__qntx"}}
-	answer, err := said.Run(context.Background(), nil)
+	answer, err := said.Run(context.Background(), func(Message) {})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestASessionMayDoWhatItWasAllowedAndTheRestIsSaid(t *testing.T) {
 func TestTheModeNamedIsTheModeRunIn(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "plan"}
-	if _, err := said.Run(context.Background(), nil); err != nil {
+	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	args := linesOf(t, filepath.Join(ran, "args"))
@@ -157,7 +157,7 @@ func TestTheModeNamedIsTheModeRunIn(t *testing.T) {
 	}
 
 	said.Mode = ""
-	if _, err := said.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), "permission mode") {
+	if _, err := said.Run(context.Background(), func(Message) {}); err == nil || !strings.Contains(err.Error(), "permission mode") {
 		t.Errorf("a session that names no permission mode was run: %v", err)
 	}
 }
@@ -168,7 +168,7 @@ func TestSaidHandsOverTheEnvironmentItWasGiven(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk",
 		Env: []string{"GIT_CONFIG_GLOBAL=/agents/root/gitconfig", "QNTX_TOKEN=qntx_its_own"}}
-	if _, err := said.Run(context.Background(), nil); err != nil {
+	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	env := linesOf(t, filepath.Join(ran, "env"))
@@ -182,7 +182,7 @@ func TestSaidHandsOverTheEnvironmentItWasGiven(t *testing.T) {
 func TestSaidResumesASessionThatExists(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "and again", Model: "m", Effort: "low", Mode: "dontAsk"}
-	if _, err := said.Run(context.Background(), nil); err != nil {
+	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	args := linesOf(t, filepath.Join(ran, "args"))
@@ -198,7 +198,7 @@ func TestSaidResumesASessionThatExists(t *testing.T) {
 func TestARunWithNoResultSaysWhatClaudeCodeSaid(t *testing.T) {
 	binary, _ := standIn(t, "", 1, "No conversation found with session ID: s-1")
 	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
-	_, err := said.Run(context.Background(), nil)
+	_, err := said.Run(context.Background(), func(Message) {})
 	if err == nil {
 		t.Fatal("a run that printed no result was taken as answered")
 	}
@@ -213,7 +213,7 @@ func TestAnErrorResultIsAnAnswerThatSaysSo(t *testing.T) {
 `
 	binary, _ := standIn(t, stream, 1, "")
 	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
-	answer, err := said.Run(context.Background(), nil)
+	answer, err := said.Run(context.Background(), func(Message) {})
 	if err != nil {
 		t.Fatalf("an error Claude Code reported as its result is an answer, not a failed run: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestAnMCPServerIsNamedWithoutItsSecret(t *testing.T) {
 		Binary: binary, Home: home, Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk",
 		MCP: []MCPServer{{Name: "qntx", URL: "http://127.0.0.1:8770/mcp", Bearer: "qntx_secret"}},
 	}
-	if _, err := said.Run(context.Background(), nil); err != nil {
+	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	args := linesOf(t, filepath.Join(ran, "args"))

@@ -1,16 +1,16 @@
 package claudecode
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
-	"slices"
+	"strconv"
 	"strings"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/teranos/QNTX/internal/agentenv"
@@ -46,6 +46,10 @@ type Said struct {
 	// Env is what the session's environment holds beyond what this sets, each
 	// NAME=value. What the session runs inherits it.
 	Env []string
+	// Apart is whether the process runs apart from the node's: in a systemd
+	// scope of its own where systemd keeps the node, and in a process group of
+	// its own elsewhere, so the node stopping is not the turn stopping.
+	Apart bool
 }
 
 // MCPServer is one MCP server the session reaches over HTTP, and the bearer it
@@ -162,68 +166,64 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		env = append(env, bearers...)
 	}
 
-	cmd := exec.CommandContext(ctx, s.Binary, args...)
-	cmd.Dir, cmd.Env = work, env
-	// Stopped the way a person stops it, so the session is left as written.
-	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
-	cmd.WaitDelay = 10 * time.Second
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return Answer{}, errors.Wrap(err, "could not read what Claude Code prints")
+	turns := turnsDir(s.Home)
+	if err := os.MkdirAll(turns, 0o700); err != nil {
+		return Answer{}, errors.Wrapf(err, "could not create %s", turns)
 	}
-	if err := cmd.Start(); err != nil {
-		return Answer{}, errors.Wrapf(err, "could not start %s", s.Binary)
+	stream := newStream(s.Home, s.Session)
+	out, err := os.OpenFile(stream, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return Answer{}, errors.Wrapf(err, "could not create the stream %s", stream)
+	}
+	said, err := os.OpenFile(stream+".err", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.Wrapf(err, "could not create %s.err", stream), out.Close())
+	}
+	// The process holds the stream and its stderr from its start on; the node
+	// reads them by name, and closes what it opened once it is handed over.
+	handedOver := func() error {
+		if err := out.Close(); err != nil {
+			return errors.WithSecondaryError(errors.Wrapf(err, "the stream %s did not close", stream), said.Close())
+		}
+		return errors.Wrapf(said.Close(), "%s.err did not close", stream)
 	}
 
-	var answer Answer
-	answered := false
-	lines := bufio.NewReader(stdout)
-	for {
-		line, readErr := lines.ReadBytes('\n')
-		if len(bytes.TrimSpace(line)) > 0 {
-			var m Message
-			// A line that is not a message is nothing the stream promised.
-			if json.Unmarshal(line, &m) == nil && m.Type != "" {
-				if m.Type == "system" && m.Subtype == "init" {
-					answer.Model, answer.Version = m.Model, m.Version
-				}
-				if m.Type == "result" {
-					answered = true
-					answer.Text, answer.IsError, answer.Subtype = m.Result, m.IsError, m.Subtype
-					answer.Session, answer.CostUSD = m.SessionID, m.CostUSD
-					answer.Took = time.Duration(m.TookMS) * time.Millisecond
-					for _, denial := range m.Denials {
-						if !slices.Contains(answer.Denied, denial.Tool) {
-							answer.Denied = append(answer.Denied, denial.Tool)
-						}
-					}
-				}
-				if each != nil {
-					each(m)
-				}
-			}
+	binary, argv := s.Binary, args
+	if s.Apart {
+		scope, systemd, err := systemdScope("qntx-turn-" + strings.TrimSuffix(filepath.Base(stream), streamExt))
+		if err != nil {
+			return Answer{}, err
 		}
-		if readErr != nil {
-			if !errors.Is(readErr, io.EOF) {
-				return Answer{}, errors.Wrap(readErr, "the stream Claude Code prints was cut short")
-			}
-			break
+		if systemd {
+			binary, argv = "systemd-run", append(append(scope, s.Binary), args...)
 		}
 	}
-	waitErr := cmd.Wait()
-	if answered {
-		return answer, nil
+	cmd := exec.Command(binary, argv...)
+	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = work, env, out, said
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: s.Apart}
+	if err := cmd.Start(); err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), handedOver())
 	}
-	said := strings.TrimSpace(stderr.String())
-	if len(said) > stderrKept {
-		said = said[len(said)-stderrKept:]
+	if err := handedOver(); err != nil {
+		return Answer{}, err
 	}
-	if waitErr != nil {
-		return Answer{}, errors.Wrapf(waitErr, "Claude Code ended with no result, saying: %s", said)
+	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(cmd.Process.Pid)), 0o600); err != nil {
+		return Answer{}, errors.Wrapf(err, "the pid of %s was not kept", stream)
 	}
-	return Answer{}, errors.Newf("Claude Code ended with no result, saying: %s", said)
+	var exited atomic.Bool
+	waited := make(chan error, 1)
+	go func() {
+		waited <- cmd.Wait()
+		exited.Store(true)
+	}()
+	answer, err := follow(ctx, stream, func() bool { return !exited.Load() }, each)
+	// A process of the node's own, not apart, stops when the node does, the
+	// way a person stops it, so the session is left as written.
+	if ctxErr := ctx.Err(); ctxErr != nil && !s.Apart {
+		signalled := cmd.Process.Signal(os.Interrupt)
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(err, signalled), <-waited)
+	}
+	return answer, err
 }
 
 // Holds reports whether Claude Code under home keeps the session: it writes
@@ -256,4 +256,26 @@ func (s Said) writeMCP() (string, []string, error) {
 		return "", nil, errors.Wrapf(err, "could not write %s", path)
 	}
 	return path, bearers, nil
+}
+
+// systemdScope is how systemd-run puts a process in a scope of its own named
+// unit, and whether systemd keeps this machine's processes: a node whose
+// processes systemd keeps stops with every one in its cgroup.
+func systemdScope(unit string) ([]string, bool, error) {
+	booted, err := os.Stat("/run/systemd/system")
+	if os.IsNotExist(err) {
+		return []string{}, false, nil
+	}
+	if err != nil {
+		return []string{}, false, errors.Wrap(err, "whether systemd keeps this machine's processes did not read")
+	}
+	me, err := user.Current()
+	if err != nil {
+		return []string{}, false, errors.Wrap(err, "who runs the node did not read")
+	}
+	scope := []string{"--scope", "--quiet", "--collect", "--unit", unit}
+	if me.Username != "root" {
+		scope = append([]string{"--user"}, scope...)
+	}
+	return scope, booted.IsDir(), nil
 }

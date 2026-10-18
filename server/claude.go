@@ -289,12 +289,20 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
 				Says: t.says, Model: named.Model, Effort: named.Effort, Token: plan,
 				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
+				// "on a redeploy NODE agent would still be alive, which is the
+				// intended state, rather than being killed mid-turn" (#1256).
+				Apart: s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,
 			}
 			if s.ownURL != "" {
 				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
 			}
 			answer, err := said.Run(s.ctx, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
 			if err != nil {
+				// The node stopping leaves the turn to the node that comes
+				// next, which reads it on from its stream to how it ends.
+				if nodeErr := s.ctx.Err(); nodeErr != nil {
+					return nil, errors.WithSecondaryError(errors.Wrap(nodeErr, "the node stopped while the turn ran, and the next node reads it on"), err)
+				}
 				t.write(t.writes.rowsOf(claudecode.Message{Type: "result", Subtype: "no_result", IsError: true, Result: err.Error()}, t.now()))
 				return nil, err
 			}
