@@ -653,6 +653,12 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		writeError(w, http.StatusBadRequest, createErr.Error())
 		return
 	}
+	// The same answer the check above gives: the store held it before this write.
+	if ats.AlreadyExists(createErr) {
+		measure.Count(measure.AttestationsRepeated, 1)
+		respond(w, s.logger, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
+		return
+	}
 	if err := createErr; err != nil {
 		writeWrappedError(w, s.logger, err,
 			fmt.Sprintf("failed to create attestation %s (subjects: %v, predicates: %v, source: %s)",
