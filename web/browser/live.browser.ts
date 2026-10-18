@@ -15,6 +15,7 @@
 
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
 import WebSocket from 'ws';
 
 /** The node, and its CI user's token (ADR-025). */
@@ -248,6 +249,44 @@ async function undersized(page: Page, id: string): Promise<string[]> {
     });
 }
 
+// "we are probably miscompliant on this as well"
+
+/** Each control in the element that is disabled: it takes no focus, and says nothing of why. */
+async function disabled(page: Page, id: string): Promise<string[]> {
+    return page.locator(`[data-element-id="${id}"]`).evaluate((element) =>
+        Array.from(element.querySelectorAll<HTMLButtonElement>('button, input, select, textarea'))
+            .filter((node) => node.disabled)
+            .map((node) => `${node.tagName.toLowerCase()}${typeof node.className === 'string' && node.className !== '' ? `.${node.className.split(' ').filter((c) => c !== '').join('.')}` : ''} is disabled`));
+}
+
+// "turn the miscompliance into a burn down"
+
+// "we wont solve all of it now"
+
+// "so, just like nil is nil"
+
+/** The debt: what WCAG 2.2 is not yet met by, per project, element and criterion. Each number may fall and may not rise. */
+function burnDown(): { path: string; lines: Map<string, number> } {
+    const config = test.info().config.configFile;
+    if (config === undefined) throw new Error('playwright names no config file, so the burn-down beside it cannot be found');
+    const path = join(dirname(config), 'wcag');
+    const lines = new Map<string, number>();
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+        if (line === '' || line.startsWith('#')) continue;
+        const tab = line.indexOf('\t');
+        const count = Number(line.slice(0, tab));
+        if (tab < 0 || !Number.isInteger(count) || count < 1) throw new Error(`${path}: "${line}" is not a count, a tab and a key`);
+        lines.set(line.slice(tab + 1), count);
+    }
+    return { path, lines };
+}
+
+/** One User's window is the User window's: the burn-down counts the element, not who it was opened on. */
+const kindOf = (id: string): string => id.startsWith('user-element-') ? 'user-element' : id;
+
+/** A finding without its numbers: a width a node's data moves is the same finding. */
+const signature = (line: string): string => line.split('').filter((c) => c < '0' || c > '9').join('');
+
 test('every element, live, can be reached whole', async ({ page }) => {
     expect(API, 'QNTX_GATE_API names no node: the live gate has nothing to ask').not.toBe('');
     expect(TOKEN, 'QNTX_GATE_TOKEN is empty: the live gate has no user').not.toBe('');
@@ -288,6 +327,15 @@ test('every element, live, can be reached whole', async ({ page }) => {
     const ids = await page.evaluate(() => window.specimens!.ids());
 
     const bad: Record<string, string[]> = {};
+    const project = test.info().project.name;
+    // What this project owes WCAG 2.2: each key's distinct findings.
+    const owed = new Map<string, Set<string>>();
+    const owe = (criterion: string, id: string, lines: string[]) => {
+        for (const line of lines) {
+            const key = `${project} ${kindOf(id)} ${criterion}`;
+            owed.set(key, (owed.get(key) ?? new Set<string>()).add(signature(line)));
+        }
+    };
     // Every element the tray offers, then the User window on every User the node lists, as Users opens it:
     // a full DID or a long email is one User's, not the first's.
     const opens: Array<{ id: string; open: () => Promise<void> }> = ids.map((id) => ({
@@ -312,7 +360,12 @@ test('every element, live, can be reached whole', async ({ page }) => {
             // An element that asks the node all the time is never quiet: it is measured once the wait is over.
             await quiet(page, wire);
             // What the node refused while it opened: what that call would have drawn was never measured.
-            const past = [...await unreachable(page, id), ...await misheld(page, id), ...await undersized(page, id), ...new Set(wire.refused.map((call) => `the node refused ${call}`))];
+            const reach = [...await unreachable(page, id), ...await misheld(page, id)];
+            // At 320 CSS px what cannot be reached is 1.4.10 Reflow's, and owed; on a phone or a desktop it is not let stand.
+            if (project === 'reflow') owe('1.4.10', id, reach);
+            owe('2.5.8', id, await undersized(page, id));
+            owe('disabled', id, await disabled(page, id));
+            const past = [...(project === 'reflow' ? [] : reach), ...new Set(wire.refused.map((call) => `the node refused ${call}`))];
             if (past.length > 0) bad[id] = past;
         } catch (err: unknown) {
             // One that never stands is named with the rest, and the next one still opens.
@@ -324,5 +377,19 @@ test('every element, live, can be reached whole', async ({ page }) => {
     expect.soft(stalled, 'the node did not answer these').toEqual([]);
     expect.soft(writes, 'an element opening tried to write to the node').toEqual([]);
     expect(users.length, 'the node lists no User: the User window has nobody to open on').toBeGreaterThan(0);
+    // As nilcheck holds its baseline: a number up, a key new, a number down or a key gone is said, and the lines as they stand.
+    const debt = burnDown();
+    const drift: string[] = [];
+    for (const [key, findings] of owed) {
+        const listed = debt.lines.get(key);
+        if (listed === undefined) drift.push(`${key}: ${findings.size}, and it is not in the burn-down: ${[...findings].join(' | ')}`);
+        else if (findings.size > listed) drift.push(`${key}: ${findings.size}, more than the burn-down's ${listed}: ${[...findings].join(' | ')}`);
+        else if (findings.size < listed) drift.push(`${key}: ${findings.size}, down from the burn-down's ${listed}. Write \`${findings.size}\t${key}\`.`);
+    }
+    for (const [key, listed] of debt.lines) {
+        if (key.startsWith(`${project} `) && !owed.has(key)) drift.push(`${key}: gone, and the burn-down still lists ${listed}. Drop the line.`);
+    }
+    if (drift.length > 0) console.log(`${debt.path}, ${project}'s lines as they stand:\n${[...owed].map(([key, findings]) => `${findings.size}\t${key}`).sort().join('\n')}`);
+    expect.soft(drift, `WCAG 2.2 owed on ${project} moved: the burn-down (${debt.path}) only falls`).toEqual([]);
     expect(bad, `${Object.keys(bad).length} of ${opens.length} elements have content that cannot be reached`).toEqual({});
 });
