@@ -4,6 +4,7 @@ import (
 	"context"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/internal/pi"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
@@ -52,11 +53,18 @@ func (s *QNTXServer) thereIsNoPi() *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it runs in Claude Code alone"}
 }
 
-// piPart is Pi's part of one turn.
+// piPart is Pi's part of one turn of the Node Agent.
 func (s *QNTXServer) piPart(named appcfg.PiConfig, agent *rootAgent) aTurn {
+	return s.piTurn(named.Thinking, func(binary, session, says string, env []string) pi.Said {
+		return s.piSaid(agent, named, binary, session, says, env)
+	})
+}
+
+// piTurn is Pi's part of one turn, run as said gives it.
+func (s *QNTXServer) piTurn(thinking string, said func(binary, session, says string, env []string) pi.Said) aTurn {
 	var binary string
 	return aTurn{
-		effort: named.Thinking,
+		effort: thinking,
 		ready: func(ctx context.Context, _ string, kept bool) (bool, *protocol.Refusal) {
 			var err error
 			if binary, err = s.harnessHeldBy("pi").Path(ctx); err != nil {
@@ -65,8 +73,7 @@ func (s *QNTXServer) piPart(named appcfg.PiConfig, agent *rootAgent) aTurn {
 			return kept, nil
 		},
 		run: func(t turnRun) (proto.Message, error) {
-			said := s.piSaid(agent, named, binary, t.session, t.says, t.env)
-			answer, err := said.Run(s.ctx, func(e pi.Event) { t.write(t.writes.rowsOfPi(e, t.now())) })
+			answer, err := said(binary, t.session, t.says, t.env).Run(s.ctx, func(e pi.Event) { t.write(t.writes.rowsOfPi(e, t.now())) })
 			if err != nil {
 				t.write(t.writes.rowsOfPi(pi.Event{Type: "message_end", Message: &pi.Message{Role: "assistant", StopReason: "error", ErrorMessage: err.Error()}}, t.now()))
 				return nil, err
@@ -89,11 +96,44 @@ func (s *QNTXServer) piSaid(agent *rootAgent, named appcfg.PiConfig, binary, ses
 		System: agent.isSaidToBe(), Env: env,
 	}
 	if s.ownURL != "" {
-		said.MCP = []pi.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
+		said.MCP = s.piMCP(agent, s.ownURL)
 		said.Provider = &pi.Provider{
 			Name: piGatewayProvider, BaseURL: s.ownURL + "/api/" + named.Gateway + "/v1",
 			Key: agent.token, Models: []string{named.Model},
 		}
 	}
 	return said
+}
+
+// piMCP is the node's MCP as an agent in Pi reaches it, at own, with the
+// agent's own token.
+func (s *QNTXServer) piMCP(agent *rootAgent, own string) []pi.MCPServer {
+	return []pi.MCPServer{{Name: nodeAgentMCP, URL: own + "/mcp", Bearer: agent.token}}
+}
+
+// namespacePiPart is Pi's part of one turn of a namespace's agent: its model
+// calls made at its provider on the namespace's key of that name, handed to
+// the process and offered to no model (ADR-051).
+func (s *QNTXServer) namespacePiPart(held aPiAgentHeld) (aTurn, *protocol.Refusal) {
+	agent, line := held.agent, held.line
+	variable, known := piProviders[line.provider]
+	if !known {
+		return aTurn{}, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + agent.namespace + " in Pi names provider " + line.provider + ", which is none Pi is run at"}
+	}
+	own, err := named.TextOf("this node's own URL, where the agent of "+agent.namespace+" reaches its MCP,", s.ownURL)
+	if err != nil {
+		return aTurn{}, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	key, err := s.keyValue(agent.namespace, line.provider)
+	if err != nil {
+		return aTurn{}, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + agent.namespace + " in Pi makes its model calls on the namespace's " + line.provider + " key: " + err.Error()}
+	}
+	return s.piTurn(line.thinking, func(binary, session, says string, env []string) pi.Said {
+		return pi.Said{
+			Binary: binary, Home: agent.home, Session: session, Says: says,
+			Model: line.provider + "/" + line.model, Thinking: line.thinking,
+			System: agent.isSaidToBe(), MCP: s.piMCP(agent, own.String()),
+			Env: append(env, variable+"="+key),
+		}
+	}), nil
 }

@@ -328,6 +328,20 @@
       ],
       "x-qntx-prefix": true
     },
+    "/api/keys/{namespace}": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "USER"
+      ]
+    },
+    "/api/keys/{namespace}/drop": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "USER"
+      ]
+    },
     "/api/mail": {
       "x-qntx-reach": [
         "ROOT"
