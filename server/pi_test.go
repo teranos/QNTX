@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,16 +123,19 @@ func TestClaudeCodeAndPiAreTwoSessionsOfOneAgent(t *testing.T) {
 	}, piSaid, "Pi's bash reads as the command it ran, as Claude Code's Bash does")
 }
 
-// Each session hears one thing at a time, and the two answer beside each
-// other: Pi answers while Claude Code is in a turn.
-func TestPiAnswersWhileClaudeCodeIsInATurn(t *testing.T) {
+// "there should be one NODE agent at a time": Pi does not answer while
+// Claude Code is in a turn.
+func TestPiDoesNotAnswerWhileClaudeCodeIsInATurn(t *testing.T) {
 	s, _, _ := runningPiToo(t)
 	s.nodeAgent.in(s.claudeHarness()).turn <- struct{}{}
 	defer func() { <-s.nodeAgent.in(s.claudeHarness()).turn }()
 
-	answer, refused := sayingToPi(s, sigil.Sent{"says": "hello"})
-	require.Nil(t, refused)
-	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	asked := httptest.NewRequest(http.MethodPost, "/api/pi/say", nil)
+	_, refused := s.harnessSay(sigil.WithCaller(ctx, asked), s.piHarness(), sigil.Sent{"says": "hello"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "still answering")
 }
 
 // piSessionSaid is the agent's session in Pi as pi session reads it.

@@ -39,10 +39,12 @@ type rootAgent struct {
 	// token is its own, and what it presents at the node's MCP.
 	token string
 	home  string
-	// sessions is its session in each harness, by the harness's name: they
-	// answer beside each other (ADR-048).
+	// sessions is its session in each harness, by the harness's name.
 	sessions   map[string]*inHarness
 	sessionsMu sync.Mutex
+	// turn holds one value while it is being spoken to, in any harness: "there
+	// should be one NODE agent at a time".
+	turn chan struct{}
 	// signingIn is its sign-in to Claude Code begun and not finished.
 	signingIn signingIn
 	// namespace is the namespace this agent stands in: system for ROOT's,
@@ -73,10 +75,11 @@ func (a *rootAgent) in(h *harness) *inHarness {
 	defer a.sessionsMu.Unlock()
 	if a.sessions == nil {
 		a.sessions = map[string]*inHarness{}
+		a.turn = make(chan struct{}, 1)
 	}
 	held, ok := a.sessions[h.name]
 	if !ok {
-		held = keptIn(h.file)
+		held = &inHarness{file: h.file, turn: a.turn}
 		a.sessions[h.name] = held
 	}
 	return held
@@ -87,15 +90,11 @@ func (a *rootAgent) in(h *harness) *inHarness {
 type inHarness struct {
 	// file is where the session is kept, under the agent's home.
 	file string
-	// turn holds one value while it is being spoken to: a session hears what
-	// is said to it one at a time.
+	// turn is the agent's: one value while it is being spoken to, in this
+	// harness or another.
 	turn chan struct{}
 	// answering is the turn it is in, and nil between turns.
 	answering atomic.Pointer[turnInSession]
-}
-
-func keptIn(file string) *inHarness {
-	return &inHarness{file: file, turn: make(chan struct{}, 1)}
 }
 
 // The file each harness's session is kept in, under the agent's home.
