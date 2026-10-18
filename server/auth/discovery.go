@@ -47,9 +47,11 @@ type protectedResourceMetadata struct {
 // handleAuthorizationServerMetadata is where a client finds the doors. The
 // issuer is the node's public origin; the authorize and token endpoints are
 // the ones under it; a code is the one response, exchanged with S256 PKCE by
-// a client presenting its secret as Basic auth or in the form.
+// a client presenting its secret as Basic auth or in the form. The same
+// secret at the same endpoint is also a client asking for a token on its
+// own behalf (client_credentials, RFC 6749 §4.4), with no person in it.
 //
-// Both grants this node serves are named. A client reads this to learn what
+// Every grant this node serves is named. A client reads this to learn what
 // the node does, so a grant left out of it is one nothing will ever ask for.
 func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -63,7 +65,7 @@ func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *ht
 		TokenEndpoint:                              issuer + tokenPath,
 		IntrospectionEndpoint:                      issuer + introspectPath,
 		ResponseTypesSupported:                     []string{"code"},
-		GrantTypesSupported:                        []string{"authorization_code", "refresh_token"},
+		GrantTypesSupported:                        []string{"authorization_code", "refresh_token", "client_credentials"},
 		TokenEndpointAuthMethodsSupported:          []string{"client_secret_basic", "client_secret_post", "private_key_jwt"},
 		CodeChallengeMethodsSupported:              []string{"S256"},
 		TokenEndpointAuthSigningAlgValuesSupported: []string{jwt.SigningMethodEdDSA.Alg()},
