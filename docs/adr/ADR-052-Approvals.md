@@ -1,16 +1,13 @@
 # ADR-052: Approvals
 
 Date: 2026-10-10
-Status: Proposed
+Status: Unpolished
 
 "There is an interactive element, 
 It lets me approve something."
 
-
 "approvals are attestations obviously"
-
 "And only through it's element"
-
 "APPROVALS INTEGRATE DIRECTLY WITH THE GITHUB APP"
 
 ## The element
