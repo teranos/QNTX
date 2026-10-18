@@ -1,3 +1,0 @@
-# WCAG 2.2 owed, per project, element and criterion: distinct findings, numbers aside. Debt: each number may fall and may not rise.
-# 1.4.10 Reflow at 320 CSS px (https://www.w3.org/TR/WCAG22/#reflow), 2.5.8 Target Size (https://www.w3.org/TR/WCAG22/#target-size-minimum), and a disabled control.
-# Read by browser/live.browser.ts; where a line was worked down, the gate says the line to write.

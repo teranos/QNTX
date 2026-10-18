@@ -265,11 +265,11 @@ async function disabled(page: Page, id: string): Promise<string[]> {
 
 // "so, just like nil is nil"
 
-/** The debt: what WCAG 2.2 is not yet met by, per project, element and criterion. Each number may fall and may not rise. */
+/** The debt: what an element does not yet meet, per project, element and what it owes. Each number may fall and may not rise. */
 function burnDown(): { path: string; lines: Map<string, number> } {
     const config = test.info().config.configFile;
     if (config === undefined) throw new Error('playwright names no config file, so the burn-down beside it cannot be found');
-    const path = join(dirname(config), 'wcag');
+    const path = join(dirname(config), 'owed');
     const lines = new Map<string, number>();
     for (const line of readFileSync(path, 'utf8').split('\n')) {
         if (line === '' || line.startsWith('#')) continue;
@@ -359,13 +359,19 @@ test('every element, live, can be reached whole', async ({ page }) => {
             await expect.poll(() => element.evaluate((el) => el.classList.contains('morphing')), { message: `${id} is still opening`, timeout: QUIET_FOR_MS }).toBe(false);
             // An element that asks the node all the time is never quiet: it is measured once the wait is over.
             await quiet(page, wire);
-            // What the node refused while it opened: what that call would have drawn was never measured.
-            const reach = [...await unreachable(page, id), ...await misheld(page, id)];
-            // At 320 CSS px what cannot be reached is 1.4.10 Reflow's, and owed; on a phone or a desktop it is not let stand.
-            if (project === 'reflow') owe('1.4.10', id, reach);
+            // "so, the gate, it can be burndown as well, cant fix all of it now"
+            // At 320 CSS px what cannot be reached is 1.4.10 Reflow's; elsewhere it is the gate's own.
+            const cut = await unreachable(page, id);
+            const held = await misheld(page, id);
+            if (project === 'reflow') owe('1.4.10', id, [...cut, ...held]);
+            else {
+                owe('reach', id, cut);
+                owe('opens', id, held);
+            }
             owe('2.5.8', id, await undersized(page, id));
             owe('disabled', id, await disabled(page, id));
-            const past = [...(project === 'reflow' ? [] : reach), ...new Set(wire.refused.map((call) => `the node refused ${call}`))];
+            // What the node refused while it opened: what that call would have drawn was never measured, so it is not owed.
+            const past = [...new Set(wire.refused.map((call) => `the node refused ${call}`))];
             if (past.length > 0) bad[id] = past;
         } catch (err: unknown) {
             // One that never stands is named with the rest, and the next one still opens.
@@ -390,6 +396,6 @@ test('every element, live, can be reached whole', async ({ page }) => {
         if (key.startsWith(`${project} `) && !owed.has(key)) drift.push(`${key}: gone, and the burn-down still lists ${listed}. Drop the line.`);
     }
     if (drift.length > 0) console.log(`${debt.path}, ${project}'s lines as they stand:\n${[...owed].map(([key, findings]) => `${findings.size}\t${key}`).sort().join('\n')}`);
-    expect.soft(drift, `WCAG 2.2 owed on ${project} moved: the burn-down (${debt.path}) only falls`).toEqual([]);
-    expect(bad, `${Object.keys(bad).length} of ${opens.length} elements have content that cannot be reached`).toEqual({});
+    expect.soft(drift, `what is owed on ${project} moved: the burn-down (${debt.path}) only falls`).toEqual([]);
+    expect(bad, `${Object.keys(bad).length} of ${opens.length} elements were not measured`).toEqual({});
 });
