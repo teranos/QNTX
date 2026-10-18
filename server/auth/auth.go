@@ -783,7 +783,7 @@ func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, mes
 // it can act on. Without the slash, because that is the URL a connector is given.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp", a2aPrefix} {
+	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp", "/comet/", a2aPrefix} {
 		if strings.HasPrefix(path, asked) {
 			return true
 		}
