@@ -3,7 +3,9 @@
 Date: 2026-09-12
 Status: Accepted
 
-GRACE is shorthand fo Graceful Async Cancellation Engine.
+GRACE is shorthand for: Graceful Async Cancellation Engine.
+
+---
 
 ❀ Closing is where the operational db should hand what it holds to the record before the process exits, which [ADR-037](ADR-037-operational-db.md) settles.
 
