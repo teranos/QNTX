@@ -12,8 +12,6 @@ Status: Proposed
 
 "approvals is ROOT only for now"
 
-"Two things, and right now only one is in scope: the github PR approval"
-
 "APPROVALS INTEGRATE DIRECTLY WITH THE GITHUB APP"
 
 ## The element
