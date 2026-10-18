@@ -859,7 +859,10 @@ export function buildCanvasWorkspace(
         for (const el of rendered) contentLayer.appendChild(el);
 
         // Step 2: Restore melded compositions after all elements are rendered
-        const savedCompositions = getAllCompositions();
+        // A composition is this canvas's when its elements are; one is stale only when an element is on no canvas at all.
+        const onThisCanvas = new Set(uiState.getCanvasElements(canvasId).map(g => g.id));
+        const onAnyCanvas = new Set(uiState.getCanvasElements().map(g => g.id));
+        const savedCompositions = getAllCompositions().filter(c => !Array.isArray(c.edges) || extractElementIds(c.edges).some(id => onThisCanvas.has(id)));
         log.debug(SEG.ELEMENT, `[Canvas] Restoring ${savedCompositions.length} compositions from state`);
 
         for (const comp of savedCompositions) {
@@ -875,11 +878,13 @@ export function buildCanvasWorkspace(
                 .map(id => container.querySelector(`[data-element-id="${id}"]`) as HTMLElement)
                 .filter(el => el !== null);
 
-            if (elementElements.length !== elementIds.length) {
-                log.debug(SEG.ELEMENT, `[Canvas] Removing stale composition ${comp.id} - ${elementIds.length - elementElements.length} elements no longer on canvas`);
+            if (elementIds.some(id => !onAnyCanvas.has(id))) {
+                log.debug(SEG.ELEMENT, `[Canvas] Removing stale composition ${comp.id} - an element of it is on no canvas`);
                 removeComposition(comp.id);
                 continue;
             }
+            // Held, not drawn: a minimized element is in the tray, and its composition waits for it.
+            if (elementElements.length !== elementIds.length) continue;
 
             try {
                 const composition = reconstructMeld(elementElements, comp.edges, comp.id, comp.x, comp.y);
