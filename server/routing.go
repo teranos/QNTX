@@ -133,6 +133,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/canvas/export", s.canvasHandler.HandleExportStatic)                 // Export canvas via server-side rendering (GET /api/canvas/export?canvas_id={id})
 	s.answer("/api/files/", s.HandleFiles)                                             // Serve stored file (GET /api/files/{id})
 	s.answer("/api/files", s.HandleFiles)                                              // Upload file (POST)
+	s.answer("/comet/", s.HandleComet)                                                 // A project's ground: read (GET /comet/{owner}/{repo}), built (POST) (ADR-050)
 	// Python capability endpoint — delegates to whichever plugin declared python_provider=true.
 	// TODO: generalize to capability-based routing for all provider types.
 	s.answer("/api/python/execute", s.HandlePythonExecute)

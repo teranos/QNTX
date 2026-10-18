@@ -221,6 +221,7 @@ REACH is '/api/canvas/minimized-windows'                                  of ROO
 REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/api/canvas/export' '/api/canvas/export-dom'                    of ROOT
 REACH is '/api/files' '/api/files/'                                       of ROOT
+REACH is '/comet/'                                                        of ROOT SUPER
 REACH is '/api/python/execute'                                            of ROOT
 REACH is '/api/search/semantic'                                           of ROOT
 REACH is '/api/embeddings/generate' '/api/embeddings/batch'               of ROOT
