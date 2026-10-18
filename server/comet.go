@@ -12,11 +12,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/internal/sacred"
@@ -26,19 +26,25 @@ import (
 // cometGround is where ground's own sources and global controls come from.
 var cometGround = buildSource{Owner: "teranos", Repo: "ground", Branch: "main"}
 
+// cometBuilds is what each comet's last build came to, by owner/repo, until one is kept:
+// building since when, or why it failed. A comet kept has no entry.
+var cometBuilds sync.Map
+
 // cometOf is the repository a /comet/{owner}/{repo} path names.
 func cometOf(path string) (string, string, error) {
 	rest, ok := strings.CutPrefix(path, "/comet/")
-	if !ok {
-		return "", "", errors.Newf("%s is not a comet's path", path)
+	refused := errors.Newf("%s names no repository: a comet is /comet/{owner}/{repo}", path)
+	if !ok || strings.HasPrefix(rest, "/") || strings.HasSuffix(rest, "/") {
+		return "", "", refused
 	}
 	parts := strings.Split(rest, "/")
 	if len(parts) != 2 {
-		return "", "", errors.Newf("%s names no repository: a comet is /comet/{owner}/{repo}", path)
+		return "", "", refused
 	}
 	for _, part := range parts {
-		if part == "" || part == "." || part == ".." {
-			return "", "", errors.Newf("%s names no repository: a comet is /comet/{owner}/{repo}", path)
+		// A name that is only dots climbs out of the comets directory.
+		if strings.Trim(part, ".") != part {
+			return "", "", refused
 		}
 	}
 	return parts[0], parts[1], nil
@@ -79,7 +85,7 @@ func heldComets(dir string) ([]map[string]any, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "the comet at %s was not read", path)
 		}
-		digest, err := fileDigest(path)
+		digest, err := cometDigest(path)
 		if err != nil {
 			return nil, err
 		}
@@ -95,16 +101,16 @@ func heldComets(dir string) ([]map[string]any, error) {
 	return comets, nil
 }
 
-// HandleComet serves a project's comet (GET), or builds it (POST) and says so when it is done.
+// HandleComet serves a project's comet (GET), its digest (GET ?digest, or HEAD), or builds it (POST).
 func (s *QNTXServer) HandleComet(w http.ResponseWriter, r *http.Request) {
 	owner, repo, err := cometOf(r.URL.Path)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	switch r.Method {
+	key := owner + "/" + repo
 	// HEAD is ground asking whether its comet moved: the digest, and none of the bytes.
-	case http.MethodGet, http.MethodHead:
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
 		path, err := cometPath(owner, repo)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
@@ -112,7 +118,11 @@ func (s *QNTXServer) HandleComet(w http.ResponseWriter, r *http.Request) {
 		}
 		digest, err := cometDigest(path)
 		if errors.Is(err, os.ErrNotExist) {
-			writeError(w, http.StatusNotFound, "no comet of "+owner+"/"+repo+" has been built: POST /comet/"+owner+"/"+repo+" builds it")
+			said := "no comet of " + key + " is kept: POST /comet/" + key + " builds it"
+			if last, building := cometBuilds.Load(key); building {
+				said = "no comet of " + key + " is kept: " + last.(string)
+			}
+			writeError(w, http.StatusNotFound, said)
 			return
 		}
 		if err != nil {
@@ -120,46 +130,48 @@ func (s *QNTXServer) HandleComet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if r.URL.Query().Has("digest") {
-			w.Header().Set("Content-Type", "text/plain")
-			if _, err := io.WriteString(w, digest); err != nil {
-				s.logger.Errorw("the comet's digest was not written to its asker", "comet", owner+"/"+repo, "error", err)
-			}
+			respond(w, s.logger, http.StatusOK, map[string]string{"digest": digest})
 			return
 		}
 		w.Header().Set("X-Comet-Digest", digest)
 		http.ServeFile(w, r, path)
-	case http.MethodPost:
+		return
+	}
+	if r.Method == http.MethodPost {
+		cometBuilds.Store(key, "building since "+time.Now().UTC().Format(time.RFC3339))
 		source := buildSource{Owner: owner, Repo: repo}
-		sacred.Go("comet.build."+owner+"/"+repo, func() {
-			path, err := s.buildComet(s.ctx, source)
-			if err != nil {
-				s.logger.Errorw("the comet did not build", "comet", owner+"/"+repo, "error", err)
+		sacred.Go("comet.build."+key, func() {
+			if err := s.buildComet(s.ctx, source); err != nil {
+				cometBuilds.Store(key, "its last build failed: "+err.Error())
 				return
 			}
-			s.logger.Infow("the comet is built", "comet", owner+"/"+repo, "path", path)
+			cometBuilds.Delete(key)
 		})
-		w.WriteHeader(http.StatusAccepted)
-	default:
-		writeError(w, http.StatusMethodNotAllowed, r.Method+" /comet/"+owner+"/"+repo+": a comet is read with GET, its digest with HEAD, and built with POST")
+		respond(w, s.logger, http.StatusAccepted, map[string]string{"building": key})
+		return
 	}
+	writeError(w, http.StatusMethodNotAllowed, r.Method+" /comet/"+key+": a comet is read with GET, its digest with HEAD or ?digest, and built with POST")
 }
 
 // buildComet builds ground with its own controls and the project's, at both repositories' latest, and keeps it.
-func (s *QNTXServer) buildComet(ctx context.Context, project buildSource) (string, error) {
+// Each comet builds in a directory of its own, emptied when its next build begins: a failed build stays to be read until then.
+func (s *QNTXServer) buildComet(ctx context.Context, project buildSource) error {
 	builds, err := buildsDir()
 	if err != nil {
-		return "", err
+		return err
 	}
-	work, err := os.MkdirTemp(builds, "comet-"+project.Owner+"-"+project.Repo+"-")
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to make a directory in %s to build the comet of %s in", builds, project.String())
+	work := filepath.Join(builds, "comet-"+project.Owner+"-"+project.Repo)
+	if err := os.RemoveAll(work); err != nil {
+		return errors.Wrapf(err, "the last build of the comet of %s in %s was not cleared", project.String(), work)
 	}
-	defer func() {
-		if removeErr := os.RemoveAll(work); removeErr != nil {
-			s.logger.Errorw("the comet's build directory was not removed", "dir", work, "error", removeErr)
-		}
-	}()
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		return errors.Wrapf(err, "failed to make %s to build the comet of %s in", work, project.String())
+	}
+	return s.buildCometIn(ctx, project, work)
+}
 
+// buildCometIn builds the comet in work and keeps it.
+func (s *QNTXServer) buildCometIn(ctx context.Context, project buildSource, work string) error {
 	src := filepath.Join(work, "ground")
 	checkout := filepath.Join(work, "project")
 	for _, got := range []struct {
@@ -168,66 +180,68 @@ func (s *QNTXServer) buildComet(ctx context.Context, project buildSource) (strin
 	}{{cometGround, src}, {project, checkout}} {
 		rev, err := s.buildRev(ctx, got.source)
 		if err != nil {
-			return "", errors.Wrapf(err, "the latest of %s was not read", got.source.String())
+			return errors.Wrapf(err, "the latest of %s was not read", got.source.String())
 		}
 		tarball := got.dir + ".tar.gz"
 		if err := s.fetchCore(ctx, got.source, rev, tarball); err != nil {
-			return "", err
+			return err
 		}
 		if err := os.Mkdir(got.dir, 0o755); err != nil {
-			return "", errors.Wrapf(err, "failed to make %s", got.dir)
+			return errors.Wrapf(err, "failed to make %s", got.dir)
 		}
 		if err := runBuild(ctx, work, nil, "tar", "-xzf", tarball, "--strip-components=1", "-C", got.dir); err != nil {
-			return "", errors.Wrapf(err, "failed to unpack %s at %s", got.source.String(), rev)
+			return errors.Wrapf(err, "failed to unpack %s at %s", got.source.String(), rev)
 		}
 	}
 
 	local := filepath.Join(src, "controls", "local")
 	if err := os.MkdirAll(local, 0o755); err != nil {
-		return "", errors.Wrapf(err, "failed to make %s", local)
+		return errors.Wrapf(err, "failed to make %s", local)
 	}
 	if err := os.WriteFile(filepath.Join(local, "comet.pbt"), []byte(cometDeclaration(checkout)), 0o644); err != nil {
-		return "", errors.Wrapf(err, "failed to write the comet's project block in %s", local)
+		return errors.Wrapf(err, "failed to write the comet's project block in %s", local)
 	}
 	if err := os.Mkdir(filepath.Join(work, "tmp"), 0o755); err != nil {
-		return "", errors.Wrapf(err, "failed to make the comet's temp directory in %s", work)
+		return errors.Wrapf(err, "failed to make the comet's temp directory in %s", work)
 	}
 
 	env := []string{"PATH=" + nixBin + ":" + os.Getenv("PATH"), "TMPDIR=" + filepath.Join(work, "tmp")}
 	nice, args := gentle(filepath.Join(nixBin, "nix"), []string{"shell", "--inputs-from", src, "nixpkgs#gnumake", "-c",
 		filepath.Join(nixBin, "nix"), "develop", ".#default", "--command", "make", "build"})
 	if err := runBuild(ctx, src, env, nice, args...); err != nil {
-		return "", errors.Wrapf(err, "the comet of %s did not build", project.String())
+		return errors.Wrapf(err, "the comet of %s did not build", project.String())
 	}
 
 	kept, err := cometPath(project.Owner, project.Repo)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(kept), 0o755); err != nil {
-		return "", errors.Wrapf(err, "failed to make %s", filepath.Dir(kept))
+		return errors.Wrapf(err, "failed to make %s", filepath.Dir(kept))
+	}
+	binary, err := os.ReadFile(filepath.Join(src, "ground"))
+	if err != nil {
+		return errors.Wrapf(err, "the built comet of %s was not found in %s", project.String(), src)
 	}
 	// Renamed into place, never written over: a GET reading the old one reads it whole.
 	staged := kept + ".new"
-	if err := copyFile(filepath.Join(src, "ground"), staged); err != nil {
-		return "", err
+	if err := os.WriteFile(staged, binary, 0o755); err != nil {
+		return errors.Wrapf(err, "failed to write %s", staged)
 	}
 	if err := os.Rename(staged, kept); err != nil {
-		return "", errors.Wrapf(err, "failed to put the comet of %s in place at %s", project.String(), kept)
+		return errors.Wrapf(err, "failed to put the comet of %s in place at %s", project.String(), kept)
 	}
-	if err := keepDigest(kept); err != nil {
-		return "", err
-	}
-	return kept, nil
+	return keepDigest(kept)
 }
 
 // keepDigest writes the comet's sha256 beside it, once, when it is built.
 func keepDigest(path string) error {
-	digest, err := fileDigest(path)
+	binary, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "the comet at %s was not read to digest", path)
 	}
-	return errors.Wrapf(os.WriteFile(path+".digest", []byte(digest), 0o644), "failed to write the digest beside %s", path)
+	sum := sha256.Sum256(binary)
+	return errors.Wrapf(os.WriteFile(path+".digest", []byte(hex.EncodeToString(sum[:])), 0o644), "failed to write the digest beside %s", path)
 }
 
 // cometDigest is the digest kept beside a comet: asked every few seconds, never hashed again.
@@ -237,36 +251,4 @@ func cometDigest(path string) (string, error) {
 		return "", errors.Wrapf(err, "no digest is kept beside %s", path)
 	}
 	return string(said), nil
-}
-
-// fileDigest is a file's sha256, in hex.
-func fileDigest(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to open %s", path)
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", errors.Wrapf(err, "failed to read %s", path)
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// copyFile writes from's bytes to to, executable.
-func copyFile(from, to string) error {
-	in, err := os.Open(from)
-	if err != nil {
-		return errors.Wrapf(err, "the built comet at %s was not found", from)
-	}
-	defer in.Close()
-	out, err := os.OpenFile(to, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
-	if err != nil {
-		return errors.Wrapf(err, "failed to make %s", to)
-	}
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		return errors.Wrapf(err, "failed to copy %s to %s", from, to)
-	}
-	return errors.Wrapf(out.Close(), "failed to finish writing %s", to)
 }

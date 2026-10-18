@@ -32,6 +32,7 @@ func TestAmGroundNamesEachCometTheNodeKeeps(t *testing.T) {
 	kept := filepath.Join(dir, "abcd-nl", "grove", "ground")
 	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
 	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+	require.NoError(t, keepDigest(kept))
 	// A build still landing is not a comet yet.
 	require.NoError(t, os.WriteFile(kept+".new", []byte("half"), 0o755))
 
@@ -80,7 +81,7 @@ func TestACometIsServedWithItsDigestAndAskedForByIt(t *testing.T) {
 	digest := httptest.NewRecorder()
 	s.HandleComet(digest, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove?digest", nil))
 	assert.Equal(t, http.StatusOK, digest.Code)
-	assert.Equal(t, hex.EncodeToString(sum[:]), digest.Body.String())
+	assert.JSONEq(t, `{"digest":"`+hex.EncodeToString(sum[:])+`"}`, digest.Body.String())
 }
 
 func TestACometsDigestIsWrittenOnceBesideIt(t *testing.T) {
