@@ -207,11 +207,12 @@ func TestAnAgentRunsUnderGroundOnceItsGroundAndSettingsStand(t *testing.T) {
 	require.NoError(t, json.Unmarshal(written, &settings))
 	assert.Equal(t, "opus", settings.Model)
 	assert.Equal(t, AgentGround(home), settings.Hooks["PreToolUse"][0].Hooks[0].Command)
+	// Under -p a hook that does not end holds the turn, so the agent's sky is spawned apart.
 	stop := settings.Hooks["Stop"][0].Hooks
 	require.Len(t, stop, 2)
-	assert.Equal(t, AgentGround(home)+` sky "$PWD"`, stop[1].Command)
-	assert.Equal(t, 86400, stop[1].Timeout)
-	assert.True(t, stop[1].AsyncRewake)
+	assert.Equal(t, AgentGround(home)+` sky "$PWD" </dev/null >/dev/null 2>&1 &`, stop[1].Command)
+	assert.Zero(t, stop[1].Timeout)
+	assert.False(t, stop[1].AsyncRewake)
 }
 
 // "That is how the node knows which ground a session runs, and so which comet landed."

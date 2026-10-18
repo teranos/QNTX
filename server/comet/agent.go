@@ -96,7 +96,8 @@ func Under(home string) error {
 }
 
 // agentHooks are the events ground answers, as the operator's own Claude Code wires them; sky is
-// spawned on skyHooks with a day's timeout, waking the session when it hands something in.
+// spawned on skyHooks. Under -p Claude Code waits for an asyncRewake hook to end, a day for sky,
+// so an agent's sky is spawned apart: each streams what is pending on its pass (q, 2026-10-19).
 var agentHooks = []string{"PreToolUse", "PostToolUse", "PreCompact", "Stop", "SessionStart", "UserPromptSubmit",
 	"PostToolUseFailure", "Notification", "StopFailure", "SubagentStart", "SubagentStop", "TeammateIdle",
 	"TaskCompleted", "InstructionsLoaded", "ConfigChange", "SessionEnd", "MessageDisplay"}
@@ -122,7 +123,7 @@ func AgentSettings(home string) error {
 	for _, event := range agentHooks {
 		run := []any{map[string]any{"type": "command", "command": ground}}
 		if skyHooks[event] {
-			run = append(run, map[string]any{"type": "command", "command": ground + " sky \"$PWD\"", "timeout": 86400, "asyncRewake": true})
+			run = append(run, map[string]any{"type": "command", "command": ground + " sky \"$PWD\" </dev/null >/dev/null 2>&1 &"})
 		}
 		hooks[event] = []any{map[string]any{"matcher": "", "hooks": run}}
 	}

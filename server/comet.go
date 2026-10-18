@@ -35,8 +35,15 @@ func (s *QNTXServer) cometHandler() comet.Handler {
 // Until it does, no turn is said to it (claudePart's ready).
 func (s *QNTXServer) groundTheNodeAgent() {
 	for _, home := range s.underGround {
-		if err := comet.Under(home); err != nil {
+		err := comet.Under(home)
+		if err != nil {
 			s.logger.Named("comet").Infow("An agent's ground is built", "home", home, "because", err.Error())
+			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
+			continue
+		}
+		// A ground that stands is run by the settings this node writes, not by those an older one wrote.
+		if err := comet.AgentSettings(home); err != nil {
+			s.logger.Named("comet").Infow("An agent's ground is built again: its settings did not write", "home", home, "because", err.Error())
 			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
 		}
 	}

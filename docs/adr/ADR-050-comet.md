@@ -188,7 +188,10 @@ Even faster when the builds are done by QNTX as Comet
   comets it moves.
 - Comet on am ground, and the Comet stratum real.
 - ground for the Node Agent: its settings.json runs it, and no turn is said to
-  the agent until it stands.
+  the agent until it stands. On q its rows name `ground comet a1ac2c0
+  agent:root` and reached the node.
+- Under `-p` Claude Code waits for an asyncRewake hook to end: q's agent turn
+  held on its sky's day-long timeout. An agent's sky is spawned apart.
 
 ## Not done
 
