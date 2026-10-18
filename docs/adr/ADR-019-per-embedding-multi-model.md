@@ -129,9 +129,8 @@ Search("similar to X", model="MiniLM-L6-v2")
 
 ### Negative
 
-⚠️ Every query path gains a model parameter — more surface area for bugs
+
 ⚠️ Per-model vec0 tables mean dynamic DDL — tables created at runtime when new models appear
-⚠️ Storage multiplies with each model — N models means N embeddings per attestation
 ⚠️ Backfill needed when adding a model to an existing corpus
 ⚠️ ort 2.0.0-rc.11 `Session::run` is `&mut self` — inference requires exclusive lock per model, no concurrent inference within a single model
 
