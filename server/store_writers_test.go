@@ -75,6 +75,9 @@ var storeWriters = map[string]string{
 	"setAgentLine": "the AGENT line a namespace opts into its agent by (ADR-048), in the namespace's own " +
 		"store through Write as the setter is admitted, after maySetAgent says they own the namespace, " +
 		"or are ROOT or SUPER",
+	"setKeyLine": "a KEY line of a namespace (ADR-051), in the namespace's own store through Write as " +
+		"the setter is admitted, after keysAsking refuses a token or a connector and mayHandleKeys says " +
+		"they own the namespace, or are ROOT or SUPER",
 
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +

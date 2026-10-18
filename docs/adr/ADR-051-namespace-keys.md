@@ -39,6 +39,9 @@ Status: Proposed
   node starts for that namespace, the way the ROOT agent's plan token does
   (internal/claudecode/run.go). ADR-048 lays the rule for git, and it holds
   here: handed to the process, offered to no model.
+- A namespace's agent in Pi is handed the key named for the provider its
+  AGENT line names, as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or
+  `OPENROUTER_API_KEY` (ADR-053).
 
 ## Through the loss of the box
 
@@ -69,6 +72,5 @@ reading every key:
 
 ## Not done
 
-- claude login.
-- The namespace agent that receives them (ADR-048, ADR-050).
+- The element.
 - REACH on a namespace, which would widen who sets them past the owner.

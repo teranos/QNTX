@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/nodedid"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
@@ -126,7 +127,7 @@ func rootAsksAm(s *QNTXServer, name string, sent sigil.Sent) (*protocol.Namespac
 	return askingAm(s, "https://example.org/root", auth.LevelRoot, nil, name, sent)
 }
 
-var sonnetGarden = sigil.Sent{"namespace": "garden", "model": "claude-sonnet-5-5", "effort": "medium", "permission_mode": "dontAsk", "allow": "Read, mcp__qntx"}
+var sonnetGarden = sigil.Sent{"namespace": "garden", "harness": "claude", "model": "claude-sonnet-5-5", "effort": "medium", "permission_mode": "dontAsk", "allow": "Read, mcp__qntx"}
 
 // "The Namespace agent is a common Agent of the Namespace it's opted into."
 // Opting in is a line in the namespace's own store, and the agent it names is
@@ -154,7 +155,7 @@ func TestANamespaceOptsIntoAnAgentOfItsOwn(t *testing.T) {
 	system, _ := s.held.WriteWhatTheNodeKnowsOfItself()
 	assert.Empty(t, system.(*handed).rows, "nothing of the namespace's agent is written in system")
 
-	again, refused := rootAsksAm(s, "am", sigil.Sent{"namespace": "garden"})
+	again, refused := rootAsksAm(s, "am", sigil.Sent{"namespace": "garden", "harness": "claude"})
 	require.Nil(t, refused)
 	assert.Equal(t, am.GetAgent().GetDid(), again.GetAgent().GetDid(), "one agent per namespace and model, wherever it is asked for")
 	holds(t, s.agentsSignum(), "am", again)
@@ -186,15 +187,15 @@ func TestEachNamespaceAndModelIsItsOwnAgent(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	garden, refused := rootAsksAm(s, "set", sonnetGarden)
 	require.Nil(t, refused)
-	orchard, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "orchard", "model": "claude-sonnet-5-5", "effort": "medium", "permission_mode": "dontAsk"})
+	orchard, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "orchard", "harness": "claude", "model": "claude-sonnet-5-5", "effort": "medium", "permission_mode": "dontAsk"})
 	require.Nil(t, refused)
 	assert.NotEqual(t, garden.GetAgent().GetDid(), orchard.GetAgent().GetDid())
 
-	opus, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "model": "claude-opus-5-5", "effort": "high", "permission_mode": "dontAsk"})
+	opus, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "harness": "claude", "model": "claude-opus-5-5", "effort": "high", "permission_mode": "dontAsk"})
 	require.Nil(t, refused)
 	assert.NotEqual(t, garden.GetAgent().GetDid(), opus.GetAgent().GetDid(), "a different model is a different agent")
 	assert.Equal(t, "claude-opus-5-5", opus.GetAgent().GetModel())
-	am, refused := rootAsksAm(s, "am", sigil.Sent{"namespace": "garden"})
+	am, refused := rootAsksAm(s, "am", sigil.Sent{"namespace": "garden", "harness": "claude"})
 	require.Nil(t, refused)
 	assert.Equal(t, opus.GetAgent().GetDid(), am.GetAgent().GetDid(), "the newest line holds")
 }
@@ -217,12 +218,13 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 	require.Nil(t, refused)
 	assert.Equal(t, true, finished["signed_in"])
 
-	said, refused := answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "say", sigil.Sent{"namespace": "garden", "says": "how long has the box been up?"})
+	said, refused := answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "say", sigil.Sent{"namespace": "garden", "harness": "claude", "says": "how long has the box been up?"})
 	require.Nil(t, refused)
-	answer, isSaid := said.(*protocol.ClaudeSaid)
+	saidIn, isSaid := said.(*protocol.NamespaceAgentSaid)
 	require.True(t, isSaid)
+	answer := saidIn.GetClaude()
 	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
-	holds(t, s.agentsSignum(), "say", answer)
+	holds(t, s.agentsSignum(), "say", saidIn)
 	// Run as the AGENT line says, on its own sign-in, with its own token.
 	run := theRunSaying(t, ran)
 	args := ranWith(t, ran, run, "args")
@@ -250,13 +252,48 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 	assert.Empty(t, system.(*handed).rows)
 	assert.Empty(t, in.store["orchard"].rows)
 
-	read, refused := answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "session", sigil.Sent{"namespace": "garden"})
+	read, refused := answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "session", sigil.Sent{"namespace": "garden", "harness": "claude"})
 	require.Nil(t, refused)
 	holds(t, s.agentsSignum(), "session", read)
 	whole, held := read.(*protocol.SessionTranscript)
 	require.True(t, held)
 	require.NotEmpty(t, whole.GetTranscript().GetTurns())
 	assert.Equal(t, "how long has the box been up?", whole.GetTranscript().GetTurns()[0].GetText())
+}
+
+// "I want Pi to also serv the function of namespace agent alongside Claude
+// code namespace agent": a namespace holds an AGENT line in each harness, the
+// one in Pi an agent of its own, and the one in Claude Code stands.
+func TestANamespaceOptsIntoAnAgentInPiAlongsideClaudeCode(t *testing.T) {
+	s, _, in := runningNamespaceAgents(t)
+	claude, refused := rootAsksAm(s, "set", sonnetGarden)
+	require.Nil(t, refused)
+
+	pi, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "harness": "pi", "model": "anthropic/claude-opus-4.6", "thinking": "low", "provider": "openrouter"})
+	require.Nil(t, refused)
+	holds(t, s.agentsSignum(), "set", pi)
+	assert.Equal(t, "garden", pi.GetNamespace())
+	assert.Equal(t, "anthropic/claude-opus-4.6", pi.GetPi().GetModel())
+	assert.Equal(t, "low", pi.GetPi().GetThinking())
+	assert.NotEmpty(t, pi.GetPi().GetDid())
+	assert.NotEqual(t, claude.GetAgent().GetDid(), pi.GetPi().GetDid(), "the agent in Pi is an agent of its own")
+	assert.NotEqual(t, s.nodeAgent.did, pi.GetPi().GetDid(), "the agent in Pi is not the Node Agent")
+
+	var harnesses []string
+	for _, row := range in.store["garden"].rows {
+		if slices.Contains(row.Subjects, "AGENT") {
+			harnesses = append(harnesses, row.Predicates...)
+		}
+	}
+	assert.ElementsMatch(t, []string{"claude", "pi"}, harnesses)
+
+	am, refused := rootAsksAm(s, "am", sigil.Sent{"namespace": "garden", "harness": "claude"})
+	require.Nil(t, refused)
+	assert.Equal(t, claude.GetAgent().GetDid(), am.GetAgent().GetDid(), "the agent in Claude Code stands")
+
+	_, refused = rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "harness": "pi", "model": "anthropic/claude-opus-4.6"})
+	require.NotNil(t, refused)
+	assert.Equal(t, "thinking", refused.Param)
 }
 
 // "shared amongst anyone who has REACH on it": who acts in the namespace
@@ -266,20 +303,20 @@ func TestANamespaceAgentIsReachedByWhoActsInTheNamespace(t *testing.T) {
 	_, refused := rootAsksAm(s, "set", sonnetGarden)
 	require.Nil(t, refused)
 
-	_, refused = asking(s, visitor, auth.LevelUser, []string{"orchard"}, "am", sigil.Sent{"namespace": "garden"})
+	_, refused = asking(s, visitor, auth.LevelUser, []string{"orchard"}, "am", sigil.Sent{"namespace": "garden", "harness": "claude"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.Why)
 
-	_, refused = asking(s, visitor, auth.LevelUser, []string{"orchard"}, "say", sigil.Sent{"namespace": "garden", "says": "hello"})
+	_, refused = asking(s, visitor, auth.LevelUser, []string{"orchard"}, "say", sigil.Sent{"namespace": "garden", "harness": "claude", "says": "hello"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.Why)
 
-	_, refused = asking(s, visitor, auth.LevelUser, []string{"orchard"}, "am", sigil.Sent{"namespace": "orchard"})
+	_, refused = asking(s, visitor, auth.LevelUser, []string{"orchard"}, "am", sigil.Sent{"namespace": "orchard", "harness": "claude"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.Why, "orchard opted into no agent")
 	assert.Contains(t, refused.Says, "opted into no agent")
 
-	_, refused = rootAsksAm(s, "am", sigil.Sent{"namespace": "system"})
+	_, refused = rootAsksAm(s, "am", sigil.Sent{"namespace": "system", "harness": "claude"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotAllowed, refused.Why, "system has no agent of its own")
 }
@@ -297,11 +334,11 @@ func TestWhoSetsANamespacesAgent(t *testing.T) {
 	require.Nil(t, refused)
 	assert.Equal(t, gardener, am.GetSetBy())
 
-	super, refused := askingAm(s, "https://example.org/super", auth.LevelSuper, nil, "set", sigil.Sent{"namespace": "orchard", "model": "claude-sonnet-5-5", "effort": "low", "permission_mode": "dontAsk"})
+	super, refused := askingAm(s, "https://example.org/super", auth.LevelSuper, nil, "set", sigil.Sent{"namespace": "orchard", "harness": "claude", "model": "claude-sonnet-5-5", "effort": "low", "permission_mode": "dontAsk"})
 	require.Nil(t, refused)
 	assert.Equal(t, "https://example.org/super", super.GetSetBy())
 
-	_, refused = askingAm(s, gardener, auth.LevelUser, []string{"garden"}, "set", sigil.Sent{"namespace": "garden", "effort": "low", "permission_mode": "dontAsk"})
+	_, refused = askingAm(s, gardener, auth.LevelUser, []string{"garden"}, "set", sigil.Sent{"namespace": "garden", "harness": "claude", "effort": "low", "permission_mode": "dontAsk"})
 	require.NotNil(t, refused)
 	assert.Equal(t, "model", refused.Param, "the agent is the model named, and nothing stands in for it")
 }
@@ -337,3 +374,68 @@ func theRunSaying(t *testing.T, ran string) string {
 }
 
 var _ ats.AttestationStore = (*handed)(nil)
+
+// "I want Pi to also serv the function of namespace agent alongside Claude
+// code namespace agent": what is said to the namespace's agent in Pi is
+// answered by Pi, its model calls on the namespace's own key, handed to the
+// process and offered to no model, and its session written in the namespace.
+func TestThePiAgentOfANamespaceAnswersOnTheNamespacesKey(t *testing.T) {
+	s, _, in := runningNamespaceAgents(t)
+	binary, piRan := claudeStandIn(t, piAnswered)
+	fetched := make(chan struct{})
+	close(fetched)
+	s.holdHarness("pi", &harnessHeld{name: "Pi", fetched: fetched, path: binary})
+	set, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "harness": "pi", "model": "anthropic/claude-opus-4.6", "thinking": "low", "provider": "openrouter"})
+	require.Nil(t, refused)
+
+	saying := sigil.Sent{"namespace": "garden", "harness": "pi", "says": "how long has the box been up?"}
+	_, refused = answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "say", saying)
+	require.NotNil(t, refused, "no key, no model call")
+	assert.Contains(t, refused.Says, "openrouter key")
+
+	_, refused = keysAs(s, person(gardener, auth.LevelUser, "garden"), "set", sigil.Sent{"namespace": "garden", "name": "openrouter", "value": "sk-or-the-gardeners"})
+	require.Nil(t, refused)
+
+	said, refused := answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "say", saying)
+	require.Nil(t, refused)
+	saidIn, isSaid := said.(*protocol.NamespaceAgentSaid)
+	require.True(t, isSaid)
+	holds(t, s.agentsSignum(), "say", saidIn)
+	assert.Equal(t, "Up 3 days.", saidIn.GetPi().GetAnswer())
+
+	args := ranWith(t, piRan, "0", "args")
+	assert.Equal(t, "openrouter/anthropic/claude-opus-4.6", after(args, "--model"))
+	assert.Equal(t, "low", after(args, "--thinking"))
+	assert.Contains(t, after(args, "--append-system-prompt"), set.GetPi().GetDid())
+	env := ranWith(t, piRan, "0", "env")
+	assert.Contains(t, env, "OPENROUTER_API_KEY=sk-or-the-gardeners", "the namespace's key, handed to the process")
+	assert.NotContains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token, "ROOT's token is not the namespace agent's")
+	home := filepath.Join(s.agentsDir, "garden", slug.Of("anthropic/claude-opus-4.6"), "pi")
+	mcp, err := os.ReadFile(filepath.Join(home, "mcp.json"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(mcp), "sk-or-the-gardeners", "offered to no model")
+	_, err = os.Stat(filepath.Join(home, "models.json"))
+	assert.True(t, os.IsNotExist(err), "no gateway of the node's stands between it and its provider")
+
+	var signers []string
+	for _, row := range in.store["garden"].rows {
+		if row.SignerDID == set.GetPi().GetDid() {
+			signers = append(signers, row.Predicates[0])
+		}
+	}
+	assert.NotEmpty(t, signers, "its session is written in the namespace, signed as itself")
+	system, _ := s.held.WriteWhatTheNodeKnowsOfItself()
+	assert.Empty(t, system.(*handed).rows)
+
+	am, refused := rootAsksAm(s, "am", sigil.Sent{"namespace": "garden", "harness": "pi"})
+	require.Nil(t, refused)
+	holds(t, s.agentsSignum(), "am", am)
+	assert.Equal(t, set.GetPi().GetDid(), am.GetPi().GetDid())
+	assert.Equal(t, "openrouter", am.GetPi().GetProvider())
+
+	read, refused := answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "session", sigil.Sent{"namespace": "garden", "harness": "pi"})
+	require.Nil(t, refused)
+	whole, held := read.(*protocol.SessionTranscript)
+	require.True(t, held)
+	assert.NotEmpty(t, whole.GetTranscript().GetTurns())
+}

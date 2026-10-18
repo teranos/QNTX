@@ -172,15 +172,52 @@ export interface ClaudeAm {
   auth_method: string;
 }
 
+/**
+ * NamespaceAgentSaid is what agents say answers: what the namespace's agent
+ * answered, in the harness it was said to.
+ */
+export interface NamespaceAgentSaid {
+  /** What it answered in Claude Code. */
+  claude:
+    | ClaudeSaid
+    | undefined;
+  /** What it answered in Pi. */
+  pi: PiSaid | undefined;
+}
+
+/**
+ * NamespaceKeys is what keys list, set and drop answer: the names of a
+ * namespace's keys, never their values (ADR-051).
+ */
+export interface NamespaceKeys {
+  /** The namespace they are kept in. */
+  namespace: string;
+  /** Each key held, by its name. */
+  keys: NamespaceKey[];
+}
+
+/** NamespaceKey is one key a namespace holds, by its name: who set it and when. */
+export interface NamespaceKey {
+  /** Its name, e.g. openrouter. */
+  name: string;
+  /** Who set it. */
+  set_by: string;
+  /** When it was set, RFC 3339. */
+  at: string;
+}
+
 /** PiAm is what pi am answers. */
 export interface PiAm {
   /** Its own DID, which signs what it writes down. */
   did: string;
-  /** The model am.toml names for Pi. */
+  /**
+   * The model it runs in Pi: am.toml's for the Node Agent, the AGENT line's for
+   * a namespace's agent.
+   */
   model: string;
-  /** The thinking level am.toml names for Pi. */
+  /** The thinking level it runs at in Pi. */
   thinking: string;
-  /** The plugin every model call Pi makes goes through. */
+  /** The plugin every model call the Node Agent makes in Pi goes through. */
   gateway: string;
   /**
    * The session it continues in Pi, or empty before anything was said to it
@@ -195,19 +232,28 @@ export interface PiAm {
   pi_version: string;
   /** Why it cannot be spoken to in Pi, when it cannot. */
   not_ready: string;
+  /**
+   * The provider a namespace's agent makes its model calls at, on the
+   * namespace's key of that name (ADR-051).
+   */
+  provider: string;
 }
 
 /**
  * NamespaceAgentAm is what agents am and agents set answer: the namespace's
- * agent, who opted the namespace into it, and who it is in Claude Code.
+ * agent, who opted the namespace into it, and who it is in Claude Code or in Pi.
  */
 export interface NamespaceAgentAm {
   /** The namespace it stands in. */
   namespace: string;
   /** Who opted the namespace into it. */
   set_by: string;
-  /** Who the agent is and how it runs. */
-  agent: ClaudeAm | undefined;
+  /** Who the agent is and how it runs, in Claude Code. */
+  agent:
+    | ClaudeAm
+    | undefined;
+  /** Who the agent is and how it runs, in Pi. */
+  pi: PiAm | undefined;
 }
 
 /**

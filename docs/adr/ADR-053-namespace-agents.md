@@ -32,6 +32,20 @@ it."
 - To who has no REACH, a namespace with an agent answers as one that does not
   exist (§3.3.2).
 
+## Pi
+
+"I want Pi to also serv the function of namespace agent alongside Claude code
+namespace agent"
+
+- A namespace opts into an agent in Pi beside the one in Claude Code: an AGENT
+  line whose predicate is pi, naming the model, the thinking level and the
+  provider.
+- Its model calls are made at that provider on the namespace's key of the
+  provider's name (ADR-051), handed to Pi's process in the variable Pi reads
+  it from.
+- It reaches the node's MCP with its own token, and its session is written in
+  the namespace.
+
 ## Not done
 
 - The namespace agent: its own DID derived from the node's key for that

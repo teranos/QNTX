@@ -129,9 +129,9 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 		return err
 	}
 	s.holdHarness("claude", holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger))
-	if s.deps.cfg.Agent.Root.Pi.Named() {
-		s.holdHarness("pi", holdPi(s.ctx, pi.PinnedFlake, s.wg.Go, s.logger))
-	}
+	// A namespace's agent runs in Pi too, so the node holds Pi whichever
+	// harnesses its Node Agent runs in.
+	s.holdHarness("pi", holdPi(s.ctx, pi.PinnedFlake, s.wg.Go, s.logger))
 
 	home, err := nodeAgentHome()
 	if err != nil {

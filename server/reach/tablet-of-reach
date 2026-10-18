@@ -174,6 +174,11 @@ REACH is '/api/pi' '/api/pi/say' '/api/pi/session'                        of ROO
 # or SUPER, asked there too.
 REACH is '/api/agents/{namespace}' '/api/agents/{namespace}/say' '/api/agents/{namespace}/session' '/api/agents/{namespace}/login' of ROOT SUPER USER
 
+# A namespace's keys (ADR-051): "a model never lists, sets or reads a key", so
+# no TOKEN, and the handler refuses a token or a connector at any level; who
+# handles them is the namespace's owner, ROOT or SUPER, asked there too.
+REACH is '/api/keys/{namespace}' '/api/keys/{namespace}/drop'              of ROOT SUPER USER
+
 # Approvals (ADR-052): "approvals is ROOT only for now". The list is a sigil;
 # the answer is a route and no sigil, "human only" and "only through it's
 # element", which the handler asks of the admission: a token is refused.
