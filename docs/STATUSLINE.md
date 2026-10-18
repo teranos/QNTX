@@ -69,7 +69,7 @@ the answer to the sieve being the same move as ritual_position.
 ## A plugin's deploy
 
 Built. `/am/statusline?format=json` carries `deploys` beside `items`
-(server/statusline_deploy.go); ug draws each on its plugin's name (ground, ug/tmux.d).
+(server/statusline/deploy.go); ug draws each on its plugin's name (ground, ug/tmux.d).
 
 "i wish ug would poll from QNTX some kind of indication that it knows a new plugin build and version is underway"
 

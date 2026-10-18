@@ -92,8 +92,8 @@
 1	server/signa.go
 1	server/staand.go
 2	server/standing_observer.go
-1	server/statusline_handlers.go
-1	server/statusline_watchers.go
+1	server/statusline/handlers.go
+1	server/statusline/watchers.go
 1	server/storage_events.go
 2	server/sub_auth.go
 1	server/sub_embedding.go

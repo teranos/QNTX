@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"context"
@@ -45,10 +45,10 @@ func drawRow(t *testing.T, h *StatusLineHandler, query string) StatusLineRespons
 
 // aNodeWithPeers is a handler with an empty registry and no plugins probed, so
 // the row runs its whole way through, with the peers answering as given.
-func aNodeWithPeers(peers peerRows) *StatusLineHandler {
+func aNodeWithPeers(peers PeerRows) *StatusLineHandler {
 	h := NewStatusLineHandler(plugin.NewRegistry("test", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
-		func() pluginProbe { return notProbedYet{} }, nil, nil, nil)
-	h.peers = peers
+		func() map[string]plugin.HealthStatus { return map[string]plugin.HealthStatus{} }, nil, nil, nil)
+	h.Peers = peers
 	return h
 }
 
@@ -82,7 +82,7 @@ func TestTheRowCarriesEveryPeersRowAfterItsOwn(t *testing.T) {
 
 // A primary asking draws the person itself, so the peer's answer carries no caller item.
 func TestAPrimarysAskIsAnsweredWithoutTheCaller(t *testing.T) {
-	h := aNodeWithPeers(noPeers)
+	h := aNodeWithPeers(NoPeers)
 	own := drawRow(t, h, "format=json")
 	require.Len(t, own.Items, 1)
 	assert.Equal(t, auth.RootName, own.Items[0].Name)
@@ -136,7 +136,7 @@ func TestAnItemOnAPeersRowIsAnsweredThroughThePrimary(t *testing.T) {
 	})
 	ctx := auth.WithAdmission(context.Background(), superRoot())
 
-	detail, refusal := h.item(ctx, "AS-CI-WATCH-1")
+	detail, refusal := h.Item(ctx, "AS-CI-WATCH-1")
 	require.Nil(t, refusal)
 	assert.Equal(t, []string{"/am/statusline/AS-CI-WATCH-1"}, asked)
 	got, isMap := detail.(map[string]any)
@@ -144,6 +144,6 @@ func TestAnItemOnAPeersRowIsAnsweredThroughThePrimary(t *testing.T) {
 	assert.Equal(t, "ci.watch", got["name"])
 	assert.Equal(t, "k", got["peer"])
 
-	_, refusal = h.item(ctx, "nowhere")
+	_, refusal = h.Item(ctx, "nowhere")
 	require.NotNil(t, refusal)
 }

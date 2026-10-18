@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"encoding/json"

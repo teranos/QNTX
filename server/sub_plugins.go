@@ -7,6 +7,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -19,16 +20,17 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth,
 		s.pluginSigilRows, s.pluginRecords().Plugins)
 	grpcplugin.SetPluginRecords(s.pluginRecords())
-	s.statusLineHandler = NewStatusLineHandler(pluginRegistry, s.logger, s.pluginHealth,
+	s.statusLineHandler = statusline.NewStatusLineHandler(pluginRegistry, s.logger,
+		func() map[string]plugin.HealthStatus { return healthOf(s.pluginHealth()) },
 		// Fetched per request: the backend supplies the watcher store after
 		// this handler is built.
 		func() storage.Watchers { return s.held.ServedUniverse().Watchers() },
-		func() *handlerFailureLog { return s.handlerFailures },
+		func() *statusline.HandlerFailureLog { return s.handlerFailures },
 		s)
-	s.statusLineHandler.news = func() *newsLog { return s.news }
-	s.statusLineHandler.deploys = s.deploys.held
-	// The auth subsystem ran first and left how the peers are asked, or noPeers.
-	s.statusLineHandler.peers = s.askPeers
+	s.statusLineHandler.News = func() *statusline.NewsLog { return s.news }
+	s.statusLineHandler.Deploys = func() ([]statusline.DeployData, bool) { return deployData(s.deploys.held()) }
+	// The auth subsystem ran first and left how the peers are asked, or statusline.NoPeers.
+	s.statusLineHandler.Peers = s.askPeers
 
 	queue := s.daemon.GetQueue()
 

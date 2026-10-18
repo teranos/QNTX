@@ -19,6 +19,7 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -247,7 +248,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 			)
 			// The row reads this. A broadcast reaches whoever is connected;
 			// the status line has to answer callers who were not.
-			s.noteHandlerFailure(HandlerFailure{
+			s.noteHandlerFailure(statusline.HandlerFailure{
 				Handler:        scheduledJob.HandlerName,
 				ScheduledJobID: execution.ScheduledJobId,
 				ExecutionID:    execution.Id,

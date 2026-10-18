@@ -8,6 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/statusline"
 	"go.uber.org/zap"
 )
 
@@ -31,7 +32,7 @@ type standingObserver struct {
 	builtins func() watcher.BuiltinExecutor
 	// Where a row that matched and could not be run is put: the status row,
 	// not only the log, which is ROOT's to read.
-	noteFailure func(HandlerFailure)
+	noteFailure func(statusline.HandlerFailure)
 	logger      *zap.SugaredLogger
 	// namespace is the one this observer was registered for.
 	namespace string
@@ -41,7 +42,7 @@ func (o *standingObserver) failed(handler, why string, as *types.As) {
 	if o.noteFailure == nil {
 		return
 	}
-	o.noteFailure(HandlerFailure{Handler: handler, ExecutionID: "standing:" + as.ID, Error: why})
+	o.noteFailure(statusline.HandlerFailure{Handler: handler, ExecutionID: "standing:" + as.ID, Error: why})
 }
 
 // OnAttestationCreated runs every standing built-in whose filter names the

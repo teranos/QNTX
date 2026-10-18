@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"strconv"
@@ -15,7 +15,7 @@ const (
 	// Longer than the watcher window: a handler that fails once an hour is the
 	// case worth catching, and an hour-wide window shows it only in the minutes
 	// after each failure.
-	handlerFailureWindow = 24 * time.Hour
+	HandlerFailureWindow = 24 * time.Hour
 	// The row is one line; the newest failing handlers name the fire.
 	handlerFailureItems = 3
 	// Bounded: a handler failing in a tight loop must not grow this without end.
@@ -37,19 +37,19 @@ type HandlerFailure struct {
 	AtMs       int64
 }
 
-// handlerFailureLog holds recent failures in memory. A restart empties it,
+// HandlerFailureLog holds recent failures in memory. A restart empties it,
 // which is correct: the row reports what this process has seen.
-type handlerFailureLog struct {
+type HandlerFailureLog struct {
 	mu       sync.Mutex
 	failures []HandlerFailure
 }
 
-func newHandlerFailureLog() *handlerFailureLog {
-	return &handlerFailureLog{}
+func NewHandlerFailureLog() *HandlerFailureLog {
+	return &HandlerFailureLog{}
 }
 
 // record appends a failure, dropping the oldest once the log is full.
-func (l *handlerFailureLog) record(f HandlerFailure) {
+func (l *HandlerFailureLog) Record(f HandlerFailure) {
 	if l == nil {
 		return
 	}
@@ -62,7 +62,7 @@ func (l *handlerFailureLog) record(f HandlerFailure) {
 }
 
 // since returns the failures inside the window, newest first.
-func (l *handlerFailureLog) since(window time.Duration) []HandlerFailure {
+func (l *HandlerFailureLog) Since(window time.Duration) []HandlerFailure {
 	if l == nil {
 		return nil
 	}
@@ -112,7 +112,7 @@ func (h *StatusLineHandler) recentHandlerFailures() []handlerFailureRun {
 	if h == nil || h.handlerFailures == nil {
 		return nil
 	}
-	return groupHandlerFailures(h.handlerFailures().since(handlerFailureWindow), handlerFailureItems)
+	return groupHandlerFailures(h.handlerFailures().Since(HandlerFailureWindow), handlerFailureItems)
 }
 
 // builtinRuns is the failing handlers that no plugin declared. A plugin's
@@ -158,16 +158,16 @@ func shortReason(errText string) string {
 				return tail
 			}
 			if word, _, ok := strings.Cut(tail, " "); ok && word != "" {
-				return firstN(word, handlerReasonLimit)
+				return FirstN(word, handlerReasonLimit)
 			}
-			return firstN(tail, handlerReasonLimit)
+			return FirstN(tail, handlerReasonLimit)
 		}
 	}
 
-	return firstN(line, handlerReasonLimit)
+	return FirstN(line, handlerReasonLimit)
 }
 
-func firstN(s string, n int) string {
+func FirstN(s string, n int) string {
 	if len(s) > n {
 		return s[:n]
 	}
@@ -202,7 +202,7 @@ func (h *StatusLineHandler) handlerFailureDetail(name string) (map[string]any, b
 			"handler":          r.Handler,
 			"healthy":          false,
 			"failures":         r.Count,
-			"window":           handlerFailureWindow.String(),
+			"window":           HandlerFailureWindow.String(),
 			"failed_at":        time.UnixMilli(r.Latest.AtMs).UTC().Format(time.RFC3339),
 			"error":            r.Latest.Error,
 			"execution_id":     r.Latest.ExecutionID,
@@ -217,23 +217,4 @@ func (h *StatusLineHandler) handlerFailureDetail(name string) (map[string]any, b
 		return detail, true
 	}
 	return nil, false
-}
-
-// noteHandlerFailure records one failed handler execution for the row.
-func (s *QNTXServer) noteHandlerFailure(f HandlerFailure) {
-	if s == nil || s.handlerFailures == nil {
-		return
-	}
-	if f.AtMs == 0 {
-		f.AtMs = time.Now().UnixMilli()
-	}
-	// An unnamed handler is still a failing one. The job id is worse to read
-	// than a name and better than an empty span on the row.
-	if f.Handler == "" {
-		f.Handler = f.ScheduledJobID
-	}
-	if f.Handler == "" {
-		f.Handler = "handler"
-	}
-	s.handlerFailures.record(f)
 }

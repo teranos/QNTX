@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"strconv"
@@ -29,7 +29,7 @@ func (h *StatusLineHandler) pluginRow(name string) ([]StatusItem, bool) {
 
 	healthy := false
 	if h.health != nil {
-		results := healthOf(h.health())
+		results := h.health()
 		healthy = well(results[name].Healthy, string(h.registry.GetAllStates()[name]))
 	}
 	meta := p.Metadata()

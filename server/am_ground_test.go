@@ -16,26 +16,27 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/QNTX/server/statusline"
 	"go.uber.org/zap/zaptest"
 )
 
 const alice = "https://mastodon.example/@alice"
 
-func left(l *newsLog, n News) {
+func left(l *statusline.NewsLog, n statusline.News) {
 	n.UntilMs = time.Now().Add(time.Minute).UnixMilli()
-	l.leave(n)
+	l.Leave(n)
 }
 
 // "this part is supposed to show things QNTX does for ground specifically"
 func TestAmGroundSaysWhatTheNodeDoesForGround(t *testing.T) {
-	l := newNewsLog()
-	left(l, News{ID: "p-1:162d82f", For: alice, Item: StatusItem{Name: "ci", Note: "success main 162d82f", Symbol: SymbolWell},
+	l := statusline.NewNewsLog()
+	left(l, statusline.News{ID: "p-1:162d82f", For: alice, Item: statusline.StatusItem{Name: "ci", Note: "success main 162d82f", Symbol: statusline.SymbolWell},
 		Detail: map[string]any{"repo": "teranos/ground", "conclusion": "success"}})
-	left(l, News{ID: "p-2:watching", For: alice, Item: StatusItem{Name: "ci", Note: "watching main 9f3c1aa 2 runs", Symbol: SymbolWell}, Quiet: true})
-	left(l, News{ID: "p-9", For: "https://mastodon.example/@bob", Item: StatusItem{Name: "ci", Note: "failure main", Symbol: SymbolUnwell}})
-	failures := newHandlerFailureLog()
-	failures.record(HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: "rearm:p-0", Error: "ci.watch: stopped waiting on main@162d82f: context canceled", AtMs: time.Now().UnixMilli()})
-	failures.record(HandlerFailure{Handler: "garden/harvest", Error: "no water", AtMs: time.Now().UnixMilli()})
+	left(l, statusline.News{ID: "p-2:watching", For: alice, Item: statusline.StatusItem{Name: "ci", Note: "watching main 9f3c1aa 2 runs", Symbol: statusline.SymbolWell}, Quiet: true})
+	left(l, statusline.News{ID: "p-9", For: "https://mastodon.example/@bob", Item: statusline.StatusItem{Name: "ci", Note: "failure main", Symbol: statusline.SymbolUnwell}})
+	failures := statusline.NewHandlerFailureLog()
+	failures.Record(statusline.HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: "rearm:p-0", Error: "ci.watch: stopped waiting on main@162d82f: context canceled", AtMs: time.Now().UnixMilli()})
+	failures.Record(statusline.HandlerFailure{Handler: "garden/harvest", Error: "no water", AtMs: time.Now().UnixMilli()})
 	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l, handlerFailures: failures, startedAt: time.Date(2026, 10, 3, 21, 58, 0, 0, time.UTC)}
 	signum := s.amSignum()
 	require.NoError(t, signum.Check())
@@ -73,23 +74,23 @@ func TestAmGroundSaysWhatTheNodeDoesForGround(t *testing.T) {
 
 // Spike: a wait is left again on every turn of its loop, and is never a conclusion.
 func TestAWaitIsNeverCountedAsLeft(t *testing.T) {
-	l := newNewsLog()
+	l := statusline.NewNewsLog()
 	for range 3 {
-		left(l, News{ID: "p-2:watching", For: alice, Item: StatusItem{Name: "ci", Symbol: SymbolWell}, Quiet: true})
+		left(l, statusline.News{ID: "p-2:watching", For: alice, Item: statusline.StatusItem{Name: "ci", Symbol: statusline.SymbolWell}, Quiet: true})
 	}
-	held, count := l.leftFor(alice)
+	held, count := l.LeftFor(alice)
 	require.Len(t, held, 1)
 	assert.Equal(t, int64(0), count)
 
-	left(l, News{ID: "p-2:9f3c1aa", For: alice, Item: StatusItem{Name: "ci", Symbol: SymbolWell}})
-	_, count = l.leftFor(alice)
+	left(l, statusline.News{ID: "p-2:9f3c1aa", For: alice, Item: statusline.StatusItem{Name: "ci", Symbol: statusline.SymbolWell}})
+	_, count = l.LeftFor(alice)
 	assert.Equal(t, int64(1), count)
 }
 
 // Spike: what has left the row is still what the node did, until the process ends.
 func TestWhatLeftTheRowIsStillSaid(t *testing.T) {
-	l := newNewsLog()
-	l.leave(News{ID: "p-0:old", For: alice, Item: StatusItem{Name: "ci", Note: "success main", Symbol: SymbolWell}, UntilMs: time.Now().Add(-time.Hour).UnixMilli()})
+	l := statusline.NewNewsLog()
+	l.Leave(statusline.News{ID: "p-0:old", For: alice, Item: statusline.StatusItem{Name: "ci", Note: "success main", Symbol: statusline.SymbolWell}, UntilMs: time.Now().Add(-time.Hour).UnixMilli()})
 	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l}
 
 	answer, refused := s.amGround(auth.WithAdmission(context.Background(), tokenCaller("did:key:alice")), sigil.Sent{})
@@ -101,8 +102,8 @@ func TestWhatLeftTheRowIsStillSaid(t *testing.T) {
 
 // Spike: a node that knows nobody has left nothing for anybody, and still says what it watches.
 func TestAmGroundForNobody(t *testing.T) {
-	l := newNewsLog()
-	left(l, News{ID: "p-1", For: alice, Item: StatusItem{Name: "ci", Symbol: SymbolWell}})
+	l := statusline.NewNewsLog()
+	left(l, statusline.News{ID: "p-1", For: alice, Item: statusline.StatusItem{Name: "ci", Symbol: statusline.SymbolWell}})
 	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: l}
 
 	answer, refused := s.amGround(context.Background(), sigil.Sent{})
@@ -171,44 +172,16 @@ func TestAmGroundSaysWhatUgPosted(t *testing.T) {
 	assert.Equal(t, 13.0, five[2]["used"])
 }
 
-// Tim: the tmux bar asks in its own format, and that is what the node remembers.
-func TestTheRowRemembersWhenTmuxAsked(t *testing.T) {
-	h := newsRow(newNewsLog())
-	for _, format := range []string{FormatTmux, FormatTmux, FormatJSON} {
-		req := httptest.NewRequest(http.MethodGet, "/am/statusline?format="+format, nil)
-		req = req.WithContext(auth.WithAdmission(req.Context(), tokenCaller("did:key:alice")))
-		h.HandleStatusLine(httptest.NewRecorder(), req)
-	}
-
-	_, count, over, asked := h.tmux.of(alice)
-	require.True(t, asked)
-	assert.Equal(t, int64(2), count, "an ask in json is a browser's, not a bar's")
-	var byTheMinute int64
-	for _, n := range over {
-		byTheMinute += n
-	}
-	assert.Equal(t, int64(2), byTheMinute)
-
-	_, _, _, bobAsked := h.tmux.of("https://mastodon.example/@bob")
-	assert.False(t, bobAsked)
-}
-
-// Spike: the count is of the whole process, and the minutes are of the last hour.
-func TestAsksOlderThanAnHourAreLetGo(t *testing.T) {
-	a := newRowAsks()
-	at := time.Date(2026, 10, 3, 22, 0, 0, 0, time.UTC)
-	a.note(alice, at)
-	a.note(alice, at.Add(90*time.Minute))
-
-	lastMs, count, over, asked := a.of(alice)
-	require.True(t, asked)
-	assert.Equal(t, at.Add(90*time.Minute).UnixMilli(), lastMs)
-	assert.Equal(t, int64(2), count)
-	assert.Equal(t, map[string]int64{"2026-10-03T23:30": 1}, over)
-}
-
 func TestAmGroundIsRootsAndSupers(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ROOT", "SUPER"}, compiled["/am/ground"])
+}
+
+// tokenCaller is a SUPER caller whose token a person minted, the way auth.go admits one.
+func tokenCaller(did string) auth.Admission {
+	a := auth.Admitted(auth.LevelSuper)
+	a.Grant = &auth.Grant{DID: did, MintedBy: "https://mastodon.example/@" + did[len("did:key:"):]}
+	a.Identity = a.Grant.MintedBy
+	return a
 }

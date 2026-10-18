@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/statusline"
 	"go.uber.org/zap"
 )
 
@@ -86,7 +87,7 @@ func jobFor(t *testing.T, as *types.As) *async.Job {
 	return &async.Job{ID: "JB-test", HandlerName: watcher.CIWatchHandlerName, Payload: payload}
 }
 
-func handlerOver(gh *scriptedGitHub, news *newsLog) *ciWatchHandler {
+func handlerOver(gh *scriptedGitHub, news *statusline.NewsLog) *ciWatchHandler {
 	return &ciWatchHandler{
 		get:   gh.get,
 		token: func(context.Context) (string, error) { return "tok-1", nil },
@@ -118,25 +119,25 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 				aRun("Nix", "completed", "success", "https://github.com/teranos/ground/actions/runs/2")),
 		},
 	}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
 
 	if err := h.Execute(context.Background(), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 
-	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	got := news.Since("https://mastodon.example/@alice", time.Now().UnixMilli())
 	if len(got) != 1 {
 		t.Fatalf("news for alice: %d items, want 1: %+v", len(got), got)
 	}
-	if left := news.since("did:key:alice", time.Now().UnixMilli()); len(left) != 0 {
+	if left := news.Since("did:key:alice", time.Now().UnixMilli()); len(left) != 0 {
 		t.Fatalf("news was filed under the token's DID, which cannot read the row: %+v", left)
 	}
 	n := got[0]
 	if n.ID != "ground:ci-status:sess-1:abc123" {
 		t.Errorf("id %q; want the attestation's own and the commit, since the row is per session", n.ID)
 	}
-	if n.Item.Symbol != SymbolWell {
+	if n.Item.Symbol != statusline.SymbolWell {
 		t.Errorf("a success drew %q", n.Item.Symbol)
 	}
 	if !strings.Contains(n.Item.Note, "success") || !strings.Contains(n.Item.Note, "sky-whisper") {
@@ -188,13 +189,13 @@ func TestCIWatchARearmedPushThatConcludedBeforeBootSaysNothing(t *testing.T) {
 		commits: []string{runsJSON(aRunAt("Go", "completed", "success", booted.Add(-time.Hour)),
 			aRunAt("Nix", "completed", "failure", booted.Add(-time.Hour)))},
 	}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
 	h.booted = booted
 	if err := h.Execute(context.Background(), rearmJobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	if got, _ := news.leftFor("https://mastodon.example/@alice"); len(got) != 0 {
+	if got, _ := news.LeftFor("https://mastodon.example/@alice"); len(got) != 0 {
 		t.Fatalf("a push concluded before boot was put on the row again: %+v", got)
 	}
 }
@@ -209,12 +210,12 @@ func TestCIWatchARearmedPushThatConcludesAfterBootIsSaid(t *testing.T) {
 			runsJSON(aRunAt("Go", "completed", "failure", booted.Add(30*time.Second))),
 		},
 	}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
 	h.booted = booted
-	var seen []News
+	var seen []statusline.News
 	h.sleep = func(context.Context, time.Duration) error {
-		seen, _ = news.leftFor("https://mastodon.example/@alice")
+		seen, _ = news.LeftFor("https://mastodon.example/@alice")
 		return nil
 	}
 	if err := h.Execute(context.Background(), rearmJobFor(t, ciStatusAs("did:key:alice"))); err != nil {
@@ -223,8 +224,8 @@ func TestCIWatchARearmedPushThatConcludesAfterBootIsSaid(t *testing.T) {
 	if len(seen) != 1 || !seen[0].Quiet || !strings.Contains(seen[0].Item.Note, "watching sky-whisper abc123 1 runs") {
 		t.Fatalf("while the re-armed run went on the row showed %+v", seen)
 	}
-	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
-	if len(got) != 1 || got[0].Item.Symbol != SymbolUnwell {
+	got := news.Since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	if len(got) != 1 || got[0].Item.Symbol != statusline.SymbolUnwell {
 		t.Fatalf("a re-armed push that failed after boot drew %+v", got)
 	}
 }
@@ -234,11 +235,11 @@ func TestCIWatchARearmedPushThatConcludesAfterBootIsSaid(t *testing.T) {
 func TestCIWatchARearmedPushIsNotWatchedBeforeItsRunsAreRead(t *testing.T) {
 	booted := time.Now()
 	gh := &scriptedGitHub{history: noHistory(), commits: []string{runsJSON(aRunAt("Go", "completed", "success", booted.Add(-time.Hour)))}}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
 	h.booted = booted
 	h.get = func(ctx context.Context, token, url string) ([]byte, error) {
-		if held, _ := news.leftFor("https://mastodon.example/@alice"); len(held) != 0 {
+		if held, _ := news.LeftFor("https://mastodon.example/@alice"); len(held) != 0 {
 			t.Fatalf("on the row before its runs were read: %+v", held)
 		}
 		return gh.get(ctx, token, url)
@@ -251,7 +252,7 @@ func TestCIWatchARearmedPushIsNotWatchedBeforeItsRunsAreRead(t *testing.T) {
 // "im more intersted in fails"
 // Green leaves the row once the laptop has seen it; anything else stays the whole hold.
 func TestCIWatchHoldsAFailureLongerThanASuccess(t *testing.T) {
-	if holdFor("success") >= holdFor("failure") || holdFor("cancelled") != newsHold || holdFor("failure") != newsHold {
+	if holdFor("success") >= holdFor("failure") || holdFor("cancelled") != statusline.NewsHold || holdFor("failure") != statusline.NewsHold {
 		t.Fatalf("success %s, failure %s, cancelled %s", holdFor("success"), holdFor("failure"), holdFor("cancelled"))
 	}
 	if successHold < 2*time.Second {
@@ -263,13 +264,13 @@ func TestCIWatchHoldsAFailureLongerThanASuccess(t *testing.T) {
 func TestCIWatchARearmedDispatchThatConcludedBeforeBootSaysNothing(t *testing.T) {
 	booted := time.Now()
 	gh := &scriptedGitHub{dispatched: []string{runsJSON(aRunAt("deploy q-deploy-1790:TARGET", "completed", "success", booted.Add(-time.Hour)))}}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
 	h.booted = booted
 	if err := h.Execute(context.Background(), rearmJobFor(t, dispatchAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	if got, _ := news.leftFor("https://mastodon.example/@alice"); len(got) != 0 {
+	if got, _ := news.LeftFor("https://mastodon.example/@alice"); len(got) != 0 {
 		t.Fatalf("a dispatch concluded before boot was put on the row again: %+v", got)
 	}
 }
@@ -281,13 +282,13 @@ func TestCIWatchARedBesideAGreenIsRed(t *testing.T) {
 		history: noHistory(),
 		commits: []string{runsJSON(aRun("deploy", "completed", "success", "g"), aRun("lint", "completed", "failure", "r"))},
 	}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
 	if err := h.Execute(context.Background(), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
-	if len(got) != 1 || got[0].Item.Symbol != SymbolUnwell {
+	got := news.Since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	if len(got) != 1 || got[0].Item.Symbol != statusline.SymbolUnwell {
 		t.Fatalf("a red beside a green drew %+v", got)
 	}
 	if !strings.Contains(got[0].Item.Note, "failure") || !strings.Contains(got[0].Item.Note, "1/2") {
@@ -307,7 +308,7 @@ func TestCIWatchWaitsForEveryWorkflow(t *testing.T) {
 			runsJSON(aRun("Go", "completed", "success", "g"), aRun("Nix", "completed", "success", "n")),
 		},
 	}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	slept := 0
 	h := handlerOver(gh, news)
 	h.sleep = func(context.Context, time.Duration) error { slept++; return nil }
@@ -317,7 +318,7 @@ func TestCIWatchWaitsForEveryWorkflow(t *testing.T) {
 	if slept != 1 {
 		t.Errorf("slept %d times; wanted once, for the queued workflow", slept)
 	}
-	if got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli()); len(got) != 1 || got[0].Item.Symbol != SymbolWell {
+	if got := news.Since("https://mastodon.example/@alice", time.Now().UnixMilli()); len(got) != 1 || got[0].Item.Symbol != statusline.SymbolWell {
 		t.Fatalf("all green drew %+v", got)
 	}
 }
@@ -333,13 +334,13 @@ func TestCIWatchShowsTheWaitOnTheRowWithoutAnID(t *testing.T) {
 			runsJSON(aRun("Go", "completed", "success", "g")),
 		},
 	}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
-	rowDuringWait := func() []StatusItem {
+	rowDuringWait := func() []statusline.StatusItem {
 		a := tokenCaller("did:key:alice")
-		return (&StatusLineHandler{news: func() *newsLog { return news }}).newsFor(a)
+		return (&statusline.StatusLineHandler{News: func() *statusline.NewsLog { return news }}).NewsFor(a)
 	}
-	var seen []StatusItem
+	var seen []statusline.StatusItem
 	h.sleep = func(context.Context, time.Duration) error { seen = rowDuringWait(); return nil }
 	if err := h.Execute(context.Background(), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -369,7 +370,7 @@ func TestCIWatchWaitsOutASpentQuota(t *testing.T) {
 		}
 		return gh.get(ctx, token, url)
 	}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	var slept []time.Duration
 	h := handlerOver(gh, news)
 	h.get = get
@@ -380,7 +381,7 @@ func TestCIWatchWaitsOutASpentQuota(t *testing.T) {
 	if len(slept) != 1 || slept[0] < 85*time.Second || slept[0] > 95*time.Second {
 		t.Fatalf("slept %v; wanted once, until the reset", slept)
 	}
-	if got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli()); len(got) != 1 {
+	if got := news.Since("https://mastodon.example/@alice", time.Now().UnixMilli()); len(got) != 1 {
 		t.Fatalf("news after the quota came back: %+v", got)
 	}
 }
@@ -445,7 +446,7 @@ func TestPercentilesOfIsGroundsArithmetic(t *testing.T) {
 func TestCIWatchRefusesARowWithNoRepo(t *testing.T) {
 	as := ciStatusAs("did:key:alice")
 	delete(as.Attributes, "repo")
-	h := handlerOver(&scriptedGitHub{history: noHistory()}, newNewsLog())
+	h := handlerOver(&scriptedGitHub{history: noHistory()}, statusline.NewNewsLog())
 	if err := h.Execute(context.Background(), jobFor(t, as)); err == nil {
 		t.Fatal("a row naming no repo was accepted")
 	}
@@ -482,14 +483,14 @@ func TestCIWatchWatchesADispatchedRunByItsName(t *testing.T) {
 				aRun("deploy other-1789:TARGET", "completed", "success", "u0")),
 		},
 	}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
 
 	if err := h.Execute(context.Background(), jobFor(t, dispatchAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 
-	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	got := news.Since("https://mastodon.example/@alice", time.Now().UnixMilli())
 	if len(got) != 1 {
 		t.Fatalf("news for alice: %d items, want 1: %+v", len(got), got)
 	}
@@ -521,7 +522,7 @@ func TestCIWatchWatchesADispatchedRunByItsName(t *testing.T) {
 // name ground gave it", and that is what comes back.
 func TestCIWatchSaysWhenNoRunCarriesTheName(t *testing.T) {
 	gh := &scriptedGitHub{}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
 	as := dispatchAs("did:key:alice")
 	as.Timestamp = time.Now().Add(-2 * dispatchAppear)
@@ -529,14 +530,14 @@ func TestCIWatchSaysWhenNoRunCarriesTheName(t *testing.T) {
 	if err := h.Execute(context.Background(), jobFor(t, as)); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	got := news.Since("https://mastodon.example/@alice", time.Now().UnixMilli())
 	if len(got) != 1 {
 		t.Fatalf("news for alice: %d items, want 1: %+v", len(got), got)
 	}
 	if !strings.Contains(got[0].Item.Note, "no run carries the name") {
 		t.Errorf("note %q", got[0].Item.Note)
 	}
-	if got[0].Item.Symbol != SymbolUnwell {
+	if got[0].Item.Symbol != statusline.SymbolUnwell {
 		t.Errorf("an absent run drew %q", got[0].Item.Symbol)
 	}
 }
@@ -546,7 +547,7 @@ func TestCIWatchSaysWhenNoRunCarriesTheName(t *testing.T) {
 // and each push of it was waited on for two hours and then called failed.
 func TestCIWatchSaysWhenAPushStartedNoRun(t *testing.T) {
 	gh := &scriptedGitHub{history: noHistory()}
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	h := handlerOver(gh, news)
 	// Waiting at all is the defect, so a wait that goes round is cut short.
 	waits := 0
@@ -563,7 +564,7 @@ func TestCIWatchSaysWhenAPushStartedNoRun(t *testing.T) {
 	if err := h.Execute(context.Background(), jobFor(t, as)); err != nil {
 		t.Fatalf("a push with no run was a failure: %v", err)
 	}
-	got := news.since("https://mastodon.example/@alice", time.Now().UnixMilli())
+	got := news.Since("https://mastodon.example/@alice", time.Now().UnixMilli())
 	if len(got) != 1 {
 		t.Fatalf("news for alice: %d items, want 1: %+v", len(got), got)
 	}
