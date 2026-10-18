@@ -9,7 +9,7 @@
         "@codemirror/lang-python": "6.2.1",
         "@codemirror/lang-yaml": "6.1.2",
         "@sentry/browser": "10.73.0",
-        "@teranos/elements": "npm:@jsr/teranos__elements@1.23.0",
+        "@teranos/elements": "npm:@jsr/teranos__elements@1.25.2",
         "d3": "7.9.0",
         "regl": "2.1.0",
         "sacred-error": "github:teranos/sacred-error#aaf9a743a2b9b0d22c6059dddbfdc4897f6528c7",
@@ -29,6 +29,7 @@
         "@tauri-apps/api": "2.11.1",
         "@types/d3": "7.4.3",
         "@types/jsdom": "27.0.0",
+        "@types/ws": "8.18.1",
         "eslint": "10.8.1",
         "fake-indexeddb": "6.2.5",
         "happy-dom": "20.0.11",
@@ -47,6 +48,7 @@
         "ts-proto": "2.11.2",
         "typescript": "5.7.2",
         "typescript-eslint": "8.67.0",
+        "ws": "8.18.3",
       },
     },
   },
@@ -164,7 +166,7 @@
 
     "@tauri-apps/api": ["@tauri-apps/api@2.11.1", "", {}, "sha512-M2FPuYND2m+wh5hfW9ZpSdxMPdEJovPBWwoHJmwUpysTYNHaOkVFN419m/K0LIgjb/7KU2vBgsUepJWugQCvAA=="],
 
-    "@teranos/elements": ["@jsr/teranos__elements@1.23.0", "https://npm.jsr.io/~/11/@jsr/teranos__elements/1.23.0.tgz", {}, "sha512-11rvhDA6NfOBom22pZ+o/mIHvTNMs4na4k52GAbTpAH21DvhwzLs+kfwi/YX7QVU3EvUFsxONCrhPIT/xJxYpA=="],
+    "@teranos/elements": ["@jsr/teranos__elements@1.25.2", "https://npm.jsr.io/~/11/@jsr/teranos__elements/1.25.2.tgz", {}, "sha512-MY0FGyxwdyT+n8QeACkCE7WuBKorX50J1/yOLKFQEQteJOyojQYoZHpSzMH7QdOCxZ9murnfUHF2lTS3+z3mEg=="],
 
     "@types/d3": ["@types/d3@7.4.3", "", { "dependencies": { "@types/d3-array": "*", "@types/d3-axis": "*", "@types/d3-brush": "*", "@types/d3-chord": "*", "@types/d3-color": "*", "@types/d3-contour": "*", "@types/d3-delaunay": "*", "@types/d3-dispatch": "*", "@types/d3-drag": "*", "@types/d3-dsv": "*", "@types/d3-ease": "*", "@types/d3-fetch": "*", "@types/d3-force": "*", "@types/d3-format": "*", "@types/d3-geo": "*", "@types/d3-hierarchy": "*", "@types/d3-interpolate": "*", "@types/d3-path": "*", "@types/d3-polygon": "*", "@types/d3-quadtree": "*", "@types/d3-random": "*", "@types/d3-scale": "*", "@types/d3-scale-chromatic": "*", "@types/d3-selection": "*", "@types/d3-shape": "*", "@types/d3-time": "*", "@types/d3-time-format": "*", "@types/d3-timer": "*", "@types/d3-transition": "*", "@types/d3-zoom": "*" } }, "sha512-lZXZ9ckh5R8uiFVt8ogUNf+pIrK4EsWrx2Np75WvF/eTpJ0FMHNhjXk8CKEx/+gpHbNQyJWehbFaTvqmHWB3ww=="],
 
@@ -249,6 +251,8 @@
     "@types/tough-cookie": ["@types/tough-cookie@4.0.5", "", {}, "sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA=="],
 
     "@types/whatwg-mimetype": ["@types/whatwg-mimetype@3.0.2", "", {}, "sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA=="],
+
+    "@types/ws": ["@types/ws@8.18.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="],
 
     "@typescript-eslint/eslint-plugin": ["@typescript-eslint/eslint-plugin@8.67.0", "", { "dependencies": { "@eslint-community/regexpp": "^4.12.2", "@typescript-eslint/scope-manager": "8.67.0", "@typescript-eslint/type-utils": "8.67.0", "@typescript-eslint/utils": "8.67.0", "@typescript-eslint/visitor-keys": "8.67.0", "ignore": "^7.0.5", "natural-compare": "^1.4.0", "ts-api-utils": "^2.5.0" }, "peerDependencies": { "@typescript-eslint/parser": "^8.67.0", "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0", "typescript": ">=4.8.4 <6.1.0" } }, "sha512-Un7Heoyj65NREbKAyIrFxeM143NZpExWmy1Nep4DLeQOeLlTeumPjoNKnBrU5D5moWXbPJgRa5Uwcdu0faVNGQ=="],
 

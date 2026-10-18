@@ -5,8 +5,8 @@
 // "is the GitHub perfectly respecting of mobile users, YES/NO — if NO ci needs to be RED"
 // "if it overflows width, hard fail, die"
 
-// The real tray and the real elements. Their API is answered by the gate from
-// browser/fixtures, and a call nothing answers is named by the gate.
+// The real tray and the real elements. Their API is answered by the node itself,
+// asked by the live gate as its CI user (browser/live.browser.ts).
 
 // A test DOM lays nothing out, so an element too wide for a phone is measured
 // here, in Chromium and WebKit, and nowhere else.
@@ -17,6 +17,7 @@ import { apiJson } from './client/http';
 import { openUserElement } from './user-element.ts';
 import { MELDABILITY } from './components/element/meld/meldability';
 import { setStanding } from './standing.ts';
+import { person } from './self-person.ts';
 import { log, SEG } from './logger.ts';
 import type { UserRecord } from './users-element.ts';
 
@@ -56,11 +57,11 @@ function fits(id: string): void {
 
 async function stand(): Promise<void> {
     configureElements({ logger: log, logSegment: SEG.ELEMENT, meldability: MELDABILITY });
-    // The person the fixtures hold stands in default (fixtures/i/index.json).
-    setStanding('default');
+    // Where the node says this person stands, as main.ts asks it: the live gate's user stands where it was minted.
+    setStanding((await person()).standing);
     tray.init();
     await registerDefaultElements(true);
-    // What the socket would push: the gate answers it from fixtures/ws, the way it answers every call.
+    // What the socket pushes: the gate asks the node's socket and gives it here (browser/live.browser.ts).
     const stats = await apiJson<Record<string, unknown>>('/ws/database_stats');
     updateDatabaseStats(stats);
     updateSigmaPanel(stats);
