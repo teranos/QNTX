@@ -133,6 +133,10 @@ type StatusLineHandler struct {
 	// The plugin slots rotate on their own tick, so a plugin's handlers are not
 	// stepped by whatever the middle slot happens to be doing.
 	pluginCarousel *carousel
+	// The one slot the healthy plugins share, taking each plugin's frames in
+	// turn. It slows as the carousel does: a plugin that is well needs saying
+	// less often.
+	healthyCarousel *carousel
 	// What the rotating slot asks about. Nil draws no rotating slot at all.
 	node StatusLineNode
 	// What built-ins left for the caller. Nil draws none.
@@ -159,6 +163,7 @@ func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 		handlerFailures: handlerFailures,
 		carousel:        newCarousel(),
 		pluginCarousel:  newCarousel(),
+		healthyCarousel: newCarousel(),
 		node:            node,
 		tmux:            newRowAsks(),
 		Peers:           NoPeers,
@@ -506,12 +511,23 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		item StatusItem
 		well bool
 	}
-	entries := make([]entry, 0)
+	pinned := make([]entry, 0)
+	// The frames of every plugin that is well and failing nothing, one plugin
+	// after another.
+	var healthy []StatusItem
 
 	// Every handler the pulse registry holds, namespaced by whoever declared it,
 	// so each plugin's slot can rotate over its own.
 	allHandlers := h.declaredHandlers()
 	at := h.pluginFrameIndex()
+	failsHandlers := func(plugin string) bool {
+		for _, run := range failures {
+			if pluginOf(run.Handler) == plugin {
+				return true
+			}
+		}
+		return false
+	}
 
 	seen := make(map[string]bool)
 	for _, name := range h.registry.List() {
@@ -521,12 +537,18 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 			continue
 		}
 		meta := p.Metadata()
-		healthy := well(healthResults[name].Healthy, string(stateResults[name]))
-		entries = append(entries, entry{
-			item: pluginItem(at, meta.Name, meta.Version, healthy,
-				handlersOf(allHandlers, meta.Name), failures),
-			well: healthy,
-		})
+		isWell := well(healthResults[name].Healthy, string(stateResults[name]))
+		handlers := handlersOf(allHandlers, meta.Name)
+		// A failing handler is a fix-now kind of event, so its plugin keeps its
+		// own slot however well the plugin is.
+		if !isWell || failsHandlers(meta.Name) {
+			pinned = append(pinned, entry{
+				item: pluginItem(at, meta.Name, meta.Version, isWell, handlers, failures),
+				well: isWell,
+			})
+			continue
+		}
+		healthy = append(healthy, pluginFrames(meta.Name, meta.Version, handlers, nil)...)
 	}
 
 	// A plugin that never loaded has no metadata, so it is named and left at that.
@@ -534,20 +556,18 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		if seen[name] {
 			continue
 		}
-		entries = append(entries, entry{
-			item: StatusItem{Name: name, Symbol: SymbolUnwell},
-			well: false,
-		})
+		pinned = append(pinned, entry{item: StatusItem{Name: name, Symbol: SymbolUnwell}, well: false})
 	}
 
 	// Two passes rather than a sort: the order is unwell then well.
 	for _, wantWell := range []bool{false, true} {
-		for _, e := range entries {
+		for _, e := range pinned {
 			if e.well == wantWell {
 				items = append(items, e.item)
 			}
 		}
 	}
+	items = append(items, pick(h.healthyCarousel, healthy)...)
 
 	// The peers' rows come last: the primary's own row reads as it did.
 	items = append(items, h.peerItems(r.Context(), admitted)...)
