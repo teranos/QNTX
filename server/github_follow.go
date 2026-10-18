@@ -90,9 +90,9 @@ func (p gitHubPush) follows(f GitHubFollow) bool {
 }
 
 // followsMovedBy dispatches every follow the push lands on, and names them.
-func (s *QNTXServer) followsMovedBy(push gitHubPush) []string {
-	logger := s.logger.Named("follow")
-	follows, err := s.nodeRecords().Follows()
+func (g *gitHub) followsMovedBy(push gitHubPush) []string {
+	logger := g.host.log().Named("follow")
+	follows, err := g.host.nodeRecords().Follows()
 	if err != nil {
 		logger.Errorw("A push arrived and the follows were not read", "repo", push.Repository.FullName, "ref", push.Ref, "error", err)
 		return []string{}
@@ -103,13 +103,13 @@ func (s *QNTXServer) followsMovedBy(push gitHubPush) []string {
 			continue
 		}
 		names = append(names, f.line())
-		sacred.Go("github."+f.line(), func() { s.dispatchFollow(f, push.After, logger) })
+		sacred.Go("github."+f.line(), func() { g.dispatchFollow(f, push.After, logger) })
 	}
 	return names
 }
 
 // dispatchFollow dispatches f's workflow for the push that landed at after.
-func (s *QNTXServer) dispatchFollow(f GitHubFollow, after string, logger *zap.SugaredLogger) {
+func (g *gitHub) dispatchFollow(f GitHubFollow, after string, logger *zap.SugaredLogger) {
 	owner, repo, named := repoNamed(f.Dispatches)
 	if !named {
 		logger.Errorw("A push landed and its follow names no repo to dispatch", "follow", f.line(), "after", after, "dispatches", f.Dispatches)
@@ -120,7 +120,7 @@ func (s *QNTXServer) dispatchFollow(f GitHubFollow, after string, logger *zap.Su
 		logger.Errorw("A push landed and its follow's inputs are not a workflow's", "follow", f.line(), "after", after, "error", err)
 		return
 	}
-	said, err := s.gitHubService().CreateAWorkflowDispatchEvent(s.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
+	said, err := g.gitHubService().CreateAWorkflowDispatchEvent(g.host.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
 		Namespace: auth.NamespaceSystem, Owner: owner, Repo: repo, WorkflowId: f.Workflow, Ref: f.Ref, Inputs: inputs,
 	})
 	if err != nil {
@@ -152,7 +152,7 @@ func githubFollowSigil() *protocol.Sigil {
 	}
 }
 
-func (s *QNTXServer) githubFollow(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (g *gitHub) githubFollow(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	on, err := strconv.ParseBool(sent["enabled"])
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "enabled", Says: "enabled is true or false, and this said " + sent["enabled"]}
@@ -173,7 +173,7 @@ func (s *QNTXServer) githubFollow(ctx context.Context, sent sigil.Sent) (any, *p
 	if err := json.Unmarshal([]byte(sent["inputs"]), &f.Inputs); err != nil {
 		return nil, notObject
 	}
-	if err := s.nodeRecords().SetFollow(actorOf(ctx), f); err != nil {
+	if err := g.host.nodeRecords().SetFollow(actorOf(ctx), f); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return map[string]GitHubFollow{"follow": f}, nil

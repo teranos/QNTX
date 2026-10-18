@@ -14,7 +14,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/teranos/QNTX/internal/sacred"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -36,13 +35,13 @@ func webhookPath(path string) error {
 
 // gitHubWebhook is the App's webhook secret. The route is NONE until ROOT
 // generates one.
-func (s *QNTXServer) gitHubWebhook() (string, bool) {
-	if s.authHandler == nil {
+func (g *gitHub) gitHubWebhook() (string, bool) {
+	if g.host.login() == nil {
 		return "", false
 	}
-	secret, found, err := s.authHandler.GitHubWebhook()
+	secret, found, err := g.host.login().GitHubWebhook()
 	if err != nil {
-		s.logger.Errorw("The App's webhook secret was not read, so the webhook answers nobody", "error", err)
+		g.host.log().Errorw("The App's webhook secret was not read, so the webhook answers nobody", "error", err)
 		return "", false
 	}
 	return secret, found
@@ -126,17 +125,17 @@ func signed(secret, signature string, body []byte) bool {
 }
 
 // HandleGitHubWebhook takes the App's webhook deliveries.
-func (s *QNTXServer) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
+func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "the App's webhook is POST")
 		return
 	}
-	secret, active := s.gitHubWebhook()
+	secret, active := g.gitHubWebhook()
 	if !active {
 		http.NotFound(w, r)
 		return
 	}
-	settings, err := s.nodeRecords().GitHub()
+	settings, err := g.host.nodeRecords().GitHub()
 	if err != nil || r.URL.Path != settings.WebhookPath {
 		http.NotFound(w, r)
 		return
@@ -157,23 +156,23 @@ func (s *QNTXServer) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request)
 			writeError(w, http.StatusBadRequest, "the workflow_run is not readable JSON: "+err.Error())
 			return
 		}
-		taking, err := s.buildsOfRun(run)
+		taking, err := g.host.buildsOfRun(run)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		respond(w, s.logger, http.StatusOK, map[string][]string{"taking": taking})
+		respond(w, g.host.log(), http.StatusOK, map[string][]string{"taking": taking})
 		return
 	}
 	if event != "push" {
 		// A pull request, its checks and main's CI are what approvals read
 		// (ADR-052). Every other event is taken and nothing is done with it.
-		touched, err := s.approvalsFromGitHub(r.Context(), event, body)
+		touched, err := g.host.approvalsFromGitHub(r.Context(), event, body)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		respond(w, s.logger, http.StatusOK, map[string][]string{"approvals": touched})
+		respond(w, g.host.log(), http.StatusOK, map[string][]string{"approvals": touched})
 		return
 	}
 	var push gitHubPush
@@ -182,42 +181,10 @@ func (s *QNTXServer) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if tag := push.tagLanded(); tag != "" {
-		s.dispatchApp(tag)
+		g.dispatchApp(tag)
 	}
-	names := s.buildsMovedBy(push)
-	filling := s.vaultsMovedBy(push)
-	dispatching := s.followsMovedBy(push)
-	respond(w, s.logger, http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching})
-}
-
-// buildsMovedBy starts the build of every enabled plugin push moves, and names them.
-func (s *QNTXServer) buildsMovedBy(push gitHubPush) []string {
-	logger := s.logger.Named("build")
-	records, err := s.pluginRecords().Plugins()
-	if err != nil {
-		logger.Errorw("A push arrived and the plugin records were not read", "repo", push.Repository.FullName, "error", err)
-		return []string{}
-	}
-	names := []string{}
-	for _, record := range records {
-		if !record.Enabled {
-			continue
-		}
-		b, built, err := buildOf(record)
-		if err != nil {
-			logger.Errorw("A plugin's build is not one QNTX can run", "plugin", record.Name, "error", err)
-			continue
-		}
-		if !built || !push.moves(b) {
-			continue
-		}
-		names = append(names, b.name)
-		logger.Infow("A push moves a plugin's source", "plugin", b.name, "repo", push.Repository.FullName, "ref", push.Ref, "after", push.After)
-		// Built once GitHub's checks on the commit pushed have passed.
-		s.deploys.begin(pluginDeploy{plugin: b.name, rev: push.After, repo: push.Repository.FullName, ref: push.Ref, after: push.After, pushed: true, stage: deployChecking})
-		sacred.Go("plugin.build."+b.name, func() {
-			s.awaitChecks(s.lifetime(), b, push.Repository.FullName, push.After, logger)
-		})
-	}
-	return names
+	names := g.host.buildsMovedBy(push)
+	filling := g.host.vaultsMovedBy(push)
+	dispatching := g.followsMovedBy(push)
+	respond(w, g.host.log(), http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching})
 }

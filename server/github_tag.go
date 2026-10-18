@@ -30,11 +30,11 @@ func (p gitHubPush) tagLanded() string {
 }
 
 // dispatchApp dispatches the app's build for the tag that landed.
-func (s *QNTXServer) dispatchApp(tag string) {
-	logger := s.logger.Named("app")
+func (g *gitHub) dispatchApp(tag string) {
+	logger := g.host.log().Named("app")
 	repo := appOwner + "/" + appRepo
 	sacred.Go("app.dispatch."+tag, func() {
-		said, _ := s.gitHubService().CreateAWorkflowDispatchEvent(s.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
+		said, _ := g.gitHubService().CreateAWorkflowDispatchEvent(g.host.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
 			Namespace: auth.NamespaceSystem, Owner: appOwner, Repo: appRepo, WorkflowId: appWorkflow, Ref: appRef,
 		})
 		if !said.Success {

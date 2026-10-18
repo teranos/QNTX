@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
@@ -18,64 +19,100 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
+	"go.uber.org/zap"
 )
 
 const githubPath = "/api/github"
 
+// gitHub is the node's GitHub (ADR-043): the GitHubService, the runner, the
+// App's webhook, the follows and the catch-up of deliveries. What it needs of
+// the node is gitHubHost, and nothing else.
+type gitHub struct {
+	host gitHubHost
+
+	// The GitHubService, made the first time it is asked for.
+	serviceOnce sync.Once
+	service     *services.GitHubServer
+	// The runner whose plugin builds the node takes, while one is watched.
+	runnerMu   sync.Mutex
+	runner     *grpcplugin.Runner
+	runnerStop context.CancelFunc
+	runnerErr  string
+}
+
+// gitHubHost is everything GitHub asks of the node: its login, its records,
+// its life, and what the node does when GitHub says a build landed, a
+// workflow ran, a pull request moved or a push arrived.
+type gitHubHost interface {
+	log() *zap.SugaredLogger
+	login() *auth.Handler
+	nodeRecords() NodeRecords
+	lifetime() context.Context
+	dbFile() string
+	serves(namespace string) (string, error)
+	fillBuilds(*protocol.GitHubStatus)
+
+	buildLanded(name string)
+	buildsOfRun(gitHubWorkflowRun) ([]string, error)
+	approvalsFromGitHub(ctx context.Context, event string, body []byte) ([]string, error)
+	buildsMovedBy(gitHubPush) []string
+	vaultsMovedBy(gitHubPush) []string
+}
+
 // gitHubCredentials hands GitHubService the GITHUB token a namespace spends.
-type gitHubCredentials struct{ s *QNTXServer }
+type gitHubCredentials struct{ host gitHubHost }
 
 // "ROOT will determine what GitHub integration is active there, either system or have the namespace take responsibility"
 func (c gitHubCredentials) Token(ctx context.Context, namespace string) (string, string, error) {
-	if c.s.authHandler == nil {
+	if c.host.login() == nil {
 		return "", "", errors.Newf("this node has no login, so namespace %q has no GitHub", namespace)
 	}
-	from, err := c.s.nodeRecords().GitHubFrom()
+	from, err := c.host.nodeRecords().GitHubFrom()
 	if err != nil {
 		return "", "", errors.Wrapf(err, "which GitHub namespace %q spends was not read", namespace)
 	}
 	if from[namespace] == GitHubFromSystem {
-		return c.s.authHandler.GitHubToken(ctx, auth.NamespaceSystem)
+		return c.host.login().GitHubToken(ctx, auth.NamespaceSystem)
 	}
-	return c.s.authHandler.GitHubToken(ctx, namespace)
+	return c.host.login().GitHubToken(ctx, namespace)
 }
 
 // AppToken is the JWT the App signs, for what GitHub takes only from the App.
 func (c gitHubCredentials) AppToken() (string, error) {
-	if c.s.authHandler == nil {
+	if c.host.login() == nil {
 		return "", errors.New("this node has no login, so it holds no GitHub App")
 	}
-	return c.s.authHandler.GitHubAppToken()
+	return c.host.login().GitHubAppToken()
 }
 
 // gitHubService is the node's GitHubService, made the first time it is asked for.
-func (s *QNTXServer) gitHubService() *services.GitHubServer {
-	s.githubOnce.Do(func() {
-		s.github = services.NewGitHubServer(gitHubCredentials{s: s}, func() bool {
-			settings, err := s.nodeRecords().GitHub()
+func (g *gitHub) gitHubService() *services.GitHubServer {
+	g.serviceOnce.Do(func() {
+		g.service = services.NewGitHubServer(gitHubCredentials{host: g.host}, func() bool {
+			settings, err := g.host.nodeRecords().GitHub()
 			if err != nil {
-				s.logger.Errorw("The node's GitHub settings were not read, so GitHub answers nothing", "error", err)
+				g.host.log().Errorw("The node's GitHub settings were not read, so GitHub answers nothing", "error", err)
 				return false
 			}
 			return settings.Enabled
-		}, s.logger.Named("github"))
+		}, g.host.log().Named("github"))
 	})
-	return s.github
+	return g.service
 }
 
 // webhookURL is the URL to paste into the App's webhook settings.
-func (s *QNTXServer) webhookURL(path string) string {
-	if s.authHandler == nil {
+func (g *gitHub) webhookURL(path string) string {
+	if g.host.login() == nil {
 		return path
 	}
-	return s.authHandler.PublicOrigin() + path
+	return g.host.login().PublicOrigin() + path
 }
 
-func (s *QNTXServer) githubSignum() sigil.Signum {
+func (g *gitHub) signum() sigil.Signum {
 	enabled := &protocol.Param{Name: "enabled", Required: true, Says: "true or false."}
 	var follows []*protocol.Follows
 	if f, err := githubFollowGitHub(); err != nil {
-		s.logger.Errorw("GitHubService's messages were not read against GitHub's description, so parity cannot hold github", "error", err)
+		g.host.log().Errorw("GitHubService's messages were not read against GitHub's description, so parity cannot hold github", "error", err)
 	} else {
 		follows = append(follows, f)
 	}
@@ -138,39 +175,33 @@ func (s *QNTXServer) githubSignum() sigil.Signum {
 			},
 		},
 		Answers: map[string]sigil.Answer{
-			"status":       s.githubStatus,
-			"node":         s.githubNode,
-			"from":         s.githubFrom,
-			"runner":       s.githubRunner,
-			"webhook":      s.githubWebhook,
-			"webhook_path": s.githubWebhookPath,
-			"follow":       s.githubFollow,
-			"ask":          s.githubAsk,
-			"operations":   s.githubOperations,
+			"status":       g.githubStatus,
+			"node":         g.githubNode,
+			"from":         g.githubFrom,
+			"runner":       g.githubRunner,
+			"webhook":      g.githubWebhook,
+			"webhook_path": g.githubWebhookPath,
+			"follow":       g.githubFollow,
+			"ask":          g.githubAsk,
+			"operations":   g.githubOperations,
 		},
 	}
 }
 
-func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
-	settings, err := s.nodeRecords().GitHub()
+func (g *gitHub) githubStatus(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	settings, err := g.host.nodeRecords().GitHub()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	status := &protocol.GitHubStatus{
-		Enabled:        settings.Enabled,
-		Namespaces:     []*protocol.GitHubNamespace{},
-		Runner:         s.runnerStatus(settings),
-		Builds:         map[string]*protocol.PluginBuild{},
-		Artifacts:      takenBuilds(s.artifacts.all()),
-		ArtifactFaults: s.artifacts.faulted(),
+		Enabled:    settings.Enabled,
+		Namespaces: []*protocol.GitHubNamespace{},
+		Runner:     g.runnerStatus(settings),
 	}
-	for name, build := range s.builds.all() {
-		status.Builds[name] = &protocol.PluginBuild{Revs: build.Revs, Digest: build.Digest,
-			At: build.At.Format(time.RFC3339Nano), Changed: build.Changed, Error: build.Error}
-	}
-	_, status.Webhook = s.gitHubWebhook()
-	status.WebhookPath, status.WebhookUrl = settings.WebhookPath, s.webhookURL(settings.WebhookPath)
-	follows, err := s.nodeRecords().Follows()
+	g.host.fillBuilds(status)
+	_, status.Webhook = g.gitHubWebhook()
+	status.WebhookPath, status.WebhookUrl = settings.WebhookPath, g.webhookURL(settings.WebhookPath)
+	follows, err := g.host.nodeRecords().Follows()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
@@ -179,10 +210,10 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 		status.Follows = append(status.Follows, &protocol.GitHubFollow{Repo: f.Repo, Branch: f.Branch, Dispatches: f.Dispatches,
 			Workflow: f.Workflow, Ref: f.Ref, Inputs: f.Inputs, Enabled: f.Enabled})
 	}
-	if s.authHandler == nil {
+	if g.host.login() == nil {
 		return status, nil
 	}
-	keeper, err := s.authHandler.GitHubKeeper()
+	keeper, err := g.host.login().GitHubKeeper()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
@@ -190,7 +221,7 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	from, err := s.nodeRecords().GitHubFrom()
+	from, err := g.host.nodeRecords().GitHubFrom()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
@@ -200,7 +231,7 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 		if from[namespace] == GitHubFromSystem {
 			continue
 		}
-		status.Namespaces = append(status.Namespaces, s.githubRow(ctx, &protocol.GitHubNamespace{
+		status.Namespaces = append(status.Namespaces, g.githubRow(ctx, &protocol.GitHubNamespace{
 			Namespace: namespace,
 			Source:    token.GitHub.Source,
 			Login:     token.GitHub.Login,
@@ -220,7 +251,7 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 		if systemHas {
 			row.Login, row.MintedBy = system.GitHub.Login, system.MintedBy
 		}
-		status.Namespaces = append(status.Namespaces, s.githubRow(ctx, row))
+		status.Namespaces = append(status.Namespaces, g.githubRow(ctx, row))
 	}
 	slices.SortFunc(status.Namespaces, func(a, b *protocol.GitHubNamespace) int {
 		return strings.Compare(a.GetNamespace(), b.GetNamespace())
@@ -230,8 +261,8 @@ func (s *QNTXServer) githubStatus(ctx context.Context, _ sigil.Sent) (any, *prot
 
 // githubRow is a namespace's row with whether its GitHub works, asked of
 // GitHub and not remembered, and its rate limit.
-func (s *QNTXServer) githubRow(ctx context.Context, row *protocol.GitHubNamespace) *protocol.GitHubNamespace {
-	said, err := s.gitHubService().RateLimit(ctx, &protocol.GitHubRateLimitRequest{Namespace: row.Namespace})
+func (g *gitHub) githubRow(ctx context.Context, row *protocol.GitHubNamespace) *protocol.GitHubNamespace {
+	said, err := g.gitHubService().RateLimit(ctx, &protocol.GitHubRateLimitRequest{Namespace: row.Namespace})
 	switch {
 	case err != nil:
 		row.AuthError = err.Error()
@@ -248,7 +279,7 @@ func (s *QNTXServer) githubRow(ctx context.Context, row *protocol.GitHubNamespac
 }
 
 // githubFrom sets which GitHub a namespace spends: the system namespace's, or its own.
-func (s *QNTXServer) githubFrom(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (g *gitHub) githubFrom(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	from := strings.TrimSpace(sent["from"])
 	if from != GitHubFromSystem && from != GitHubFromNamespace {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "from",
@@ -258,33 +289,33 @@ func (s *QNTXServer) githubFrom(ctx context.Context, sent sigil.Sent) (any, *pro
 	if namespace == auth.NamespaceSystem {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "namespace", Says: "the system namespace's GitHub is ROOT's own, and comes from nowhere else"}
 	}
-	served, err := s.held.Serves(namespace)
+	served, err := g.host.serves(namespace)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "namespace", Says: err.Error()}
 	}
-	if err := s.nodeRecords().SetGitHubFrom(actorOf(ctx), served, from); err != nil {
+	if err := g.host.nodeRecords().SetGitHubFrom(actorOf(ctx), served, from); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return &protocol.GitHubFrom{Namespace: served, From: from}, nil
 }
 
-func (s *QNTXServer) githubNode(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (g *gitHub) githubNode(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	on, err := strconv.ParseBool(sent["enabled"])
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "enabled", Says: "enabled is true or false, and this said " + sent["enabled"]}
 	}
-	settings, err := s.nodeRecords().GitHub()
+	settings, err := g.host.nodeRecords().GitHub()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	settings.Enabled = on
-	if err := s.nodeRecords().SetGitHub(actorOf(ctx), settings); err != nil {
+	if err := g.host.nodeRecords().SetGitHub(actorOf(ctx), settings); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return &protocol.GitHubNode{Enabled: on}, nil
 }
 
-func (s *QNTXServer) githubRunner(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (g *gitHub) githubRunner(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	on, err := strconv.ParseBool(sent["enabled"])
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "enabled", Says: "enabled is true or false, and this said " + sent["enabled"]}
@@ -298,58 +329,58 @@ func (s *QNTXServer) githubRunner(ctx context.Context, sent sigil.Sent) (any, *p
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "path", Says: err.Error()}
 		}
 	}
-	settings, err := s.nodeRecords().GitHub()
+	settings, err := g.host.nodeRecords().GitHub()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	settings.RunnerPath, settings.RunnerEnabled = path, on
-	if err := s.nodeRecords().SetGitHub(actorOf(ctx), settings); err != nil {
+	if err := g.host.nodeRecords().SetGitHub(actorOf(ctx), settings); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	s.StartRunner()
-	return &protocol.GitHubRunnerSet{Runner: s.runnerStatus(settings)}, nil
+	g.StartRunner()
+	return &protocol.GitHubRunnerSet{Runner: g.runnerStatus(settings)}, nil
 }
 
-func (s *QNTXServer) githubWebhook(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
-	if s.authHandler == nil {
+func (g *gitHub) githubWebhook(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	if g.host.login() == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no login, so it keeps no webhook secret"}
 	}
-	secret, err := s.authHandler.NewGitHubWebhook(actorOf(ctx))
+	secret, err := g.host.login().NewGitHubWebhook(actorOf(ctx))
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	settings, err := s.nodeRecords().GitHub()
+	settings, err := g.host.nodeRecords().GitHub()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return &protocol.GitHubWebhook{Secret: secret, Url: s.webhookURL(settings.WebhookPath)}, nil
+	return &protocol.GitHubWebhook{Secret: secret, Url: g.webhookURL(settings.WebhookPath)}, nil
 }
 
-func (s *QNTXServer) githubWebhookPath(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (g *gitHub) githubWebhookPath(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	path := strings.TrimSpace(sent["path"])
 	if err := webhookPath(path); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "path", Says: err.Error()}
 	}
-	settings, err := s.nodeRecords().GitHub()
+	settings, err := g.host.nodeRecords().GitHub()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	settings.WebhookPath = path
-	if err := s.nodeRecords().SetGitHub(actorOf(ctx), settings); err != nil {
+	if err := g.host.nodeRecords().SetGitHub(actorOf(ctx), settings); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return &protocol.GitHubWebhookPath{Url: s.webhookURL(path)}, nil
+	return &protocol.GitHubWebhookPath{Url: g.webhookURL(path)}, nil
 }
 
 // runnerStatus is the runner as the Actions section shows it.
-func (s *QNTXServer) runnerStatus(settings GitHubSettings) *protocol.GitHubRunner {
+func (g *gitHub) runnerStatus(settings GitHubSettings) *protocol.GitHubRunner {
 	shown := &protocol.GitHubRunner{Path: settings.RunnerPath, Enabled: settings.RunnerEnabled}
 	if !settings.RunnerEnabled {
 		return shown
 	}
-	s.runnerMu.Lock()
-	runner, failed := s.runner, s.runnerErr
-	s.runnerMu.Unlock()
+	g.runnerMu.Lock()
+	runner, failed := g.runner, g.runnerErr
+	g.runnerMu.Unlock()
 	if runner == nil {
 		shown.Error = failed
 		if shown.Error == "" {
@@ -383,11 +414,11 @@ func takenBuilds(builds []grpcplugin.TakenBuild) []*protocol.TakenBuild {
 
 // StartRunner watches the runner the node's settings name, or stops watching
 // when they name none. Called at start and whenever the settings change.
-func (s *QNTXServer) StartRunner() {
-	s.stopRunner()
-	settings, err := s.nodeRecords().GitHub()
+func (g *gitHub) StartRunner() {
+	g.stopRunner()
+	settings, err := g.host.nodeRecords().GitHub()
 	if err != nil {
-		s.logger.Errorw("The node's GitHub settings were not read, so no runner is watched", "error", err)
+		g.host.log().Errorw("The node's GitHub settings were not read, so no runner is watched", "error", err)
 		return
 	}
 	if !settings.RunnerEnabled {
@@ -395,79 +426,32 @@ func (s *QNTXServer) StartRunner() {
 	}
 	runner, err := grpcplugin.OpenRunner(settings.RunnerPath)
 	if err != nil {
-		s.runnerFailed(err)
+		g.runnerFailed(err)
 		return
 	}
-	ctx, cancel := context.WithCancel(s.lifetime())
-	if err := runner.Watch(ctx, s.buildLanded, s.logger.Named("runner")); err != nil {
+	ctx, cancel := context.WithCancel(g.host.lifetime())
+	if err := runner.Watch(ctx, g.host.buildLanded, g.host.log().Named("runner")); err != nil {
 		cancel()
-		s.runnerFailed(err)
+		g.runnerFailed(err)
 		return
 	}
-	s.runnerMu.Lock()
-	s.runner, s.runnerStop, s.runnerErr = runner, cancel, ""
-	s.runnerMu.Unlock()
+	g.runnerMu.Lock()
+	g.runner, g.runnerStop, g.runnerErr = runner, cancel, ""
+	g.runnerMu.Unlock()
 }
 
-func (s *QNTXServer) runnerFailed(err error) {
-	s.logger.Errorw("The runner is on and not watched", "error", err)
-	s.runnerMu.Lock()
-	s.runnerErr = err.Error()
-	s.runnerMu.Unlock()
+func (g *gitHub) runnerFailed(err error) {
+	g.host.log().Errorw("The runner is on and not watched", "error", err)
+	g.runnerMu.Lock()
+	g.runnerErr = err.Error()
+	g.runnerMu.Unlock()
 }
 
-func (s *QNTXServer) stopRunner() {
-	s.runnerMu.Lock()
-	defer s.runnerMu.Unlock()
-	if s.runnerStop != nil {
-		s.runnerStop()
+func (g *gitHub) stopRunner() {
+	g.runnerMu.Lock()
+	defer g.runnerMu.Unlock()
+	if g.runnerStop != nil {
+		g.runnerStop()
 	}
-	s.runner, s.runnerStop, s.runnerErr = nil, nil, ""
-}
-
-// lifetime is the server's own context, or one that never ends in a server
-// that was not started.
-func (s *QNTXServer) lifetime() context.Context {
-	if s.ctx != nil {
-		return s.ctx
-	}
-	return context.Background()
-}
-
-// buildLanded runs a plugin's new build, when the plugin is enabled.
-func (s *QNTXServer) buildLanded(name string) {
-	// A build the runner delivered, or one started again because what it loads
-	// from was collected, is a deploy of the archive installed. One installed
-	// with no digest recorded names no rev, and begins none.
-	if s.deploys.inFlight(name) {
-		s.deploys.stage(name, deployRestarting)
-	} else if digest, recorded := grpcplugin.InstalledDigest(name); recorded {
-		s.deploys.begin(pluginDeploy{plugin: name, rev: digest, stage: deployRestarting})
-	}
-	record, found, err := s.pluginRecords().Plugin(name)
-	if err != nil {
-		s.deploys.fail(name, err)
-		s.logger.Errorw("A build landed and the plugin records were not read", "plugin", name, "error", err)
-		return
-	}
-	if !found || !record.Enabled {
-		s.deploys.stage(name, deployDisabled)
-		s.logger.Infow("A build landed for a plugin that is not enabled; it runs once enabled", "plugin", name, "known", found)
-		return
-	}
-	pm, err := s.getPluginManager()
-	if err != nil {
-		s.deploys.fail(name, err)
-		s.logger.Errorw("A build landed and there is no plugin manager to run it", "plugin", name, "error", err)
-		return
-	}
-	s.pluginMuxes.Delete(name)
-	s.pluginMuxInit.Delete(name)
-	if err := pm.RestartPlugin(s.lifetime(), name, pluginSearchPaths(), s.pluginRegistry, s.services); err != nil {
-		s.deploys.fail(name, err)
-		s.logger.Errorw("A build landed and the plugin did not start from it", "plugin", name, "error", err)
-		return
-	}
-	s.deploys.stage(name, deployLive)
-	s.BroadcastPluginHealth(name, true, "running", "Started from the build the runner delivered")
+	g.runner, g.runnerStop, g.runnerErr = nil, nil, ""
 }

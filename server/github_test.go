@@ -122,7 +122,7 @@ func TestAnEnabledRunnerShowsItsStats(t *testing.T) {
 
 	_, refused := answer(t, s, "runner", sigil.Sent{"path": runner, "enabled": "true"})
 	require.Nil(t, refused)
-	t.Cleanup(s.stopRunner)
+	t.Cleanup(s.gh().stopRunner)
 
 	said, refused := answer(t, s, "status", sigil.Sent{})
 	require.Nil(t, refused)

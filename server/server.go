@@ -19,7 +19,6 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
@@ -89,14 +88,9 @@ type QNTXServer struct {
 	// What sends the node's own mail: the mail service, or, until the plugin
 	// services make it, what refuses each mail saying so.
 	nodeMailer nodeMailer
-	// The node's GitHubService (ADR-043), made on first use.
+	// The node's GitHub (ADR-043), made on first use.
 	githubOnce sync.Once
-	github     *services.GitHubServer
-	// The runner whose plugin builds the node takes, while one is watched.
-	runnerMu   sync.Mutex
-	runner     *grpcplugin.Runner
-	runnerStop context.CancelFunc
-	runnerErr  string
+	github     *gitHub
 	// What QNTX last built of each plugin it builds itself, one build at a time.
 	builds   pluginBuilds
 	building sync.Mutex
