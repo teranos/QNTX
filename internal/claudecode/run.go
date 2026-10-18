@@ -175,12 +175,18 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	if err != nil {
 		return Answer{}, errors.Wrapf(err, "could not create the stream %s", stream)
 	}
-	defer out.Close()
 	said, err := os.OpenFile(stream+".err", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
-		return Answer{}, errors.Wrapf(err, "could not create %s.err", stream)
+		return Answer{}, errors.WithSecondaryError(errors.Wrapf(err, "could not create %s.err", stream), out.Close())
 	}
-	defer said.Close()
+	// The process holds the stream and its stderr from its start on; the node
+	// reads them by name, and closes what it opened once it is handed over.
+	handedOver := func() error {
+		if err := out.Close(); err != nil {
+			return errors.WithSecondaryError(errors.Wrapf(err, "the stream %s did not close", stream), said.Close())
+		}
+		return errors.Wrapf(said.Close(), "%s.err did not close", stream)
+	}
 
 	binary, argv := s.Binary, args
 	if s.Apart {
@@ -196,7 +202,10 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = work, env, out, said
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: s.Apart}
 	if err := cmd.Start(); err != nil {
-		return Answer{}, errors.Wrapf(err, "could not start %s", binary)
+		return Answer{}, errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), handedOver())
+	}
+	if err := handedOver(); err != nil {
+		return Answer{}, err
 	}
 	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(cmd.Process.Pid)), 0o600); err != nil {
 		return Answer{}, errors.Wrapf(err, "the pid of %s was not kept", stream)

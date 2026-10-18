@@ -94,12 +94,16 @@ func pidRuns(stream string) bool {
 
 // follow reads stream from its .read mark until a result, or until runs says
 // the process is gone and nothing more is in it.
-func follow(ctx context.Context, stream string, runs func() bool, each func(Message)) (Answer, error) {
+func follow(ctx context.Context, stream string, runs func() bool, each func(Message)) (answered Answer, err error) {
 	file, err := os.Open(stream)
 	if err != nil {
 		return Answer{}, errors.Wrapf(err, "the stream %s did not open", stream)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			err = errors.WithSecondaryError(errors.Wrapf(closeErr, "the stream %s did not close", stream), err)
+		}
+	}()
 	read, err := readMark(stream)
 	if err != nil {
 		return Answer{}, err
@@ -110,17 +114,17 @@ func follow(ctx context.Context, stream string, runs func() bool, each func(Mess
 	}
 
 	var answer Answer
-	answered, gone := false, false
+	resulted, gone := false, false
 	lines := bufio.NewReader(file)
 	var partial []byte
-	for !answered {
+	for !resulted {
 		line, readErr := lines.ReadBytes('\n')
 		partial = append(partial, line...)
 		if readErr == nil {
 			var m Message
 			// A line that is not a message is nothing the stream promised.
 			if unmarshalErr := json.Unmarshal(partial, &m); unmarshalErr == nil {
-				answered = answered || answerFrom(&answer, m)
+				resulted = resulted || answerFrom(&answer, m)
 				each(m)
 			}
 			read += int64(len(partial))
