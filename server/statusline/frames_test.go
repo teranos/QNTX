@@ -4,6 +4,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/plugin"
 )
 
 // A node with every answer, so a frame that fails to read one is visible.
@@ -95,7 +100,7 @@ func TestNobodyRefusedDrawsNoFrame(t *testing.T) {
 // Stepping past an omitted frame is what keeps the sweep from stuttering: the
 // slot moves on rather than going blank for one turn.
 func TestTheSlotStepsPastAnOmittedFrame(t *testing.T) {
-	h := &StatusLineHandler{carousel: newCarousel(), node: quietNode{}}
+	h := aRow(quietNode{})
 	// The refused frame is last, so land the sweep on it.
 	h.carousel.at = len(carouselFrames) - 1
 
@@ -150,7 +155,7 @@ func TestShortDuration(t *testing.T) {
 // The slot sits between the two pinned halves: who is asking, what the node is
 // doing, what it runs.
 func TestTheRotatingSlotSitsAfterTheCaller(t *testing.T) {
-	h := &StatusLineHandler{carousel: newCarousel(), node: fullNode{}}
+	h := aRow(fullNode{})
 
 	items := h.carouselItem()
 	if len(items) != 1 {
@@ -161,15 +166,11 @@ func TestTheRotatingSlotSitsAfterTheCaller(t *testing.T) {
 	}
 }
 
-// A handler with no node behind it draws the caller and nothing invented.
-func TestNoNodeDrawsNoRotatingSlot(t *testing.T) {
-	h := &StatusLineHandler{carousel: newCarousel()}
-	if got := h.carouselItem(); got != nil {
-		t.Fatalf("a handler with no node drew %v", got)
-	}
-
-	var nilHandler *StatusLineHandler
-	if got := nilHandler.carouselItem(); got != nil {
-		t.Fatalf("a nil handler drew %v", got)
-	}
+// aRow is a handler holding what a node holds, with nothing in it: no plugins,
+// no watchers, no failures, no news.
+func aRow(node StatusLineNode) *StatusLineHandler {
+	return NewStatusLineHandler(plugin.NewRegistry("1.0.0", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
+		func() map[string]plugin.HealthStatus { return map[string]plugin.HealthStatus{} },
+		func() storage.Watchers { return nil },
+		func() *HandlerFailureLog { return NewHandlerFailureLog() }, node)
 }

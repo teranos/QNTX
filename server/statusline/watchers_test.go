@@ -33,11 +33,11 @@ func rootContext(r *http.Request) *http.Request {
 // "To me it’s important enough to show those kinds of things and their
 // details at a higher priority than showing plugin versions"
 func TestFailingWatchersLeadTheRow(t *testing.T) {
-	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers {
+	h := newWatcherRow(func() storage.Watchers {
 		return &fakeWatcherStore{fires: []storage.WatcherErrorFire{
 			{WatcherID: "crier-ingest-1", Name: "ingest", AtMs: time.Now().Add(-2 * time.Minute).UnixMilli(), Error: "gave up after 5 attempts"},
 		}}
-	}, nil, nil)
+	})
 
 	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline?format=json", nil))
 	rec := httptest.NewRecorder()
@@ -47,14 +47,14 @@ func TestFailingWatchersLeadTheRow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("row is not json: %v", err)
 	}
-	// Index 0 is who is looking, pinned there and never rotating. The failure
-	// leads everything that is not pinned, which is what the quote asks for.
-	if len(body.Items) < 2 {
+	// Index 0 is who is looking, pinned there and never rotating; the node's
+	// own frame follows, and the failure comes before anything a plugin says.
+	if len(body.Items) < 3 {
 		t.Fatalf("a failing watcher drew nothing: %+v", body.Items)
 	}
-	first := body.Items[1]
+	first := body.Items[2]
 	if first.Name != "ingest" || first.Symbol != SymbolUnwell {
-		t.Fatalf("the failure does not lead the row: %+v", body.Items)
+		t.Fatalf("the failure does not follow the node's frame: %+v", body.Items)
 	}
 	if first.Note != "2m" {
 		t.Fatalf("the row does not say how long ago: %q", first.Note)
@@ -64,11 +64,11 @@ func TestFailingWatchersLeadTheRow(t *testing.T) {
 // The row names it; the click has the whole of it.
 func TestFailingWatcherDetailAnswersInFull(t *testing.T) {
 	failedAt := time.Now().Add(-30 * time.Second)
-	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers {
+	h := newWatcherRow(func() storage.Watchers {
 		return &fakeWatcherStore{fires: []storage.WatcherErrorFire{
 			{WatcherID: "crier-ingest-1", Name: "ingest", AtMs: failedAt.UnixMilli(), Error: "plugin not loaded"},
 		}}
-	}, nil, nil)
+	})
 
 	detail := itemDetail(t, h, rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline/ingest", nil)), "ingest")
 	if detail["error"] != "plugin not loaded" {
@@ -81,7 +81,7 @@ func TestFailingWatcherDetailAnswersInFull(t *testing.T) {
 
 // No store wired, no failure items — and no panic reaching for one.
 func TestNoWatcherStoreDrawsNoFailures(t *testing.T) {
-	h := NewStatusLineHandler(nil, nil, nil, func() storage.Watchers { return nil }, nil, nil)
+	h := newWatcherRow(func() storage.Watchers { return nil })
 
 	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline?format=json", nil))
 	rec := httptest.NewRecorder()
@@ -97,4 +97,11 @@ func TestNoWatcherStoreDrawsNoFailures(t *testing.T) {
 			t.Fatalf("a failure was drawn with no store: %+v", body.Items)
 		}
 	}
+}
+
+// newWatcherRow is a row over the given watcher store.
+func newWatcherRow(src func() storage.Watchers) *StatusLineHandler {
+	h := aRow(quietNode{})
+	h.watchers = src
+	return h
 }

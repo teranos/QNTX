@@ -6,8 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"github.com/teranos/QNTX/ats/storage"
 )
 
 // logWith builds a failure log holding the given failures.
@@ -20,9 +18,9 @@ func logWith(failures ...HandlerFailure) *HandlerFailureLog {
 }
 
 func handlerRow(l *HandlerFailureLog) *StatusLineHandler {
-	return NewStatusLineHandler(nil, nil, nil,
-		func() storage.Watchers { return nil },
-		func() *HandlerFailureLog { return l }, nil)
+	h := aRow(quietNode{})
+	h.handlerFailures = func() *HandlerFailureLog { return l }
+	return h
 }
 
 // A handler failure no longer draws its own item on the row: it is shown inside
@@ -150,16 +148,6 @@ func TestHandlerFailuresOutsideTheWindowDrawNothing(t *testing.T) {
 
 	if items := handlerFailureItemsFor(h.recentHandlerFailures()); len(items) != 0 {
 		t.Fatalf("a failure past the window still draws: %+v", items)
-	}
-}
-
-// No log wired, no failure items — and no panic reaching for one.
-func TestNoHandlerFailureLogDrawsNoFailures(t *testing.T) {
-	h := NewStatusLineHandler(nil, nil, nil,
-		func() storage.Watchers { return nil }, nil, nil)
-
-	if items := handlerFailureItemsFor(h.recentHandlerFailures()); len(items) != 0 {
-		t.Fatalf("no log drew failures: %+v", items)
 	}
 }
 

@@ -10,9 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	errors "github.com/teranos/sacred-error"
-	"go.uber.org/zap"
 
-	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -46,8 +44,7 @@ func drawRow(t *testing.T, h *StatusLineHandler, query string) StatusLineRespons
 // aNodeWithPeers is a handler with an empty registry and no plugins probed, so
 // the row runs its whole way through, with the peers answering as given.
 func aNodeWithPeers(peers PeerRows) *StatusLineHandler {
-	h := NewStatusLineHandler(plugin.NewRegistry("test", zap.NewNop().Sugar()), zap.NewNop().Sugar(),
-		func() map[string]plugin.HealthStatus { return map[string]plugin.HealthStatus{} }, nil, nil, nil)
+	h := aRow(quietNode{})
 	h.Peers = peers
 	return h
 }
@@ -84,11 +81,12 @@ func TestTheRowCarriesEveryPeersRowAfterItsOwn(t *testing.T) {
 func TestAPrimarysAskIsAnsweredWithoutTheCaller(t *testing.T) {
 	h := aNodeWithPeers(NoPeers)
 	own := drawRow(t, h, "format=json")
-	require.Len(t, own.Items, 1)
+	require.Len(t, own.Items, 2, "the caller, and the node's own frame")
 	assert.Equal(t, auth.RootName, own.Items[0].Name)
 
 	forPrimary := drawRow(t, h, "format=json&for=primary")
-	assert.Empty(t, forPrimary.Items, "a primary's ask drew the person again")
+	require.Len(t, forPrimary.Items, 1, "only the node's own frame")
+	assert.NotEqual(t, auth.RootName, forPrimary.Items[0].Name, "a primary's ask drew the person again")
 }
 
 // A peer with an unwell item is marked unwell at its name, so the row says
@@ -115,7 +113,7 @@ func TestAPeerThatDidNotAnswerIsSaid(t *testing.T) {
 // A node with no peers draws the row it always drew.
 func TestANodeWithNoPeersDrawsItsOwnRow(t *testing.T) {
 	row, _ := rowWithPeers(t, nil)
-	assert.Len(t, row.Items, 1)
+	assert.Len(t, row.Items, 2, "the caller, and the node's own frame")
 	assert.Equal(t, auth.RootName, row.Items[0].Name)
 }
 

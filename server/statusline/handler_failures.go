@@ -100,12 +100,8 @@ func groupHandlerFailures(failures []HandlerFailure, limit int) []handlerFailure
 	return runs
 }
 
-// recentHandlerFailures reads the failing handlers inside the window, or
-// nothing when no log is wired.
+// recentHandlerFailures reads the failing handlers inside the window.
 func (h *StatusLineHandler) recentHandlerFailures() []handlerFailureRun {
-	if h == nil || h.handlerFailures == nil {
-		return nil
-	}
 	return groupHandlerFailures(h.handlerFailures().Since(HandlerFailureWindow), handlerFailureItems)
 }
 

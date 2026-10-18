@@ -10,16 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/server/auth"
 )
 
 const alice = "https://mastodon.example/@alice"
 
 func newsRow(l *NewsLog) *StatusLineHandler {
-	h := NewStatusLineHandler(nil, nil, nil,
-		func() storage.Watchers { return nil },
-		func() *HandlerFailureLog { return NewHandlerFailureLog() }, nil)
+	h := aRow(quietNode{})
 	h.News = func() *NewsLog { return l }
 	return h
 }

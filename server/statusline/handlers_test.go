@@ -13,7 +13,7 @@ import (
 // A caller that names no format is told what it may ask for. Guessing here
 // hands a surface escapes it prints literally.
 func TestStatusLineRequiresFormat(t *testing.T) {
-	var h *StatusLineHandler
+	h := aRow(quietNode{})
 
 	for _, q := range []string{"", "?format=", "?format=html"} {
 		req := httptest.NewRequest(http.MethodGet, "/statusline"+q, nil)
@@ -136,7 +136,7 @@ const admittedRoute = "https://mastodon.example/@tim"
 
 func rowFor(t *testing.T, caller auth.Admission) *httptest.ResponseRecorder {
 	t.Helper()
-	var h *StatusLineHandler
+	h := aRow(quietNode{})
 
 	req := httptest.NewRequest(http.MethodGet, "/statusline?format=json", nil)
 	req = req.WithContext(auth.WithAdmission(req.Context(), caller))

@@ -39,7 +39,7 @@ func TestARouteSaysItsCallsAndWhatItAnsweredBadly(t *testing.T) {
 
 // A plugin the node does not hold is said, not answered with the node's row.
 func TestAPluginRowForNoSuchPluginIsA404(t *testing.T) {
-	var h *StatusLineHandler
+	h := aRow(quietNode{})
 	req := httptest.NewRequest(http.MethodGet, "/am/statusline?format=json&plugin=nobody", nil)
 	req = req.WithContext(auth.WithAdmission(req.Context(), auth.Admitted(auth.LevelRoot)))
 	rec := httptest.NewRecorder()

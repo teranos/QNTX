@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -150,12 +149,17 @@ type StatusLineHandler struct {
 	Deploys func() ([]DeployData, bool)
 }
 
-// NewStatusLineHandler builds the handler behind /statusline.
+// NewStatusLineHandler builds the handler behind /statusline. Everything it
+// is given is read on every request, so none of it may be nil.
 func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 	health func() map[string]plugin.HealthStatus,
 	watchers func() storage.Watchers, handlerFailures func() *HandlerFailureLog,
 	node StatusLineNode) *StatusLineHandler {
+	// Until the node hands over its own, what is left is a log nothing has been
+	// left in.
+	unwritten := NewNewsLog()
 	return &StatusLineHandler{
+		News:            func() *NewsLog { return unwritten },
 		registry:        registry,
 		logger:          logger,
 		health:          health,
@@ -178,18 +182,12 @@ const pluginFrameSlots = 12
 
 // pluginFrameIndex advances the plugin tick and returns where it landed.
 func (h *StatusLineHandler) pluginFrameIndex() int {
-	if h == nil || h.pluginCarousel == nil {
-		return 0
-	}
 	return h.pluginCarousel.frame(pluginFrameSlots)
 }
 
 // declaredHandlers is every handler the pulse registry holds, which is the
 // built-ins plus one per handler a plugin declared.
 func (h *StatusLineHandler) declaredHandlers() []string {
-	if h == nil || h.node == nil {
-		return nil
-	}
 	return h.node.HandlerNames()
 }
 
@@ -395,12 +393,8 @@ func readout(d time.Duration, finest time.Duration) string {
 	return said
 }
 
-// The one frame the row is showing. A handler with no node behind it draws
-// nothing here rather than guessing at values it cannot read.
+// The one frame the row is showing.
 func (h *StatusLineHandler) carouselItem() []StatusItem {
-	if h == nil || h.carousel == nil || h.node == nil {
-		return nil
-	}
 	// The sweep keeps its own pace; a frame with nothing to say is stepped past
 	// rather than drawn blank, so the slot never stutters.
 	at := h.carousel.frame(len(carouselFrames))
@@ -490,11 +484,6 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	failing := append(watcherFailureItemsFor(h.recentWatcherFailures(r.Context())),
 		handlerFailureItemsFor(builtinRuns(failures))...)
 
-	if h == nil || h.registry == nil {
-		h.noteWriteFailure(writeStatusLine(w, format, slices.Concat(items, carousel, failing)))
-		return
-	}
-
 	// The deploys go out as data; the carousel waits while one is in flight.
 	deploys, inFlight := h.Deploys()
 	if !inFlight {
@@ -580,17 +569,8 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 // A response that did not reach the client is not a response. There is no
 // client left to tell, so it goes where the operator can find it.
-// log tolerates a nil receiver: the format check runs before any state and
-// tests exercise it that way; respond accepts a nil logger.
-func (h *StatusLineHandler) log() *zap.SugaredLogger {
-	if h == nil {
-		return nil
-	}
-	return h.logger
-}
-
 func (h *StatusLineHandler) noteWriteFailure(err error) {
-	if err == nil || h == nil || h.logger == nil {
+	if err == nil {
 		return
 	}
 	h.logger.Errorw("status line not written", "error", err)
@@ -621,10 +601,6 @@ func (h *StatusLineHandler) Item(ctx context.Context, name string) (any, *protoc
 	}
 	if detail, ok := h.watcherFailureDetail(ctx, name); ok {
 		return detail, nil
-	}
-
-	if h == nil || h.registry == nil {
-		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "no such item"}
 	}
 
 	// The row truncates a long name to fit tmux's range argument, so what comes

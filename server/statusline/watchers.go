@@ -29,11 +29,8 @@ type watcherErrorSource interface {
 }
 
 // recentWatcherFailures reads the failing watchers inside the window, or
-// nothing when no store is wired or the store cannot answer.
+// nothing when the store cannot answer.
 func (h *StatusLineHandler) recentWatcherFailures(ctx context.Context) []storage.WatcherErrorFire {
-	if h == nil || h.watchers == nil {
-		return nil
-	}
 	src, ok := h.watchers().(watcherErrorSource)
 	if !ok {
 		return nil
@@ -43,9 +40,7 @@ func (h *StatusLineHandler) recentWatcherFailures(ctx context.Context) []storage
 	if err != nil {
 		// The row still draws without them; the failure to read failures is
 		// itself worth finding.
-		if h.logger != nil {
-			h.logger.Errorw("watcher failures not read for status line", "error", err)
-		}
+		h.logger.Errorw("watcher failures not read for status line", "error", err)
 		return nil
 	}
 	return fires

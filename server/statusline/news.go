@@ -151,9 +151,6 @@ func (h *StatusLineHandler) NewsFor(a auth.Admission) []StatusItem {
 
 // heldNews is what is on the row for the caller now.
 func (h *StatusLineHandler) heldNews(a auth.Admission) []News {
-	if h == nil || h.News == nil {
-		return nil
-	}
 	return h.News().Since(NewsKey(a), time.Now().UnixMilli())
 }
 
@@ -172,9 +169,6 @@ func newsItems(held []News) []StatusItem {
 
 // newsDetail answers /am/statusline/{id} for a news item.
 func (h *StatusLineHandler) newsDetail(a auth.Admission, id string) (map[string]any, bool) {
-	if h == nil || h.News == nil {
-		return nil, false
-	}
 	n, ok := h.News().ByID(NewsKey(a), id)
 	if !ok {
 		return nil, false
