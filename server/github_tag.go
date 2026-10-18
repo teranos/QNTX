@@ -34,9 +34,13 @@ func (g *gitHub) dispatchApp(tag string) {
 	logger := g.host.log().Named("app")
 	repo := appOwner + "/" + appRepo
 	sacred.Go("app.dispatch."+tag, func() {
-		said, _ := g.gitHubService().CreateAWorkflowDispatchEvent(g.host.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
+		said, err := g.gitHubService().CreateAWorkflowDispatchEvent(g.host.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
 			Namespace: auth.NamespaceSystem, Owner: appOwner, Repo: appRepo, WorkflowId: appWorkflow, Ref: appRef,
 		})
+		if err != nil {
+			logger.Errorw("A tag landed and the app's build was not dispatched", "tag", tag, "repo", repo, "workflow", appWorkflow, "error", err)
+			return
+		}
 		if !said.Success {
 			logger.Errorw("A tag landed and the app's build was not dispatched", "tag", tag, "repo", repo, "workflow", appWorkflow, "error", said.Error)
 			return
