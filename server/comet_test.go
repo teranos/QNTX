@@ -119,5 +119,7 @@ func TestACometsDigestIsWrittenOnceBesideIt(t *testing.T) {
 
 func TestCometSandIsGroundsControlsAndTheProjectsAlone(t *testing.T) {
 	// One project block naming the checkout: wind folds that project's controls and nothing of anyone's.
-	assert.Equal(t, "project {\n  path: \"/b/grove\"\n}\n", cometDeclaration("/b/grove"))
+	// Its origin is the repository wherever it is checked out on the machine the comet lands on.
+	assert.Equal(t, "project {\n  path: \"/b/grove\"\n  origin: \"abcd-nl/grove\"\n}\n",
+		cometDeclaration("/b/grove", buildSource{Owner: "abcd-nl", Repo: "grove"}))
 }

@@ -70,8 +70,10 @@ func cometOf(path string) (string, string, string, error) {
 }
 
 // cometDeclaration is the one project block a comet's sand holds besides ground's own controls.
-func cometDeclaration(checkout string) string {
-	return "project {\n  path: \"" + checkout + "\"\n}\n"
+// The path is where wind reads the project's controls on the node; the origin is how ground
+// knows the repository on the machine it lands on, wherever its checkout is (ground source/place.d).
+func cometDeclaration(checkout string, project buildSource) string {
+	return "project {\n  path: \"" + checkout + "\"\n  origin: \"" + project.Owner + "/" + project.Repo + "\"\n}\n"
 }
 
 // cometsDir is where the node keeps every comet, one per repository.
@@ -229,7 +231,7 @@ func (s *QNTXServer) buildCometIn(ctx context.Context, project buildSource, plat
 	if err := os.MkdirAll(local, 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s", local)
 	}
-	if err := os.WriteFile(filepath.Join(local, "comet.pbt"), []byte(cometDeclaration(checkout)), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(local, "comet.pbt"), []byte(cometDeclaration(checkout, project)), 0o644); err != nil {
 		return errors.Wrapf(err, "failed to write the comet's project block in %s", local)
 	}
 	if err := os.Mkdir(filepath.Join(work, "tmp"), 0o755); err != nil {
