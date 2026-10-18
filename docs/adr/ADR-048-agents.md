@@ -39,7 +39,7 @@ reachable by each other."
 "So the first persistent Agent swarm is really three, or four if we include
 something we run on Pi"
 
-- ROOT's are Opus, Fable and Sonnet in Claude Code, and the one in Pi.
+- ROOT's is one Node Agent at a time, Opus or Fable.
 
 "So a conversation I have with Mistral as ROOT is one long Mistral conversation"
 
@@ -58,8 +58,8 @@ expressed to ROOT."
 
 "we cant just have any ai be the ROOT agent"
 
-- In Claude Code it is Claude, run by the node: Opus, Fable and Sonnet, each a
-  ROOT agent of its own. Only Claude runs there.
+- It is Opus or Fable, run by the node. am.toml naming any other model is
+  refused.
 - am.toml names each under `[agent.root]`: its model, its effort, and a
   reference to the Claude plan token. A node that names no model has no ROOT
   agent, and nothing stands in for the model named.
@@ -117,9 +117,9 @@ process. It starts it, resumes it and stops it.
   in Pi.
 "WHY ISNT PI SEPARATE"
 
-- The one in Pi is an agent of its own: its own DID, its own token, its own
-  session. Each element reads its own agent's session, and they answer at the
-  same time.
+- In Pi it is the same agent: one DID, one token, and a session of its own
+  there. Each element reads its session in its harness. While it answers in
+  one, the other waits.
 - Pi reaches the node's MCP with the agent's own token, and its model calls go
   to the provider am.toml names under `[agent.root.pi]`.
 - The node gets Pi as it gets Claude Code, pinned by the build and nothing
@@ -131,40 +131,8 @@ process. It starts it, resumes it and stops it.
 
 "LETS SAY FOR DEVELOPMENT WEE USE"
 
-- In Pi it runs the model am.toml names, which need not be Claude: during
-  development, `openai/gpt-oss-120b` through OpenRouter. In Claude Code only
-  Claude can be it.
-
-## The namespace agent
-
-"an agent session for a particular namespace, different concept from the ROOT
-host agent"
-
-"The shared namespace agent, opted into"
-
-"The Namespace agent is a common Agent of the Namespace it’s opted into. That
-means the one who sets it up knows it’s shared amongst anyone who has REACH on
-it."
-
-- It is an agent the node hosts, reached over A2A by its tenant, and the
-  tenant is its namespace. It stands in that namespace and nothing crosses
-  (ADR-026).
-- Who may see its Tasks is REACH on its namespace: A2A's "Project or workspace
-  membership (project-based authorization)" (§13.1).
-- A namespace opts into a model, and its agent is that model there: a
-  namespace's Sonnet and ROOT's Sonnet are two agents.
-
-"The one who set’s it up does, they provide their own Subscription or API key"
-
-- Every model call it makes is on that credential, whoever with REACH spoke to
-  it.
-
-"Namespaces shouldn’t be catalogued"
-
-- Its card is not at /.well-known/agent-card.json and is in no list. It is
-  given to who has REACH on its namespace, A2A's "Direct Configuration" (§8.2).
-- To who has no REACH, a namespace with an agent answers as one that does not
-  exist (§3.3.2).
+- In Pi it runs the model am.toml names under `[agent.root.pi]`, Opus or
+  Fable as in Claude Code.
 
 ## First uses
 
@@ -249,9 +217,3 @@ to Pi by itself: what Claude Code answers then has not been seen.
 
 - Comet is ADR-050: the box's own ground, the readiness of a hosted agent, and
   a ritual's performer on the box.
-- The namespace agent: its own DID derived from the node's key for that
-  namespace and model, its own home, session and token, signed in through
-  claude login (ADR-051), a sandbox around the turn, and one test of the whole
-  claim: it fails to reach the node's environment, its config, another
-  namespace, the box's AWS role and its own credential file, and its model
-  call succeeds on its own sign-in. Its story is docs/stories.
