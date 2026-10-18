@@ -54,6 +54,7 @@ type QNTXServer struct {
 	namespaceAgents     agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
 	agentsDir           string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL              string                        // Where this node answers on its own machine; empty until it listens
+	underGround         []string                      // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)
 	daemon              *async.WorkerPool             // Background job processor (daemon)
 	scheduleStore       *schedule.Store               // Schedule persistence (shared with ticker)
 	tickerCfg           schedule.TickerConfig         // Ticker configuration (resolved at init)

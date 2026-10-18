@@ -169,6 +169,7 @@ func (s *QNTXServer) nameNodeAgent(home string) error {
 		}
 	}
 	s.nodeAgent = agent
+	s.underGround = append(s.underGround, home)
 	s.logger.Infow("The Node Agent is this node's", "did", agent.did, "home", home)
 	return nil
 }

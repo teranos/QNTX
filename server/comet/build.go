@@ -60,34 +60,47 @@ func (b Builder) Build(ctx context.Context, n Name) error {
 
 // buildIn builds the comet in work and keeps it.
 func (b Builder) buildIn(ctx context.Context, n Name, work string) error {
-	src := filepath.Join(work, "ground")
 	checkout := filepath.Join(work, "project")
-	for _, got := range []struct {
-		source Source
-		dir    string
-	}{{Ground, src}, {Source{Owner: n.Owner, Repo: n.Repo}, checkout}} {
-		rev, err := b.Node.Latest(ctx, got.source)
-		if err != nil {
-			return errors.Wrapf(err, "the latest of %s was not read", got.source.String())
-		}
-		tarball := got.dir + ".tar.gz"
-		if err := b.Node.Fetch(ctx, got.source, rev, tarball); err != nil {
-			return err
-		}
-		if err := os.Mkdir(got.dir, 0o755); err != nil {
-			return errors.Wrapf(err, "failed to make %s", got.dir)
-		}
-		if err := b.Node.Run(ctx, work, nil, "tar", "-xzf", tarball, "--strip-components=1", "-C", got.dir); err != nil {
-			return errors.Wrapf(err, "failed to unpack %s at %s", got.source.String(), rev)
-		}
+	if err := b.unpack(ctx, Source{Owner: n.Owner, Repo: n.Repo}, work, checkout); err != nil {
+		return err
 	}
+	kept, err := Path(n)
+	if err != nil {
+		return err
+	}
+	return errors.Wrapf(b.ground(ctx, work, n.Platform, Declaration(checkout, n.Owner, n.Repo), kept), "the comet of %s did not build", n.Key())
+}
 
+// unpack is source at its latest, unpacked into dir.
+func (b Builder) unpack(ctx context.Context, source Source, work, dir string) error {
+	rev, err := b.Node.Latest(ctx, source)
+	if err != nil {
+		return errors.Wrapf(err, "the latest of %s was not read", source.String())
+	}
+	tarball := dir + ".tar.gz"
+	if err := b.Node.Fetch(ctx, source, rev, tarball); err != nil {
+		return err
+	}
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		return errors.Wrapf(err, "failed to make %s", dir)
+	}
+	return errors.Wrapf(b.Node.Run(ctx, work, nil, "tar", "-xzf", tarball, "--strip-components=1", "-C", dir),
+		"failed to unpack %s at %s", source.String(), rev)
+}
+
+// ground builds ground's main in work with sand beside its own controls, for platform, and keeps
+// it at kept with its digest beside it.
+func (b Builder) ground(ctx context.Context, work, platform, sand, kept string) error {
+	src := filepath.Join(work, "ground")
+	if err := b.unpack(ctx, Ground, work, src); err != nil {
+		return err
+	}
 	local := filepath.Join(src, "controls", "local")
 	if err := os.MkdirAll(local, 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s", local)
 	}
-	if err := os.WriteFile(filepath.Join(local, "comet.pbt"), []byte(Declaration(checkout, n.Owner, n.Repo)), 0o644); err != nil {
-		return errors.Wrapf(err, "failed to write the comet's project block in %s", local)
+	if err := os.WriteFile(filepath.Join(local, "comet.pbt"), []byte(sand), 0o644); err != nil {
+		return errors.Wrapf(err, "failed to write the comet's sand in %s", local)
 	}
 	if err := os.Mkdir(filepath.Join(work, "tmp"), 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make the comet's temp directory in %s", work)
@@ -98,27 +111,23 @@ func (b Builder) buildIn(ctx context.Context, n Name, work string) error {
 	if err != nil {
 		return err
 	}
-	if n.Platform == native {
+	if platform == native {
 		if err := b.step(ctx, src, env, b.inGround(src, "make", "build")); err != nil {
-			return errors.Wrapf(err, "the comet of %s did not build", n.Key())
+			return err
 		}
 	}
-	if n.Platform != native {
-		if err := b.buildDarwin(ctx, src, env, n.Platform); err != nil {
-			return errors.Wrapf(err, "the comet of %s did not build", n.Key())
+	if platform != native {
+		if err := b.buildDarwin(ctx, src, env, platform); err != nil {
+			return err
 		}
 	}
 
-	kept, err := Path(n)
-	if err != nil {
-		return err
-	}
 	if err := os.MkdirAll(filepath.Dir(kept), 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s", filepath.Dir(kept))
 	}
 	binary, err := os.ReadFile(filepath.Join(src, "ground"))
 	if err != nil {
-		return errors.Wrapf(err, "the built comet of %s was not found in %s", n.Key(), src)
+		return errors.Wrapf(err, "the built ground was not found in %s", src)
 	}
 	// Renamed into place, never written over: a GET reading the old one reads it whole.
 	staged := kept + ".new"
@@ -126,7 +135,7 @@ func (b Builder) buildIn(ctx context.Context, n Name, work string) error {
 		return errors.Wrapf(err, "failed to write %s", staged)
 	}
 	if err := os.Rename(staged, kept); err != nil {
-		return errors.Wrapf(err, "failed to put the comet of %s in place at %s", n.Key(), kept)
+		return errors.Wrapf(err, "failed to put the built ground in place at %s", kept)
 	}
 	return KeepDigest(kept)
 }

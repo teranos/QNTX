@@ -177,6 +177,47 @@ func TestAPushRebuildsTheCometsItMoves(t *testing.T) {
 	assert.Empty(t, MovedBy(kept, "teranos/ground", "a-branch", "main"))
 }
 
+// "AS AN A2A AGENT, IT ALSO NEEDS TO SHACKLE ITSELF UNDER GROUND"
+func TestAnAgentRunsUnderGroundOnceItsGroundAndSettingsStand(t *testing.T) {
+	home := t.TempDir()
+	assert.ErrorContains(t, Under(home), "its ground is not built")
+
+	require.NoError(t, os.MkdirAll(filepath.Dir(AgentGround(home)), 0o755))
+	require.NoError(t, os.WriteFile(AgentGround(home), []byte("a ground"), 0o755))
+	assert.ErrorContains(t, Under(home), "its settings are not written")
+
+	// Settings held already keep what they hold; the hooks are ground's.
+	require.NoError(t, os.MkdirAll(filepath.Join(home, "claude"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(home, "claude", "settings.json"), []byte(`{"model":"opus"}`), 0o600))
+	require.NoError(t, AgentSettings(home))
+	assert.NoError(t, Under(home))
+
+	written, err := os.ReadFile(filepath.Join(home, "claude", "settings.json"))
+	require.NoError(t, err)
+	var settings struct {
+		Model string `json:"model"`
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command     string `json:"command"`
+				Timeout     int    `json:"timeout"`
+				AsyncRewake bool   `json:"asyncRewake"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	require.NoError(t, json.Unmarshal(written, &settings))
+	assert.Equal(t, "opus", settings.Model)
+	assert.Equal(t, AgentGround(home), settings.Hooks["PreToolUse"][0].Hooks[0].Command)
+	stop := settings.Hooks["Stop"][0].Hooks
+	require.Len(t, stop, 2)
+	assert.Equal(t, AgentGround(home)+` sky "$PWD"`, stop[1].Command)
+	assert.Equal(t, 86400, stop[1].Timeout)
+	assert.True(t, stop[1].AsyncRewake)
+}
+
+func TestTheAgentsSandIsItsWorkAndTheNode(t *testing.T) {
+	assert.Equal(t, "project {\n  path: \"/a/work\"\n}\n\nqntx {\n  url: \"http://127.0.0.1:8772\"\n}\n", AgentDeclaration("/a/work", "http://127.0.0.1:8772"))
+}
+
 func TestACometsDigestIsWrittenOnceBesideIt(t *testing.T) {
 	dir := t.TempDir()
 	kept := filepath.Join(dir, "ground")

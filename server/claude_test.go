@@ -21,6 +21,7 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/comet"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -111,6 +112,24 @@ func (h *handed) CreateAttestation(as *types.As) error {
 	return h.AttestationStore.CreateAttestation(as)
 }
 
+// underGround stands the agent in home under ground: a stand-in for its ground, and the settings that run it.
+func underGround(t *testing.T, home string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(comet.AgentGround(home)), 0o755))
+	require.NoError(t, os.WriteFile(comet.AgentGround(home), []byte("#!/bin/sh\n"), 0o755))
+	require.NoError(t, comet.AgentSettings(home))
+}
+
+// "AS AN A2A AGENT, IT ALSO NEEDS TO SHACKLE ITSELF UNDER GROUND"
+func TestTheNodeAgentIsSaidNothingUntilItRunsUnderGround(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	require.NoError(t, os.Remove(comet.AgentGround(s.nodeAgent.home)))
+	_, refused := saying(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.Says, "is said nothing until it runs under ground")
+	assert.Contains(t, refused.Says, "its ground is not built")
+}
+
 // runningTheNodeAgent is a node whose am.toml names the Node Agent, holding a
 // stand-in for Claude Code.
 func runningTheNodeAgent(t *testing.T, named appcfg.NodeAgentConfig) (s *QNTXServer, ran string) {
@@ -125,6 +144,7 @@ func runningTheNodeAgent(t *testing.T, named appcfg.NodeAgentConfig) (s *QNTXSer
 	seed[0] = 7
 	agent, err := theNodeAgent(ed25519.NewKeyFromSeed(seed), t.TempDir())
 	require.NoError(t, err)
+	underGround(t, agent.home)
 
 	t.Setenv("QNTX_TEST_PLAN_TOKEN", "the-plan-token")
 	named.TokenRef = "env:QNTX_TEST_PLAN_TOKEN"
