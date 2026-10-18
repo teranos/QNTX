@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/internal/sacred"
 	errors "github.com/teranos/sacred-error"
@@ -48,13 +49,50 @@ func cometDeclaration(checkout string) string {
 	return "project {\n  path: \"" + checkout + "\"\n}\n"
 }
 
-// cometPath is where a project's comet is kept on the node.
-func cometPath(owner, repo string) (string, error) {
+// cometsDir is where the node keeps every comet, one per repository.
+func cometsDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", errors.Wrap(err, "the node's home was not found, so there is nowhere to keep a comet")
 	}
-	return filepath.Join(home, ".qntx", "comets", owner, repo, "ground"), nil
+	return filepath.Join(home, ".qntx", "comets"), nil
+}
+
+// cometPath is where a project's comet is kept on the node.
+func cometPath(owner, repo string) (string, error) {
+	dir, err := cometsDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, owner, repo, "ground"), nil
+}
+
+// heldComets is each comet kept under dir, as am ground says it: its repository, digest, size and when it was built.
+func heldComets(dir string) ([]map[string]any, error) {
+	found, err := filepath.Glob(filepath.Join(dir, "*", "*", "ground"))
+	if err != nil {
+		return nil, errors.Wrapf(err, "the comets under %s were not listed", dir)
+	}
+	comets := make([]map[string]any, 0, len(found))
+	for _, path := range found {
+		info, err := os.Stat(path)
+		if err != nil {
+			return nil, errors.Wrapf(err, "the comet at %s was not read", path)
+		}
+		digest, err := fileDigest(path)
+		if err != nil {
+			return nil, err
+		}
+		repo := filepath.Base(filepath.Dir(path))
+		owner := filepath.Base(filepath.Dir(filepath.Dir(path)))
+		comets = append(comets, map[string]any{
+			"repository": owner + "/" + repo,
+			"digest":     digest,
+			"size":       info.Size(),
+			"built":      info.ModTime().UTC().Format(time.RFC3339),
+		})
+	}
+	return comets, nil
 }
 
 // HandleComet serves a project's comet (GET), or builds it (POST) and says so when it is done.
