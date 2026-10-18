@@ -3,14 +3,10 @@
 Date: 2026-10-10
 Status: Proposed
 
-"There is an interactive element that I want to prototype here. It lets me
-approve something."
+"There is an interactive element that I want to prototype here. It lets me approve something."
 
-"Do you hear how little it matters what the 'thing' is to approve?"
 
 "approvals are attestations obviously"
-
-"Approvals is human only"
 
 "And only through it's element"
 
