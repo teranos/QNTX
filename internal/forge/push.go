@@ -14,6 +14,8 @@ type Push struct {
 	Deleted bool
 	// Changed is every file the push added, removed or modified.
 	Changed []string
+	// DefaultBranch is the repository's default branch, as the forge said it with the push.
+	DefaultBranch string
 }
 
 // Branch is the branch pushed to, or empty for a tag.

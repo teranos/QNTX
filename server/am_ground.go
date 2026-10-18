@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/comet"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
@@ -220,11 +221,11 @@ func (s *QNTXServer) amGround(ctx context.Context, _ sigil.Sent) (any, *protocol
 
 	// "Comet is answered beside ug"
 	// Each comet the node keeps (ADR-050).
-	dir, err := cometsDir()
+	dir, err := comet.Dir()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	comets, err := heldComets(dir)
+	comets, err := comet.Held(dir)
 	if err != nil {
 		s.logger.Errorw("am ground could not read the comets the node keeps", "dir", dir, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the comets the node keeps did not read: " + err.Error()}
