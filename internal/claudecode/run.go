@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/agentenv"
+	"github.com/teranos/QNTX/internal/sacred"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -212,10 +213,10 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	}
 	var exited atomic.Bool
 	waited := make(chan error, 1)
-	go func() {
+	sacred.Go("waiting on a Claude Code turn's process", func() {
 		waited <- cmd.Wait()
 		exited.Store(true)
-	}()
+	})
 	answer, err := follow(ctx, stream, func() bool { return !exited.Load() }, each)
 	// A process of the node's own, not apart, stops when the node does, the
 	// way a person stops it, so the session is left as written.
