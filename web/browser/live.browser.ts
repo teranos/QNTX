@@ -217,13 +217,15 @@ async function undersized(page: Page, id: string): Promise<string[]> {
         const name = (node: HTMLElement) => `${node.tagName.toLowerCase()}${typeof node.className === 'string' && node.className !== '' ? `.${node.className.split(' ').filter((c) => c !== '').join('.')}` : ''}`;
         const targets = Array.from(element.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, [role="button"]')).filter((node) => {
             const r = node.getBoundingClientRect();
-            if (r.width === 0 && r.height === 0) return false;
+            // A box with no width or no height draws nothing to point at.
+            if (r.width === 0 || r.height === 0) return false;
             // "Inline": a target in a sentence is sized by the line it stands in.
             return getComputedStyle(node).display !== 'inline';
         });
         const small = (r: DOMRect) => r.width < MIN || r.height < MIN;
         const centre = (r: DOMRect) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
-        const said: string[] = [];
+        // A row of targets alike is said once, with how many of them are.
+        const said = new Map<string, number>();
         for (const target of targets) {
             const r = target.getBoundingClientRect();
             if (!small(r)) continue;
@@ -238,9 +240,11 @@ async function undersized(page: Page, id: string): Promise<string[]> {
                 const oc = centre(o);
                 return small(o) && Math.hypot(oc.x - c.x, oc.y - c.y) < MIN;
             });
-            if (meets) said.push(`target ${name(target)} ${Math.round(r.width)}×${Math.round(r.height)}, under ${MIN}×${MIN}, its circle meets ${name(meets)}`);
+            if (!meets) continue;
+            const line = `target ${name(target)} ${Math.round(r.height) < MIN ? `${Math.round(r.height)} high` : `${Math.round(r.width)} wide`}, under ${MIN}×${MIN}, its circle meets ${name(meets)}`;
+            said.set(line, (said.get(line) ?? 0) + 1);
         }
-        return said;
+        return Array.from(said, ([line, times]) => times > 1 ? `${line} (×${times})` : line);
     });
 }
 
