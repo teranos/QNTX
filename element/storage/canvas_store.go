@@ -31,7 +31,7 @@ type CanvasElement struct {
 
 // CanvasComposition represents a melded composition of elements
 // Uses edge-based DAG structure to support multi-directional melding
-// See ADR-009 for rationale
+// See Elements' ADR-009 for rationale: https://github.com/teranos/elements/blob/main/docs/adr/ADR-009-edge-based-composition-dag.md
 type CanvasComposition struct {
 	ID        string                `json:"id"`
 	Edges     []*pb.CompositionEdge `json:"edges"`

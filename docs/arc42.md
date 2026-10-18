@@ -245,7 +245,7 @@ Attestations are append-only. Sync is set union — commutative, idempotent, con
 | [006](adr/ADR-006-proto-as-source-of-truth.md) | Protobuf as single source of truth for types |
 | [007](adr/ADR-007-typescript-proto-interfaces-only.md) | TypeScript gets interfaces only from proto |
 | [008](adr/ADR-008-rust-proto-separation.md) | Separate prost (types) from tonic (transport) in Rust |
-| [009](adr/ADR-009-edge-based-composition-dag.md) | Edge-based DAG for multi-directional element melding |
+| [009](https://github.com/teranos/elements/blob/main/docs/adr/ADR-009-edge-based-composition-dag.md) | Edge-based DAG for multi-directional element melding (Elements') |
 
 ---
 
