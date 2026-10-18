@@ -210,9 +210,12 @@ func (s *Store) UpdateJob(job *Job) error {
 	return nil
 }
 
+// newestInStatus is where ListJobs reads, read in order from an index rather than sorted.
+const newestInStatus = `FROM async_ix_jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?`
+
 // ListJobs is the newest jobs in one status, up to limit.
 func (s *Store) ListJobs(status JobStatus, limit int) ([]*Job, error) {
-	return s.listJobs(`SELECT `+StandardJobSelectColumns()+` FROM async_ix_jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?`, status, limit)
+	return s.listJobs(`SELECT `+StandardJobSelectColumns()+` `+newestInStatus, status, limit)
 }
 
 // ListEveryJob is the newest jobs in every status, up to limit.
