@@ -60,12 +60,24 @@
         {
           "continue-on-error": true,
           "env": {
+            "QNTX_GATE_API": "${{ inputs.api }}",
+            "QNTX_GATE_SHA": "${{ steps.commit.outputs.sha }}",
+            "QNTX_GATE_TOKEN": "${{ secrets.gate_token }}"
+          },
+          "id": "node",
+          "name": "The node runs this commit, and stays up",
+          "run": "cd web && bun browser/node-runs.ts"
+        },
+        {
+          "continue-on-error": true,
+          "env": {
             "CI": "1",
             "QNTX_GATE_API": "${{ inputs.api }}",
             "QNTX_GATE_ORIGIN": "${{ inputs.origin }}",
             "QNTX_GATE_TOKEN": "${{ secrets.gate_token }}"
           },
           "id": "gate",
+          "if": "steps.node.outcome == 'success'",
           "name": "The branch's page, answered live by the node as its CI user, on Pixel 7, iPhone 15 and desktop",
           "run": "cd web && bunx playwright test -c browser live.browser.ts --workers 1"
         },
@@ -84,13 +96,14 @@
         {
           "env": {
             "GH_TOKEN": "${{ steps.app.outputs.token }}",
+            "NODE": "${{ steps.node.outcome }}",
             "RUN": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
             "SHA": "${{ steps.commit.outputs.sha }}",
             "STATE": "${{ steps.gate.outcome == 'success' && 'success' || 'failure' }}"
           },
           "if": "always()",
           "name": "The verdict, sent to QNTX, which says it on the commit (live-verdict.yml)",
-          "run": "if [ \"$STATE\" = success ]; then SAID='every element, live, can be reached whole'; else SAID='an element live on the node has content that cannot be reached: see the run'; fi\njq -n --arg sha \"$SHA\" --arg state \"$STATE\" --arg said \"$SAID\" --arg run \"$RUN\" '{event_type: \"live-verdict\", client_payload: {sha: $sha, state: $state, said: $said, run: $run}}' | gh api repos/teranos/QNTX/dispatches --input -\n"
+          "run": "if [ \"$STATE\" = success ]; then SAID='every element, live, can be reached whole'; elif [ \"$NODE\" != success ]; then SAID='the node did not run this commit, so nothing was measured: see the run'; else SAID='an element live on the node has content that cannot be reached: see the run'; fi\njq -n --arg sha \"$SHA\" --arg state \"$STATE\" --arg said \"$SAID\" --arg run \"$RUN\" '{event_type: \"live-verdict\", client_payload: {sha: $sha, state: $state, said: $said, run: $run}}' | gh api repos/teranos/QNTX/dispatches --input -\n"
         },
         {
           "if": "steps.gate.outcome != 'success'",
