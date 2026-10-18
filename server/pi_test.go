@@ -75,6 +75,7 @@ func TestWhatIsSaidToPiIsAnsweredByPi(t *testing.T) {
 	assert.Equal(t, "low", after(args, "--thinking"))
 	assert.Equal(t, answer.GetSession(), after(args, "--session-id"))
 	assert.Contains(t, after(args, "--append-system-prompt"), s.nodeAgent.did)
+	assert.NotContains(t, args, "--no-builtin-tools", "the Node Agent runs Pi's own tools")
 
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token)

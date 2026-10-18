@@ -93,7 +93,7 @@ func (s *QNTXServer) piSaid(agent *rootAgent, named appcfg.PiConfig, binary, ses
 	said := pi.Said{
 		Binary: binary, Home: agent.home, Session: session, Says: says,
 		Model: piGatewayProvider + "/" + named.Model, Thinking: named.Thinking,
-		System: agent.isSaidToBe(), Env: env,
+		System: agent.isSaidToBe(), Env: env, Tools: pi.PisOwnTools,
 	}
 	if s.ownURL != "" {
 		said.MCP = s.piMCP(agent, s.ownURL)
@@ -134,6 +134,10 @@ func (s *QNTXServer) namespacePiPart(held aPiAgentHeld) (aTurn, *protocol.Refusa
 			Model: line.provider + "/" + line.model, Thinking: line.thinking,
 			System: agent.isSaidToBe(), MCP: s.piMCP(agent, own.String()),
 			Env: append(env, variable+"="+key),
+			// Pi asks before no tool call and has no sandbox (ADR-048), so a
+			// namespace's agent runs none of Pi's own tools: the node's MCP
+			// alone.
+			Tools: pi.NoneOfPisOwn,
 		}
 	}), nil
 }

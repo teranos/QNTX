@@ -407,6 +407,7 @@ func TestThePiAgentOfANamespaceAnswersOnTheNamespacesKey(t *testing.T) {
 	assert.Equal(t, "openrouter/anthropic/claude-opus-4.6", after(args, "--model"))
 	assert.Equal(t, "low", after(args, "--thinking"))
 	assert.Contains(t, after(args, "--append-system-prompt"), set.GetPi().GetDid())
+	assert.Contains(t, args, "--no-builtin-tools", "none of Pi's own tools: the node's MCP alone")
 	env := ranWith(t, piRan, "0", "env")
 	assert.Contains(t, env, "OPENROUTER_API_KEY=sk-or-the-gardeners", "the namespace's key, handed to the process")
 	assert.NotContains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token, "ROOT's token is not the namespace agent's")
