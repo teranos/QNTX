@@ -39,7 +39,7 @@ reachable by each other."
 "So the first persistent Agent swarm is really three, or four if we include
 something we run on Pi"
 
-- ROOT's are Opus, Fable and Sonnet in Claude Code, and the one in Pi.
+- ROOT's is one Node Agent at a time, Opus or Fable.
 
 "So a conversation I have with Mistral as ROOT is one long Mistral conversation"
 
@@ -58,8 +58,8 @@ expressed to ROOT."
 
 "we cant just have any ai be the ROOT agent"
 
-- In Claude Code it is Claude, run by the node: Opus, Fable and Sonnet, each a
-  ROOT agent of its own. Only Claude runs there.
+- It is Opus or Fable, run by the node. am.toml naming any other model is
+  refused.
 - am.toml names each under `[agent.root]`: its model, its effort, and a
   reference to the Claude plan token. A node that names no model has no ROOT
   agent, and nothing stands in for the model named.
@@ -117,9 +117,9 @@ process. It starts it, resumes it and stops it.
   in Pi.
 "WHY ISNT PI SEPARATE"
 
-- The one in Pi is an agent of its own: its own DID, its own token, its own
-  session. Each element reads its own agent's session, and they answer at the
-  same time.
+- In Pi it is the same agent: one DID, one token, and a session of its own
+  there. Each element reads its session in its harness. While it answers in
+  one, the other waits.
 - Pi reaches the node's MCP with the agent's own token, and its model calls go
   to the provider am.toml names under `[agent.root.pi]`.
 - The node gets Pi as it gets Claude Code, pinned by the build and nothing
@@ -131,9 +131,8 @@ process. It starts it, resumes it and stops it.
 
 "LETS SAY FOR DEVELOPMENT WEE USE"
 
-- In Pi it runs the model am.toml names, which need not be Claude: during
-  development, `openai/gpt-oss-120b` through OpenRouter. In Claude Code only
-  Claude can be it.
+- In Pi it runs the model am.toml names under `[agent.root.pi]`, Opus or
+  Fable as in Claude Code.
 
 ## First uses
 
