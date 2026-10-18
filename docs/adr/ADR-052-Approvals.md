@@ -3,14 +3,13 @@
 Date: 2026-10-10
 Status: Proposed
 
-"There is an interactive element that I want to prototype here. It lets me approve something."
+"There is an interactive element, 
+It lets me approve something."
 
 
 "approvals are attestations obviously"
 
 "And only through it's element"
-
-"approvals is ROOT only for now"
 
 "APPROVALS INTEGRATE DIRECTLY WITH THE GITHUB APP"
 
