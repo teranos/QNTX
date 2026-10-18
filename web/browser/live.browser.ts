@@ -148,7 +148,10 @@ async function unreachable(page: Page, id: string): Promise<string[]> {
             }
             const r = node.getBoundingClientRect();
             if (r.width === 0 && r.height === 0) return false;
-            return r.left < edge.left - 1 || r.right > edge.right + 1 || node.scrollWidth > node.clientWidth + 1;
+            // Cut off from below too: a box that hides what is taller than it, and is not a scroller.
+            const y = getComputedStyle(node).overflowY;
+            const cut = (y === 'hidden' || y === 'clip') && node.scrollHeight > node.clientHeight + 1;
+            return r.left < edge.left - 1 || r.right > edge.right + 1 || node.scrollWidth > node.clientWidth + 1 || cut;
         });
         const innermost = reaching.filter((node) => !reaching.some((other) => other !== node && node.contains(other)));
         const dead = element.querySelector<HTMLElement>('[data-too-wide]');
@@ -162,7 +165,8 @@ async function unreachable(page: Page, id: string): Promise<string[]> {
             const holder = node.parentElement ? getComputedStyle(node.parentElement) : null;
             const laid = `${own.display} ${own.position} ws=${own.whiteSpace} w=${own.width} minw=${own.minWidth} flex=${own.flex}` +
                 (holder ? ` | in ${holder.display}${holder.display.includes('grid') ? ` cols=${holder.gridTemplateColumns}` : ''} ws=${holder.whiteSpace}` : '');
-            const line = `${node.tagName.toLowerCase()}${classes} ${Math.round(r.left - edge.left)}..${Math.round(r.right - edge.left)} in ${Math.round(edge.width)}, scrolls ${node.scrollWidth} in ${node.clientWidth} [${laid}]`;
+            const tall = node.scrollHeight > node.clientHeight + 1 && (own.overflowY === 'hidden' || own.overflowY === 'clip') ? `, cut ${node.clientHeight} of ${node.scrollHeight} high` : '';
+            const line = `${node.tagName.toLowerCase()}${classes} ${Math.round(r.left - edge.left)}..${Math.round(r.right - edge.left)} in ${Math.round(edge.width)}, scrolls ${node.scrollWidth} in ${node.clientWidth}${tall} [${laid}]`;
             said.set(line, (said.get(line) ?? 0) + 1);
         }
         return [
