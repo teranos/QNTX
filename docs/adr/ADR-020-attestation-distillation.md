@@ -2,7 +2,7 @@
 
 Date: 2026-05-12
 Updated: 2026-09-13 — what a sigma has to be before 1.0.0
-Status: Accepted,
+Status: Accepted
 
 ## Context
 
