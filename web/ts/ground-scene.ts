@@ -128,6 +128,8 @@ export interface Comet {
     /** How often main moved in the last week. */
     moved: number;
     state: 'observed' | 'observing' | 'unobserved';
+    /** Each platform's ground the node keeps of it, as am ground answers it. */
+    builds?: Array<{ platform: string; digest: string; bytes: number; at: string }>;
 }
 
 /** The height the comet band is drawn at, and the most comets drawn in it. */

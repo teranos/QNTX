@@ -20,11 +20,11 @@ describe('Comet - Tim', () => {
 });
 
 describe('Comet - Spike', () => {
-    // What is not in the node yet is said on tape, not offered as a button.
+    // What the element cannot do is said on tape, not offered as a button: the node observes, the element does not.
     test('nothing here observes: the limit says so and no button is drawn', () => {
         const body = cometBody({ repo: 'teranos/new', built: false, size: 0, moved: 2, state: 'unobserved' });
         expect(body.querySelector('.comet-state')?.textContent).toBe('Not observed.');
-        expect(body.querySelector('.gr-limit')?.textContent).toContain('not in the node yet');
+        expect(body.querySelector('.gr-limit')?.textContent).toContain('Nothing here starts or stops one.');
         expect(body.querySelector('button')).toBeNull();
     });
 });

@@ -225,7 +225,7 @@ func (s *QNTXServer) amGround(ctx context.Context, _ sigil.Sent) (any, *protocol
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	comets, err := comet.Held(dir)
+	comets, err := comet.Held(dir, func(owner, repo string) (int, error) { return s.movedThisWeek(ctx, owner, repo) })
 	if err != nil {
 		s.logger.Errorw("am ground could not read the comets the node keeps", "dir", dir, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the comets the node keeps did not read: " + err.Error()}

@@ -37,17 +37,27 @@ func TestAmGroundNamesEachCometTheNodeKeeps(t *testing.T) {
 	// A build still landing is not a comet yet.
 	require.NoError(t, os.WriteFile(kept+".new", []byte("half"), 0o755))
 
-	comets, err := Held(dir)
+	moved := func(owner, repo string) (int, error) {
+		assert.Equal(t, "abcd-nl/grove", owner+"/"+repo)
+		return 12, nil
+	}
+	comets, err := Held(dir, moved)
 	require.NoError(t, err)
 	require.Len(t, comets, 1)
-	assert.Equal(t, "abcd-nl/grove", comets[0]["repository"])
-	assert.Equal(t, "aarch64-darwin", comets[0]["platform"])
-	assert.Equal(t, int64(7), comets[0]["size"])
 	sum := sha256.Sum256([]byte("a comet"))
-	assert.Equal(t, hex.EncodeToString(sum[:]), comets[0]["digest"])
+	// As the Ground element draws a comet: the repository, built, observed, and how often main moved.
+	assert.Equal(t, "abcd-nl/grove", comets[0].Repo)
+	assert.True(t, comets[0].Built)
+	assert.Equal(t, "observed", comets[0].State)
+	assert.Equal(t, 12, comets[0].Moved)
+	assert.InDelta(t, 7.0/(1<<20), comets[0].Size, 1e-12)
+	require.Len(t, comets[0].Builds, 1)
+	assert.Equal(t, "aarch64-darwin", comets[0].Builds[0].Platform)
+	assert.Equal(t, hex.EncodeToString(sum[:]), comets[0].Builds[0].Digest)
+	assert.Equal(t, int64(7), comets[0].Builds[0].Bytes)
 
 	// A node that has built none keeps none, and says so as an empty list.
-	none, err := Held(filepath.Join(dir, "nothing"))
+	none, err := Held(filepath.Join(dir, "nothing"), moved)
 	require.NoError(t, err)
 	assert.Empty(t, none)
 }
@@ -154,7 +164,7 @@ func TestAPushRebuildsTheCometsItMoves(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
 		require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
 	}
-	kept, err := Kept(dir)
+	kept, err := Names(dir)
 	require.NoError(t, err)
 	require.Len(t, kept, 3)
 

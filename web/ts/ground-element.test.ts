@@ -116,6 +116,26 @@ describe('Ground - Tim', () => {
     });
 });
 
+describe('Ground - Tim comets', () => {
+    // "which is for all of this to be visible in the existing Element in the ui, remvoing the coment crosshatches"
+    test('a comet the node keeps is drawn real, its repository and size over its head', () => {
+        const { body, scene } = drawn();
+        const fall = body.querySelector('.gr-comet')!;
+        expect(fall.classList.contains('gr-unreal')).toBe(true);
+        // As am ground answers it (server/comet Repository).
+        scene.does({
+            ...does,
+            comets: [{
+                repo: 'sbvh-nl/grove', built: true, size: 0.6, moved: 3, state: 'observed',
+                builds: [{ platform: 'aarch64-darwin', digest: 'c074e2b8', bytes: 596736, at: '2026-10-18T22:03:21Z' }],
+            }],
+        });
+        expect(fall.classList.contains('gr-unreal')).toBe(false);
+        expect(texts(body, '.gr-comet-name')).toEqual(['sbvh-nl/grove · 0.6 MB']);
+        expect(fall.querySelector('.gr-limit')?.textContent).toContain('starts none');
+    });
+});
+
 describe('Ground - Spike', () => {
     // "IN THE REAL UI IT WILL BE CROSSHATCHED OUT, EACH NOTHING THEIR LIMITATION WITH REGARDS TO WHAT GROUND OR SKY DOES"
     test('what is not real yet is hatched, and says its limitation', () => {

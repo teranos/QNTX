@@ -3,9 +3,13 @@ package server
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/teranos/QNTX/internal/forge"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/comet"
+	errors "github.com/teranos/sacred-error"
 )
 
 // HandleComet is the comet route (ADR-050); package comet answers it.
@@ -32,7 +36,7 @@ func (s *QNTXServer) cometsMovedBy(push forge.Push) []string {
 		logger.Errorw("A push arrived and the comets were not looked for", "repo", push.Repo.String(), "error", err)
 		return []string{}
 	}
-	kept, err := comet.Kept(dir)
+	kept, err := comet.Names(dir)
 	if err != nil {
 		logger.Errorw("A push arrived and the comets the node keeps were not read", "repo", push.Repo.String(), "dir", dir, "error", err)
 		return []string{}
@@ -46,6 +50,27 @@ func (s *QNTXServer) cometsMovedBy(push forge.Push) []string {
 		rebuilding = append(rebuilding, n.Key())
 	}
 	return rebuilding
+}
+
+// movedThisWeek is how often owner/repo's default branch moved in the last week: its commits since then, by the node's GitHub App.
+func (s *QNTXServer) movedThisWeek(ctx context.Context, owner, repo string) (int, error) {
+	since := time.Now().UTC().Add(-7 * 24 * time.Hour).Format(time.RFC3339)
+	moved := 0
+	for page := int64(1); ; page++ {
+		said, err := s.gitHubService().ListCommits(ctx, &protocol.GitHubListCommitsRequest{
+			Namespace: auth.NamespaceSystem, Owner: owner, Repo: repo, Since: since, PerPage: 100, Page: page,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if !said.Success {
+			return 0, errors.Newf("GitHub did not list the commits of %s/%s since %s: %s", owner, repo, since, said.Error)
+		}
+		moved += len(said.Items)
+		if len(said.Items) < 100 {
+			return moved, nil
+		}
+	}
 }
 
 // cometNode is the node as a comet's build asks it: plugin_build.go's fetching and running.

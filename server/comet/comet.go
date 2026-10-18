@@ -88,14 +88,41 @@ func Path(n Name) (string, error) {
 	return filepath.Join(dir, n.Owner, n.Repo, n.Platform, "ground"), nil
 }
 
-// Held is each comet kept under dir, as am ground says it: its repository, platform, digest, size and when it was built.
-func Held(dir string) ([]map[string]any, error) {
-	found, err := filepath.Glob(filepath.Join(dir, "*", "*", "*", "ground"))
+// Repository is one repository as a comet, as the Ground element draws it (web/ts/ground-scene.ts Comet):
+// the grounds built from it, the heaviest's size in MB, and how often its default branch moved in the last week.
+type Repository struct {
+	Repo   string  `json:"repo"`
+	Built  bool    `json:"built"`
+	Size   float64 `json:"size"`
+	Moved  int     `json:"moved"`
+	State  string  `json:"state"`
+	Builds []Built `json:"builds"`
+}
+
+// Built is one platform's ground built from a repository: its sha256 digest, its bytes and when it was built.
+type Built struct {
+	Platform string `json:"platform"`
+	Digest   string `json:"digest"`
+	Bytes    int64  `json:"bytes"`
+	At       string `json:"at"`
+}
+
+// "a comet can be in the observed state"
+
+// observed is a comet the node keeps: a push that moves it rebuilds it, so when main moves, ground moves.
+const observed = "observed"
+
+// Held is each repository with a comet kept under dir, as am ground says it, its builds by platform.
+// moved is how often the repository's default branch moved in the last week, asked of GitHub.
+func Held(dir string, moved func(owner, repo string) (int, error)) ([]Repository, error) {
+	names, err := Names(dir)
 	if err != nil {
-		return nil, errors.Wrapf(err, "the comets under %s were not listed", dir)
+		return nil, err
 	}
-	comets := make([]map[string]any, 0, len(found))
-	for _, path := range found {
+	repos := []Repository{}
+	at := map[string]int{}
+	for _, n := range names {
+		path := filepath.Join(dir, n.Owner, n.Repo, n.Platform, "ground")
 		info, err := os.Stat(path)
 		if err != nil {
 			return nil, errors.Wrapf(err, "the comet at %s was not read", path)
@@ -104,22 +131,25 @@ func Held(dir string) ([]map[string]any, error) {
 		if err != nil {
 			return nil, err
 		}
-		platform := filepath.Dir(path)
-		repo := filepath.Dir(platform)
-		owner := filepath.Dir(repo)
-		comets = append(comets, map[string]any{
-			"repository": filepath.Base(owner) + "/" + filepath.Base(repo),
-			"platform":   filepath.Base(platform),
-			"digest":     digest,
-			"size":       info.Size(),
-			"built":      info.ModTime().UTC().Format(time.RFC3339),
-		})
+		key := n.Owner + "/" + n.Repo
+		i, seen := at[key]
+		if !seen {
+			count, err := moved(n.Owner, n.Repo)
+			if err != nil {
+				return nil, errors.Wrapf(err, "how often %s moved was not read", key)
+			}
+			i = len(repos)
+			at[key] = i
+			repos = append(repos, Repository{Repo: key, Built: true, Moved: count, State: observed, Builds: []Built{}})
+		}
+		repos[i].Builds = append(repos[i].Builds, Built{Platform: n.Platform, Digest: digest, Bytes: info.Size(), At: info.ModTime().UTC().Format(time.RFC3339)})
+		repos[i].Size = max(repos[i].Size, float64(info.Size())/(1<<20))
 	}
-	return comets, nil
+	return repos, nil
 }
 
-// Kept is each comet kept under dir, by name.
-func Kept(dir string) ([]Name, error) {
+// Names is each comet kept under dir, by name.
+func Names(dir string) ([]Name, error) {
 	found, err := filepath.Glob(filepath.Join(dir, "*", "*", "*", "ground"))
 	if err != nil {
 		return nil, errors.Wrapf(err, "the comets under %s were not listed", dir)
