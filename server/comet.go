@@ -110,13 +110,20 @@ func (s *QNTXServer) HandleComet(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		digest, err := fileDigest(path)
+		digest, err := cometDigest(path)
 		if errors.Is(err, os.ErrNotExist) {
 			writeError(w, http.StatusNotFound, "no comet of "+owner+"/"+repo+" has been built: POST /comet/"+owner+"/"+repo+" builds it")
 			return
 		}
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if r.URL.Query().Has("digest") {
+			w.Header().Set("Content-Type", "text/plain")
+			if _, err := io.WriteString(w, digest); err != nil {
+				s.logger.Errorw("the comet's digest was not written to its asker", "comet", owner+"/"+repo, "error", err)
+			}
 			return
 		}
 		w.Header().Set("X-Comet-Digest", digest)
@@ -208,7 +215,28 @@ func (s *QNTXServer) buildComet(ctx context.Context, project buildSource) (strin
 	if err := os.Rename(staged, kept); err != nil {
 		return "", errors.Wrapf(err, "failed to put the comet of %s in place at %s", project.String(), kept)
 	}
+	if err := keepDigest(kept); err != nil {
+		return "", err
+	}
 	return kept, nil
+}
+
+// keepDigest writes the comet's sha256 beside it, once, when it is built.
+func keepDigest(path string) error {
+	digest, err := fileDigest(path)
+	if err != nil {
+		return err
+	}
+	return errors.Wrapf(os.WriteFile(path+".digest", []byte(digest), 0o644), "failed to write the digest beside %s", path)
+}
+
+// cometDigest is the digest kept beside a comet: asked every few seconds, never hashed again.
+func cometDigest(path string) (string, error) {
+	said, err := os.ReadFile(path + ".digest")
+	if err != nil {
+		return "", errors.Wrapf(err, "no digest is kept beside %s", path)
+	}
+	return string(said), nil
 }
 
 // fileDigest is a file's sha256, in hex.

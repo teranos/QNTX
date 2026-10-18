@@ -55,6 +55,7 @@ func TestACometIsServedWithItsDigestAndAskedForByIt(t *testing.T) {
 	kept := filepath.Join(home, ".qntx", "comets", "abcd-nl", "grove", "ground")
 	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
 	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+	require.NoError(t, keepDigest(kept))
 	sum := sha256.Sum256([]byte("a comet"))
 	s := &QNTXServer{}
 
@@ -74,6 +75,30 @@ func TestACometIsServedWithItsDigestAndAskedForByIt(t *testing.T) {
 	none := httptest.NewRecorder()
 	s.HandleComet(none, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/other", nil))
 	assert.Equal(t, http.StatusNotFound, none.Code)
+
+	// The digest alone, as text: what ground reads every few seconds.
+	digest := httptest.NewRecorder()
+	s.HandleComet(digest, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove?digest", nil))
+	assert.Equal(t, http.StatusOK, digest.Code)
+	assert.Equal(t, hex.EncodeToString(sum[:]), digest.Body.String())
+}
+
+func TestACometsDigestIsWrittenOnceBesideIt(t *testing.T) {
+	dir := t.TempDir()
+	kept := filepath.Join(dir, "ground")
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+	sum := sha256.Sum256([]byte("a comet"))
+
+	require.NoError(t, keepDigest(kept))
+	written, err := os.ReadFile(kept + ".digest")
+	require.NoError(t, err)
+	assert.Equal(t, hex.EncodeToString(sum[:]), string(written))
+
+	// Read from beside it, not hashed again.
+	require.NoError(t, os.WriteFile(kept+".digest", []byte("said"), 0o644))
+	said, err := cometDigest(kept)
+	require.NoError(t, err)
+	assert.Equal(t, "said", said)
 }
 
 func TestCometSandIsGroundsControlsAndTheProjectsAlone(t *testing.T) {
