@@ -49,7 +49,7 @@ every tool. The reach table names it and the list of ROOT, and the handler
 refuses a token however ROOT the token is, and a session that names nobody. The actor on
 the line is the route the human logged in by.
 
-The node merges as the App's installation where the repository is (ADR-043),
+The node merges as the App's installation where the repository is ([[ADR-043-github-service]]),
 at the head the human saw: GitHub refuses a merge whose `sha` moved. The merge is written down by the human.
 
 ## The PR story
