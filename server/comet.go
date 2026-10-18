@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -30,24 +31,42 @@ var cometGround = buildSource{Owner: "teranos", Repo: "ground", Branch: "main"}
 // building since when, or why it failed. A comet kept has no entry.
 var cometBuilds sync.Map
 
-// cometOf is the repository a /comet/{owner}/{repo} path names.
-func cometOf(path string) (string, string, error) {
+// "A comet is one sand for one user, one project and one platform."
+
+// cometPlatforms are the systems ground's flake names, as ground names the one it was built for.
+var cometPlatforms = map[string]bool{"x86_64-linux": true, "aarch64-linux": true, "x86_64-darwin": true, "aarch64-darwin": true}
+
+// nodePlatform is the system this node builds natively, as ground's flake names it.
+func nodePlatform() (string, error) {
+	arch, ok := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[runtime.GOARCH]
+	platform := arch + "-" + runtime.GOOS
+	if !ok || !cometPlatforms[platform] {
+		return "", errors.Newf("this node runs %s/%s, which builds no platform ground's flake names", runtime.GOOS, runtime.GOARCH)
+	}
+	return platform, nil
+}
+
+// cometOf is the repository and platform a /comet/{owner}/{repo}/{platform} path names.
+func cometOf(path string) (string, string, string, error) {
 	rest, ok := strings.CutPrefix(path, "/comet/")
-	refused := errors.Newf("%s names no repository: a comet is /comet/{owner}/{repo}", path)
+	refused := errors.Newf("%s names no comet: a comet is /comet/{owner}/{repo}/{platform}", path)
 	if !ok || strings.HasPrefix(rest, "/") || strings.HasSuffix(rest, "/") {
-		return "", "", refused
+		return "", "", "", refused
 	}
 	parts := strings.Split(rest, "/")
-	if len(parts) != 2 {
-		return "", "", refused
+	if len(parts) != 3 {
+		return "", "", "", refused
 	}
 	for _, part := range parts {
 		// A name that is only dots climbs out of the comets directory.
 		if strings.Trim(part, ".") != part {
-			return "", "", refused
+			return "", "", "", refused
 		}
 	}
-	return parts[0], parts[1], nil
+	if !cometPlatforms[parts[2]] {
+		return "", "", "", errors.Newf("%s names %s, which is not a platform ground's flake names: x86_64-linux, aarch64-linux, x86_64-darwin or aarch64-darwin", path, parts[2])
+	}
+	return parts[0], parts[1], parts[2], nil
 }
 
 // cometDeclaration is the one project block a comet's sand holds besides ground's own controls.
@@ -64,18 +83,18 @@ func cometsDir() (string, error) {
 	return filepath.Join(home, ".qntx", "comets"), nil
 }
 
-// cometPath is where a project's comet is kept on the node.
-func cometPath(owner, repo string) (string, error) {
+// cometPath is where a project's comet for one platform is kept on the node.
+func cometPath(owner, repo, platform string) (string, error) {
 	dir, err := cometsDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, owner, repo, "ground"), nil
+	return filepath.Join(dir, owner, repo, platform, "ground"), nil
 }
 
-// heldComets is each comet kept under dir, as am ground says it: its repository, digest, size and when it was built.
+// heldComets is each comet kept under dir, as am ground says it: its repository, platform, digest, size and when it was built.
 func heldComets(dir string) ([]map[string]any, error) {
-	found, err := filepath.Glob(filepath.Join(dir, "*", "*", "ground"))
+	found, err := filepath.Glob(filepath.Join(dir, "*", "*", "*", "ground"))
 	if err != nil {
 		return nil, errors.Wrapf(err, "the comets under %s were not listed", dir)
 	}
@@ -89,10 +108,12 @@ func heldComets(dir string) ([]map[string]any, error) {
 		if err != nil {
 			return nil, err
 		}
-		repo := filepath.Base(filepath.Dir(path))
-		owner := filepath.Base(filepath.Dir(filepath.Dir(path)))
+		platform := filepath.Dir(path)
+		repo := filepath.Dir(platform)
+		owner := filepath.Dir(repo)
 		comets = append(comets, map[string]any{
-			"repository": owner + "/" + repo,
+			"repository": filepath.Base(owner) + "/" + filepath.Base(repo),
+			"platform":   filepath.Base(platform),
 			"digest":     digest,
 			"size":       info.Size(),
 			"built":      info.ModTime().UTC().Format(time.RFC3339),
@@ -103,15 +124,15 @@ func heldComets(dir string) ([]map[string]any, error) {
 
 // HandleComet serves a project's comet (GET), its digest (GET ?digest, or HEAD), or builds it (POST).
 func (s *QNTXServer) HandleComet(w http.ResponseWriter, r *http.Request) {
-	owner, repo, err := cometOf(r.URL.Path)
+	owner, repo, platform, err := cometOf(r.URL.Path)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	key := owner + "/" + repo
+	key := owner + "/" + repo + "/" + platform
 	// HEAD is ground asking whether its comet moved: the digest, and none of the bytes.
 	if r.Method == http.MethodGet || r.Method == http.MethodHead {
-		path, err := cometPath(owner, repo)
+		path, err := cometPath(owner, repo, platform)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -138,10 +159,20 @@ func (s *QNTXServer) HandleComet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodPost {
+		native, err := nodePlatform()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		// A Darwin comet built on the box links Apple's stubs (ADR-050, The stubs).
+		if platform != native {
+			writeError(w, http.StatusUnprocessableEntity, "this node builds "+native+" natively, and a comet for "+platform+" links Apple's stubs, which this node does not hold yet (ADR-050, The stubs)")
+			return
+		}
 		cometBuilds.Store(key, "building since "+time.Now().UTC().Format(time.RFC3339))
 		source := buildSource{Owner: owner, Repo: repo}
 		sacred.Go("comet.build."+key, func() {
-			if err := s.buildComet(s.ctx, source); err != nil {
+			if err := s.buildComet(s.ctx, source, platform); err != nil {
 				cometBuilds.Store(key, "its last build failed: "+err.Error())
 				return
 			}
@@ -155,7 +186,7 @@ func (s *QNTXServer) HandleComet(w http.ResponseWriter, r *http.Request) {
 
 // buildComet builds ground with its own controls and the project's, at both repositories' latest, and keeps it.
 // Each comet builds in a directory of its own, emptied when its next build begins: a failed build stays to be read until then.
-func (s *QNTXServer) buildComet(ctx context.Context, project buildSource) error {
+func (s *QNTXServer) buildComet(ctx context.Context, project buildSource, platform string) error {
 	builds, err := buildsDir()
 	if err != nil {
 		return err
@@ -167,11 +198,11 @@ func (s *QNTXServer) buildComet(ctx context.Context, project buildSource) error 
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s to build the comet of %s in", work, project.String())
 	}
-	return s.buildCometIn(ctx, project, work)
+	return s.buildCometIn(ctx, project, platform, work)
 }
 
 // buildCometIn builds the comet in work and keeps it.
-func (s *QNTXServer) buildCometIn(ctx context.Context, project buildSource, work string) error {
+func (s *QNTXServer) buildCometIn(ctx context.Context, project buildSource, platform, work string) error {
 	src := filepath.Join(work, "ground")
 	checkout := filepath.Join(work, "project")
 	for _, got := range []struct {
@@ -212,7 +243,7 @@ func (s *QNTXServer) buildCometIn(ctx context.Context, project buildSource, work
 		return errors.Wrapf(err, "the comet of %s did not build", project.String())
 	}
 
-	kept, err := cometPath(project.Owner, project.Repo)
+	kept, err := cometPath(project.Owner, project.Repo, platform)
 	if err != nil {
 		return err
 	}
