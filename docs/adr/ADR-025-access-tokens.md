@@ -2,7 +2,6 @@
 
 Date: 2026-07-20
 Status: Accepted
-Target: v0.30.0
 
 ## Context
 
@@ -15,6 +14,7 @@ Add a second auth path: **access tokens**, presented as `Authorization: Bearer <
 - Persisted per backend: on SQLite via a new `access_tokens` table (`db/sqlite/migrations/`); on parquet as one object per token under `<location>/system/access_tokens/`, matching the "small config" shape in ADR-024. Only the SHA-256 hash is stored.
 - Raw token is 32 random bytes, hex-encoded, `qntx_`-prefixed. Shown once at creation.
 - Issued from a passkey-authenticated session via `/auth/tokens` (POST create / GET list / DELETE revoke / POST enable). Bearer tokens cannot mint new tokens.
+- Issued to a machine with no browser through the device flow (RFC 8628): `POST /auth/device` with a label, the person approves at `/auth/device/approve` with their passkey, and the machine polls the token endpoint with `grant_type=urn:ietf:params:oauth:grant-type:device_code`. The token's DID is its own client, admitted as the person, for 30 days; it lands in the same store as one minted at `/auth/tokens` (`server/auth/device.go`).
 - `Handler.Middleware` gains a bearer-header path before the cookie check.
 - UI surfaces create / list / revoke / enable.
 - Rejected bearer attempts are recorded per token, so a revoked token shows whether it is still being presented.
