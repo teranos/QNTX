@@ -4,6 +4,7 @@
 
 import createREGL from 'regl';
 import { log, SEG } from './logger';
+import { meterLoop } from './loop-metrics';
 
 // The door is a page someone is reading, not a game. Thirty is plenty and it
 // halves the work.
@@ -376,7 +377,17 @@ export function startField(canvas: HTMLCanvasElement): Field {
         canvas.height = tall;
     }
 
+    // "The suspicion that it keeps persisting on the background." What this
+    // loop costs is counted here and said when it stops, and by loop-metrics
+    // when the page is hidden or left; nothing about how it runs depends on it.
+    const meterOf = meterLoop('door.field', () => ({
+        'door.buffer': `${canvas.width}x${canvas.height}`,
+        'door.dpr': window.devicePixelRatio,
+        'door.depth': fullFloat ? 'float' : 'half float',
+    }));
+
     const loop = regl.frame(({ time }) => {
+        meterOf.called();
         if (time - last < 1 / FPS) return;
         const step = lastTime === 0 ? 0 : time - lastTime;
         lastTime = time;
@@ -421,8 +432,10 @@ export function startField(canvas: HTMLCanvasElement): Field {
             regl.clear({ framebuffer: store, color: [0, 0, 0, 1] });
         }
 
+        const drawing = performance.now();
         gather();
         present();
+        meterOf.ran(performance.now() - drawing, canvas.getClientRects().length > 0);
     });
 
     return {
@@ -479,6 +492,7 @@ export function startField(canvas: HTMLCanvasElement): Field {
             held = next;
         },
         stop() {
+            meterOf.report('stop');
             loop.cancel();
             regl.destroy();
         },
