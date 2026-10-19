@@ -10,6 +10,7 @@
  */
 
 import * as Sentry from '@sentry/browser';
+import { everyMs } from './trace-every';
 
 /** What the build stamped into the page. build.ts writes both. */
 interface Stamped {
@@ -33,16 +34,24 @@ export function leavingFrom(stamped: Stamped): Leaving | null {
     return { dsn, release: stamped.__QNTX_WEB_BUILD__?.qntx ?? 'unknown' };
 }
 
+/** One trace in ten minutes, in milliseconds. */
+const TRACE_EVERY_MS = 600000;
+
 /** Starts the client, once, before anything else runs. Off is a no-op. */
 export function leave(stamped: Stamped): Leaving | null {
     const going = leavingFrom(stamped);
     if (!going) return null;
+    const sampleTrace = everyMs(TRACE_EVERY_MS, () => Date.now());
     Sentry.init({
         dsn: going.dsn,
         release: going.release,
         // The page says which door it is; a hostname is the deployment.
         environment: window.location.hostname,
         sendDefaultPii: false,
+        // "Let's say per 10 min": a trace is sampled once in ten minutes. A
+        // trace that is part of a sampled one goes with it.
+        integrations: [Sentry.browserTracingIntegration({ enableLongAnimationFrame: true })],
+        tracesSampler: (context) => context.parentSampled ?? sampleTrace(),
     });
     return going;
 }
