@@ -78,7 +78,7 @@
           },
           "id": "gate",
           "if": "steps.node.outcome == 'success'",
-          "name": "The branch's page, answered live by the node as its CI user, on Pixel 7, iPhone 15 and desktop",
+          "name": "The branch's page, answered live by the node as its CI user, on Pixel 7, iPhone 15, desktop and 320 px",
           "run": "cd web && bunx playwright test -c browser live.browser.ts --workers 1"
         },
         {

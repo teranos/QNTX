@@ -26,6 +26,9 @@ export default defineConfig({
         // WebKit: the engine Chromium's emulation is not.
         { name: 'iphone', use: { ...devices['iPhone 15'] } },
         { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+        // "this doc is important for us"
+        // WCAG 2.2, 1.4.10 Reflow: content at 320 CSS px, a desktop at 400%.
+        { name: 'reflow', use: { ...devices['Desktop Chrome'], viewport: { width: 320, height: 640 } } },
     ],
     webServer: {
         command: 'bun browser/serve.ts',

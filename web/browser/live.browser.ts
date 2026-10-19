@@ -208,6 +208,42 @@ async function misheld(page: Page, id: string): Promise<string[]> {
     });
 }
 
+// "this doc is important for us"
+
+/** Each target in the element smaller than WCAG 2.2's 2.5.8 allows, where its 24 CSS px circle meets another target. */
+async function undersized(page: Page, id: string): Promise<string[]> {
+    return page.locator(`[data-element-id="${id}"]`).evaluate((element) => {
+        const MIN = 24;
+        const name = (node: HTMLElement) => `${node.tagName.toLowerCase()}${typeof node.className === 'string' && node.className !== '' ? `.${node.className.split(' ').filter((c) => c !== '').join('.')}` : ''}`;
+        const targets = Array.from(element.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, [role="button"]')).filter((node) => {
+            const r = node.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) return false;
+            // "Inline": a target in a sentence is sized by the line it stands in.
+            return getComputedStyle(node).display !== 'inline';
+        });
+        const small = (r: DOMRect) => r.width < MIN || r.height < MIN;
+        const centre = (r: DOMRect) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+        const said: string[] = [];
+        for (const target of targets) {
+            const r = target.getBoundingClientRect();
+            if (!small(r)) continue;
+            const c = centre(r);
+            // "Spacing": its circle does not meet another target, nor the circle of another undersized one.
+            const meets = targets.find((other) => {
+                if (other === target || target.contains(other) || other.contains(target)) return false;
+                const o = other.getBoundingClientRect();
+                const dx = Math.max(o.left - c.x, 0, c.x - o.right);
+                const dy = Math.max(o.top - c.y, 0, c.y - o.bottom);
+                if (Math.hypot(dx, dy) < MIN / 2) return true;
+                const oc = centre(o);
+                return small(o) && Math.hypot(oc.x - c.x, oc.y - c.y) < MIN;
+            });
+            if (meets) said.push(`target ${name(target)} ${Math.round(r.width)}×${Math.round(r.height)}, under ${MIN}×${MIN}, its circle meets ${name(meets)}`);
+        }
+        return said;
+    });
+}
+
 test('every element, live, can be reached whole', async ({ page }) => {
     expect(API, 'QNTX_GATE_API names no node: the live gate has nothing to ask').not.toBe('');
     expect(TOKEN, 'QNTX_GATE_TOKEN is empty: the live gate has no user').not.toBe('');
@@ -272,7 +308,7 @@ test('every element, live, can be reached whole', async ({ page }) => {
             // An element that asks the node all the time is never quiet: it is measured once the wait is over.
             await quiet(page, wire);
             // What the node refused while it opened: what that call would have drawn was never measured.
-            const past = [...await unreachable(page, id), ...await misheld(page, id), ...new Set(wire.refused.map((call) => `the node refused ${call}`))];
+            const past = [...await unreachable(page, id), ...await misheld(page, id), ...await undersized(page, id), ...new Set(wire.refused.map((call) => `the node refused ${call}`))];
             if (past.length > 0) bad[id] = past;
         } catch (err: unknown) {
             // One that never stands is named with the rest, and the next one still opens.
