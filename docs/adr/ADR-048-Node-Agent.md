@@ -15,7 +15,7 @@ QNTX interacts with a Node Agent; Claude Code in this case.
 - To A2A an agent is described by its Agent Card, and its skills are what it
   can perform [[ADR-039-Sigils]].
 
-## An agent per model
+## An agent per model - Nope
 
 "I feel like Opus and Fable are two distinct identities"
 
