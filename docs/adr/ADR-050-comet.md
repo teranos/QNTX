@@ -47,15 +47,18 @@ Even faster when the builds are done by QNTX as Comet
 - For a Darwin target LDC runs `cc -target <triple>` and adds
   `-lpthread -lm -lobjc`; it reads no SDK and no sysroot (ldc
   driver/tool.cpp, driver/linker-gcc.cpp). With -betterC it links no druntime
-  and no Phobos (driver/linker.cpp). ground is -betterC and links sqlite3 and
-  curl (ground dub.json).
+  and no Phobos (driver/linker.cpp). ground is -betterC and links sqlite3,
+  curl and git2 (ground dub.json).
 - A Darwin build on the box takes clang as cc, ld64.lld as linker, and Apple's
   link stubs: libSystem, libobjc, libsqlite3, libcurl, libpthread and libm as
   .tbd, with SDKSettings.json. nixpkgs lld 21.1.8 ships ld64.lld. The stubs
   are 15 MB of text under MacOSX.sdk/usr/lib of Xcode Command Line Tools.
-- Unverified: whether macOS runs a binary ld64.lld signed, on first exec. The
-  binary ground builds today is ad-hoc, linker-signed by Apple's ld.
-  `codesign -s -` runs on the machine that lands it.
+- macOS runs a binary ld64.lld signed, on first exec: grove's comet, linked for
+  aarch64-darwin on x86_64-linux, ran on the operator's M1 on 2026-10-19,
+  flags adhoc and linker-signed. `codesign -s -` runs on the machine that lands
+  it (ground source/comet.d).
+- No SDK carries libgit2. An aarch64-darwin comet links the libgit2 the
+  operator's machine's ground loads, from its nix store.
 - Linked against Apple's stubs, the binary loads /usr/lib's sqlite3 and curl,
   not the two Nix store dylibs the current binary names.
 - ground's ci/ci.nix builds aarch64-darwin on macos-latest for tags. The
@@ -137,6 +140,10 @@ Even faster when the builds are done by QNTX as Comet
 - The box's role reads the bootstrap bucket the deploy repository fills, and
   the reconciler already copies from it with `aws s3 cp --recursive`. The
   stubs go there as a build input.
+- The stubs are `sdk/MacOSX26.1.sdk` and `sdk/aarch64-darwin/libgit2.dylib` in
+  the bootstrap bucket (the deploy repository's infra/macos-link-stubs.tf). The reconciler
+  syncs them to the node's `~/.qntx/darwin-stubs` (infra/bootstrap/apply.sh),
+  where server/comet links against them.
 
 ## Rituals
 
@@ -152,28 +159,42 @@ Even faster when the builds are done by QNTX as Comet
 - The node runs Claude Code with `-p` (run.go), not `--bg`. The box's role
   writes one plugin's SSM parameters and no other.
 
-## Pi
+## Done
 
-"and another thing i want, but that is a way bigger item, is for ground to be usage usable with coding agent pi"
+- `/comet/{owner}/{repo}/{platform}`: POST builds, GET serves with its digest,
+  `?digest` and HEAD answer the digest alone (server/comet).
+- The Darwin build on the box, end to end, with the stubs from S3: grove's
+  aarch64-darwin comet, built on q, landed on the operator's machine.
+- A hook per repository: the universal ground hands a repository's hooks to
+  the comet landed for it (ground source/comet.d, main.d).
+- Landing: sky pulls the digest every five seconds and renames a checked
+  comet over the one there (ground source/sky.d).
+- A push to a project's default branch, or to ground's main, rebuilds the
+  comets it moves.
+- Comet on am ground, and the Comet stratum real.
+- ground for the Node Agent: its settings.json runs it, and no turn is said to
+  the agent until it stands. On q its rows name `ground comet a1ac2c0
+  agent:root` and reached the node.
+- Under `-p` Claude Code waits for an asyncRewake hook to end: q's agent turn
+  held on its sky's day-long timeout. An agent's sky is spawned apart.
 
-- ground speaks Claude Code's hook protocol: the event's JSON on stdin, exit
-  codes, systemMessage and hookSpecificOutput. The node reads a transcript by
-  mapping speakers to those events (server/transcripts.go).
-- Pi loads TypeScript extensions from its extensions directory or `-e <path>`.
-  `pi.on("tool_call")` mutates input or blocks; `before_agent_start` carries
-  the prompt; `session_start` and `agent_end` exist; `pi.sendMessage()` puts
-  content into model context; sessions are JSONL under the session dir (Pi
-  docs: extensions.md, cli.md, session-format.md). The node runs Pi with
-  PI_CODING_AGENT_DIR under the agent's home in `--mode json`
-  (internal/pi/run.go).
+- The sand on the node, configured by a person: a POST names the machine
+  repository, and its controls/ fold in beside ground's own and the project's.
+  grove's comet for k's machine names its three revs in its rows and k's node
+  in its sand.
+- aarch64-linux from the box: ld.lld links against that platform's libraries
+  from the binary cache at ground's pin. q's build of grove ran under
+  qemu-aarch64 on k as grove's ground.
+
+- A comet lands from its machine's node, on the box: grove's comet for the
+  box's own machine names q, and the Node Agent's sky landed it from q in its
+  home, digest 77ef85de.
 
 ## Not done
 
-- The sand on the node, configured by a person.
-- The Darwin build on the box, end to end, with the stubs from S3.
-- A hook per repository.
-- aarch64-linux from the box.
-- Comet on am ground, and the Comet stratum real.
-- ground on the box, and the ROOT agent's settings.json.
-- Rituals on the box.
-- ground as a Pi extension.
+- A comet lands from l's and k's own nodes: they refuse a request without a
+  token with 401, whatever their machine repository's qntx.pbt says, and a
+  token is minted from a passkey session (ADR-025). k's node runs no comet.
+- Rituals on the box: everything a ritual needs stands in the Node Agent's
+  grove checkout, and grove's rituals are off there until a person's session
+  standing in it says rituals on.
