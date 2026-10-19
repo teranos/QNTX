@@ -58,12 +58,6 @@ every device through Sync.
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
 
-## When both sides changed
-
-The same note changed in the vault and on the repository's main before either
-side has seen the other:
-
-"main wins"
 
 ## Which folders are the vault's
 
