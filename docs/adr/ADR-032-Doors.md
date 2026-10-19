@@ -1,7 +1,7 @@
 # ADR-032 — Doors
 
 One Node, several Doors. 
-One place to manage it.
+QNTX as the one place to manage it.
 
 Door enter's into a [[ADR-026-Namespaces|Namespace]], set by it's `rp_id` in the `am.toml` 
 
