@@ -54,7 +54,7 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 The loop is Claude Code's, not the node's: "accepted." The node hosts the process. It starts it, resumes it and stops it.
 ## Its harnesses
 
-Update: This Entire 
+Update: This Entire Section may be moved elsewhere, as a development doc, its not ADR ready yet.
 
 "IS BECAUSE I WANT TO EXPECT THAT IT WILL HAPPEN THAT I RUN OUT"
 
