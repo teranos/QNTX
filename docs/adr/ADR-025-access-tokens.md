@@ -42,6 +42,18 @@ say, through their WRITE and READ lines (ADR-034).
 `Lookup` returns that grant instead of a bool. A bool could carry none of it,
 which is why the middleware could only ever say "someone authenticated".
 
+## A ROOT token
+
+"So what we have right now, is too granular for me as a person,"
+
+"the model is more designed to be used by what would be the real users in the future, but we are actualy way ahead of it,"
+
+"i need a ROOT token"
+
+"and removing this will be a 1.0.0 blocker"
+
+A ROOT session mints a ROOT token at `/auth/tokens`. It names no namespace.
+
 ## Consequences
 
 - A leaked token reaches what the roles its DID holds allow, in its namespace,
