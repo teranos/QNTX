@@ -1,6 +1,6 @@
 # ADR-025: Access Tokens for Machine Access
 
-Date: 2026-07-20
+Date: 2026-10-19
 Status: Accepted
 
 ## Context
