@@ -118,6 +118,8 @@ func underGround(t *testing.T, home string) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(comet.AgentGround(home)), 0o755))
 	require.NoError(t, os.WriteFile(comet.AgentGround(home), []byte("#!/bin/sh\n"), 0o755))
 	require.NoError(t, comet.AgentSettings(home))
+	require.NoError(t, os.MkdirAll(filepath.Dir(comet.AgentPiExtension(home)), 0o700))
+	require.NoError(t, os.WriteFile(comet.AgentPiExtension(home), []byte("export default function () {}\n"), 0o600))
 }
 
 // "AS AN A2A AGENT, IT ALSO NEEDS TO SHACKLE ITSELF UNDER GROUND"

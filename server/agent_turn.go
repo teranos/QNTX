@@ -3,12 +3,14 @@ package server
 import (
 	"context"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/comet"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
 	"google.golang.org/protobuf/proto"
@@ -90,6 +92,8 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 		if itsGit, err = s.gitEnvironment(agent); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's git was not set up, so nothing was said to it: " + err.Error()}
 		}
+		// Its ground is the one its hooks and its Pi extension run (ADR-050, Hosted agents under ground).
+		itsGit = append(itsGit, "PATH="+comet.AgentPath(agent.home, os.Getenv("PATH")))
 	}
 	told, err := writes.told(says, spokenBy(caller), time.Now())
 	write([]*types.As{told}, err)

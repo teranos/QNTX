@@ -220,7 +220,12 @@ func TestAnAgentRunsUnderGroundOnceItsGroundAndSettingsStand(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(home, "claude"), 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(home, "claude", "settings.json"), []byte(`{"model":"opus"}`), 0o600))
 	require.NoError(t, AgentSettings(home))
+	// In Pi it runs under ground through ground's extension.
+	assert.ErrorContains(t, Under(home), "under ground in Pi")
+	require.NoError(t, os.MkdirAll(filepath.Dir(AgentPiExtension(home)), 0o700))
+	require.NoError(t, os.WriteFile(AgentPiExtension(home), []byte("export default function () {}\n"), 0o600))
 	assert.NoError(t, Under(home))
+	assert.Equal(t, filepath.Join(home, "bin")+":/usr/bin", AgentPath(home, "/usr/bin"))
 
 	written, err := os.ReadFile(filepath.Join(home, "claude", "settings.json"))
 	require.NoError(t, err)
