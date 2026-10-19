@@ -107,6 +107,9 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 
 	// Where an agent the node runs reaches the node's own MCP.
 	s.ownURL = ownURLOf(s.bindAddress, port)
+	if nowhere := nixIsNowhere(); nowhere != "" {
+		s.logger.Errorw(nowhere, "looked_in", nixBins)
+	}
 	s.groundTheAgents()
 
 	// What this node can answer, and then what the table grants reach to. A
