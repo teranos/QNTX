@@ -98,9 +98,7 @@ folder itself carries nothing.
 
 ## Per namespace
 
-"and have the possibility to also set Obsidian per nanespace"
+"and have the possibility to also set Obsidian per namespace"
 
-- One vault today, synced by a systemd unit on the box as root. Every vault
-  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node
-  record (server/vault.go). A vault per namespace is that line in the
+- One vault today, synced by a systemd unit on the box as root. Every vault  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node  record (server/vault.go). A vault per namespace is that line in the
   namespace, its reach lines there, and one sync process per vault.
