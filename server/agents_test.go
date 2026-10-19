@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,7 @@ import (
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/comet"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
@@ -200,6 +202,16 @@ func TestEachNamespaceAndModelIsItsOwnAgent(t *testing.T) {
 	assert.Equal(t, opus.GetAgent().GetDid(), am.GetAgent().GetDid(), "the newest line holds")
 }
 
+// A namespace agent, like the Node Agent, is said nothing until it runs under ground (ADR-050).
+func TestANamespaceAgentIsSaidNothingUntilItRunsUnderGround(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	_, refused := rootAsksAm(s, "set", sonnetGarden)
+	require.Nil(t, refused)
+	_, refused = answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "say", sigil.Sent{"namespace": "garden", "harness": "claude", "says": "how long has the box been up?"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.Says, "the agent of garden is said nothing until it runs under ground")
+}
+
 // It is signed in through claude login, in its own home, and what is said to
 // it is run as the line says and written in the namespace, signed by its own
 // DID: nothing of it lands in system (ADR-026, nothing crosses).
@@ -217,6 +229,7 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 	finished, refused := rootAsks(s, "login", sigil.Sent{"namespace": "garden", "code": "the-code-shown"})
 	require.Nil(t, refused)
 	assert.Equal(t, true, finished["signed_in"])
+	underGround(t, home)
 
 	said, refused := answeredAs(s, visitor, auth.LevelUser, []string{"garden"}, "say", sigil.Sent{"namespace": "garden", "harness": "claude", "says": "how long has the box been up?"})
 	require.Nil(t, refused)
@@ -239,6 +252,14 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 	for _, line := range env {
 		assert.False(t, len(line) > 13 && line[:13] == "GIT_CONFIG_GL", "the namespace agent holds no git: %s", line)
 	}
+
+	// "i wanted ground for the namespace agent under claude first"
+
+	// Its hooks run its own ground, first on its PATH, and ground reports with the agent's own token.
+	agent, held := s.namespaceAgents.of(agentPurpose("garden", "claude-sonnet-5-5"))
+	require.True(t, held)
+	assert.Contains(t, env, "QNTX_TOKEN="+agent.token)
+	assert.Contains(t, strings.Join(env, "\n"), "PATH="+filepath.Dir(comet.AgentGround(home))+":")
 
 	// Written in garden by the agent, signed as itself; not in system, not in orchard.
 	var session []string

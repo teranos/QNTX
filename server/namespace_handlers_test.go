@@ -410,6 +410,22 @@ func TestANamespaceIsGivenTheStorageAskedFor(t *testing.T) {
 	}
 }
 
+// "i dont want this to be a UI only thing, needs to be easily doable"
+// On k, Ground had no storage and the one token there stands in Ground.
+func TestTheNamespaceYouStandInIsGivenItsStorage(t *testing.T) {
+	fake := &fakeNamespaces{}
+	s := namespaceServer(t, fake)
+
+	_, refusal := askNamespaces(t, s, callerAt(auth.LevelRoot, "Ground"), "store", sigil.Sent{"name": "Ground", "kind": "parquet"})
+
+	if refusal != nil {
+		t.Fatalf("standing in Ground, giving it storage was refused: %s", refusal.GetSays())
+	}
+	if fake.given != "Ground" || fake.givenRecord != (storage.NamespaceRecord{Kind: storage.RecordParquet}) {
+		t.Errorf("gave %s %v, want Ground parquet", fake.given, fake.givenRecord)
+	}
+}
+
 func TestStorageThatIsNotOneOfTheKindsIsRefused(t *testing.T) {
 	for _, kind := range []string{"none", "mysql"} {
 		fake := &fakeNamespaces{}

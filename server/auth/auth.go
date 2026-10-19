@@ -76,9 +76,12 @@ type Handler struct {
 	// The way home from a client (oauth.go): ticket -> the authorize request
 	// parked while the passkey is done. fosite is built once, from what this
 	// handler holds, the first time a client sends somebody.
-	authorizings  sync.Map
-	oauthOnce     sync.Once
-	oauthProvider fosite.OAuth2Provider
+	authorizings sync.Map
+	// An agent's sign-in (device.go): device code -> the sign-in, and journey ticket -> its device code.
+	devices        sync.Map
+	deviceJourneys sync.Map
+	oauthOnce      sync.Once
+	oauthProvider  fosite.OAuth2Provider
 	// Held atomically: the sweep goroutine reads it without ever calling
 	// oauth(), so sync.Once orders nothing between them.
 	oauthStore atomic.Pointer[oauthStore]
@@ -92,7 +95,8 @@ type Handler struct {
 	logsInElsewhere bool
 	elsewhere       elsewhereJourneys
 	// How this primary asks GitHub for a peer (github_for_peers.go).
-	githubForPeers GitHubGet
+	githubForPeers         GitHubGet
+	githubLocationForPeers GitHubLocate
 	// nodes.peers: this primary's peers, by did:key and by name, and the
 	// tokens people are carried to them with.
 	carried  carriedTokens
@@ -169,18 +173,19 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 	}
 
 	h := &Handler{
-		webauthn:       w,
-		ownOrigins:     rpOrigins,
-		githubForPeers: asksGitHubForNobody,
-		creds:          newCredentialStore(db, logger),
-		sessions:       newSessionStore(sessionExpiryHours).kept(db, logger),
-		invitations:    newInvitationTable(db),
-		tokens:         tokens,
-		users:          users,
-		secureCookies:  secureCookies,
-		loopbackOrigin: fmt.Sprintf("http://127.0.0.1:%d", serverPort),
-		logger:         logger,
-		corsWrap:       corsWrap,
+		webauthn:               w,
+		ownOrigins:             rpOrigins,
+		githubForPeers:         asksGitHubForNobody,
+		githubLocationForPeers: locatesGitHubForNobody,
+		creds:                  newCredentialStore(db, logger),
+		sessions:               newSessionStore(sessionExpiryHours).kept(db, logger),
+		invitations:            newInvitationTable(db),
+		tokens:                 tokens,
+		users:                  users,
+		secureCookies:          secureCookies,
+		loopbackOrigin:         fmt.Sprintf("http://127.0.0.1:%d", serverPort),
+		logger:                 logger,
+		corsWrap:               corsWrap,
 	}
 	h.SetIdentities(rootIdentities, bindingSigners)
 	if err := h.becomings.kept(db, logger); err != nil {
@@ -526,12 +531,17 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(authorizePath, h.handleAuthorize)
 	mux.answer(authorizeDonePath, h.handleAuthorizeDone)
 	mux.answer(tokenPath, h.handleToken)
+	// An agent asks to be signed in, and the person says yes at the passkey (RFC 8628).
+	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
+	mux.answer(deviceApprovePath, h.handleDeviceApprove)
+	mux.answer(deviceDonePath, h.handleDeviceDone)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
 	// A peer asks for the lines about the namespaces it serves, signing as itself.
 	mux.answer(linesPath, h.handleLines)
 	// A peer asks GitHub through this node, signing as itself.
 	mux.answer(githubForPeersPath, h.handleGitHubForPeers)
+	mux.answer(githubLocationForPeersPath, h.handleGitHubLocationForPeers)
 	// A node whose people log in at another sends them there and takes them back.
 	mux.answer(elsewherePath, h.handleElsewhere)
 	mux.answer(elsewhereBackPath, h.handleElsewhereBack)
@@ -691,6 +701,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 				h.sweepSignedBindings()
 				h.sweepHomeward()
 				h.sweepAuthorizing()
+				h.sweepDevices()
 			case <-cancel:
 				return
 			}
@@ -783,7 +794,7 @@ func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, mes
 // it can act on. Without the slash, because that is the URL a connector is given.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp", a2aPrefix} {
+	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp", "/comet/", a2aPrefix} {
 		if strings.HasPrefix(path, asked) {
 			return true
 		}

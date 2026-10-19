@@ -19,7 +19,7 @@ const STATE_SAID: Record<Comet['state'], string> = {
     unobserved: 'Not observed.',
 };
 
-const NOT_YET = 'Observing a comet, and the build it starts, are not in the node yet: nothing here starts or stops one.';
+const NOT_YET = 'The node observes a comet it keeps: it builds one when POST /comet/{owner}/{repo}/{platform}?machine={owner}/{repo} asks, carrying that machine\'s controls, and again each time main moves. Nothing here starts or stops one.';
 
 /** Exported for tests: the element's body, the comet alone and what state it is in. */
 export function cometBody(c: Comet): HTMLElement {

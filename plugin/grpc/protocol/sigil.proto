@@ -168,6 +168,24 @@ message NamespaceAgentSaid {
   PiSaid pi = 2;
 }
 
+// NodeAgentSaid is what agent say answers: what the Node Agent answered, in the
+// harness it was said to.
+message NodeAgentSaid {
+  // What it answered in Claude Code.
+  ClaudeSaid claude = 1;
+  // What it answered in Pi.
+  PiSaid pi = 2;
+}
+
+// NodeAgentAm is what agent am answers: who the Node Agent is and how the node
+// runs it, in the harness named.
+message NodeAgentAm {
+  // In Claude Code.
+  ClaudeAm claude = 1;
+  // In Pi.
+  PiAm pi = 2;
+}
+
 // NamespaceKeys is what keys list, set and drop answer: the names of a
 // namespace's keys, never their values (ADR-051).
 message NamespaceKeys {

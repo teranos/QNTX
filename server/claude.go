@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/comet"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
 	"google.golang.org/protobuf/proto"
@@ -185,15 +186,9 @@ func (s *QNTXServer) claudeHarness() *harness {
 	named := func() appcfg.NodeAgentConfig { return s.deps.cfg.Agent.Root }
 	h := &harness{
 		name: "claude", called: "Claude Code", file: claudeSessionFile,
-		description: "The Node Agent: Claude Code, run by the node as itself.",
-		sayDoes:     "Says something to the Node Agent and gives what it answered. It is one session that continues, written down by the agent as it goes and read with claude session.",
-		amDoes:      "Who the Node Agent is and how the node runs it.",
-		sessionDoes: "The Node Agent's one session, whole: everything said to it by whoever said it, as a transcript.",
 		sayTakes: []*protocol.Param{
-			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "The permission mode Claude Code runs this in. Not sent, it is the one am.toml gives."},
+			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs this in. Not sent, it is the one am.toml gives."},
 		},
-		sayAnswer: "protocol.ClaudeSaid",
-		amAnswer:  "protocol.ClaudeAm",
 		// am.toml naming the Node Agent names it in Claude Code.
 		named:    func() bool { return true },
 		absent:   s.thereIsNoNodeAgent,
@@ -217,7 +212,6 @@ func (s *QNTXServer) claudeHarness() *harness {
 			return am
 		},
 	}
-	h.also = []harnessSigil{s.loginSigil(h)}
 	return h
 }
 
@@ -264,6 +258,14 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			var err error
 			if binary, err = s.harnessHeldBy("claude").Path(ctx); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no Claude Code to run: " + err.Error()}
+			}
+			// "which is for A2A agents to receive a coment first, or be known that they run under ground before they do A2A shut"
+			if err := comet.Under(agent.home); err != nil {
+				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " is said nothing until it runs under ground (ADR-050): " + err.Error()}
+			}
+			// A repository the agent cloned since its last turn is trusted before a ritual starts in it.
+			if err := comet.AgentTrust(agent.home); err != nil {
+				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + "'s work was not trusted for the rituals it starts: " + err.Error()}
 			}
 			if plan, err = secretref.Resolve(ctx, named.TokenRef); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "the Claude plan token am.toml names did not resolve: " + err.Error()}

@@ -3,7 +3,7 @@
 The app is [QNTX-App](https://github.com/teranos/QNTX-App), and how it is
 released is written there.
 
-Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
+Unix-like hosts only — see [ADR-029](adr/ADR-029-Windows.md).
 
 ## What ships
 - Docker images: `ghcr.io/teranos/qntx:latest` and `ghcr.io/teranos/qntx:{version}`

@@ -582,6 +582,11 @@ func (h *Handler) handleToken(w http.ResponseWriter, r *http.Request) {
 		provider.WriteAccessError(ctx, w, nil, err)
 		return
 	}
+	// An agent's sign-in is no grant fosite serves (device.go).
+	if r.PostForm.Get("grant_type") == deviceCodeGrant {
+		h.handleDeviceToken(w, r.PostForm)
+		return
+	}
 	// The session handed in is replaced by the one the code carries, which is
 	// the person who said yes. It is a TokenSession so the strategy has
 	// somewhere to put the DID either way.

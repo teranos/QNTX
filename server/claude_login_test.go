@@ -20,7 +20,7 @@ import (
 const standInSignInURL = "https://claude.com/cai/oauth/authorize?code=true&state=stand-in"
 
 func loggingIn(s *QNTXServer, sent sigil.Sent) (map[string]any, *protocol.Refusal) {
-	asked := httptest.NewRequest(http.MethodPost, "/api/claude/login", nil)
+	asked := httptest.NewRequest(http.MethodPost, "/api/agent/login", nil)
 	h := s.claudeHarness()
 	answer, refused := s.claudeLogin(sigil.WithCaller(context.Background(), asked), h, sent)
 	if refused != nil {
@@ -39,7 +39,7 @@ func TestSigningInIsClaudeCodesOwnFlow(t *testing.T) {
 	require.Nil(t, refused)
 	assert.Equal(t, standInSignInURL, begun["url"])
 	assert.Equal(t, false, begun["signed_in"])
-	holds(t, s.harnessSignum(s.claudeHarness()), "login", begun)
+	holds(t, s.nodeAgentSignum(), "login", begun)
 
 	args := ranWith(t, ran, "0", "args")
 	assert.Equal(t, []string{"auth", "login", "--claudeai"}, args)
@@ -50,7 +50,7 @@ func TestSigningInIsClaudeCodesOwnFlow(t *testing.T) {
 	assert.Equal(t, "", finished["url"])
 	assert.Equal(t, true, finished["signed_in"])
 	assert.Equal(t, "claude.ai", finished["auth_method"])
-	holds(t, s.harnessSignum(s.claudeHarness()), "login", finished)
+	holds(t, s.nodeAgentSignum(), "login", finished)
 
 	kept, err := os.ReadFile(filepath.Join(s.nodeAgent.home, "claude", ".credentials.json"))
 	require.NoError(t, err)
@@ -61,7 +61,7 @@ func TestSigningInIsClaudeCodesOwnFlow(t *testing.T) {
 	am := is.(*protocol.ClaudeAm)
 	assert.True(t, am.GetSignedIn())
 	assert.Equal(t, "claude.ai", am.GetAuthMethod())
-	holds(t, s.harnessSignum(s.claudeHarness()), "am", am)
+	holds(t, s.nodeAgentSignum(), "am", &protocol.NodeAgentAm{Claude: am})
 }
 
 // The Console pays when asked; the subscription otherwise.

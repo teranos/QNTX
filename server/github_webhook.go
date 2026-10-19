@@ -59,7 +59,8 @@ type gitHubPush struct {
 	After      string `json:"after"`
 	Deleted    bool   `json:"deleted"`
 	Repository struct {
-		FullName string `json:"full_name"`
+		FullName      string `json:"full_name"`
+		DefaultBranch string `json:"default_branch"`
 	} `json:"repository"`
 	Commits []struct {
 		Added    []string `json:"added"`
@@ -77,11 +78,12 @@ func (p gitHubPush) push() forge.Push {
 		changed = slices.Concat(changed, c.Added, c.Removed, c.Modified)
 	}
 	return forge.Push{
-		Repo:    forge.Repo{Host: forge.GitHub, Path: p.Repository.FullName},
-		Ref:     p.Ref,
-		After:   p.After,
-		Deleted: p.Deleted,
-		Changed: changed,
+		Repo:          forge.Repo{Host: forge.GitHub, Path: p.Repository.FullName},
+		Ref:           p.Ref,
+		After:         p.After,
+		Deleted:       p.Deleted,
+		Changed:       changed,
+		DefaultBranch: p.Repository.DefaultBranch,
 	}
 }
 
@@ -178,5 +180,6 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	names := g.host.buildsMovedBy(landed)
 	filling := g.host.vaultsMovedBy(landed)
 	dispatching := g.followsMovedBy(landed)
-	respond(w, g.host.log(), http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching})
+	rebuilding := g.host.cometsMovedBy(landed)
+	respond(w, g.host.log(), http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding})
 }

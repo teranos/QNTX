@@ -78,6 +78,7 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 						{Name: "news", Says: "What ci.watch said for the caller, newest first: each wait and each conclusion, when it was left, until when the status line carries it, and what the item holds in full."},
 						{Name: "failed", Says: "What ci.watch could not do in the last day, newest first: when, the exact error, and which run of it."},
 						{Name: "ug", Says: "What the node sees of ug: when the caller's tmux bar last asked for the status line, how often since this process began and by the minute over the last hour; each session whose status line posted a usage reading in the last day, with its first, its latest and its readings by the hour; and each window ug read, with what it read over that day."},
+						{Name: "comets", Says: "Each repository the node keeps a comet of (ADR-050), as the Ground element draws it: the repository, that it is built and observed, the heaviest build's size in MB, how often its default branch moved in the last week, and each platform's build with its sha256 digest, its bytes and when it was built."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/ground"},
 				},

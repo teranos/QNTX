@@ -22,16 +22,10 @@ func (s *QNTXServer) piHarness() *harness {
 	named := func() appcfg.PiConfig { return s.deps.cfg.Agent.Root.Pi }
 	return &harness{
 		name: "pi", called: "Pi", file: piSessionFile,
-		description: "The Node Agent in Pi: the same agent as in Claude Code, in its other harness and a session of its own.",
-		sayDoes:     "Says something to the Node Agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
-		amDoes:      "Who the Node Agent is in Pi and how the node runs it there.",
-		sessionDoes: "The Node Agent's session in Pi, whole: everything said to it there, as a transcript.",
-		sayAnswer:   "protocol.PiSaid",
-		amAnswer:    "protocol.PiAm",
-		named:       func() bool { return named().Named() },
-		absent:      s.thereIsNoPi,
-		fetching:    "Pi is still being built",
-		spec:        func() agentSpec { return agentSpec{} },
+		named:    func() bool { return named().Named() },
+		absent:   s.thereIsNoPi,
+		fetching: "Pi is still being built",
+		spec:     func() agentSpec { return agentSpec{} },
 		part: func(_ context.Context, _ sigil.Sent, agent *rootAgent, _ agentSpec) (aTurn, *protocol.Refusal) {
 			return s.piPart(named(), agent), nil
 		},
@@ -50,7 +44,15 @@ func (s *QNTXServer) thereIsNoPi() *protocol.Refusal {
 	if s.nodeAgent == nil {
 		return s.thereIsNoNodeAgent()
 	}
-	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it runs in Claude Code alone"}
+	if !s.deps.cfg.Agent.Root.Pi.Named() {
+		return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it runs in Claude Code alone"}
+	}
+	return piIsOff()
+}
+
+// piIsOff is why no agent runs in Pi: the node holds no Pi.
+func piIsOff() *protocol.Refusal {
+	return &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Pi, so no agent runs in it, the Node Agent nor a namespace's: Pi is off"}
 }
 
 // piPart is Pi's part of one turn of the Node Agent.

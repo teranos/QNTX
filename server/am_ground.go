@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/comet"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
@@ -217,5 +218,17 @@ func (s *QNTXServer) amGround(ctx context.Context, _ sigil.Sent) (any, *protocol
 		started = s.startedAt.UTC().Format(time.RFC3339)
 	}
 	ug := map[string]any{"tmux": tmux, "sessions": sessions, "windows": windows, "since": since.UTC().Format(time.RFC3339)}
-	return map[string]any{"started": started, "left": left, "watches": watches, "news": news, "failed": failed, "ug": ug}, nil
+
+	// "Comet is answered beside ug"
+	// Each comet the node keeps (ADR-050).
+	dir, err := comet.Dir()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	comets, err := comet.Held(dir, func(owner, repo string) (int, error) { return s.movedThisWeek(ctx, owner, repo) })
+	if err != nil {
+		s.logger.Errorw("am ground could not read the comets the node keeps", "dir", dir, "error", err)
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the comets the node keeps did not read: " + err.Error()}
+	}
+	return map[string]any{"started": started, "left": left, "watches": watches, "news": news, "failed": failed, "ug": ug, "comets": comets}, nil
 }

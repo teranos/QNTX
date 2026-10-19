@@ -368,10 +368,12 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	}
 	// A peer's ci.watch asks GitHub through this node, with this node's token;
 	// this node, when it is a peer, asks through its own primary.
-	authHandler.SetGitHubForPeers(githubForPeers)
-	if through, hasPrimary := authHandler.GitHubThroughThePrimary(); hasPrimary {
+	authHandler.SetGitHubForPeers(githubForPeers, githubLocationForPeers)
+	if through, locate, hasPrimary := authHandler.GitHubThroughThePrimary(); hasPrimary {
 		s.ciGitHubGet = githubThroughThePrimary(through)
 		s.ciGitHubToken = noGitHubToken
+		// A comet's build asks through it too.
+		s.primaryGitHub = primaryGitHub{get: through, locate: locate, held: true}
 	}
 	// Where a person may stand is what the stores serve, asked at the same
 	// door a write goes through.

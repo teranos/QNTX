@@ -41,13 +41,16 @@ REACH is '/auth/authorize' '/auth/authorize/done'                         of ANY
 # The client comes for its token with the code and its secret, holding no
 # session: the secret is the credential, checked at the endpoint itself.
 REACH is '/auth/token'                                                    of ANYONE
+# An agent asks to be signed in and holds no session: the person's yes at the
+# passkey, at home, is the credential, checked at the endpoints themselves.
+REACH is '/auth/device' '/auth/device/approve' '/auth/device/done'        of ANYONE
 # Another node asks whether a token this one issued is live, holding no session:
 # its signed assertion is the credential, checked at the endpoint itself.
 REACH is '/auth/introspect'                                               of ANYONE
 # A peer asks for the lines about the namespaces it serves, the same way.
 REACH is '/auth/lines/served'                                             of ANYONE
 # A peer asks GitHub through its primary, the same way: the token stays here.
-REACH is '/auth/github'                                                   of ANYONE
+REACH is '/auth/github' '/auth/github/location'                           of ANYONE
 # A node whose people log in at another sends them there and takes them back,
 # before they hold any session here.
 REACH is '/auth/elsewhere' '/auth/elsewhere/back'                         of ANYONE
@@ -163,10 +166,9 @@ REACH is '/api/vault/unbind' '/api/vault/disable' '/api/vault/enable'     of ROO
 REACH is '/api/vault/send'                                                of ROOT
 REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
 
-# The Node Agent (the claude signum, ADR-048). Who may talk to it is the whole
-# of what guards it, and that is ROOT.
-REACH is '/api/claude' '/api/claude/say' '/api/claude/session' '/api/claude/login' of ROOT
-REACH is '/api/pi' '/api/pi/say' '/api/pi/session'                        of ROOT
+# The Node Agent (the agent signum, ADR-048), in Claude Code or in Pi. Who may
+# talk to it is the whole of what guards it, and that is ROOT.
+REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' of ROOT
 
 # The namespace agent (the agents signum, ADR-048): "shared amongst anyone who
 # has REACH on it". Who acts in the namespace reaches it, which the handler
@@ -221,6 +223,7 @@ REACH is '/api/canvas/minimized-windows'                                  of ROO
 REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/api/canvas/export' '/api/canvas/export-dom'                    of ROOT
 REACH is '/api/files' '/api/files/'                                       of ROOT
+REACH is '/comet/'                                                        of ROOT SUPER
 REACH is '/api/python/execute'                                            of ROOT
 REACH is '/api/search/semantic'                                           of ROOT
 REACH is '/api/embeddings/generate' '/api/embeddings/batch'               of ROOT

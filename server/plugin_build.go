@@ -40,8 +40,31 @@ const (
 	buildOutput    = "build.output"
 )
 
-// nixBin is where the node's nix is: not on the service's PATH.
-const nixBin = "/nix/var/nix/profiles/default/bin"
+// nixBins are where a node's nix is, as it was put there: by nix's installer (q, a Mac),
+// or by NixOS (k), which keeps no default profile. Neither is on every service's PATH.
+var nixBins = []string{"/nix/var/nix/profiles/default/bin", "/run/current-system/sw/bin"}
+
+// nixBin is where the node's nix is: the first of nixBins holding one. A node with none
+// is told so at start (nixIsNowhere), and a build asks the first and is refused there.
+var nixBin = nixHeldAt(nixBins)
+
+// nixHeldAt is the first of dirs holding nix, or the first of them when none does.
+func nixHeldAt(dirs []string) string {
+	for _, dir := range dirs {
+		if _, err := os.Stat(filepath.Join(dir, "nix")); err == nil {
+			return dir
+		}
+	}
+	return dirs[0]
+}
+
+// nixIsNowhere says a node holds no nix in any of nixBins, and is empty on a node that holds one.
+func nixIsNowhere() string {
+	if _, err := os.Stat(filepath.Join(nixBin, "nix")); err == nil {
+		return ""
+	}
+	return "this node holds no nix in " + strings.Join(nixBins, " nor ") + ", so nothing it builds (plugins, comets, an agent's ground) is built"
+}
 
 // buildSource is one repository a build takes from, at a branch. An input
 // names a single file of it in Path; the source that is built names none.

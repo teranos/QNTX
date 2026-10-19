@@ -71,6 +71,26 @@
         "SUPER"
       ]
     },
+    "/api/agent": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/agent/login": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/agent/say": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/agent/session": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/agents/{namespace}": {
       "x-qntx-reach": [
         "ROOT",
@@ -211,26 +231,6 @@
         "USER"
       ],
       "x-qntx-prefix": true
-    },
-    "/api/claude": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/claude/login": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/claude/say": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/claude/session": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
     },
     "/api/crash-test": {
       "x-qntx-reach": [
@@ -413,21 +413,6 @@
       ]
     },
     "/api/parity/storage": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/pi": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/pi/say": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/pi/session": {
       "x-qntx-reach": [
         "ROOT"
       ]
@@ -674,6 +659,21 @@
         "ANYONE"
       ]
     },
+    "/auth/device": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/device/approve": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/device/done": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/door/home": {
       "x-qntx-reach": [
         "ANYONE"
@@ -710,6 +710,11 @@
       ]
     },
     "/auth/github": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/github/location": {
       "x-qntx-reach": [
         "ANYONE"
       ]
@@ -816,6 +821,13 @@
       ]
     },
     "/auth/users/": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ],
+      "x-qntx-prefix": true
+    },
+    "/comet/": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"

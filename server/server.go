@@ -54,6 +54,7 @@ type QNTXServer struct {
 	namespaceAgents     agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
 	agentsDir           string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL              string                        // Where this node answers on its own machine; empty until it listens
+	underGround         groundHomes                   // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)
 	daemon              *async.WorkerPool             // Background job processor (daemon)
 	scheduleStore       *schedule.Store               // Schedule persistence (shared with ticker)
 	tickerCfg           schedule.TickerConfig         // Ticker configuration (resolved at init)
@@ -194,8 +195,10 @@ type QNTXServer struct {
 	embeddingStore              *storage.EmbeddingStore
 	embeddingClusterInvalidator func() // called after re-cluster to invalidate centroid cache
 	// How ci.watch asks GitHub and with what: this node's own token, or its primary's way (sub_auth.go).
-	ciGitHubGet        func(ctx context.Context, token, url string) ([]byte, error)
-	ciGitHubToken      func(ctx context.Context) (string, error)
+	ciGitHubGet   func(ctx context.Context, token, url string) ([]byte, error)
+	ciGitHubToken func(ctx context.Context) (string, error)
+	// How a comet's build asks GitHub on a peer: through its primary (sub_auth.go, comet.go).
+	primaryGitHub      primaryGitHub
 	watcherDB          *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)
 	pulseReadDB        *sql.DB            // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
 	walCheckpointer    WALCheckpointer    // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)

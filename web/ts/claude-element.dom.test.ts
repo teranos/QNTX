@@ -190,7 +190,7 @@ describe('Claude - Spike', () => {
     test('a refusal is drawn, and the words are kept', async () => {
         const body = document.createElement('div');
         const stop = drawClaude(body, node({
-            say: () => Promise.reject(new Error('/api/claude/say: HTTP 500 Claude Code did not answer: exit status 1')),
+            say: () => Promise.reject(new Error('/api/agent/say: HTTP 500 Claude Code did not answer: exit status 1')),
         }));
         await settled();
         say(body, 'install htop');
@@ -222,7 +222,7 @@ describe('Claude - Spike', () => {
     test('a node with no Node Agent says why', async () => {
         const body = document.createElement('div');
         const stop = drawClaude(body, node({
-            am: () => Promise.reject(new Error("/api/claude: HTTP 404 this node's am.toml names no Node Agent")),
+            am: () => Promise.reject(new Error("/api/agent?harness=claude: HTTP 404 this node's am.toml names no Node Agent")),
         }));
         await settled();
         expect(body.querySelector('.claude-who')?.textContent).toContain('names no Node Agent');

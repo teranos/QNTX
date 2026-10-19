@@ -62,18 +62,18 @@ export function asSaid(said: PiSaid): ClaudeSaid {
 // The node, as the Pi element asks it: its session in Pi, beside the one the
 // Claude element reads.
 const theNodeInPi: NodeAgent = {
-    am: () => apiJson<PiAm>('/api/pi').then(asAm),
-    say: (says) => apiJson<PiSaid>('/api/pi/say', {
+    am: () => apiJson<{ pi: PiAm }>('/api/agent?harness=pi').then(is => asAm(is.pi)),
+    say: (says) => apiJson<{ pi: PiSaid }>('/api/agent/say', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ says }),
-    }).then(asSaid),
-    read: () => apiJson<{ transcript: TranscriptRead }>('/api/pi/session')
+        body: JSON.stringify({ harness: 'pi', says }),
+    }).then(said => asSaid(said.pi)),
+    read: () => apiJson<{ transcript: TranscriptRead }>('/api/agent/session?harness=pi')
         .then(answer => answer.transcript),
 };
 
 // Who this is for: whoever reaches these (audience.ts).
-export const needs = ['/api/pi'] as const;
+export const needs = ['/api/agent'] as const;
 
 export function createPiElement(): Element {
     return {
