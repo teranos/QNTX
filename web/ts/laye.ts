@@ -1,6 +1,7 @@
 import init, * as laye from '../wasm/laye_p2p.js';
 import { log, SEG } from './logger.ts';
 import { apiFetch } from './client';
+import { timed, timedAsync } from './wasm-metrics';
 
 export interface BindingClaim {
     peer_pubkey_hex: string;
@@ -133,7 +134,7 @@ export async function initialize(): Promise<void> {
 
     initPromise = (async () => {
         try {
-            await init();
+            await timedAsync('laye', 'instantiate', () => init());
         } catch (error: unknown) {
             const wasmUrl = new URL('laye_p2p_bg.wasm', import.meta.url).href;
             let httpStatus = 'unknown';
@@ -151,11 +152,12 @@ export async function initialize(): Promise<void> {
             ].join('\n'));
         }
 
-        await laye.init(JSON.stringify({
+        const config = JSON.stringify({
             bootstrap_addrs: BOOTSTRAP,
             identify_protocol: '/qntx/1.0.0',
             binding_signers: await trustedSigners(),
-        }));
+        });
+        await timedAsync('laye', 'init', () => laye.init(config));
 
         ready = true;
         // bindings() is JSON; its length was the string's, which read "489
@@ -173,7 +175,7 @@ export function did(): string {
 
 /** Sign with the key that never leaves this tab. */
 export function sign(bytes: Uint8Array): Uint8Array {
-    return laye.sign(bytes);
+    return timed('laye', 'sign', () => laye.sign(bytes));
 }
 
 /** An ed25519 signature is 64 bytes; laye answers anything else when it signed nothing. */
@@ -201,7 +203,8 @@ export async function signAttestation(attestation: { id: string }): Promise<{ si
     if (!await whenReady()) {
         throw new Error(`laye did not start, so ${attestation.id} has no key to be signed with`);
     }
-    const signature = laye.sign_attestation(JSON.stringify(attestation));
+    const attestationJson = JSON.stringify(attestation);
+    const signature = timed('laye', 'sign_attestation', () => laye.sign_attestation(attestationJson));
     if (signature.length !== ED25519_SIGNATURE_BYTES) {
         throw new Error(`laye did not sign ${attestation.id}: ${laye.errors()}`);
     }

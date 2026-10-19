@@ -11,6 +11,7 @@
 import { embeddingStore } from './embedding-store';
 import { cosineSimilarity } from './ats-wasm';
 import { log, SEG } from './logger';
+import { timed } from './wasm-metrics';
 
 export interface LocalSearchResult {
     attestationId: string;
@@ -37,17 +38,20 @@ export async function localSemanticSearch(
 
     const results: LocalSearchResult[] = [];
 
-    for (const [sourceId, vector] of allEmbeddings) {
-        try {
-            const similarity = cosineSimilarity(queryVector, vector);
-            if (similarity >= threshold) {
-                results.push({ attestationId: sourceId, similarity });
+    // One call per cached embedding, so the loop is timed and not each call.
+    timed('ats', 'cosine_similarity_f32_loop', () => {
+        for (const [sourceId, vector] of allEmbeddings) {
+            try {
+                const similarity = cosineSimilarity(queryVector, vector);
+                if (similarity >= threshold) {
+                    results.push({ attestationId: sourceId, similarity });
+                }
+            } catch (err) {
+                // Dimension mismatch — likely different embedding model
+                log.warn(SEG.WASM, `Skipping ${sourceId}: ${err instanceof Error ? err.message : String(err)}`);
             }
-        } catch (err) {
-            // Dimension mismatch — likely different embedding model
-            log.warn(SEG.WASM, `Skipping ${sourceId}: ${err instanceof Error ? err.message : String(err)}`);
         }
-    }
+    }, { 'wasm.calls': allEmbeddings.size });
 
     // Sort by similarity descending, take top N
     results.sort((a, b) => b.similarity - a.similarity);

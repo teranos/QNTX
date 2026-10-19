@@ -10,6 +10,7 @@
 
 import init, * as wasm from '../wasm/ats_wasm.js';
 import { log, SEG } from './logger.ts';
+import { timed, timedAsync } from './wasm-metrics';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
 // Re-export proto-generated Attestation type for convenience
@@ -53,7 +54,7 @@ export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void
     initPromise = (async () => {
         // Initialize WASM module
         try {
-            await init();
+            await timedAsync('ats', 'instantiate', () => init());
         } catch (error: unknown) {
             // Construct expected WASM URL for debugging
             const wasmUrl = new URL('ats_wasm_bg.wasm', import.meta.url).href;
@@ -78,7 +79,7 @@ export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void
         }
 
         // Initialize IndexedDB store
-        await wasm.init_store(dbName);
+        await timedAsync('ats', 'init_store', () => wasm.init_store(dbName));
 
         log.info(SEG.WASM, `[ats-wasm] Initialized (v${wasm.version()})`);
     })();
@@ -107,7 +108,7 @@ async function ensureInit(): Promise<void> {
  * }
  */
 export function axFilter(query: string, limit: number): AxFilterResult {
-    const answer = JSON.parse(wasm.ax_filter(query, Date.now(), limit));
+    const answer = JSON.parse(timed('ats', 'ax_filter', () => wasm.ax_filter(query, Date.now(), limit)));
 
     if ('error' in answer) {
         return { ok: false, error: answer.error };
@@ -123,7 +124,7 @@ export function axFilter(query: string, limit: number): AxFilterResult {
 export async function putAttestation(attestation: Attestation): Promise<Attestation> {
     await ensureInit();
     const json = JSON.stringify(attestation);
-    await wasm.put_attestation(json);
+    await timedAsync('ats', 'put_attestation', () => wasm.put_attestation(json));
     return attestation;
 }
 
@@ -133,7 +134,7 @@ export async function putAttestation(attestation: Attestation): Promise<Attestat
  */
 export async function getAttestation(id: string): Promise<Attestation | null> {
     await ensureInit();
-    const json = await wasm.get_attestation(id);
+    const json = await timedAsync('ats', 'get_attestation', () => wasm.get_attestation(id));
     return json ? JSON.parse(json) : null;
 }
 
@@ -143,7 +144,7 @@ export async function getAttestation(id: string): Promise<Attestation | null> {
  */
 export async function deleteAttestation(id: string): Promise<boolean> {
     await ensureInit();
-    return await wasm.delete_attestation(id);
+    return await timedAsync('ats', 'delete_attestation', () => wasm.delete_attestation(id));
 }
 
 /**
@@ -151,7 +152,7 @@ export async function deleteAttestation(id: string): Promise<boolean> {
  */
 export async function existsAttestation(id: string): Promise<boolean> {
     await ensureInit();
-    return await wasm.exists_attestation(id);
+    return await timedAsync('ats', 'exists_attestation', () => wasm.exists_attestation(id));
 }
 
 /** The limit that reads every row, said; Rust's `EVERY_ROW`. */
@@ -163,7 +164,8 @@ export const EVERY_ROW = 2147483647;
  */
 export async function queryAttestations(filter: AxFilter): Promise<Attestation[]> {
     await ensureInit();
-    const json = await wasm.query_attestations(JSON.stringify(filter));
+    const filterJson = JSON.stringify(filter);
+    const json = await timedAsync('ats', 'query_attestations', () => wasm.query_attestations(filterJson));
     return JSON.parse(json);
 }
 
@@ -172,7 +174,7 @@ export async function queryAttestations(filter: AxFilter): Promise<Attestation[]
  */
 export async function listAttestationIds(): Promise<string[]> {
     await ensureInit();
-    const json = await wasm.list_attestation_ids();
+    const json = await timedAsync('ats', 'list_attestation_ids', () => wasm.list_attestation_ids());
     return JSON.parse(json);
 }
 
@@ -218,7 +220,7 @@ export function generateASUID(prefix: string, subject: string, predicate: string
         random_bytes: Array.from(randomBytes),
     });
 
-    const result = JSON.parse(wasm.generate_asuid(input));
+    const result = JSON.parse(timed('ats', 'generate_asuid', () => wasm.generate_asuid(input)));
     if (result.error) {
         throw new Error(`ASUID generation failed: ${result.error}`);
     }
