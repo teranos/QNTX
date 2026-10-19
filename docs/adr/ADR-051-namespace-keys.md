@@ -1,7 +1,7 @@
 # ADR-051: A namespace's keys
 
 Date: 2026-10-08
-Status: Proposed
+Status: Proposed; Brandon
 
 "customer, or friend who helps ne test in this casem provide their own key"
 
