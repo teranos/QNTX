@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -166,10 +169,16 @@ func (s *QNTXServer) movedThisWeek(ctx context.Context, owner, repo string) (int
 type cometNode struct{ s *QNTXServer }
 
 func (n cometNode) Latest(ctx context.Context, source comet.Source) (string, error) {
+	if n.s.primaryGitHub.held {
+		return n.s.primaryGitHub.latest(ctx, source)
+	}
 	return n.s.buildRev(ctx, cometSource(source))
 }
 
 func (n cometNode) Fetch(ctx context.Context, source comet.Source, rev, tarball string) error {
+	if n.s.primaryGitHub.held {
+		return n.s.primaryGitHub.fetch(ctx, source, rev, tarball)
+	}
 	return n.s.fetchCore(ctx, cometSource(source), rev, tarball)
 }
 
@@ -177,6 +186,71 @@ func (n cometNode) Fetch(ctx context.Context, source comet.Source, rev, tarball 
 // cometSource is a comet's source as a build reads one.
 func cometSource(source comet.Source) buildSource {
 	return buildSource{Repo: forge.Repo{Host: forge.GitHub, Path: source.Owner + "/" + source.Repo}, Branch: source.Branch}
+}
+
+// "cant k use piggyback on what q offers"
+// primaryGitHub is a peer's GitHub: its primary's, asked by signing as this node (auth/github_for_peers.go).
+type primaryGitHub struct {
+	get    auth.GitHubGet
+	locate auth.GitHubLocate
+	held   bool
+}
+
+// latest is the commit source's branch points at now, as the primary asks GitHub.
+func (p primaryGitHub) latest(ctx context.Context, source comet.Source) (string, error) {
+	asked := githubAPI + "/repos/" + url.PathEscape(source.Owner) + "/" + url.PathEscape(source.Repo) + "/commits?per_page=1&sha=" + url.QueryEscape(source.Branch)
+	body, err := p.get(ctx, asked)
+	if err != nil {
+		return "", errors.Wrapf(err, "the primary did not ask GitHub where %s/%s@%s is", source.Owner, source.Repo, source.Branch)
+	}
+	var commits []struct {
+		SHA string `json:"sha"`
+	}
+	if err := json.Unmarshal(body, &commits); err != nil {
+		return "", errors.Wrapf(err, "GitHub's commits of %s/%s@%s did not read: %s", source.Owner, source.Repo, source.Branch, body)
+	}
+	// per_page is 1: the one commit GitHub hands back is where the branch is now.
+	for _, commit := range commits {
+		return commit.SHA, nil
+	}
+	return "", errors.Newf("GitHub has no commit for %s/%s@%s", source.Owner, source.Repo, source.Branch)
+}
+
+// fetch writes source's archive at rev to tarball: from where GitHub points, as the primary asked it.
+func (p primaryGitHub) fetch(ctx context.Context, source comet.Source, rev, tarball string) error {
+	asked := githubAPI + "/repos/" + url.PathEscape(source.Owner) + "/" + url.PathEscape(source.Repo) + "/tarball/" + url.PathEscape(rev)
+	location, err := p.locate(ctx, asked)
+	if err != nil {
+		return errors.Wrapf(err, "the primary did not ask GitHub where the archive of %s/%s at %s is", source.Owner, source.Repo, rev)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, location, nil)
+	if err != nil {
+		return errors.Wrapf(err, "where GitHub keeps the archive of %s/%s at %s is no request", source.Owner, source.Repo, rev)
+	}
+	resp, err := (&http.Client{Timeout: 10 * time.Minute}).Do(req)
+	if err != nil {
+		return errors.Wrapf(err, "the archive of %s/%s at %s did not come", source.Owner, source.Repo, rev)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		said, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if readErr != nil {
+			return errors.Wrapf(readErr, "the archive of %s/%s at %s answered %d, and what it said did not read", source.Owner, source.Repo, rev, resp.StatusCode)
+		}
+		return errors.Newf("the archive of %s/%s at %s answered %d: %s", source.Owner, source.Repo, rev, resp.StatusCode, said)
+	}
+	file, err := os.Create(tarball)
+	if err != nil {
+		return errors.Wrapf(err, "failed to make %s", tarball)
+	}
+	if written, err := io.Copy(file, resp.Body); err != nil {
+		_ = file.Close()
+		return errors.Wrapf(err, "failed to write %s/%s at %s to %s after %d bytes", source.Owner, source.Repo, rev, tarball, written)
+	}
+	if err := file.Close(); err != nil {
+		return errors.Wrapf(err, "failed to finish writing %s", tarball)
+	}
+	return nil
 }
 
 func (cometNode) BuildsDir() (string, error) { return buildsDir() }

@@ -74,6 +74,54 @@ func githubForPeers(ctx context.Context, url string) ([]byte, error) {
 	return githubGet(ctx, token, url)
 }
 
+// githubLocationForPeers is where GitHub points one GET of its API, asked with
+// this node's own token, for the peers that ask through it.
+func githubLocationForPeers(ctx context.Context, url string) (string, error) {
+	token, err := githubToken(ctx)
+	if err != nil {
+		return "", err
+	}
+	return githubLocate(ctx, token, url)
+}
+
+// githubLocate is the Location GitHub's redirect for url names, at the shared
+// pace: an archive's signed URL, which whoever is handed it fetches.
+func githubLocate(ctx context.Context, token, url string) (string, error) {
+	if err := githubPace.Wait(ctx); err != nil {
+		return "", errors.Wrap(err, "waiting for a turn to ask github")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", errors.Wrapf(err, "building the request for %s", url)
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	client := &http.Client{
+		Timeout:       20 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", errors.Wrapf(err, "asking %s", url)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusFound {
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if readErr != nil {
+			return "", errors.Wrapf(readErr, "github answered %d for %s, and what it said did not read", resp.StatusCode, url)
+		}
+		return "", errors.Newf("github answered %d for %s, not where it points: %s", resp.StatusCode, url, strings.TrimSpace(string(body)))
+	}
+	location := resp.Header.Get("Location")
+	if location == "" {
+		return "", errors.Newf("github answered %d for %s and named no Location", resp.StatusCode, url)
+	}
+	return location, nil
+}
+
 // "can k make use of the github integration setup on q ?"
 // githubThroughThePrimary is a peer's ask of GitHub: through its primary,
 // which holds the token, so the peer carries none.

@@ -92,7 +92,8 @@ type Handler struct {
 	logsInElsewhere bool
 	elsewhere       elsewhereJourneys
 	// How this primary asks GitHub for a peer (github_for_peers.go).
-	githubForPeers GitHubGet
+	githubForPeers         GitHubGet
+	githubLocationForPeers GitHubLocate
 	// nodes.peers: this primary's peers, by did:key and by name, and the
 	// tokens people are carried to them with.
 	carried  carriedTokens
@@ -169,18 +170,19 @@ func New(db *sql.DB, rpID string, rpOrigins []string, serverPort, frontendPort i
 	}
 
 	h := &Handler{
-		webauthn:       w,
-		ownOrigins:     rpOrigins,
-		githubForPeers: asksGitHubForNobody,
-		creds:          newCredentialStore(db, logger),
-		sessions:       newSessionStore(sessionExpiryHours).kept(db, logger),
-		invitations:    newInvitationTable(db),
-		tokens:         tokens,
-		users:          users,
-		secureCookies:  secureCookies,
-		loopbackOrigin: fmt.Sprintf("http://127.0.0.1:%d", serverPort),
-		logger:         logger,
-		corsWrap:       corsWrap,
+		webauthn:               w,
+		ownOrigins:             rpOrigins,
+		githubForPeers:         asksGitHubForNobody,
+		githubLocationForPeers: locatesGitHubForNobody,
+		creds:                  newCredentialStore(db, logger),
+		sessions:               newSessionStore(sessionExpiryHours).kept(db, logger),
+		invitations:            newInvitationTable(db),
+		tokens:                 tokens,
+		users:                  users,
+		secureCookies:          secureCookies,
+		loopbackOrigin:         fmt.Sprintf("http://127.0.0.1:%d", serverPort),
+		logger:                 logger,
+		corsWrap:               corsWrap,
 	}
 	h.SetIdentities(rootIdentities, bindingSigners)
 	if err := h.becomings.kept(db, logger); err != nil {
@@ -532,6 +534,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(linesPath, h.handleLines)
 	// A peer asks GitHub through this node, signing as itself.
 	mux.answer(githubForPeersPath, h.handleGitHubForPeers)
+	mux.answer(githubLocationForPeersPath, h.handleGitHubLocationForPeers)
 	// A node whose people log in at another sends them there and takes them back.
 	mux.answer(elsewherePath, h.handleElsewhere)
 	mux.answer(elsewhereBackPath, h.handleElsewhereBack)

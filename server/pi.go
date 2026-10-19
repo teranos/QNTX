@@ -22,10 +22,10 @@ func (s *QNTXServer) piHarness() *harness {
 	named := func() appcfg.PiConfig { return s.deps.cfg.Agent.Root.Pi }
 	return &harness{
 		name: "pi", called: "Pi", file: piSessionFile,
-		named: func() bool { return named().Named() },
-		absent:      s.thereIsNoPi,
-		fetching:    "Pi is still being built",
-		spec:        func() agentSpec { return agentSpec{} },
+		named:    func() bool { return named().Named() },
+		absent:   s.thereIsNoPi,
+		fetching: "Pi is still being built",
+		spec:     func() agentSpec { return agentSpec{} },
 		part: func(_ context.Context, _ sigil.Sent, agent *rootAgent, _ agentSpec) (aTurn, *protocol.Refusal) {
 			return s.piPart(named(), agent), nil
 		},

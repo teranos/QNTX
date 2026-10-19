@@ -195,8 +195,10 @@ type QNTXServer struct {
 	embeddingStore              *storage.EmbeddingStore
 	embeddingClusterInvalidator func() // called after re-cluster to invalidate centroid cache
 	// How ci.watch asks GitHub and with what: this node's own token, or its primary's way (sub_auth.go).
-	ciGitHubGet        func(ctx context.Context, token, url string) ([]byte, error)
-	ciGitHubToken      func(ctx context.Context) (string, error)
+	ciGitHubGet   func(ctx context.Context, token, url string) ([]byte, error)
+	ciGitHubToken func(ctx context.Context) (string, error)
+	// How a comet's build asks GitHub on a peer: through its primary (sub_auth.go, comet.go).
+	primaryGitHub      primaryGitHub
 	watcherDB          *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)
 	pulseReadDB        *sql.DB            // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
 	walCheckpointer    WALCheckpointer    // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
