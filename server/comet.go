@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -74,14 +76,38 @@ func (s *QNTXServer) groundAgent(home string) {
 	err := comet.Under(home)
 	if err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built", "home", home, "because", err.Error())
-		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround)
+		return
+	}
+	// A ground that stands loads from the store a deploy collects (plugin_roots.go): kept, or built again.
+	if err := s.keepAgentGround(home); err != nil {
+		s.logger.Named("comet").Infow("An agent's ground is built again: what it loads from was not kept", "home", home, "because", err.Error())
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround)
 		return
 	}
 	// A ground that stands is run by the settings this node writes, not by those an older one wrote.
 	if err := comet.AgentSettings(home); err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built again: its settings did not write", "home", home, "because", err.Error())
-		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround)
 	}
+}
+
+// keepAgentGround roots every store path the agent's ground loads from beside it, and fetches any a
+// collection took: on 2026-10-19 a deploy took its glibc, and the ground stood and ran nothing.
+func (s *QNTXServer) keepAgentGround(home string) error {
+	ground := comet.AgentGround(home)
+	data, err := os.ReadFile(ground)
+	if err != nil {
+		return errors.Wrapf(err, "the agent's ground at %s did not read", ground)
+	}
+	fetched, collected, err := rootStorePaths(s.ctx, filepath.Join(nixBin, "nix-store"), ground, data, filepath.Join(filepath.Dir(ground), storeRootsDir))
+	if err != nil {
+		return err
+	}
+	if collected {
+		s.logger.Named("comet").Infow("What an agent's ground loads from had been collected, and is fetched and kept again", "home", home, "fetched", fetched)
+	}
+	return nil
 }
 
 // cometsMovedBy rebuilds each comet the node keeps that the push moves, and names them.
@@ -101,7 +127,7 @@ func (s *QNTXServer) cometsMovedBy(push forge.Push) []string {
 	// An agent's ground is built from ground's main as every comet is.
 	if strings.EqualFold(push.Repo.Path, comet.Ground.Owner+"/"+comet.Ground.Repo) && push.Branch() == comet.Ground.Branch {
 		for _, home := range s.underGround.all() {
-			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
+			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround)
 			rebuilding = append(rebuilding, "the ground of the agent in "+home)
 		}
 	}
