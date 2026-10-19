@@ -34,7 +34,7 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 - What it is told, what it reaches for and what it answers, it attests under
   its session by its own DID, as the hook events a transcript is read from.
 
-"ROOT is ROOT"
+"NDOE is ROOT"
 
 "i want to be able to do anything"
 
