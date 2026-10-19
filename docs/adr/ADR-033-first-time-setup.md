@@ -13,7 +13,7 @@ auth state.
 
 "Because this is a new root box without a user and only root_identities set, the first glyph you see isnt the auth glyph"
 
-"Its a wizard anyone can see"
+"Its a wizard anyone can see "
 
 "only one of the root_identities are able to proof who they are so those are the only ones allowed o continue from here."
 
