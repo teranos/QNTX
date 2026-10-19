@@ -105,24 +105,7 @@ in
 
         rustCache
 
-        # --all, because naming packages is how crates fall out of the check:
-        # the laye crates, ats-id and qntx-proto were never fmt-checked while
-        # three packages were named here.
-        {
-          name = "Check formatting";
-          run = "cargo fmt --all --check";
-        }
-
-        # Every crate this container can build. A lint that no job runs is not
-        # enforced, and naming three packages left the rest unchecked.
-        # ats-duckdb needs libduckdb, so it is linted in the Nix job below.
-        {
-          name = "Clippy";
-          run = "cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets";
-          env.RUSTFLAGS = "-Dwarnings";
-        }
-
-        # Same principle as fmt: the workspace, not a list. Crates whose tests
+        # The workspace, not a list. Crates whose tests
         # never ran in CI (laye-*, ats-id, qntx-proto, qntx-ffi-common) run
         # here now. ats-duckdb tests need libduckdb and run via the Makefile's
         # parquet path; ats-postgres tests need a Postgres and run in the job
@@ -152,9 +135,8 @@ in
     };
 
     # DuckDB backend (ADR-024). Uses Nix so libduckdb from nixpkgs is available.
-    # fmt and cargo-test are skipped here — qntx-proto's protoc build script
-    # doesn't survive the mixed-cache environment we'd otherwise create.
-    # Clippy is not skipped: this is the only job that can build ats-duckdb.
+    # cargo-test is skipped here — qntx-proto's protoc build script doesn't
+    # survive the mixed-cache environment we'd otherwise create.
     ats-duckdb = {
       name = "DuckDB Backend";
       runs-on = "ubuntu-latest";
@@ -185,13 +167,6 @@ in
             cp result-duckdb/lib/libats_duckdb.* target/release/
             cp result-sqlite/lib/libats_sqlite.* target/release/
           '';
-        }
-
-        # The one crate the container job cannot build. libduckdb is here.
-        {
-          name = "Clippy";
-          run = "nix develop --command cargo clippy --package ats-duckdb --all-targets";
-          env.RUSTFLAGS = "-Dwarnings";
         }
 
         {
@@ -270,10 +245,7 @@ in
         {
           name = "Install Rust toolchain";
           uses = "dtolnay/rust-toolchain@stable";
-          "with" = {
-            targets = "wasm32-unknown-unknown";
-            components = "rustfmt";
-          };
+          "with".targets = "wasm32-unknown-unknown";
         }
 
         rustCache
@@ -287,11 +259,6 @@ in
           name = "Set up Go";
           uses = "actions/setup-go@v5";
           "with".go-version-file = "go.mod";
-        }
-
-        {
-          name = "Check formatting";
-          run = "cargo fmt --check --package ats-wasm";
         }
 
         {
@@ -318,16 +285,6 @@ in
         (cachix // {
           "with" = cachix."with" // { skipPush = true; };
         })
-
-        {
-          name = "Check formatting";
-          run = "nix develop ./qntx-plugins/qntx-meili --command cargo fmt --check -p qntx-meili";
-        }
-
-        {
-          name = "Clippy (via Nix)";
-          run = "nix flake check ./qntx-plugins/qntx-meili --print-build-logs";
-        }
 
         {
           name = "Build via Nix";

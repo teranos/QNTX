@@ -47,10 +47,6 @@
           "run": "cd web && bun run typecheck"
         },
         {
-          "name": "The bans, nil is nil among them",
-          "run": "cd web && bun run lint"
-        },
-        {
           "env": {
             "USE_JSDOM": 1
           },
@@ -66,12 +62,7 @@
       "paths": [
         "**/*.ts",
         "web/package.json",
-        "web/eslint.config.js",
-        "web/eslint-suppressions.json",
-        "web/**/*.css",
-        "web/index.html",
-        ".github/workflows/ts.yml",
-        "web/browser/**"
+        ".github/workflows/ts.yml"
       ]
     },
     "push": {

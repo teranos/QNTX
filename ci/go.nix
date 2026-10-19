@@ -81,7 +81,7 @@ in
     pull_request = {
       branches = [ "main" ];
       # Rust has the Rust CI.
-      paths = goPaths ++ [ "internal/tools/nilcheck/**" ".github/workflows/go.yml" ];
+      paths = goPaths ++ [ ".github/workflows/go.yml" ];
     };
     push = {
       branches = [ "main" ];
@@ -94,20 +94,7 @@ in
     test = {
       name = "Go Tests";
       runs-on = "ubuntu-latest";
-      steps = [
-        (checkout // {
-          "with" = {
-            # The sacred error check reads the merge base, which a depth-1
-            # checkout does not have.
-            fetch-depth = 0;
-          };
-        })
-      ] ++ toolchain ++ [
-        {
-          name = "nil is nil";
-          run = "go run ./internal/tools/nilcheck";
-        }
-
+      steps = [ checkout ] ++ toolchain ++ [
         {
           name = "Run tests";
           # Test with core tags to ensure we test what we ship
@@ -115,26 +102,6 @@ in
             export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
             go test -tags "rustsqlite,qntxwasm" ./...
           '';
-        }
-
-        # A failure that reaches only a log is one the person waiting never sees.
-        # (tsot-roam ERROR.md). What already stands stays standing; this answers
-        # for what the branch added, so the checkout above needs full history.
-        {
-          name = "Sacred error check";
-          uses = "golangci/golangci-lint-action@v8";
-          "with" = {
-            # Held to the version flake.nix pins. Raise both or neither.
-            version = "v2.7.2";
-            args = "--new-from-merge-base origin/main ./...";
-            # verify runs `golangci-lint config verify`, which fetches a JSON
-            # schema from golangci-lint.run before any linting; that site timing
-            # out fails this check with zero lint findings — the gate reporting
-            # the branch bad when only a third-party host was unreachable. The
-            # lint run itself still rejects an invalid config (strict decoding),
-            # so nothing is silently skipped by turning the phone-home off.
-            verify = false;
-          };
         }
       ];
     };

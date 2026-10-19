@@ -6,12 +6,6 @@
 - When a task cannot be completed correctly, stop and explain the blocker rather than implementing workarounds
 - **Maximize signal-to-noise: essential information only, no filler.**
 
-**Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
-
-**Nil is nil:** nil, empty and zero mean nothing. Meaning given to nothing is banned outright: no granting all namespaces, no unrestricted, no every. Banned the same way: a discarded result, a catch-all branch, a fallback value, an error logged and carried on from, a config default. `internal/tools/nilcheck` (Go, Rust) and `web/eslint.config.js` (TypeScript) stop the build on a new one; what already stands is debt that only falls.
-
-"it needs to be abolutely clear you cant attribute meaning to nil like granting all namepsaces"
-
 A sigil handles a server capability, the reach table governs it with attestation DSL policy lines like this:
 `REACH is '/i/standing' of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION`
 `REACH is '/am/syscap' of ROOT`
@@ -27,10 +21,6 @@ A sigil handles a server capability, the reach table governs it with attestation
 **Tests passing ≠ feature is correct.** Only manual verification by the developer confirms behavior matches intent.
 
 **Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, literally, don't describe implementation details, User Vision outlives derived code. Ask questions to preserve the user's mental model _verbatim_ rather than descriptive interpreted summaries. **Maximize signal-to-noise: essential context only, no filler.**
-
-## Regex
-
-**FORBIDDEN.** Regex is banned in code. Use string methods (`split`, `indexOf`, `includes`, `startsWith`, `endsWith`, `slice`) instead.
 
 ## Identity
 

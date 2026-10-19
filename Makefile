@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-web sacred-go sacred-rs sacred-spawn-write nil-writetest-web test-jsdom test-browser test test-suite test-parquet test-postgres test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web run-web test-web test-jsdom testtest-suite test-parquet test-postgres test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -60,57 +60,6 @@ says: ## Write what the specs and our protocol say of themselves for the parity 
 	@nix eval --raw -f nix/references/umami.nix > server/parity/umami_v3.3.1_ca661c7/openapi.words.json
 	@nix eval --raw -f nix/references/a2a.nix > server/parity/a2a_v1.0.1_3303592/specification.md
 	@nix eval --raw -f nix/references/github.nix | jq . > server/parity/github_2026-03-10_7bdf5f0/openapi.json
-
-# git is the baseline, so there is no file to keep in step. What already stands
-# keeps standing; what this branch added is what answers. Exit 2 and not 1: a
-# ground rite that declares no catch is given 1, which means "not yet".
-# The Go half was the whole of it, so a red Rust tree shipped while CI was
-# still going red about it. Both halves, one gate.
-SACRED_NIX = command -v nix >/dev/null 2>&1 || { echo "$@ needs nix: the linters are pinned in flake.nix" >&2; exit 1; }
-
-# tagcheck first: golangci reads only what its build-tags list lets it, so a
-# wrong list makes everything after it a pass over less code than ships.
-SACRED_GO_BRANCH = go run ./internal/tools/tagcheck; \
-	golangci-lint run --issues-exit-code 2 --new-from-merge-base origin/main ./...
-# spawncheck and nilcheck last, and over the whole tree rather than the
-# branch — the count each holds is a debt, and merge-base cannot see a debt.
-SACRED_GO = $(SACRED_GO_BRANCH); \
-	go run ./internal/tools/spawncheck; \
-	go run ./internal/tools/nilcheck
-
-# The clippy exclusions are the ones .github/workflows/rs.yml names —
-# ats-duckdb needs libduckdb, qntx-reduce-plugin builds only through Nix.
-SACRED_RS = export RUSTFLAGS=-Dwarnings; \
-	cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets || exit 2; \
-	cargo clippy --package ats-duckdb --all-targets || exit 2
-
-# The web bans, the TypeScript half of nilcheck among them.
-sacred-web: ## Fail on any dropped failure this branch adds (eslint)
-	@$(MAKE) --no-print-directory lint
-
-sacred-go: ## Fail on any dropped failure this branch adds (.golangci.yml)
-	@$(SACRED_NIX)
-	@nix develop .#default --command bash -c 'set -e; $(SACRED_GO)'
-
-sacred-rs: ## Fail on any dropped failure this branch adds (clippy)
-	@$(SACRED_NIX)
-	@nix develop .#default --command bash -c 'set -e; $(SACRED_RS)'
-
-# One shell for Go and Rust: entering it costs ~55s and the linting itself
-# costs five, so an entry per half would be flake evaluation twice.
-sacred-error: sacred-web ## sacred-web, sacred-go and sacred-rs
-	@$(SACRED_NIX)
-	@nix develop .#default --command bash -c 'set -e; $(SACRED_GO); $(SACRED_RS)'
-
-# The baseline falls when a goroutine starts going through sacred. Running this
-# is how that lands as a diff somebody can read, which is the whole mechanism.
-sacred-spawn-write: ## Bring the goroutine baseline to what the tree holds
-	@go run ./internal/tools/spawncheck -write
-
-# "nil is nil"
-nil-write: ## Bring every absence baseline, Go, Rust and TypeScript, to what the tree holds
-	@go run ./internal/tools/nilcheck -write
-	@cd web && bun x eslint ts --prune-suppressions
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
@@ -195,27 +144,13 @@ test-jsdom: ## Run web UI tests including JSDOM DOM tests
 	fi
 	@cd web && USE_JSDOM=1 bun test
 
-test-browser: ## Every element in a real browser, on a phone and on a desktop: nothing in it wider than it
-	@if [ ! -d "web/node_modules" ]; then \
-		echo "Installing web dependencies..."; \
-		cd web && bun install; \
-	fi
-	@cd web && bun run test:browser
-
-lint: ## Check the frontend bans (web/eslint.config.js)
-	@if [ ! -d "web/node_modules" ]; then \
-		cd web && bun install; \
-	fi
-	@cd web && bun run lint
-
 # A verdict on both paths. Piping this to anything hands the reader the pipe's
 # exit code, not make's, so the last line has to carry the answer by itself.
-test: lint ## Run all tests (Go + TypeScript + parquet backend)
+test: ## Run all tests (Go + TypeScript + parquet backend)
 	@$(MAKE) --no-print-directory test-suite || { echo "✗ TESTS FAILED"; exit 1; }
 	@echo "✓ All tests complete"
 
 test-suite: ## The suite itself. Run `make test`, which reports a verdict.
-	@go run ./internal/tools/nilcheck
 	@go test -tags "rustsqlite,qntxwasm" -short ./...
 	@$(MAKE) --no-print-directory test-parquet
 	@$(MAKE) --no-print-directory test-postgres

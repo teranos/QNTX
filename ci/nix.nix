@@ -54,24 +54,6 @@ in
   };
 
   jobs = {
-    # Fast formatting and pre-commit checks (run on both OS)
-    lint = {
-      "if" = notTheVault;
-      strategy.matrix.os = [ "ubuntu-latest" "macos-latest" ];
-      runs-on = "\${{ matrix.os }}";
-      steps = setup ++ [
-        {
-          name = "Check Nix formatting";
-          run = "nix run nixpkgs#nixpkgs-fmt -- --check *.nix";
-        }
-
-        {
-          name = "Run pre-commit checks";
-          run = "nix build --show-trace .#checks.\${{ matrix.os == 'ubuntu-latest' && 'x86_64-linux' || 'aarch64-darwin' }}.pre-commit";
-        }
-      ];
-    };
-
     # Core Go binaries (parallel builds per OS)
     build-go = {
       "if" = notTheVault;

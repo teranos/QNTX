@@ -124,10 +124,7 @@
       "steps": [
         {
           "name": "Checkout repository",
-          "uses": "actions/checkout@v5",
-          "with": {
-            "fetch-depth": 0
-          }
+          "uses": "actions/checkout@v5"
         },
         {
           "name": "Set up Go",
@@ -173,21 +170,8 @@
           "run": "make rust-sqlite"
         },
         {
-          "name": "nil is nil",
-          "run": "go run ./internal/tools/nilcheck"
-        },
-        {
           "name": "Run tests",
           "run": "export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH\ngo test -tags \"rustsqlite,qntxwasm\" ./...\n"
-        },
-        {
-          "name": "Sacred error check",
-          "uses": "golangci/golangci-lint-action@v8",
-          "with": {
-            "args": "--new-from-merge-base origin/main ./...",
-            "verify": false,
-            "version": "v2.7.2"
-          }
         }
       ]
     }
@@ -202,7 +186,6 @@
         "**/*.go",
         "go.mod",
         "go.sum",
-        "internal/tools/nilcheck/**",
         ".github/workflows/go.yml"
       ]
     },

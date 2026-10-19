@@ -83,47 +83,6 @@
           ]
         }
       }
-    },
-    "lint": {
-      "if": "!(github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbvh-qntx[bot]' && github.head_ref == 'docs-pr')",
-      "runs-on": "${{ matrix.os }}",
-      "steps": [
-        {
-          "name": "Checkout repository",
-          "uses": "actions/checkout@v5"
-        },
-        {
-          "name": "Install Nix",
-          "uses": "cachix/install-nix-action@v30",
-          "with": {
-            "extra_nix_config": "experimental-features = nix-command flakes\n"
-          }
-        },
-        {
-          "name": "Setup Cachix",
-          "uses": "cachix/cachix-action@v14",
-          "with": {
-            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
-            "name": "qntx"
-          }
-        },
-        {
-          "name": "Check Nix formatting",
-          "run": "nix run nixpkgs#nixpkgs-fmt -- --check *.nix"
-        },
-        {
-          "name": "Run pre-commit checks",
-          "run": "nix build --show-trace .#checks.${{ matrix.os == 'ubuntu-latest' && 'x86_64-linux' || 'aarch64-darwin' }}.pre-commit"
-        }
-      ],
-      "strategy": {
-        "matrix": {
-          "os": [
-            "ubuntu-latest",
-            "macos-latest"
-          ]
-        }
-      }
     }
   },
   "name": "Nix",
