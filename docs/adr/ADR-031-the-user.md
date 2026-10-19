@@ -10,7 +10,6 @@ Date: 2026-08-18
 - phone numbers.
 - `auth.root_identities` lists ways to reach a User, not Users ([[ADR-030-identity-providers]]).
 - There is one ROOT User. A SUPER User is created by it and by nobody else ([[ADR-027-Permissions]]).
-
 - Every User has provenance: the record names the User that created it, whatever the level. The ROOT User is to name the node that signed its first admission — a node is
   the one thing that exists before any User does.
 - A User carries the signed binding for each account it holds. Storing a binding is not
