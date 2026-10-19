@@ -56,7 +56,7 @@ func gitBlobSHA(content []byte) string {
 // repoNotes is every note under folder of repo on branch, its folders'
 // own included.
 func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, folder string) ([]repoNote, error) {
-	reader, err := s.readers().For(repo)
+	reader, err := s.forges().For(repo)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 
 // repoNoteContent is a note's content on branch.
 func (s *QNTXServer) repoNoteContent(ctx context.Context, repo forge.Repo, branch, file string) ([]byte, error) {
-	reader, err := s.readers().For(repo)
+	reader, err := s.forges().For(repo)
 	if err != nil {
 		return nil, err
 	}

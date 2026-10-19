@@ -13,7 +13,6 @@ package server
 
 import (
 	"context"
-	"encoding/base64"
 	"io/fs"
 	"os"
 	"path"
@@ -23,9 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
 )
@@ -135,39 +134,33 @@ type vaultSent struct {
 	Refused   error
 }
 
-// branchHeld makes sure branch is on owner/repo, made from the default branch
-// when it is not yet.
+// branchHeld makes sure branch is on the source's repository, made from the
+// default branch when it is not yet.
 func (s *QNTXServer) branchHeld(ctx context.Context, source buildSource, branch string) error {
-	at := services.AsInstallation(ctx)
-	on, err := source.onGitHub()
+	host, err := s.forges().For(source.Repo)
 	if err != nil {
 		return err
 	}
-	got, err := s.gitHubService().GetABranch(at, &protocol.GitHubGetABranchRequest{Owner: on.Owner, Repo: on.Name, Branch: branch})
-	if err != nil {
-		return errors.Wrapf(err, "%s of %s was not asked", branch, on)
+	_, err = host.Branch(ctx, forge.AsApp, source.Repo, branch)
+	var absent forge.Refused
+	if !errors.As(err, &absent) {
+		return err
 	}
-	if got.GetSuccess() {
-		return nil
-	}
-	from, err := s.gitHubService().GetABranch(at, &protocol.GitHubGetABranchRequest{Owner: on.Owner, Repo: on.Name, Branch: source.Branch})
-	if err != nil {
-		return errors.Wrapf(err, "%s of %s was not asked", source.Branch, on)
-	}
-	if !from.GetSuccess() {
+	from, err := host.Branch(ctx, forge.AsApp, source.Repo, source.Branch)
+	var fromAbsent forge.Refused
+	if errors.As(err, &fromAbsent) {
 		return errors.Newf("%s is not on %s (%s), and %s, which it would be made from, is not either: %s",
-			branch, on, got.GetError(), source.Branch, from.GetError())
+			branch, source.Repo, absent.Says, source.Branch, fromAbsent.Says)
 	}
-	made, err := s.gitHubService().CreateAReference(at, &protocol.GitHubCreateAReferenceRequest{
-		Owner: on.Owner, Repo: on.Name, Ref: "refs/heads/" + branch, Sha: from.GetCommit().GetSha()})
 	if err != nil {
-		return errors.Wrapf(err, "%s was not asked to be made on %s", branch, on)
+		return err
 	}
-	if !made.GetSuccess() {
-		return errors.Newf("%s is not on %s (%s), and was not made from %s: %s",
-			branch, on, got.GetError(), source.Branch, made.GetError())
+	err = host.CreateBranch(ctx, forge.AsApp, source.Repo, branch, from)
+	var refused forge.Refused
+	if errors.As(err, &refused) {
+		return errors.Newf("%s is not on %s (%s), and was not made from %s: %s", branch, source.Repo, absent.Says, source.Branch, refused.Says)
 	}
-	return nil
+	return err
 }
 
 // sendVaultFolder commits each note the vault holds differently from branch,
@@ -180,7 +173,7 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		sent.Refused = err
 		return sent
 	}
-	on, err := source.onGitHub()
+	host, err := s.forges().For(source.Repo)
 	if err != nil {
 		sent.Refused = err
 		return sent
@@ -191,7 +184,7 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		return sent
 	}
 	if defaultBranch != source.Branch {
-		sent.Refused = errors.Newf("the default branch of %s is now %s, not %s: bind %s again", on, defaultBranch, source.Branch, place)
+		sent.Refused = errors.Newf("the default branch of %s is now %s, not %s: bind %s again", source.Repo, defaultBranch, source.Branch, place)
 		return sent
 	}
 	if err := s.branchHeld(ctx, source, branch); err != nil {
@@ -207,7 +200,6 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 	for _, note := range onBranch {
 		held[note.under] = note
 	}
-	at := services.AsInstallation(ctx)
 	unders := make([]string, 0, len(notes))
 	for under := range notes {
 		unders = append(unders, under)
@@ -220,20 +212,19 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 			continue
 		}
 		file := path.Join(source.Path, under)
-		put := &protocol.GitHubCreateOrUpdateFileContentsRequest{
-			Owner: on.Owner, Repo: on.Name, Path: file, Branch: branch,
-			Message: vault.Name + ": " + path.Join(place, under), Content: base64.StdEncoding.EncodeToString(content),
-		}
+		message := vault.Name + ": " + path.Join(place, under)
 		if there {
-			put.Sha = was.sha
+			err = host.ReplaceFile(ctx, forge.AsApp, source.Repo, branch, file, content, was.sha, message)
+		} else {
+			err = host.AddFile(ctx, forge.AsApp, source.Repo, branch, file, content, message)
 		}
-		answered, err := s.gitHubService().CreateOrUpdateFileContents(at, put)
-		if err != nil {
-			sent.Refused = errors.Wrapf(err, "%s was not asked to be committed to %s of %s", file, branch, on)
+		var refused forge.Refused
+		if errors.As(err, &refused) {
+			sent.Refused = errors.Newf("%s was not committed to %s of %s: %s", file, branch, source.Repo, refused.Says)
 			return sent
 		}
-		if !answered.GetSuccess() {
-			sent.Refused = errors.Newf("%s was not committed to %s of %s: %s", file, branch, on, answered.GetError())
+		if err != nil {
+			sent.Refused = err
 			return sent
 		}
 		sent.Committed = append(sent.Committed, file)
@@ -242,16 +233,15 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		if _, kept := notes[note.under]; kept {
 			continue
 		}
-		answered, err := s.gitHubService().DeleteAFile(at, &protocol.GitHubDeleteAFileRequest{
-			Owner: on.Owner, Repo: on.Name, Path: note.path, Branch: branch, Sha: note.sha,
-			Message: vault.Name + ": " + path.Join(place, note.under) + " is gone from the vault",
-		})
-		if err != nil {
-			sent.Refused = errors.Wrapf(err, "%s was not asked to be removed from %s of %s", note.path, branch, on)
+		err := host.DeleteFile(ctx, forge.AsApp, source.Repo, branch, note.path, note.sha,
+			vault.Name+": "+path.Join(place, note.under)+" is gone from the vault")
+		var refused forge.Refused
+		if errors.As(err, &refused) {
+			sent.Refused = errors.Newf("%s was not removed from %s of %s: %s", note.path, branch, source.Repo, refused.Says)
 			return sent
 		}
-		if !answered.GetSuccess() {
-			sent.Refused = errors.Newf("%s was not removed from %s of %s: %s", note.path, branch, on, answered.GetError())
+		if err != nil {
+			sent.Refused = err
 			return sent
 		}
 		sent.Removed = append(sent.Removed, note.path)
@@ -264,37 +254,34 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 // pullHeld is the open pull request from branch into the default branch,
 // opened when the vault just sent something and none is open.
 func (s *QNTXServer) pullHeld(ctx context.Context, source buildSource, branch, vault, place string, sentSomething bool) (string, error) {
-	at := services.AsInstallation(ctx)
-	on, err := source.onGitHub()
+	host, err := s.forges().For(source.Repo)
 	if err != nil {
 		return "", err
 	}
-	open, err := s.gitHubService().ListPullRequests(at, &protocol.GitHubListPullRequestsRequest{
-		Owner: on.Owner, Repo: on.Name, State: "open", Head: on.Owner + ":" + branch, Base: source.Branch})
+	open, found, err := host.ChangeFrom(ctx, forge.AsApp, source.Repo, branch, source.Branch)
+	var refused forge.Refused
+	if errors.As(err, &refused) {
+		return "", errors.Newf("the open pull requests from %s of %s were not listed: %s", branch, source.Repo, refused.Says)
+	}
 	if err != nil {
-		return "", errors.Wrapf(err, "the open pull requests from %s of %s were not asked", branch, on)
+		return "", err
 	}
-	if !open.GetSuccess() {
-		return "", errors.Newf("the open pull requests from %s of %s were not listed: %s", branch, on, open.GetError())
-	}
-	if len(open.GetItems()) > 0 {
-		return open.GetItems()[0].GetHtmlUrl(), nil
+	if found {
+		return open.URL, nil
 	}
 	if !sentSomething {
 		return "", nil
 	}
-	made, err := s.gitHubService().CreateAPullRequest(at, &protocol.GitHubCreateAPullRequestRequest{
-		Owner: on.Owner, Repo: on.Name, Head: branch, Base: source.Branch,
-		Title: "Obsidian " + vault + ": " + place,
-		Body:  "What the vault " + vault + " holds in " + place + ", sent to " + branch + " (QNTX ADR-049). It stays open, and is merged when somebody merges it.",
-	})
+	made, err := host.NewChange(ctx, forge.AsApp, source.Repo, branch, source.Branch,
+		"Obsidian "+vault+": "+place,
+		"What the vault "+vault+" holds in "+place+", sent to "+branch+" (QNTX ADR-049). It stays open, and is merged when somebody merges it.")
+	if errors.As(err, &refused) {
+		return "", errors.Newf("no pull request from %s into %s of %s was opened: %s", branch, source.Branch, source.Repo, refused.Says)
+	}
 	if err != nil {
-		return "", errors.Wrapf(err, "a pull request from %s of %s was not asked for", branch, on)
+		return "", err
 	}
-	if !made.GetSuccess() {
-		return "", errors.Newf("no pull request from %s into %s of %s was opened: %s", branch, source.Branch, on, made.GetError())
-	}
-	return made.GetHtmlUrl(), nil
+	return made.URL, nil
 }
 
 // vaultLooked is what a sending folder held when it was last sent, and when
@@ -428,32 +415,32 @@ func (s *QNTXServer) SendVaults() {
 // sendState is what a folder that sends is now: its branch, whether that
 // branch holds anything the default branch does not, and its open pull request.
 func (s *QNTXServer) sendState(ctx context.Context, source buildSource, branch string) (state, pull string, err error) {
-	at := services.AsInstallation(ctx)
-	on, err := source.onGitHub()
+	host, err := s.forges().For(source.Repo)
 	if err != nil {
 		return "", "", err
 	}
-	got, err := s.gitHubService().GetABranch(at, &protocol.GitHubGetABranchRequest{Owner: on.Owner, Repo: on.Name, Branch: branch})
-	if err != nil {
-		return "", "", errors.Wrapf(err, "%s of %s was not asked", branch, on)
-	}
-	if !got.GetSuccess() {
+	_, err = host.Branch(ctx, forge.AsApp, source.Repo, branch)
+	var absent forge.Refused
+	if errors.As(err, &absent) {
 		// Nothing was sent yet, so the branch is still to be made.
 		return vaultUnchanged, "", nil
 	}
-	compared, err := s.gitHubService().CompareTwoCommits(at, &protocol.GitHubCompareTwoCommitsRequest{
-		Owner: on.Owner, Repo: on.Name, Basehead: source.Branch + "..." + branch})
 	if err != nil {
-		return "", "", errors.Wrapf(err, "%s and %s of %s were not asked to be compared", source.Branch, branch, on)
+		return "", "", err
 	}
-	if !compared.GetSuccess() {
-		return "", "", errors.Newf("%s and %s of %s were not compared: %s", source.Branch, branch, on, compared.GetError())
+	compared, err := host.Compare(ctx, forge.AsApp, source.Repo, source.Branch, branch)
+	var refused forge.Refused
+	if errors.As(err, &refused) {
+		return "", "", errors.Newf("%s and %s of %s were not compared: %s", source.Branch, branch, source.Repo, refused.Says)
+	}
+	if err != nil {
+		return "", "", err
 	}
 	pull, err = s.pullHeld(ctx, source, branch, "", "", false)
 	if err != nil {
 		return "", "", err
 	}
-	if len(compared.GetFiles()) > 0 {
+	if compared.Files > 0 {
 		return vaultChanges, pull, nil
 	}
 	return vaultUnchanged, pull, nil

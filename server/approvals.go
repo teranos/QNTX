@@ -26,8 +26,8 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -106,13 +106,14 @@ func (a *approvalState) waits() bool {
 	return a.said == saysMergeWhenReady
 }
 
-// ownerAndName is the repository as GitHub takes it in a path, in two.
-func (a *approvalState) ownerAndName() (string, string, error) {
-	owner, name, slashed := strings.Cut(a.repo, "/")
-	if !slashed {
-		return "", "", errors.Newf("%s names its repository %q, which is not owner/repo", a.subject, a.repo)
+// forgeRepo is the repository the approval is about. Approvals come from the
+// GitHub App's webhook, which names a repository owner/repo, so it is on GitHub.
+func (a *approvalState) forgeRepo() (forge.Repo, error) {
+	repo, err := forge.ParseRepo(forge.GitHub + "/" + a.repo)
+	if err != nil {
+		return forge.Repo{}, errors.Wrapf(err, "%s names its repository %q, which is not owner/repo", a.subject, a.repo)
 	}
-	return owner, name, nil
+	return repo, nil
 }
 
 // headOf is the first of a line's words. A line with none names nothing, and
@@ -361,48 +362,50 @@ func (s *QNTXServer) HandleApprovalAnswer(w http.ResponseWriter, r *http.Request
 // App's installation where the repository is, and writes the merge down by
 // the human who answered: the node did it, and the human decided it.
 func (s *QNTXServer) mergeApproval(ctx context.Context, st *approvalState) (string, error) {
-	owner, name, err := st.ownerAndName()
+	repo, err := st.forgeRepo()
 	if err != nil {
 		return "", err
 	}
-	said, err := s.gitHubService().MergeAPullRequest(services.AsInstallation(ctx), &protocol.GitHubMergeAPullRequestRequest{
-		Owner: owner, Repo: name, PullNumber: st.pull, Sha: st.sha, MergeMethod: "merge",
-	})
+	host, err := s.forges().For(repo)
+	if err != nil {
+		return "", err
+	}
+	mergeSha, err := host.MergeChange(ctx, forge.AsApp, repo, st.pull, st.sha)
+	var refused forge.Refused
+	if errors.As(err, &refused) {
+		if err := s.approvalLine(s.nodeActor(), st.subject, watcher.ApprovalFailed, st.repo, map[string]any{"sha": st.sha, "error": refused.Says}); err != nil {
+			return "", errors.Wrapf(err, "GitHub refused to merge %s at %s (%s), and the refusal was not written down", st.subject, st.sha, refused.Says)
+		}
+		return "", errors.Newf("GitHub refused to merge %s at %s: %s", st.subject, st.sha, refused.Says)
+	}
 	if err != nil {
 		return "", errors.Wrapf(err, "GitHub was not asked to merge %s", st.subject)
 	}
-	if !said.GetSuccess() {
-		if err := s.approvalLine(s.nodeActor(), st.subject, watcher.ApprovalFailed, st.repo, map[string]any{"sha": st.sha, "error": said.GetError()}); err != nil {
-			return "", errors.Wrapf(err, "GitHub refused to merge %s at %s (%s), and the refusal was not written down", st.subject, st.sha, said.GetError())
-		}
-		return "", errors.Newf("GitHub refused to merge %s at %s: %s", st.subject, st.sha, said.GetError())
-	}
-	if err := s.approvalLine(st.answeredBy, st.subject, watcher.ApprovalMerged, st.repo, map[string]any{"sha": st.sha, "merge_sha": said.GetSha()}); err != nil {
+	if err := s.approvalLine(st.answeredBy, st.subject, watcher.ApprovalMerged, st.repo, map[string]any{"sha": st.sha, "merge_sha": mergeSha}); err != nil {
 		return "", errors.Wrapf(err, "%s was merged and the merge was not written down", st.subject)
 	}
 	st.over = true
-	return said.GetSha(), nil
+	return mergeSha, nil
 }
 
 // mainGreen is whether every check run at the head of the branch the pull
 // request targets has concluded well. A branch nothing runs on waits on
 // nothing.
 func (s *QNTXServer) mainGreen(ctx context.Context, st *approvalState) (bool, error) {
-	owner, name, err := st.ownerAndName()
+	repo, err := st.forgeRepo()
 	if err != nil {
 		return false, err
 	}
-	said, err := s.gitHubService().ListCheckRunsForAGitReference(services.AsInstallation(ctx), &protocol.GitHubListCheckRunsForAGitReferenceRequest{
-		Owner: owner, Repo: name, Ref: st.base, PerPage: 100,
-	})
+	host, err := s.forges().For(repo)
 	if err != nil {
-		return false, errors.Wrapf(err, "GitHub was not asked about the check runs on %s", st.base)
+		return false, err
 	}
-	if !said.GetSuccess() {
-		return false, errors.Newf("the check runs on %s were not listed: %s", st.base, said.GetError())
+	checks, err := host.Checks(ctx, forge.AsApp, repo, st.base, forge.EveryCheck)
+	if err != nil {
+		return false, errors.Wrapf(err, "the check runs on %s were not read", st.base)
 	}
-	for _, run := range said.GetCheckRuns() {
-		if checkState(run.GetStatus(), run.GetConclusion()) != checkDone {
+	for _, state := range checks.States {
+		if state != forge.CheckDone {
 			return false, nil
 		}
 	}

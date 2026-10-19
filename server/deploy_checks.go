@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/forge"
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/plugin/grpc/services"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
@@ -25,76 +23,22 @@ const (
 	checksAppear = time.Minute
 )
 
-// commitChecks is what GitHub Actions says of one commit.
-type commitChecks struct {
-	// states is each check run's newest word, by its name.
-	states map[string]string
-	// suited is whether Actions made a suite for the commit at all; settled,
-	// whether every suite it made completed; failed, a suite or run that did
-	// not conclude well.
-	suited, settled, refused bool
-	failed                   []string
+// checkWords are each check's newest word, as the deploy records them.
+func checkWords(states map[string]forge.CheckState) map[string]string {
+	words := make(map[string]string, len(states))
+	for name, state := range states {
+		words[name] = string(state)
+	}
+	return words
 }
 
-// refuse is a suite or run that did not conclude well.
-func (c *commitChecks) refuse(what string) {
-	c.refused = true
-	c.failed = append(c.failed, what)
-}
-
-// checksOn asks GitHub what Actions says of repo at sha.
-func (s *QNTXServer) checksOn(ctx context.Context, repo forge.Repo, sha string) (commitChecks, error) {
-	on, err := onGitHub(repo)
+// commitChecks is what the forge's own CI says of the commit pushed.
+func (s *QNTXServer) commitChecks(ctx context.Context, repo forge.Repo, sha string) (forge.Checks, error) {
+	host, err := s.forges().For(repo)
 	if err != nil {
-		return commitChecks{}, err
+		return forge.Checks{}, err
 	}
-	owner, name := on.Owner, on.Name
-	ctx = services.AsInstallation(ctx)
-	suites, err := s.gitHubService().ListCheckSuitesForAGitReference(ctx, &protocol.GitHubListCheckSuitesForAGitReferenceRequest{
-		Owner: owner, Repo: name, Ref: sha, AppId: gitHubActionsApp, PerPage: 100,
-	})
-	if err != nil {
-		return commitChecks{}, errors.Wrapf(err, "GitHub was not asked about the check suites on %s@%s", repo, sha)
-	}
-	if !suites.GetSuccess() {
-		return commitChecks{}, errors.Newf("the check suites on %s@%s were not listed: %s", repo, sha, suites.GetError())
-	}
-	runs, err := s.gitHubService().ListCheckRunsForAGitReference(ctx, &protocol.GitHubListCheckRunsForAGitReferenceRequest{
-		Owner: owner, Repo: name, Ref: sha, AppId: gitHubActionsApp, PerPage: 100,
-	})
-	if err != nil {
-		return commitChecks{}, errors.Wrapf(err, "GitHub was not asked about the check runs on %s@%s", repo, sha)
-	}
-	if !runs.GetSuccess() {
-		return commitChecks{}, errors.Newf("the check runs on %s@%s were not listed: %s", repo, sha, runs.GetError())
-	}
-
-	said := commitChecks{states: map[string]string{}, settled: true}
-	for _, suite := range suites.GetCheckSuites() {
-		said.suited = true
-		if suite.GetStatus() != "completed" {
-			said.settled = false
-			continue
-		}
-		if !concludedWell(suite.GetConclusion()) {
-			said.refuse("a suite concluded " + suite.GetConclusion())
-		}
-	}
-	// A check run again is a newer run under the same name; the newest stands.
-	newest := map[string]int64{}
-	for _, run := range runs.GetCheckRuns() {
-		if seen, held := newest[run.GetName()]; held && seen > run.GetId() {
-			continue
-		}
-		newest[run.GetName()] = run.GetId()
-		said.states[run.GetName()] = checkState(run.GetStatus(), run.GetConclusion())
-	}
-	for name, state := range said.states {
-		if state == checkFailed {
-			said.refuse(name)
-		}
-	}
-	return said, nil
+	return host.Checks(ctx, forge.AsApp, repo, sha, forge.OwnCI)
 }
 
 // awaitChecks holds b's deploy at its checks until GitHub Actions passed every
@@ -103,21 +47,21 @@ func (s *QNTXServer) checksOn(ctx context.Context, repo forge.Repo, sha string) 
 func (s *QNTXServer) awaitChecks(ctx context.Context, b pluginBuild, repo forge.Repo, sha string, logger *zap.SugaredLogger) {
 	began := time.Now()
 	for s.deploys.awaiting(b.name, sha) {
-		said, err := s.checksOn(ctx, repo, sha)
+		said, err := s.commitChecks(ctx, repo, sha)
 		if err != nil {
 			s.deploys.fail(b.name, err)
 			logger.Errorw("A plugin's checks were not read, so it is not built", "plugin", b.name, "repo", repo.String(), "sha", sha, "error", err)
 			return
 		}
-		s.deploys.checksAre(b.name, sha, said.states)
-		if said.refused {
-			s.deploys.fail(b.name, errors.Newf("checks on %s@%s did not pass: %s", repo, sha, strings.Join(said.failed, ", ")))
+		s.deploys.checksAre(b.name, sha, checkWords(said.States))
+		if len(said.Failed) > 0 {
+			s.deploys.fail(b.name, errors.Newf("checks on %s@%s did not pass: %s", repo, sha, strings.Join(said.Failed, ", ")))
 			return
 		}
-		if said.suited && said.settled {
+		if said.Ran && said.Settled {
 			break
 		}
-		if !said.suited && time.Since(began) >= checksAppear {
+		if !said.Ran && time.Since(began) >= checksAppear {
 			break
 		}
 		select {

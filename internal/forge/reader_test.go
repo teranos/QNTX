@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestARepoOnAForgeTheNodeDoesNotReadIsRefusedNamingIt(t *testing.T) {
+func TestARepoOnAForgeTheNodeDoesNotReachIsRefusedNamingIt(t *testing.T) {
 	gitlab, err := ParseRepo("gitlab.com/group/sub/project")
 	require.NoError(t, err)
-	_, err = ReadersOf(map[string]Reader{}).For(gitlab)
+	_, err = ForgesOf(map[string]Forge{}).For(gitlab)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gitlab.com")
 	assert.Contains(t, err.Error(), "gitlab.com/group/sub/project")

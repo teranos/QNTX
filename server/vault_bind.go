@@ -28,7 +28,7 @@ import (
 
 // repoDefaultBranch is the branch repo names its default, as its forge says it now.
 func (s *QNTXServer) repoDefaultBranch(ctx context.Context, repo forge.Repo) (string, error) {
-	reader, err := s.readers().For(repo)
+	reader, err := s.forges().For(repo)
 	if err != nil {
 		return "", err
 	}
@@ -178,7 +178,7 @@ func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *pro
 // repoDirs is the folders directly inside dir of repo on branch, or why they
 // are not: the forge's own words, or dir being a file.
 func (s *QNTXServer) repoDirs(ctx context.Context, repo forge.Repo, branch, dir string) ([]string, error) {
-	reader, err := s.readers().For(repo)
+	reader, err := s.forges().For(repo)
 	if err != nil {
 		return nil, err
 	}
