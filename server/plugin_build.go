@@ -7,7 +7,6 @@ package server
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"html"
 	"io"
@@ -23,9 +22,7 @@ import (
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
-	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
@@ -66,9 +63,6 @@ func (b buildSource) String() string {
 type gitHubRepo struct{ Owner, Name string }
 
 func (g gitHubRepo) String() string { return g.Owner + "/" + g.Name }
-
-// Forge is the repository as records name it: with its forge.
-func (g gitHubRepo) Forge() forge.Repo { return forge.Repo{Host: forge.GitHub, Path: g.String()} }
 
 // onGitHub is the repository as GitHubService is asked about it. A repository
 // on another forge is refused here, naming it, and not asked of GitHub.
@@ -473,29 +467,11 @@ func interrupted(err error) bool {
 // buildRev is the commit source's branch points at now, or the last commit
 // that touched its file.
 func (s *QNTXServer) buildRev(ctx context.Context, source buildSource) (string, error) {
-	repo, err := source.onGitHub()
+	reader, err := s.readers().For(source.Repo)
 	if err != nil {
 		return "", err
 	}
-	said, err := s.gitHubService().ListCommits(ctx, &protocol.GitHubListCommitsRequest{
-		Namespace: auth.NamespaceSystem,
-		Owner:     repo.Owner,
-		Repo:      repo.Name,
-		Sha:       source.Branch,
-		Path:      source.Path,
-		PerPage:   1,
-	})
-	if err != nil {
-		return "", err
-	}
-	if !said.Success {
-		return "", errors.New(said.Error)
-	}
-	// PerPage is 1: the one commit GitHub hands back is where source is now.
-	for _, commit := range said.Items {
-		return commit.Sha, nil
-	}
-	return "", errors.Newf("GitHub has no commit for %s", source.String())
+	return reader.Head(ctx, forge.AsNode, source.Repo, source.Branch, source.Path)
 }
 
 // buildsDir is where builds work: on disk under the node's home.
@@ -630,11 +606,11 @@ func builtVersion(ctx context.Context, name, binary string) (string, error) {
 
 // fetchCore writes the core's archive at rev to path.
 func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path string) error {
-	repo, err := core.onGitHub()
+	reader, err := s.readers().For(core.Repo)
 	if err != nil {
 		return err
 	}
-	body, err := s.gitHubService().Tarball(ctx, auth.NamespaceSystem, repo.Owner, repo.Name, rev)
+	body, err := reader.Archive(ctx, forge.AsNode, core.Repo, rev)
 	if err != nil {
 		return errors.Wrapf(err, "failed to fetch %s at %s", core.String(), rev)
 	}
@@ -655,35 +631,19 @@ func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path 
 
 // fetchInput writes one input file at rev into work, and says where.
 func (s *QNTXServer) fetchInput(ctx context.Context, in buildSource, rev, work string) (string, error) {
-	repo, err := in.onGitHub()
+	reader, err := s.readers().For(in.Repo)
 	if err != nil {
 		return "", err
 	}
-	said, err := s.gitHubService().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
-		Namespace: auth.NamespaceSystem,
-		Owner:     repo.Owner,
-		Repo:      repo.Name,
-		Path:      in.Path,
-		Ref:       rev,
-	})
+	data, err := reader.File(ctx, forge.AsNode, in.Repo, rev, in.Path)
 	if err != nil {
-		return "", err
-	}
-	if !said.Success {
-		return "", errors.Newf("%s: %s", in.String(), said.Error)
-	}
-	if said.Encoding != "base64" {
-		return "", errors.Newf("%s came as %q, not base64", in.String(), said.Encoding)
-	}
-	data, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(said.Content, "\n", ""))
-	if err != nil {
-		return "", errors.Wrapf(err, "%s is not base64", in.String())
+		return "", errors.Wrapf(err, "%s", in.String())
 	}
 	dir := filepath.Join(work, "inputs")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", errors.Wrapf(err, "failed to make %s", dir)
 	}
-	file := filepath.Join(dir, repo.Owner+"-"+repo.Name+"-"+filepath.Base(in.Path))
+	file := filepath.Join(dir, strings.ReplaceAll(in.Repo.Path, "/", "-")+"-"+filepath.Base(in.Path))
 	if err := os.WriteFile(file, data, 0o644); err != nil {
 		return "", errors.Wrapf(err, "failed to write %s", file)
 	}
