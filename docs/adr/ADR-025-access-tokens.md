@@ -6,6 +6,12 @@ Status: Accepted
 
 Access Tokens for Machine and Agent Access
 
+"so, in a sense, the true goal is"
+
+"eliminate access tokens before we 1.0.0"
+
+"kill the entire concept"
+
 ## Context
 
 Auth is passkey-only. `Handler.Middleware` in `server/auth/auth.go` gates the API on the `qntx_session` cookie, which is `HttpOnly` and lives in an in-memory `sync.Map`. Scripts, plugins, and CI cannot authenticate.
@@ -53,6 +59,22 @@ which is why the middleware could only ever say "someone authenticated".
 "and removing this will be a 1.0.0 blocker"
 
 A ROOT session mints a ROOT token at `/auth/tokens`. It names no namespace.
+
+## CI by OIDC
+
+"Another question is, how much of a place should access tokens have, if we are so OAuth native"
+
+"to you this may seem like security or compliance,"
+
+"but to me this is shadow IT"
+
+"i would feel a lot better if our ci used oicd for example."
+
+"can this be another 1.0.0 blocker please"
+
+A CI job presents its own OIDC ID token at the token endpoint as an RFC 7523
+JWT-bearer grant. QNTX checks it against the issuer's keys; a REACH line names
+the repository the node admits. Nothing is minted, pasted or rotated.
 
 ## Consequences
 
