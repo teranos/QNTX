@@ -16,7 +16,7 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 
 
 
-## The host agent
+## The NODE agent
 
 "NODE agent, one persistent session agent that is QNTX itself as expressed to ROOT."
 
@@ -27,11 +27,8 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 
 - am.toml names each under `[agent.root]`: its model, its effort, and a  reference to the Claude plan token. A node that names no model has no NODE agent, and nothing stands in for the model named.
 - It is one session: `--resume` continues it, and Claude Code compacts its own  context.
-- Its key is derived from the node's own, for its model, so it is the same DID
-  wherever the node is rebuilt from its record, and nothing more is kept for
-  it.
-- It reaches sigils through the node's own MCP, with a token of its own. The
-  token is ROOT's kind, which minting hands to nobody, and the node writes it
+- Its key is derived from the node's own, for its model, so it is the same DID wherever the node is rebuilt from its record, and nothing more is kept for it.
+- It reaches sigils through the node's own MCP, with a token of its own. The  token is ROOT's kind, which minting hands to nobody, and the node writes it
   down for this agent alone.
 - `claude say` says something to it and answers with what it said back.
 - What it is told, what it reaches for and what it answers, it attests under
