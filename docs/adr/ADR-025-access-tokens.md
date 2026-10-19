@@ -3,6 +3,9 @@
 Date: 2026-10-19
 Status: Accepted
 
+
+Access Tokens for Machine and Agent Access
+
 ## Context
 
 Auth is passkey-only. `Handler.Middleware` in `server/auth/auth.go` gates the API on the `qntx_session` cookie, which is `HttpOnly` and lives in an in-memory `sync.Map`. Scripts, plugins, and CI cannot authenticate.
