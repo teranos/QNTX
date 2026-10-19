@@ -88,3 +88,5 @@ deferred.
 An entry that is not a Mastodon profile URL is a valid way in but not a one-press one: a
 credential provider needs an app password, which is typing ([[ADR-030-identity-providers]]).
 
+## Open Idea's
+
