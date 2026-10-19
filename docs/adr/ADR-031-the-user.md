@@ -9,7 +9,7 @@ Date: 2026-08-18
 - A User holds keys and accounts. laye mints a key per browser, an authenticator derives one per device, and a provider names an account its own way. A User holds several of each, so none of them is the User.
 - phone numbers.
 - `auth.root_identities` lists ways to reach a User, not Users ([[ADR-030-identity-providers]]).
-- There is one ROOT User. A SUPER User is created by it and by nobody else (ADR-027).
+- There is one ROOT User. A SUPER User is created by it and by nobody else ([[ADR-027-Permissions]]).
 - The first User to prove they hold a root identity is the first User, and the first User
   is always the ROOT User. Proving a listed route is what creates them — there is no
   separate act, and nothing has to be seeded ahead of it.
