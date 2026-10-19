@@ -1,7 +1,7 @@
 # ADR-025: Access Tokens
 
 Date: 2026-10-19
-Status: Accepted
+Status: Debated
 
 
 Access Tokens for Machine and Agent Access
