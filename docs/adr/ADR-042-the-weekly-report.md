@@ -3,6 +3,10 @@
 Date: 2026-09-25
 Status: Proposed
 
+
+
+
+
 "let's say QNTX also has it's own built in messages it would like to send sometimes via email"
 
 "for a user that is one of the root identities, i want to receive a weekly report."
