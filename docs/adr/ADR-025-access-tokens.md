@@ -43,7 +43,7 @@ what it minted.
 **`namespace`** — where it may act, chosen at mint time.
 
 What a token may read and write is not on the token: the roles its DID holds
-say, through their WRITE and READ lines (ADR-034).
+say, through their WRITE and READ lines ([[ADR-034-roles-as-attestations]]).
 
 `Lookup` returns that grant instead of a bool. A bool could carry none of it,
 which is why the middleware could only ever say "someone authenticated".
