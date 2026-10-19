@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/sigil"
@@ -25,35 +26,43 @@ import (
 
 // "concept of default branch, not main or master"
 
-// repoDefaultBranch is the branch owner/repo names its default, as GitHub says it now.
-func (s *QNTXServer) repoDefaultBranch(ctx context.Context, owner, repo string) (string, error) {
+// repoDefaultBranch is the branch repo names its default, as GitHub says it now.
+func (s *QNTXServer) repoDefaultBranch(ctx context.Context, repo gitHubRepo) (string, error) {
 	answered, err := s.gitHubService().GetARepository(services.AsInstallation(ctx),
-		&protocol.GitHubGetARepositoryRequest{Owner: owner, Repo: repo})
+		&protocol.GitHubGetARepositoryRequest{Owner: repo.Owner, Repo: repo.Name})
 	if err != nil {
-		return "", errors.Wrapf(err, "the default branch of %s/%s was not asked", owner, repo)
+		return "", errors.Wrapf(err, "the default branch of %s was not asked", repo)
 	}
 	if !answered.GetSuccess() {
 		return "", errors.New(answered.GetError())
 	}
 	if answered.GetDefaultBranch() == "" {
-		return "", errors.Newf("GitHub named no default branch for %s/%s", owner, repo)
+		return "", errors.Newf("GitHub named no default branch for %s", repo)
 	}
 	return answered.GetDefaultBranch(), nil
 }
 
-// ownerRepo reads owner/repo.
-func ownerRepo(said string) (string, string, *protocol.Refusal) {
-	owner, repo, named := repoNamed(said)
-	if !named {
-		return "", "", &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: said + " names no repository: owner/repo"}
+// repoOf reads the repository a sigil names, with its host.
+func repoOf(said string) (forge.Repo, *protocol.Refusal) {
+	repo, err := forge.ParseRepo(said)
+	if err != nil {
+		return forge.Repo{}, &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: err.Error()}
 	}
-	return owner, repo, nil
+	return repo, nil
 }
 
-// repoNamed is owner and repo of owner/repo, and whether said is one.
-func repoNamed(said string) (string, string, bool) {
-	owner, repo, ok := strings.Cut(said, "/")
-	return owner, repo, ok && owner != "" && repo != "" && !strings.Contains(repo, "/")
+// gitHubRepoOf reads the repository a sigil names, for a sigil that asks GitHub
+// and refuses one that is on another forge.
+func gitHubRepoOf(said string) (gitHubRepo, *protocol.Refusal) {
+	repo, refused := repoOf(said)
+	if refused != nil {
+		return gitHubRepo{}, refused
+	}
+	on, err := onGitHub(repo)
+	if err != nil {
+		return gitHubRepo{}, &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: err.Error()}
+	}
+	return on, nil
 }
 
 // githubPage is as many as GitHub gives on one page.
@@ -170,7 +179,7 @@ func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *pro
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what installation " + sent["installation"] + " reaches was not learned: " + answered.GetError()}
 		}
 		for _, repo := range answered.GetRepositories() {
-			repos = append(repos, repo.GetFields()["full_name"].GetStringValue())
+			repos = append(repos, forge.Repo{Host: forge.GitHub, Path: repo.GetFields()["full_name"].GetStringValue()}.String())
 		}
 		if len(answered.GetRepositories()) < githubPage {
 			break
@@ -180,23 +189,23 @@ func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *pro
 	return &protocol.VaultRepos{Repos: repos}, nil
 }
 
-// repoDirs is the folders directly inside dir of owner/repo on branch, or why
-// they are not: GitHub's own words, or dir being a file.
-func (s *QNTXServer) repoDirs(ctx context.Context, owner, repo, branch, dir string) ([]string, error) {
+// repoDirs is the folders directly inside dir of repo on branch, or why they
+// are not: GitHub's own words, or dir being a file.
+func (s *QNTXServer) repoDirs(ctx context.Context, repo gitHubRepo, branch, dir string) ([]string, error) {
 	if dir == "" {
 		// GitHub lists a repository's top at ".".
 		dir = "."
 	}
 	answered, err := s.gitHubService().GetRepositoryContent(services.AsInstallation(ctx),
-		&protocol.GitHubGetRepositoryContentRequest{Owner: owner, Repo: repo, Path: dir, Ref: branch})
+		&protocol.GitHubGetRepositoryContentRequest{Owner: repo.Owner, Repo: repo.Name, Path: dir, Ref: branch})
 	if err != nil {
-		return nil, errors.Wrapf(err, "%s of %s/%s on %s was not asked", dir, owner, repo, branch)
+		return nil, errors.Wrapf(err, "%s of %s on %s was not asked", dir, repo, branch)
 	}
 	if !answered.GetSuccess() {
 		return nil, errors.New(answered.GetError())
 	}
 	if answered.GetType() == "file" {
-		return nil, errors.Newf("%s is a file of %s/%s on %s, not a folder", dir, owner, repo, branch)
+		return nil, errors.Newf("%s is a file of %s on %s, not a folder", dir, repo, branch)
 	}
 	dirs := []string{}
 	for _, entry := range answered.GetItems() {
@@ -209,15 +218,15 @@ func (s *QNTXServer) repoDirs(ctx context.Context, owner, repo, branch, dir stri
 }
 
 func (s *QNTXServer) vaultSubdirs(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	owner, repo, refused := ownerRepo(sent["repo"])
+	repo, refused := gitHubRepoOf(sent["repo"])
 	if refused != nil {
 		return nil, refused
 	}
-	branch, err := s.repoDefaultBranch(ctx, owner, repo)
+	branch, err := s.repoDefaultBranch(ctx, repo)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	dirs, err := s.repoDirs(ctx, owner, repo, branch, sent["path"])
+	dirs, err := s.repoDirs(ctx, repo, branch, sent["path"])
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
@@ -237,7 +246,7 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	if !there {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is no folder of " + vault.Name + " at " + vault.Path}
 	}
-	owner, repo, refused := ownerRepo(sent["repo"])
+	repo, refused := gitHubRepoOf(sent["repo"])
 	if refused != nil {
 		return nil, refused
 	}
@@ -245,11 +254,11 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	if dir := path.Clean(sent["path"]); dir == "." || dir == "/" || strings.HasPrefix(dir, "../") || strings.HasPrefix(dir, "/") {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "path", Says: sent["path"] + " is not a folder inside " + sent["repo"] + "; a vault's folder is bound to one, never to the repository's top"}
 	}
-	branch, err := s.repoDefaultBranch(ctx, owner, repo)
+	branch, err := s.repoDefaultBranch(ctx, repo)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	folder := sent["repo"] + "@" + branch + ":" + sent["path"] + "=" + place
+	folder := repo.Forge().String() + "@" + branch + ":" + sent["path"] + "=" + place
 	folders, err := vaultFoldersOf(append(slices.Clone(vault.Folders), folder))
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Says: err.Error()}
@@ -333,16 +342,21 @@ const (
 
 // foldersState is what an enabled folder whose place is on the box is now.
 func (s *QNTXServer) foldersState(ctx context.Context, vault Vault, source buildSource, place string, state *protocol.VaultFolderState) {
-	defaultBranch, err := s.repoDefaultBranch(ctx, source.Owner, source.Repo)
+	repo, err := source.onGitHub()
+	if err != nil {
+		state.State, state.Why = vaultInvalid, err.Error()
+		return
+	}
+	defaultBranch, err := s.repoDefaultBranch(ctx, repo)
 	if err != nil {
 		state.State, state.Why = vaultInvalid, err.Error()
 		return
 	}
 	if defaultBranch != source.Branch {
-		state.State, state.Why = vaultInvalid, "the default branch of "+source.Owner+"/"+source.Repo+" is now "+defaultBranch+", not "+source.Branch+": bind "+place+" again"
+		state.State, state.Why = vaultInvalid, "the default branch of "+repo.String()+" is now "+defaultBranch+", not "+source.Branch+": bind "+place+" again"
 		return
 	}
-	if _, err := s.repoDirs(ctx, source.Owner, source.Repo, source.Branch, source.Path); err != nil {
+	if _, err := s.repoDirs(ctx, repo, source.Branch, source.Path); err != nil {
 		state.State, state.Why = vaultInvalid, err.Error()
 		return
 	}
@@ -374,7 +388,7 @@ func (s *QNTXServer) vaultStates(ctx context.Context, sent sigil.Sent) (any, *pr
 		repo, place, named := strings.Cut(folder, "=")
 		state := &protocol.VaultFolderState{Folder: folder, Place: place, State: vaultActive}
 		if !named {
-			state.State, state.Why = vaultInvalid, folder+" names no place in the vault: owner/repo@branch:path=place"
+			state.State, state.Why = vaultInvalid, folder+" names no place in the vault: host/path@branch:path=place"
 			states = append(states, state)
 			continue
 		}

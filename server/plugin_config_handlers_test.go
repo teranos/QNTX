@@ -43,7 +43,7 @@ func TestAPutKeepsTheKeysItDoesNotName(t *testing.T) {
 	_, err := records.AddPlugin(rootAccount, "https://github.com/teranos/staands")
 	require.NoError(t, err)
 	require.NoError(t, records.ConfigurePlugin(rootAccount, "staands", map[string]string{
-		buildCore:   "teranos/staands@main",
+		buildCore:   "github.com/teranos/staands@main",
 		"namespace": "Clean",
 		"bucket":    "media",
 	}))
@@ -64,7 +64,7 @@ func TestAPutKeepsTheKeysItDoesNotName(t *testing.T) {
 
 	put(`{"config":{"bucket":"media.cleanamsterdam.nl"}}`)
 	assert.Equal(t, map[string]string{
-		buildCore:   "teranos/staands@main",
+		buildCore:   "github.com/teranos/staands@main",
 		"namespace": "Clean",
 		"bucket":    "media.cleanamsterdam.nl",
 	}, held(), "a PUT naming only bucket")

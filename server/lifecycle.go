@@ -90,6 +90,11 @@ func (s *QNTXServer) startBackgroundServices() {
 
 // Start starts the server on the specified port
 func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
+	// Before anything reads a record that names a repository.
+	if err := s.nameForges(); err != nil {
+		return errors.Wrap(err, "the node's records name a repository without its forge")
+	}
+
 	// Start the hub in a goroutine. It owns every send to every client, so it
 	// ending quietly is the node still up and answering nobody.
 	s.wg.Go("server.hub", s.Run)
