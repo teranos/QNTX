@@ -93,4 +93,6 @@ credential provider needs an app password, which is typing ([[ADR-030-identity-p
 "The first time setup's real start begin's where?"
 "As in, how would anyone get to this in the first place?"
 "First time setup for who?"
-"People using Claude "
+"People using Claude Code I guess"
+"But they could use QuickDev"
+"Like i am doing inside of "
