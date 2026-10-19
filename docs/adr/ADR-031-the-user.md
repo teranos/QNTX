@@ -16,13 +16,12 @@ Date: 2026-08-18
   one and enables it again. Data never leaves, and a person is not an exception.
 - "user should be able to disable their acc, but reawaken (enable) it later as well"
 - The record says who switched a User off, and only they switch it on. What a person did  to themselves is theirs to undo; what ROOT did is not.
-- A disabled User is admitted at no gate. They still prove a route and still get a session, because the switch is the one thing a disabled User has to reach. What they  minted stops with them — a token speaks for whoever minted it (ADR-025), so it is
+- A disabled User is admitted at no gate. They still prove a route and still get a session, because the switch is the one thing a disabled User has to reach. What they  minted stops with them — a token speaks for whoever minted it ([[ADR-025-access-tokens]]), so it is
   disabled by the same switch, read on every request rather than at login.
 - That switch is why revoking a person is one act. Striking a route out of
   `auth.root_identities` closes one way in, and a User holds several; disabling the User
   is the person, not the door.
-- Ownership is recorded on the namespace, not on the User. The namespace's own record is
-  what refuses a second create; a list on the User would be a second answer.
+- Ownership is recorded on the namespace, not on the User. The namespace's own record is  what refuses a second create; a list on the User would be a second answer.
 - A User record lives in `system`, where the token objects already are (ADR-027).
 - No User is visible below SUPER, because `system` is not (ADR-026). An ATTESTOR sees no
   User record: not another's, and not their own. There is no directory of people at that
