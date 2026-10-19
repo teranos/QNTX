@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	// TODO(forge): The records are named for GitHub: GITHUB, GITHUB_FROM and the node line. A forge-neutral name is a record migration like forge_names.go.
 	// A GITHUB line is about the node's GitHub; its predicate says which part.
 	githubSubject  = "GITHUB"
 	githubNodeLine = "node"
@@ -28,9 +29,11 @@ const (
 	GitHubFromNamespace = "namespace"
 )
 
+// TODO(forge): GitHub Actions' runner. A CI runner of another forge is that forge's.
 // DefaultRunnerPath is where the Actions runner is installed on a box.
 const DefaultRunnerPath = "/opt/actions-runner"
 
+// TODO(forge): Settings per forge: enabled, and its webhook path. The runner is GitHub Actions'.
 // GitHubSettings is the node's GitHub as the GitHub element sets it.
 type GitHubSettings struct {
 	Enabled       bool   `json:"enabled"`

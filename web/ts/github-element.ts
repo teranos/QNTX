@@ -87,6 +87,7 @@ export interface GitHubWebhook {
     url: string;
 }
 
+// TODO(forge): The element shows the node's forge as GitHub: its sections, its runner, its webhook. One element for forges, with what is GitHub's alone (the Actions runner) marked as such.
 export const ELEMENT_ID = 'github-element';
 
 // server/node_records.go DefaultRunnerPath; the node sends it too, this is for a path it left empty.

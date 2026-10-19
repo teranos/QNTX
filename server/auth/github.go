@@ -21,6 +21,7 @@ import (
 // googleIdentityPrefix does: GitHub's id is a bare number.
 const githubIdentityPrefix = "github:"
 
+// TODO(forge): Signing in with GitHub gives the node a token to GitHub. Another forge's sign-in gives its token to that forge (see GitHubKeeper).
 // githubAuthHost is where the person consents. Not a thing anyone picks, so the
 // ceremony never asks for it.
 const githubAuthHost = "github.com"

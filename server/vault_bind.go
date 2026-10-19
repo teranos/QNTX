@@ -125,6 +125,7 @@ func (s *QNTXServer) vaultDirs(_ context.Context, sent sigil.Sent) (any, *protoc
 func (s *QNTXServer) vaultOwners(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
 	owners := []*protocol.VaultOwner{}
 	for page := int64(1); ; page++ {
+		// TODO(forge): The owners the node can reach is a Forge method (Reader), not GitHubService's App installations.
 		answered, err := s.gitHubService().ListInstallationsForTheAuthenticatedApp(ctx,
 			&protocol.GitHubListInstallationsForTheAuthenticatedAppRequest{PerPage: githubPage, Page: page})
 		if err != nil {
@@ -156,6 +157,7 @@ func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *pro
 	}
 	repos := []string{}
 	for page := int64(1); ; page++ {
+		// TODO(forge): The repositories of an owner the node can reach is a Forge method (Reader), not GitHubService's installation listing.
 		answered, err := s.gitHubService().ListRepositoriesAccessibleToTheAppInstallation(services.AsInstallationOf(ctx, id),
 			&protocol.GitHubListRepositoriesAccessibleToTheAppInstallationRequest{PerPage: githubPage, Page: page})
 		if err != nil {
@@ -165,6 +167,7 @@ func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *pro
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what installation " + sent["installation"] + " reaches was not learned: " + answered.GetError()}
 		}
 		for _, repo := range answered.GetRepositories() {
+			// TODO(forge): The host is the listing forge's own, not GitHub's constant.
 			repos = append(repos, forge.Repo{Host: forge.GitHub, Path: repo.GetFields()["full_name"].GetStringValue()}.String())
 		}
 		if len(answered.GetRepositories()) < githubPage {

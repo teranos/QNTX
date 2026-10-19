@@ -35,11 +35,13 @@ import (
 // that never came. A run that long is its own failure.
 const ciWatchCeiling = 2 * time.Hour
 
+// TODO(forge): This file is a GitHub REST client beside GitHubService, with its own token, pacing and URLs. Every request below (runs of a branch, a commit's full sha, dispatched runs, runs of a sha) is a Forge method (Reader), so the CI watch is the same for any forge.
 // GitHub is asked directly. "eliminate gh dependency": the box runs no gh,
 // its service has no PATH to find one on, and the node already holds a token
 // for github.com — the one that fetches private plugin repos.
 const githubAPI = "https://api.github.com"
 
+// TODO(forge): The host of the repository being watched, not a constant.
 // githubHost is the forge the plugin access token is configured for, and the
 // one CI runs are asked of.
 const githubHost = "github.com"
@@ -367,6 +369,7 @@ func (h *ciWatchHandler) watching(id, addressee, note string) {
 // ninetieth percentile of the last twenty completed, in seconds, as ground
 // computed them. Unknown is 0 0, which pickAdaptiveSleep reads as no history.
 func (h *ciWatchHandler) percentiles(ctx context.Context, token, repo, branch string) (int64, int64) {
+	// TODO(forge): Forge: the pipeline runs of a branch.
 	url := githubAPI + "/repos/" + repo + "/actions/runs?branch=" + branch + "&status=completed&per_page=20"
 	out, err := h.get(ctx, token, url)
 	if err != nil {
@@ -405,6 +408,7 @@ func (h *ciWatchHandler) fullSha(ctx context.Context, token, repo, sha string) (
 	if len(sha) >= 40 {
 		return sha, nil
 	}
+	// TODO(forge): Forge: the full commit of an abbreviated sha.
 	out, err := h.get(ctx, token, githubAPI+"/repos/"+repo+"/commits/"+sha)
 	if err != nil {
 		return "", errors.Wrapf(err, "ci.watch: resolving %s on %s to a whole sha", sha, repo)
@@ -503,6 +507,7 @@ func (h *ciWatchHandler) watchDispatch(ctx context.Context, as types.As, address
 // runsDispatched is every dispatched run whose name ends with the name ground
 // gave it. The listing is the repo's recent dispatches; the match is ground's.
 func (h *ciWatchHandler) runsDispatched(ctx context.Context, ghToken, repo, name string) ([]ciRun, error) {
+	// TODO(forge): Forge: the pipeline runs a dispatch started.
 	url := githubAPI + "/repos/" + repo + "/actions/runs?event=workflow_dispatch&per_page=40"
 	out, err := h.get(ctx, ghToken, url)
 	if err != nil {
@@ -583,6 +588,7 @@ func (h *ciWatchHandler) leaveNoRun(as types.As, addressee, repo, branch, shortS
 
 // runsFor is every run github has for this commit, none yet included.
 func (h *ciWatchHandler) runsFor(ctx context.Context, token, repo, sha string) ([]ciRun, error) {
+	// TODO(forge): Forge: the pipeline runs of a commit.
 	url := githubAPI + "/repos/" + repo + "/actions/runs?head_sha=" + sha + "&per_page=" + ciRunsPage
 	out, err := h.get(ctx, token, url)
 	if err != nil {

@@ -250,6 +250,7 @@ type githubNotHanded struct{}
 func (githubHanded) handsGitHub()    {}
 func (githubNotHanded) handsGitHub() {}
 
+// TODO(forge): The manager holds the GitHubServer. Plugins' calls to a forge go through a Forge, chosen by the repository's host.
 // SetGitHub hands the manager the node's GitHubService, and how a plugin's
 // token names the namespace it stands in. Handed before Start, or Start runs
 // without it and says so.

@@ -110,6 +110,7 @@ function handleVersion(data: VersionMessage): void {
         buildHash.textContent = `${versionText} · `;
 
         const commitLink = document.createElement('a');
+        // TODO(forge): The node's own source is a setting with its forge, not github.com/teranos/QNTX.
         commitLink.href = `https://github.com/teranos/QNTX/commit/${data.commit}`;
         commitLink.target = '_blank';
         commitLink.classList.add('u-color-inherit', 'u-no-underline');

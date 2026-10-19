@@ -40,6 +40,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	servicesManager := grpcplugin.NewServicesManager(s.deps.cfg.LLM, s.deps.cfg.Fetch, s.nodeDID.DID, s.logger)
 	filesDir := filepath.Join(filepath.Dir(s.dbPath), "files")
 
+	// TODO(forge): Plugins reach the forge through GitHubService. They should reach forges through the same Forge the core does (ServicesManager.SetGitHub in plugin/grpc/services_manager.go).
 	// A plugin calls GitHub as the namespace its record names (ADR-043, ADR-046).
 	servicesManager.SetGitHub(s.gitHubService(), s.namespaceOfPlugin)
 

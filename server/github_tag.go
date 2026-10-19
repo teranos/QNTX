@@ -20,6 +20,7 @@ const (
 	appRef      = "main"
 )
 
+// TODO(forge): The app's repository is named here with GitHub's host. It is a setting of the node, with its forge, like any other source.
 // appSource is the repository whose tags build the app.
 var appSource = forge.Repo{Host: forge.GitHub, Path: "teranos/QNTX"}
 
@@ -37,6 +38,7 @@ func (g *gitHub) dispatchApp(tag string) {
 	logger := g.host.log().Named("app")
 	repo := appOwner + "/" + appRepo
 	sacred.Go("app.dispatch."+tag, func() {
+		// TODO(forge): Dispatching a pipeline is a Forge method (Writer), not GitHubService's CreateAWorkflowDispatchEvent.
 		said, err := g.gitHubService().CreateAWorkflowDispatchEvent(g.host.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
 			Namespace: auth.NamespaceSystem, Owner: appOwner, Repo: appRepo, WorkflowId: appWorkflow, Ref: appRef,
 		})

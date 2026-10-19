@@ -59,6 +59,7 @@ func (b buildSource) String() string {
 	return s
 }
 
+// TODO(forge): gitHubRepo and onGitHub are the adapter's. Move them to forge_github.go; outside it, only github_follow.go still calls onGitHub, and buildSource.onGitHub below has no caller.
 // gitHubRepo is a repository as GitHub's API names it: an owner and a name.
 type gitHubRepo struct{ Owner, Name string }
 
@@ -77,6 +78,7 @@ func onGitHub(repo forge.Repo) (gitHubRepo, error) {
 	return gitHubRepo{Owner: owner, Name: name}, nil
 }
 
+// TODO(forge): No caller. Remove.
 // onGitHub is the source's repository as GitHubService is asked about it.
 func (b buildSource) onGitHub() (gitHubRepo, error) { return onGitHub(b.Repo) }
 
