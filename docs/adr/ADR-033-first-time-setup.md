@@ -90,3 +90,4 @@ credential provider needs an app password, which is typing ([[ADR-030-identity-p
 
 ## Open Idea's
 
+"The first time setup's real start "
