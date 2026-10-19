@@ -121,7 +121,6 @@ export function buildStructureViewer(sequence: string, structure: string): HTMLE
         text.setAttribute('y', String(seqY + 12));
         text.setAttribute('text-anchor', 'middle');
         text.setAttribute('font-family', 'monospace');
-        text.setAttribute('font-size', '10');
         text.setAttribute('fill', color);
         text.textContent = base;
         svg.appendChild(text);
@@ -132,7 +131,6 @@ export function buildStructureViewer(sequence: string, structure: string): HTMLE
     dbText.setAttribute('x', String(padLeft));
     dbText.setAttribute('y', String(seqY + 12));
     dbText.setAttribute('font-family', 'monospace');
-    dbText.setAttribute('font-size', '9');
     dbText.setAttribute('fill', '#555');
     dbText.setAttribute('opacity', '0');
     svg.appendChild(dbText);

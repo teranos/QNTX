@@ -1,4 +1,8 @@
 {
+  "concurrency": {
+    "cancel-in-progress": true,
+    "group": "${{ github.workflow }}-${{ github.ref }}"
+  },
   "jobs": {
     "build-docker": {
       "if": "github.ref == 'refs/heads/main'",
@@ -37,6 +41,7 @@
       }
     },
     "build-docs": {
+      "if": "!(github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbvh-qntx[bot]' && github.head_ref == 'docs-pr')",
       "runs-on": "ubuntu-latest",
       "steps": [
         {
@@ -70,6 +75,7 @@
       ]
     },
     "build-go": {
+      "if": "!(github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbvh-qntx[bot]' && github.head_ref == 'docs-pr')",
       "runs-on": "${{ matrix.os }}",
       "steps": [
         {
@@ -113,6 +119,7 @@
       }
     },
     "lint": {
+      "if": "!(github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbvh-qntx[bot]' && github.head_ref == 'docs-pr')",
       "runs-on": "${{ matrix.os }}",
       "steps": [
         {

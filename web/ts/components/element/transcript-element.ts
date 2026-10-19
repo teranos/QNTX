@@ -9,6 +9,7 @@ import type { Element } from '@teranos/elements';
 import {
     tray, canvasPlaced, wireExpandToWindow, preventDrag, createSymbolSpan, settleSymbolSpan,
     getForm, setForm, teardownWindowDrag, removeWindowControls, makeDraggable, makeResizable, storeCleanup, createCorner,
+    declareScroller,
 } from '@teranos/elements';
 import { apiJson } from '../../client';
 import { escapeHtml } from '../../html-utils';
@@ -263,6 +264,8 @@ export function renderTranscript(body: HTMLElement, read: TranscriptRead, copy: 
     rows.className = 'tr-body';
     const column = document.createElement('div');
     column.className = 'tr-col';
+    // What was said scrolls here, and nowhere else in the element: the package's to follow (opensAt).
+    declareScroller(column);
     const selection = new Selection(read.turns, copy);
     let prev = 0;
     // The line of chips being drawn, and the run its last chip holds.

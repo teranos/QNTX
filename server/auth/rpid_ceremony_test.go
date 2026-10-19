@@ -53,11 +53,11 @@ func TestRegistrationCeremonyUsesConfiguredRPID(t *testing.T) {
 		24,
 		testLogger(),
 		passthroughCors,
-		nil,                       // token store not exercised by RPID ceremony tests
+		nil,                          // token store not exercised by RPID ceremony tests
 		&memUsers{held: []User{tim}}, // the User the passkey is made for
-		false,                     // secureCookies — cookie flag not exercised here
-		[]string{mastodonAccount}, // rootIdentities — enrolment is admitted or it does not happen
-		nil,                       // bindingSigners
+		false,                        // secureCookies — cookie flag not exercised here
+		[]string{mastodonAccount},    // rootIdentities — enrolment is admitted or it does not happen
+		nil,                          // bindingSigners
 	)
 	require.NoError(t, err)
 

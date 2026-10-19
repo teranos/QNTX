@@ -57,7 +57,6 @@ function field(label: string, placeholder: string, type: string): Field {
     wrap.style.display = 'flex';
     wrap.style.flexDirection = 'column';
     wrap.style.gap = '3px';
-    wrap.style.fontSize = '10px';
     wrap.style.opacity = '0.7';
     wrap.style.color = 'var(--door-text)';
     wrap.textContent = label;
@@ -67,8 +66,7 @@ function field(label: string, placeholder: string, type: string): Field {
     input.placeholder = placeholder;
     input.autocomplete = 'off';
     input.spellcheck = false;
-    input.style.font = 'inherit';
-    input.style.fontSize = '12px';
+    input.style.fontFamily = 'inherit';
     input.style.padding = '6px 8px';
     input.style.boxSizing = 'border-box';
     input.style.width = '100%';

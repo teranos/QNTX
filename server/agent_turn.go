@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// A turn is the same in every harness the ROOT agent runs in (ADR-048): who
+// A turn is the same in every harness the Node Agent runs in (ADR-048): who
 // said it, one at a time, written down as the agent, and the session kept.
 // What differs is the harness's part, an aTurn.
 
@@ -81,11 +81,38 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	t.in.answering.Store(&turnInSession{session: session})
 	defer t.in.answering.Store(nil)
 
-	// The session is the agent's to write down, signed as itself. A row that
-	// does not land is said with the answer and never stops the turn.
 	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: t.effort}
-	unwritten := ""
-	write := func(rows []*types.As, err error) {
+	write, unwritten := s.sessionRows(agent, store, session, t.called)
+	// The Node Agent's git is its own (ADR-048, Its git). A namespace agent has
+	// none: nothing of it is written for one yet.
+	var itsGit []string
+	if agent.namespace == auth.NamespaceSystem {
+		if itsGit, err = s.gitEnvironment(agent); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's git was not set up, so nothing was said to it: " + err.Error()}
+		}
+	}
+	told, err := writes.told(says, spokenBy(caller), time.Now())
+	write([]*types.As{told}, err)
+
+	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
+		unwritten: unwritten})
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: t.called + " did not answer: " + err.Error()}
+	}
+	if !kept {
+		if err := agent.keepIn(t.in.file, session); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "it answered, and the session it answered in was not kept: " + err.Error()}
+		}
+	}
+	return answer, nil
+}
+
+// sessionRows writes rows of agent's session down in store. The session is the
+// agent's to write down, signed as itself. A row that does not land is said by
+// unwritten, as of the rows written so far, and never stops the turn.
+func (s *QNTXServer) sessionRows(agent *rootAgent, store ats.AttestationStore, session, harness string) (write func([]*types.As, error), unwritten func() string) {
+	why := ""
+	write = func(rows []*types.As, err error) {
 		if err == nil {
 			for _, row := range rows {
 				if err = agent.signer.Sign(row); err != nil {
@@ -97,34 +124,13 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 			}
 		}
 		if err != nil {
-			s.logger.Errorw("a row of the agent's session was not written", "agent", agent.did, "session", session, "harness", t.called, "error", err)
-			if unwritten == "" {
-				unwritten = err.Error()
+			s.logger.Errorw("a row of the agent's session was not written", "agent", agent.did, "session", session, "harness", harness, "error", err)
+			if why == "" {
+				why = err.Error()
 			}
 		}
 	}
-	// The ROOT agent's git is its own (ADR-048, Its git). A namespace agent has
-	// none: nothing of it is written for one yet.
-	var itsGit []string
-	if agent.namespace == auth.NamespaceSystem {
-		if itsGit, err = s.gitEnvironment(agent); err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the ROOT agent's git was not set up, so nothing was said to it: " + err.Error()}
-		}
-	}
-	told, err := writes.told(says, spokenBy(caller), time.Now())
-	write([]*types.As{told}, err)
-
-	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
-		unwritten: func() string { return unwritten }})
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: t.called + " did not answer: " + err.Error()}
-	}
-	if !kept {
-		if err := agent.keepIn(t.in.file, session); err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "it answered, and the session it answered in was not kept: " + err.Error()}
-		}
-	}
-	return answer, nil
+	return write, func() string { return why }
 }
 
 // sessionStoreOf is where an agent's session is written: system for ROOT's,

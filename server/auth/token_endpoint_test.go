@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -515,4 +516,207 @@ func TestATokenForAnotherResourceIsNotMinted(t *testing.T) {
 	here := httptest.NewRecorder()
 	h.handleToken(here, exchangeRequest(did, secret, code, verifier))
 	assert.Equal(t, http.StatusOK, here.Code, here.Body.String())
+}
+
+// The client credentials grant (RFC 6749 §4.4): the client comes with its
+// secret and nothing else. No code, no PKCE, no person.
+
+// clientCredentialsRequest is the client asking for a token for itself, with
+// its id and secret in Basic auth, as §4.4.2 writes it.
+func clientCredentialsRequest(did, secret string, scope ...string) *http.Request {
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	for _, asked := range scope {
+		form.Set("scope", asked)
+	}
+	r := httptest.NewRequest(http.MethodPost, tokenPath, strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.SetBasicAuth(url.QueryEscape(did), url.QueryEscape(secret))
+	return r
+}
+
+// A client asking on its own behalf gets the token QNTX already hands out,
+// and no refresh token: §4.4.3 says it gets none, because it holds the
+// secret and asking again is this same request.
+func TestAClientAsksForATokenOfItsOwn(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, clientCredentialsRequest(did, clientSecret(t, store, did)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var answer struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+		ExpiresIn   int    `json:"expires_in"`
+		Refresh     string `json:"refresh_token"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answer))
+	assert.Equal(t, "bearer", answer.TokenType)
+	assert.True(t, strings.HasPrefix(answer.AccessToken, tokenPrefix), answer.AccessToken)
+	// The hour every access token here lasts, the same as one a code bought.
+	assert.InDelta(t, time.Hour.Seconds(), answer.ExpiresIn, 5)
+	assert.Empty(t, answer.Refresh, "a refresh token came back, and §4.4.3 issues none")
+
+	// Written down the way the code path writes one: the DID its own seed
+	// names, the client's label and namespace, and the client it came from.
+	grant, ok := store.Lookup(sha256Hex(answer.AccessToken))
+	require.True(t, ok, "the issued token does not authenticate")
+	assert.Equal(t, didOf(t, answer.AccessToken), grant.DID)
+	assert.Equal(t, "app", grant.Label)
+	assert.Equal(t, []string{NamespaceDefault}, grant.Namespaces)
+	assert.Equal(t, did, grant.ClientDID)
+	// Nobody said yes, so the provenance is who minted the door: striking
+	// them out of am.toml is what stops the client's tokens.
+	assert.Equal(t, mastodonAccount, grant.MintedBy)
+	// What it may do is a token's, not theirs. The same client through the
+	// passkey gets ROOT; coming for itself it gets TOKEN.
+	assert.Equal(t, LevelToken, grant.Level)
+
+	listed, err := store.List()
+	require.NoError(t, err)
+	var issued *TokenInfo
+	for i := range listed {
+		if listed[i].DID == grant.DID {
+			issued = &listed[i]
+		}
+	}
+	require.NotNil(t, issued)
+	assert.NotNil(t, issued.ExpiresAt, "a client's own token never ends")
+}
+
+// The token is the client, not the person who minted the door: admitted at
+// TOKEN with the lines its label holds, where the same client's token from
+// the passkey journey is admitted as them.
+func TestAClientsOwnTokenIsNotThePersonWhoMintedIt(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, clientCredentialsRequest(did, clientSecret(t, store, did)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var answer struct {
+		AccessToken string `json:"access_token"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answer))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.Header.Set("Authorization", "Bearer "+answer.AccessToken)
+	admission, admitted := h.admissionOf(h.presented(req))
+	require.True(t, admitted, "the client's own token is not admitted")
+	assert.Equal(t, string(LevelToken), admission.LevelName())
+	assert.NotEqual(t, string(LevelRoot), admission.LevelName(),
+		"a client asking for itself was handed the person's own reach")
+	assert.Equal(t, []string{NamespaceDefault}, admission.Namespaces)
+	assert.NotNil(t, admission.Grant, "the token was admitted as a person rather than as a token")
+	// Still known to be a connector, which is what the client DID says.
+	assert.Equal(t, did, admission.ClientDID)
+}
+
+// The person who minted the door is the token's provenance, so striking them
+// out reaches it, the same as every other token they minted.
+func TestAClientsOwnTokenIsNobodyOnceItsMinterIs(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, clientCredentialsRequest(did, clientSecret(t, store, did)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var answer struct {
+		AccessToken string `json:"access_token"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answer))
+
+	h.SetIdentities(nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.Header.Set("Authorization", "Bearer "+answer.AccessToken)
+	_, admitted := h.admissionOf(h.presented(req))
+	assert.False(t, admitted, "the token outlived the person who minted the door")
+}
+
+// The secret is the raw token the client was minted as, here as everywhere.
+func TestAClientAskingForItselfWithTheWrongSecretGetsNoToken(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, clientCredentialsRequest(did, "qntx_"+strings.Repeat("f", 64)))
+	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "invalid_client")
+
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Len(t, listed, 1, "a token was written for a stranger")
+}
+
+// A client revoked before it asked is a door that shut, the same as one that
+// came with a code.
+func TestARevokedClientAsksForNothing(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+	secret := clientSecret(t, store, did)
+	listed, err := store.List()
+	require.NoError(t, err)
+	require.NoError(t, store.Revoke(listed[0].ID))
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, clientCredentialsRequest(did, secret))
+	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
+}
+
+// A client is granted no scope, here as in the code flow: where it acts is
+// the door it was minted at, and a scope asks for what none was given.
+func TestAClientAskingForAScopeIsRefused(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, clientCredentialsRequest(did, clientSecret(t, store, did), "read"))
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "invalid_scope")
+
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Len(t, listed, 1, "a token was written for a scope nothing granted")
+}
+
+// The secret may be presented in the form instead of Basic auth (RFC 6749
+// §2.3.1): both are what the metadata document names.
+func TestAClientMayAskForItselfWithItsSecretInTheForm(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	form.Set("client_id", did)
+	form.Set("client_secret", clientSecret(t, store, did))
+	r := httptest.NewRequest(http.MethodPost, tokenPath, strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var answer struct {
+		AccessToken string `json:"access_token"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answer))
+	_, live := store.Lookup(sha256Hex(answer.AccessToken))
+	assert.True(t, live, "the issued token does not authenticate")
+}
+
+// A client asking for itself names this node or nothing, the same as every
+// other request at this endpoint (RFC 8707).
+func TestAClientsOwnTokenForAnotherResourceIsNotMinted(t *testing.T) {
+	h, store, did := authorizingHandler(t)
+
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	form.Set("resource", "https://other.example/mcp")
+	elsewhere := httptest.NewRequest(http.MethodPost, tokenPath, strings.NewReader(form.Encode()))
+	elsewhere.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	elsewhere.SetBasicAuth(url.QueryEscape(did), url.QueryEscape(clientSecret(t, store, did)))
+
+	w := httptest.NewRecorder()
+	h.handleToken(w, elsewhere)
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "invalid_target")
+
+	listed, err := store.List()
+	require.NoError(t, err)
+	assert.Len(t, listed, 1, "a token was written for another resource")
 }

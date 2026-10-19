@@ -7,6 +7,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -19,16 +20,17 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	s.pluginHandler = NewPluginHandler(pluginRegistry, s.logger, s.pluginHealth,
 		s.pluginSigilRows, s.pluginRecords().Plugins)
 	grpcplugin.SetPluginRecords(s.pluginRecords())
-	s.statusLineHandler = NewStatusLineHandler(pluginRegistry, s.logger, s.pluginHealth,
+	s.statusLineHandler = statusline.NewStatusLineHandler(pluginRegistry, s.logger,
+		func() map[string]plugin.HealthStatus { return healthOf(s.pluginHealth()) },
 		// Fetched per request: the backend supplies the watcher store after
 		// this handler is built.
 		func() storage.Watchers { return s.held.ServedUniverse().Watchers() },
-		func() *handlerFailureLog { return s.handlerFailures },
+		func() *statusline.HandlerFailureLog { return s.handlerFailures },
 		s)
-	s.statusLineHandler.news = func() *newsLog { return s.news }
-	s.statusLineHandler.deploys = s.deploys.held
-	// The auth subsystem ran first and left how the peers are asked, or noPeers.
-	s.statusLineHandler.peers = s.askPeers
+	s.statusLineHandler.News = func() *statusline.NewsLog { return s.news }
+	s.statusLineHandler.Deploys = func() ([]statusline.DeployData, bool) { return deployData(s.deploys.held()) }
+	// The auth subsystem ran first and left how the peers are asked, or statusline.NoPeers.
+	s.statusLineHandler.Peers = s.askPeers
 
 	queue := s.daemon.GetQueue()
 
@@ -37,6 +39,9 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	// The node DID subsystem runs first and is fatal, so the node has its DID here.
 	servicesManager := grpcplugin.NewServicesManager(s.deps.cfg.LLM, s.deps.cfg.Fetch, s.nodeDID.DID, s.logger)
 	filesDir := filepath.Join(filepath.Dir(s.dbPath), "files")
+
+	// A plugin calls GitHub as the namespace its record names (ADR-043, ADR-046).
+	servicesManager.SetGitHub(s.gitHubService(), s.namespaceOfPlugin)
 
 	// Services that did not start are held with why: each plugin asking for
 	// one in its Initialize is refused with it, and the node boots without.
@@ -55,6 +60,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 			"embedding", started.Embedding,
 			"search", started.Search,
 			"mail", started.Mail,
+			"github", started.GitHub,
 		)
 	}
 
@@ -77,6 +83,8 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	// A plugin whose record names a namespace reads and writes there (ADR-046).
 	servicesManager.SetPluginStores(s.storeOfPlugin)
+	// And mails as that plugin, and no other.
+	servicesManager.SetPluginNames(s.pluginOfToken)
 
 	// "a schedule remembers who created it and where", and each run goes there.
 	servicesManager.SetCallers(s.callerOf)

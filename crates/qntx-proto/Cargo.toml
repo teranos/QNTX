@@ -18,6 +18,9 @@ serde_json = { workspace = true }
 base64 = "0.22"
 ats.workspace = true
 
+[features]
+github = []
+
 [dev-dependencies]
 
 [build-dependencies]

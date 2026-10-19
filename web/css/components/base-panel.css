@@ -127,7 +127,7 @@
 
 .panel-title {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   color: #000;
   letter-spacing: 0.3px;
@@ -152,7 +152,7 @@
   cursor: pointer;
   border-radius: var(--border-radius);
   color: #666;
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 

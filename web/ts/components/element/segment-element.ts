@@ -25,7 +25,6 @@ import { parseAttributes } from './attestation-attrs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
 const FONT = 'var(--font-mono)';
-const SIZE = '13px';
 const EDGE = '12px';
 const MUTE = 'var(--text-on-dark-tertiary)';
 
@@ -119,7 +118,7 @@ export function renderSegmentStats(
     const title = el('div', {
         text: value,
         style: {
-            fontSize: '15px', marginBottom: '2px',
+            marginBottom: '2px',
             overflowWrap: 'break-word', wordBreak: 'break-word',
         },
     });
@@ -179,7 +178,7 @@ export function openSegmentElement(segment: Segment, value: string): void {
         renderContent: () => {
             const content = el('div', {
                 class: `${segment.kind}-element-content`,
-                style: { fontFamily: FONT, fontSize: SIZE, padding: EDGE },
+                style: { fontFamily: FONT, padding: EDGE },
             });
 
             content.appendChild(el('div', {

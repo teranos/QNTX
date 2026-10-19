@@ -1,11 +1,11 @@
 /**
  * @jest-environment jsdom
  *
- * Pi element — the ROOT agent in Pi, drawn as the Claude element draws it.
+ * Pi element — the Node Agent in Pi, drawn as the Claude element draws it.
  */
 
 import { describe, test, expect } from 'bun:test';
-import { drawClaude, type RootAgent } from './claude-element';
+import { drawClaude, type NodeAgent } from './claude-element';
 import { asAm, asSaid, type PiAm, type PiSaid } from './pi-element';
 import type { TranscriptRead } from './components/element/transcript-element';
 
@@ -59,7 +59,7 @@ async function settled(): Promise<void> {
 describe.skipIf(!USE_JSDOM)('Pi element', () => {
     test('who answers in Pi is drawn, and no permission mode is offered', async () => {
         const body = document.createElement('div');
-        const node: RootAgent = {
+        const node: NodeAgent = {
             am: () => Promise.resolve(asAm(piAm)),
             say: () => Promise.resolve(asSaid(piSaid)),
             read: () => Promise.resolve(session),
@@ -68,7 +68,8 @@ describe.skipIf(!USE_JSDOM)('Pi element', () => {
         await settled();
 
         const who = body.querySelector('.claude-who')!.textContent ?? '';
-        expect(who).toContain(piAm.did);
+        // "No need to show did key to user"
+        expect(who).not.toContain(piAm.did);
         expect(who).toContain('anthropic/claude-sonnet-4.6');
         expect(who).toContain('low');
         expect(body.querySelector<HTMLSelectElement>('.claude-mode')!.hidden).toBe(true);

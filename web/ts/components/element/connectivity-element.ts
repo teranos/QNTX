@@ -39,28 +39,23 @@ function renderConnectivityContent(): HTMLElement {
     container.style.gap = '8px';
     container.style.padding = '10px 12px';
     container.style.fontFamily = 'var(--font-mono)';
-    container.style.fontSize = '11px';
     container.style.color = 'var(--text-on-dark)';
 
     const header = document.createElement('div');
     header.textContent = 'Connectivity failures';
-    header.style.fontSize = '11px';
     header.style.opacity = '0.7';
     header.style.textTransform = 'uppercase';
     header.style.letterSpacing = '0.5px';
 
     const buildLine = document.createElement('div');
     buildLine.textContent = webBuildLine();
-    buildLine.style.fontSize = '10px';
     buildLine.style.opacity = '0.55';
     copyable(buildLine);
 
     const list = document.createElement('pre');
     list.style.margin = '0';
-    // Let the widest line drive the window's intrinsic width via the
-    // ResizeObserver in @teranos/elements window/window.ts. maxWidth
-    // (viewport * MAX_VIEWPORT_WIDTH_RATIO) still caps very long URLs.
-    list.style.whiteSpace = 'pre';
+    // One failure a line, and a URL longer than a phone breaks where it must.
+    list.style.whiteSpace = 'pre-wrap';
     list.style.color = '#e06060';
     copyable(list);
 

@@ -28,6 +28,11 @@ const (
 	// accepted and stored.
 	AttestationsWritten = "qntx.attestations.written"
 
+	// AttestationsRepeated is one per POST of an id the store already held,
+	// caught by the store after the handler's own check let it by. It is a
+	// writer saying something twice, answered as exists, and never an error.
+	AttestationsRepeated = "qntx.attestations.repeated"
+
 	// AttestationWriteTook is how long a POST that stored one ran, from the
 	// request arriving to the answer. Every write is here; only a slow one is
 	// also a log line, which names the phase it spent it in.

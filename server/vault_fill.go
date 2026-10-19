@@ -2,20 +2,20 @@ package server
 
 // "6. And QNTX ensures changes flow back into the Obsidian Vault as well"
 
-// "main wins"
+// "my word should supersede always no exception"
 
-// Main reaching the vault (ADR-049): each note of a bound folder on its
-// repository's branch is written into the vault's copy on the box.
+// Main reaching the vault (ADR-049): main's change to a note is written into
+// the vault's copy on the box, where the vault did not change it.
 
-// Obsidian Sync takes it from there to every device. A note that differs is
-// main's, and what is only in the vault is left as it is.
+// Obsidian Sync takes it from there to every device. What the vault changed
+// stays as the vault has it (vault_merge.go).
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1" //nolint:gosec // git names a blob by its SHA-1, used only to compare with GitHub's
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"os"
 	"path"
 	"path/filepath"
@@ -112,19 +112,42 @@ func (s *QNTXServer) repoNoteContent(ctx context.Context, owner, repo, branch, f
 	return content, nil
 }
 
-// vaultFilled is what filling one folder did.
+// vaultFilled is what filling one folder did: each note written as main has
+// it, merged, kept as the vault has it, or removed, and how many were the same.
 type vaultFilled struct {
 	Folder  string
 	Wrote   []string
+	Merged  []string
+	Kept    []string
 	Removed []string
 	Same    int
 	Refused error
 }
 
-// fillVaultFolder writes each note of folder's repository folder that the
-// vault's copy does not hold as the branch has it.
+// readIfThere is a file's content, and whether there is one.
+func readIfThere(at string) ([]byte, bool, error) {
+	content, err := os.ReadFile(at)
+	if os.IsNotExist(err) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "%s did not read", at)
+	}
+	return content, true, nil
+}
+
+// writeNote writes a note, and the folders it is in.
+func writeNote(at string, content []byte, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(at), 0o755); err != nil {
+		return errors.Wrapf(err, "could not create %s", filepath.Dir(at))
+	}
+	return errors.Wrapf(os.WriteFile(at, content, mode), "could not write %s", at)
+}
+
+// fillVaultFolder brings main's changes to the notes of folder into the vault's
+// copy, against what main had when they last agreed (the base).
 func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder string) vaultFilled {
-	filled := vaultFilled{Folder: folder, Wrote: []string{}, Removed: []string{}}
+	filled := vaultFilled{Folder: folder, Wrote: []string{}, Merged: []string{}, Kept: []string{}, Removed: []string{}}
 	repo, place, named := strings.Cut(folder, "=")
 	if !named {
 		filled.Refused = errors.Newf("%s names no place in the vault", folder)
@@ -141,19 +164,43 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		return filled
 	}
 	root := filepath.Join(vault.Path, filepath.FromSlash(place))
+	bases, err := vaultBases(vault.Name, place)
+	if err != nil {
+		filled.Refused = err
+		return filled
+	}
+	now := map[string]bool{}
 	for _, note := range notes {
+		now[note.under] = true
 		at := filepath.Join(root, filepath.FromSlash(path.Clean(note.under)))
-		if !strings.HasPrefix(at, root+string(filepath.Separator)) {
+		baseAt := filepath.Join(bases, filepath.FromSlash(path.Clean(note.under)))
+		if !strings.HasPrefix(at, root+string(filepath.Separator)) || !strings.HasPrefix(baseAt, bases+string(filepath.Separator)) {
 			filled.Refused = errors.Newf("%s of %s would be written outside %s, at %s", note.path, repo, root, at)
 			return filled
 		}
-		held, err := os.ReadFile(at)
-		if err != nil && !os.IsNotExist(err) {
-			filled.Refused = errors.Wrapf(err, "%s in the vault did not read", at)
+		placed := path.Join(place, note.under)
+		held, inVault, err := readIfThere(at)
+		if err != nil {
+			filled.Refused = err
 			return filled
 		}
-		if err == nil && gitBlobSHA(held) == note.sha {
+		base, hasBase, err := readIfThere(baseAt)
+		if err != nil {
+			filled.Refused = err
+			return filled
+		}
+		if inVault && gitBlobSHA(held) == note.sha {
 			filled.Same++
+			if !hasBase || !bytes.Equal(base, held) {
+				if err := writeNote(baseAt, held, 0o600); err != nil {
+					filled.Refused = err
+					return filled
+				}
+			}
+			continue
+		}
+		// Taken out of the vault after they agreed: it stays out.
+		if !inVault && hasBase {
 			continue
 		}
 		content, err := s.repoNoteContent(ctx, source.Owner, source.Repo, source.Branch, note.path)
@@ -161,53 +208,80 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 			filled.Refused = err
 			return filled
 		}
-		if err := os.MkdirAll(filepath.Dir(at), 0o755); err != nil {
-			filled.Refused = errors.Wrapf(err, "could not create %s", filepath.Dir(at))
+		write, writes := content, false
+		switch {
+		case !inVault, bytes.Equal(held, base) && hasBase:
+			writes = true
+			filled.Wrote = append(filled.Wrote, placed)
+		case !hasBase, bytes.Equal(content, base):
+			// Nothing says main changed it, or main did not: the vault's word.
+			filled.Kept = append(filled.Kept, placed)
+		case inVault && hasBase:
+			// Both changed it since they agreed.
+			write = mergeVaultWins(base, held, content)
+			if bytes.Equal(write, held) {
+				filled.Kept = append(filled.Kept, placed)
+			} else {
+				writes = true
+				filled.Merged = append(filled.Merged, placed)
+			}
+		}
+		if writes {
+			if err := writeNote(at, write, 0o644); err != nil { //nolint:gosec // a note is read by Obsidian Sync, which runs as another process
+				filled.Refused = err
+				return filled
+			}
+		}
+		if err := writeNote(baseAt, content, 0o600); err != nil {
+			filled.Refused = err
 			return filled
 		}
-		if err := os.WriteFile(at, content, 0o644); err != nil { //nolint:gosec // a note is read by Obsidian Sync, which runs as another process
-			filled.Refused = errors.Wrapf(err, "could not write %s", at)
-			return filled
-		}
-		filled.Wrote = append(filled.Wrote, path.Join(place, note.under))
 	}
 
 	// "yes"
-	// A note main had when this folder was last filled, and has no more, is
-	// gone from the vault too. One main never had is the vault's own.
-	seen, err := mainSaw(vault.Name)
+	// A note main no longer has is gone from the vault too, unless the vault changed it.
+	gone, err := basesNotIn(bases, now)
 	if err != nil {
 		filled.Refused = err
 		return filled
 	}
-	now := make([]string, 0, len(notes))
-	for _, note := range notes {
-		now = append(now, note.under)
-	}
-	for _, under := range seen[folder] {
-		if slices.Contains(now, under) {
-			continue
-		}
+	for _, under := range gone {
 		at := filepath.Join(root, filepath.FromSlash(path.Clean(under)))
+		baseAt := filepath.Join(bases, filepath.FromSlash(path.Clean(under)))
 		if !strings.HasPrefix(at, root+string(filepath.Separator)) {
 			filled.Refused = errors.Newf("%s, which main no longer has, would be removed outside %s, at %s", under, root, at)
 			return filled
 		}
-		if err := os.Remove(at); err != nil && !os.IsNotExist(err) {
-			filled.Refused = errors.Wrapf(err, "could not remove %s, which main no longer has", at)
+		held, inVault, err := readIfThere(at)
+		if err != nil {
+			filled.Refused = err
 			return filled
 		}
-		filled.Removed = append(filled.Removed, path.Join(place, under))
-	}
-	seen[folder] = now
-	if err := keepMainSaw(vault.Name, seen); err != nil {
-		filled.Refused = err
+		base, hadBase, err := readIfThere(baseAt)
+		if err != nil {
+			filled.Refused = err
+			return filled
+		}
+		switch {
+		case inVault && hadBase && bytes.Equal(held, base):
+			if err := os.Remove(at); err != nil && !os.IsNotExist(err) {
+				filled.Refused = errors.Wrapf(err, "could not remove %s, which main no longer has", at)
+				return filled
+			}
+			filled.Removed = append(filled.Removed, path.Join(place, under))
+		case inVault:
+			filled.Kept = append(filled.Kept, path.Join(place, under))
+		}
+		if err := os.Remove(baseAt); err != nil && !os.IsNotExist(err) {
+			filled.Refused = errors.Wrapf(err, "could not remove the base of %s", under)
+			return filled
+		}
 	}
 	return filled
 }
 
-// vaultsSeenDir is where the node keeps, per vault, the notes main had when
-// each folder was last filled.
+// vaultsSeenDir is where the node keeps, per vault and folder, each note as
+// main had it when the vault and main last agreed on it: the base a merge reads.
 var vaultsSeenDir = func() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -216,42 +290,43 @@ var vaultsSeenDir = func() (string, error) {
 	return filepath.Join(home, ".qntx", "vaults"), nil
 }
 
-// mainSaw is, per folder of the vault, the notes main had when it was last filled.
-func mainSaw(name string) (map[string][]string, error) {
+// vaultBases is where the bases of one place of a vault are kept.
+func vaultBases(name, place string) (string, error) {
 	dir, err := vaultsSeenDir()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	at := filepath.Join(dir, name+".json")
-	held, err := os.ReadFile(at)
-	if os.IsNotExist(err) {
-		return map[string][]string{}, nil
+	kept := filepath.Join(dir, name)
+	at := filepath.Join(kept, filepath.FromSlash(path.Clean(place)))
+	if !strings.HasPrefix(at, kept+string(filepath.Separator)) {
+		return "", errors.Newf("the bases of %s would be kept outside %s, at %s", place, kept, at)
 	}
-	if err != nil {
-		return nil, errors.Wrapf(err, "what main had for %s did not read from %s", name, at)
-	}
-	seen := map[string][]string{}
-	if err := json.Unmarshal(held, &seen); err != nil {
-		return nil, errors.Wrapf(err, "what main had for %s, in %s, is not JSON the node wrote", name, at)
-	}
-	return seen, nil
+	return at, nil
 }
 
-// keepMainSaw writes down what main had, per folder of the vault.
-func keepMainSaw(name string, seen map[string][]string) error {
-	dir, err := vaultsSeenDir()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return errors.Wrapf(err, "could not create %s", dir)
-	}
-	written, err := json.MarshalIndent(seen, "", "  ")
-	if err != nil {
-		return errors.Wrapf(err, "what main had for %s did not marshal", name)
-	}
-	at := filepath.Join(dir, name+".json")
-	return errors.Wrapf(os.WriteFile(at, written, 0o600), "could not write %s", at)
+// basesNotIn is every note a base is kept for that main does not have now.
+func basesNotIn(bases string, now map[string]bool) ([]string, error) {
+	var gone []string
+	err := filepath.WalkDir(bases, func(at string, entry os.DirEntry, err error) error {
+		if os.IsNotExist(err) {
+			return filepath.SkipAll
+		}
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), noteSuffix) {
+			return nil
+		}
+		under, err := filepath.Rel(bases, at)
+		if err != nil {
+			return err
+		}
+		if under = filepath.ToSlash(under); !now[under] {
+			gone = append(gone, under)
+		}
+		return nil
+	})
+	return gone, errors.Wrapf(err, "the bases in %s did not read", bases)
 }
 
 // folderMoved says whether a bound folder is to be filled now.
@@ -278,9 +353,9 @@ func (s *QNTXServer) fillVault(ctx context.Context, name string, moved folderMov
 		}
 		filled := s.fillVaultFolder(ctx, vault, folder)
 		if filled.Refused != nil {
-			logger.Errorw("A vault's folder was not filled from its repository", "vault", vault.Name, "folder", folder, "wrote", filled.Wrote, "removed", filled.Removed, "error", filled.Refused)
+			logger.Errorw("A vault's folder was not filled from its repository", "vault", vault.Name, "folder", folder, "wrote", filled.Wrote, "merged", filled.Merged, "kept", filled.Kept, "removed", filled.Removed, "error", filled.Refused)
 		} else {
-			logger.Infow("A vault's folder was filled from its repository", "vault", vault.Name, "folder", folder, "wrote", filled.Wrote, "removed", filled.Removed, "same", filled.Same)
+			logger.Infow("A vault's folder was filled from its repository", "vault", vault.Name, "folder", folder, "wrote", filled.Wrote, "merged", filled.Merged, "kept", filled.Kept, "removed", filled.Removed, "same", filled.Same)
 		}
 		done = append(done, filled)
 	}

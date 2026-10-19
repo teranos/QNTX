@@ -185,6 +185,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		for service, handed := range map[string]*protocol.ServiceEndpoint{
 			"embedding": req.EmbeddingEndpoint,
 			"mail":      req.MailEndpoint,
+			"github":    req.GithubEndpoint,
 		} {
 			key, value := EndpointFrom(service, handed).configKey(service)
 			pluginConfig[key] = value

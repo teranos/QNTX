@@ -116,7 +116,6 @@ export function showToast(message: string, options: ToastOptions = {}): void {
         detailsContainer.style.marginTop = '6px';
         detailsContainer.style.paddingTop = '6px';
         detailsContainer.style.borderTop = '1px solid rgba(255,255,255,0.1)';
-        detailsContainer.style.fontSize = '11px';
         detailsContainer.style.fontFamily = 'var(--font-mono)';
         detailsContainer.style.color = 'var(--text-secondary, #999)';
         detailsContainer.style.maxHeight = '120px';
@@ -137,7 +136,6 @@ export function showToast(message: string, options: ToastOptions = {}): void {
         toggleBtn.style.border = 'none';
         toggleBtn.style.color = 'var(--text-secondary, #999)';
         toggleBtn.style.cursor = 'pointer';
-        toggleBtn.style.fontSize = '11px';
         toggleBtn.style.padding = '4px 0 0 0';
 
         toggleBtn.addEventListener('click', (e) => {

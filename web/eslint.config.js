@@ -94,6 +94,42 @@ const NO_RAW_TABLE = [
     { selector: "CallExpression[callee.property.name='createElement'][arguments.0.value=/^(table|thead|tbody|tr|th)$/]", message: TABLE_IS_ELEMENTS },
     { selector: "Literal[value=/<(table|thead|tbody|tr|th)[\\s>]/]", message: TABLE_IS_ELEMENTS },
     { selector: "TemplateElement[value.raw=/<(table|thead|tbody|tr|th)[\\s>]/]", message: TABLE_IS_ELEMENTS },
+    // "i wish very deeply that this was made structurally impossible, it should simply not be a thing, ci should fail on it"
+    { selector: "CallExpression[callee.name='createTable'][arguments.1.type='ArrayExpression'][arguments.1.elements.length=2]", message: 'a record, a label beside its value, is record() from ts/table-cell.ts: its labels never break inside a word.' },
+];
+
+// "i want it to not compile when shit like this happens"
+// A control is @teranos/elements': pressFrom, its switch, its fields. One drawn here stops the build.
+const CONTROL_IS_ELEMENTS = "a control is @teranos/elements': pressFrom for a button, and its switch and fields. QNTX does not draw a control.";
+const NO_RAW_CONTROL = [
+    ...['button', 'input', 'select', 'textarea'].map((tag) => ({
+        selector: `CallExpression[callee.property.name='createElement'][arguments.0.value='${tag}']`,
+        message: CONTROL_IS_ELEMENTS,
+    })),
+    { selector: "Literal[value=/<(button|input|select|textarea)[\\s>]/]", message: CONTROL_IS_ELEMENTS },
+    { selector: "TemplateElement[value.raw=/<(button|input|select|textarea)[\\s>]/]", message: CONTROL_IS_ELEMENTS },
+    { selector: "ImportDeclaration[source.value=/components\\/button/]", message: CONTROL_IS_ELEMENTS },
+];
+
+// "if it overflows width, hard fail, die"
+// What makes content wider than its element, as far as the code says it: a line held unbroken.
+const WIDTH = "WIDTH: a line held unbroken is wider than a phone (@teranos/elements drops the element dead). Let it wrap: pre-wrap, pre-line or normal.";
+const NO_FIXED_WIDTH = [
+    { selector: "AssignmentExpression[left.object.property.name='style'][left.property.name='whiteSpace'][right.value=/^(nowrap|pre)$/]", message: WIDTH },
+    { selector: "CallExpression[callee.property.name='setProperty'][arguments.0.value='white-space'][arguments.1.value=/^(nowrap|pre)$/]", message: WIDTH },
+];
+
+// "There's no doubt in my mind that Elements owns it's own font sizes."
+// "I WANT QNTX WEB TO FAIL"
+// Text size is @teranos/elements': sizeText(node, size) with a size from TEXT_SIZES. Written
+// anywhere else, it stops the build. A stylesheet is read by font-size-ban.ts.
+const TEXT_SIZE_IS_ELEMENTS = "text size is @teranos/elements': sizeText(node, 'xs' | 'sm' | 'md' | 'lg'). QNTX does not size text.";
+const NO_FONT_SIZE = [
+    { selector: "AssignmentExpression[left.property.name=/^(fontSize|font)$/]", message: TEXT_SIZE_IS_ELEMENTS },
+    { selector: "CallExpression[callee.property.name='setProperty'][arguments.0.value=/^font(-size)?$/]", message: TEXT_SIZE_IS_ELEMENTS },
+    { selector: "Property[key.name=/^(fontSize|font)$/]", message: TEXT_SIZE_IS_ELEMENTS },
+    { selector: "Literal[value=/font-size|(^|[\\s;{\"'])font:/]", message: TEXT_SIZE_IS_ELEMENTS },
+    { selector: "TemplateElement[value.raw=/font-size|(^|[\\s;{\"'])font:/]", message: TEXT_SIZE_IS_ELEMENTS },
 ];
 
 // "ban 1, 2, 3, 4, 5"
@@ -128,7 +164,7 @@ export default [
             'no-empty': 'error',
             'no-restricted-globals': ['error', ...BANNED_GLOBALS],
             'no-restricted-imports': ['error', NO_SHOW_TOAST],
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -149,14 +185,14 @@ export default [
         // client/ is where apiFetch lives.
         files: ['ts/client/**/*.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
         // These load a .wasm binary by URL.
         files: ['ts/laye.ts', 'ts/ats-wasm.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -164,7 +200,7 @@ export default [
         // reports every answer to the connectivity manager.
         files: ['ts/liveness.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...SACRED_CATCH, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
     {
@@ -175,7 +211,7 @@ export default [
         // "i want tooltip to be propagated more"
         files: ['ts/market-element.ts'],
         rules: {
-            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE],
+            'no-restricted-syntax': ['error', ...NO_RAW_TABLE, ...NO_RAW_CONTROL, ...NO_FONT_SIZE, NO_TOAST, ...NO_RAW_FETCH, ...SACRED_CATCH, NO_RAW_TITLE, ...ABSENCE, ...NO_FIXED_WIDTH],
         },
     },
 ];

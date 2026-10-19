@@ -38,4 +38,4 @@ tonic-build = { workspace = true, optional = true }
 
 [features]
 default = []
-plugin = ["dep:qntx-proto", "dep:tokio", "dep:tokio-stream", "dep:tonic", "dep:prost", "dep:prost-types", "dep:http", "dep:tonic-build"]
+plugin = ["dep:qntx-proto", "qntx-proto/github", "dep:tokio", "dep:tokio-stream", "dep:tonic", "dep:prost", "dep:prost-types", "dep:http", "dep:tonic-build"]

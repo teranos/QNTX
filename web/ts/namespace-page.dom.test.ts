@@ -126,10 +126,10 @@ describe('the namespace page', () => {
         name.value = 'garden';
 
         const plus = () => document.querySelector<HTMLButtonElement>('.canvas-birth-plus')!;
-        expect(plus().classList.contains('qntx-btn-confirming')).toBe(false);
+        expect(plus().dataset.stage).toBe('rest');
         plus().click();
         await tick();
-        expect(plus().classList.contains('qntx-btn-confirming')).toBe(true);
+        expect(plus().dataset.stage).toBe('armed');
         expect(created).toEqual([]);
 
         plus().click();
@@ -160,7 +160,7 @@ describe('the namespace page', () => {
         expect(rows[1].classList.contains('disabled')).toBe(true);
         expect(rows[1].querySelector('.canvas-card-owners')?.textContent).toContain('Bob');
         expect(rows[1].querySelector('.canvas-card-state')?.textContent).toContain('disabled by US-ROOT');
-        // The acts are the system's buttons.
-        expect(rows[1].querySelector('.canvas-act.qntx-btn')).not.toBeNull();
+        // The acts are presses.
+        expect(rows[1].querySelector('.canvas-act[data-press]')).not.toBeNull();
     });
 });

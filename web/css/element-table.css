@@ -38,9 +38,30 @@
     cursor: pointer;
 }
 
+/* A row of presses wraps to the width it has: on a phone, ⍟'s ways ran 653px into 329px. */
 .element-actions {
-    text-align: right;
-    white-space: nowrap;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+/* The package injects its own `.element-table th { white-space: nowrap }` after
+   this sheet (table.ts ensureStyle), so this is said one step more specific: a
+   head wraps on a phone, where four heads do not fit on one line each. */
+table.element-table th {
+    white-space: normal;
+}
+
+/* The webhook's path is typed into the width the row has, not the input's own. */
+.github-webhook-path {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.github-webhook-url {
+    overflow-wrap: anywhere;
 }
 
 .element-pill {
@@ -79,7 +100,7 @@
 .element-pill-when {
     margin-left: 6px;
     color: var(--text-on-dark-tertiary);
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
 
 /* What goes with a cell, under what it says: a table is four columns at most. */
@@ -136,49 +157,6 @@
 .token-age-months,
 .token-age-years {
     color: var(--age-old);
-}
-
-/* The composer: one line's slots on one row, and the sentence above it. */
-.roles-compose {
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-}
-
-.roles-compose-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-}
-
-/* Each slot is its own width, never the row's: the window stylesheet gives
-   .input flex: 1, and a who that grew to the row broke the sentence. */
-.roles-compose-row .input,
-.roles-compose-row select.input,
-.roles-compose-row span > .input {
-    flex: 0 0 auto;
-    width: 11em;
-    min-width: 0;
-    font-size: var(--font-size-sm);
-    padding: 3px 6px;
-}
-
-.roles-compose-row > span {
-    display: inline-flex;
-    flex: 0 0 auto;
-}
-
-.roles-compose-row select.input {
-    width: auto;
-}
-
-.roles-compose-word {
-    color: var(--text-on-dark-tertiary);
-    white-space: nowrap;
-}
-
-.roles-compose-sentence {
-    padding: 4px 0;
 }
 
 /* GitHub (ADR-043): the runner's page is outside QNTX, and underlined as such. */

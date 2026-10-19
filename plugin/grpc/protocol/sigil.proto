@@ -159,15 +159,44 @@ message ClaudeAm {
   string auth_method = 12;
 }
 
+// NamespaceAgentSaid is what agents say answers: what the namespace's agent
+// answered, in the harness it was said to.
+message NamespaceAgentSaid {
+  // What it answered in Claude Code.
+  ClaudeSaid claude = 1;
+  // What it answered in Pi.
+  PiSaid pi = 2;
+}
+
+// NamespaceKeys is what keys list, set and drop answer: the names of a
+// namespace's keys, never their values (ADR-051).
+message NamespaceKeys {
+  // The namespace they are kept in.
+  string namespace = 1;
+  // Each key held, by its name.
+  repeated NamespaceKey keys = 2;
+}
+
+// NamespaceKey is one key a namespace holds, by its name: who set it and when.
+message NamespaceKey {
+  // Its name, e.g. openrouter.
+  string name = 1;
+  // Who set it.
+  string set_by = 2;
+  // When it was set, RFC 3339.
+  string at = 3;
+}
+
 // PiAm is what pi am answers.
 message PiAm {
   // Its own DID, which signs what it writes down.
   string did = 1;
-  // The model am.toml names for Pi.
+  // The model it runs in Pi: am.toml's for the Node Agent, the AGENT line's for
+  // a namespace's agent.
   string model = 2;
-  // The thinking level am.toml names for Pi.
+  // The thinking level it runs at in Pi.
   string thinking = 3;
-  // The plugin every model call Pi makes goes through.
+  // The plugin every model call the Node Agent makes in Pi goes through.
   string gateway = 4;
   // The session it continues in Pi, or empty before anything was said to it
   // there.
@@ -180,17 +209,22 @@ message PiAm {
   string pi_version = 8;
   // Why it cannot be spoken to in Pi, when it cannot.
   string not_ready = 9;
+  // The provider a namespace's agent makes its model calls at, on the
+  // namespace's key of that name (ADR-051).
+  string provider = 10;
 }
 
 // NamespaceAgentAm is what agents am and agents set answer: the namespace's
-// agent, who opted the namespace into it, and who it is in Claude Code.
+// agent, who opted the namespace into it, and who it is in Claude Code or in Pi.
 message NamespaceAgentAm {
   // The namespace it stands in.
   string namespace = 1;
   // Who opted the namespace into it.
   string set_by = 2;
-  // Who the agent is and how it runs.
+  // Who the agent is and how it runs, in Claude Code.
   ClaudeAm agent = 3;
+  // Who the agent is and how it runs, in Pi.
+  PiAm pi = 4;
 }
 
 // Follows says which column of a reference each of a signum's fields is. The

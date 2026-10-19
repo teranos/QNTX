@@ -5,7 +5,13 @@
 {
   name = "Pi";
 
-  # The ROOT agent runs in Pi too (ADR-048). The box downloads Pi from the qntx
+  # A newer push to the same ref makes this run's answer stale.
+  concurrency = {
+    group = "\${{ github.workflow }}-\${{ github.ref }}";
+    cancel-in-progress = true;
+  };
+
+  # The Node Agent runs in Pi too (ADR-048). The box downloads Pi from the qntx
   # cache and never builds it: a build there took the node down.
 
   # Built when the pin moves, and by hand.

@@ -1,0 +1,164 @@
+package statusline
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+)
+
+// logWith builds a failure log holding the given failures.
+func logWith(failures ...HandlerFailure) *HandlerFailureLog {
+	l := NewHandlerFailureLog()
+	for _, f := range failures {
+		l.Record(f)
+	}
+	return l
+}
+
+func handlerRow(l *HandlerFailureLog) *StatusLineHandler {
+	h := aRow(quietNode{})
+	h.handlerFailures = func() *HandlerFailureLog { return l }
+	return h
+}
+
+// A handler failure no longer draws its own item on the row: it is shown inside
+// the slot of the plugin that declared it, so the row does not carry the same
+// plugin twice under two names.
+func TestAHandlerFailureDrawsNoItemOfItsOwn(t *testing.T) {
+	h := handlerRow(logWith(HandlerFailure{
+		Handler: "capy/capy.campaigns",
+		Error:   "rpc error: code = Unavailable",
+		AtMs:    time.Now().Add(-2 * time.Minute).UnixMilli(),
+	}))
+
+	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline?format=json", nil))
+	rec := httptest.NewRecorder()
+	h.HandleStatusLine(rec, req)
+
+	var body StatusLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("row is not json: %v", err)
+	}
+	for _, item := range body.Items {
+		if item.Name == "capy/capy.campaigns" {
+			t.Fatalf("the failure drew a standalone item: %+v", body.Items)
+		}
+	}
+}
+
+// A built-in has no plugin slot to be shown inside. Its failure draws its own
+// item, or it is invisible: ci.watch refused a row for an hour and the row
+// said nothing.
+func TestABuiltInFailureDrawsItsOwnItem(t *testing.T) {
+	h := handlerRow(logWith(HandlerFailure{
+		Handler: "ci.watch",
+		Error:   "ci.watch: attestation x names no push: repo=\"teranos/QNTX\" branch=\"main\" sha=\"\"",
+		AtMs:    time.Now().Add(-2 * time.Minute).UnixMilli(),
+	}))
+
+	req := rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline?format=json", nil))
+	rec := httptest.NewRecorder()
+	h.HandleStatusLine(rec, req)
+
+	var body StatusLineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("row is not json: %v", err)
+	}
+	for _, item := range body.Items {
+		if item.Name == "ci.watch" {
+			if item.Symbol != SymbolUnwell {
+				t.Fatalf("the failure drew well: %+v", item)
+			}
+			return
+		}
+	}
+	t.Fatalf("a built-in's failure drew nothing: %+v", body.Items)
+}
+
+// One item per handler, carrying how many times. Forty failures are one thing
+// to fix, and the count is what says it keeps happening.
+func TestRepeatedHandlerFailuresCollapseWithACount(t *testing.T) {
+	now := time.Now()
+	h := handlerRow(logWith(
+		HandlerFailure{Handler: "capy.account", Error: "expired", AtMs: now.Add(-3 * time.Hour).UnixMilli()},
+		HandlerFailure{Handler: "capy.account", Error: "expired", AtMs: now.Add(-2 * time.Hour).UnixMilli()},
+		HandlerFailure{Handler: "capy.account", Error: "expired", AtMs: now.Add(-1 * time.Hour).UnixMilli()},
+	))
+
+	items := handlerFailureItemsFor(h.recentHandlerFailures())
+	if len(items) != 1 {
+		t.Fatalf("three failures of one handler drew %d items: %+v", len(items), items)
+	}
+	if items[0].Note != "3x expired" {
+		t.Fatalf("the row does not carry the count and the reason: %q", items[0].Note)
+	}
+}
+
+// The row names it; the click has the exact error.
+// itemDetail is what am_item answers for one name, as a surface carries it.
+func itemDetail(t *testing.T, h *StatusLineHandler, asked *http.Request, name string) map[string]any {
+	t.Helper()
+	answer, refusal := h.Item(asked.Context(), name)
+	if refusal != nil {
+		t.Fatalf("item %s refused: %s", name, refusal.GetSays())
+	}
+	body, err := json.Marshal(answer)
+	if err != nil {
+		t.Fatalf("detail does not marshal: %v", err)
+	}
+	var detail map[string]any
+	if err := json.Unmarshal(body, &detail); err != nil {
+		t.Fatalf("detail is not a json object: %v", err)
+	}
+	return detail
+}
+
+func TestFailingHandlerDetailCarriesTheExactError(t *testing.T) {
+	failedAt := time.Now().Add(-30 * time.Second)
+	h := handlerRow(logWith(HandlerFailure{
+		Handler:        "capy.campaigns",
+		ScheduledJobID: "AS-CAPYCAPY-SCHEDULE-PULSE-FZ36C6PW",
+		ExecutionID:    "PX-EXECUTIO-ID-PULSE-PJSGBAAE",
+		Error:          `rpc error: code = Unavailable desc = closing transport due to: EOF`,
+		AtMs:           failedAt.UnixMilli(),
+	}))
+
+	detail := itemDetail(t, h, rootContext(httptest.NewRequest(http.MethodGet, "/am/statusline/capy.campaigns", nil)), "capy.campaigns")
+	if detail["error"] != `rpc error: code = Unavailable desc = closing transport due to: EOF` {
+		t.Fatalf("detail does not carry the error in full: %+v", detail)
+	}
+	if detail["healthy"] != false {
+		t.Fatalf("a failure reads healthy: %+v", detail)
+	}
+	if detail["scheduled_job_id"] != "AS-CAPYCAPY-SCHEDULE-PULSE-FZ36C6PW" {
+		t.Fatalf("detail does not say which job: %+v", detail)
+	}
+}
+
+// Past the window the row is quiet again, so a handler fixed yesterday is not
+// still being reported today.
+func TestHandlerFailuresOutsideTheWindowDrawNothing(t *testing.T) {
+	h := handlerRow(logWith(HandlerFailure{
+		Handler: "capy.account",
+		Error:   "long ago",
+		AtMs:    time.Now().Add(-HandlerFailureWindow - time.Hour).UnixMilli(),
+	}))
+
+	if items := handlerFailureItemsFor(h.recentHandlerFailures()); len(items) != 0 {
+		t.Fatalf("a failure past the window still draws: %+v", items)
+	}
+}
+
+// The log is bounded, so a handler failing in a tight loop cannot grow it.
+func TestHandlerFailureLogIsBounded(t *testing.T) {
+	l := NewHandlerFailureLog()
+	now := time.Now().UnixMilli()
+	for i := 0; i < handlerFailureLogSize*2; i++ {
+		l.Record(HandlerFailure{Handler: "capy.script", Error: "no", AtMs: now})
+	}
+	if got := len(l.Since(HandlerFailureWindow)); got != handlerFailureLogSize {
+		t.Fatalf("log holds %d, want %d", got, handlerFailureLogSize)
+	}
+}

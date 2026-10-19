@@ -26,6 +26,7 @@ import (
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/reach"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
@@ -36,34 +37,35 @@ type QNTXServer struct {
 	// its doors, and the health of the file underneath. What a namespace keeps
 	// is the namespace's, and is reached through it.
 	nodeDB              *sql.DB
-	startedAt           time.Time             // When this process began answering; zero until New runs
-	dbPath              string                // Database file path (for display in banner)
-	logPath             string                // File log path (for banner)
-	deps                *serverDependencies   // Initialization dependencies (available during subsystem init)
-	store               string                // Configured storage backend, "sqlite" or "parquet" (ADR-023)
-	held                *namespaces.Held      // The node's universes, and the only way to reach one
-	bindAddress         string                // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
-	port                int                   // The port am.toml says the node listens on
-	authHandler         *auth.Handler         // nil when auth.enabled = false
-	authEnabled         bool                  // resolved at init, never changes
-	nodeDID             *nodedid.Handler      // node's decentralized identity
-	harnessBinaries     harnessesHeld         // Each harness the ROOT agent runs in, as this node holds its binary, by the harness's name (ADR-048)
-	rootAgent           *rootAgent            // The ROOT agent this node runs; nil when am.toml names none (ADR-048)
-	noRootAgent         error                 // Why the ROOT agent am.toml names did not start, for whoever speaks to it
-	namespaceAgents     agentsHeld            // Each namespace agent this node has held, by its purpose (ADR-048)
-	agentsDir           string                // Where agents are kept; empty is ~/.qntx/agents
-	ownURL              string                // Where this node answers on its own machine; empty until it listens
-	daemon              *async.WorkerPool     // Background job processor (daemon)
-	scheduleStore       *schedule.Store       // Schedule persistence (shared with ticker)
-	tickerCfg           schedule.TickerConfig // Ticker configuration (resolved at init)
-	ticker              *schedule.Ticker      // Pulse ticker for scheduled jobs
-	configWatcher       *config.ConfigWatcher // Config watcher for auto-reload on config changes
-	storageEventsPoller *StorageEventsPoller  // Poller for storage events (warnings/evictions)
-	handlerFailures     *handlerFailureLog    // Recent failed handler executions, for the status row
-	news                *newsLog              // What built-ins left on the status row, per caller
-	askPeers            peerRows              // How the peers' rows are asked for the status row; noPeers until auth declares them
-	builtin             *builtinExecutor      // What a builtin_execute action reaches; nil until the daemon is wired
-	standing            *standingObserver     // The standing table, run for whichever namespace a row lands in
+	nodeAgentApart      bool                          // The Node Agent's turns run apart from this process; set as the agent subsystem boots
+	startedAt           time.Time                     // When this process began answering; zero until New runs
+	dbPath              string                        // Database file path (for display in banner)
+	logPath             string                        // File log path (for banner)
+	deps                *serverDependencies           // Initialization dependencies (available during subsystem init)
+	store               string                        // Configured storage backend, "sqlite" or "parquet" (ADR-023)
+	held                *namespaces.Held              // The node's universes, and the only way to reach one
+	bindAddress         string                        // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
+	port                int                           // The port am.toml says the node listens on
+	authHandler         *auth.Handler                 // nil when auth.enabled = false
+	authEnabled         bool                          // resolved at init, never changes
+	nodeDID             *nodedid.Handler              // node's decentralized identity
+	harnessBinaries     harnessesHeld                 // Each harness the Node Agent runs in, as this node holds its binary, by the harness's name (ADR-048)
+	nodeAgent           *rootAgent                    // The Node Agent this node runs; nil when am.toml names none (ADR-048)
+	noNodeAgent         error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
+	namespaceAgents     agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
+	agentsDir           string                        // Where agents are kept; empty is ~/.qntx/agents
+	ownURL              string                        // Where this node answers on its own machine; empty until it listens
+	daemon              *async.WorkerPool             // Background job processor (daemon)
+	scheduleStore       *schedule.Store               // Schedule persistence (shared with ticker)
+	tickerCfg           schedule.TickerConfig         // Ticker configuration (resolved at init)
+	ticker              *schedule.Ticker              // Pulse ticker for scheduled jobs
+	configWatcher       *config.ConfigWatcher         // Config watcher for auto-reload on config changes
+	storageEventsPoller *StorageEventsPoller          // Poller for storage events (warnings/evictions)
+	handlerFailures     *statusline.HandlerFailureLog // Recent failed handler executions, for the status row
+	news                *statusline.NewsLog           // What built-ins left on the status row, per caller
+	askPeers            statusline.PeerRows           // How the peers' rows are asked for the status row; statusline.NoPeers until auth declares them
+	builtin             *builtinExecutor              // What a builtin_execute action reaches; nil until the daemon is wired
+	standing            *standingObserver             // The standing table, run for whichever namespace a row lands in
 	clients             map[*Client]bool
 	broadcastReq        chan *broadcastRequest // Requests to broadcast worker (thread-safe sends)
 	register            chan *Client
@@ -183,7 +185,7 @@ type QNTXServer struct {
 	pluginHandler *PluginHandler
 
 	// What the status line, the phone and the log all draw
-	statusLineHandler *StatusLineHandler
+	statusLineHandler *statusline.StatusLineHandler
 
 	// Watcher CRUD handlers
 	watcherHandler *WatcherHandler

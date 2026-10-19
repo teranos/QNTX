@@ -11,7 +11,7 @@ import { apiJson } from './client';
 import { log, SEG } from './logger.ts';
 import { Agent } from './sym';
 import { standingNamespace } from './standing.ts';
-import { drawClaude, type ClaudeAm, type ClaudeSaid, type RootAgent } from './claude-element';
+import { drawClaude, type ClaudeAm, type ClaudeSaid, type NodeAgent } from './claude-element';
 import type { TranscriptRead } from './components/element/transcript-element';
 import { apiError, sacredEntry } from './components/sacred';
 
@@ -35,7 +35,7 @@ export interface SignedIn {
 }
 
 // The node, as this element asks it about one namespace's agent.
-export interface NamespaceAgent extends RootAgent {
+export interface NamespaceAgent extends NodeAgent {
     begin(): Promise<SignedIn>;
     finish(code: string): Promise<SignedIn>;
 }
@@ -46,14 +46,14 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
 export function agentOf(namespace: string): NamespaceAgent {
     const at = `/api/agents/${encodeURIComponent(namespace)}`;
     return {
-        am: () => apiJson<AgentAm>(at).then(is => is.agent),
-        say: (says, mode) => apiJson<ClaudeSaid>(`${at}/say`, {
+        am: () => apiJson<AgentAm>(`${at}?harness=claude`).then(is => is.agent),
+        say: (says, mode) => apiJson<{ claude: ClaudeSaid }>(`${at}/say`, {
             method: 'POST',
             headers: JSON_HEADERS,
-            body: JSON.stringify(mode ? { says, permission_mode: mode } : { says }),
-        }),
-        // Its one session, shared by everyone who has reach on the namespace.
-        read: () => apiJson<{ transcript: TranscriptRead }>(`${at}/session`)
+            body: JSON.stringify(mode ? { harness: 'claude', says, permission_mode: mode } : { harness: 'claude', says }),
+        }).then(said => said.claude),
+        // Its one session in Claude Code, shared by everyone who has reach on the namespace.
+        read: () => apiJson<{ transcript: TranscriptRead }>(`${at}/session?harness=claude`)
             .then(answer => answer.transcript),
         // Without a code a sign-in is begun and the URL given; with the code shown there it is finished.
         begin: () => apiJson<SignedIn>(`${at}/login`, { method: 'POST', headers: JSON_HEADERS, body: '{}' }),
@@ -171,6 +171,9 @@ export function drawAgent(body: HTMLElement, namespace: string, node: NamespaceA
 
     return () => settle();
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/agents/{namespace}'] as const;
 
 export function createAgentElement(): Element {
     return {

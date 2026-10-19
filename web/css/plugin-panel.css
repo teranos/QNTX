@@ -115,7 +115,7 @@
 }
 
 .plugin-server-label {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: #6b7280;
 }
 
@@ -193,7 +193,7 @@
 
 .plugin-state-icon,
 .plugin-status-icon {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 .plugin-state-text,
@@ -233,34 +233,6 @@
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     gap: 8px;
-}
-
-.plugin-pause-btn,
-.plugin-resume-btn {
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    padding: 4px 12px;
-    border-radius: 4px;
-    border: 1px solid;
-    background: transparent;
-}
-
-.plugin-pause-btn {
-    border-color: #fbbf24;
-    color: #fbbf24;
-}
-
-.plugin-pause-btn:hover {
-    background: rgba(251, 191, 36, 0.1);
-}
-
-.plugin-resume-btn {
-    border-color: #4ade80;
-    color: #4ade80;
-}
-
-.plugin-resume-btn:hover {
-    background: rgba(74, 222, 128, 0.1);
 }
 
 /* Plugin message (health status message) */
@@ -333,7 +305,7 @@
     display: grid;
     grid-template-columns: 1fr 2fr;
     gap: 1px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     text-transform: uppercase;
     color: #6b7280;
@@ -576,7 +548,7 @@
 }
 
 .panel-error-details-header {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: #6b7280;
     text-transform: uppercase;
@@ -707,7 +679,7 @@
     border: 1px solid var(--border-on-dark, #555);
     border-radius: 4px;
     color: var(--text-on-dark);
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 .plugin-search-input,
@@ -732,7 +704,7 @@
     align-items: center;
     justify-content: center;
     min-height: 56px;
-    font-size: 28px;
+    font-size: var(--font-size-lg);
     color: #9ca3af;
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
@@ -850,7 +822,7 @@
 }
 
 .plugin-log-header {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     text-transform: uppercase;
     color: #6b7280;

@@ -1,14 +1,14 @@
 /**
  * @jest-environment jsdom
  *
- * Claude element — the ROOT agent: said to, and read as the session it continues.
+ * Claude element — the Node Agent: said to, and read as the session it continues.
  *
  * Personas: Tim (happy path), Spike (edge cases), Jenny (complex scenarios).
  */
 
 import { describe, test, expect } from 'bun:test';
 import { createPiElement } from './pi-element';
-import { createClaudeElement, drawClaude, type ClaudeAm, type ClaudeSaid, type RootAgent } from './claude-element';
+import { createClaudeElement, drawClaude, type ClaudeAm, type ClaudeSaid, type NodeAgent } from './claude-element';
 import type { TranscriptRead } from './components/element/transcript-element';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -60,7 +60,7 @@ const session: TranscriptRead = {
 };
 
 // A node standing in for the one the element asks, keeping what it was sent.
-function node(over: Partial<RootAgent> = {}, is: ClaudeAm = am): RootAgent & { sent: Array<[string, string]> } {
+function node(over: Partial<NodeAgent> = {}, is: ClaudeAm = am): NodeAgent & { sent: Array<[string, string]> } {
     const sent: Array<[string, string]> = [];
     return {
         sent,
@@ -88,12 +88,13 @@ describe('Claude - Tim', () => {
     }
 
     // Tim: opening it says who answers, before anything is said.
-    test('it says who it is and how it runs', async () => {
+    // "No need to show did key to user"
+    test('it says how it runs, and not its did', async () => {
         const body = document.createElement('div');
         const stop = drawClaude(body, node());
         await settled();
         const who = body.querySelector('.claude-who')?.textContent ?? '';
-        expect(who).toContain('did:key:z6MkqViDuPd5');
+        expect(who).not.toContain('did:key');
         expect(who).toContain('claude-opus-5-5');
         expect(who).toContain('low');
         stop();
@@ -119,7 +120,8 @@ describe('Claude - Tim', () => {
         const stop = drawClaude(body, node());
         await settled();
         const mode = body.querySelector<HTMLSelectElement>('.claude-mode')!;
-        expect([...mode.options].map(o => o.value)).toEqual(MODES.filter(m => m !== 'dontAsk'));
+        // The modes, not the "permission mode" that stands for the node's own (Spike).
+        expect([...mode.options].map(o => o.value).filter(Boolean)).toEqual(MODES.filter(m => m !== 'dontAsk'));
         stop();
     });
 
@@ -155,6 +157,22 @@ describe('Claude - Spike', () => {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
         return;
     }
+
+    // "The two red X indicates inefficient use of space": the node runs dontAsk, which is not
+    // offered, and the choice showed nothing at all.
+    test('a node running in a mode not offered: the choice says what it is, and sends none', async () => {
+        const body = document.createElement('div');
+        const asked = node();
+        const stop = drawClaude(body, asked);
+        await settled();
+        const mode = body.querySelector<HTMLSelectElement>('.claude-mode')!;
+        expect(mode.selectedIndex).toBeGreaterThanOrEqual(0);
+        expect(mode.options[mode.selectedIndex].textContent).toBe('permission mode');
+        say(body, 'how long has the box been up?');
+        await settled();
+        expect(asked.sent).toEqual([['how long has the box been up?', '']]);
+        stop();
+    });
 
     // Spike: nothing typed is nothing said.
     test('an empty box sends nothing', async () => {
@@ -200,14 +218,14 @@ describe('Claude - Spike', () => {
         stop();
     });
 
-    // Spike: a node with no ROOT agent says so, in the node's words.
-    test('a node with no ROOT agent says why', async () => {
+    // Spike: a node with no Node Agent says so, in the node's words.
+    test('a node with no Node Agent says why', async () => {
         const body = document.createElement('div');
         const stop = drawClaude(body, node({
-            am: () => Promise.reject(new Error("/api/claude: HTTP 404 this node's am.toml names no ROOT agent")),
+            am: () => Promise.reject(new Error("/api/claude: HTTP 404 this node's am.toml names no Node Agent")),
         }));
         await settled();
-        expect(body.querySelector('.claude-who')?.textContent).toContain('names no ROOT agent');
+        expect(body.querySelector('.claude-who')?.textContent).toContain('names no Node Agent');
         expect(body.querySelector<HTMLButtonElement>('.claude-send')!.disabled).toBe(true);
         stop();
     });

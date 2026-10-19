@@ -175,6 +175,9 @@ function renderAm(): void {
     amElement.firstElementChild?.appendChild(a2aCardRow());
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/.well-known/did.json'] as const;
+
 /** ≡ in the tray: a window, the same form as ⍟. */
 export function createAmElement() {
     return {

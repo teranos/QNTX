@@ -1,36 +1,18 @@
 # QNTX Web UI
 
-- REWORK: This file is in heavy need of an update. It's not like this README is completely useless, but it's pretty close for how things are structured now and how things evolved. what needs to happen is that we move almost all of the information aboutglyphs to the glyphs package, and link to it. this file just needs a  readover and update in order to make it more accurate.
+Web interface for QNTX, built on [@teranos/elements](https://github.com/teranos/elements).
 
-Web interface for QNTX built on the [Glyph](../packages/glyphs/VISION.md) primitive - a universal UI element that morphs between states while maintaining identity.
+"web/README.md is still refferring to Elements as the Glyphs System, which is outdated, and perhaps partly owned by Elements"
 
-## Glyph System
+## Elements
 
-Glyphs (⧉) are the atoms of the QNTX interface. A glyph is exactly ONE DOM element for its entire lifetime - it morphs between visual states (dot, window, canvas, modal) through smooth animations.
-
-**Core glyph types:**
-- `glyph.ts` - Base interface and constants
-- `canvas-glyph.ts` - Spatial canvas with grid layout
-- `py-glyph.ts` - Python editor with `attest()` support
-- `ix-glyph.ts` - Ingest operations
-- `result-glyph.ts` - Execution results
-
-**Infrastructure:**
-- `run.ts` - GlyphRun (the tray where collapsed glyphs live)
-- `proximity.ts` - Proximity-based expansion
-- `morph-transaction.ts` - Animation orchestration
-- `manifestations/` - How glyphs render when expanded (window, canvas, etc.)
-
-See [packages/glyphs/VISION.md](../packages/glyphs/VISION.md) for the glyph vision and [glyph-migration](../docs/vision/glyph-migration.md) for attestable glyph state.
+What an element is, the forms it takes (dot, window, panel, workspace, canvas), the tray, melding and how a press, a table and text are drawn are Elements': its [README](https://github.com/teranos/elements/blob/main/README.md), [VISION](https://github.com/teranos/elements/blob/main/VISION.md) and [AXIOMAS](https://github.com/teranos/elements/blob/main/AXIOMAS.md). QNTX's own elements are in `ts/`, registered in `ts/components/element/element-registry.ts`; what QNTX holds them to is [CLAUDE.md](CLAUDE.md).
 
 ## Why Web UI
 
 The web UI is essential for QNTX's vision of Continuous Intelligence:
-- **Glyph-based visualization** - entities manifest as glyphs that morph and persist state
 - **Real-time updates** show intelligence evolving as new attestations arrive
 - **Foundation for visions** documented in [time-travel](../docs/vision/time-travel.md)
-
-While `ax` queries provide the data, glyphs make the relationships tangible.
 
 ## Architecture
 
@@ -83,7 +65,6 @@ names as `window.__DEV_PLUGINS__` and probes each for its `glyph-module.js`.
 ### Runtime Dependencies
 - **No NPM required at runtime** - All TypeScript is bundled and embedded in the Go binary
 - WebSocket for real-time updates
-- WAAPI (Web Animations API) for glyph morphing
 - CodeMirror 6 for the ATS query editor
 
 ### Build System: Bun
@@ -194,12 +175,6 @@ make cli
 ```
 
 ## Key Features Enabled
-
-### Glyph System
-- Proximity-based morphing (dot → expanded → window)
-- WAAPI animations for smooth state transitions
-- Canvas glyph with spatial grid layout
-- Python programmature glyphs with `attest()` support
 
 ### CodeMirror 6
 - Syntax highlighting (semantic tokens)

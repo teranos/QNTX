@@ -31,7 +31,7 @@ mock.module('./client', () => ({
     unregisterHandler: () => {},
 }));
 
-const { renderActions, renderNamespaces, renderNode, sourceInWords } = await import('./github-element');
+const { renderActions, renderFrom, renderNamespaces, renderNode, sourceInWords } = await import('./github-element');
 type GitHubNamespace = Parameters<typeof renderNamespaces>[1][number];
 type GitHubRunner = Parameters<typeof renderActions>[1];
 
@@ -163,7 +163,32 @@ describe('Jenny: turning the runner on where there is none', () => {
         await flush();
 
         expect(sent).toEqual({ path: '/api/github/runner', body: { path: '/srv/none', enabled: 'true' } });
-        expect(container.querySelector('.qntx-btn-error-box')?.textContent).toBe('no runner at /srv/none: .runner is missing');
+        expect(container.querySelector('[data-press-said]')?.textContent).toBe('no runner at /srv/none: .runner is missing');
         expect(reloaded).toBe(false);
+    });
+});
+
+describe('Tim: ROOT gives a namespace the system namespace\'s GitHub', () => {
+    // "ROOT will determine what GitHub integration is active there, either system or have the namespace take responsibility"
+    test('each namespace but system says which GitHub it spends, and a press changes it', async () => {
+        let sent: unknown = null;
+        answer = (path, init) => {
+            sent = { path, body: JSON.parse(String(init?.body)) };
+            return Promise.resolve(new Response(JSON.stringify({ namespace: 'market', from: 'system' })));
+        };
+        let reloaded = false;
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        renderFrom(container, ['system', 'garden', 'market'], [ns({ source: 'system' })], async () => { reloaded = true; });
+
+        const rows = [...container.querySelectorAll('.element-row')].map(r => r.textContent);
+        expect(rows).toEqual(['garden:Its own GitHub', 'market:System’s GitHub']);
+        expect(sourceInWords('system')).toBe('system namespace');
+
+        container.querySelectorAll<HTMLButtonElement>('.element-row button')[1].click();
+        await flush();
+
+        expect(sent).toEqual({ path: '/api/github/from', body: { namespace: 'market', from: 'system' } });
+        expect(reloaded).toBe(true);
     });
 });

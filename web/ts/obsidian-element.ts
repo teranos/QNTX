@@ -10,10 +10,9 @@
 // Blackbird, its CSS under .obsidian/themes); the element does not read it yet.
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { tray, pressFrom } from '@teranos/elements';
 import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
-import { Button } from './components/button';
 import { refusal } from './self-person';
 import { log, SEG } from './logger';
 
@@ -205,7 +204,7 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
                 link.textContent = state.pull;
                 s.appendChild(link);
             }
-            const stop = new Button({ label: 'Stop sending', variant: 'secondary', onClick: send('') });
+            const stop = pressFrom({ id: `obsidian-stop-${view.vault.name}-${place}`, title: 'Stop sending', does: send('') });
             s.appendChild(stop.element);
             return s;
         }
@@ -217,11 +216,11 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
         name.placeholder = `obsidian-${view.vault.name}`;
         name.autocomplete = 'off';
         name.spellcheck = false;
-        const start = new Button({
-            label: 'Send to this branch',
-            variant: 'primary',
-            confirmation: { label: 'Confirm again to send' },
-            onClick: async () => send(name.value.trim())(),
+        const start = pressFrom({
+            id: `obsidian-send-${view.vault.name}-${place}`,
+            title: 'Send to this branch',
+            again: 'the vault sends its changes there',
+            does: async () => send(name.value.trim())(),
         });
         row.append(name, start.element);
         s.appendChild(row);
@@ -234,11 +233,11 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
         if (state) {
             p.append(div('obsidian-folder', state.folder));
             // "and if expanded, there should be a two stage button to allow me to unbind as well."
-            const unbind = new Button({
-                label: 'Unbind',
-                variant: 'danger',
-                confirmation: { label: 'Confirm again to unbind' },
-                onClick: async () => {
+            const unbind = pressFrom({
+                id: `obsidian-unbind-${view.vault.name}-${place}`,
+                title: 'Unbind',
+                again: 'the folder is unbound',
+                does: async () => {
                     const response = await apiFetch('/api/vault/unbind', jsonBody('POST', { name: view.vault.name, place }));
                     if (!response.ok) throw new Error(await refusal(response));
                     await reload();
@@ -246,10 +245,10 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
             });
             // "and another button to simply disable it, but the bind is still there, it just doesnt do anything"
             const disabled = state.state === 'disabled';
-            const toggle = new Button({
-                label: disabled ? 'Enable' : 'Disable',
-                variant: 'secondary',
-                onClick: async () => {
+            const toggle = pressFrom({
+                id: `obsidian-toggle-${view.vault.name}-${place}`,
+                title: disabled ? 'Enable' : 'Disable',
+                does: async () => {
                     const response = await apiFetch(`/api/vault/${disabled ? 'enable' : 'disable'}`, jsonBody('POST', { name: view.vault.name, place }));
                     if (!response.ok) throw new Error(await refusal(response));
                     await reload();
@@ -281,11 +280,11 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
         p.appendChild(list);
         if (b.path !== undefined) {
             p.append(div('obsidian-folder', `${b.repo}@${b.branch}:${b.path}=${place}`));
-            const confirm = new Button({
-                label: 'Confirm',
-                variant: 'primary',
-                confirmation: { label: 'Confirm again to bind' },
-                onClick: async () => {
+            const confirm = pressFrom({
+                id: `obsidian-bind-${view.vault.name}-${place}`,
+                title: 'Confirm',
+                again: 'the folder is bound',
+                does: async () => {
                     const response = await apiFetch('/api/vault/bind', jsonBody('POST', { name: view.vault.name, place, repo: b.repo, path: b.path }));
                     if (!response.ok) throw new Error(await refusal(response));
                     await reload();
@@ -369,6 +368,9 @@ export async function load(container: HTMLElement): Promise<void> {
         container.appendChild(div('element-error', message));
     }
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/vault'] as const;
 
 export function createObsidianElement(): Element {
     return {

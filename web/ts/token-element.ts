@@ -5,16 +5,13 @@
  */
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createButton, createDangerButton, createGhostButton } from './components/button';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 import { spawnAttestationAsWindow } from './components/element/attestation-element';
 import { jsonBody } from './http-utils';
 import { log, SEG } from './logger';
 import { kindOf, ordered, type Namespace } from './namespaces-view';
-import { knownFrom } from './roles-compose';
-import type { Line } from './roles-element';
 
 /** What the node says about a token. No hash, ever. */
 export interface TokenInfo {
@@ -46,31 +43,6 @@ export interface TokenInfo {
 
 async function fetchToken(id: string): Promise<TokenInfo> {
     return await apiJson<TokenInfo>(`/auth/tokens/${encodeURIComponent(id)}`);
-}
-
-/** Every role any line names, read off the lines the gate reads. */
-async function rolesTheLinesName(): Promise<string[]> {
-    const answer = await apiJson<{ lines?: Line[] }>('/api/roles');
-    if (!Array.isArray(answer.lines)) {
-        throw new Error(`/api/roles answered no lines: ${JSON.stringify(answer)}`);
-    }
-    return knownFrom(answer.lines, [], [], [], [], []).roles;
-}
-
-/** The grant, on the wire (ADR-034): the role to this token in every namespace
- *  it names. The label is the token's name, and what the grant names; the DID
- *  is its signature, and rides as the actor on what it writes, not here. What
- *  the role may say is the role's own lines, written in the Roles element. */
-export function linesFor(t: TokenInfo, role: string): Array<Record<string, unknown>> {
-    return (t.namespaces || []).map(namespace => ({
-        subjects: [t.label], predicates: ['role:granted', role], contexts: [namespace],
-    }));
-}
-
-async function grant(t: TokenInfo, role: string): Promise<void> {
-    for (const line of linesFor(t, role)) {
-        await apiJson('/api/attestations', jsonBody('POST', line));
-    }
 }
 
 async function revokeToken(id: string): Promise<void> {
@@ -109,7 +81,6 @@ function field(name: string, value: string, copyable = false, hover = ''): HTMLE
 
     const caption = document.createElement('span');
     caption.style.color = 'var(--text-on-dark-tertiary)';
-    caption.style.fontSize = '11px';
     caption.textContent = name;
 
     const held = document.createElement('div');
@@ -196,75 +167,10 @@ export function rolesText(t: TokenInfo): string {
     return lines.length ? lines.join('\n') : '—';
 }
 
-// The roles, and beside the caption a + that is a pick of the roles the lines
-// name. Choosing one writes the grant and the element is drawn again from the
-// node. A role the token already holds is not offered; a new role is made in
-// the Roles element, where its lines are.
-function rolesField(container: HTMLElement, t: TokenInfo): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.style.display = 'flex';
-    wrap.style.flexDirection = 'column';
-    wrap.style.gap = '2px';
-
-    const caption = document.createElement('span');
-    caption.style.display = 'flex';
-    caption.style.alignItems = 'center';
-    caption.style.gap = '6px';
-    caption.style.color = 'var(--text-on-dark-tertiary)';
-    caption.style.fontSize = '11px';
-    caption.textContent = 'Roles';
-
-    const held = document.createElement('div');
-    held.style.whiteSpace = 'pre-line';
-    held.style.wordBreak = 'break-word';
-    held.style.overflowWrap = 'break-word';
-    held.textContent = rolesText(t);
-
-    // A failure is the button's own: it throws, and the button says.
-    const add = createGhostButton('+', async () => {
-        if (wrap.querySelector('select')) return;
-        const roles = await rolesTheLinesName();
-        const holds = new Set((t.namespaces || []).flatMap(ns => t.roles?.[ns] ?? []));
-        const offered = roles.filter(r => !holds.has(r));
-        if (offered.length === 0) {
-            throw new Error(roles.length === 0 ? 'no line names a role yet' : `${t.label} holds every role the lines name`);
-        }
-        const pick = document.createElement('select');
-        pick.className = 'input';
-        const first = document.createElement('option');
-        first.value = '';
-        first.textContent = 'pick a role';
-        pick.appendChild(first);
-        for (const role of offered) {
-            const option = document.createElement('option');
-            option.value = role;
-            option.textContent = role;
-            pick.appendChild(option);
-        }
-        pick.addEventListener('change', () => {
-            const role = pick.value;
-            if (role === '') return;
-            pick.disabled = true;
-            grant(t, role)
-                .then(() => redraw(container, t.id))
-                .catch((err: unknown) => {
-                    pick.disabled = false;
-                    wrap.querySelector('.element-error')?.remove();
-                    wrap.appendChild(errorBox(err instanceof Error ? err.message : String(err)));
-                });
-        });
-        wrap.appendChild(pick);
-        pick.focus();
-    });
-    add.element.title = 'grant a role';
-    add.element.setAttribute('aria-label', 'Grant a role');
-    add.element.style.fontSize = '14px';
-    add.element.style.lineHeight = '1';
-    add.element.style.padding = '2px 8px';
-    caption.appendChild(add.element);
-
-    wrap.append(caption, held);
-    return wrap;
+// "it almost feels like the ability to create from the ui should be removed"
+// The roles this token holds, read: a grant is not written from a page.
+function rolesField(t: TokenInfo): HTMLElement {
+    return field('Roles', rolesText(t));
 }
 
 /** Makes the client active in a namespace; every connector follows at its next refresh. */
@@ -469,7 +375,6 @@ function stateOf(t: TokenInfo, now: Date): string {
 export function renderIssued(container: HTMLElement, issued: TokenInfo[], now: Date): void {
     container.innerHTML = '';
     // Smaller than the list it stands in for, not larger.
-    container.style.fontSize = '11px';
     container.style.lineHeight = '1.4';
     container.style.gap = '0';
     const caption = document.createElement('span');
@@ -482,7 +387,6 @@ export function renderIssued(container: HTMLElement, issued: TokenInfo[], now: D
         const line = document.createElement('div');
         line.className = 'token-issued-line';
         line.style.cursor = 'pointer';
-        line.style.whiteSpace = 'nowrap';
         line.textContent = `${t.level || '—'} ${fmt(t.created_at).slice(0, 10)} ${stateOf(t, now)}`;
         line.title = `created ${fmt(t.created_at)}`;
         if (stateOf(t, now) !== 'active') line.style.color = 'var(--text-on-dark-tertiary)';
@@ -523,7 +427,7 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     }
     // What this token may read and write is not on the token: the roles its
     // DID holds say, through their WRITE and READ lines (ADR-034).
-    container.appendChild(rolesField(container, t));
+    container.appendChild(rolesField(t));
     container.appendChild(field('May write', t.words?.write.length ? t.words.write.join(', ') : '—'));
     container.appendChild(field('May read', mayRead(t)));
     container.appendChild(field('Created', fmt(t.created_at)));
@@ -536,20 +440,21 @@ export function renderToken(container: HTMLElement, t: TokenInfo, raw?: string):
     actions.style.flexWrap = 'wrap';
 
     if (t.revoked_at) {
-        const enable = createButton({
-            label: 'Enable',
-            variant: 'secondary',
-            onClick: async () => {
+        const enable = pressFrom({
+            id: `token-enable-${t.id}`,
+            title: 'Enable',
+            does: async () => {
                 await enableToken(t.id);
                 await redraw(container, t.id);
             },
         });
         actions.appendChild(enable.element);
     } else {
-        const revoke = createDangerButton('Revoke', 'Confirm revoke', async () => {
+        // Revoked, it can be enabled again: white even armed.
+        const revoke = pressFrom({ id: `token-revoke-${t.id}`, title: 'Revoke', again: 'the token stops working', does: async () => {
             await revokeToken(t.id);
             await redraw(container, t.id);
-        });
+        } });
         actions.appendChild(revoke.element);
     }
 

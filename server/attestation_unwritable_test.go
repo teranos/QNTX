@@ -78,6 +78,23 @@ func TestNoSubjectToSeedAnIDFromIsABadRequest(t *testing.T) {
 	}
 }
 
+// An id the store already holds is refused as that, not as the store failing,
+// so the handler answers exists instead of 500.
+func TestAnIDTheStoreHoldsIsRefusedAsAlreadyExisting(t *testing.T) {
+	_, store := rustWritingServer(t)
+	as := &types.As{ID: "AS-TWICE", Subjects: []string{"qntx"}, Predicates: []string{"noted"}, Source: "test"}
+	if err := store.CreateAttestation(as); err != nil {
+		t.Fatalf("first write: %v", err)
+	}
+	err := store.CreateAttestation(as)
+	if !ats.AlreadyExists(err) {
+		t.Fatalf("err = %v, want the store's already-exists refusal", err)
+	}
+	if ats.Unwritable(err) {
+		t.Fatalf("err = %v read as unwritable", err)
+	}
+}
+
 // A plugin writes through the store with no HTTP in front of it, and is
 // refused the same, as a refusal and not as the store failing.
 func TestAPluginIsRefusedWhatHTTPIsRefused(t *testing.T) {

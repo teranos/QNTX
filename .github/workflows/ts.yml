@@ -1,4 +1,8 @@
 {
+  "concurrency": {
+    "cancel-in-progress": true,
+    "group": "${{ github.workflow }}-${{ github.ref }}"
+  },
   "jobs": {
     "test": {
       "name": "TypeScript Tests",
@@ -64,7 +68,10 @@
         "web/package.json",
         "web/eslint.config.js",
         "web/eslint-suppressions.json",
-        ".github/workflows/ts.yml"
+        "web/**/*.css",
+        "web/index.html",
+        ".github/workflows/ts.yml",
+        "web/browser/**"
       ]
     },
     "push": {

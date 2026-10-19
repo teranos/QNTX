@@ -33,10 +33,10 @@ import {
     handleAutoLoadTaskLogs,
     type JobActionContext,
 } from './pulse/job-actions';
-import { hydrateButtons, registerButton, type HydrateConfig } from './components/button';
+import { placePresses } from './components/press-places';
 import { tooltip } from './components/tooltip.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
-import type { Element } from '@teranos/elements';
+import type { Element, Press } from '@teranos/elements';
 import { Pulse } from './sym';
 import { log, SEG } from './logger.ts';
 
@@ -54,13 +54,15 @@ let activeQueueCleanupTimer: ReturnType<typeof setTimeout> | null = null;
 let tooltipCleanup: (() => void) | null = null;
 let cachedActiveQueue: import('./pulse/active-queue.ts').ActiveQueueResult | null = null;
 
-// Eagerly prefetch schedule data so it's ready before panel opens
-listScheduledJobs().then(result => {
-    result.forEach(job => jobs.set(job.id, job));
-}).catch((err: unknown) => {
-    // The panel refetches on open; the prefetch failing is still a fact.
-    log.warn(SEG.PULSE, 'Schedule prefetch failed; the panel will fetch on open:', err);
-});
+// Prefetch schedule data so it's ready before the panel opens, for a viewer it is added for.
+function prefetchSchedules(): void {
+    listScheduledJobs().then(result => {
+        result.forEach(job => jobs.set(job.id, job));
+    }).catch((err: unknown) => {
+        // The panel refetches on open; the prefetch failing is still a fact.
+        log.warn(SEG.PULSE, 'Schedule prefetch failed; the panel will fetch on open:', err);
+    });
+}
 
 function getActionContext(): JobActionContext {
     return {
@@ -166,51 +168,26 @@ function renderSchedules(): void {
 
 function hydrateJobButtons(container: HTMLElement): void {
     const ctx = getActionContext();
-    const config: HydrateConfig = {};
+    const presses: Record<string, Press> = {};
 
     for (const job of jobs.values()) {
         const isActive = job.state === 'active';
-
-        config[`force-trigger-${job.id}`] = {
-            label: 'Force Trigger',
-            onClick: async () => {
-                await handleForceTrigger(job.id, ctx);
-            },
-            variant: 'warning',
-            size: 'small',
-            confirmation: {
-                label: 'Confirm Trigger',
-                timeout: 5000
-            }
+        // A run made now cannot be taken back, and neither can a job deleted.
+        presses[`force-trigger-${job.id}`] = {
+            id: `force-trigger-${job.id}`, title: 'Force Trigger', again: 'it runs now', irrevocable: true,
+            does: async () => { await handleForceTrigger(job.id, ctx); },
         };
-
-        config[`toggle-state-${job.id}`] = {
-            label: isActive ? 'Pause' : 'Resume',
-            onClick: async () => {
-                await handleJobAction(job.id, isActive ? 'pause' : 'resume', ctx);
-            },
-            variant: isActive ? 'secondary' : 'primary',
-            size: 'small'
+        presses[`toggle-state-${job.id}`] = {
+            id: `toggle-state-${job.id}`, title: isActive ? 'Pause' : 'Resume',
+            does: async () => { await handleJobAction(job.id, isActive ? 'pause' : 'resume', ctx); },
         };
-
-        config[`delete-${job.id}`] = {
-            label: 'Delete',
-            onClick: async () => {
-                await handleJobAction(job.id, 'delete', ctx);
-            },
-            variant: 'danger',
-            size: 'small',
-            confirmation: {
-                label: 'Confirm Delete',
-                timeout: 5000
-            }
+        presses[`delete-${job.id}`] = {
+            id: `delete-${job.id}`, title: 'Delete', again: 'the job is deleted', irrevocable: true,
+            does: async () => { await handleJobAction(job.id, 'delete', ctx); },
         };
     }
 
-    const buttons = hydrateButtons(container, config);
-    for (const [buttonId, button] of Object.entries(buttons)) {
-        registerButton(buttonId, button);
-    }
+    placePresses(container, presses);
 }
 
 function refreshTooltips(): void {
@@ -234,10 +211,14 @@ function handleDaemonStatusUpdate(e: Event): void {
     }
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/pulse/schedules', '/api/pulse/jobs'] as const;
+
 /**
  * Create a Element definition for the pulse panel
  */
 export function createPulseElement(): Element {
+    prefetchSchedules();
     return {
         id: 'pulse-element',
         title: 'Pulse',

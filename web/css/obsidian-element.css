@@ -99,7 +99,7 @@
 }
 
 .obsidian-state {
-    font-size: 8px;
+    font-size: var(--font-size-xs);
     cursor: help;
 }
 

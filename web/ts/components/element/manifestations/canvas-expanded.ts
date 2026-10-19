@@ -19,7 +19,7 @@
 
 import { log, SEG } from '../../../logger';
 import type { Element } from '@teranos/elements';
-import { getOpenDuration, getRestDuration, setForm, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMorphToBox, beginMorphToCanvasPlaced } from '@teranos/elements';
+import { getOpenDuration, getRestDuration, setForm, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMorphToBox, beginMorphToCanvasPlaced, pressFrom } from '@teranos/elements';
 import { canvasToScreen, getTransform } from '../canvas/canvas-pan';
 import { buildCanvasWorkspace } from '../canvas/canvas-workspace-builder';
 import { uiState } from '../../../state/ui';
@@ -27,7 +27,6 @@ import { getElementTypeBySavedSymbol } from '../element-registry';
 import { destroyCanvasSelection } from '../canvas/selection';
 import { pushBreadcrumb, popBreadcrumb, buildBreadcrumbBar } from '../canvas/breadcrumb';
 import { exportCanvasStatic } from '../../../api/canvas';
-import { Button } from '../../button';
 
 /**
  * Morph a canvas-placed element to fullscreen workspace
@@ -119,21 +118,16 @@ export function morphCanvasPlacedToCanvasExpanded(
             // Export button — server-side rendering via canvas-renderer plugin
             // Button automatically shows slide-out error display on failure
             // TODO: Add Publish button next to Export (scope to canvas_id like export)
-            const exportBtn = new Button({
-                label: 'Export',
-                icon: '↓',
-                variant: 'warning',
-                size: 'small',
-                className: 'canvas-export-btn',
-                confirmation: {
-                    label: 'Confirm Export',
-                    timeout: 5000
-                },
-                onClick: async () => {
+            const exportBtn = pressFrom({
+                id: `canvas-export-${item.id}`,
+                title: '↓ Export',
+                again: 'the canvas is exported',
+                does: async () => {
                     await exportCanvasStatic(item.id);
                     log.info(SEG.ELEMENT, '[Canvas] Export complete (server-side rendering)');
                 }
             });
+            exportBtn.element.classList.add('canvas-export-btn');
             breadcrumbBar.appendChild(exportBtn.element);
 
             const minimizeBtn = document.createElement('button');

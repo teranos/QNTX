@@ -46,7 +46,6 @@
 /* The drawer is the frame, and the door is the whole of what it holds. */
 #system-drawer.door-held {
     height: var(--door-height);
-    transition: height 620ms cubic-bezier(.65, 0, .2, 1);
     /* Above the element tray and the toast. A tray floating over a door nobody
        has opened offers the app before the app is reachable. */
     z-index: 100003;
@@ -130,7 +129,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     color: var(--door-text);
     background: var(--door-face-low);
     border-left: 1px solid var(--door-line);
@@ -145,7 +144,7 @@
 
 .door-dials button {
     font: inherit;
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     padding: 3px 6px;
     cursor: pointer;
     color: var(--door-text);
@@ -178,36 +177,6 @@
 
 .door-dials input[type="range"] {
     width: 100%;
-}
-
-/* The field is looked at alone, then the way in, then whose door it is, then
-   what else is on offer. None of them is conditional on anything: the
-   fingerprint is always there. */
-.door-stand {
-    animation: doorArrives 1000ms ease-out 2000ms both;
-}
-
-.door-mark {
-    animation: doorArrives 1000ms ease-out 2600ms both;
-}
-
-.door-plate,
-.door-say {
-    animation: doorArrives 1000ms ease-out 3200ms both;
-}
-
-@keyframes doorArrives {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .door-mark,
-    .door-stand,
-    .door-plate,
-    .door-say {
-        animation: none;
-    }
 }
 
 .door-mark { grid-column: 1; grid-row: 1; justify-self: end; }
@@ -259,6 +228,15 @@
     gap: 6px;
 }
 
+.door-fields label {
+    font-size: var(--font-size-xs);
+}
+
+/* Under the field size, iOS zooms the page when the field is tapped. */
+.door-fields input {
+    font-size: var(--font-size-field);
+}
+
 /* A way in wears its own mark and says nothing. Square, because the one round
    thing on this door is the fingerprint. */
 .door-provider {
@@ -298,30 +276,8 @@
     opacity: 1;
 }
 
-/* Nothing moves on this door until you touch it. What a press asks for should
-   arrive rather than appear — the door answering, not performing. */
-.door-fields > *,
-.door-continue {
-    animation: doorArrive 190ms ease-out both;
-}
-
-@keyframes doorArrive {
-    from {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .door-fields > *,
-    .door-continue {
-        animation: none;
-    }
-}
-
 #door.door-opening {
     opacity: 0;
-    transition: opacity 320ms ease-out;
 }
 
 /* The node's own face, at the top of the door. Colour and text both come from
@@ -330,7 +286,7 @@
     position: absolute;
     top: 14px;
     font-family: var(--font-mono);
-    font-size: var(--font-size-xs, 11px);
+    font-size: var(--font-size-xs);
     letter-spacing: .08em;
     color: var(--door-text-dim);
     padding: 3px 10px;
@@ -360,7 +316,7 @@
     margin: 0 auto;
     width: fit-content;
     font-family: var(--font-mono);
-    font-size: var(--font-size-xs, 11px);
+    font-size: var(--font-size-xs);
     letter-spacing: .08em;
     color: var(--door-text-dim);
     padding: 3px 10px;
@@ -434,7 +390,7 @@
     top: calc(50% + 86px);
     margin: 0 auto;
     z-index: 1;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     letter-spacing: .14em;
     text-transform: lowercase;
     color: var(--door-text-dim);
@@ -520,7 +476,7 @@
 
 .door-press {
     font: inherit;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     letter-spacing: .1em;
     text-transform: lowercase;
     color: var(--door-text);
@@ -552,7 +508,7 @@
 }
 
 .door-skip {
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     letter-spacing: .08em;
     color: var(--door-text);
     text-align: center;
@@ -580,7 +536,7 @@
     padding: 7px 9px;
     border: 1px solid var(--door-line);
     background: var(--door-well);
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     line-height: 1.55;
     color: var(--door-text-dim);
     text-align: left;
@@ -600,14 +556,14 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     letter-spacing: .1em;
     color: var(--door-text-dim);
 }
 
 .door-field input {
     font: inherit;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     letter-spacing: normal;
     width: 100%;
     box-sizing: border-box;
@@ -628,7 +584,7 @@
    focus for a field under 16px, and 44 is Apple's touch target. */
 @media (pointer: coarse) {
     .door-field input {
-        font-size: 16px;
+        font-size: var(--font-size-field);
         min-height: 44px;
     }
 }
@@ -645,7 +601,7 @@
     box-sizing: border-box;
     padding: 0;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     line-height: 1;
     color: var(--door-lamp-dim);
     background: transparent;

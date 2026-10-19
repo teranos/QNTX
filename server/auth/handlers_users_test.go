@@ -114,3 +114,53 @@ func TestRootNamesAUserThatIsNotThere(t *testing.T) {
 	rec = asRoot(h, rootSession, http.MethodPost, "/auth/users/US-TIM-1/erase")
 	assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
 }
+
+func leveling(h *Handler, session, id, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/auth/users/"+id+"/level", strings.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+	rec := httptest.NewRecorder()
+	h.sessionOnly(h.handleUserByID)(rec, req)
+	return rec
+}
+
+// "can i still not change the role of a User ?"
+
+// ROOT sets the level a User holds, to a rung the gate admits a User at; nobody
+// else does, nobody is made ROOT, and ROOT stays ROOT.
+func TestRootSetsAUsersLevel(t *testing.T) {
+	h, store, rootSession, tim := rootAndTim(t)
+	root := store.held[0]
+	ada := User{ID: "US-ADA-1", Level: LevelPublicRegistration, Keys: []UserKey{{DID: "did:key:zAda", Origin: OriginBrowser}}, CreatedAt: 3}
+	require.NoError(t, store.Put(ada))
+
+	adaSession, err := h.sessions.create("did:key:zAda", ada)
+	require.NoError(t, err)
+	rec := leveling(h, adaSession, tim.ID, `{"level":"USER"}`)
+	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	assert.Equal(t, LevelAttestor, store.held[1].Level)
+
+	for _, refused := range []string{`{"level":"ROOT"}`, `{"level":"SUPER"}`, `{"level":"ATTESTOR"}`, `{"level":"TOKEN"}`, `level=USER`} {
+		rec = leveling(h, rootSession, tim.ID, refused)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, refused+": "+rec.Body.String())
+	}
+	assert.Equal(t, LevelAttestor, store.held[1].Level)
+
+	rec = leveling(h, rootSession, root.ID, `{"level":"USER"}`)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Equal(t, LevelRoot, store.held[0].Level)
+
+	rec = leveling(h, rootSession, tim.ID, `{"level":"USER"}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, LevelUser, store.held[1].Level)
+	assert.Contains(t, rec.Body.String(), `"was":"ATTESTOR"`)
+
+	rec = leveling(h, rootSession, tim.ID, `{"level":"USER"}`)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+
+	rec = leveling(h, rootSession, ada.ID, `{"level":"USER"}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, LevelUser, store.held[2].Level)
+
+	rec = leveling(h, rootSession, "US-NOBODY-1", `{"level":"USER"}`)
+	assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
+}

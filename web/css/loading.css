@@ -1,7 +1,7 @@
 /**
  * Loading Screen Styles
  *
- * Shows during initial app load with progress indicator
+ * Shows during initial app load, with the steps the app logs as it takes them.
  */
 
 #loading-screen {
@@ -17,7 +17,6 @@
     justify-content: center;
     z-index: 200000;
     color: var(--text-on-dark-tertiary);
-    animation: fadeInLoader 300ms ease-out;
 }
 
 #loading-screen .logo {
@@ -33,22 +32,6 @@
 #loading-screen .status-text {
     font-size: var(--font-size-md);
     margin-bottom: 12px;
-}
-
-#loading-screen .progress-bar-container {
-    width: 200px;
-    height: 2px;
-    background: var(--bg-dark-light);
-    border-radius: 1px;
-    overflow: hidden;
-    margin-bottom: 12px;
-}
-
-#loading-bar {
-    height: 100%;
-    background: #666;
-    width: 0%;
-    transition: width 0.3s;
 }
 
 #loading-status {
@@ -72,40 +55,4 @@
     margin-bottom: 16px;
 }
 
-#metamask-warning {
-    display: none;
-    padding: var(--panel-padding-md);
-    background: var(--bg-dark);
-    border: 1px solid var(--border-on-dark);
-    border-radius: var(--border-radius);
-    max-width: 400px;
-    text-align: center;
-}
-
-#metamask-warning .warning-title {
-    font-size: var(--font-size-sm);
-    color: #f59e0b;
-    margin-bottom: 6px;
-}
-
-#metamask-warning .warning-text {
-    font-size: var(--font-size-sm);
-    color: var(--text-on-dark-tertiary);
-    line-height: 1.4;
-}
-
-#loading-screen.fade-out {
-    animation: fadeOutLoader 500ms ease-out forwards;
-}
-
 /* Scrollbar styling moved to scrollbar.css */
-
-/* Reduced motion preference */
-@media (prefers-reduced-motion: reduce) {
-    #loading-screen,
-    #loading-screen.fade-out,
-    #loading-bar {
-        animation: none;
-        transition: none;
-    }
-}

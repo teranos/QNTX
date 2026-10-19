@@ -15,7 +15,7 @@
     /* Base styles */
     background: transparent;
     border: 1px solid transparent;
-    font-size: 18px;
+    font-size: var(--font-size-lg);
     color: var(--text-secondary);
     cursor: pointer;
     padding: 0;
@@ -238,36 +238,6 @@
 .qntx-btn-loading {
     cursor: wait;
 }
-
-.qntx-btn-confirming {
-    animation: qntx-btn-pulse 0.6s ease-in-out infinite;
-}
-
-@keyframes qntx-btn-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
-
-/* Confirmation state colors
- * TODO: Confirming is visually indistinct from danger — just a pulse animation
- * on the same red. Needs its own color identity to communicate "are you sure?"
- * separately from "this is destructive." */
-.qntx-btn-danger.qntx-btn-confirming {
-    background: #ff4757;
-    border-color: #ff4757;
-}
-
-.qntx-btn-warning.qntx-btn-confirming {
-    background: #ffc107;
-    border-color: #ffc107;
-}
-
-.qntx-btn-ghost.qntx-btn-confirming {
-    color: #e8a040;
-    background: transparent;
-    border-color: transparent;
-}
-
 /* Focus state */
 .qntx-btn:focus-visible {
     outline: 2px solid #666;
@@ -276,7 +246,7 @@
 
 /* Icon */
 .qntx-btn-icon {
-    font-size: 1em;
+    font-size: var(--font-size-sm);
     line-height: 1;
 }
 
@@ -313,7 +283,7 @@
     margin-top: 4px;
     padding: 4px 8px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--color-error);
     background: rgba(197, 48, 48, 0.12);
     border: 1px solid rgba(197, 48, 48, 0.25);
@@ -326,60 +296,62 @@
 
 
 /* Transcript element: one session Ground recorded, as loom read it */
-.tr { display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden; text-align: left; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-on-dark); }
+.tr { display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden; text-align: left; font-family: var(--font-mono, monospace); font-size: var(--font-size-sm); color: var(--text-on-dark); }
 .tr-said { color: var(--text-on-dark-tertiary); padding: 4px 6px; }
 .tr-session { display: flex; gap: 8px; align-items: baseline; text-align: left; background: none; border: none; border-bottom: 1px solid var(--bg-secondary); color: inherit; font: inherit; padding: 3px 6px; cursor: pointer; }
 .tr-session:hover { background: var(--bg-dark-hover); }
 .tr-opening { flex: 1; min-width: 0; overflow-wrap: break-word; word-break: break-word; }
-.tr-ran { color: var(--earth-ochre); font-size: var(--font-size-xs, 10px); white-space: nowrap; }
+.tr-ran { color: var(--earth-ochre); font-size: var(--font-size-xs); white-space: nowrap; }
 .tr-natural { width: 520px; height: 640px; max-width: 100%; max-height: 100%; }
-.tr-when { color: var(--text-secondary); font-size: var(--font-size-xs, 10px); white-space: nowrap; }
+.tr-when { color: var(--text-secondary); font-size: var(--font-size-xs); white-space: nowrap; }
 .tr-head { padding: 3px 6px; border-bottom: 1px solid var(--border-on-dark); color: var(--text-on-dark-secondary); white-space: pre; flex-shrink: 0; }
 .tr-body { display: flex; flex: 1; min-height: 0; }
 .tr-col { flex: 1; overflow-y: auto; padding: 2px 0; }
 .tr-spacer { margin: 0 6px; border-left: 1px dashed var(--border-on-dark); border-right: 1px dashed var(--border-on-dark); }
 .tr-turn { cursor: pointer; padding: 0 6px; overflow-wrap: break-word; word-break: break-word; }
-.tr-speaker { font-weight: 500; font-size: var(--font-size-xs, 10px); margin-right: 4px; }
-.tr-text { font-size: 11px; line-height: 1.3; white-space: pre-wrap; }
+.tr-speaker { font-weight: 500; font-size: var(--font-size-xs); margin-right: 4px; }
+.tr-text { font-size: var(--font-size-sm); line-height: 1.3; white-space: pre-wrap; }
 .tr-sp-human .tr-speaker { color: var(--accent-on-dark); }
 .tr-sp-assistant .tr-speaker { color: var(--element-status-running-text); }
 .tr-small { background: var(--bg-almost-black); border-left: 2px solid var(--element-status-running-text); margin: 1px 6px; padding-left: 4px; }
 .tr-small .tr-speaker { color: var(--element-status-running-text); }
-.tr-small .tr-text { color: var(--text-on-dark-secondary); font-size: 8px; }
+.tr-small .tr-text { color: var(--text-on-dark-secondary); font-size: var(--font-size-xs); }
 .tr-small.tr-sp-tool { border-left-color: var(--color-warning); }
 .tr-small.tr-sp-tool .tr-speaker { color: var(--color-warning); }
 .tr-ground { background: var(--bg-almost-black); border-left: 2px solid var(--color-error); margin: 1px 6px; padding-left: 4px; }
 .tr-ground .tr-speaker { color: var(--color-error); }
-.tr-ground .tr-text { color: var(--text-on-dark-secondary); font-size: 8px; }
+.tr-ground .tr-text { color: var(--text-on-dark-secondary); font-size: var(--font-size-xs); }
 .tr-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 1px 6px; }
-.tr-chips .tr-chip { margin: 0; padding: 0 4px; cursor: pointer; font-size: var(--font-size-xs, 10px); color: var(--text-on-dark-secondary); }
+.tr-chips .tr-chip { margin: 0; padding: 0 4px; cursor: pointer; font-size: var(--font-size-xs); color: var(--text-on-dark-secondary); }
 .tr-chips .tr-chip .tr-speaker { margin-right: 0; }
 .tr-selected { outline: 1px solid var(--accent-on-dark); background: var(--bg-dark-hover); }
 .tr-chip-list { position: fixed; z-index: 100000; max-width: 480px; max-height: 60vh; overflow-y: auto; padding: 2px 0; background: var(--bg-almost-black); border: 1px solid var(--border-on-dark); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); font-family: var(--font-mono, monospace); color: var(--text-on-dark); }
-.tr-chip-list .tr-text { font-size: 11px; }
+.tr-chip-list .tr-text { font-size: var(--font-size-sm); }
 .tr-marker { font-style: italic; }
 .tr-marker .tr-speaker { color: var(--color-scheduled); }
-.tr-marker .tr-text { color: var(--text-secondary); font-size: 10px; }
-.tr-code { background: var(--bg-almost-black); border: 1px solid var(--border-on-dark); padding: 3px 6px; margin: 2px 0; font-size: 11px; white-space: pre-wrap; }
+.tr-marker .tr-text { color: var(--text-secondary); font-size: var(--font-size-xs); }
+.tr-code { background: var(--bg-almost-black); border: 1px solid var(--border-on-dark); padding: 3px 6px; margin: 2px 0; font-size: var(--font-size-sm); white-space: pre-wrap; }
 .tr-inline-code { background: var(--bg-almost-black); padding: 0 3px; color: var(--text-on-dark-secondary); }
 
 /* An error through its one render (teranos/sacred-error), placed in the flow of
  * a log by its host: the render fixes itself only at a cursor a failure carries. */
 .sacred-entry { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sacred-entry sacred-error { position: static; z-index: auto; }
-.sacred-back { align-self: flex-start; padding: 2px 6px; font: inherit; font-size: var(--font-size-xs, 10px); text-align: left; color: var(--text-on-dark-secondary); background: none; border: 1px dashed var(--sacred-border); cursor: pointer; overflow-wrap: break-word; word-break: break-word; }
+.sacred-back { align-self: flex-start; padding: 2px 6px; font: inherit; font-size: var(--font-size-xs); text-align: left; color: var(--text-on-dark-secondary); background: none; border: 1px dashed var(--sacred-border); cursor: pointer; overflow-wrap: break-word; word-break: break-word; }
 .tr-error .tr-speaker { color: var(--sacred-error); }
 
-/* Claude element: the ROOT agent's session, drawn as a transcript, over where something is said to it */
-.claude { display: flex; flex-direction: column; width: 520px; height: 640px; max-width: 100%; max-height: 100%; min-height: 0; padding: 0; text-align: left; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-on-dark); }
-.claude-who { padding: 3px 6px; border-bottom: 1px solid var(--border-on-dark); color: var(--text-on-dark-secondary); font-size: var(--font-size-xs, 10px); white-space: normal; overflow-wrap: break-word; word-break: break-word; flex-shrink: 0; }
+/* Claude element: the Node Agent's session, drawn as a transcript, over where something is said to it */
+.claude { display: flex; flex-direction: column; box-sizing: border-box; width: 520px; height: 640px; max-width: 100%; max-height: 100%; min-height: 0; padding: 0; text-align: left; font-family: var(--font-mono, monospace); font-size: var(--font-size-sm); color: var(--text-on-dark); }
+/* A content-area scrolls (window.css); Claude's does not: its transcript is its one scroller, declared to the package. */
+.content-area.claude { overflow: hidden; }
+.claude-who { padding: 3px 6px; border-bottom: 1px solid var(--border-on-dark); color: var(--text-on-dark-secondary); font-size: var(--font-size-xs); white-space: normal; overflow-wrap: break-word; word-break: break-word; flex-shrink: 0; }
 .claude-session { flex: 1; color: var(--text-on-dark-tertiary); }
 .claude-session .tr-head { display: none; }
-.claude-status { padding: 0 6px; color: var(--element-status-running-text); font-size: var(--font-size-xs, 10px); flex-shrink: 0; }
-.claude-denied { padding: 0 6px; color: var(--color-warning); font-size: var(--font-size-xs, 10px); flex-shrink: 0; }
+.claude-status { padding: 0 6px; color: var(--element-status-running-text); font-size: var(--font-size-xs); flex-shrink: 0; }
+.claude-denied { padding: 0 6px; color: var(--color-warning); font-size: var(--font-size-xs); flex-shrink: 0; }
 .claude-failed { padding: 0 6px; flex-shrink: 0; }
 .claude-say { display: flex; gap: 4px; align-items: stretch; padding: 4px 6px; border-top: 1px solid var(--border-on-dark); flex-shrink: 0; }
-.claude-mode { background: var(--bg-almost-black); color: var(--text-on-dark-secondary); border: 1px solid var(--border-on-dark); font: inherit; font-size: var(--font-size-xs, 10px); }
+.claude-mode { background: var(--bg-almost-black); color: var(--text-on-dark-secondary); border: 1px solid var(--border-on-dark); font: inherit; font-size: var(--font-size-xs); }
 /* The Claude element in Claude's own colours: Clay, Ivory and Slate, from Anthropic's media resources */
 .claude-brand { --claude-clay: #D97757; --claude-ivory: #FAF9F5; --claude-slate: #151514; background: var(--claude-slate); color: var(--claude-ivory); }
 .claude-head { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-bottom: 1px solid var(--claude-clay); flex-shrink: 0; }
@@ -397,10 +369,10 @@
 .claude-says { flex: 1; min-width: 0; resize: none; background: var(--bg-almost-black); color: var(--text-on-dark); border: 1px solid var(--border-on-dark); font: inherit; padding: 2px 4px; }
 
 /* Agent element: a namespace's agent, its sign-in by Claude Code's own flow over the Claude element's conversation */
-.agent-head { padding: 3px 6px; border-bottom: 1px solid var(--border-on-dark); color: var(--text-on-dark-secondary); font-size: var(--font-size-xs, 10px); overflow-wrap: break-word; word-break: break-word; flex-shrink: 0; }
+.agent-head { padding: 3px 6px; border-bottom: 1px solid var(--border-on-dark); color: var(--text-on-dark-secondary); font-size: var(--font-size-xs); overflow-wrap: break-word; word-break: break-word; flex-shrink: 0; }
 .agent-signin:not(:empty) { display: flex; flex-direction: column; gap: 6px; padding: 8px 6px; flex-shrink: 0; }
-.agent-said { color: var(--text-on-dark-secondary); font-size: 11px; line-height: 1.4; overflow-wrap: break-word; word-break: break-word; }
-.agent-url { color: var(--accent-on-dark); font-size: 11px; overflow-wrap: break-word; word-break: break-word; }
+.agent-said { color: var(--text-on-dark-secondary); font-size: var(--font-size-sm); line-height: 1.4; overflow-wrap: break-word; word-break: break-word; }
+.agent-url { color: var(--accent-on-dark); font-size: var(--font-size-sm); overflow-wrap: break-word; word-break: break-word; }
 .agent-code { background: var(--bg-almost-black); color: var(--text-on-dark); border: 1px solid var(--border-on-dark); font: inherit; padding: 2px 4px; }
 .agent-begin, .agent-finish { align-self: flex-start; }
 .agent-failed { padding: 0 6px; flex-shrink: 0; }

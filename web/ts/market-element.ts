@@ -11,10 +11,9 @@
 // event; a stand writes only under staand:*, so nothing here sets a predicate.
 
 import type { Element } from '@teranos/elements';
-import { tray, buttonFrom } from '@teranos/elements';
+import { tray, buttonFrom, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
 import { backendUrl } from './client/url';
-import { createPrimaryButton, createDangerButton, createGhostButton } from './components/button';
 import { tooltip } from './components/tooltip';
 import { kindOf } from './namespaces-view';
 import { standActivity, standElementId } from './stand-activity-element';
@@ -60,7 +59,7 @@ export interface StaandInfo {
     walks: StandWalk[];
 }
 
-const ELEMENT_ID = 'market-element';
+export const ELEMENT_ID = 'market-element';
 
 // A friendly name to prefill the slug with — a market stall by another word.
 // The form offers an unused one and lets you type anything instead.
@@ -170,7 +169,6 @@ export function standSnippet(url: string): string {
 // One font scale, one margin: the element sets these once and every part reads
 // them, so nothing drifts (UI-wide, ADR-035).
 const FONT = 'var(--font-mono)';
-const SIZE = '13px';
 const EDGE = '12px';
 const MUTE = 'var(--text-on-dark-tertiary)';
 const LINE = 'var(--border-on-dark)';
@@ -235,7 +233,6 @@ export function renderStandList(container: HTMLElement, stands: StaandInfo[], on
         row.style.padding = '8px ' + EDGE;
         row.style.borderBottom = '1px solid ' + LINE;
         row.style.cursor = 'pointer';
-        row.style.fontSize = SIZE;
 
         const left = document.createElement('span');
         const market = document.createElement('span');
@@ -267,7 +264,6 @@ function fact(label: string, value: HTMLElement | string, tip?: string): HTMLEle
     row.style.flexWrap = 'wrap';
     row.style.gap = '10px';
     row.style.padding = '3px 0';
-    row.style.fontSize = SIZE;
     const key = document.createElement('span');
     key.textContent = label;
     key.style.color = MUTE;
@@ -329,12 +325,11 @@ export function renderStandDetail(
 ): void {
     container.replaceChildren();
 
-    const back = createGhostButton('← Stands', onBack);
+    const back = pressFrom({ id: 'market-back', title: '← Stands', does: onBack });
     container.appendChild(back.element);
 
     const title = document.createElement('div');
     title.textContent = s.market + ' / ' + s.slug;
-    title.style.fontSize = '15px';
     title.style.margin = '8px 0';
     container.appendChild(title);
 
@@ -364,7 +359,6 @@ export function renderStandDetail(
     summary.textContent = 'Snippet — paste on your site; you name the event';
     summary.style.cursor = 'pointer';
     summary.style.color = MUTE;
-    summary.style.fontSize = SIZE;
     summary.style.margin = '10px 0 4px';
     snippetBox.appendChild(summary);
 
@@ -373,7 +367,6 @@ export function renderStandDetail(
     pre.className = 'has-tooltip stand-snippet';
     pre.setAttribute('data-tooltip', 'press to copy');
     pre.textContent = snippet;
-    pre.style.fontSize = '12px';
     pre.style.whiteSpace = 'pre-wrap';
     pre.style.wordBreak = 'break-all';
     pre.style.padding = '8px ' + EDGE;
@@ -397,9 +390,9 @@ export function renderStandDetail(
     foot.style.borderTop = '1px solid ' + LINE;
     foot.style.display = 'flex';
     foot.style.justifyContent = 'flex-end';
-    const del = createDangerButton('Delete', 'Confirm delete', async () => {
+    const del = pressFrom({ id: 'market-delete', title: 'Delete', again: 'the stand is deleted', irrevocable: true, does: async () => {
         await onDelete();
-    });
+    } });
     foot.appendChild(del.element);
     container.appendChild(foot);
 }
@@ -420,7 +413,6 @@ export function buildCreateForm(
     form.style.gap = '2px';
     form.style.padding = '10px ' + EDGE;
     form.style.fontFamily = FONT;
-    form.style.fontSize = SIZE;
 
     const fixed = (text: string): HTMLElement => {
         const el = document.createElement('span');
@@ -436,7 +428,6 @@ export function buildCreateForm(
     const ns = document.createElement('select');
     ns.className = 'stand-market';
     ns.style.fontFamily = FONT;
-    ns.style.fontSize = SIZE;
     ns.style.padding = '3px 4px';
     const placeholder = document.createElement('option');
     placeholder.value = '';
@@ -460,18 +451,17 @@ export function buildCreateForm(
     slug.value = unusedSlug(usedSlugs);
     slug.size = 12;
     slug.style.fontFamily = FONT;
-    slug.style.fontSize = SIZE;
     slug.style.padding = '3px 4px';
     form.appendChild(slug);
 
-    const create = createPrimaryButton('Create', async () => {
+    const create = pressFrom({ id: 'market-create', title: 'Create', does: async () => {
         const market = ns.value;
         const g = slug.value.trim();
         if (market === '' || g === '') {
             throw new Error('a stand needs a namespace and a slug');
         }
         await onCreate(market, g);
-    });
+    } });
     create.element.style.marginLeft = '8px';
     form.appendChild(create.element);
 
@@ -537,6 +527,9 @@ function showRefusal(root: HTMLElement, err: unknown): void {
     root.appendChild(box);
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/staands'] as const;
+
 export function createMarketElement(): Element {
     return {
         id: ELEMENT_ID,
@@ -546,7 +539,6 @@ export function createMarketElement(): Element {
             const content = document.createElement('div');
             content.className = 'stands-element-content';
             content.style.fontFamily = FONT;
-            content.style.fontSize = SIZE;
 
             const root = document.createElement('div');
             content.appendChild(root);

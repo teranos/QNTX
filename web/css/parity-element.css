@@ -4,7 +4,8 @@
 .parity-element-content {
     display: flex;
     flex-direction: column;
-    min-width: 560px;
+    /* 560px where there is room; a phone has less, and the seam takes what it has. */
+    min-width: min(560px, 100%);
     max-width: 760px;
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
@@ -97,7 +98,7 @@
 }
 
 .parity-required {
-    font-size: 9px;
+    font-size: var(--font-size-xs);
     font-weight: 400;
     letter-spacing: 0.06em;
     padding: 1px 5px;

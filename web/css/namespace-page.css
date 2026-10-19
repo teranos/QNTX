@@ -53,7 +53,7 @@
 
 .namespace-page-name {
     margin: 0 0 16px 0;
-    font-size: 16px;
+    font-size: var(--font-size-lg);
     font-weight: 500;
     color: var(--text-on-dark-emphasis);
 }
@@ -67,7 +67,7 @@
 }
 
 .canvas-none {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-on-dark-tertiary);
 }
 
@@ -81,7 +81,7 @@
     border: 1px solid var(--border-on-dark);
     background: var(--bg-dark-hover);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     transition: filter 0.3s ease, opacity 0.3s ease, border-color 0.2s ease;
 }
 
@@ -106,12 +106,12 @@
 }
 
 .canvas-card-symbol {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
     color: var(--text-on-dark-secondary);
 }
 
 .canvas-card-name {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     color: var(--text-on-dark-emphasis);
     white-space: nowrap;
     overflow: hidden;
@@ -120,7 +120,7 @@
 
 .canvas-card-kind,
 .canvas-card-state {
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     color: var(--text-on-dark-tertiary);
 }
 
@@ -132,7 +132,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-on-dark-secondary);
 }
 
@@ -153,7 +153,7 @@
     margin-bottom: 16px;
     padding: 4px 8px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-on-dark);
     background: transparent;
     border: 1px solid var(--border-on-dark);
@@ -171,13 +171,6 @@
     gap: 12px;
 }
 
-.canvas-birth-symbol.qntx-btn {
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    font-size: 20px;
-}
-
 .canvas-birth-form {
     display: flex;
     align-items: center;
@@ -190,7 +183,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
+    font-size: var(--font-size-lg);
     border: 1px solid var(--border-on-dark);
     color: var(--text-on-dark);
 }
@@ -201,7 +194,7 @@
     box-sizing: border-box;
     padding: 0 10px;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--font-size-md);
     color: var(--text-on-dark);
     background: transparent;
     border: 1px solid var(--border-on-dark);
@@ -212,35 +205,6 @@
     border-color: var(--text-on-dark-tertiary);
 }
 
-.canvas-birth-plus.qntx-btn {
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    font-size: 18px;
-}
-
-/* "button becomes green and shimmers, 2nd click actually creates it": the
-   system button's confirming state, in success, with the shimmer. */
-.canvas-birth-plus.qntx-btn-confirming {
-    color: #0b1a0f;
-    border-color: #4ade80;
-    background: linear-gradient(110deg, #4ade80 0%, #86efac 40%, #4ade80 60%, #86efac 100%);
-    background-size: 200% 100%;
-    animation: canvas-birth-shimmer 1.2s linear infinite;
-}
-
-@keyframes canvas-birth-shimmer {
-    from { background-position: 200% 0; }
-    to { background-position: 0 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .canvas-birth-plus.qntx-btn-confirming {
-        animation: none;
-        background: #4ade80;
-    }
-}
-
 /* A disabled canvas, opened on purpose: "also desaturated view". */
 body.canvas-disabled [data-element-id="canvas-workspace"] {
     filter: saturate(0.2);
@@ -248,6 +212,6 @@ body.canvas-disabled [data-element-id="canvas-workspace"] {
 
 .namespace-page-failure {
     margin-top: 12px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: #fbbf24;
 }

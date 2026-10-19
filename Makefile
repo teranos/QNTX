@@ -1,4 +1,4 @@
-.PHONY: cli web run-web lint sacred-error sacred-web sacred-go sacred-rs sacred-spawn-write nil-writetest-web test-jsdom test test-suite test-parquet test-postgres test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web run-web lint sacred-error sacred-web sacred-go sacred-rs sacred-spawn-write nil-writetest-web test-jsdom test-browser test test-suite test-parquet test-postgres test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -25,6 +25,11 @@ BUILD_TAGS := rustsqlite,qntxwasm
 cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM parser)
 	@echo "Building QNTX CLI with Rust optimizations (sqlite) and WASM (parser, fuzzy)..."
 	$(call ground-notify,go-build,Go: building qntx cli)
+	@# cargo writes libats_sqlite as a shared library beside the static one, and
+	@# the linker takes the shared one, at this tree's absolute path: the darwin
+	@# release loaded on no machine but the runner that built it. Gone, the
+	@# binary carries the static library, as a plugin's does.
+	@rm -f target/release/libats_sqlite.dylib target/release/deps/libats_sqlite.dylib target/release/libats_sqlite.so target/release/deps/libats_sqlite.so
 	@go build -tags "$(BUILD_TAGS)" $(GO_LDFLAGS) -o bin/qntx ./cmd/qntx || { \
 		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
@@ -189,6 +194,13 @@ test-jsdom: ## Run web UI tests including JSDOM DOM tests
 		cd web && bun install; \
 	fi
 	@cd web && USE_JSDOM=1 bun test
+
+test-browser: ## Every element in a real browser, on a phone and on a desktop: nothing in it wider than it
+	@if [ ! -d "web/node_modules" ]; then \
+		echo "Installing web dependencies..."; \
+		cd web && bun install; \
+	fi
+	@cd web && bun run test:browser
 
 lint: ## Check the frontend bans (web/eslint.config.js)
 	@if [ ! -d "web/node_modules" ]; then \

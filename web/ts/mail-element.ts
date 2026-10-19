@@ -9,9 +9,8 @@
 // and every mail sent or refused. Nothing here sends.
 
 import type { Element } from '@teranos/elements';
-import { createTable, tray } from '@teranos/elements';
+import { createTable, tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
 import { stacked } from './table-cell';
 
@@ -87,7 +86,7 @@ export interface MailAccount {
     unanswered: string;
 }
 
-const ELEMENT_ID = 'mail-element';
+export const ELEMENT_ID = 'mail-element';
 
 /** An attestation's time, to the second, in UTC. */
 export function fmt(at: string): string {
@@ -388,11 +387,11 @@ function reportControl(onSent: () => void): HTMLDivElement {
     control.className = 'element-actions';
     const said = document.createElement('span');
     said.className = 'element-pill-when';
-    const button = createPrimaryButton('Send the weekly report now', async () => {
+    const button = pressFrom({ id: 'mail-report-send', title: 'Send the weekly report now', does: async () => {
         const r = await apiJson<ReportSent>('/api/mail/report', { method: 'POST' });
         said.textContent = reportSentLine(r);
         onSent();
-    });
+    } });
     control.appendChild(button.element);
     control.appendChild(said);
     return control;
@@ -409,6 +408,9 @@ function load(account: HTMLElement, templates: HTMLElement, sent: HTMLElement): 
         .then((r) => renderSent(sent, r.mails))
         .catch((err: unknown) => refused(sent, 'what mail it sent', err));
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/mail'] as const;
 
 export function createMailElement(): Element {
     return {

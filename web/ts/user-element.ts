@@ -10,11 +10,11 @@
 // nobody else's. The first address is the one mail goes to (ADR-041).
 
 import type { Element } from '@teranos/elements';
-import { createTable, tableCell, tray, type TableRow } from '@teranos/elements';
+import { tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { Button, createDangerButton, createPrimaryButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
+import { record } from './table-cell';
 import type { UserRecord } from './users-element';
 
 /** The ROOT User is root until they say otherwise (ADR-031). */
@@ -28,17 +28,6 @@ function nameOf(u: UserRecord): string {
 function when(ms: number): string {
     if (!ms) return '—';
     return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
-}
-
-function row(label: string, value: string): TableRow<readonly [string, string]> {
-    const name = tableCell(label);
-    // A label reads as the head does.
-    name.style.color = 'var(--text-on-dark-tertiary)';
-    name.style.paddingRight = '12px';
-    name.style.verticalAlign = 'top';
-    const td = tableCell(value);
-    td.style.overflowWrap = 'break-word';
-    return { cells: [name, td] };
 }
 
 /** Exported for tests: the addresses, the primary one named as such. */
@@ -70,7 +59,7 @@ function addForm(onAdded: () => void): HTMLDivElement {
     phone.type = 'tel';
     phone.placeholder = 'phone number';
     phone.className = 'user-add-phone';
-    const add = createPrimaryButton('Add to my record', async () => {
+    const add = pressFrom({ id: 'user-record-add', title: 'Add to my record', does: async () => {
         const typedEmail = email.value.trim();
         const typedPhone = phone.value.trim();
         if (!typedEmail && !typedPhone) {
@@ -80,7 +69,7 @@ function addForm(onAdded: () => void): HTMLDivElement {
         email.value = '';
         phone.value = '';
         onAdded();
-    });
+    } });
     form.appendChild(email);
     form.appendChild(phone);
     form.appendChild(add.element);
@@ -99,17 +88,17 @@ function switchOn(u: UserRecord, onSwitched: () => void): HTMLElement {
     const actions = document.createElement('div');
     actions.className = 'element-actions';
     if (u.disabled_by) {
-        const on = createPrimaryButton('Switch on', async () => {
+        const on = pressFrom({ id: `user-switch-on-${u.id}`, title: 'Switch on', does: async () => {
             await flip(u.id, 'enable');
             onSwitched();
-        });
+        } });
         actions.appendChild(on.element);
         return actions;
     }
-    const off = createDangerButton('Switch off', 'Confirm switch off', async () => {
+    const off = pressFrom({ id: `user-switch-off-${u.id}`, title: 'Switch off', again: `${nameOf(u)} is switched off`, does: async () => {
         await flip(u.id, 'disable');
         onSwitched();
-    });
+    } });
     actions.appendChild(off.element);
     return actions;
 }
@@ -127,6 +116,50 @@ export function becomable(u: UserRecord, viewerIsRoot: boolean): boolean {
     return viewerIsRoot && u.level !== 'ROOT' && !u.disabled_by;
 }
 
+// "can i still not change the role of a User ?"
+
+/** The rungs ROOT sets a User to: the ones the gate admits a User at. ROOT is one User and is not set (ADR-031). */
+export const USER_LEVELS = ['USER', 'PUBLIC_REGISTRATION'] as const;
+
+/** Exported for tests: whether ROOT is offered to set this User's level. */
+export function levelable(u: UserRecord, viewerIsRoot: boolean): boolean {
+    return viewerIsRoot && u.level !== 'ROOT';
+}
+
+/** Sets the level one User holds. The node's refusal is the error. */
+async function setLevel(id: string, level: string): Promise<void> {
+    await apiJson(`/auth/users/${encodeURIComponent(id)}/level`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level }),
+    });
+}
+
+/** The level ROOT sets: the rungs to choose from, the User's own chosen, and the press. */
+function levelForm(u: UserRecord, onSet: () => void): HTMLElement {
+    const form = document.createElement('div');
+    form.className = 'element-actions';
+    const choice = document.createElement('select');
+    choice.className = 'input user-level-choice';
+    for (const level of USER_LEVELS) {
+        const option = document.createElement('option');
+        option.value = level;
+        option.textContent = level;
+        choice.appendChild(option);
+    }
+    choice.value = u.level;
+    const set = pressFrom({ id: `user-level-${u.id}`, title: 'Set level', again: `the level of ${nameOf(u)} is set`, does: async () => {
+        if (choice.value === u.level) {
+            throw new Error(`${nameOf(u)} is ${u.level} already`);
+        }
+        await setLevel(u.id, choice.value);
+        onSet();
+    } });
+    form.appendChild(choice);
+    form.appendChild(set.element);
+    return form;
+}
+
 /**
  * Exported for tests: one User's record. `own` is whether the viewer is this
  * User in a session, the one case the node takes an addition from. `switches`
@@ -137,17 +170,17 @@ export function renderUser(container: HTMLElement, u: UserRecord, own: boolean, 
     container.innerHTML = '';
 
     // The record is headed by who it is.
-    const table = createTable('user-record', ['Name', nameOf(u)], [
-        row('Id', u.id),
-        row('Level', u.level),
-        row('Door', u.namespace || '—'),
-        row('Email', addressesOf(u)),
-        row('Phone', u.phone_numbers?.length ? u.phone_numbers.join('\n') : '—'),
-        row('Accounts', (u.accounts ?? []).map(a => `${a.provider || 'account'}: ${a.handle || a.canonical_id}`).join('\n') || '—'),
-        row('Keys', (u.keys ?? []).map(k => `${k.origin.toLowerCase()} ${k.did}`).join('\n') || '—'),
-        row('Created', when(u.created_at)),
-        row('Created by', u.created_by || '—'),
-        row('Status', u.disabled_by ? `off, by ${u.disabled_by}` : 'on'),
+    const table = record('user-record', ['Name', nameOf(u)], [
+        ['Id', u.id],
+        ['Level', u.level],
+        ['Door', u.namespace || '—'],
+        ['Email', addressesOf(u)],
+        ['Phone', u.phone_numbers?.length ? u.phone_numbers.join('\n') : '—'],
+        ['Accounts', (u.accounts ?? []).map(a => `${a.provider || 'account'}: ${a.handle || a.canonical_id}`).join('\n') || '—'],
+        ['Keys', (u.keys ?? []).map(k => `${k.origin.toLowerCase()} ${k.did}`).join('\n') || '—'],
+        ['Created', when(u.created_at)],
+        ['Created by', u.created_by || '—'],
+        ['Status', u.disabled_by ? `off, by ${u.disabled_by}` : 'on'],
     ]);
     table.style.whiteSpace = 'pre-line';
     container.appendChild(table);
@@ -159,13 +192,17 @@ export function renderUser(container: HTMLElement, u: UserRecord, own: boolean, 
     if (becomable(u, viewerIsRoot)) {
         const actions = document.createElement('div');
         actions.className = 'element-actions';
-        actions.appendChild(new Button({
-            label: `Become ${nameOf(u)}`,
-            variant: 'danger',
-            confirmation: { label: `Their sessions end, and their tokens stop until you are ROOT again` },
-            onClick: () => become(u),
+        actions.appendChild(pressFrom({
+            id: `user-become-${u.id}`,
+            title: `Become ${nameOf(u)}`,
+            again: 'their sessions end, and their tokens stop until you are ROOT again',
+            does: () => become(u),
         }).element);
         container.appendChild(actions);
+    }
+
+    if (levelable(u, viewerIsRoot)) {
+        container.appendChild(levelForm(u, onAdded));
     }
 
     if (own) {
@@ -199,6 +236,20 @@ function refused(container: HTMLElement, err: unknown): void {
     container.appendChild(box);
 }
 
+// "also, on desktop, i see no reason to have this odd sized element."
+// The window measures this content before the record arrives: the width is the record's.
+/** Exported for tests: what the User window holds. */
+export function userContent(): HTMLDivElement {
+    const content = document.createElement('div');
+    content.className = 'user-element-content';
+    content.style.padding = '12px';
+    content.style.width = '80ch';
+    content.style.maxWidth = '100%';
+    // The padding is inside the width, or on a phone the content is 100% plus 24px.
+    content.style.boxSizing = 'border-box';
+    return content;
+}
+
 /** Opens one User as its own element. Called from Users. */
 export function openUserElement(u: UserRecord): void {
     const elementId = `user-element-${u.id}`;
@@ -213,9 +264,7 @@ export function openUserElement(u: UserRecord): void {
         symbol: '⚇',
         onClose: () => { tray.remove(elementId); },
         renderContent: () => {
-            const content = document.createElement('div');
-            content.className = 'user-element-content';
-            content.style.padding = '12px';
+            const content = userContent();
             content.innerHTML = '<div class="element-loading">Loading User…</div>';
             redraw(content, u.id).catch((err: unknown) => refused(content, err));
             return content;

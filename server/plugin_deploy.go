@@ -6,10 +6,12 @@ package server
 import (
 	"maps"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -242,4 +244,27 @@ func (t *deployTracker) held() []pluginDeploy {
 		out = append(out, copied)
 	}
 	return out
+}
+
+// deployData is every deploy the node holds, by plugin, and whether one is
+// in flight: the carousel waits while one is.
+func deployData(deploys []pluginDeploy) ([]statusline.DeployData, bool) {
+	sort.Slice(deploys, func(i, j int) bool { return deploys[i].plugin < deploys[j].plugin })
+	out := make([]statusline.DeployData, 0, len(deploys))
+	inFlight := false
+	for _, d := range deploys {
+		if !slices.Contains(deployEnded, d.stage) {
+			inFlight = true
+		}
+		data := statusline.DeployData{
+			Plugin: d.plugin, Stage: d.stage, Repo: d.repo, Pushed: d.pushed, Rev: d.rev,
+			Checks: maps.Clone(d.checks), Began: maps.Clone(d.began),
+			FailedAt: d.failedAt, Failure: d.failure,
+		}
+		if d.versioned {
+			data.Version = d.version
+		}
+		out = append(out, data)
+	}
+	return out, inFlight
 }

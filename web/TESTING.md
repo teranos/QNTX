@@ -25,6 +25,10 @@ ts/prose-navigation.test.ts
 
 **DOM Testing** — `test-setup.ts` provides happy-dom by default or JSDOM when `USE_JSDOM=1` is set. Tests using basic DOM APIs (document.createElement, etc.) work as regular `.test.ts` files with happy-dom. Tests requiring full browser APIs (Web Animations API, ResizeObserver) use `.dom.test.ts` with the JSDOM skip pattern.
 
+**Width** — neither test DOM lays anything out, so an element wider than its screen is measured in a real browser and nowhere else, against the node as it is: `browser/live.browser.ts` opens every element of `ts/specimens.ts` on a Pixel 7, an iPhone 15 and a desktop, every call answered by the node as its CI user, and names each element with content that cannot be reached, and each that opens at its end (`data-opens-at`) short of it or with its field (`data-say`) off the bottom line. There are no fixtures. The deployment that owns a node runs it (`.github/workflows/live-gate.yml`) and says the verdict as the commit's `live` status (`live-verdict.yml`).
+
+"if it overflows width, hard fail, die"
+
 **localStorage Mocking** (see `prose-navigation.test.ts`):
 ```typescript
 const mockLocalStorage = (() => {

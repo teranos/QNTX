@@ -8,9 +8,8 @@
 // holds them; pressing a name opens that User, where the switch on them is.
 
 import type { Element } from '@teranos/elements';
-import { createTable, tray, type TableRow } from '@teranos/elements';
+import { createTable, tray, type TableRow, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createGhostButton } from './components/button';
 import { log, SEG } from './logger';
 import { person } from './self-person';
 import { stacked } from './table-cell';
@@ -33,7 +32,7 @@ export interface UserRecord {
     created_at: number;
 }
 
-const ELEMENT_ID = 'users-element';
+export const ELEMENT_ID = 'users-element';
 
 /** What the ROOT User is called before they say otherwise (ADR-031). */
 const ROOT_NAME = 'root';
@@ -164,26 +163,26 @@ export function renderInviteLink(container: HTMLElement, invited?: () => void): 
     container.innerHTML = '';
     container.style.padding = '8px 0';
 
-    const invite = createGhostButton('+', async () => {
+    const invite = pressFrom({ id: 'users-invite', title: '+', does: async () => {
         openUserInviteElement(invited);
-    });
+    } });
     invite.element.title = 'invite a user';
     invite.element.setAttribute('aria-label', 'Invite a user');
-    invite.element.style.fontSize = '16px';
-    invite.element.style.lineHeight = '1';
-    invite.element.style.padding = '4px 10px';
     container.appendChild(invite.element);
 
     // Inviting is a session's act, the way switching a person is.
     person().then(who => {
         if (who.via !== 'token') return;
         const why = 'only a session invites a user, and this page reaches the node as a token';
-        invite.setDisabled(true, why);
+        invite.hold(why);
         container.title = why;
     }).catch((err: unknown) => {
         log.error(SEG.UI, '[UsersElement] the node did not say who is looking', err);
     });
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/auth/users', '/auth/invitations'] as const;
 
 export function createUsersElement(): Element {
     return {

@@ -84,10 +84,10 @@ func TestAskingForClaudeCodeEndsWithTheAsker(t *testing.T) {
 	require.Error(t, err)
 }
 
-// The node names its ROOT agent at start, and writes its token down where the
+// The node names its Node Agent at start, and writes its token down where the
 // gate reads tokens: what the agent presents is admitted as ROOT's kind, and
 // acts as the agent's own DID (ADR-048).
-func TestTheNodeNamesItsRootAgentAndTheGateKnowsIt(t *testing.T) {
+func TestTheNodeNamesItsNodeAgentAndTheGateKnowsIt(t *testing.T) {
 	_, db := createTestStore(t)
 	tokens, _, err := auth.OpenTokenTable(db, nil)
 	require.NoError(t, err)
@@ -98,8 +98,8 @@ func TestTheNodeNamesItsRootAgentAndTheGateKnowsIt(t *testing.T) {
 	node := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
 	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), authHandler: h, nodeDID: &nodedid.Handler{PrivateKey: node}, logger: zaptest.NewLogger(t).Sugar()}
 
-	require.NoError(t, s.nameRootAgent(t.TempDir()))
-	require.NotNil(t, s.rootAgent)
+	require.NoError(t, s.nameNodeAgent(t.TempDir()))
+	require.NotNil(t, s.nodeAgent)
 
 	var admitted auth.Admission
 	gated := h.Middleware("/mcp", auth.Reach{}, func(w http.ResponseWriter, r *http.Request) {
@@ -107,25 +107,25 @@ func TestTheNodeNamesItsRootAgentAndTheGateKnowsIt(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 	asked := httptest.NewRequest(http.MethodPost, "/mcp", nil)
-	asked.Header.Set("Authorization", "Bearer "+s.rootAgent.token)
+	asked.Header.Set("Authorization", "Bearer "+s.nodeAgent.token)
 	answered := httptest.NewRecorder()
 	gated.ServeHTTP(answered, asked)
 
 	require.Equal(t, http.StatusOK, answered.Code)
 	assert.True(t, admitted.IsRoot())
-	assert.Equal(t, s.rootAgent.did, admitted.ActsAs())
+	assert.Equal(t, s.nodeAgent.did, admitted.ActsAs())
 
 	// A second start finds the token held, and holds it once.
-	require.NoError(t, s.nameRootAgent(t.TempDir()))
+	require.NoError(t, s.nameNodeAgent(t.TempDir()))
 }
 
 // A node with no login has no gate to know the agent, and names it all the same.
-func TestANodeWithNoLoginStillNamesItsRootAgent(t *testing.T) {
+func TestANodeWithNoLoginStillNamesItsNodeAgent(t *testing.T) {
 	node := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
 	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), nodeDID: &nodedid.Handler{PrivateKey: node}, logger: zaptest.NewLogger(t).Sugar()}
-	require.NoError(t, s.nameRootAgent(t.TempDir()))
-	require.NotNil(t, s.rootAgent)
-	assert.NotEmpty(t, s.rootAgent.did)
+	require.NoError(t, s.nameNodeAgent(t.TempDir()))
+	require.NotNil(t, s.nodeAgent)
+	assert.NotEmpty(t, s.nodeAgent.did)
 }
 
 // Where the node answers on its own machine is where its agent reaches it.

@@ -87,7 +87,7 @@ function renderPanel(): void {
     const oldest = d.oldest ? formatAge(d.oldest) : '';
     const newest = d.newest ? formatAge(d.newest) : '';
 
-    html += `<div style="display: flex; flex-wrap: wrap; gap: 12px; padding: 6px 0; border-bottom: 1px solid #3c3836; font-size: 11px;">
+    html += `<div style="display: flex; flex-wrap: wrap; gap: 12px; padding: 6px 0; border-bottom: 1px solid #3c3836;">
         <span style="color: #a89984;">Sigmas: <span style="color: #ebdbb2; font-weight: 600;">${sigmaCount}</span></span>
         <span style="color: #a89984;">Observations: <span style="color: #ebdbb2; font-weight: 600;">${preserved}</span></span>
         ${oldest ? `<span style="color: #a89984;">Span: <span style="color: #ebdbb2;">${oldest} — ${newest}</span></span>` : ''}
@@ -96,7 +96,7 @@ function renderPanel(): void {
     // Predicate breakdown — horizontal compact
     if (d.predicates && d.predicates.length > 0) {
         const predColors = ['#fe8019', '#fabd2f', '#b8bb26', '#83a598', '#d3869b', '#8ec07c', '#fb4934', '#d65d0e'];
-        html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0; border-bottom: 1px solid #3c3836; font-size: 10px;">';
+        html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0; border-bottom: 1px solid #3c3836;">';
         // Each predicate over time and when last observed, not how many: one
         // window for them all, so a day sits at the same place on each line.
         // The histograms are keyed with every distill: layer stripped.
@@ -229,11 +229,10 @@ function renderPanel(): void {
                 onPress: () => { spawnSigmaAsWindow(sigmaToAttestation(sigma)); },
             };
         }));
-        table.style.fontSize = '10px';
         table.style.marginTop = '4px';
         const heads = table.tHead?.rows[0];
         if (!heads) throw new Error('the sigma table has no heads');
-        heads.style.cssText = 'color: #7c6f64; font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px;';
+        heads.style.cssText = 'color: #7c6f64; text-transform: uppercase; letter-spacing: 0.5px;';
         // The timeline's head is its axis: the first day, each day between, and the last.
         const axis = heads.cells[3];
         axis.style.cssText = 'min-width: 40%; position: relative;';
@@ -244,9 +243,12 @@ function renderPanel(): void {
         return;
     }
 
-    html += '<div style="padding: 16px 0; text-align: center; color: #7c6f64; font-size: 11px;">No sigmas with >= 100 observations yet</div>';
+    html += '<div style="padding: 16px 0; text-align: center; color: #7c6f64;">No sigmas with >= 100 observations yet</div>';
     panelElement.innerHTML = html;
 }
+
+// Who this is for: whoever reaches these (audience.ts). It draws what /ws sends.
+export const needs = ['/ws'] as const;
 
 export function createSigmaPanel(): Element {
     return {

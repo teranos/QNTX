@@ -62,7 +62,7 @@ export function createNebulaNav(config: NebulaNavConfig): NebulaNavHandle {
     // ── Help overlay ────────────────────────────────────────────────
 
     const helpOverlay = document.createElement('div');
-    helpOverlay.style.cssText = 'position:absolute;bottom:4px;left:6px;font:10px monospace;color:rgba(255,255,255,0.5);z-index:2;line-height:1.6;display:none;background:rgba(0,0,0,0.5);padding:4px 8px;border-radius:3px;';
+    helpOverlay.style.cssText = 'position:absolute;bottom:4px;left:6px;color:rgba(255,255,255,0.5);z-index:2;line-height:1.6;display:none;background:rgba(0,0,0,0.5);padding:4px 8px;border-radius:3px;';
     let helpVisible = false;
 
     function buildHelp(): void {

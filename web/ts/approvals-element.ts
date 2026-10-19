@@ -153,7 +153,6 @@ export function approvalsRoll(): { body: HTMLElement; load: () => Promise<void> 
             }
             const said = document.createElement('div');
             said.style.fontFamily = 'var(--font-mono)';
-            said.style.fontSize = '12px';
             const card = cardOf(approval, said);
             const handle = roll.add(card);
             const made = { approval, handle, said };
@@ -178,6 +177,9 @@ export function reloadApprovals(): Promise<void> {
         log.error(SEG.UI, 'The approvals were not read again:', err instanceof Error ? err.message : String(err));
     });
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/approvals'] as const;
 
 export function createApprovalsElement(): Element {
     return {

@@ -1,6 +1,6 @@
 # tests against nil, zero or empty, per file. Debt: each number may fall and may not rise.
 # Instead: name the meaning in a type or a value, or refuse on nothing.
-# 2609 in 374 files.
+# 2562 in 375 files.
 # db/rustdriver/slow.go: 1, no watch on slow store calls until the node names one is no watch.
 # server/watcher_handler.go: +2, a fire rate left out (the config's) told from one said, 0 included, where > 0 made 0 the config's.
 # server/a2a_route.go: 2, an extended card lacking what the spec requires is refused, as the public card is (a2a_card.go); and a node running without auth has no handler, so it declares no peers.
@@ -154,7 +154,7 @@
 6	internal/access/users.go
 3	internal/admission/admission.go
 5	internal/claudecode/login.go
-12	internal/claudecode/run.go
+8	internal/claudecode/run.go
 7	internal/config/am.go
 2	internal/config/environ.go
 3	internal/config/introspection.go
@@ -226,7 +226,7 @@
 2	server/a2a_route.go
 9	server/agent_harness.go
 2	server/agent_turn.go
-20	server/agents.go
+14	server/agents.go
 5	server/am_ground.go
 2	server/am_sigils.go
 1	server/answers.go
@@ -255,6 +255,7 @@
 4	server/auth/laye.go
 4	server/auth/mastodon.go
 1	server/auth/may_register.go
+4	server/auth/node_agent.go
 20	server/auth/oauth.go
 2	server/auth/owner_match.go
 6	server/auth/person.go
@@ -264,7 +265,6 @@
 7	server/auth/public_user.go
 1	server/auth/refusals.go
 15	server/auth/roles.go
-4	server/auth/root_agent.go
 7	server/auth/sessions.go
 5	server/auth/setup.go
 1	server/auth/shed.go
@@ -312,6 +312,7 @@
 2	server/github_deliveries.go
 1	server/github_parity.go
 3	server/github_webhook.go
+3	server/handler_failures.go
 7	server/handlers.go
 4	server/host_gauges.go
 3	server/i_sigils.go
@@ -327,6 +328,7 @@
 2	server/namespaces/named.go
 15	server/namespaces/universe.go
 4	server/node_records.go
+14	server/node_stats.go
 11	server/operational_watchdog.go
 5	server/parity/apiwords.go
 1	server/parity/claudecode.go
@@ -371,15 +373,14 @@
 13	server/signa.go
 56	server/staand.go
 9	server/standing_observer.go
-4	server/statusline_asks.go
-3	server/statusline_carousel.go
-16	server/statusline_handler_failures.go
-28	server/statusline_handlers.go
-12	server/statusline_news.go
-14	server/statusline_node.go
-1	server/statusline_plugin_frames.go
-7	server/statusline_plugin_row.go
-5	server/statusline_watchers.go
+2	server/statusline/asks.go
+3	server/statusline/carousel.go
+7	server/statusline/handler_failures.go
+14	server/statusline/handlers.go
+3	server/statusline/news.go
+1	server/statusline/plugin_frames.go
+4	server/statusline/plugin_row.go
+2	server/statusline/watchers.go
 4	server/storage_events.go
 1	server/strict_transport.go
 3	server/sub_agent.go

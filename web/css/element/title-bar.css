@@ -48,7 +48,7 @@
     width: 22px;
     height: 22px;
     padding: 1px 2px;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     background: rgba(104, 105, 105, 0.67);
     color: #9fa0a0;
     border: 1px solid #999a99;
@@ -106,7 +106,7 @@
     .title-bar button {
         width: 44px;
         height: 44px;
-        font-size: 17px;
+        font-size: var(--font-size-lg);
         margin-left: 2px;
     }
 

@@ -47,7 +47,7 @@ export function renderPager<T>(
 
     const prev = document.createElement('button');
     prev.textContent = '◀';
-    prev.style.cssText = 'background:none;border:1px solid ' + line + ';color:inherit;cursor:pointer;padding:2px 6px;font-size:11px;border-radius:3px';
+    prev.style.cssText = 'background:none;border:1px solid ' + line + ';color:inherit;cursor:pointer;padding:2px 6px;border-radius:3px';
     preventDrag(prev);
 
     const next = document.createElement('button');

@@ -1,0 +1,148 @@
+# SIEVE
+
+Deferred, and not ug's. QNTX owns it. The words are here so the shape survives
+until something is built to hold it.
+
+Said in passing mid-turn, so unquoted: an event stays about fourteen seconds,
+longer when urgent. CI in general, being very low on context, and gh being down
+were named alongside the rest as things that happen. And QNTX owning this was
+the answer to the sieve being the same move as ritual_position.
+
+## The deploy marker
+
+"i still see signal in the verion nr's changing though"
+
+"i always felt that this one went away too fast"
+
+## What the second line is for
+
+"i wish the second line showed me web ui changing"
+
+"like missing meta ads payments"
+
+"so, not just qntx"
+
+"but missing meta payments need to also be in ug because its business critical"
+
+## CRIER
+
+"CRIER is involved with this"
+
+"the thing CRIER really is, is python scripts on ON qntx,"
+
+"and these scripts there called handlers, and a function can have a decorator that makes it be scheduled or it can watch on creation of data from other handlers"
+
+"yes, almost the 007 runs between 003 and 004, common mistake, i know, i have tripped over it"
+
+## What deserves to be said
+
+"i want to know if handlers are failing, i want to know if they work as well, but i want to especially know if they dont , i care about newly stoked handlers the most and their result, i care less about that later and even less if it doesnt return errors and works for awhile, in that case i care very little to nothing about it, unless it goes wrong. i also care about things that run infrequently and together, but if that has happened before i care a lot less of their results, i care more that it happened, for infrequent ones it remains interesting to me,"
+
+"when something fails frequently i care less about seeing its results but i do care about it earlier in its development, especially in the first hour it gets stoked"
+
+"i want to consider a handler failing a very serious event, i dont expect to be in a situation where they arent failing, a failing handler is a fix now kind of event"
+
+## How, and whose
+
+"why not take the transparent sieve approach again"
+
+"make it not ug problem"
+
+"defer the whole thing"
+
+## The two modes
+
+"sieve, it receives actionable data directly for me to copy into claude and be decisive on. it's a changing opportunistic selection over time driven by informed observer, and i do the selecting."
+
+"Everything is down, the goal is to get QNTX up and running again by whatever means"
+
+## How long a thing stays
+
+"drop the marquee, not doing it"
+
+"some visual marker needs to exist to indicate how long a piece of information remains to be on screen, but its not a number."
+
+"Silence conditionally, in the sense, it can be expected because of a rolling update, but just seeing how long it has been is already signal"
+
+"i do think that what i want to have is, a ritual to kick off automatically after an hour"
+
+## A plugin's deploy
+
+Built. `/am/statusline?format=json` carries `deploys` beside `items`
+(server/statusline/deploy.go); ug draws each on its plugin's name (ground, ug/tmux.d).
+
+"i wish ug would poll from QNTX some kind of indication that it knows a new plugin build and version is underway"
+
+"consider an ongoing deploy a higher priority thing to express than any other information at that moment"
+
+"until its actually active at which point it resumes the carriousel"
+
+"in a way that is a lot more distinct from what i see now"
+
+What clears a failed deploy:
+
+"Time, or other news"
+
+"distict can mean though the text bg"
+
+"nothing functional should be changign except for the states in ug how it looks like"
+
+"like yellow bg for building"
+
+"o rmake it based on checks"
+
+"like percentage filled"
+
+"yellow to green"
+
+"building on qntx"
+
+"another line beign filled"
+
+"WHEN ITS BUILDING IN GITHUB THE AREA BEHIND THE C NEEDS TO BE GREEN, THE OTHER LETTER YELLOW"
+
+"nothing next to name"
+
+"not 2/3 or 3/4"
+
+"the colored bg behind the text should communicate how far we are"
+
+"my tmux only goes so wide, its alreayd not wide enough and you want to add more to it"
+
+"yes alternating"
+
+"no, i said version number"
+
+"i dont want blinking bg when its building, just slight blink on finish"
+
+"just give me the data"
+
+## The carousel
+
+Built, unlike the rest of this file. The row is one line and holds more than one line's
+worth, so one slot between the two pinned halves takes turns.
+
+"carousel, user, tagged version commit hah, uptime, ats version, cpu, memory, total watchers, total attestations, total schedules, total handlers"
+
+The user is pinned leftmost and the plugins are pinned right; those never rotate. The
+node advances the slot, not the caller, so every surface drawing the row is on the same
+frame.
+
+"and it goes fast on the first three times"
+
+"and gets slower and slower until its 5m per carousel item"
+
+Three sweeps of the whole set at two seconds a frame, which is how the set becomes known;
+then doubling until it rests at five minutes, which is how it stops being noise. A node
+nobody looked at for an hour advances once — what is owed is a fresh frame, not a replay
+of the ones that went unseen.
+
+## The plugins
+
+"plugins take a lot of space"
+
+"we don’t need to report about healthy plugins as often, healthy plugins can be their own carrousel of plugin carrousels if you will"
+
+Built. A plugin that is unwell, or has a failing handler, keeps its own slot on the right.
+The plugins that are well share one slot, which takes each plugin's frames in turn on the
+carousel's pacing (`healthyCarousel`).

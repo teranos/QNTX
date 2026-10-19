@@ -32,6 +32,7 @@ type ServiceEndpoints struct {
 	Search       ServiceEndpoint
 	Fetch        ServiceEndpoint
 	Mail         ServiceEndpoint
+	GitHub       ServiceEndpoint
 	AuthToken    string
 }
 
@@ -62,6 +63,8 @@ type ServicesManager struct {
 	node               string // The node's DID, who writes what a plugin named no actor for
 	mailServer         *grpc.Server
 	mailSrv            *services.MailServer // wired once the node has Users and its DID
+	githubServer       *grpc.Server
+	github             handedGitHub // the node's GitHubService, handed before Start
 	logger             *zap.SugaredLogger
 	// running is every service server that started, in the order it did.
 	running []*grpc.Server
@@ -124,6 +127,7 @@ func NewServicesManager(llmCfg config.LLMConfig, fetchCfg config.FetchConfig, no
 		logger:    logger,
 		llm:       unrouted[*services.LLMServer]{why: errors.New("the LLM service has not started")},
 		search:    unrouted[*services.SearchServer]{why: errors.New("the search service has not started")},
+		github:    githubNotHanded{},
 	}
 	notYet := OpenRun(func(_, namespace string) (string, func(), error) {
 		return "", nil, errors.Newf("the node has not handed over how to mint a store token for namespace %s yet", namespace)
@@ -223,7 +227,55 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		return m.startMailService(ctx)
 	})
 
+	// Start GitHub service, as the namespace each plugin stands in (ADR-043)
+	m.endpoints.GitHub = m.startOptional("github", func() (string, error) {
+		return m.startGitHubService(ctx)
+	})
+
 	return nil
+}
+
+// handedGitHub is whether the node handed the manager its GitHubService.
+type handedGitHub interface{ handsGitHub() }
+
+// githubHanded is the node's GitHubService, and how a plugin's token names its namespace.
+type githubHanded struct {
+	server     *services.GitHubServer
+	namespaces services.PluginNamespaces
+}
+
+// githubNotHanded is a manager the node handed no GitHubService.
+type githubNotHanded struct{}
+
+func (githubHanded) handsGitHub()    {}
+func (githubNotHanded) handsGitHub() {}
+
+// SetGitHub hands the manager the node's GitHubService, and how a plugin's
+// token names the namespace it stands in. Handed before Start, or Start runs
+// without it and says so.
+func (m *ServicesManager) SetGitHub(server *services.GitHubServer, namespaces services.PluginNamespaces) {
+	m.github = githubHanded{server: server, namespaces: namespaces}
+}
+
+func (m *ServicesManager) startGitHubService(ctx context.Context) (string, error) {
+	handed, ok := m.github.(githubHanded)
+	if !ok {
+		return "", errors.Newf("the node handed no GitHubService before its plugin services started (%T)", m.github)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	m.githubServer = grpc.NewServer(grpc.UnaryInterceptor(handed.server.ForPlugins(handed.namespaces)))
+	protocol.RegisterGitHubServiceServer(m.githubServer, handed.server)
+
+	m.serve(ctx, "GitHub", m.githubServer, listener, &m.endpoints.GitHub)
+
+	addr := listener.Addr().String()
+	m.logger.Debugw("GitHub service started", "address", addr)
+
+	return addr, nil
 }
 
 // startOptional starts a service the node boots without when it does not
@@ -496,6 +548,11 @@ func (m *ServicesManager) SetCallStores(calls services.CallStores) {
 func (m *ServicesManager) SetPluginStores(plugins services.PluginStores) {
 	m.atsStore.SetPluginStores(plugins)
 	m.fetchSrv.SetPluginStores(plugins)
+}
+
+// SetPluginNames hands the mail service which plugin each token the node handed out is for.
+func (m *ServicesManager) SetPluginNames(plugins services.PluginNames) {
+	m.mailSrv.SetPluginNames(plugins)
 }
 
 // SetCallers hands the schedule service the callers of the calls plugins are

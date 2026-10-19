@@ -1,9 +1,9 @@
-// Claude Element — the ROOT agent: said to, and read as the session it continues.
+// Claude Element — the Node Agent: said to, and read as the session it continues.
 // "in terms of ui, this will be the Claude Element"
 // What it is and why is ADR-048's; this draws what the claude signum answers.
 
 import type { Element } from '@teranos/elements';
-import { preventDrag, tray } from '@teranos/elements';
+import { declareSay, preventDrag, tray } from '@teranos/elements';
 import { apiJson } from './client';
 import { log, SEG } from './logger.ts';
 import { Claude } from './sym';
@@ -13,7 +13,7 @@ import { renderTranscript, type TranscriptRead } from './components/element/tran
 
 const ELEMENT_ID = 'claude-element';
 
-// Who the ROOT agent is and how the node runs it (claude am).
+// Who the Node Agent is and how the node runs it (claude am).
 export interface ClaudeAm {
     did: string;
     model: string;
@@ -46,13 +46,13 @@ export interface ClaudeSaid {
 }
 
 // The node, as this element asks it.
-export interface RootAgent {
+export interface NodeAgent {
     am(): Promise<ClaudeAm>;
     say(says: string, mode: string): Promise<ClaudeSaid>;
     read(): Promise<TranscriptRead | undefined>;
 }
 
-const theNode: RootAgent = {
+const theNode: NodeAgent = {
     am: () => apiJson<ClaudeAm>('/api/claude'),
     say: (says, mode) => apiJson<ClaudeSaid>('/api/claude/say', {
         method: 'POST',
@@ -85,10 +85,10 @@ function wordsOf(err: unknown): string {
 }
 
 /**
- * The ROOT agent drawn into body: who it is, its session, and where something
+ * The Node Agent drawn into body: who it is, its session, and where something
  * is said to it. What it gives back stops reading a turn that is going.
  */
-export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: number = FOLLOW_MS): () => void {
+export function drawClaude(body: HTMLElement, node: NodeAgent = theNode, every: number = FOLLOW_MS): () => void {
     const who = part('div', 'claude-who');
     who.textContent = 'Asking the node who answers…';
     const session = part('div', 'claude-session tr');
@@ -100,11 +100,13 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
     mode.title = 'The permission mode Claude Code runs this turn in';
     const says = part('textarea', 'claude-says');
     says.rows = 2;
-    says.placeholder = 'Say something to the ROOT agent';
+    says.placeholder = 'Say something to the Node Agent';
     const send = part('button', 'qntx-btn qntx-btn-small claude-send');
     send.textContent = 'Say';
     const form = part('div', 'claude-say');
     form.append(mode, says, send);
+    // "the inputfield take up the entire bottom of the screen for chat elements like claude or pi"
+    declareSay(says);
     // What is typed and pressed here is not a drag of the element.
     preventDrag(form);
     preventDrag(session);
@@ -183,15 +185,20 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
 
     node.am()
         .then(is => {
-            who.textContent = [is.did, is.model, is.effort, is.not_ready].filter(Boolean).join('  ');
+            // "No need to show did key to user"
+            who.textContent = [is.model, is.effort, is.not_ready].filter(Boolean).join('  ');
             who.title = is.allow.length > 0 ? `Allowed without being asked: ${is.allow.join(', ')}` : 'Nothing is allowed without being asked';
             // A harness with no permission modes, Pi, has nothing to choose here.
             mode.hidden = is.permission_modes.length === 0;
-            // am.toml that gives no mode leaves the choice here, and none is made for the speaker.
-            if (!is.permission_mode && !mode.hidden) mode.appendChild(choice('', 'permission mode'));
             // "claude element 'dontask' doesnt make sense there"
-            for (const name of is.permission_modes) if (name !== 'dontAsk') mode.appendChild(choice(name, name));
-            mode.value = is.permission_mode;
+            const offered = is.permission_modes.filter(name => name !== 'dontAsk');
+            // am.toml that gives no mode, or one not offered here (dontAsk), leaves the choice here,
+            // and none is made for the speaker: what is said runs in the node's own. Without this
+            // the choice showed nothing at all.
+            const ownMode = offered.includes(is.permission_mode) ? is.permission_mode : '';
+            if (!ownMode && !mode.hidden) mode.appendChild(choice('', 'permission mode'));
+            for (const name of offered) mode.appendChild(choice(name, name));
+            mode.value = ownMode;
             reading = is.session;
             if (reading) void read();
             else session.textContent = 'Nothing has been said to it yet.';
@@ -206,11 +213,16 @@ export function drawClaude(body: HTMLElement, node: RootAgent = theNode, every: 
     return settle;
 }
 
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/claude'] as const;
+
 export function createClaudeElement(): Element {
     return {
         id: ELEMENT_ID,
         title: 'Claude',
         symbol: Claude,
+        // "claude element should not start at top when opening requiring user to scroll down every single time"
+        opensAt: 'end',
         renderContent: () => {
             const body = part('div', 'content-area claude claude-brand');
             drawClaude(body);

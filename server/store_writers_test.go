@@ -64,14 +64,20 @@ var storeWriters = map[string]string{
 	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
 		"Reached from the github sigils, which the reach table gives to ROOT",
 
-	"sessionStoreOf": "where an agent's session lands (ADR-048): the ROOT agent's in system, which is " +
+	"sessionStoreOf": "where an agent's session lands (ADR-048): the Node Agent's in system, which is " +
 		"the node's own record whoever spoke to it, reached from the claude and pi sigils, which the " +
 		"reach table gives to ROOT; a namespace agent's in its namespace, through Write as the caller " +
 		"is admitted to act there, reached from the agents sigils, which the table gives to whoever acts " +
 		"in a namespace and the handler narrows to the namespace named",
+	"followLeftTurns": "the rest of a Node Agent turn the node's last process left running (ADR-048: the " +
+		"node hosts the process, it starts it, resumes it and stops it), in system as sessionStoreOf " +
+		"writes the Node Agent's: reached from nothing anyone calls, only from the node's own boot",
 	"setAgentLine": "the AGENT line a namespace opts into its agent by (ADR-048), in the namespace's own " +
 		"store through Write as the setter is admitted, after maySetAgent says they own the namespace, " +
 		"or are ROOT or SUPER",
+	"setKeyLine": "a KEY line of a namespace (ADR-051), in the namespace's own store through Write as " +
+		"the setter is admitted, after keysAsking refuses a token or a connector and mayHandleKeys says " +
+		"they own the namespace, or are ROOT or SUPER",
 
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +

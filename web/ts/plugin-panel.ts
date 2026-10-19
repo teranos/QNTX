@@ -21,10 +21,10 @@ import { assertOk, jsonBody } from './http-utils.ts';
 import { escapeHtml, formatBuildTime } from './html-utils.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
-import { buttonPlaceholder, hydrateButtons, registerButton, type HydrateConfig } from './components/button';
+import { pressPlace, placePresses } from './components/press-places';
 import { tooltip } from './components/tooltip.ts';
 import { refusal } from './self-person.ts';
-import type { Element } from '@teranos/elements';
+import type { Element, Press } from '@teranos/elements';
 
 interface PluginInfo {
     name: string;
@@ -300,9 +300,9 @@ export function renderAddCard(): string {
             ${renderCheckedReadme(resolved)}` : ''}
             <div class="plugin-controls">
                 ${checked
-                    ? buttonPlaceholder('plugin-add-confirm', 'Add', 'plugin-add-confirm')
-                    : buttonPlaceholder('plugin-add-check', 'Check', 'plugin-add-check')}
-                ${buttonPlaceholder('plugin-add-cancel', 'Cancel', 'plugin-add-cancel')}
+                    ? pressPlace('plugin-add-confirm', 'plugin-add-confirm')
+                    : pressPlace('plugin-add-check', 'plugin-add-check')}
+                ${pressPlace('plugin-add-cancel', 'plugin-add-cancel')}
             </div>
         </div>
     `;
@@ -541,105 +541,45 @@ function addConfigKey(): void {
 }
 
 function hydratePluginButtons(container: HTMLElement): void {
-    const config: HydrateConfig = {};
+    const presses: Record<string, Press> = {};
+    const at = (press: Press) => { presses[press.id] = press; };
 
     for (const plugin of plugins) {
         if (plugin.pausable) {
             if (plugin.state === 'running') {
-                config[`plugin-pause-${plugin.name}`] = {
-                    label: '\u275A\u275A Pause',
-                    onClick: async () => {
-                        await pausePlugin(plugin.name);
-                    },
-                    variant: 'secondary',
-                    size: 'small'
-                };
+                at({ id: `plugin-pause-${plugin.name}`, title: '\u275A\u275A Pause', does: async () => { await pausePlugin(plugin.name); } });
             } else if (plugin.state === 'paused') {
-                config[`plugin-resume-${plugin.name}`] = {
-                    label: '\u25B6 Resume',
-                    onClick: async () => {
-                        await resumePlugin(plugin.name);
-                    },
-                    variant: 'primary',
-                    size: 'small'
-                };
+                at({ id: `plugin-resume-${plugin.name}`, title: '\u25B6 Resume', does: async () => { await resumePlugin(plugin.name); } });
             }
         }
 
         if (plugin.state === 'running') {
-            config[`plugin-restart-${plugin.name}`] = {
-                label: 'Restart',
-                onClick: async () => {
-                    await restartPlugin(plugin.name);
-                },
-                variant: 'ghost',
-                size: 'small',
-                confirmation: {
-                    label: 'Confirm'
-                }
-            };
+            at({ id: `plugin-restart-${plugin.name}`, title: 'Restart', again: `${plugin.name} restarts`, does: async () => { await restartPlugin(plugin.name); } });
         }
 
         if (enables(plugin)) {
-            config[`plugin-enable-${plugin.name}`] = {
-                label: 'Enable',
-                onClick: async () => {
-                    await switchPlugin(plugin.name, 'enable');
-                },
-                variant: 'primary',
-                size: 'small'
-            };
+            at({ id: `plugin-enable-${plugin.name}`, title: 'Enable', does: async () => { await switchPlugin(plugin.name, 'enable'); } });
         }
 
         if (disables(plugin)) {
-            config[`plugin-disable-${plugin.name}`] = {
-                label: 'Disable',
-                onClick: async () => {
-                    await switchPlugin(plugin.name, 'disable');
-                },
-                variant: 'ghost',
-                size: 'small',
-                confirmation: {
-                    label: 'Confirm'
-                }
-            };
+            at({ id: `plugin-disable-${plugin.name}`, title: 'Disable', again: `${plugin.name} is disabled`, does: async () => { await switchPlugin(plugin.name, 'disable'); } });
         }
     }
 
     if (adding) {
-        config['plugin-add-check'] = {
-            label: 'Check',
-            onClick: async () => {
+        at({
+            id: 'plugin-add-check',
+            title: 'Check',
+            does: async () => {
                 const typed = container.querySelector<HTMLInputElement>('.plugin-add-repo')?.value.trim() ?? '';
                 await checkPlugin(typed);
             },
-            variant: 'secondary',
-            size: 'small'
-        };
-        config['plugin-add-confirm'] = {
-            label: 'Add',
-            onClick: async () => {
-                if (resolved) await addPlugin(resolved.repo);
-            },
-            variant: 'primary',
-            size: 'small'
-        };
-        config['plugin-add-cancel'] = {
-            label: 'Cancel',
-            onClick: () => {
-                closeAddCard();
-                render();
-            },
-            variant: 'ghost',
-            size: 'small'
-        };
+        });
+        at({ id: 'plugin-add-confirm', title: 'Add', does: async () => { if (resolved) await addPlugin(resolved.repo); } });
+        at({ id: 'plugin-add-cancel', title: 'Cancel', does: () => { closeAddCard(); render(); } });
     }
 
-    const buttons = hydrateButtons(container, config);
-
-    for (const [buttonId, button] of Object.entries(buttons)) {
-        registerButton(buttonId, button);
-    }
+    placePresses(container, presses);
 }
 
 /** Switched off, stopped, or failed. */
@@ -727,22 +667,22 @@ function renderPlugin(plugin: PluginInfo): string {
     let controls = '';
     if (plugin.pausable) {
         if (plugin.state === 'running') {
-            controls = buttonPlaceholder(`plugin-pause-${plugin.name}`, '\u275A\u275A Pause', 'plugin-pause-btn');
+            controls = pressPlace(`plugin-pause-${plugin.name}`, 'plugin-pause-btn');
         } else if (plugin.state === 'paused') {
-            controls = buttonPlaceholder(`plugin-resume-${plugin.name}`, '\u25B6 Resume', 'plugin-resume-btn');
+            controls = pressPlace(`plugin-resume-${plugin.name}`, 'plugin-resume-btn');
         }
     }
 
     if (enables(plugin)) {
-        controls += buttonPlaceholder(`plugin-enable-${plugin.name}`, 'Enable', 'plugin-enable-btn');
+        controls += pressPlace(`plugin-enable-${plugin.name}`, 'plugin-enable-btn');
     }
     if (disables(plugin)) {
-        controls += buttonPlaceholder(`plugin-disable-${plugin.name}`, 'Disable', 'plugin-disable-btn');
+        controls += pressPlace(`plugin-disable-${plugin.name}`, 'plugin-disable-btn');
     }
 
     let restartBtn = '';
     if (plugin.state === 'running') {
-        restartBtn = buttonPlaceholder(`plugin-restart-${plugin.name}`, 'Restart', 'plugin-restart-btn');
+        restartBtn = pressPlace(`plugin-restart-${plugin.name}`, 'plugin-restart-btn');
     }
 
     const notRunning = NOT_RUNNING.includes(plugin.state);
@@ -1375,6 +1315,9 @@ function filterPlugins(searchText: string): void {
         }
     });
 }
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/plugins'] as const;
 
 /**
  * Create a Element definition for the plugin panel

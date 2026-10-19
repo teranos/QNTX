@@ -75,7 +75,6 @@ export function showQueryError(
     const errorDisplay = document.createElement('div');
     errorDisplay.className = errorClass;
     errorDisplay.style.padding = '6px 8px';
-    errorDisplay.style.fontSize = '11px';
     errorDisplay.style.fontFamily = 'var(--font-mono)';
     errorDisplay.style.backgroundColor = severity === 'error' ? 'var(--element-status-error-section-bg)' : 'var(--element-status-warning-section-bg)';
     errorDisplay.style.color = severity === 'error' ? 'var(--element-status-error-text)' : 'var(--element-status-warning-text)';

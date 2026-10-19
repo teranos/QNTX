@@ -277,6 +277,16 @@ func (h *Held) Universe(admitted auth.Admission, namespace string) (*Universe, e
 	return h.universeIn(namespace)
 }
 
+// Serves is a namespace's name as it was created, refused when the node does
+// not serve it. It hands back no store to read or write.
+func (h *Held) Serves(namespace string) (string, error) {
+	u, err := h.universeIn(namespace)
+	if err != nil {
+		return "", err
+	}
+	return u.Name(), nil
+}
+
 // ScheduledRun hands back the universe a schedule's run acts in: the namespace
 // its creator acted in, as the sigil call that created it was admitted.
 func (h *Held) ScheduledRun(namespace string) (*Universe, error) {

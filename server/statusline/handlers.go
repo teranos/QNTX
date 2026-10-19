@@ -1,0 +1,681 @@
+package statusline
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/sigil"
+	errors "github.com/teranos/sacred-error"
+	"go.uber.org/zap"
+)
+
+// The symbol is the whole of what crosses; each surface maps it to its own colour.
+const (
+	SymbolWell   = "+"
+	SymbolUnwell = "!"
+)
+
+// StatusItem is one thing worth naming, with what it is at and how it is.
+type StatusItem struct {
+	// ID is set on news only. A poll that writes items down writes each once
+	// by it, and a click asks for it by it.
+	ID     string `json:"id,omitempty"`
+	Name   string `json:"name"`
+	Note   string `json:"note,omitempty"`
+	Symbol string `json:"symbol"`
+}
+
+// StatusLineResponse carries the items in the order they should be read, and
+// each plugin's newest deploy (deploy.go).
+type StatusLineResponse struct {
+	Items   []StatusItem `json:"items"`
+	Deploys []DeployData `json:"deploys"`
+}
+
+// A surface draws in its own escapes and cannot read another's: tmux prints
+// ANSI literally, a terminal prints #[fg=...] literally. So the caller names
+// what it draws for, and there is no default.
+const (
+	FormatJSON = "json"
+	FormatANSI = "ansi"
+	FormatTmux = "tmux"
+)
+
+// Escapes for one surface. The symbol stays the whole of what crosses; this is
+// only how it is spelled.
+type palette struct {
+	well   string
+	unwell string
+	note   string
+	reset  string
+}
+
+var palettes = map[string]palette{
+	FormatANSI: {well: "\033[32m", unwell: "\033[31m", note: "\033[2m", reset: "\033[0m"},
+	FormatTmux: {well: "#[fg=colour34]", unwell: "#[fg=colour160]", note: "#[fg=colour244]", reset: "#[default]"},
+}
+
+// One line, whatever the items are. tmux keeps the first line of a #() and
+// drops the rest, so a row that wrapped would lose everything past the first
+// newline without saying so.
+func renderLine(items []StatusItem, p palette, clickable bool) string {
+	out := ""
+	for i, it := range items {
+		if i > 0 {
+			out += "  "
+		}
+		colour := p.unwell
+		if it.Symbol == SymbolWell {
+			colour = p.well
+		}
+
+		// tmux hands the name of the clicked span back in mouse_status_range,
+		// so the row is what says which span is which. News is asked for by
+		// its id, so that is what its span carries.
+		if clickable {
+			span := it.Name
+			if it.ID != "" {
+				span = it.ID
+			}
+			out += "#[range=user|" + rangeName(span) + "]"
+		}
+
+		out += colour + it.Name + p.reset
+		if it.Note != "" {
+			out += " " + p.note + it.Note + p.reset
+		}
+
+		if clickable {
+			out += "#[norange]"
+		}
+	}
+	return out
+}
+
+// tmux caps a user range argument at 15 bytes. A longer name would be cut
+// where tmux chose rather than where we did, and come back naming nothing.
+const rangeLimit = 15
+
+func rangeName(name string) string {
+	// A range name comes back as a path segment, and `ug expand` drops the
+	// characters that could steer that request elsewhere — a slash among them.
+	// A namespaced handler carrying one would come back naming nothing.
+	name = strings.ReplaceAll(name, "/", ".")
+	if len(name) <= rangeLimit {
+		return name
+	}
+	return name[:rangeLimit]
+}
+
+// StatusLineHandler answers what the surfaces draw.
+type StatusLineHandler struct {
+	registry *plugin.Registry
+	logger   *zap.SugaredLogger
+	health   func() map[string]plugin.HealthStatus
+	// The watcher store, fetched per request because a backend supplies it
+	// after this handler is built. Nil draws no failure items.
+	watchers func() storage.Watchers
+	// Failed handler executions this process has seen. Nil draws none.
+	handlerFailures func() *HandlerFailureLog
+	// Which frame the rotating slot is on. The node holds it, so every surface
+	// drawing the row sees the same one.
+	carousel *carousel
+	// The plugin slots rotate on their own tick, so a plugin's handlers are not
+	// stepped by whatever the middle slot happens to be doing.
+	pluginCarousel *carousel
+	// The one slot the healthy plugins share, taking each plugin's frames in
+	// turn. It slows as the carousel does: a plugin that is well needs saying
+	// less often.
+	healthyCarousel *carousel
+	// What the rotating slot asks about. Nil draws no rotating slot at all.
+	node StatusLineNode
+	// What built-ins left for the caller. Nil draws none.
+	News func() *NewsLog
+	// When each person's tmux bar last asked for the row (asks.go).
+	tmux *rowAsks
+	// The peers' rows, asked as the caller (peers.go). Nil draws none.
+	Peers PeerRows
+	// Each plugin's newest deploy (plugin_deploy.go). Nil draws none.
+	// Every deploy, and whether one is in flight: the carousel waits while one is.
+	Deploys func() ([]DeployData, bool)
+}
+
+// NewStatusLineHandler builds the handler behind /statusline. Everything it
+// is given is read on every request, so none of it may be nil.
+func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
+	health func() map[string]plugin.HealthStatus,
+	watchers func() storage.Watchers, handlerFailures func() *HandlerFailureLog,
+	node StatusLineNode) *StatusLineHandler {
+	// Until the node hands over its own, what is left is a log nothing has been
+	// left in.
+	unwritten := NewNewsLog()
+	return &StatusLineHandler{
+		News:            func() *NewsLog { return unwritten },
+		registry:        registry,
+		logger:          logger,
+		health:          health,
+		watchers:        watchers,
+		handlerFailures: handlerFailures,
+		carousel:        newCarousel(),
+		pluginCarousel:  newCarousel(),
+		healthyCarousel: newCarousel(),
+		node:            node,
+		tmux:            newRowAsks(),
+		Peers:           NoPeers,
+		Deploys:         func() ([]DeployData, bool) { return []DeployData{}, false },
+	}
+}
+
+// pluginFrameSlots is how many frames the plugin tick sweeps before it slows.
+// Each plugin has its own number of frames and takes this index modulo its own,
+// so the slots move together rather than each on its own clock.
+const pluginFrameSlots = 12
+
+// pluginFrameIndex advances the plugin tick and returns where it landed.
+func (h *StatusLineHandler) pluginFrameIndex() int {
+	return h.pluginCarousel.frame(pluginFrameSlots)
+}
+
+// declaredHandlers is every handler the pulse registry holds, which is the
+// built-ins plus one per handler a plugin declared.
+func (h *StatusLineHandler) declaredHandlers() []string {
+	return h.node.HandlerNames()
+}
+
+// StatusLineNode is what the rotating slot asks the node about. An interface
+// because the row has to be drawable in a test with no server behind it.
+type StatusLineNode interface {
+	// Uptime is how long this process has been answering.
+	Uptime() time.Duration
+	// ParserVersion is the ats WASM module's own version.
+	ParserVersion() string
+	// Pressure is the last sampled CPU and memory percentages. Sampling CPU
+	// blocks for a second, so these are read from the node's cache.
+	Pressure() (cpuPct, memPct float64, ok bool)
+	// Attestations is the count from that same cache.
+	Attestations() (int, bool)
+	Watchers() int
+	Schedules() int
+	Handlers() int
+	// HandlerNames is those same handlers by name, so a plugin's slot can
+	// rotate over the ones it declared.
+	HandlerNames() []string
+	// Refusals is how many callers this process turned away, and how many of
+	// those held a token.
+	Refusals() (turnedAway, stale int64)
+	// Answered is how many 4xx and 5xx this process has written.
+	Answered() (refused, broke int64)
+	// Goroutines and HeapBytes are what pprof would say, on the row.
+	Goroutines() int
+	HeapBytes() uint64
+}
+
+// A frame is produced only when it is the one being drawn. The row is polled
+// constantly and shows one frame at a time, so building all of them per request
+// would pay for nine nobody sees.
+type carouselFrame struct {
+	produce func(StatusLineNode) StatusItem
+	// omit says this frame has nothing to report. A row is a handful of
+	// characters, and a slot spent saying nothing happened is a slot not
+	// spent on what did. Nil is a frame that is always worth drawing.
+	omit func(StatusLineNode) bool
+}
+
+// The order the slot sweeps. What the node is, then how hard it is working,
+// then how much it holds.
+var carouselFrames = []carouselFrame{
+	{produce: func(StatusLineNode) StatusItem {
+		build := version.Get()
+		return StatusItem{Name: build.Version, Note: build.Short(), Symbol: SymbolWell}
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		return StatusItem{Name: "up", Note: shortDuration(n.Uptime()), Symbol: SymbolWell}
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("ats", n.ParserVersion())
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		cpu, _, ok := n.Pressure()
+		return pctItem("cpu", cpu, ok)
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		_, mem, ok := n.Pressure()
+		return pctItem("mem", mem, ok)
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		held, ok := n.Attestations()
+		if !ok {
+			return StatusItem{Name: "attestations", Note: "uncounted", Symbol: SymbolUnwell}
+		}
+		return countItem("attestations", strconv.Itoa(held))
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("watchers", strconv.Itoa(n.Watchers()))
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("schedules", strconv.Itoa(n.Schedules()))
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("handlers", strconv.Itoa(n.Handlers()))
+	}},
+	{
+		produce: func(n StatusLineNode) StatusItem {
+			return refusedItem(n.Refusals())
+		},
+		// Nobody turned away is the ordinary state and needs no line.
+		omit: func(n StatusLineNode) bool {
+			turnedAway, _ := n.Refusals()
+			return turnedAway == 0
+		},
+	},
+	{
+		produce: func(n StatusLineNode) StatusItem {
+			return answeredItem(n.Answered())
+		},
+		// A node answering nothing badly has nothing to say here.
+		omit: func(n StatusLineNode) bool {
+			refused, broke := n.Answered()
+			return refused == 0 && broke == 0
+		},
+	},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("goroutines", strconv.Itoa(n.Goroutines()))
+	}},
+	{produce: func(n StatusLineNode) StatusItem {
+		return countItem("heap", shortBytes(n.HeapBytes()))
+	}},
+}
+
+// What this node answered badly. A 5xx is the node saying it broke, and that
+// outranks a caller who asked for something that is not there.
+func answeredItem(refused, broke int64) StatusItem {
+	if broke > 0 {
+		return StatusItem{
+			Name:   "5xx",
+			Note:   strconv.FormatInt(broke, 10) + ", " + strconv.FormatInt(refused, 10) + " 4xx",
+			Symbol: SymbolUnwell,
+		}
+	}
+	return StatusItem{Name: "4xx", Note: strconv.FormatInt(refused, 10), Symbol: SymbolWell}
+}
+
+// Two significant figures and a unit. A row has no room for a byte count.
+func shortBytes(n uint64) string {
+	const unit = 1024
+	if n < unit {
+		return strconv.FormatUint(n, 10) + "B"
+	}
+	div, exp := uint64(unit), 0
+	for n/div >= unit && exp < 3 {
+		div *= unit
+		exp++
+	}
+	return strconv.FormatUint(n/div, 10) + string("KMGT"[exp]) + "B"
+}
+
+// What the node turned away. Unwell is reserved for the ones holding a token:
+// a person refused signs in a second later, a machine refused keeps presenting
+// the same dead credential until somebody replaces it.
+func refusedItem(turnedAway, stale int64) StatusItem {
+	if stale > 0 {
+		return StatusItem{
+			Name:   "refused",
+			Note:   strconv.FormatInt(turnedAway, 10) + ", " + strconv.FormatInt(stale, 10) + " holding a token",
+			Symbol: SymbolUnwell,
+		}
+	}
+	return StatusItem{Name: "refused", Note: strconv.FormatInt(turnedAway, 10), Symbol: SymbolWell}
+}
+
+// A named thing and what it is at. Empty is unwell: a value the node could not
+// produce says so rather than drawing a blank where a number belongs.
+func countItem(name, note string) StatusItem {
+	if note == "" {
+		return StatusItem{Name: name, Note: "unknown", Symbol: SymbolUnwell}
+	}
+	return StatusItem{Name: name, Note: note, Symbol: SymbolWell}
+}
+
+func pctItem(name string, pct float64, ok bool) StatusItem {
+	if !ok {
+		return StatusItem{Name: name, Note: "unsampled", Symbol: SymbolUnwell}
+	}
+	return StatusItem{Name: name, Note: strconv.Itoa(int(pct)) + "%", Symbol: SymbolWell}
+}
+
+// Two units to the minute, in the span grammar the ax language reads back
+// (crates/ats/src/span.rs readout): 3d4h, 1h30m, 9m. A status line has room for
+// two units and no room for a decimal.
+func shortDuration(d time.Duration) string {
+	return readout(d, time.Minute)
+}
+
+// readout is a length as its largest whole fixed unit, then the unit right
+// below it when that counts any, down to finest: what Span::readout writes,
+// held to it by crates/ats/testdata/spans.json. Under finest is 0 of it.
+func readout(d time.Duration, finest time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	var ladder []spanUnit
+	for _, u := range readoutUnits {
+		if u.per >= finest {
+			ladder = append(ladder, u)
+		}
+	}
+	said := ""
+	shown := false
+	for i, u := range ladder {
+		count := d / u.per
+		if shown {
+			// The unit right below the first is the only other one shown.
+			if count >= 1 {
+				said += strconv.FormatInt(int64(count), 10) + u.short
+			}
+			break
+		}
+		// Under the finest unit is 0 of it.
+		if count >= 1 || i == len(ladder)-1 {
+			said += strconv.FormatInt(int64(count), 10) + u.short
+			d -= count * u.per
+			shown = true
+		}
+	}
+	return said
+}
+
+// The one frame the row is showing.
+func (h *StatusLineHandler) carouselItem() []StatusItem {
+	// The sweep keeps its own pace; a frame with nothing to say is stepped past
+	// rather than drawn blank, so the slot never stutters.
+	at := h.carousel.frame(len(carouselFrames))
+	for step := range carouselFrames {
+		frame := carouselFrames[(at+step)%len(carouselFrames)]
+		if frame.omit != nil && frame.omit(h.node) {
+			continue
+		}
+		return []StatusItem{frame.produce(h.node)}
+	}
+	return nil
+}
+
+// Who the row is drawn for, leftmost. ADR-027 is that the level says what and
+// the User says who, so the row answers both rather than picking one.
+
+// The display_name when there is one. A route is a way in rather than a person,
+// and it falls back to one only where nothing records a User (ADR-031).
+func callerItem(a auth.Admission) StatusItem {
+	// Never the route. A profile URL is a door, not a person, and putting one
+	// on the row says who let you in rather than who you are.
+	name := a.DisplayName
+	if name == "" {
+		name = "QNTX"
+	}
+	return StatusItem{Name: name, Note: a.LevelName(), Symbol: SymbolWell}
+}
+
+// Running and reporting healthy. Healthy while stopped is not doing anything.
+func well(healthy bool, state string) bool {
+	return healthy && state == "running"
+}
+
+// HandleStatusLine returns the items a status line draws, unwell first.
+// GET /statusline; the route refuses any other method.
+func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Request) {
+	// Named, never guessed. A caller that omits it is told what it may ask for
+	// rather than handed a row its surface cannot render.
+	format := r.URL.Query().Get("format")
+	if format != FormatJSON && format != FormatANSI && format != FormatTmux {
+		h.respond(w, http.StatusBadRequest, map[string]any{
+			"error":   "format is required",
+			"formats": []string{FormatJSON, FormatANSI, FormatTmux},
+		})
+		return
+	}
+
+	// Which levels reach this route is server/reach's. No caller means the route
+	// ran outside Middleware.
+	admitted, ok := auth.AdmissionFrom(r.Context())
+	if !ok {
+		h.noteWriteFailure(writeStatusLine(w, format, []StatusItem{{Name: "QNTX", Symbol: SymbolWell}}))
+		return
+	}
+
+	if format == FormatTmux {
+		h.tmux.note(NewsKey(admitted), time.Now())
+	}
+
+	// One plugin's own row, when that is what was asked for. A name the node
+	// holds no plugin under is said, not answered with the node's row.
+	if name := r.URL.Query().Get("plugin"); name != "" {
+		row, found := h.pluginRow(name)
+		if !found {
+			h.respond(w, http.StatusNotFound, map[string]any{"error": "no such plugin: " + name})
+			return
+		}
+		h.noteWriteFailure(writeStatusLine(w, format, row))
+		return
+	}
+
+	// Who is looking is pinned leftmost, what was left for them comes next, the
+	// plugins are pinned right; the rotating slot sits between.
+	items := []StatusItem{callerItem(admitted)}
+	// A primary asking for its own row drew the person already (peers.go).
+	if r.URL.Query().Get("for") == forPrimary {
+		items = []StatusItem{}
+	}
+	items = append(items, h.NewsFor(admitted)...)
+	carousel := h.carouselItem()
+
+	// A failing handler is a fix-now kind of event, and it is drawn inside its
+	// own plugin's slot below rather than as a separate item. Watchers belong to
+	// no plugin, so theirs still lead the row; nor does a built-in, so its
+	// failure draws its own item here or it is invisible.
+	failures := h.recentHandlerFailures()
+	failing := append(watcherFailureItemsFor(h.recentWatcherFailures(r.Context())),
+		handlerFailureItemsFor(builtinRuns(failures))...)
+
+	// The deploys go out as data; the carousel waits while one is in flight.
+	deploys, inFlight := h.Deploys()
+	if !inFlight {
+		items = append(items, carousel...)
+	}
+	items = append(items, failing...)
+
+	// The last probe, not a fresh one. Probing per request cost gRPC calls and
+	// held the registry's read lock across them.
+	healthResults := h.health()
+	stateResults := h.registry.GetAllStates()
+
+	type entry struct {
+		item StatusItem
+		well bool
+	}
+	pinned := make([]entry, 0)
+	// The frames of every plugin that is well and failing nothing, one plugin
+	// after another.
+	var healthy []StatusItem
+
+	// Every handler the pulse registry holds, namespaced by whoever declared it,
+	// so each plugin's slot can rotate over its own.
+	allHandlers := h.declaredHandlers()
+	at := h.pluginFrameIndex()
+	failsHandlers := func(plugin string) bool {
+		for _, run := range failures {
+			if pluginOf(run.Handler) == plugin {
+				return true
+			}
+		}
+		return false
+	}
+
+	seen := make(map[string]bool)
+	for _, name := range h.registry.List() {
+		seen[name] = true
+		p, ok := h.registry.Get(name)
+		if !ok {
+			continue
+		}
+		meta := p.Metadata()
+		isWell := well(healthResults[name].Healthy, string(stateResults[name]))
+		handlers := handlersOf(allHandlers, meta.Name)
+		// A failing handler is a fix-now kind of event, so its plugin keeps its
+		// own slot however well the plugin is.
+		if !isWell || failsHandlers(meta.Name) {
+			pinned = append(pinned, entry{
+				item: pluginItem(at, meta.Name, meta.Version, isWell, handlers, failures),
+				well: isWell,
+			})
+			continue
+		}
+		healthy = append(healthy, pluginFrames(meta.Name, meta.Version, handlers, nil)...)
+	}
+
+	// A plugin that never loaded has no metadata, so it is named and left at that.
+	for _, name := range h.registry.ListEnabled() {
+		if seen[name] {
+			continue
+		}
+		pinned = append(pinned, entry{item: StatusItem{Name: name, Symbol: SymbolUnwell}, well: false})
+	}
+
+	// Two passes rather than a sort: the order is unwell then well.
+	for _, wantWell := range []bool{false, true} {
+		for _, e := range pinned {
+			if e.well == wantWell {
+				items = append(items, e.item)
+			}
+		}
+	}
+	items = append(items, pick(h.healthyCarousel, healthy)...)
+
+	// The peers' rows come last: the primary's own row reads as it did.
+	items = append(items, h.peerItems(r.Context(), admitted)...)
+	if format == FormatJSON {
+		h.noteWriteFailure(writeJSON(w, http.StatusOK, StatusLineResponse{Items: items, Deploys: deploys}))
+		return
+	}
+	h.noteWriteFailure(writeStatusLine(w, format, items))
+}
+
+// A response that did not reach the client is not a response. There is no
+// client left to tell, so it goes where the operator can find it.
+func (h *StatusLineHandler) noteWriteFailure(err error) {
+	if err == nil {
+		return
+	}
+	h.logger.Errorw("status line not written", "error", err)
+}
+
+// Item is what one item on the row is doing, in full: am_item's answer. The
+// row has one line and cannot carry this; a click is where it goes.
+func (h *StatusLineHandler) Item(ctx context.Context, name string) (any, *protocol.Refusal) {
+	if name == "" {
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: "name is required"}
+	}
+
+	admitted, ok := auth.AdmissionFrom(ctx)
+	if !ok {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "no such item"}
+	}
+
+	// News first: it is the caller's, by id, and nothing else on the row is.
+	if detail, ok := h.newsDetail(admitted, name); ok {
+		return detail, nil
+	}
+
+	// Failures outrank the registry here the way they do on the row: a name
+	// that matches a failing handler or watcher answers with the failure in
+	// full, which is where the exact error lives.
+	if detail, ok := h.handlerFailureDetail(name); ok {
+		return detail, nil
+	}
+	if detail, ok := h.watcherFailureDetail(ctx, name); ok {
+		return detail, nil
+	}
+
+	// The row truncates a long name to fit tmux's range argument, so what comes
+	// back is a prefix rather than the whole of it.
+	health := h.health()
+	states := h.registry.GetAllStates()
+
+	full := ""
+	for _, candidate := range h.registry.List() {
+		if candidate == name || rangeName(candidate) == name {
+			full = candidate
+			break
+		}
+	}
+	if full == "" {
+		// Not this node's: a peer's row is on this row too, so its items are asked of it.
+		if detail, ok := h.peerItemDetail(ctx, admitted, name); ok {
+			return detail, nil
+		}
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "no such item: " + name}
+	}
+
+	hs := health[full]
+	detail := map[string]any{
+		"name":    full,
+		"state":   string(states[full]),
+		"healthy": hs.Healthy,
+		"paused":  hs.Paused,
+		"message": hs.Message,
+		"details": hs.Details,
+	}
+
+	if p, ok := h.registry.Get(full); ok {
+		meta := p.Metadata()
+		detail["version"] = meta.Version
+		detail["description"] = meta.Description
+	}
+	return detail, nil
+}
+
+// The same items, spelled for whichever surface asked. The write can fail and
+// the caller is owed that, the same way writeJSON owes it.
+func writeStatusLine(w http.ResponseWriter, format string, items []StatusItem) error {
+	if format == FormatJSON {
+		return writeJSON(w, http.StatusOK, StatusLineResponse{Items: items, Deploys: []DeployData{}})
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	line := renderLine(items, palettes[format], format == FormatTmux)
+	if _, err := w.Write([]byte(line)); err != nil {
+		return errors.Wrap(err, "failed to write status line")
+	}
+	return nil
+}
+
+// writeJSON writes a JSON response with the given status code.
+func writeJSON(w http.ResponseWriter, status int, data any) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		return errors.Wrap(err, "failed to encode JSON")
+	}
+	return nil
+}
+
+// respond writes a JSON response and records a body that never reached the
+// client: the status is on the wire and the caller is gone.
+func (h *StatusLineHandler) respond(w http.ResponseWriter, status int, data any) {
+	h.noteWriteFailure(writeJSON(w, status, data))
+}
+
+// Asked is what one person's tmux bar has asked of the row: the last ask, the
+// count, and the asks of each minute still kept. False is a person whose bar
+// never asked.
+func (h *StatusLineHandler) Asked(who string) (lastMs, count int64, over map[string]int64, asked bool) {
+	return h.tmux.of(who)
+}

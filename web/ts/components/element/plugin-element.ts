@@ -43,7 +43,7 @@ export async function createPluginElement(
     Object.assign(symbol.style, { fontWeight: 'bold', color: '#adbcc1' });
     const titleText = el('span', {
         text: def.title,
-        style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: '#d7dee3' },
+        style: { fontFamily: 'monospace', lineHeight: '1.4', color: '#d7dee3' },
     });
     const expandBtn = el('button', {
         text: '\u2B06',
@@ -230,7 +230,7 @@ export function createPluginPlaceholderElement(
     Object.assign(symbol.style, { fontWeight: 'bold', color: '#666', opacity: '0.5' });
     const titleText = el('span', {
         text: `${pluginName} (unavailable)`,
-        style: { fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.4', color: '#999' },
+        style: { fontFamily: 'monospace', lineHeight: '1.4', color: '#999' },
     });
     const titleBar = el('div', { class: 'title-bar title-bar--auto' }, [symbol, titleText]);
     element.appendChild(titleBar);
@@ -240,7 +240,7 @@ export function createPluginPlaceholderElement(
         class: 'plugin-placeholder-content',
         style: {
             flex: '1', padding: '16px', color: 'var(--text-secondary)',
-            fontSize: '12px', fontFamily: 'monospace', textAlign: 'center',
+            fontFamily: 'monospace', textAlign: 'center',
             lineHeight: '1.6', display: 'flex', flexDirection: 'column',
             justifyContent: 'center', alignItems: 'center', gap: '12px',
         },
@@ -249,7 +249,7 @@ export function createPluginPlaceholderElement(
     if (isOffline) {
         content.innerHTML = `
             <div>Plugin requires server connection</div>
-            <div style="font-size: 11px; color: #666;">
+            <div style=" color: #666;">
                 Plugin elements are only available when online
             </div>
         `;
@@ -261,7 +261,7 @@ export function createPluginPlaceholderElement(
             el('div', { text: `${displayName} is not enabled` }),
             el('div', {
                 text: 'Add and enable it in the plugin element (⚙ Domain Plugins): press +, enter its repository URL, Check, then Add; or press Enable on it.',
-                style: { fontSize: '11px', color: '#999', maxWidth: '320px' },
+                style: { color: '#999', maxWidth: '320px' },
             }),
         );
 
@@ -291,7 +291,7 @@ function fetchPluginState(pluginName: string, content: HTMLElement, displayName:
                     el('div', { text: `${displayName} is loading...` }),
                     el('div', {
                         text: 'Plugin is starting up, element will appear when ready',
-                        style: { fontSize: '11px', color: '#999' },
+                        style: { color: '#999' },
                     }),
                 );
             } else if (info.state === 'failed' && info.message) {
@@ -301,7 +301,7 @@ function fetchPluginState(pluginName: string, content: HTMLElement, displayName:
                     el('div', {
                         text: info.message,
                         style: {
-                            fontSize: '11px', color: '#ef4444', maxWidth: '360px',
+                            color: '#ef4444', maxWidth: '360px',
                             wordBreak: 'break-word', overflowWrap: 'break-word',
                         },
                     }),

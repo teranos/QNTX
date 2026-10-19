@@ -10,10 +10,9 @@
 // the Actions runner. Asked on open and after each press; nothing polls.
 
 import type { Element } from '@teranos/elements';
-import { createTable, tray } from '@teranos/elements';
+import { createTable, tray, pressFrom } from '@teranos/elements';
 import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
-import { Button } from './components/button';
 import { refusal } from './self-person';
 import { log, SEG } from './logger';
 import { stacked } from './table-cell';
@@ -88,7 +87,7 @@ export interface GitHubWebhook {
     url: string;
 }
 
-const ELEMENT_ID = 'github-element';
+export const ELEMENT_ID = 'github-element';
 
 // server/node_records.go DefaultRunnerPath; the node sends it too, this is for a path it left empty.
 const DEFAULT_RUNNER_PATH = '/opt/actions-runner';
@@ -165,6 +164,7 @@ async function send(path: string, body: Record<string, string>): Promise<void> {
 export function sourceInWords(source: string): string {
     if (source === 'oauth') return 'OAuth';
     if (source === 'access_token') return 'access token';
+    if (source === 'system') return 'system namespace';
     return source;
 }
 
@@ -176,19 +176,19 @@ export function renderNode(container: HTMLElement, status: GitHubStatus, reload:
     const actions = document.createElement('div');
     actions.className = 'element-actions';
     const flip = status.enabled
-        ? new Button({
-            label: 'Disable GitHub on the node',
-            variant: 'danger',
-            confirmation: { label: 'Disable for every namespace' },
-            onClick: async () => {
+        ? pressFrom({
+            id: 'github-node-disable',
+            title: 'Disable GitHub on the node',
+            again: 'GitHub is off for every namespace',
+            does: async () => {
                 await send('/api/github/node', { enabled: 'false' });
                 await reload();
             },
         })
-        : new Button({
-            label: 'Enable GitHub on the node',
-            variant: 'primary',
-            onClick: async () => {
+        : pressFrom({
+            id: 'github-node-enable',
+            title: 'Enable GitHub on the node',
+            does: async () => {
                 await send('/api/github/node', { enabled: 'true' });
                 await reload();
             },
@@ -222,35 +222,34 @@ export function renderWebhook(container: HTMLElement, status: GitHubStatus, relo
     const shown = document.createElement('div');
     const actions = document.createElement('div');
     actions.className = 'element-actions';
-    const move = new Button({
-        label: 'Set the path',
-        variant: 'ghost',
-        onClick: async () => {
+    const move = pressFrom({
+        id: 'github-webhook-path',
+        title: 'Set the path',
+        does: async () => {
             await send('/api/github/webhook/path', { path: path.value.trim() });
             await reload();
         },
     });
     actions.appendChild(move.element);
-    const generate = new Button({
-        label: active ? 'Generate a new secret' : 'Generate the secret',
-        variant: active ? 'ghost' : 'primary',
-        ...(active ? { confirmation: { label: 'Replace the secret GitHub holds' } } : {}),
-        onClick: async () => {
-            const response = await apiFetch('/api/github/webhook', jsonBody('POST', {}));
-            if (!response.ok) throw new Error(await refusal(response));
-            const made = await response.json() as GitHubWebhook;
-            await reload();
-            const again = container.querySelector('.github-webhook-shown');
-            if (!again) return;
-            const madeURL = document.createElement('code');
-            madeURL.textContent = made.url;
-            again.appendChild(row('URL:', madeURL));
-            const secret = document.createElement('code');
-            secret.textContent = made.secret;
-            again.appendChild(row('Secret:', secret));
-            again.appendChild(said('Shown this once: set both in the App’s webhook settings.'));
-        },
-    });
+    const generating = async () => {
+        const response = await apiFetch('/api/github/webhook', jsonBody('POST', {}));
+        if (!response.ok) throw new Error(await refusal(response));
+        const made = await response.json() as GitHubWebhook;
+        await reload();
+        const again = container.querySelector('.github-webhook-shown');
+        if (!again) return;
+        const madeURL = document.createElement('code');
+        madeURL.textContent = made.url;
+        again.appendChild(row('URL:', madeURL));
+        const secret = document.createElement('code');
+        secret.textContent = made.secret;
+        again.appendChild(row('Secret:', secret));
+        again.appendChild(said('Shown this once: set both in the App’s webhook settings.'));
+    };
+    // The secret GitHub holds cannot be had back once it is replaced.
+    const generate = active
+        ? pressFrom({ id: 'github-webhook-secret', title: 'Generate a new secret', again: 'the secret GitHub holds is replaced', irrevocable: true, does: generating })
+        : pressFrom({ id: 'github-webhook-secret', title: 'Generate the secret', does: generating });
     actions.appendChild(generate.element);
     s.appendChild(actions);
     shown.className = 'github-webhook-shown';
@@ -293,6 +292,27 @@ export function renderNamespaces(container: HTMLElement, namespaces: GitHubNames
         };
     }));
     s.appendChild(table);
+    container.appendChild(s);
+}
+
+// "ROOT will determine what GitHub integration is active there, either system or have the namespace take responsibility"
+/** Exported for tests: per namespace the node serves, which GitHub it spends, and the press that changes it. */
+export function renderFrom(container: HTMLElement, served: string[], namespaces: GitHubNamespace[], reload: () => Promise<void>): void {
+    container.innerHTML = '';
+    const s = section('From');
+    const sources = new Map(namespaces.map(ns => [ns.namespace, ns.source]));
+    for (const name of served.filter(n => n !== 'system')) {
+        const fromSystem = sources.get(name) === 'system';
+        const press = pressFrom({
+            id: `github-from-${name}`,
+            title: fromSystem ? 'Its own GitHub' : 'System’s GitHub',
+            does: async () => {
+                await send('/api/github/from', { namespace: name, from: fromSystem ? 'namespace' : 'system' });
+                await reload();
+            },
+        });
+        s.appendChild(row(`${name}:`, press.element));
+    }
     container.appendChild(s);
 }
 
@@ -339,10 +359,10 @@ export function renderActions(container: HTMLElement, runner: GitHubRunner, relo
 
     const actions = document.createElement('div');
     actions.className = 'element-actions';
-    const toggle = new Button({
-        label: runner.enabled ? 'Turn the runner off' : 'Turn the runner on',
-        variant: runner.enabled ? 'ghost' : 'primary',
-        onClick: async () => {
+    const toggle = pressFrom({
+        id: 'github-runner',
+        title: runner.enabled ? 'Turn the runner off' : 'Turn the runner on',
+        does: async () => {
             await send('/api/github/runner', { path: path.value.trim(), enabled: String(!runner.enabled) });
             await reload();
         },
@@ -380,20 +400,37 @@ function refused(container: HTMLElement, err: unknown): void {
 }
 
 /** Exported for tests: ask the node once and draw every section from its answer. */
-export async function load(node: HTMLElement, namespaces: HTMLElement, actions: HTMLElement, webhook?: HTMLElement): Promise<void> {
-    const reload = () => load(node, namespaces, actions, webhook);
+export async function load(node: HTMLElement, namespaces: HTMLElement, actions: HTMLElement, webhook?: HTMLElement, from?: HTMLElement): Promise<void> {
+    const reload = () => load(node, namespaces, actions, webhook, from);
     try {
         const status = await apiJson<GitHubStatus>('/api/github');
         renderNode(node, status, reload);
         if (webhook) renderWebhook(webhook, status, reload);
         renderNamespaces(namespaces, status.namespaces);
         renderActions(actions, status.runner, reload);
+        if (from) await loadFrom(from, status.namespaces, reload);
     } catch (err: unknown) {
         refused(node, err);
         namespaces.innerHTML = '';
         actions.innerHTML = '';
         if (webhook) webhook.innerHTML = '';
+        if (from) from.innerHTML = '';
     }
+}
+
+// Who this is for: whoever reaches these (audience.ts).
+export const needs = ['/api/github'] as const;
+
+/** The From section, from the namespaces the node serves; a node that keeps none says why there. */
+async function loadFrom(from: HTMLElement, namespaces: GitHubNamespace[], reload: () => Promise<void>): Promise<void> {
+    const response = await apiFetch('/api/namespaces');
+    if (!response.ok) {
+        from.innerHTML = '';
+        from.appendChild(errorText(`the node did not say its namespaces: ${await refusal(response)}`));
+        return;
+    }
+    const listed = await response.json() as { namespaces: { name: string }[] };
+    renderFrom(from, listed.namespaces.map(ns => ns.name), namespaces, reload);
 }
 
 export function createGitHubElement(): Element {
@@ -412,14 +449,16 @@ export function createGitHubElement(): Element {
             const node = document.createElement('div');
             const webhook = document.createElement('div');
             const namespaces = document.createElement('div');
+            const from = document.createElement('div');
             const actions = document.createElement('div');
             node.appendChild(said('Loading the node’s GitHub…'));
             content.appendChild(node);
             content.appendChild(webhook);
             content.appendChild(namespaces);
+            content.appendChild(from);
             content.appendChild(actions);
 
-            void load(node, namespaces, actions, webhook);
+            void load(node, namespaces, actions, webhook, from);
             return content;
         },
     };

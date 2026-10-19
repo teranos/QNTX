@@ -72,13 +72,11 @@ function renderScalar(text: string): HTMLElement {
         a.target = '_blank';
         a.rel = 'noopener';
         a.style.color = '#5a8faa';
-        a.style.fontSize = '12px';
         a.style.wordBreak = 'break-word';
         return a;
     }
     const el = document.createElement('span');
     el.style.color = AZURE_VALUE;
-    el.style.fontSize = '12px';
     el.style.wordBreak = 'break-word';
     el.textContent = text;
     return el;
@@ -147,7 +145,6 @@ function buildUrlPill(key: string, url: string): HTMLElement {
     pill.style.padding = '2px 6px';
     pill.style.backgroundColor = color;
     pill.style.color = AZURE_VALUE;
-    pill.style.fontSize = '10px';
     pill.style.fontFamily = 'var(--font-mono)';
     pill.style.textDecoration = 'none';
     pill.style.cursor = 'pointer';
@@ -197,7 +194,6 @@ export function renderItem(item: unknown): HTMLElement {
             row.style.marginBottom = '2px';
             const keyEl = document.createElement('span');
             keyEl.style.color = AZURE_KEYWORD;
-            keyEl.style.fontSize = '11px';
             keyEl.textContent = k + ': ';
             // Nested objects/arrays: render recursively
             if (typeof v === 'object' && v !== null) {
@@ -215,7 +211,6 @@ export function renderItem(item: unknown): HTMLElement {
             if (hasHtml) {
                 const valEl = document.createElement('div');
                 valEl.style.color = AZURE_VALUE;
-                valEl.style.fontSize = '12px';
                 valEl.style.wordBreak = 'break-word';
                 valEl.style.marginTop = '4px';
                 const doc = new DOMParser().parseFromString(text, 'text/html');
@@ -296,7 +291,6 @@ export function renderItem(item: unknown): HTMLElement {
                 labelRow.style.gap = '4px';
                 labelRow.style.padding = '2px 6px';
                 labelRow.style.color = AZURE_VALUE;
-                labelRow.style.fontSize = '10px';
                 labelRow.style.fontFamily = 'var(--font-mono)';
                 labelRow.style.textDecoration = 'none';
                 labelRow.style.backgroundColor = 'transparent';
@@ -356,7 +350,6 @@ export function renderAttributeValue(value: unknown): HTMLElement {
         if (obj) return renderItem(obj);
         // Plain string
         const el = document.createElement('div');
-        el.style.fontSize = '12px';
         el.style.color = AZURE_VALUE;
         el.style.whiteSpace = 'pre-wrap';
         el.style.wordBreak = 'break-word';
@@ -370,7 +363,6 @@ export function renderAttributeValue(value: unknown): HTMLElement {
     if (typeof value === 'object' && value !== null) return renderItem(value);
     // Scalar fallback
     const el = document.createElement('div');
-    el.style.fontSize = '12px';
     el.style.color = AZURE_VALUE;
     el.textContent = String(value);
     return el;
@@ -396,7 +388,6 @@ function buildArrayPager(items: unknown[]): HTMLElement {
     prevBtn.style.color = AZURE_VALUE;
     prevBtn.style.cursor = 'pointer';
     prevBtn.style.padding = '2px 6px';
-    prevBtn.style.fontSize = '11px';
     prevBtn.style.borderRadius = '3px';
 
     const nextBtn = document.createElement('button');
@@ -406,12 +397,10 @@ function buildArrayPager(items: unknown[]): HTMLElement {
     nextBtn.style.color = AZURE_VALUE;
     nextBtn.style.cursor = 'pointer';
     nextBtn.style.padding = '2px 6px';
-    nextBtn.style.fontSize = '11px';
     nextBtn.style.borderRadius = '3px';
 
     const counter = document.createElement('span');
     counter.style.color = AZURE_KEYWORD;
-    counter.style.fontSize = '11px';
     counter.style.fontFamily = 'var(--font-mono)';
 
     preventDrag(prevBtn);
@@ -460,7 +449,6 @@ function buildArrayPager(items: unknown[]): HTMLElement {
  */
 export function renderAttestationAttrs(attrs: Record<string, unknown>): HTMLElement {
     const attrDiv = document.createElement('div');
-    attrDiv.style.fontSize = '12px';
     attrDiv.style.fontFamily = 'var(--font-mono)';
     for (const [key, value] of Object.entries(attrs)) {
         if (isFastaAttribute(attrs, key)) {
@@ -478,7 +466,6 @@ export function renderAttestationAttrs(attrs: Record<string, unknown>): HTMLElem
             const row = document.createElement('div');
             row.style.marginBottom = '4px';
             const keyEl = document.createElement('div');
-            keyEl.style.fontSize = '10px';
             keyEl.style.color = 'var(--text-secondary)';
             keyEl.style.marginBottom = '1px';
             keyEl.textContent = key;
@@ -493,7 +480,6 @@ export function renderAttestationAttrs(attrs: Record<string, unknown>): HTMLElem
             const row = document.createElement('div');
             row.style.marginBottom = '4px';
             const keyEl = document.createElement('div');
-            keyEl.style.fontSize = '10px';
             keyEl.style.color = 'var(--text-secondary)';
             keyEl.style.marginBottom = '1px';
             keyEl.textContent = key;
@@ -506,7 +492,6 @@ export function renderAttestationAttrs(attrs: Record<string, unknown>): HTMLElem
         const row = document.createElement('div');
         row.style.marginBottom = '4px';
         const keyEl = document.createElement('div');
-        keyEl.style.fontSize = '10px';
         keyEl.style.color = 'var(--text-secondary)';
         keyEl.style.marginBottom = '1px';
         keyEl.textContent = key;

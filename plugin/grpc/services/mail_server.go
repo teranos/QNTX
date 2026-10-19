@@ -146,6 +146,36 @@ type MailServer struct {
 	logger          *zap.SugaredLogger
 	wired           atomic.Pointer[mailWired]
 	versionResolver atomic.Pointer[VersionResolver]
+	// Which plugin each token the node minted at Initialize is for (ADR-046),
+	// handed after the service is serving.
+	plugins atomic.Pointer[PluginNames]
+}
+
+// PluginNames is the plugin a token was minted for, and whether it was minted at all.
+type PluginNames func(token string) (string, bool)
+
+// noPluginNamed is the node before it mints its plugins their tokens.
+func noPluginNamed(string) (string, bool) { return "", false }
+
+// SetPluginNames hands the service which plugin each minted token is for.
+func (s *MailServer) SetPluginNames(plugins PluginNames) {
+	s.plugins.Store(&plugins)
+}
+
+// admits is whether a token may set or send as source: the shared one may, and a
+// token the node minted for a plugin may as that plugin and no other.
+func (s *MailServer) admits(token, source string) error {
+	if sameToken(token, s.authToken) {
+		return nil
+	}
+	plugin, minted := (*s.plugins.Load())(token)
+	if !minted {
+		return errors.New("invalid authentication token")
+	}
+	if plugin != source {
+		return errors.Newf("the token minted for %s speaks for %s, not for %s", plugin, plugin, source)
+	}
+	return nil
 }
 
 // mailWired is what the service sends with, or why it has nothing yet.
@@ -159,6 +189,7 @@ func NewMailServer(authToken string, logger *zap.SugaredLogger) *MailServer {
 	s := &MailServer{authToken: authToken, logger: logger}
 	s.wired.Store(&mailWired{err: errors.New("the mail service is not wired yet: the node has not finished starting")})
 	s.SetVersionResolver(noVersions)
+	s.SetPluginNames(noPluginNamed)
 	return s
 }
 
@@ -188,7 +219,7 @@ func (s *MailServer) SetTemplate(_ context.Context, req *protocol.SetMailTemplat
 		return &protocol.SetMailTemplateResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	if err := s.admits(req.AuthToken, req.Source); err != nil {
 		return refuse(err)
 	}
 	source, err := named.TextOf("source, the plugin the template belongs to,", req.Source)
@@ -281,7 +312,7 @@ func (s *MailServer) Send(ctx context.Context, req *protocol.SendMailRequest) (*
 		return &protocol.SendMailResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	if err := s.admits(req.AuthToken, req.Source); err != nil {
 		return refuse(err)
 	}
 	source, err := named.TextOf("source, the plugin sending,", req.Source)

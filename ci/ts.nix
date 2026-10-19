@@ -13,8 +13,22 @@ in
 {
   name = "TypeScript";
 
+  # A newer push to the same ref makes this run's answer stale.
+  concurrency = {
+    group = "\${{ github.workflow }}-\${{ github.ref }}";
+    cancel-in-progress = true;
+  };
+
   on = {
-    pull_request.paths = tsPaths ++ [ ".github/workflows/ts.yml" ];
+    pull_request.paths = tsPaths ++ [
+      "web/eslint.config.js"
+      "web/eslint-suppressions.json"
+      # A size written in a stylesheet stops the build (web/font-size-ban.ts).
+      "web/**/*.css"
+      "web/index.html"
+      ".github/workflows/ts.yml"
+      "web/browser/**"
+    ];
     push = {
       branches = [ "main" ];
       paths = tsPaths;
@@ -69,9 +83,37 @@ in
       }
 
       {
+        name = "The bans, nil is nil among them";
+        run = "cd web && bun run lint";
+      }
+
+      {
         name = "Run tests";
         run = "cd web && bun test";
         env.USE_JSDOM = 1;
+      }
+
+      # "if it overflows width, hard fail, die"
+      {
+        name = "Chromium and WebKit, as the pinned @playwright/test wants them";
+        run = "cd web && bunx playwright install --with-deps chromium webkit";
+      }
+
+      {
+        name = "Every element on a phone and on a desktop: nothing in it wider than it";
+        run = "cd web && bun run test:browser";
+        env.CI = "1";
+      }
+
+      {
+        name = "What the browser saw";
+        "if" = "failure()";
+        uses = "actions/upload-artifact@v4";
+        "with" = {
+          name = "browser-report";
+          path = "web/browser/playwright-report\nweb/browser/test-results";
+          retention-days = 14;
+        };
       }
     ];
   };

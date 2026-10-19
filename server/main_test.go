@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/server/statusline"
 	"go.uber.org/zap"
 )
 
@@ -28,5 +29,5 @@ func TestMain(m *testing.M) {
 
 // bareNode is a node holding nothing but what every node holds.
 func bareNode() *QNTXServer {
-	return &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry()}
+	return &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), news: statusline.NewNewsLog(), handlerFailures: statusline.NewHandlerFailureLog()}
 }

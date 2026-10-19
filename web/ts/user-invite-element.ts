@@ -17,9 +17,8 @@
 // "or the username"
 
 import type { Element } from '@teranos/elements';
-import { tray } from '@teranos/elements';
+import { tray, pressFrom } from '@teranos/elements';
 import { apiJson } from './client/http';
-import { createDangerButton, createPrimaryButton } from './components/button';
 import { fetchProviders, type ProviderDescription } from './ceremony';
 import { providerMark } from './provider-marks';
 import { log, SEG } from './logger';
@@ -199,7 +198,7 @@ export function renderInvite(
     said.style.wordBreak = 'break-word';
     said.style.overflowWrap = 'break-word';
 
-    const sendButton = createPrimaryButton('Send invitation', async () => {
+    const sendButton = pressFrom({ id: 'invite-send', title: 'Send invitation', does: async () => {
         said.textContent = '';
         const address = email.value.trim();
         if (!address) throw new Error('no invitation mail');
@@ -214,7 +213,7 @@ export function renderInvite(
         await send({ display_name: name.value.trim(), email: address, namespace: namespace.value.trim(), accounts: named });
         said.textContent = `invitation sent to ${address}`;
         onInvited?.();
-    });
+    } });
 
     content.append(
         labelled('Name', name),
@@ -301,10 +300,10 @@ export function renderCancel(content: HTMLElement, inv: InvitationRecord): void 
         content.appendChild(state);
         return;
     }
-    const cancel = createDangerButton('Cancel the invitation', 'Confirm cancel', async () => {
+    const cancel = pressFrom({ id: `invite-cancel-${inv.id}`, title: 'Cancel the invitation', again: 'the invitation is cancelled', irrevocable: true, does: async () => {
         await apiJson<unknown>(`/auth/invitations/${encodeURIComponent(inv.id)}/cancel`, { method: 'POST' });
         renderCancel(content, { ...inv, cancelled_at: Date.now(), state: 'cancelled' });
-    });
+    } });
     content.appendChild(cancel.element);
 }
 

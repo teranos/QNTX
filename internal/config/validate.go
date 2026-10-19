@@ -62,14 +62,17 @@ func (c *Config) Validate() error {
 		return errors.Newf("pulse.ticker_interval_seconds must be >= 0, got %d", c.Pulse.TickerIntervalSeconds)
 	}
 
-	// The ROOT agent is named whole or not at all (ADR-048): a model nothing
+	// The Node Agent is named whole or not at all (ADR-048): a model nothing
 	// named would be a model something chose for it.
 	if root := c.Agent.Root; root.Named() {
 		if root.Model == "" {
-			return errors.New("agent.root.model is required: the ROOT agent is the model am.toml names, and nothing stands in for it")
+			return errors.New("agent.root.model is required: the Node Agent is the model am.toml names, and nothing stands in for it")
+		}
+		if !NodeAgentModel(root.Model) {
+			return errors.Newf("agent.root.model is %q: only Opus or Fable may be the Node Agent", root.Model)
 		}
 		if root.Effort == "" {
-			return errors.New("agent.root.effort is required: the ROOT agent runs at the effort am.toml names")
+			return errors.New("agent.root.effort is required: the Node Agent runs at the effort am.toml names")
 		}
 		if err := secretref.Validate(root.TokenRef); err != nil {
 			return errors.Wrap(err, "agent.root.token is invalid")
@@ -80,6 +83,9 @@ func (c *Config) Validate() error {
 		if pi := root.Pi; pi.Named() {
 			if pi.Model == "" || pi.Gateway == "" {
 				return errors.New("agent.root.pi names a model and the gateway plugin its calls go through, both or neither")
+			}
+			if !NodeAgentModel(pi.Model) {
+				return errors.Newf("agent.root.pi.model is %q: only Opus or Fable may be the Node Agent", pi.Model)
 			}
 			if pi.Thinking != "" && !slices.Contains(ThinkingLevels, pi.Thinking) {
 				return errors.Newf("agent.root.pi.thinking must be one of [%s], got %q", strings.Join(ThinkingLevels, ", "), pi.Thinking)
@@ -258,4 +264,12 @@ func validateOAuthClient(at, clientID, secretRef string) error {
 		return errors.Wrapf(err, "%s.client_secret is invalid", at)
 	}
 	return nil
+}
+
+// NodeAgentModel reports whether model may be the Node Agent: Opus or Fable,
+// by Claude's full name, after the provider a gateway prefixes it with.
+// "any model that isn't Opus or Fable shouldn't be allowed to be NODE agent"
+func NodeAgentModel(model string) bool {
+	id := model[strings.LastIndex(model, "/")+1:]
+	return strings.HasPrefix(id, "claude-opus-") || strings.HasPrefix(id, "claude-fable-")
 }

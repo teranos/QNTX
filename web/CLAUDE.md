@@ -10,6 +10,10 @@ All tray creation via `tray.add`; canvas via `canvasPlaced`. Register new types 
 
 **A table is @teranos/elements'.** "The elements package should own Tables" "TABLES BEING MAX 4 col". Build one with `createTable(name, heads, rows)`: one to four heads, every row as wide, or it does not compile. A table built by hand (`createElement('table' | 'thead' | 'tbody' | 'tr' | 'th')`, or table markup in a string) stops the build (ESLint `NO_RAW_TABLE`). A cell may be the host's own `td`.
 
+## Controls
+
+**A control is @teranos/elements'.** A button is `pressFrom`: the same size at every stage, white at rest, red armed only when its second press cannot be undone (`irrevocable`), green and shimmering armed only when it creates (`creates`); no colour, size or variant to choose, and misuse does not compile. A `button`, `input`, `select` or `textarea` made by hand (`createElement`, or markup in a string), or an import of `components/button`, stops the build (ESLint `NO_RAW_CONTROL`). What stands is in `eslint-suppressions.json` and only falls. The rules: the QNTX Design System's Press component.
+
 ## WASM
 
 `ats-wasm.ts` wraps the browser WASM module (crates/ats-wasm). Must call `initialize(dbName)` before any WASM operation except `axFilter` (synchronous, no init needed).
@@ -27,6 +31,12 @@ Handlers register via `registerHandler(type, handler)` and MUST `unregisterHandl
 ## CSS
 
 Dark-mode first. Design tokens in `tokens.css`. **`!important` is banned.** Fix specificity at the source.
+
+**Text size is @teranos/elements'.**
+
+"There's no doubt in my mind that Elements owns it's own font sizes."
+
+TypeScript writes no size: inside an element, `sizeText(node, 'xs' | 'sm' | 'md' | 'lg')`; ESLint (`NO_FONT_SIZE`) stops any other. A stylesheet or `index.html` picks one of the package's sizes by its token, `font-size: var(--font-size-xs | sm | md | lg | field)`, and `tokens.css` says the package's number for each; `font-size-ban.ts` stops anything else, a token off the package's number among them. Both run in `bun run lint`.
 
 Z-index hierarchy:
 
@@ -67,7 +77,7 @@ Use `apiFetch`/`apiJson` from `./client`. Exemptions are in `eslint.config.js`.
 
 Use contextualized error display:
 
-- **Button component:** Throws from `onClick` → automatic slide-out error display (see components/button.ts)
+- **A press:** throw from `does` → the failure is said beside it (`pressFrom`, @teranos/elements)
 - **Form validation:** Inline messages near fields
 - **API errors:** `log.error()` to console, display in UI context where action occurred
 

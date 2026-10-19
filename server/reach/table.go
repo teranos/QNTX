@@ -5,6 +5,7 @@
 package reach
 
 import (
+	_ "embed"
 	"maps"
 	"slices"
 	"strings"
@@ -15,225 +16,11 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// Each line is an `as`. REACH is what the line is about, the quoted paths are
-// what is said of it, and the levels are the context it holds in.
-
-// Several paths share a line because predicates are a list, and so are the
-// levels.
-
-// ANYONE is not a level anybody holds. It means the route is served without
-// asking who is calling.
-const reachTable = `
-# The model is: root can do anything, and everyone else cannot unless explicitly decided.
-# No fork — root gets everything, everyone else does not. Undeclared should not mean
-# everyone. Not defined is no access. And this should not be something you can forget.
-
-REACH is '/' '/health' '/.well-known/did.json'                            of ANYONE
-
-# Logging in cannot ask you to be logged in.
-REACH is '/auth/login' '/auth/status'                                     of ANYONE
-REACH is '/auth/login/begin' '/auth/login/finish'                         of ANYONE
-REACH is '/auth/register/begin' '/auth/register/finish'                   of ANYONE
-REACH is '/auth/logout'                                                   of ANYONE
-REACH is '/auth/forget' '/auth/forget/begin'                              of ANYONE
-REACH is '/auth/laye/challenge' '/auth/laye/verify'                       of ANYONE
-REACH is '/auth/binding/providers' '/auth/binding/start'                  of ANYONE
-REACH is '/auth/binding/go' '/auth/binding/callback'                      of ANYONE
-REACH is '/auth/binding/result'                                           of ANYONE
-REACH is '/auth/door/home' '/auth/door/home/result'                       of ANYONE
-# Who sent the person home, answered from the ticket they hold, so the face
-# can name a client. A stranger holding no ticket is told nothing.
-REACH is '/auth/door/journey'                                             of ANYONE
-# A client is a door (ADR-025): it sends a stranger here for the passkey, and
-# the code goes back by ticket. Both are the way home, for a client.
-REACH is '/auth/authorize' '/auth/authorize/done'                         of ANYONE
-# The client comes for its token with the code and its secret, holding no
-# session: the secret is the credential, checked at the endpoint itself.
-REACH is '/auth/token'                                                    of ANYONE
-# Another node asks whether a token this one issued is live, holding no session:
-# its signed assertion is the credential, checked at the endpoint itself.
-REACH is '/auth/introspect'                                               of ANYONE
-# A peer asks for the lines about the namespaces it serves, the same way.
-REACH is '/auth/lines/served'                                             of ANYONE
-# A peer asks GitHub through its primary, the same way: the token stays here.
-REACH is '/auth/github'                                                   of ANYONE
-# A node whose people log in at another sends them there and takes them back,
-# before they hold any session here.
-REACH is '/auth/elsewhere' '/auth/elsewhere/back'                         of ANYONE
-# The primary carries a request for a peer to it: the peer decides who is in.
-REACH is '/n/'                                                            of ANYONE
-# The GitHub App's webhook, at the path ROOT sets under /github/. The
-# delivery's signature is the credential; every other path answers nobody.
-REACH is '/github/'                                                       of ANYONE
-# Discovery documents (RFC 8414, RFC 9728): how a client that has never seen
-# this node finds its doors without being configured by hand. Read before it
-# sends anybody anywhere, so by a stranger.
-REACH is '/.well-known/oauth-authorization-server'                        of ANYONE
-REACH is '/.well-known/oauth-protected-resource'                          of ANYONE
-# The A2A agent card (ADR-039): how an agent that has never seen this node
-# finds what it is and what it serves.
-REACH is '/.well-known/agent-card.json'                                   of ANYONE
-REACH is '/auth/user/arrival' '/auth/user/arrive'                         of ANYONE
-
-# The switch on the person (ADR-031). Gated by the handler and not by this
-# line, so a caller with no session gets 403 from there: a person who is off is
-# admitted at no gate, and has to reach this to turn themselves back on.
-REACH is '/i/disable' '/i/enable'                                         of ANYONE
-
-# ROOT being itself again (ADR-031). Gated by the handler, which answers the
-# one session that is being a User and nobody else.
-REACH is '/i/unbecome'                                                    of ANYONE
-
-# i's own paths: who you are, and where you stand.
-REACH is '/i/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
-REACH is '/i/standing'                                                    of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
-REACH is '/i/picture'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
-
-# First-time setup: the ways in this node offers, and claiming it.
-REACH is '/setup' '/setup/claim'                                          of ANYONE
-
-# A staand is a market's public receive point (ADR-035).
-REACH is '/s/'                                                            of ANYONE
-
-# An element module is UI, and a page importing it carries no session. Every
-# call the module goes on to make is gated on its own line above.
-REACH is '/g/'                                                            of ANYONE
-
-# Tokens (ADR-025) and Users (ADR-031). A write on either is a session's
-# alone, gated by the handler and not by this line.
-REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT SUPER
-REACH is '/auth/users' '/auth/users/'                                     of ROOT SUPER
-# ROOT invites a friend (ADR-031). The list and the invite are ROOT's, gated by
-# the handler; the link the friend was mailed is read by whoever holds it,
-# before they hold any session, and the cancel is ROOT's session's.
-REACH is '/auth/invitations'                                              of ROOT SUPER
-REACH is '/auth/invitations/'                                             of ANYONE
-
-REACH is '/api/attestations'                                              of ROOT SUPER TOKEN ATTESTOR
-# The standing guard is the handler's, not this line's.
-REACH is '/api/namespaces' '/api/namespaces/{name}'                       of ROOT SUPER
-REACH is '/api/namespaces/{name}/disable' '/api/namespaces/{name}/enable' of ROOT SUPER
-REACH is '/api/namespaces/{name}/store'                                 of ROOT SUPER
-
-# The lines the gate reads (ADR-034). Writing one is gated at the
-# attestation handler, not by this line.
-REACH is '/api/roles'                                                     of ROOT SUPER
-
-# Who reaches what at runtime, granted and revoked (the reach signum).
-REACH is '/api/reach'                                                     of ROOT
-
-# What the node mails on plugins' behalf, the templates it fills and the
-# account it sends through (the mail signum, ADR-041). ROOT alone governs
-# what plugins call.
-REACH is '/api/mail' '/api/mail/templates' '/api/mail/account'            of ROOT
-REACH is '/api/mail/report' '/api/mail/message'                           of ROOT
-
-# What the node serves, as MCP tools (ADR-038). A connector's token is the
-# person who said yes, and every tool call is gated on its own path's line.
-# A namespace agent reaches the node's sigils through MCP with a token of its
-# own (ADR-048), which acts in its namespace and nowhere else.
-REACH is '/mcp' '/mcp/'                                                   of ROOT SUPER TOKEN
-
-# A line that names a signum is about its sigils, over every surface, whatever
-# path the plugin bound them to (ReachingSigil).
-REACH is 'datapunt'                                                       of ROOT SUPER
-
-# A longer path wins over the prefix above, so widening that line does not
-# widen this one.
-REACH is '/api/namespaces/default/nuke'                                   of ROOT
-
-# Stands (ADR-035) and what arrives at them (ADR-036).
-REACH is '/api/staands'                                                   of ROOT SUPER
-REACH is '/api/staands/metrics' '/api/staands/visits'                     of ROOT SUPER
-REACH is '/api/staands/activity'                                          of ROOT SUPER
-
-# What arrives on a socket is gated per attestation by mayRead, not here.
-REACH is '/ws' '/ws/llm'                                                  of ROOT SUPER
-REACH is '/am/version'                                                    of ROOT SUPER
-# What the node does in Ground's place, and what it left for whoever asks.
-REACH is '/am/ground'                                                     of ROOT SUPER
-REACH is '/am/syscap'                                                     of ROOT
-REACH is '/am/node'                                                       of ROOT
-
-# A signum held to a reference it follows (the parity signum): "parity the
-# sigil is what an Agent should deal with through MCP".
-REACH is '/api/parity/hold' '/api/parity/storage' '/api/parity/follows'   of ROOT
-
-# What was said and done in each agent session Ground recorded (transcripts).
-REACH is '/api/transcripts'                                               of ROOT SUPER
-
-# The Obsidian vaults the node keeps a copy of, and the folders each holds (ADR-049).
-REACH is '/api/vault'                                                     of ROOT
-REACH is '/api/vault/dirs' '/api/vault/states' '/api/vault/bind'          of ROOT
-REACH is '/api/vault/unbind' '/api/vault/disable' '/api/vault/enable'     of ROOT
-REACH is '/api/vault/send'                                                of ROOT
-REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
-
-# The ROOT agent (the claude signum, ADR-048). Who may talk to it is the whole
-# of what guards it, and that is ROOT.
-REACH is '/api/claude' '/api/claude/say' '/api/claude/session' '/api/claude/login' of ROOT
-REACH is '/api/pi' '/api/pi/say' '/api/pi/session'                        of ROOT
-
-# The namespace agent (the agents signum, ADR-048): "shared amongst anyone who
-# has REACH on it". Who acts in the namespace reaches it, which the handler
-# asks of the admission; who may opt the namespace into one is its owner, ROOT
-# or SUPER, asked there too.
-REACH is '/api/agents/{namespace}' '/api/agents/{namespace}/say' '/api/agents/{namespace}/session' '/api/agents/{namespace}/login' of ROOT SUPER USER
-
-# Approvals (ADR-052): "approvals is ROOT only for now". The list is a sigil;
-# the answer is a route and no sigil, "human only" and "only through it's
-# element", which the handler asks of the admission: a token is refused.
-REACH is '/api/approvals' '/api/approvals/answer'                         of ROOT
-
-# A2A over HTTP+JSON, one line for every operation: a route like
-# /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the
-# foreseeable future" (ADR-039); a2a:<signum> lines say who reaches a skill.
-REACH is '/a2a/'                                                          of ROOT
-
-# Generated by make openapi and held to this table by a test, so a line added
-# here without regenerating fails the build.
-REACH is '/openapi.json'                                                  of ROOT SUPER
-REACH is '/api/dev' '/api/debug' '/api/crash-test'                        of ROOT
-REACH is '/api/pulse/executions/'                                         of ROOT SUPER
-REACH is '/api/pulse/schedules' '/api/pulse/schedules/'                   of ROOT SUPER
-REACH is '/api/pulse/jobs' '/api/pulse/jobs/'                             of ROOT SUPER
-REACH is '/api/prompt/'                                                   of ROOT
-REACH is '/api/plugins'                                                   of ROOT SUPER
-REACH is '/api/plugins/check'                                             of ROOT SUPER
-REACH is 'plugins:pause' 'plugins:resume' 'plugins:restart'               of ROOT SUPER
-REACH is 'plugins:enable' 'plugins:disable'                               of ROOT SUPER
-REACH is '/api/plugins/elements' '/api/plugins/routes'                      of ROOT
-REACH is '/api/plugins/{name}/logs'                                       of ROOT
-REACH is '/api/plugins/{name}/config'                                     of ROOT
-REACH is '/am/statusline' '/am/statusline/{name}'                         of ROOT SUPER
-REACH is '/api/types' '/api/types/'                                       of ROOT
-# A watcher acts inside a namespace, and the standing table is on these paths
-# too. A watcher nobody may read is one that fires unseen.
-REACH is '/api/watchers' '/api/watchers/'                                 of ROOT SUPER
-REACH is '/api/watchers/queue/stats'                                      of ROOT SUPER
-REACH is '/api/element-config'                                              of ROOT
-# "the canvas becomes reachable to whoever the namespace is for": which canvas
-# a caller may act on is the canvas's owners' to say (element/handlers).
-REACH is '/api/canvas'                                                    of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
-REACH is '/api/canvases' '/api/canvases/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
-REACH is '/api/canvas/elements' '/api/canvas/elements/'                   of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
-REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
-REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
-REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
-REACH is '/api/canvas/export' '/api/canvas/export-dom'                    of ROOT
-REACH is '/api/files' '/api/files/'                                       of ROOT
-REACH is '/api/python/execute'                                            of ROOT
-REACH is '/api/search/semantic'                                           of ROOT
-REACH is '/api/embeddings/generate' '/api/embeddings/batch'               of ROOT
-REACH is '/api/embeddings/clusters'                                       of ROOT
-REACH is '/api/embeddings/clusters/samples'                               of ROOT
-REACH is '/api/embeddings/clusters/members'                               of ROOT
-REACH is '/api/embeddings/clusters/memberships'                           of ROOT
-REACH is '/api/embeddings/cluster' '/api/embeddings/by-source'            of ROOT
-REACH is '/api/embeddings/cluster-timeline'                               of ROOT
-REACH is '/api/embeddings/info' '/api/embeddings/unembedded'              of ROOT
-REACH is '/api/embeddings/project' '/api/embeddings/projections'          of ROOT
-`
+// The Tablet of Reach is the deployment's, compiled in: QNTX's own is for its
+// tests and development, and a deployment builds with its own at this path.
+//
+//go:embed tablet-of-reach
+var tablet string
 
 // reachSubject is what every line here is about. A line about anything else is
 // in the wrong file.
@@ -242,20 +29,20 @@ const reachSubject = "REACH"
 // Subject is the same word for the store: a runtime line is about REACH too.
 const Subject = reachSubject
 
-// Paths is every path the const table names, for a caller that has to answer
-// on all of them before Open will build. The table is the node's; a caller
+// Paths is every path the tablet names, for a caller that has to answer
+// on all of them before Open will build. The tablet is the node's; a caller
 // learns its paths and not its grants.
 func Paths() []string {
-	rows, err := readReaches(reachTable)
+	rows, err := readReaches(tablet)
 	if err != nil {
-		// The table is a const and TestTheTableReads holds it readable; a
-		// node with an unreadable table never gets past Open.
+		// TestTheTableReads holds QNTX's tablet readable; a node with an
+		// unreadable tablet never gets past Open.
 		return nil
 	}
 	return sorted(routesIn(rows))
 }
 
-// Reached is who reaches each path the const table names, as the line wrote
+// Reached is who reaches each path the tablet names, as the line wrote
 // it: the levels, or ANYONE.
 //
 // Paths is what a caller gets at runtime — the table is the node's, and a
@@ -264,7 +51,7 @@ func Paths() []string {
 // It reads through the same parser the mux does, so a document cannot say
 // something the mux does not do.
 func Reached() (map[string][]string, error) {
-	rows, err := readReaches(reachTable)
+	rows, err := readReaches(tablet)
 	if err != nil {
 		return nil, err
 	}
@@ -291,8 +78,8 @@ var levels = map[auth.Level]bool{
 }
 
 // runtimeLevels is every level a runtime line may name, and only on a plugin's
-// routes and sigils: the node's own paths stay the const table's, which is
-// static. ROOT is never named; ROOT reaches everything.
+// routes and sigils: the node's own paths stay the tablet's, which is
+// compiled in. ROOT is never named; ROOT reaches everything.
 var runtimeLevels = map[auth.Level]bool{
 	auth.LevelSuper:              true,
 	auth.LevelToken:              true,
@@ -313,8 +100,8 @@ type aRow struct {
 }
 
 // A Line is what a runtime reach line says, read out of the store. Same shape
-// as a line in the const: REACH, the paths, and who reaches them. Who is a
-// role, or PUBLIC_REGISTRATION or ANYONE on a plugin's path: the const is the floor.
+// as a line in the tablet: REACH, the paths, and who reaches them. Who is a
+// role, or PUBLIC_REGISTRATION or ANYONE on a plugin's path: the tablet is the floor.
 
 // By is who may grant those roles, as written after `by`. Kept on the row and
 // not yet asked (phase 4 of #899).
@@ -357,9 +144,9 @@ func (l Line) Unopenable(plugin func(path string) bool) []string {
 	if !level {
 		return nil
 	}
-	compiled, err := readReaches(reachTable)
+	compiled, err := readReaches(tablet)
 	if err != nil {
-		// TestTheTableReads holds the const readable; unreadable, nothing opens.
+		// TestTheTableReads holds QNTX's tablet readable; unreadable, nothing opens.
 		return slices.Clone(l.Paths)
 	}
 	var outside []string
@@ -379,7 +166,7 @@ func opensAtRuntime(path string, compiled map[string]aRow, plugin func(path stri
 }
 
 // ReadLine reads a stored attestation as a runtime reach line, refusing what
-// the const would refuse the other way round: a level or ANYONE as a context.
+// the tablet would refuse the other way round: a level or ANYONE as a context.
 // The write path asks this before a line is stored; the read path asks it
 // again, because a line in the store is not a line the node has to serve.
 func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Line, error) {
@@ -403,7 +190,7 @@ func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Li
 	for _, named := range contexts {
 		role := strings.ToUpper(named)
 		if levels[auth.Level(role)] && !runtimeLevels[auth.Level(role)] {
-			return Line{}, errors.Newf("a runtime line names %s, and only the const table names that level", named)
+			return Line{}, errors.Newf("a runtime line names %s, and only the tablet names that level", named)
 		}
 		line.Roles = append(line.Roles, role)
 	}
@@ -414,10 +201,10 @@ func ReadLine(subjects, predicates, contexts, actors []string, at time.Time) (Li
 	return line, nil
 }
 
-// addRuntime lays the store's lines over the const rows. Lines settle per
+// addRuntime lays the store's lines over the tablet's rows. Lines settle per
 // pair, a path with a role: the latest line about a pair wins, ROOT first, and
 // a line about a different pair is untouched. A pair whose winning line is
-// revoked is gone; the rest reach. A path the const names keeps its levels
+// revoked is gone; the rest reach. A path the tablet names keeps its levels
 // and gains the roles.
 //
 // The second return is who may grant each role: what the winning lines said
