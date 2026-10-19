@@ -4,6 +4,7 @@
 **Date:** 2026-08-22
 **Related:** ADR-027 (Permissions), ADR-030 (Identity Providers), ADR-031 (The User)
 
+- The first User to prove they hold a root identity is the first User, and the first User is always the ROOT User. Proving a listed route is what creates them — there is no separate act, and nothing has to be seeded ahead of it.
 ## Decision
 
 A node with `auth.root_identities` set and no User belongs to nobody, and that is not an
