@@ -22,12 +22,9 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 
 - It has a DID of its own and attests as itself, as any agent does.
 
-  of its own.
-
 "we cant just have any ai be the ROOT agent"
 
-- In Claude Code it is Claude, run by the node: Opus, Fable and Sonnet, each a
-  ROOT agent of its own. Only Claude runs there.
+- In Claude Code it is Claude, run by the node: Opus, Fable and Sonnet.
 - am.toml names each under `[agent.root]`: its model, its effort, and a
   reference to the Claude plan token. A node that names no model has no ROOT
   agent, and nothing stands in for the model named.
