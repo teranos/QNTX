@@ -4,7 +4,7 @@ Date: 2026-08-18
 
 ## Statements
 
-- A User in QNTX is a human being with an ASUID under the `US` prefix (ADR-010). The name segment is a snapshot
+- A User in QNTX is a human being with an ASUID under the `US` prefix ([[ADR-010-identity-system]]). The name segment is a snapshot
   taken at registration; the random suffix is what makes it unique,
 - A User holds keys and accounts. laye mints a key per browser, an authenticator derives
   one per device, and a provider names an account its own way. A User holds several of
