@@ -169,6 +169,9 @@ func (s *QNTXServer) namespacesCreate(ctx context.Context, sent sigil.Sent) (any
 // The door held from before the switch would keep serving what was just
 // switched off. Dropped either way: re-enabling reopens it on the next call.
 func (s *QNTXServer) namespacesSwitch(ctx context.Context, name string, enabled bool) (any, *protocol.Refusal) {
+	if refusal := s.notStandingIn(ctx, name); refusal != nil {
+		return nil, refusal
+	}
 	return s.actOn(ctx, name, func(namespaces storage.Namespaces) error {
 		return namespaces.SetEnabled(name, enabled)
 	}, "namespace switched", "enabled", enabled)
@@ -213,14 +216,11 @@ func (s *QNTXServer) namespacesStore(ctx context.Context, sent sigil.Sent) (any,
 }
 
 // actOn is what switching a namespace and giving it storage share: asked of a
-// node that keeps namespaces, never on the one the caller stands in, and the
-// door held from before dropped once the store has done it.
+// node that keeps namespaces, and the door held from before dropped once the
+// store has done it.
 func (s *QNTXServer) actOn(ctx context.Context, name string, act func(storage.Namespaces) error, did string, what string, was any) (any, *protocol.Refusal) {
 	namespaces, refusal := s.superNamespaces(ctx)
 	if refusal != nil {
-		return nil, refusal
-	}
-	if refusal := s.notStandingIn(ctx, name); refusal != nil {
 		return nil, refusal
 	}
 	if err := act(namespaces); err != nil {
