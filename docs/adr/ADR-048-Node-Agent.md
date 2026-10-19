@@ -19,22 +19,7 @@ Brandon: Update, 1 Node agent please, with option to switch models.
 
 "I feel like Opus and Fable are two distinct identities"
 
-"each model would be its own agent session, independent of each other but still
-reachable by each other."
 
-- An agent is one model in one place: its own DID, its own session, its own
-  context. Two models are two agents, and so is one model in two places.
-- They reach each other, each an A2A Server to the others and their A2A
-  Client.
-
-"So the first persistent Agent swarm is really three, or four if we include
-something we run on Pi"
-
-- ROOT's are Opus, Fable and Sonnet in Claude Code, and the one in Pi.
-
-"So a conversation I have with Mistral as ROOT is one long Mistral conversation"
-
-- Each of ROOT's agents is one session with ROOT, and it continues.
 
 ## The host agent
 
