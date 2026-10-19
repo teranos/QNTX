@@ -95,4 +95,4 @@ credential provider needs an app password, which is typing ([[ADR-030-identity-p
 "First time setup for who?"
 "People using Claude Code I guess"
 "But they could use QuickDev"
-"Like i am doing inside of "
+"Like i am doing inside of Claude Code mobile claude.ai sessions."
