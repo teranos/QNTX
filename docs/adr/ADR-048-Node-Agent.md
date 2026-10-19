@@ -47,15 +47,11 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 "make sure --permission-mode for Claude is configurable in the Agent Element"
 
 - The permission mode a turn runs in is named by whoever speaks, and the  Agent element offers every mode Claude Code has.
-- am.toml gives the mode used when none is named (`permission_mode`) and the
-  tools it may use without being asked (`allow`), by Claude Code's own names.
-- Claude Code refuses `bypassPermissions` to a process run as root, which is
-  how the node runs on the box. Its hands there are what `allow` names.
+- Claude Code refuses `bypassPermissions` to a process run as root, which is  how the node runs on the box. Its hands there are what `allow` names.
 
 ## The loop
 
-The loop is Claude Code's, not the node's: "accepted." The node hosts the
-process. It starts it, resumes it and stops it.
+The loop is Claude Code's, not the node's: "accepted." The node hosts the process. It starts it, resumes it and stops it.
 
 ## Its harnesses
 
