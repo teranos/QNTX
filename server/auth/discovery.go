@@ -28,6 +28,7 @@ type authorizationServerMetadata struct {
 	AuthorizationEndpoint             string   `json:"authorization_endpoint"`
 	TokenEndpoint                     string   `json:"token_endpoint"`
 	IntrospectionEndpoint             string   `json:"introspection_endpoint"`
+	DeviceAuthorizationEndpoint       string   `json:"device_authorization_endpoint"`
 	ResponseTypesSupported            []string `json:"response_types_supported"`
 	GrantTypesSupported               []string `json:"grant_types_supported"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
@@ -64,8 +65,9 @@ func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *ht
 		AuthorizationEndpoint:                      issuer + authorizePath,
 		TokenEndpoint:                              issuer + tokenPath,
 		IntrospectionEndpoint:                      issuer + introspectPath,
+		DeviceAuthorizationEndpoint:                issuer + deviceAuthorizationPath,
 		ResponseTypesSupported:                     []string{"code"},
-		GrantTypesSupported:                        []string{"authorization_code", "refresh_token", "client_credentials"},
+		GrantTypesSupported:                        []string{"authorization_code", "refresh_token", "client_credentials", deviceCodeGrant},
 		TokenEndpointAuthMethodsSupported:          []string{"client_secret_basic", "client_secret_post", "private_key_jwt"},
 		CodeChallengeMethodsSupported:              []string{"S256"},
 		TokenEndpointAuthSigningAlgValuesSupported: []string{jwt.SigningMethodEdDSA.Alg()},

@@ -216,6 +216,18 @@ func (h *Handler) handleJourney(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// An agent's sign-in is named by its label and the code the agent printed, to compare.
+	if val, ok := h.deviceJourneys.Load(cookie.Value); ok {
+		if device, ok := h.devices.Load(val); ok {
+			if d, ok := device.(*deviceSignIn); ok {
+				d.mu.Lock()
+				title := d.title()
+				d.mu.Unlock()
+				h.writeJSON(w, http.StatusOK, map[string]any{"kind": "client", "label": title})
+				return
+			}
+		}
+	}
 	if val, ok := h.homewards.Load(cookie.Value); ok {
 		if journey, ok := val.(homeward); ok && time.Since(journey.startedAt) <= homewardTTL {
 			h.writeJSON(w, http.StatusOK, map[string]any{"kind": "door", "door": journey.door})

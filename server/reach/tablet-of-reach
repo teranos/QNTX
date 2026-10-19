@@ -41,6 +41,9 @@ REACH is '/auth/authorize' '/auth/authorize/done'                         of ANY
 # The client comes for its token with the code and its secret, holding no
 # session: the secret is the credential, checked at the endpoint itself.
 REACH is '/auth/token'                                                    of ANYONE
+# An agent asks to be signed in and holds no session: the person's yes at the
+# passkey, at home, is the credential, checked at the endpoints themselves.
+REACH is '/auth/device' '/auth/device/approve' '/auth/device/done'        of ANYONE
 # Another node asks whether a token this one issued is live, holding no session:
 # its signed assertion is the credential, checked at the endpoint itself.
 REACH is '/auth/introspect'                                               of ANYONE

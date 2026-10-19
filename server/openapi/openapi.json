@@ -659,6 +659,21 @@
         "ANYONE"
       ]
     },
+    "/auth/device": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/device/approve": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/device/done": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/door/home": {
       "x-qntx-reach": [
         "ANYONE"

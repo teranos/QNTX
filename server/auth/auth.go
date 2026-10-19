@@ -76,9 +76,12 @@ type Handler struct {
 	// The way home from a client (oauth.go): ticket -> the authorize request
 	// parked while the passkey is done. fosite is built once, from what this
 	// handler holds, the first time a client sends somebody.
-	authorizings  sync.Map
-	oauthOnce     sync.Once
-	oauthProvider fosite.OAuth2Provider
+	authorizings sync.Map
+	// An agent's sign-in (device.go): device code -> the sign-in, and journey ticket -> its device code.
+	devices        sync.Map
+	deviceJourneys sync.Map
+	oauthOnce      sync.Once
+	oauthProvider  fosite.OAuth2Provider
 	// Held atomically: the sweep goroutine reads it without ever calling
 	// oauth(), so sync.Once orders nothing between them.
 	oauthStore atomic.Pointer[oauthStore]
@@ -528,6 +531,10 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(authorizePath, h.handleAuthorize)
 	mux.answer(authorizeDonePath, h.handleAuthorizeDone)
 	mux.answer(tokenPath, h.handleToken)
+	// An agent asks to be signed in, and the person says yes at the passkey (RFC 8628).
+	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
+	mux.answer(deviceApprovePath, h.handleDeviceApprove)
+	mux.answer(deviceDonePath, h.handleDeviceDone)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
 	// A peer asks for the lines about the namespaces it serves, signing as itself.
@@ -694,6 +701,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 				h.sweepSignedBindings()
 				h.sweepHomeward()
 				h.sweepAuthorizing()
+				h.sweepDevices()
 			case <-cancel:
 				return
 			}
