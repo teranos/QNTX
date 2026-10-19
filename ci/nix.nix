@@ -45,13 +45,10 @@ in
 
   on = {
     push.branches = [ "main" ];
+    # Only a change to nix itself: docs have the Docs CI, Go the Go CI.
     pull_request.paths = [
       "**.nix"
       "flake.lock"
-      "docs/**"
-      "**.go"
-      "go.mod"
-      "go.sum"
       ".github/workflows/nix.yml"
     ];
   };
@@ -94,27 +91,6 @@ in
         {
           name = "Push to Cachix";
           run = "nix build .#\${{ matrix.package }} --print-out-paths --no-link | cachix push qntx";
-        }
-      ];
-    };
-
-    # Documentation (single OS, includes link checking)
-    build-docs = {
-      "if" = notTheVault;
-      runs-on = "ubuntu-latest";
-      steps = setup ++ [
-        {
-          name = "Build and validate docs";
-          run = ''
-            nix build --show-trace .#checks.x86_64-linux.docs-site-builds
-            nix build --show-trace .#checks.x86_64-linux.docs-site-links
-          '';
-        }
-
-        {
-          name = "Push to Cachix";
-          "if" = "github.ref == 'refs/heads/main'";
-          run = "nix build .#docs-site --print-out-paths --no-link | cachix push qntx";
         }
       ];
     };

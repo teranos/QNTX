@@ -80,7 +80,8 @@ in
   on = {
     pull_request = {
       branches = [ "main" ];
-      paths = goPaths ++ [ "internal/tools/nilcheck/**" "**/*.rs" ".github/workflows/go.yml" ];
+      # Rust has the Rust CI.
+      paths = goPaths ++ [ "internal/tools/nilcheck/**" ".github/workflows/go.yml" ];
     };
     push = {
       branches = [ "main" ];

@@ -13,7 +13,11 @@
   # that GitHub records but never turns into a run leaves the branch with no way
   # to build its own tip — the only recovery was a commit with nothing in it.
   on = {
-    push.branches = [ "**" ];
+    # A docs change builds no binary.
+    push = {
+      branches = [ "**" ];
+      paths-ignore = [ "docs/**" "**/*.md" ];
+    };
     workflow_dispatch = null;
   };
 
