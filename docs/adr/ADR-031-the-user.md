@@ -22,8 +22,8 @@ Date: 2026-08-18
   `auth.root_identities` closes one way in, and a User holds several; disabling the User
   is the person, not the door.
 - Ownership is recorded on the namespace, not on the User. The namespace's own record is  what refuses a second create; a list on the User would be a second answer.
-- A User record lives in `system`, where the token objects already are (ADR-027).
-- No User is visible below SUPER, because `system` is not (ADR-026). An ATTESTOR sees no
+- A User record lives in `system`, where the token objects already are ([[ADR-027-Permissions]]).
+- No User is visible below SUPER, because `system` is not ([[ADR-026-Namespaces]]). An ATTESTOR sees no
   User record: not another's, and not their own. There is no directory of people at that
   level. What an ATTESTOR sees inside a namespace is what signed something, and `by` is
   the signer (ADR-026) — never the person behind it.
