@@ -191,12 +191,13 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 
 	binary, argv := s.Binary, args
 	if s.Apart {
-		scope, systemd, err := systemdScope("qntx-turn-" + strings.TrimSuffix(filepath.Base(stream), streamExt))
+		scope, bus, systemd, err := systemdScope("qntx-turn-" + strings.TrimSuffix(filepath.Base(stream), streamExt))
 		if err != nil {
 			return Answer{}, err
 		}
 		if systemd {
 			binary, argv = "systemd-run", append(append(scope, s.Binary), args...)
+			env = append(env, bus...)
 		}
 	}
 	cmd := exec.Command(binary, argv...)
@@ -259,24 +260,42 @@ func (s Said) writeMCP() (string, []string, error) {
 	return path, bearers, nil
 }
 
-// systemdScope is how systemd-run puts a process in a scope of its own named
-// unit, and whether systemd keeps this machine's processes: a node whose
-// processes systemd keeps stops with every one in its cgroup.
-func systemdScope(unit string) ([]string, bool, error) {
+// systemdScope is how systemd-run puts a process in a scope of its own named unit, what it needs to
+// reach that systemd, and whether systemd keeps this machine's processes: a node whose processes
+// systemd keeps stops with every one in its cgroup.
+func systemdScope(unit string) ([]string, []string, bool, error) {
 	booted, err := os.Stat("/run/systemd/system")
 	if os.IsNotExist(err) {
-		return []string{}, false, nil
+		return []string{}, []string{}, false, nil
 	}
 	if err != nil {
-		return []string{}, false, errors.Wrap(err, "whether systemd keeps this machine's processes did not read")
+		return []string{}, []string{}, false, errors.Wrap(err, "whether systemd keeps this machine's processes did not read")
 	}
 	me, err := user.Current()
 	if err != nil {
-		return []string{}, false, errors.Wrap(err, "who runs the node did not read")
+		return []string{}, []string{}, false, errors.Wrap(err, "who runs the node did not read")
 	}
 	scope := []string{"--scope", "--quiet", "--collect", "--unit", unit}
-	if me.Username != "root" {
-		scope = append([]string{"--user"}, scope...)
+	if me.Username == "root" {
+		return scope, []string{}, booted.IsDir(), nil
 	}
-	return scope, booted.IsDir(), nil
+	bus, err := userBus(me.Username, filepath.Join(userRuntimeRoot, me.Uid))
+	if err != nil {
+		return []string{}, []string{}, false, err
+	}
+	return append([]string{"--user"}, scope...), bus, booted.IsDir(), nil
+}
+
+// userRuntimeRoot is where systemd keeps each user's runtime directory, by uid.
+const userRuntimeRoot = "/run/user"
+
+// userBus is how systemd-run --user reaches the user's own systemd from their runtime directory.
+// A system service hands a node neither variable: on k, 2026-10-19, every turn of the Node Agent
+// ended at systemd-run, which found no bus.
+func userBus(name, runtime string) ([]string, error) {
+	socket := filepath.Join(runtime, "bus")
+	if _, err := os.Stat(socket); err != nil {
+		return []string{}, errors.Wrapf(err, "a turn runs apart in %s's own systemd, whose bus %s is not there: it runs only while %s is logged in or lingers (loginctl enable-linger %s)", name, socket, name, name)
+	}
+	return []string{"XDG_RUNTIME_DIR=" + runtime, "DBUS_SESSION_BUS_ADDRESS=unix:path=" + socket}, nil
 }
