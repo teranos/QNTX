@@ -263,6 +263,10 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			if err := comet.Under(agent.home); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " is said nothing until it runs under ground (ADR-050): " + err.Error()}
 			}
+			// A repository the agent cloned since its last turn is trusted before a ritual starts in it.
+			if err := comet.AgentTrust(agent.home); err != nil {
+				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + "'s work was not trusted for the rituals it starts: " + err.Error()}
+			}
 			if plan, err = secretref.Resolve(ctx, named.TokenRef); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "the Claude plan token am.toml names did not resolve: " + err.Error()}
 			}

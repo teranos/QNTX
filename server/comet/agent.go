@@ -152,9 +152,9 @@ func AgentSettings(home string) error {
 	return AgentTrust(home)
 }
 
-// AgentTrust trusts the agent's work directory in its Claude Code, and every tree under it: a ritual
-// starts its own agent with claude --bg, which refuses a workspace nobody trusted, and on q,
-// 2026-10-19, willow-1792407056 was left with no agent for that reason.
+// AgentTrust trusts the agent's work directory in its Claude Code, and each repository it keeps there
+// as work/<owner>/<repo>: a ritual starts its own agent with claude --bg, which refuses a workspace
+// nobody trusted, and a git checkout is trusted only by name, never by a parent's trust.
 func AgentTrust(home string) error {
 	work := filepath.Join(home, "work")
 	if err := os.MkdirAll(work, 0o700); err != nil {
@@ -163,6 +163,14 @@ func AgentTrust(home string) error {
 	resolved, err := filepath.EvalSymlinks(work)
 	if err != nil {
 		return errors.Wrapf(err, "the agent's work directory %s did not resolve", work)
+	}
+	trusted := []string{resolved}
+	repos, err := filepath.Glob(filepath.Join(resolved, "*", "*", ".git"))
+	if err != nil {
+		return errors.Wrapf(err, "the repositories under %s were not listed", resolved)
+	}
+	for _, git := range repos {
+		trusted = append(trusted, filepath.Dir(git))
 	}
 	path := filepath.Join(home, "claude", ".claude.json")
 	config := map[string]any{}
@@ -179,12 +187,14 @@ func AgentTrust(home string) error {
 	if !ok {
 		projects = map[string]any{}
 	}
-	project, ok := projects[resolved].(map[string]any)
-	if !ok {
-		project = map[string]any{}
+	for _, dir := range trusted {
+		project, ok := projects[dir].(map[string]any)
+		if !ok {
+			project = map[string]any{}
+		}
+		project["hasTrustDialogAccepted"] = true
+		projects[dir] = project
 	}
-	project["hasTrustDialogAccepted"] = true
-	projects[resolved] = project
 	config["projects"] = projects
 	written, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {

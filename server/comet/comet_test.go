@@ -253,6 +253,8 @@ func TestAnAgentsWorkIsTrustedForTheRitualsItStarts(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(home, "claude"), 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(home, "claude", ".claude.json"),
 		[]byte(`{"userID":"kept","projects":{"/elsewhere":{"hasTrustDialogAccepted":false}}}`), 0o600))
+	// A checkout is trusted by its own name: on q a trusted work did not reach abcd-nl/grove.
+	require.NoError(t, os.MkdirAll(filepath.Join(home, "work", "abcd-nl", "grove", ".git"), 0o700))
 	require.NoError(t, AgentSettings(home))
 
 	written, err := os.ReadFile(filepath.Join(home, "claude", ".claude.json"))
@@ -267,6 +269,7 @@ func TestAnAgentsWorkIsTrustedForTheRitualsItStarts(t *testing.T) {
 	work, err := filepath.EvalSymlinks(filepath.Join(home, "work"))
 	require.NoError(t, err)
 	assert.True(t, config.Projects[work].Trusted)
+	assert.True(t, config.Projects[filepath.Join(work, "abcd-nl", "grove")].Trusted)
 	assert.False(t, config.Projects["/elsewhere"].Trusted)
 	assert.Equal(t, "kept", config.UserID)
 }
