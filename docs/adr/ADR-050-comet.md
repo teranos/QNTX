@@ -159,21 +159,6 @@ Even faster when the builds are done by QNTX as Comet
 - The node runs Claude Code with `-p` (run.go), not `--bg`. The box's role
   writes one plugin's SSM parameters and no other.
 
-## Pi
-
-"and another thing i want, but that is a way bigger item, is for ground to be usage usable with coding agent pi"
-
-- ground speaks Claude Code's hook protocol: the event's JSON on stdin, exit
-  codes, systemMessage and hookSpecificOutput. The node reads a transcript by
-  mapping speakers to those events (server/transcripts.go).
-- Pi loads TypeScript extensions from its extensions directory or `-e <path>`.
-  `pi.on("tool_call")` mutates input or blocks; `before_agent_start` carries
-  the prompt; `session_start` and `agent_end` exist; `pi.sendMessage()` puts
-  content into model context; sessions are JSONL under the session dir (Pi
-  docs: extensions.md, cli.md, session-format.md). The node runs Pi with
-  PI_CODING_AGENT_DIR under the agent's home in `--mode json`
-  (internal/pi/run.go).
-
 ## Done
 
 - `/comet/{owner}/{repo}/{platform}`: POST builds, GET serves with its digest,
@@ -204,8 +189,6 @@ Even faster when the builds are done by QNTX as Comet
 - A comet lands from its machine's node, on the box: grove's comet for the
   box's own machine names q, and the Node Agent's sky landed it from q in its
   home, digest 77ef85de.
-- ground as a Pi extension (ground pi/ground.ts): Pi 1.0.3 at the node's pin
-  loaded it, and its session_start reached grove's comet.
 
 ## Not done
 
@@ -215,5 +198,3 @@ Even faster when the builds are done by QNTX as Comet
 - Rituals on the box: everything a ritual needs stands in the Node Agent's
   grove checkout, and grove's rituals are off there until a person's session
   standing in it says rituals on.
-- A whole Pi turn under ground: q's am.toml names no Pi for its agent, so Pi
-  has no model to answer with.

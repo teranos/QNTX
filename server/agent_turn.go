@@ -93,7 +93,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 		if itsGit, err = s.gitEnvironment(agent); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's git was not set up, so nothing was said to it: " + err.Error()}
 		}
-		// Its ground is the one its hooks and its Pi extension run (ADR-050, Hosted agents under ground),
+		// Its ground is the one its hooks run (ADR-050, Hosted agents under ground),
 		// and the node's Claude Code the one a ritual it performs starts its agent with (ground ritual/run.d).
 		claude, err := s.harnessHeldBy("claude").Path(ctx)
 		if err != nil {

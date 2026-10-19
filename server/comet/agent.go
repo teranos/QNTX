@@ -47,25 +47,11 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 		return errors.Wrapf(err, "failed to make %s to build the agent's ground in", work)
 	}
 	sand := map[string]string{"comet.pbt": AgentDeclaration(filepath.Join(home, "work"), url)}
-	if err := b.ground(ctx, work, platform, sand, "agent:"+filepath.Base(home), AgentGround(home)); err != nil {
-		return err
-	}
-	// The agent runs in Pi as well: ground's extension for it, from the ground just built (ground pi/ground.ts).
-	extension, err := os.ReadFile(filepath.Join(work, "ground", "pi", "ground.ts"))
-	if err != nil {
-		return errors.Wrapf(err, "the ground built in %s carries no Pi extension", work)
-	}
-	if err := os.MkdirAll(filepath.Dir(AgentPiExtension(home)), 0o700); err != nil {
-		return errors.Wrapf(err, "failed to make %s", filepath.Dir(AgentPiExtension(home)))
-	}
-	return errors.Wrapf(os.WriteFile(AgentPiExtension(home), extension, 0o600), "failed to write the agent's Pi extension at %s", AgentPiExtension(home))
+	return b.ground(ctx, work, platform, sand, "agent:"+filepath.Base(home), AgentGround(home))
 }
 
-// AgentPiExtension is where an agent's Pi loads ground from: its extensions, under PI_CODING_AGENT_DIR (internal/pi).
-func AgentPiExtension(home string) string { return filepath.Join(home, "pi", "extensions", "ground.ts") }
-
-// AgentPath is the PATH an agent's turn runs with: its own ground first, which the hooks and the Pi
-// extension run as ground.
+// AgentPath is the PATH an agent's turn runs with: its own ground first, which its hooks and a
+// ritual it performs run as ground.
 func AgentPath(home, path string) string { return filepath.Dir(AgentGround(home)) + ":" + path }
 
 // agentBuilds is what each agent's last ground build came to, by its home, until one stands.
@@ -110,13 +96,6 @@ func Under(home string) error {
 	}
 	if !bytes.Contains(settings, []byte(ground)) {
 		return errors.Newf("the agent does not run under ground: its settings run no %s", ground)
-	}
-	extension, err := os.Stat(AgentPiExtension(home))
-	if err != nil {
-		return errors.Wrapf(err, "the agent does not run under ground in Pi: %s", why)
-	}
-	if extension.IsDir() {
-		return errors.Newf("the agent does not run under ground in Pi: %s is a directory", AgentPiExtension(home))
 	}
 	return nil
 }
