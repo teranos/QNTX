@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/forge"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -55,8 +56,8 @@ type gitHubHost interface {
 	buildLanded(name string)
 	buildsOfRun(gitHubWorkflowRun) ([]string, error)
 	approvalsFromGitHub(ctx context.Context, event string, body []byte) ([]string, error)
-	buildsMovedBy(gitHubPush) []string
-	vaultsMovedBy(gitHubPush) []string
+	buildsMovedBy(forge.Push) []string
+	vaultsMovedBy(forge.Push) []string
 }
 
 // gitHubCredentials hands GitHubService the GITHUB token a namespace spends.

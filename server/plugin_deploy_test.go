@@ -185,7 +185,7 @@ func TestAFailedCheckEndsTheDeployAtItsChecks(t *testing.T) {
 	s := deployingServer(t)
 	s.deploys.begin(pluginDeploy{plugin: "datapunt", rev: "c0ffee", repo: "teranos/datapunt", after: "c0ffee", pushed: true, stage: deployChecking})
 	s.deploys.checksAre("datapunt", "c0ffee", map[string]string{"test": checkFailed})
-	s.deploys.fail("datapunt", errors.New("checks on teranos/datapunt@c0ffee did not pass: test"))
+	s.deploys.fail("datapunt", errors.New("checks on github.com/teranos/datapunt@c0ffee did not pass: test"))
 
 	data, inFlight := deployData(s.deploys.held())
 	assert.False(t, inFlight)

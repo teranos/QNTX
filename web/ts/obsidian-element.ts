@@ -20,7 +20,7 @@ import { log, SEG } from './logger';
 export interface Vault {
     name: string;
     path: string;
-    /** Each folder it holds, as owner/repo@branch:path=place, place being where in the vault it is. */
+    /** Each folder it holds, as host/path@branch:path=place (github.com/owner/repo@main:docs=Notes), place being where in the vault it is. */
     folders: string[];
 }
 
@@ -272,7 +272,7 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
         const b = binding;
         const crumbs = div('obsidian-crumbs');
         crumbs.append(`${place} ⇄ `, b.owner ? pick(b.owner.login, () => { binding = { owner: b.owner, at: '' }; draw(); }, 'obsidian-crumb') : '…');
-        if (b.repo) crumbs.append(' / ', pick(b.repo.slice(b.repo.indexOf('/') + 1), () => { binding = { owner: b.owner, repo: b.repo, at: '' }; draw(); }, 'obsidian-crumb'));
+        if (b.repo) crumbs.append(' / ', pick(b.repo.slice(b.repo.lastIndexOf('/') + 1), () => { binding = { owner: b.owner, repo: b.repo, at: '' }; draw(); }, 'obsidian-crumb'));
         if (b.at) crumbs.append(` : ${b.at}`);
         p.appendChild(crumbs);
 
@@ -313,7 +313,7 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
                 const { repos } = await apiJson<{ repos: string[] }>(query('/api/vault/repos', { installation: String(b.owner.installation) }));
                 list.innerHTML = '';
                 for (const repo of repos) {
-                    list.appendChild(pick(repo.slice(repo.indexOf('/') + 1), () => { binding = { owner: b.owner, repo, at: '' }; draw(); }));
+                    list.appendChild(pick(repo.slice(repo.lastIndexOf('/') + 1), () => { binding = { owner: b.owner, repo, at: '' }; draw(); }));
                 }
             } else {
                 const { dirs, branch } = await apiJson<{ dirs: string[]; branch: string }>(query('/api/vault/subdirs', { repo: b.repo, path: b.at }));

@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/forge"
 	"io"
 	"net/http"
 	"slices"
@@ -65,44 +66,29 @@ type gitHubPush struct {
 	} `json:"commits"`
 }
 
-// branch is the branch pushed to, or empty for a tag.
-func (p gitHubPush) branch() string {
-	branch, ok := strings.CutPrefix(p.Ref, "refs/heads/")
-	if !ok {
-		return ""
-	}
-	return branch
-}
-
-// touched is whether the push changed path.
-func (p gitHubPush) touched(path string) bool {
+// push is what the push says in the part any forge says it. The files are
+// every one GitHub says the push added, removed or modified.
+func (p gitHubPush) push() forge.Push {
+	var changed []string
 	for _, c := range p.Commits {
-		if slices.Contains(c.Added, path) || slices.Contains(c.Removed, path) || slices.Contains(c.Modified, path) {
-			return true
-		}
+		changed = slices.Concat(changed, c.Added, c.Removed, c.Modified)
 	}
-	return false
+	return forge.Push{
+		Repo:    forge.Repo{Host: forge.GitHub, Path: p.Repository.FullName},
+		Ref:     p.Ref,
+		After:   p.After,
+		Deleted: p.Deleted,
+		Changed: changed,
+	}
 }
 
-// touchedUnder is whether the push changed anything inside folder.
-func (p gitHubPush) touchedUnder(folder string) bool {
-	for _, c := range p.Commits {
-		for _, changed := range slices.Concat(c.Added, c.Removed, c.Modified) {
-			if strings.HasPrefix(changed, folder+"/") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// moves is whether the push moves a source of b.
-func (p gitHubPush) moves(b pluginBuild) bool {
+// pushMoves is whether the push moves a source of b.
+func pushMoves(p forge.Push, b pluginBuild) bool {
 	for _, source := range b.sources() {
-		if !strings.EqualFold(source.Owner+"/"+source.Repo, p.Repository.FullName) || source.Branch != p.branch() {
+		if !source.Repo.Is(p.Repo) || source.Branch != p.Branch() {
 			continue
 		}
-		if !source.PathNamed || p.touched(source.Path) {
+		if !source.PathNamed || p.Touched(source.Path) {
 			return true
 		}
 	}
@@ -180,11 +166,12 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "the push is not readable JSON: "+err.Error())
 		return
 	}
-	if tag := push.tagLanded(); tag != "" {
+	landed := push.push()
+	if tag := tagLanded(landed); tag != "" {
 		g.dispatchApp(tag)
 	}
-	names := g.host.buildsMovedBy(push)
-	filling := g.host.vaultsMovedBy(push)
-	dispatching := g.followsMovedBy(push)
+	names := g.host.buildsMovedBy(landed)
+	filling := g.host.vaultsMovedBy(landed)
+	dispatching := g.followsMovedBy(landed)
 	respond(w, g.host.log(), http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching})
 }

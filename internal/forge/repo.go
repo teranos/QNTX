@@ -10,6 +10,9 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
+// GitHub is the host GitHub serves repositories from.
+const GitHub = "github.com"
+
 // Repo is a repository: the host that serves it and its path there. A path is
 // two segments on GitHub, owner/repo, and more on a forge that nests, as
 // group/subgroup/project.

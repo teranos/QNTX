@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/internal/sacred"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -109,11 +110,11 @@ func (s *QNTXServer) buildLanded(name string) {
 }
 
 // buildsMovedBy starts the build of every enabled plugin push moves, and names them.
-func (s *QNTXServer) buildsMovedBy(push gitHubPush) []string {
+func (s *QNTXServer) buildsMovedBy(push forge.Push) []string {
 	logger := s.logger.Named("build")
 	records, err := s.pluginRecords().Plugins()
 	if err != nil {
-		logger.Errorw("A push arrived and the plugin records were not read", "repo", push.Repository.FullName, "error", err)
+		logger.Errorw("A push arrived and the plugin records were not read", "repo", push.Repo.String(), "error", err)
 		return []string{}
 	}
 	names := []string{}
@@ -126,15 +127,15 @@ func (s *QNTXServer) buildsMovedBy(push gitHubPush) []string {
 			logger.Errorw("A plugin's build is not one QNTX can run", "plugin", record.Name, "error", err)
 			continue
 		}
-		if !built || !push.moves(b) {
+		if !built || !pushMoves(push, b) {
 			continue
 		}
 		names = append(names, b.name)
-		logger.Infow("A push moves a plugin's source", "plugin", b.name, "repo", push.Repository.FullName, "ref", push.Ref, "after", push.After)
+		logger.Infow("A push moves a plugin's source", "plugin", b.name, "repo", push.Repo.String(), "ref", push.Ref, "after", push.After)
 		// Built once GitHub's checks on the commit pushed have passed.
-		s.deploys.begin(pluginDeploy{plugin: b.name, rev: push.After, repo: push.Repository.FullName, ref: push.Ref, after: push.After, pushed: true, stage: deployChecking})
+		s.deploys.begin(pluginDeploy{plugin: b.name, rev: push.After, repo: push.Repo.String(), ref: push.Ref, after: push.After, pushed: true, stage: deployChecking})
 		sacred.Go("plugin.build."+b.name, func() {
-			s.awaitChecks(s.lifetime(), b, push.Repository.FullName, push.After, logger)
+			s.awaitChecks(s.lifetime(), b, push.Repo, push.After, logger)
 		})
 	}
 	return names

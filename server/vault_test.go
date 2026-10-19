@@ -24,29 +24,29 @@ import (
 
 // A repository's folder, read as a build's input is, and where in the vault it is.
 func TestAVaultHoldsFoldersNamedAtBothEnds(t *testing.T) {
-	folders, err := vaultFolders("abcd-nl/clean@main:cdr=ABCD/clean/cdr  abcd-nl/clean-business@main:WEEK_41.md=ABCD/weeks/WEEK_41.md")
+	folders, err := vaultFolders("github.com/abcd-nl/clean@main:cdr=ABCD/clean/cdr  github.com/abcd-nl/clean-business@main:WEEK_41.md=ABCD/weeks/WEEK_41.md")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"abcd-nl/clean@main:cdr=ABCD/clean/cdr", "abcd-nl/clean-business@main:WEEK_41.md=ABCD/weeks/WEEK_41.md"}, folders)
+	assert.Equal(t, []string{"github.com/abcd-nl/clean@main:cdr=ABCD/clean/cdr", "github.com/abcd-nl/clean-business@main:WEEK_41.md=ABCD/weeks/WEEK_41.md"}, folders)
 
 	none, err := vaultFolders("")
 	require.NoError(t, err)
 	assert.Equal(t, []string{}, none)
 
 	// A place is kept as it reads, without what says nothing.
-	tidy, err := vaultFolders("abcd-nl/clean@main:cdr=ABCD//clean/./cdr/")
+	tidy, err := vaultFolders("github.com/abcd-nl/clean@main:cdr=ABCD//clean/./cdr/")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"abcd-nl/clean@main:cdr=ABCD/clean/cdr"}, tidy)
+	assert.Equal(t, []string{"github.com/abcd-nl/clean@main:cdr=ABCD/clean/cdr"}, tidy)
 }
 
 // A folder missing either end is refused, and with it the whole vault.
 func TestAVaultRefusesAFolderThatDoesNotRead(t *testing.T) {
 	for _, said := range []string{
-		"abcd-nl/clean@main:cdr",
-		"abcd-nl/clean@main:cdr=",
-		"abcd-nl/clean@main=ABCD/clean",
+		"github.com/abcd-nl/clean@main:cdr",
+		"github.com/abcd-nl/clean@main:cdr=",
+		"github.com/abcd-nl/clean@main=ABCD/clean",
 		"abcd-nl/clean:cdr=ABCD/clean",
 		"clean@main:cdr=ABCD/clean",
-		"abcd-nl/clean@main:cdr=ABCD/clean abcd-nl/clean@main:docs",
+		"github.com/abcd-nl/clean@main:cdr=ABCD/clean github.com/abcd-nl/clean@main:docs",
 	} {
 		_, err := vaultFolders(said)
 		assert.Error(t, err, said)
@@ -56,9 +56,9 @@ func TestAVaultRefusesAFolderThatDoesNotRead(t *testing.T) {
 // A place is inside the vault.
 func TestAVaultRefusesAPlaceOutsideIt(t *testing.T) {
 	for _, said := range []string{
-		"abcd-nl/clean@main:cdr=/etc/cdr",
-		"abcd-nl/clean@main:cdr=../cdr",
-		"abcd-nl/clean@main:cdr=ABCD/../../cdr",
+		"github.com/abcd-nl/clean@main:cdr=/etc/cdr",
+		"github.com/abcd-nl/clean@main:cdr=../cdr",
+		"github.com/abcd-nl/clean@main:cdr=ABCD/../../cdr",
 	} {
 		_, err := vaultFolders(said)
 		assert.Error(t, err, said)
@@ -68,15 +68,15 @@ func TestAVaultRefusesAPlaceOutsideIt(t *testing.T) {
 // A note is one folder's: no two places are one, and none holds another.
 func TestAVaultRefusesTwoFoldersAtOnePlace(t *testing.T) {
 	for _, said := range []string{
-		"abcd-nl/clean@main:cdr=ABCD/docs abcd-nl/q@main:docs=ABCD/docs",
-		"abcd-nl/clean@main:cdr=ABCD abcd-nl/q@main:docs=ABCD/docs",
-		"abcd-nl/clean@main:cdr=ABCD/docs/cdr abcd-nl/q@main:docs=ABCD/docs",
+		"github.com/abcd-nl/clean@main:cdr=ABCD/docs github.com/abcd-nl/q@main:docs=ABCD/docs",
+		"github.com/abcd-nl/clean@main:cdr=ABCD github.com/abcd-nl/q@main:docs=ABCD/docs",
+		"github.com/abcd-nl/clean@main:cdr=ABCD/docs/cdr github.com/abcd-nl/q@main:docs=ABCD/docs",
 	} {
 		_, err := vaultFolders(said)
 		assert.Error(t, err, said)
 	}
 	// Two places that only share a beginning are two places.
-	_, err := vaultFolders("abcd-nl/clean@main:cdr=ABCD/doc abcd-nl/q@main:docs=ABCD/docs")
+	_, err := vaultFolders("github.com/abcd-nl/clean@main:cdr=ABCD/doc github.com/abcd-nl/q@main:docs=ABCD/docs")
 	assert.NoError(t, err)
 }
 
@@ -100,9 +100,9 @@ func TestAVaultsFoldersAreReadFromTheBox(t *testing.T) {
 
 // A place may hold a space when the folders are read one by one.
 func TestAPlaceMayHoldASpace(t *testing.T) {
-	folders, err := vaultFoldersOf([]string{"abcd-nl/clean@main:cdr=Course Material"})
+	folders, err := vaultFoldersOf([]string{"github.com/abcd-nl/clean@main:cdr=Course Material"})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"abcd-nl/clean@main:cdr=Course Material"}, folders)
+	assert.Equal(t, []string{"github.com/abcd-nl/clean@main:cdr=Course Material"}, folders)
 }
 
 // mainNotes is what docs/adr of abcd-nl/clean holds on main, by path: stand's main.
@@ -205,37 +205,37 @@ func TestAVaultFolderIsBoundByClicking(t *testing.T) {
 
 	got, refused = askVault(t, s, "repos", sigil.Sent{"installation": "7"})
 	require.Nil(t, refused, "%v", refused)
-	assert.Equal(t, []string{"abcd-nl/clean"}, got.(*protocol.VaultRepos).GetRepos())
+	assert.Equal(t, []string{"github.com/abcd-nl/clean"}, got.(*protocol.VaultRepos).GetRepos())
 
-	got, refused = askVault(t, s, "subdirs", sigil.Sent{"repo": "abcd-nl/clean"})
+	got, refused = askVault(t, s, "subdirs", sigil.Sent{"repo": "github.com/abcd-nl/clean"})
 	require.Nil(t, refused, "%v", refused)
 	assert.Equal(t, []string{"cdr", "docs"}, got.(*protocol.VaultSubdirs).GetDirs())
-	got, refused = askVault(t, s, "subdirs", sigil.Sent{"repo": "abcd-nl/clean", "path": "docs"})
+	got, refused = askVault(t, s, "subdirs", sigil.Sent{"repo": "github.com/abcd-nl/clean", "path": "docs"})
 	require.Nil(t, refused, "%v", refused)
 	assert.Equal(t, []string{"docs/adr"}, got.(*protocol.VaultSubdirs).GetDirs())
 
-	_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
+	_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 	vaults, err := s.nodeRecords().Vaults()
 	require.NoError(t, err)
 	require.Len(t, vaults, 1)
 	assert.Equal(t, vault.Path, vaults[0].Path)
-	assert.Equal(t, []string{"abcd-nl/clean@main:docs/adr=Course Material"}, vaults[0].Folders)
+	assert.Equal(t, []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}, vaults[0].Folders)
 }
 
 // A folder bound, or inside one, or holding one, is not bound again; nor is a
 // folder the vault's copy does not have.
 func TestABindingIsRefusedWhereANoteWouldBeTwoFolders(t *testing.T) {
 	s, _ := vaultBindingServer(t)
-	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "ABCD", "repo": "abcd-nl/clean", "path": "cdr"})
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "ABCD", "repo": "github.com/abcd-nl/clean", "path": "cdr"})
 	require.Nil(t, refused, "%v", refused)
 
 	for _, place := range []string{"ABCD", "ABCD/lttr"} {
-		_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": place, "repo": "abcd-nl/clean", "path": "docs"})
+		_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": place, "repo": "github.com/abcd-nl/clean", "path": "docs"})
 		require.NotNil(t, refused, place)
 		assert.Contains(t, refused.GetSays(), "one holds the other", place)
 	}
-	_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Nowhere", "repo": "abcd-nl/clean", "path": "docs"})
+	_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Nowhere", "repo": "github.com/abcd-nl/clean", "path": "docs"})
 	require.NotNil(t, refused)
 	assert.Equal(t, "place", refused.GetParam())
 	_, refused = askVault(t, s, "dirs", sigil.Sent{"name": "efgh"})
@@ -246,14 +246,14 @@ func TestABindingIsRefusedWhereANoteWouldBeTwoFolders(t *testing.T) {
 // A folder unbound is no longer held, and the others stay as they were.
 func TestABoundFolderIsUnbound(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material", "abcd-nl/clean@main:cdr=ABCD"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material", "github.com/abcd-nl/clean@main:cdr=ABCD"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 
 	_, refused := askVault(t, s, "unbind", sigil.Sent{"name": "abcd", "place": "Course Material"})
 	require.Nil(t, refused, "%v", refused)
 	vaults, err := s.nodeRecords().Vaults()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"abcd-nl/clean@main:cdr=ABCD"}, vaults[0].Folders)
+	assert.Equal(t, []string{"github.com/abcd-nl/clean@main:cdr=ABCD"}, vaults[0].Folders)
 
 	_, refused = askVault(t, s, "unbind", sigil.Sent{"name": "abcd", "place": "Course Material"})
 	require.NotNil(t, refused)
@@ -263,7 +263,7 @@ func TestABoundFolderIsUnbound(t *testing.T) {
 // "and another button to simply disable it, but the bind is still there, it just doesnt do anything"
 func TestADisabledFolderStaysBound(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 
 	_, refused := askVault(t, s, "disable", sigil.Sent{"name": "abcd", "place": "Course Material"})
@@ -292,10 +292,10 @@ func TestEachBoundFolderSaysWhetherItIsActive(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(vault.Path, "EFGH"), 0o755))
 	vault.Folders = []string{
-		"abcd-nl/clean@main:docs/adr=Course Material",
-		"abcd-nl/clean@main:gone=ABCD/lttr",
-		"abcd-nl/clean@main:cdr/CDR-001.md=EFGH",
-		"abcd-nl/clean@main:docs=Gone",
+		"github.com/abcd-nl/clean@main:docs/adr=Course Material",
+		"github.com/abcd-nl/clean@main:gone=ABCD/lttr",
+		"github.com/abcd-nl/clean@main:cdr/CDR-001.md=EFGH",
+		"github.com/abcd-nl/clean@main:docs=Gone",
 	}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 
