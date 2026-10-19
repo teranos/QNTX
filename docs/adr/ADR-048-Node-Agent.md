@@ -1,7 +1,7 @@
 # ADR-048: Node-Agent
 
-Date: 2026-10-16
-Status: Revised
+Date: 2026-10-19
+Status: Revised Again
 
 QNTX interacts with a Node Agent; Claude Code in this case.
 
