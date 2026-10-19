@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
@@ -67,14 +68,14 @@ func TestAVTagLandingOnQNTXIsKnown(t *testing.T) {
 		if err := json.Unmarshal([]byte(raw), &p); err != nil {
 			t.Fatal(err)
 		}
-		if got := p.tagLanded(); got != tag {
+		if got := tagLanded(p.push()); got != tag {
 			t.Errorf("%s: landed %q", raw, got)
 		}
 	}
 }
 
 func TestAPushLandsOnTheFollowOfItsRepoAndBranch(t *testing.T) {
-	f := GitHubFollow{Repo: "teranos/QNTX", Branch: "main", Dispatches: "sbvh-nl/q.sbvh.nl", Workflow: "deploy.yml", Ref: "master"}
+	f := GitHubFollow{Repo: "github.com/teranos/QNTX", Branch: "main", Dispatches: "github.com/sbvh-nl/q.sbvh.nl", Workflow: "deploy.yml", Ref: "master"}
 	for name, c := range map[string]struct {
 		raw     string
 		enabled bool
@@ -93,7 +94,11 @@ func TestAPushLandsOnTheFollowOfItsRepoAndBranch(t *testing.T) {
 			t.Fatal(err)
 		}
 		f.Enabled = c.enabled
-		if got := p.follows(f); got != c.follows {
+		got, err := followed(p.push(), f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != c.follows {
 			t.Errorf("%s: follows=%v", name, got)
 		}
 	}
@@ -102,8 +107,8 @@ func TestAPushLandsOnTheFollowOfItsRepoAndBranch(t *testing.T) {
 func TestAPushMovesTheBuildsItsRepoAndBranchFeed(t *testing.T) {
 	b := pluginBuild{
 		name:   "datapunt",
-		core:   buildSource{Owner: "teranos", Repo: "datapunt", Branch: "main"},
-		inputs: []buildSource{{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue", PathNamed: true}},
+		core:   buildSource{Repo: forge.Repo{Host: forge.GitHub, Path: "teranos/datapunt"}, Branch: "main"},
+		inputs: []buildSource{{Repo: forge.Repo{Host: forge.GitHub, Path: "abcd-nl/clean"}, Branch: "main", Path: "competitor.cue", PathNamed: true}},
 	}
 	push := func(raw string) gitHubPush {
 		var p gitHubPush
@@ -125,8 +130,28 @@ func TestAPushMovesTheBuildsItsRepoAndBranchFeed(t *testing.T) {
 			"commits":[{"modified":["README.md"]}]}`, false},
 		"an unrelated repo": {`{"ref":"refs/heads/main","repository":{"full_name":"teranos/QNTX"}}`, false},
 	} {
-		if got := push(c.raw).moves(b); got != c.moves {
+		if got := pushMoves(push(c.raw).push(), b); got != c.moves {
 			t.Errorf("%s: moves=%v", name, got)
 		}
+	}
+}
+
+// The same owner and name on another forge is another repository.
+func TestAPushToTheSameNameOnAnotherForgeMovesNothing(t *testing.T) {
+	b := pluginBuild{
+		name: "datapunt",
+		core: buildSource{Repo: forge.Repo{Host: forge.GitHub, Path: "teranos/datapunt"}, Branch: "main"},
+	}
+	elsewhere := forge.Push{Repo: forge.Repo{Host: "gitlab.com", Path: "teranos/datapunt"}, Ref: "refs/heads/main"}
+	if pushMoves(elsewhere, b) {
+		t.Errorf("a push to %s moved a build of %s", elsewhere.Repo, b.core.Repo)
+	}
+	f := GitHubFollow{Repo: "github.com/teranos/datapunt", Branch: "main", Enabled: true}
+	got, err := followed(elsewhere, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got {
+		t.Errorf("a push to %s landed on a follow of %s", elsewhere.Repo, f.Repo)
 	}
 }

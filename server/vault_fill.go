@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -55,22 +56,22 @@ func gitBlobSHA(content []byte) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// repoNotes is every note under folder of owner/repo on branch, its folders'
+// repoNotes is every note under folder of repo on branch, its folders'
 // own included.
-func (s *QNTXServer) repoNotes(ctx context.Context, owner, repo, branch, folder string) ([]repoNote, error) {
+func (s *QNTXServer) repoNotes(ctx context.Context, repo gitHubRepo, branch, folder string) ([]repoNote, error) {
 	var notes []repoNote
 	var walk func(dir string) error
 	walk = func(dir string) error {
 		answered, err := s.gitHubService().GetRepositoryContent(services.AsInstallation(ctx),
-			&protocol.GitHubGetRepositoryContentRequest{Owner: owner, Repo: repo, Path: dir, Ref: branch})
+			&protocol.GitHubGetRepositoryContentRequest{Owner: repo.Owner, Repo: repo.Name, Path: dir, Ref: branch})
 		if err != nil {
-			return errors.Wrapf(err, "%s of %s/%s on %s was not asked", dir, owner, repo, branch)
+			return errors.Wrapf(err, "%s of %s on %s was not asked", dir, repo, branch)
 		}
 		if !answered.GetSuccess() {
 			return errors.New(answered.GetError())
 		}
 		if answered.GetType() == "file" {
-			return errors.Newf("%s is a file of %s/%s on %s, not a folder", dir, owner, repo, branch)
+			return errors.Newf("%s is a file of %s on %s, not a folder", dir, repo, branch)
 		}
 		for _, entry := range answered.GetItems() {
 			switch {
@@ -92,22 +93,22 @@ func (s *QNTXServer) repoNotes(ctx context.Context, owner, repo, branch, folder 
 }
 
 // repoNoteContent is a note's content on branch, as GitHub gives it.
-func (s *QNTXServer) repoNoteContent(ctx context.Context, owner, repo, branch, file string) ([]byte, error) {
+func (s *QNTXServer) repoNoteContent(ctx context.Context, repo gitHubRepo, branch, file string) ([]byte, error) {
 	answered, err := s.gitHubService().GetRepositoryContent(services.AsInstallation(ctx),
-		&protocol.GitHubGetRepositoryContentRequest{Owner: owner, Repo: repo, Path: file, Ref: branch})
+		&protocol.GitHubGetRepositoryContentRequest{Owner: repo.Owner, Repo: repo.Name, Path: file, Ref: branch})
 	if err != nil {
-		return nil, errors.Wrapf(err, "%s of %s/%s on %s was not asked", file, owner, repo, branch)
+		return nil, errors.Wrapf(err, "%s of %s on %s was not asked", file, repo, branch)
 	}
 	if !answered.GetSuccess() {
 		return nil, errors.New(answered.GetError())
 	}
 	if answered.GetEncoding() != "base64" {
-		return nil, errors.Newf("GitHub gave %s of %s/%s on %s encoded as %q, which the node does not read; a file over 1 MB comes with none",
-			file, owner, repo, branch, answered.GetEncoding())
+		return nil, errors.Newf("GitHub gave %s of %s on %s encoded as %q, which the node does not read; a file over 1 MB comes with none",
+			file, repo, branch, answered.GetEncoding())
 	}
 	content, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(answered.GetContent(), "\n", ""))
 	if err != nil {
-		return nil, errors.Wrapf(err, "%s of %s/%s on %s did not decode", file, owner, repo, branch)
+		return nil, errors.Wrapf(err, "%s of %s on %s did not decode", file, repo, branch)
 	}
 	return content, nil
 }
@@ -158,7 +159,12 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		filled.Refused = err
 		return filled
 	}
-	notes, err := s.repoNotes(ctx, source.Owner, source.Repo, source.Branch, source.Path)
+	on, err := source.onGitHub()
+	if err != nil {
+		filled.Refused = err
+		return filled
+	}
+	notes, err := s.repoNotes(ctx, on, source.Branch, source.Path)
 	if err != nil {
 		filled.Refused = err
 		return filled
@@ -203,7 +209,7 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		if !inVault && hasBase {
 			continue
 		}
-		content, err := s.repoNoteContent(ctx, source.Owner, source.Repo, source.Branch, note.path)
+		content, err := s.repoNoteContent(ctx, on, source.Branch, note.path)
 		if err != nil {
 			filled.Refused = err
 			return filled
@@ -386,19 +392,18 @@ func (s *QNTXServer) fillPlaceSoon(name, place string) {
 }
 
 // movedBy is whether push changed a note under source's folder on its branch.
-func movedBy(push gitHubPush) folderMoved {
+func movedBy(push forge.Push) folderMoved {
 	return func(source buildSource, _ string) bool {
-		return strings.EqualFold(source.Owner+"/"+source.Repo, push.Repository.FullName) &&
-			source.Branch == push.branch() && push.touchedUnder(source.Path)
+		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && push.TouchedUnder(source.Path)
 	}
 }
 
 // vaultsMovedBy fills each enabled folder a push changed a note of, and names
 // them as vault:place.
-func (s *QNTXServer) vaultsMovedBy(push gitHubPush) []string {
+func (s *QNTXServer) vaultsMovedBy(push forge.Push) []string {
 	vaults, err := s.nodeRecords().Vaults()
 	if err != nil {
-		s.logger.Named("vault").Errorw("A push arrived and the vaults were not read", "repo", push.Repository.FullName, "error", err)
+		s.logger.Named("vault").Errorw("A push arrived and the vaults were not read", "repo", push.Repo.String(), "error", err)
 		return []string{}
 	}
 	moved := movedBy(push)

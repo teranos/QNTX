@@ -6,6 +6,7 @@ package server
 import (
 	"strings"
 
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
@@ -13,17 +14,19 @@ import (
 
 // A v* tag landing on appSource dispatches the app's build.
 const (
-	appSource   = "teranos/QNTX"
 	appOwner    = "teranos"
 	appRepo     = "QNTX-App"
 	appWorkflow = "testflight.yml"
 	appRef      = "main"
 )
 
+// appSource is the repository whose tags build the app.
+var appSource = forge.Repo{Host: forge.GitHub, Path: "teranos/QNTX"}
+
 // tagLanded is the v* tag the push put on appSource, or empty.
-func (p gitHubPush) tagLanded() string {
-	tag, ok := strings.CutPrefix(p.Ref, "refs/tags/")
-	if !ok || p.Deleted || !strings.EqualFold(p.Repository.FullName, appSource) || !strings.HasPrefix(tag, "v") {
+func tagLanded(p forge.Push) string {
+	tag := p.Tag()
+	if p.Deleted || !p.Repo.Is(appSource) || !strings.HasPrefix(tag, "v") {
 		return ""
 	}
 	return tag

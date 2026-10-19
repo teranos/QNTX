@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/plugin"
 	"os"
 	"path/filepath"
@@ -20,8 +21,8 @@ func TestBuildOfReadsWhatDatapuntIsBuiltFrom(t *testing.T) {
 		Name:    "datapunt",
 		Enabled: true,
 		Config: map[string]string{
-			buildCore:      "teranos/datapunt@main",
-			buildInputs:    "abcd-nl/clean@main:competitor.cue abcd-nl/q.abcd.nl@master:company.cue",
+			buildCore:      "github.com/teranos/datapunt@main",
+			buildInputs:    "github.com/abcd-nl/clean@main:competitor.cue github.com/abcd-nl/q.abcd.nl@master:company.cue",
 			buildInputsEnv: "DATAPUNT_SCHEMAS",
 			buildPackages:  "ldc dub",
 			buildCommand:   "dub build --config=plugin --compiler=ldc2 --build=release",
@@ -32,12 +33,12 @@ func TestBuildOfReadsWhatDatapuntIsBuiltFrom(t *testing.T) {
 	if err != nil || !built {
 		t.Fatalf("built=%v err=%v", built, err)
 	}
-	if b.core != (buildSource{Owner: "teranos", Repo: "datapunt", Branch: "main"}) {
+	if b.core != (buildSource{Repo: onGitHubTest("teranos/datapunt"), Branch: "main"}) {
 		t.Fatalf("core: %+v", b.core)
 	}
 	want := []buildSource{
-		{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue", PathNamed: true},
-		{Owner: "abcd-nl", Repo: "q.abcd.nl", Branch: "master", Path: "company.cue", PathNamed: true},
+		{Repo: onGitHubTest("abcd-nl/clean"), Branch: "main", Path: "competitor.cue", PathNamed: true},
+		{Repo: onGitHubTest("abcd-nl/q.abcd.nl"), Branch: "master", Path: "company.cue", PathNamed: true},
 	}
 	if len(b.inputs) != len(want) || b.inputs[0] != want[0] || b.inputs[1] != want[1] {
 		t.Fatalf("inputs: %+v", b.inputs)
@@ -50,14 +51,14 @@ func TestBuildOfReadsWhatDatapuntIsBuiltFrom(t *testing.T) {
 func TestAFailedBuildsMailNamesEverySourceAndWhy(t *testing.T) {
 	b := pluginBuild{
 		name:   "datapunt",
-		core:   buildSource{Owner: "teranos", Repo: "datapunt", Branch: "main"},
-		inputs: []buildSource{{Owner: "abcd-nl", Repo: "clean", Branch: "main", Path: "competitor.cue", PathNamed: true}},
+		core:   buildSource{Repo: onGitHubTest("teranos/datapunt"), Branch: "main"},
+		inputs: []buildSource{{Repo: onGitHubTest("abcd-nl/clean"), Branch: "main", Path: "competitor.cue", PathNamed: true}},
 	}
 	mail := buildFailureMail(b, []string{"c0ffee"}, errors.New("dub build: <exit 1>"))
 	if mail.Subject != "datapunt did not build" {
 		t.Fatalf("subject: %q", mail.Subject)
 	}
-	for _, want := range []string{"teranos/datapunt@main at c0ffee", "abcd-nl/clean@main:competitor.cue at not read", "dub build: <exit 1>"} {
+	for _, want := range []string{"github.com/teranos/datapunt@main at c0ffee", "github.com/abcd-nl/clean@main:competitor.cue at not read", "dub build: <exit 1>"} {
 		if !strings.Contains(nodeBody(t, mail, services.MailText), want) {
 			t.Errorf("text lacks %q:\n%s", want, nodeBody(t, mail, services.MailText))
 		}
@@ -70,7 +71,7 @@ func TestAFailedBuildsMailNamesEverySourceAndWhy(t *testing.T) {
 // On start the node asks after each enabled plugin it builds, and no other.
 func TestEnabledBuildsAreEachEnabledPluginQNTXBuilds(t *testing.T) {
 	built := map[string]string{
-		buildCore:    "teranos/QNTX@real-inboxes",
+		buildCore:    "github.com/teranos/QNTX@real-inboxes",
 		buildCommand: "go build -o bin/qntx-inbox-plugin ./cmd/qntx-inbox-plugin",
 		buildOutput:  "bin/qntx-inbox-plugin",
 	}
@@ -200,12 +201,12 @@ func TestBuildOfRefusesAnIncompleteBuild(t *testing.T) {
 	for name, config := range map[string]map[string]string{
 		"no branch":  {buildCore: "teranos/datapunt", buildCommand: "x", buildOutput: "y"},
 		"empty core": {buildCore: "", buildCommand: "x", buildOutput: "y"},
-		"no command": {buildCore: "teranos/datapunt@main", buildOutput: "y"},
-		"no output":  {buildCore: "teranos/datapunt@main", buildCommand: "x"},
-		"input without env": {buildCore: "teranos/datapunt@main", buildCommand: "x", buildOutput: "y",
-			buildInputs: "abcd-nl/clean@main:competitor.cue"},
-		"input without file": {buildCore: "teranos/datapunt@main", buildCommand: "x", buildOutput: "y",
-			buildInputs: "abcd-nl/clean@main", buildInputsEnv: "E"},
+		"no command": {buildCore: "github.com/teranos/datapunt@main", buildOutput: "y"},
+		"no output":  {buildCore: "github.com/teranos/datapunt@main", buildCommand: "x"},
+		"input without env": {buildCore: "github.com/teranos/datapunt@main", buildCommand: "x", buildOutput: "y",
+			buildInputs: "github.com/abcd-nl/clean@main:competitor.cue"},
+		"input without file": {buildCore: "github.com/teranos/datapunt@main", buildCommand: "x", buildOutput: "y",
+			buildInputs: "github.com/abcd-nl/clean@main", buildInputsEnv: "E"},
 	} {
 		if _, _, err := buildOf(grpcplugin.PluginRecord{Name: "p", Config: config}); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -253,5 +254,30 @@ func TestABuildEndedFromOutsideItIsInterrupted(t *testing.T) {
 	}
 	if err := runBuild(context.Background(), work, nil, "sh", "-c", "echo 'error[E0425]: cannot find value' >&2; exit 101"); interrupted(err) {
 		t.Errorf("a build that failed reads as interrupted: %v", err)
+	}
+}
+
+func onGitHubTest(path string) forge.Repo { return forge.Repo{Host: forge.GitHub, Path: path} }
+
+// A source names its forge; owner/repo says which it is on to nobody.
+func TestASourceWithNoHostIsRefused(t *testing.T) {
+	for _, said := range []string{"teranos/datapunt@main", "teranos/datapunt@main:notes"} {
+		if _, err := parseBuildSource(said, strings.Contains(said, ":")); err == nil {
+			t.Errorf("%q was read as a source", said)
+		}
+	}
+}
+
+// GitLab nests; what is asked of GitHub does not.
+func TestASourceOnGitLabIsReadAndNotAskedOfGitHub(t *testing.T) {
+	source, err := parseBuildSource("gitlab.com/group/subgroup/project@main", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if source.Repo.Path != "group/subgroup/project" || source.String() != "gitlab.com/group/subgroup/project@main" {
+		t.Fatalf("source: %+v", source)
+	}
+	if _, err := source.onGitHub(); err == nil {
+		t.Fatal("a GitLab source was asked of GitHub")
 	}
 }

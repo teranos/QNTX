@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/internal/forge"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,7 +28,7 @@ func readNote(t *testing.T, vault Vault, place string) string {
 // Binding a folder writes its repository folder's notes into it, folders and all.
 func TestBindingAFolderFillsItFromMain(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 
 	assert.Equal(t, mainNotes["docs/adr/ADR-001.md"], readNote(t, vault, "Course Material/ADR-001.md"))
@@ -42,7 +43,7 @@ func TestBindingAFolderFillsItFromMain(t *testing.T) {
 // is left as it is.
 func TestTheVaultsWordWins(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "ADR-001.md"), []byte("# ADR-001\n\nAs the vault has it.\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "only here.md"), []byte("mine\n"), 0o644))
@@ -67,7 +68,7 @@ func TestTheVaultsWordWins(t *testing.T) {
 // and the node restarting filled every folder. The edit stays.
 func TestAVaultEditOutlivesARestart(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	s.fillVault(t.Context(), "abcd", everyFolder)
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "ADR-001.md"), []byte("# ADR-001\n\nWritten this week.\n"), 0o644))
@@ -84,7 +85,7 @@ func TestAVaultEditOutlivesARestart(t *testing.T) {
 // The vault changed one line and main another: the note holds both.
 func TestBothChangesOfANoteAreKept(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	mainNotes["docs/adr/ADR-001.md"] = "# ADR-001\n\nfirst\nsecond\nthird\n"
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	s.fillVault(t.Context(), "abcd", everyFolder)
@@ -101,7 +102,7 @@ func TestBothChangesOfANoteAreKept(t *testing.T) {
 // The vault and main both changed one line: the vault's line stays.
 func TestOneLineBothChangedIsTheVaults(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	s.fillVault(t.Context(), "abcd", everyFolder)
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "ADR-001.md"), []byte("# ADR-001\n\nAs I say it.\n"), 0o644))
@@ -118,7 +119,7 @@ func TestOneLineBothChangedIsTheVaults(t *testing.T) {
 // A note taken out of the vault is not put back.
 func TestANoteTheVaultRemovedStaysRemoved(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	s.fillVault(t.Context(), "abcd", everyFolder)
 	require.NoError(t, os.Remove(filepath.Join(vault.Path, "Course Material", "ADR-001.md")))
@@ -133,18 +134,12 @@ func TestANoteTheVaultRemovedStaysRemoved(t *testing.T) {
 // A push to main that changes a note of a bound folder writes it into the vault.
 func TestAPushToMainReachesTheVault(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	s.fillVault(t.Context(), "abcd", everyFolder)
 
 	mainNotes["docs/adr/ADR-001.md"] = "# ADR-001\n\nPushed to main.\n"
-	push := gitHubPush{Ref: "refs/heads/main"}
-	push.Repository.FullName = "abcd-nl/clean"
-	push.Commits = append(push.Commits, struct {
-		Added    []string `json:"added"`
-		Removed  []string `json:"removed"`
-		Modified []string `json:"modified"`
-	}{Modified: []string{"docs/adr/ADR-001.md"}})
+	push := forge.Push{Ref: "refs/heads/main", Repo: onGitHubTest("abcd-nl/clean"), Changed: []string{"docs/adr/ADR-001.md"}}
 
 	assert.Equal(t, []string{"abcd:Course Material"}, s.vaultsMovedBy(push))
 	assert.Equal(t, "# ADR-001\n\nPushed to main.\n", readNote(t, vault, "Course Material/ADR-001.md"))
@@ -153,22 +148,15 @@ func TestAPushToMainReachesTheVault(t *testing.T) {
 // A push elsewhere, or to a disabled folder, writes nothing.
 func TestAPushElsewhereLeavesTheVault(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	s.fillVault(t.Context(), "abcd", everyFolder)
 	mainNotes["docs/adr/ADR-001.md"] = "# ADR-001\n\nPushed to main.\n"
 
-	pushed := func(repo, ref, changed string) gitHubPush {
-		push := gitHubPush{Ref: ref}
-		push.Repository.FullName = repo
-		push.Commits = append(push.Commits, struct {
-			Added    []string `json:"added"`
-			Removed  []string `json:"removed"`
-			Modified []string `json:"modified"`
-		}{Modified: []string{changed}})
-		return push
+	pushed := func(repo, ref, changed string) forge.Push {
+		return forge.Push{Ref: ref, Repo: onGitHubTest(repo), Changed: []string{changed}}
 	}
-	for name, push := range map[string]gitHubPush{
+	for name, push := range map[string]forge.Push{
 		"another branch":     pushed("abcd-nl/clean", "refs/heads/obsidian-abcd", "docs/adr/ADR-001.md"),
 		"another repository": pushed("abcd-nl/other", "refs/heads/main", "docs/adr/ADR-001.md"),
 		"another folder":     pushed("abcd-nl/clean", "refs/heads/main", "cdr/CDR-001.md"),
@@ -190,7 +178,7 @@ func TestAPushElsewhereLeavesTheVault(t *testing.T) {
 // A note main had and has no more is gone from the vault; one main never had stays.
 func TestANoteGoneFromMainIsGoneFromTheVault(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "only here.md"), []byte("mine\n"), 0o644))
 	s.fillVault(t.Context(), "abcd", everyFolder)
@@ -208,7 +196,7 @@ func TestANoteGoneFromMainIsGoneFromTheVault(t *testing.T) {
 // A note main no longer has, which the vault changed, stays as the vault has it.
 func TestANoteGoneFromMainThatTheVaultChangedStays(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	s.fillVault(t.Context(), "abcd", everyFolder)
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "old", "ADR-000.md"), []byte("# ADR-000\n\nStill mine.\n"), 0o644))
@@ -225,7 +213,7 @@ func TestANoteGoneFromMainThatTheVaultChangedStays(t *testing.T) {
 // A folder that could not be filled says why, and writes nothing.
 func TestAFolderNotFilledSaysWhy(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:gone=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:gone=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 
 	filled := s.fillVault(t.Context(), "abcd", everyFolder)
