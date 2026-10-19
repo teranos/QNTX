@@ -84,9 +84,7 @@ folder itself carries nothing.
 
 ## What reaches the repository
 
-"i don't want that to be automatically opted in,"
-
-"and i want to set what the name of the branch would be in the obsidian element in the binding."
+"i don't want that to be automatically opted in, and i want to set what the name of the branch would be in the obsidian element in the binding."
 
 - A bound folder sends nothing until a branch is named for it in the element.
 
