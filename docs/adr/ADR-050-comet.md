@@ -201,10 +201,19 @@ Even faster when the builds are done by QNTX as Comet
   from the binary cache at ground's pin. q's build of grove ran under
   qemu-aarch64 on k as grove's ground.
 
+- A comet lands from its machine's node, on the box: grove's comet for the
+  box's own machine names q, and the Node Agent's sky landed it from q in its
+  home, digest 77ef85de.
+- ground as a Pi extension (ground pi/ground.ts): Pi 1.0.3 at the node's pin
+  loaded it, and its session_start reached grove's comet.
+
 ## Not done
 
-- A comet lands from its machine's node: l's and k's nodes refuse a request
-  without a token with 401, whatever their machine repository's qntx.pbt says,
-  and a token is minted from a passkey session (ADR-025).
-- Rituals on the box.
-- ground as a Pi extension.
+- A comet lands from l's and k's own nodes: they refuse a request without a
+  token with 401, whatever their machine repository's qntx.pbt says, and a
+  token is minted from a passkey session (ADR-025). k's node runs no comet.
+- Rituals on the box: everything a ritual needs stands in the Node Agent's
+  grove checkout, and grove's rituals are off there until a person's session
+  standing in it says rituals on.
+- A whole Pi turn under ground: q's am.toml names no Pi for its agent, so Pi
+  has no model to answer with.
