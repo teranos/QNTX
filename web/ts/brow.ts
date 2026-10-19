@@ -20,7 +20,7 @@ import { apiFetch } from './client';
 import { isTauri } from './tauri-notifications';
 import { log, SEG } from './logger';
 
-// ── The row's shape (server/statusline_handlers.go) ─────────────────
+// ── The row's shape (server/statusline/handlers.go) ─────────────────
 
 export interface StatusItem {
     name: string;

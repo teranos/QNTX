@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
@@ -53,7 +54,7 @@ type quoteDegree struct {
 type quoteHandler struct {
 	// prompts is every prompt the namespace holds, as typed.
 	prompts func(namespace string) ([]string, error)
-	news    *newsLog
+	news    *statusline.NewsLog
 	// Who the token that attested the claim speaks for, as ci.watch files it.
 	mintedBy func(did string) (string, bool)
 	logger   *zap.SugaredLogger
@@ -129,10 +130,10 @@ func (h *quoteHandler) leave(as types.As, namespace string, unsourced, stretched
 	if more > 0 {
 		note += " and " + strconv.Itoa(more) + " more"
 	}
-	h.news.leave(News{
+	h.news.Leave(statusline.News{
 		ID:   as.ID,
 		For:  addressee,
-		Item: StatusItem{Name: "quote", Note: note, Symbol: SymbolUnwell},
+		Item: statusline.StatusItem{Name: "quote", Note: note, Symbol: statusline.SymbolUnwell},
 		Detail: map[string]any{
 			"session":      sessionOf(as.Contexts),
 			"file_path":    attrString(as.Attributes, "file_path"),
@@ -143,7 +144,7 @@ func (h *quoteHandler) leave(as types.As, namespace string, unsourced, stretched
 			"namespace":    namespace,
 			"caller":       caller,
 		},
-		UntilMs: time.Now().Add(newsHold).UnixMilli(),
+		UntilMs: time.Now().Add(statusline.NewsHold).UnixMilli(),
 	})
 	h.logger.Infow("quote.provenance left news on the row",
 		"attestation", as.ID, "unsourced", len(unsourced), "stretched", len(stretched),

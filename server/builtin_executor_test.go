@@ -7,6 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -33,8 +34,8 @@ func TestBuiltinExecutorReachesTheRegisteredHandler(t *testing.T) {
 	h := &recordingHandler{name: "test.builtin"}
 	reg.Register(h)
 
-	var failed []HandlerFailure
-	ex := &builtinExecutor{registry: reg, noteFailure: func(f HandlerFailure) { failed = append(failed, f) }}
+	var failed []statusline.HandlerFailure
+	ex := &builtinExecutor{registry: reg, noteFailure: func(f statusline.HandlerFailure) { failed = append(failed, f) }}
 
 	as := &types.As{ID: "as-1", Predicates: []string{"p"}, Attributes: map[string]any{"k": "v"}}
 	if err := ex.ExecuteBuiltin(context.Background(), "test.builtin", as); err != nil {
@@ -51,7 +52,7 @@ func TestBuiltinExecutorReachesTheRegisteredHandler(t *testing.T) {
 // A name the registry does not hold is an error the watcher records. Nothing
 // is queued for later: a built-in is compiled in or it is not.
 func TestBuiltinExecutorRefusesAnUnknownName(t *testing.T) {
-	ex := &builtinExecutor{registry: async.NewHandlerRegistry(), noteFailure: func(HandlerFailure) {}}
+	ex := &builtinExecutor{registry: async.NewHandlerRegistry(), noteFailure: func(statusline.HandlerFailure) {}}
 	if err := ex.ExecuteBuiltin(context.Background(), "nobody.home", &types.As{ID: "as-2"}); err == nil {
 		t.Fatal("an unknown built-in was accepted")
 	}
@@ -63,8 +64,8 @@ func TestBuiltinExecutorNotesAFailureForTheRow(t *testing.T) {
 	reg := async.NewHandlerRegistry()
 	reg.Register(&recordingHandler{name: "test.fails", refuse: errors.New("gh: not found")})
 
-	var failed []HandlerFailure
-	ex := &builtinExecutor{registry: reg, noteFailure: func(f HandlerFailure) { failed = append(failed, f) }}
+	var failed []statusline.HandlerFailure
+	ex := &builtinExecutor{registry: reg, noteFailure: func(f statusline.HandlerFailure) { failed = append(failed, f) }}
 
 	err := ex.ExecuteBuiltin(context.Background(), "test.fails", &types.As{ID: "as-3"})
 	if err == nil {

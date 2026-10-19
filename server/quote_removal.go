@@ -9,6 +9,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
@@ -27,7 +28,7 @@ type quoteRemoved struct {
 type quoteRemovalHandler struct {
 	// prompts is every prompt the namespace holds, as typed.
 	prompts func(namespace string) ([]string, error)
-	news    *newsLog
+	news    *statusline.NewsLog
 	// Who the token that attested the removal speaks for, as ci.watch files it.
 	mintedBy func(did string) (string, bool)
 	logger   *zap.SugaredLogger
@@ -90,10 +91,10 @@ func (h *quoteRemovalHandler) leave(as types.As, namespace, commit string, remov
 	if more := len(removed) - 1; more > 0 {
 		note += " and " + strconv.Itoa(more) + " more"
 	}
-	h.news.leave(News{
+	h.news.Leave(statusline.News{
 		ID:   as.ID,
 		For:  addressee,
-		Item: StatusItem{Name: "quote", Note: note, Symbol: SymbolUnwell},
+		Item: statusline.StatusItem{Name: "quote", Note: note, Symbol: statusline.SymbolUnwell},
 		Detail: map[string]any{
 			"session":      sessionOf(as.Contexts),
 			"commit":       commit,
@@ -102,7 +103,7 @@ func (h *quoteRemovalHandler) leave(as types.As, namespace, commit string, remov
 			"namespace":    namespace,
 			"caller":       caller,
 		},
-		UntilMs: time.Now().Add(newsHold).UnixMilli(),
+		UntilMs: time.Now().Add(statusline.NewsHold).UnixMilli(),
 	})
 	h.logger.Infow("quote.removal left news on the row",
 		"attestation", as.ID, "commit", commit, "removed", len(removed),
