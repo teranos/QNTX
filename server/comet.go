@@ -76,19 +76,19 @@ func (s *QNTXServer) groundAgent(home string) {
 	err := comet.Under(home)
 	if err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built", "home", home, "because", err.Error())
-		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround)
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
 		return
 	}
 	// A ground that stands loads from the store a deploy collects (plugin_roots.go): kept, or built again.
 	if err := s.keepAgentGround(home); err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built again: what it loads from was not kept", "home", home, "because", err.Error())
-		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround)
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
 		return
 	}
 	// A ground that stands is run by the settings this node writes, not by those an older one wrote.
 	if err := comet.AgentSettings(home); err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built again: its settings did not write", "home", home, "because", err.Error())
-		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround)
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
 	}
 }
 
@@ -127,7 +127,7 @@ func (s *QNTXServer) cometsMovedBy(push forge.Push) []string {
 	// An agent's ground is built from ground's main as every comet is.
 	if strings.EqualFold(push.Repo.Path, comet.Ground.Owner+"/"+comet.Ground.Repo) && push.Branch() == comet.Ground.Branch {
 		for _, home := range s.underGround.all() {
-			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround)
+			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
 			rebuilding = append(rebuilding, "the ground of the agent in "+home)
 		}
 	}

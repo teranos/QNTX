@@ -58,8 +58,9 @@ func AgentPath(home, path string) string { return filepath.Dir(AgentGround(home)
 var agentBuilds sync.Map
 
 // GroundAgent builds the agent's ground apart from whoever asked, keeps what it loads from as keep
-// says, then writes the settings that run it; what the build came to is kept for Under to say.
-func (b Builder) GroundAgent(ctx context.Context, home, url string, keep func(home string) error) {
+// says, then writes the settings that run it; what the build came to is kept for Under to say, and
+// said by log as it ends.
+func (b Builder) GroundAgent(ctx context.Context, home, url string, keep func(home string) error, log func(msg string, keysAndValues ...any)) {
 	agentBuilds.Store(home, "its ground is building since "+time.Now().UTC().Format(time.RFC3339))
 	sacred.Go("comet.agent."+filepath.Base(home), func() {
 		err := b.BuildAgent(ctx, home, url)
@@ -71,9 +72,11 @@ func (b Builder) GroundAgent(ctx context.Context, home, url string, keep func(ho
 		}
 		if err != nil {
 			agentBuilds.Store(home, "its last ground build failed: "+err.Error())
+			log("An agent's ground build failed", "home", home, "error", err)
 			return
 		}
 		agentBuilds.Delete(home)
+		log("An agent's ground is built", "home", home, "ground", AgentGround(home))
 	})
 }
 
