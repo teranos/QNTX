@@ -2,7 +2,7 @@
 
 **Status:** Accepted 
 **Date:** 2026-09-07 
-**Related:** ADR-025 (Access Tokens), ADR-026 (Namespaces), ADR-030 (Identity Providers), ADR-031 (The User), ADR-032 (Front Doors), ADR-034 (Roles as Attestations)
+**Related:** [[ADR-025-access-tokens]] (Access Tokens), [[ADR-026-Namespaces]] (Namespaces), [[ADR-030-identity-providers]] (Identity Providers), ADR-031 (The User), [[ADR-032-Doors]] (Front Doors), ADR-034 (Roles as Attestations)
 
 Analytics Pixel
 
