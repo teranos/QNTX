@@ -6,7 +6,7 @@ Status: Proposed
 BRING YOUR OWN KEY
 BYOK
 
-USE 
+USE INDUSTRY STANDARD LANGUAGE FOR THIS PLEASE, THIS IS NOT AN INVENTION, AND SHOULD NOT BW
 
 "customer, or friend who helps ne test in this casem provide their own key"
 
