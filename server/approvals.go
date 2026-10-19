@@ -66,6 +66,7 @@ const (
 
 // The segment a check is drawn as (protocol.ApprovalCheck.state).
 const (
+	// TODO(forge): These are forge.CheckState. Use it.
 	checkWaiting = "waiting"
 	checkRunning = "running"
 	checkDone    = "done"
@@ -106,6 +107,7 @@ func (a *approvalState) waits() bool {
 	return a.said == saysMergeWhenReady
 }
 
+// TODO(forge): An approval names its forge. Its subject is owner/repo#n, written from the App's webhook, so naming it anew is a record migration like forge_names.go, with approvals open at cutover to decide.
 // forgeRepo is the repository the approval is about. Approvals come from the
 // GitHub App's webhook, which names a repository owner/repo, so it is on GitHub.
 func (a *approvalState) forgeRepo() (forge.Repo, error) {
@@ -412,6 +414,7 @@ func (s *QNTXServer) mainGreen(ctx context.Context, st *approvalState) (bool, er
 	return true, nil
 }
 
+// TODO(forge): GitHub's conclusion words. The adapter's, used by Checks and by the webhook path alike.
 // concludedWell is a conclusion GitHub itself merges on.
 func concludedWell(conclusion string) bool {
 	return conclusion == "success" || conclusion == "neutral" || conclusion == "skipped"

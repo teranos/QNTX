@@ -48,6 +48,7 @@ func init() {
 	GitCmd.AddCommand(gitCredentialCmd)
 }
 
+// TODO(forge): git asks for a credential by host. The node mints one for any host it has a Forge for, not github.com alone.
 // gitHubHost is the one host the node mints a credential for.
 const gitHubHost = "github.com"
 
@@ -69,6 +70,7 @@ func gitCredential(operation string, asked io.Reader, answer io.Writer, mint fun
 	if err := lines.Err(); err != nil {
 		return errors.Wrap(err, "what git asked did not read")
 	}
+	// TODO(forge): Look the forge up by this host and ask it for the credential, instead of refusing every host but GitHub's.
 	// Another host is left to whatever else git has for it.
 	if about["host"] != gitHubHost {
 		return nil

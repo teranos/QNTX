@@ -40,6 +40,7 @@ func githubAskSigils() []*protocol.Sigil {
 
 func (g *gitHub) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	operation := sent["operation"]
+	// TODO(forge): ask and operations expose GitHubService by operation name. They are GitHub's and should say so (sigil names), or each forge lists its own operations.
 	raw, err := g.gitHubService().Ask(services.AsInstallation(ctx), operation, []byte(sent["request"]))
 	var noSuch services.NoSuchOperation
 	var notTaken services.NotWhatItTakes

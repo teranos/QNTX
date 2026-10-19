@@ -19,6 +19,7 @@ import (
 // githubForPeersPath is where a peer asks its primary one GET of GitHub's API.
 const githubForPeersPath = "/auth/github"
 
+// TODO(forge): Asking the primary node to ask GitHub for a peer is for any forge: the primary reaches the repository's host.
 // peersGitHubAPI is the one host the primary asks on a peer's behalf.
 const peersGitHubAPI = "https://api.github.com/"
 

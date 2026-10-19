@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO(forge): Redelivering what the App's webhook missed is GitHub's. A forge that keeps and redelivers deliveries does it behind a Forge method; one that does not, does not.
 // deliveriesAsker is the part of GitHubService a catch-up spends.
 type deliveriesAsker interface {
 	ListDeliveriesForAnAppWebhook(context.Context, *protocol.GitHubListDeliveriesForAnAppWebhookRequest) (*protocol.GitHubListDeliveriesForAnAppWebhookResponse, error)

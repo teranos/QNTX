@@ -11,11 +11,13 @@ import (
 // What carries a push from this node (ADR-048, Its git): a token the node
 // mints as the GitHub App, for one repository, when git asks for it.
 
+// TODO(forge): The route is named for GitHub. The credential is the forge's, asked for by the repository's host.
 // A route and no sigil, and no tool (routeTool): on the box the agent took the
 // sigil as a tool, and the token went into its context and into a command.
 // What asks here is git's credential helper (qntx git credential).
 const githubCredentialPath = githubPath + "/credential"
 
+// TODO(forge): x-access-token is GitHub's username for an installation token. Another forge says its own, with the credential.
 // gitCredentialUser is the username GitHub takes an installation token under
 // over HTTPS.
 const gitCredentialUser = "x-access-token"
@@ -42,6 +44,7 @@ func (g *gitHub) HandleGitHubCredential(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// TODO(forge): Minting a short-lived push credential for one repository is a Forge method (Writer), not GitHubService's InstallationToken. The username it is spent under comes from the forge.
 	minted, err := g.gitHubService().InstallationToken(r.Context(), asked.Owner, asked.Repo)
 	var notInstalled services.NoInstallation
 	switch {

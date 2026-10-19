@@ -23,8 +23,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO(forge): The route, the github signum and its sigils name the node's forge as GitHub. The core holds forges; what is GitHub's alone (the Actions runner, the App's webhook secret) is marked as such under it.
 const githubPath = "/api/github"
 
+// TODO(forge): The core holds Forges (s.forges()). This struct holds GitHub's service, webhook, follows, runner and deliveries: rename it when what is forge-neutral has moved out, and what is left is GitHub's.
 // gitHub is the node's GitHub (ADR-043): the GitHubService, the runner, the
 // App's webhook, the follows and the catch-up of deliveries. What it needs of
 // the node is gitHubHost, and nothing else.
@@ -60,6 +62,7 @@ type gitHubHost interface {
 	vaultsMovedBy(forge.Push) []string
 }
 
+// TODO(forge): Credentials per forge host (see GitHubKeeper).
 // gitHubCredentials hands GitHubService the GITHUB token a namespace spends.
 type gitHubCredentials struct{ host gitHubHost }
 
@@ -263,6 +266,7 @@ func (g *gitHub) githubStatus(ctx context.Context, _ sigil.Sent) (any, *protocol
 // githubRow is a namespace's row with whether its GitHub works, asked of
 // GitHub and not remembered, and its rate limit.
 func (g *gitHub) githubRow(ctx context.Context, row *protocol.GitHubNamespace) *protocol.GitHubNamespace {
+	// TODO(forge): Whether a namespace's token works, and its rate limit, is asked of GitHubService. A forge answers whether it is reached as a namespace, and its limit if it has one (Forge).
 	said, err := g.gitHubService().RateLimit(ctx, &protocol.GitHubRateLimitRequest{Namespace: row.Namespace})
 	switch {
 	case err != nil:

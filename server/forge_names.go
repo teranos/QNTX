@@ -52,6 +52,7 @@ func legacySource(said string) (string, bool) {
 	return named + "@" + rest, true
 }
 
+// TODO(forge): Delete this file, its test and the call in Start once every node has started on a build that has it.
 // nameForges names the forge of every repository the node's records hold as
 // owner/repo. A record that cannot be read, or named, stops the node here: a
 // reader that met it would refuse it anyway, and a node that went on without

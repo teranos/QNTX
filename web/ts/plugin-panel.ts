@@ -287,6 +287,7 @@ export function renderAddCard(): string {
         return `<div class="plugin-add-card plugin-add-card-closed" role="button" tabindex="0" aria-label="Add a plugin by its repository URL">+</div>`;
     }
     const checked = resolved !== null && resolved.repo === addingRepo.trim();
+    // TODO(forge): The placeholder below is a github.com URL. Any forge's repository URL is added (see plugin_check.go).
     return `
         <div class="plugin-add-card plugin-add-card-open">
             <input type="text" class="plugin-add-repo plugin-mono" placeholder="https://github.com/owner/repo/tree/main/plugin" value="${escapeHtml(addingRepo)}" autocomplete="off" spellcheck="false">

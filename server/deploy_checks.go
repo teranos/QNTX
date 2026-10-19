@@ -15,6 +15,7 @@ import (
 const (
 	// deployChecking is a pushed deploy waiting on GitHub's checks.
 	deployChecking = "checks"
+	// TODO(forge): Only the adapter uses it (Checks, OwnCI). Move it to forge_github.go.
 	// gitHubActionsApp is GitHub Actions' App: the checks a push waits on are the ones it runs.
 	gitHubActionsApp = 15368
 	checksEvery      = 10 * time.Second

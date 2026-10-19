@@ -59,6 +59,7 @@ func githubHash(namespace string) string {
 	return sha256Hex(string(LevelGitHub) + " " + namespace)
 }
 
+// TODO(forge): A namespace's GITHUB token is its access to a forge. Tokens are kept per forge host, so another forge's token is kept the same way.
 // GitHubKeeper is the part of a token store that holds GITHUB tokens.
 type GitHubKeeper interface {
 	KeepGitHub(namespace, mintedBy string, secret GitHubSecret) (string, error)

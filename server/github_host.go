@@ -26,6 +26,7 @@ func (s *QNTXServer) gh() *gitHub {
 	return s.github
 }
 
+// TODO(forge): The delegate stays until nothing outside the GitHub files calls it. The calls left are marked TODO(forge) where they are.
 // gitHubService is the node's GitHubService.
 func (s *QNTXServer) gitHubService() *services.GitHubServer { return s.gh().gitHubService() }
 

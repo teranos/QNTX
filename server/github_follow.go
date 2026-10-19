@@ -26,6 +26,7 @@ import (
 // A follow's line is GITHUB follow:<owner/repo>@<branch>.
 const githubFollowLine = "follow:"
 
+// TODO(forge): A follow is not GitHub's: Follow. Its record is the GITHUB subject with a follow: predicate (see node_records.go), so naming it anew is a record migration like forge_names.go.
 // GitHubFollow is a push to Repo's Branch dispatching Workflow of Dispatches at
 // Ref. Repo and Dispatches name their forge: github.com/owner/repo.
 type GitHubFollow struct {
@@ -129,6 +130,7 @@ func (g *gitHub) dispatchFollow(f GitHubFollow, after string, logger *zap.Sugare
 		logger.Errorw("A push landed and its follow names no repo to dispatch", "follow", f.line(), "after", after, "dispatches", f.Dispatches, "error", err)
 		return
 	}
+	// TODO(forge): The follow names its forge in Dispatches. Look the forge up with s.forges().For(dispatches) and dispatch through it; onGitHub is the adapter's.
 	on, err := onGitHub(dispatches)
 	if err != nil {
 		logger.Errorw("A push landed and its follow dispatches where GitHub does not", "follow", f.line(), "after", after, "dispatches", f.Dispatches, "error", err)
@@ -140,6 +142,7 @@ func (g *gitHub) dispatchFollow(f GitHubFollow, after string, logger *zap.Sugare
 		logger.Errorw("A push landed and its follow's inputs are not a workflow's", "follow", f.line(), "after", after, "error", err)
 		return
 	}
+	// TODO(forge): Dispatching a pipeline is a Forge method (Writer), not GitHubService's CreateAWorkflowDispatchEvent.
 	said, err := g.gitHubService().CreateAWorkflowDispatchEvent(g.host.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
 		Namespace: auth.NamespaceSystem, Owner: owner, Repo: repo, WorkflowId: f.Workflow, Ref: f.Ref, Inputs: inputs,
 	})

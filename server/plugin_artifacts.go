@@ -24,6 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO(forge): GitHub's workflow_run payload. A forge's adapter reads its own pipeline-finished event into a forge event.
 // gitHubWorkflowRun is the part of a workflow_run event a build reads.
 type gitHubWorkflowRun struct {
 	Action      string `json:"action"`
@@ -56,6 +57,7 @@ func pluginsOfRun(records []grpcplugin.PluginRecord, repo, branch, defaultBranch
 		if !record.Enabled {
 			continue
 		}
+		// TODO(forge): A plugin's repository is read for any forge the node reaches (see plugin_check.go), and compared as a forge.Repo, not by owner/repo against the run's full_name.
 		source, err := readGitHubSource(record.Repo)
 		if err != nil || !strings.EqualFold(source.Owner+"/"+source.Repo, repo) {
 			continue
@@ -103,6 +105,7 @@ func (s *QNTXServer) buildsOfRun(run gitHubWorkflowRun) ([]string, error) {
 // platform, and installs it unless the installed build is of a newer run.
 func (s *QNTXServer) takeRun(ctx context.Context, name string, source gitHubSource, run gitHubWorkflowRun) error {
 	logger := s.logger.Named("artifact")
+	// TODO(forge): A pipeline run's artifacts are a Forge method (Reader), not GitHubService's ListWorkflowRunArtifacts.
 	listed, err := s.gitHubService().ListWorkflowRunArtifacts(services.AsInstallation(ctx), &protocol.GitHubListWorkflowRunArtifactsRequest{
 		Owner: source.Owner, Repo: source.Repo, RunId: run.WorkflowRun.ID, PerPage: 100})
 	if err != nil {
@@ -136,6 +139,7 @@ func (s *QNTXServer) takeRun(ctx context.Context, name string, source gitHubSour
 
 // downloadArtifact is what one artifact holds, as GitHub zips it.
 func (s *QNTXServer) downloadArtifact(ctx context.Context, source gitHubSource, artifact *protocol.GitHubActionsArtifactsArtifact) ([]byte, error) {
+	// TODO(forge): Downloading a pipeline run's artifact is a Forge method (Reader), not GitHubService's Artifact.
 	body, err := s.gitHubService().Artifact(ctx, source.Owner, source.Repo, artifact.Id)
 	if err != nil {
 		return nil, errors.Wrapf(err, "artifact %s of %s/%s was not downloaded", artifact.Name, source.Owner, source.Repo)

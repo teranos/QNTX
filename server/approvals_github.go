@@ -14,6 +14,7 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
+// TODO(forge): GitHub's pull_request, check_run and check_suite payloads. A forge's adapter reads its own into a forge event of a change or a check, and approvalsFromGitHub takes those.
 // gitHubPullRequestEvent is the part of a pull_request event an approval reads.
 type gitHubPullRequestEvent struct {
 	Action      string `json:"action"`
@@ -70,6 +71,7 @@ type gitHubCheckSuiteEvent struct {
 	} `json:"repository"`
 }
 
+// TODO(forge): GitHub's status and conclusion words. The adapter maps them to forge.CheckState (forge_github.go already does for Checks); here the webhook path does it again.
 // checkState is the segment a check run is drawn as, from what GitHub said of
 // it: queued is waiting, in progress is running, and completed is done or
 // failed by its conclusion.

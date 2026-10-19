@@ -14,6 +14,7 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
+// TODO(forge): A plugin's repository URL is read for any forge the node reaches: a forge.Repo, a ref and a path. The /tree/<ref>/<path> form is GitHub's; another forge's tree URL is read by its adapter.
 // gitHubSource is a plugin's repository URL, read into the parts GitHub names.
 // A tree URL names a Ref, and a Path when the plugin is a directory of it; a
 // plugin that is the whole repository names neither.
@@ -32,6 +33,7 @@ func readGitHubSource(repo string) (gitHubSource, error) {
 	if err != nil {
 		return gitHubSource{}, errors.Wrapf(err, "%q is not a repository URL", repo)
 	}
+	// TODO(forge): Any host the node has a Forge for, not github.com alone.
 	if u.Host != "github.com" {
 		return gitHubSource{}, errors.Newf("%q is not on github.com, and a plugin's repository is", repo)
 	}
@@ -67,6 +69,7 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 	if name == "." {
 		return nil, errors.Newf("%q names no plugin", repo)
 	}
+	// TODO(forge): The repository is the URL's own host and path, once the URL is read for any forge.
 	// The node reads as itself.
 	where := forge.Repo{Host: forge.GitHub, Path: source.Owner + "/" + source.Repo}
 	reader, err := s.forges().For(where)

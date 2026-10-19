@@ -300,6 +300,7 @@ export function renderVault(container: HTMLElement, view: View, reload: () => Pr
 
     // Each step asks the node, as the App, for what can be clicked next.
     const fill = async (list: HTMLElement, b: Binding, place: string) => {
+        // TODO(forge): The owners and repositories listed are the forge's own (see vault_bind.go); say which forge.
         list.appendChild(div('element-loading', 'Asking GitHub…'));
         try {
             if (!b.owner) {

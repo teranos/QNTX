@@ -21,6 +21,7 @@ import (
 // The App's webhook is at a path ROOT sets under githubWebhookPrefix, the one
 // prefix the reach table opens; githubWebhookPath until ROOT sets another.
 const (
+	// TODO(forge): The App's webhook is one route for GitHub. A webhook per forge is routed by forge, verified by that forge's adapter, and yields forge events (Push, a pipeline finished, a change, a check).
 	githubWebhookPrefix = "/github/"
 	githubWebhookPath   = githubWebhookPrefix + "webhook"
 )
@@ -51,6 +52,7 @@ func (g *gitHub) gitHubWebhook() (string, bool) {
 // githubWebhookBody bounds a delivery; GitHub caps a payload at 25 MB.
 const githubWebhookBody = 25 << 20
 
+// TODO(forge): GitHub's push payload, read by push() below. Each forge's adapter reads its own into forge.Push.
 // gitHubPush is the part of a push event a build reads.
 type gitHubPush struct {
 	Ref        string `json:"ref"`
@@ -66,6 +68,7 @@ type gitHubPush struct {
 	} `json:"commits"`
 }
 
+// TODO(forge): The adapter's. Move with gitHubPush to forge_github.go, with Host as the forge's own.
 // push is what the push says in the part any forge says it. The files are
 // every one GitHub says the push added, removed or modified.
 func (p gitHubPush) push() forge.Push {
@@ -95,6 +98,7 @@ func pushMoves(p forge.Push, b pluginBuild) bool {
 	return false
 }
 
+// TODO(forge): HMAC over the body under X-Hub-Signature-256 is how GitHub signs a delivery. A forge verifies a delivery its own way, in its adapter.
 // signed is whether signature is body's HMAC under secret.
 func signed(secret, signature string, body []byte) bool {
 	hexed, ok := strings.CutPrefix(signature, "sha256=")
@@ -135,6 +139,7 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "the delivery is not signed with the App's webhook secret")
 		return
 	}
+	// TODO(forge): The event names (workflow_run, push, pull_request, check_run, check_suite) are GitHub's. The handler decodes forge events, and the adapter names its own.
 	event := r.Header.Get("X-GitHub-Event")
 	if event == "workflow_run" {
 		var run gitHubWorkflowRun
