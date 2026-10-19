@@ -35,9 +35,35 @@ type Said struct {
 	System   string
 	MCP      []MCPServer
 	Provider *Provider
+	// Tools is which of Pi's own tools it runs with beside its MCP.
+	Tools Tools
 	// Env is what the session's environment holds beyond what this sets, each
 	// NAME=value.
 	Env []string
+}
+
+// Tools is which of Pi's own tools a session runs with: read, bash, edit,
+// write and the rest Pi builds in (docs/cli.md).
+type Tools string
+
+const (
+	// PisOwnTools is Pi's own tools beside its MCP.
+	PisOwnTools Tools = "pi's own"
+	// NoneOfPisOwn is none of Pi's own tools: its MCP alone, as
+	// --no-builtin-tools leaves it.
+	NoneOfPisOwn Tools = "none of pi's own"
+)
+
+// args is how Pi is told which of its own tools it runs with, or why a
+// session names none it knows.
+func (t Tools) args() ([]string, error) {
+	switch t {
+	case PisOwnTools:
+		return []string{}, nil
+	case NoneOfPisOwn:
+		return []string{"--no-builtin-tools"}, nil
+	}
+	return nil, errors.Newf("a session names which of Pi's own tools it runs with, and %q is neither %q nor %q", string(t), string(PisOwnTools), string(NoneOfPisOwn))
 }
 
 // MCPServer is one MCP server the session reaches over HTTP, and the bearer it
@@ -134,6 +160,10 @@ const stderrKept = 4096
 // it arrives. A run that completed no answer is an error carrying what Pi
 // wrote to stderr.
 func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
+	tools, err := s.Tools.args()
+	if err != nil {
+		return Answer{}, err
+	}
 	agentDir, work := filepath.Join(s.Home, "pi"), filepath.Join(s.Home, "work")
 	for _, dir := range []string{agentDir, work} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -162,7 +192,7 @@ func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
 	if s.System != "" {
 		args = append(args, "--append-system-prompt", s.System)
 	}
-	args = append(args, "--", s.Says)
+	args = append(append(args, tools...), "--", s.Says)
 
 	started := time.Now()
 	cmd := exec.CommandContext(ctx, s.Binary, args...)

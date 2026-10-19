@@ -77,6 +77,7 @@ func said(binary, home string) Said {
 		MCP:      []MCPServer{{Name: "qntx", URL: "http://127.0.0.1:8770/mcp", Bearer: "the-agent-token"}},
 		Provider: &Provider{Name: "qntx", BaseURL: "http://127.0.0.1:8770/api/openrouter-qntx/v1", Key: "the-agent-token", Models: []string{"anthropic/claude-sonnet-4.6"}},
 		Env:      []string{"GIT_CONFIG_GLOBAL=/agent/gitconfig"},
+		Tools:    PisOwnTools,
 	}
 }
 
@@ -213,5 +214,42 @@ func TestARunWithNoAnswerSaysWhatPiSaid(t *testing.T) {
 	_, err := said(binary, t.TempDir()).Run(context.Background(), nil)
 	if err == nil || !strings.Contains(err.Error(), "No API key found for qntx") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// A session that runs none of Pi's own tools tells Pi so, one that runs them
+// says nothing of it, and one that names neither is not run.
+func TestSaidNamesWhichOfPisOwnToolsItRunsWith(t *testing.T) {
+	binary, ran := standIn(t, answered, 0, "")
+	own := said(binary, t.TempDir())
+	if _, err := own.Run(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(linesOf(t, filepath.Join(ran, "args")), "--no-builtin-tools") {
+		t.Error("a session that runs Pi's own tools was told to run none")
+	}
+
+	binary, ran = standIn(t, answered, 0, "")
+	none := said(binary, t.TempDir())
+	none.Tools = NoneOfPisOwn
+	if _, err := none.Run(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	args := linesOf(t, filepath.Join(ran, "args"))
+	if !slices.Contains(args, "--no-builtin-tools") {
+		t.Errorf("a session that runs none of Pi's own tools was not told so: %v", args)
+	}
+	if args[len(args)-2] != "--" {
+		t.Errorf("what is said is not the last argument after --: %v", args)
+	}
+
+	binary, ran = standIn(t, answered, 0, "")
+	unnamed := said(binary, t.TempDir())
+	unnamed.Tools = ""
+	if _, err := unnamed.Run(context.Background(), nil); err == nil {
+		t.Error("a session that named none of Pi's tools was run")
+	}
+	if _, err := os.Stat(filepath.Join(ran, "args")); !os.IsNotExist(err) {
+		t.Error("Pi was started for a session that named none of its tools")
 	}
 }
