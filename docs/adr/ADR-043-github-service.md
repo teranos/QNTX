@@ -3,7 +3,7 @@
 Date: 2026-09-28
 Status: Proposed
 
-
+brandon: "So, this concept, it will be called Forge in the future, "
 
 "GitHubService needs to be a thing, and QNTX should own it."
 
