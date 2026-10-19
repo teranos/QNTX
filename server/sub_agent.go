@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/teranos/QNTX/internal/claudecode"
-	"github.com/teranos/QNTX/internal/pi"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
@@ -79,30 +78,6 @@ func holdClaudeCode(ctx context.Context, pin claudecode.Pin, dir string, spawn f
 	return held
 }
 
-// holdPi builds the pinned Pi with the machine's nix, off the boot's own time:
-// a build Nix does not hold yet takes minutes, and the node serves meanwhile.
-func holdPi(ctx context.Context, flake string, spawn func(string, func()), logger *zap.SugaredLogger) *harnessHeld {
-	held := &harnessHeld{name: "Pi", fetched: make(chan struct{})}
-	spawn("agent.pi", func() {
-		defer close(held.fetched)
-		nix, err := pi.Nix()
-		var home string
-		if err == nil {
-			home, err = os.UserHomeDir()
-		}
-		if err == nil {
-			held.path, err = pi.Ensure(ctx, nix, flake, filepath.Join(home, ".qntx", "pi", "result"))
-		}
-		held.err = err
-		if err != nil {
-			logger.Errorw("Pi was not built, so the Node Agent runs in Claude Code alone", "flake", flake, "error", err)
-			return
-		}
-		logger.Infow("Pi is on this node", "version", pi.PinnedVersion, "path", held.path)
-	})
-	return held
-}
-
 // claudeCodeDir is where a node keeps the Claude Code it fetched, beside where
 // it keeps the plugins it fetched.
 func claudeCodeDir() (string, error) {
@@ -129,9 +104,8 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 		return err
 	}
 	s.holdHarness("claude", holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger))
-	// A namespace's agent runs in Pi too, so the node holds Pi whichever
-	// harnesses its Node Agent runs in.
-	s.holdHarness("pi", holdPi(s.ctx, pi.PinnedFlake, s.wg.Go, s.logger))
+	// No node holds Pi, so neither the Node Agent nor a namespace's agent runs in it:
+	// "disable Pi tmp as a Namespace Agent and as a Node Agent"
 
 	home, err := nodeAgentHome()
 	if err != nil {

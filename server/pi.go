@@ -50,7 +50,15 @@ func (s *QNTXServer) thereIsNoPi() *protocol.Refusal {
 	if s.nodeAgent == nil {
 		return s.thereIsNoNodeAgent()
 	}
-	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it runs in Claude Code alone"}
+	if !s.deps.cfg.Agent.Root.Pi.Named() {
+		return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it runs in Claude Code alone"}
+	}
+	return piIsOff()
+}
+
+// piIsOff is why no agent runs in Pi: the node holds no Pi.
+func piIsOff() *protocol.Refusal {
+	return &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Pi, so no agent runs in it, the Node Agent nor a namespace's: Pi is off"}
 }
 
 // piPart is Pi's part of one turn of the Node Agent.

@@ -296,6 +296,9 @@ func (s *QNTXServer) namespacePiAgent(ctx context.Context, sent sigil.Sent) (aPi
 		if !set {
 			return aPiAgentHeld{}, &protocol.Refusal{Why: sigil.NotFound, Says: namespace + " opted into no agent in Pi: set one with agents set, harness pi"}
 		}
+		if s.harnessHeldBy("pi") == nil {
+			return aPiAgentHeld{}, piIsOff()
+		}
 		// The node holds Pi wherever it keeps agents (agentHome), so an agent
 		// it can hold is one it can run.
 		agent, refused := s.holdNamespaceAgent(namespace, line.model, line.setBy)
