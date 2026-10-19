@@ -13,19 +13,13 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 - To A2A an agent is described by its Agent Card, and its skills are what it
   can perform [[ADR-039-Sigils]].
 
-## An agent per model - Nope
-
-Brandon: Update, 1 Node agent please, with option to switch models.
-
-"I feel like Opus and Fable are two distinct identities"
 
 
 
 ## The host agent
 
 "the ROOT host agent is QNTX as ROOT would talk to it."
-
-"It is the ROOT agent, one persistent session agent that is QNTX itself as
+"NODE agent, one persistent session agent that is QNTX itself as
 expressed to ROOT."
 
 - It has a DID of its own and attests as itself, as any agent does.
