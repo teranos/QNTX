@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"strconv"
@@ -19,19 +19,12 @@ type trafficked interface {
 
 // pluginRow is one plugin's row, or false when the node holds no such plugin.
 func (h *StatusLineHandler) pluginRow(name string) ([]StatusItem, bool) {
-	if h == nil || h.registry == nil {
-		return nil, false
-	}
 	p, ok := h.registry.Get(name)
 	if !ok {
 		return nil, false
 	}
 
-	healthy := false
-	if h.health != nil {
-		results := healthOf(h.health())
-		healthy = well(results[name].Healthy, string(h.registry.GetAllStates()[name]))
-	}
+	healthy := well(h.health()[name].Healthy, string(h.registry.GetAllStates()[name]))
 	meta := p.Metadata()
 
 	// The name leads, so clicking it again is where the node's row comes back.

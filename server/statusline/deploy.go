@@ -1,15 +1,10 @@
-package server
+package statusline
 
-// Each plugin's newest deploy, as the node holds it (plugin_deploy.go), sent
+// Each plugin's newest deploy, as the node holds it (server/plugin_deploy.go), sent
 // with the row as data. How it is drawn is the surface's to decide.
 // "just give me the data and i decide how to render it"
 
-import (
-	"maps"
-	"slices"
-	"sort"
-	"time"
-)
+import "time"
 
 // DeployData is one plugin's newest deploy.
 type DeployData struct {
@@ -29,27 +24,4 @@ type DeployData struct {
 	Began    map[string]time.Time `json:"began"`
 	FailedAt string               `json:"failed_at,omitempty"`
 	Failure  string               `json:"failure,omitempty"`
-}
-
-// deployData is every deploy the node holds, by plugin, and whether one is
-// in flight: the carousel waits while one is.
-func deployData(deploys []pluginDeploy) ([]DeployData, bool) {
-	sort.Slice(deploys, func(i, j int) bool { return deploys[i].plugin < deploys[j].plugin })
-	out := make([]DeployData, 0, len(deploys))
-	inFlight := false
-	for _, d := range deploys {
-		if !slices.Contains(deployEnded, d.stage) {
-			inFlight = true
-		}
-		data := DeployData{
-			Plugin: d.plugin, Stage: d.stage, Repo: d.repo, Pushed: d.pushed, Rev: d.rev,
-			Checks: maps.Clone(d.checks), Began: maps.Clone(d.began),
-			FailedAt: d.failedAt, Failure: d.failure,
-		}
-		if d.versioned {
-			data.Version = d.version
-		}
-		out = append(out, data)
-	}
-	return out, inFlight
 }

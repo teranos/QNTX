@@ -19,6 +19,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -183,7 +184,7 @@ type ciWatchHandler struct {
 	get   func(ctx context.Context, token, url string) ([]byte, error)
 	token func(ctx context.Context) (string, error)
 	sleep func(ctx context.Context, d time.Duration) error
-	news  *newsLog
+	news  *statusline.NewsLog
 	// Who the token that attested the push speaks for. The row is asked as a
 	// person — their session or their own token — and the ground token that
 	// streamed the push cannot read the row at all; the news is filed under
@@ -269,7 +270,7 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 	if !rearmed {
 		h.watching(watchingID, addressee, "watching "+branch+" "+shortSha)
 	}
-	defer h.news.drop(watchingID)
+	defer h.news.Drop(watchingID)
 
 	token, err := h.token(ctx)
 	if err != nil {
@@ -353,11 +354,11 @@ func (h *ciWatchHandler) addressee(caller string) string {
 // as one poll interval can be plus the hold — refreshed on every turn of the
 // loop, so a wait that ended without a verdict expires off the row on its own.
 func (h *ciWatchHandler) watching(id, addressee, note string) {
-	h.news.leave(News{
+	h.news.Leave(statusline.News{
 		ID:      id,
 		For:     addressee,
-		Item:    StatusItem{Name: "ci", Note: note, Symbol: SymbolWell},
-		UntilMs: time.Now().Add(ciWatchCeiling + newsHold).UnixMilli(),
+		Item:    statusline.StatusItem{Name: "ci", Note: note, Symbol: statusline.SymbolWell},
+		UntilMs: time.Now().Add(ciWatchCeiling + statusline.NewsHold).UnixMilli(),
 		Quiet:   true,
 	})
 }
@@ -412,7 +413,7 @@ func (h *ciWatchHandler) fullSha(ctx context.Context, token, repo, sha string) (
 		SHA string `json:"sha"`
 	}
 	if err := json.Unmarshal(out, &commit); err != nil || commit.SHA == "" {
-		return "", errors.Newf("ci.watch: github answered for %s on %s with no sha: %q", sha, repo, firstN(string(out), 200))
+		return "", errors.Newf("ci.watch: github answered for %s on %s with no sha: %q", sha, repo, statusline.FirstN(string(out), 200))
 	}
 	return commit.SHA, nil
 }
@@ -442,7 +443,7 @@ func (h *ciWatchHandler) watchDispatch(ctx context.Context, as types.As, address
 	if !rearmed {
 		h.watching(watchingID, addressee, "watching "+token)
 	}
-	defer h.news.drop(watchingID)
+	defer h.news.Drop(watchingID)
 
 	ghToken, err := h.token(ctx)
 	if err != nil {
@@ -509,7 +510,7 @@ func (h *ciWatchHandler) runsDispatched(ctx context.Context, ghToken, repo, name
 	}
 	var listed ciRuns
 	if err := json.Unmarshal(out, &listed); err != nil {
-		return nil, errors.Wrapf(err, "ci.watch: github answered for %s with something other than runs: %q", repo, firstN(string(out), 200))
+		return nil, errors.Wrapf(err, "ci.watch: github answered for %s with something other than runs: %q", repo, statusline.FirstN(string(out), 200))
 	}
 	ours := make([]ciRun, 0, 1)
 	for _, r := range listed.WorkflowRuns {
@@ -524,14 +525,14 @@ func (h *ciWatchHandler) runsDispatched(ctx context.Context, ghToken, repo, name
 // ever carried the name, in ground's own words for it.
 func (h *ciWatchHandler) leaveDispatch(as types.As, addressee, caller, repo, token string, runs []ciRun) {
 	note := "no run carries the name ground gave it: " + token
-	symbol := SymbolUnwell
+	symbol := statusline.SymbolUnwell
 	conclusion := "absent"
 	url := ""
 	if len(runs) > 0 {
 		var failed []ciRun
 		conclusion, failed = verdict(runs)
 		if conclusion == "success" {
-			symbol = SymbolWell
+			symbol = statusline.SymbolWell
 		}
 		note = conclusion + " " + token
 		url = runs[0].URL
@@ -545,11 +546,11 @@ func (h *ciWatchHandler) leaveDispatch(as types.As, addressee, caller, repo, tok
 			session = strings.TrimPrefix(c, "session:")
 		}
 	}
-	h.news.leave(News{
+	h.news.Leave(statusline.News{
 		// One row per dispatch already: the id carries the run's name.
 		ID:  as.ID,
 		For: addressee,
-		Item: StatusItem{
+		Item: statusline.StatusItem{
 			Name:   "run",
 			Note:   note,
 			Symbol: symbol,
@@ -562,18 +563,18 @@ func (h *ciWatchHandler) leaveDispatch(as types.As, addressee, caller, repo, tok
 			"session":    session,
 			"caller":     caller,
 		},
-		UntilMs: time.Now().Add(newsHold).UnixMilli(),
+		UntilMs: time.Now().Add(statusline.NewsHold).UnixMilli(),
 	})
 }
 
 // leaveNoRun says on the row that the push started no run. Quiet: it is not a
 // verdict, and no session is woken for it.
 func (h *ciWatchHandler) leaveNoRun(as types.As, addressee, repo, branch, shortSha string) {
-	h.news.leave(News{
+	h.news.Leave(statusline.News{
 		ID:      as.ID + ":" + shortSha + ":no-run",
 		For:     addressee,
-		Item:    StatusItem{Name: "ci", Note: "no CI run for " + branch + " " + shortSha, Symbol: SymbolWell},
-		UntilMs: time.Now().Add(newsHold).UnixMilli(),
+		Item:    statusline.StatusItem{Name: "ci", Note: "no CI run for " + branch + " " + shortSha, Symbol: statusline.SymbolWell},
+		UntilMs: time.Now().Add(statusline.NewsHold).UnixMilli(),
 		Quiet:   true,
 	})
 	h.logger.Infow("ci.watch: the push started no run",
@@ -589,7 +590,7 @@ func (h *ciWatchHandler) runsFor(ctx context.Context, token, repo, sha string) (
 	}
 	var listed ciRuns
 	if err := json.Unmarshal(out, &listed); err != nil {
-		return nil, errors.Wrapf(err, "ci.watch: github answered for %s@%s with something other than runs: %q", repo, sha, firstN(string(out), 200))
+		return nil, errors.Wrapf(err, "ci.watch: github answered for %s@%s with something other than runs: %q", repo, sha, statusline.FirstN(string(out), 200))
 	}
 	return listed.WorkflowRuns, nil
 }
@@ -633,15 +634,15 @@ func holdFor(conclusion string) time.Duration {
 	if conclusion == "success" {
 		return successHold
 	}
-	return newsHold
+	return statusline.NewsHold
 }
 
 // leave puts the conclusion on the row for the caller.
 func (h *ciWatchHandler) leave(as types.As, addressee, caller, repo, branch, sha string, runs []ciRun, pushedAt time.Time) {
 	conclusion, failed := verdict(runs)
-	symbol := SymbolUnwell
+	symbol := statusline.SymbolUnwell
 	if conclusion == "success" {
-		symbol = SymbolWell
+		symbol = statusline.SymbolWell
 	}
 	shortSha := sha
 	if len(shortSha) > 7 {
@@ -666,10 +667,10 @@ func (h *ciWatchHandler) leave(as types.As, addressee, caller, repo, branch, sha
 	// session and replaces it on every push — so the id here carries the
 	// commit as well, or the laptop would take a second push's result for the
 	// first's and write nothing.
-	h.news.leave(News{
+	h.news.Leave(statusline.News{
 		ID:  as.ID + ":" + shortSha,
 		For: addressee,
-		Item: StatusItem{
+		Item: statusline.StatusItem{
 			Name:   "ci",
 			Note:   note,
 			Symbol: symbol,
@@ -749,7 +750,7 @@ func ciStatusSince(store namespaces.Reading, since time.Time) ([]*types.As, erro
 // what the person whose push went unreported is looking at.
 func (s *QNTXServer) rearmFailed(namespace string, err error) {
 	s.logger.Errorw("ci.watch could not re-arm", "namespace", namespace, "error", err)
-	s.noteHandlerFailure(HandlerFailure{
+	s.noteHandlerFailure(statusline.HandlerFailure{
 		Handler:     watcher.CIWatchHandlerName,
 		ExecutionID: "rearm:" + namespace,
 		Error:       "re-arm in " + namespace + ": " + err.Error(),
@@ -820,7 +821,7 @@ func (s *QNTXServer) setupCIWatch() {
 			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: rearmSource,
 				MadeBy: async.MadeByNoCaller, Pulse: async.NoPulse(), Started: async.At(time.Now()), Completed: async.NotYet()}
 			if err := h.Execute(s.ctx, job); err != nil {
-				s.noteHandlerFailure(HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: job.ID,
+				s.noteHandlerFailure(statusline.HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: job.ID,
 					Error: err.Error(), Details: errors.GetAllDetails(err)})
 			}
 		})

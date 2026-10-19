@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/statusline"
 	"go.uber.org/zap"
 )
 
@@ -40,9 +41,9 @@ func removalJob(t *testing.T, files, spans []string) *async.Job {
 	return &async.Job{ID: "builtin:quote-removal", HandlerName: watcher.QuoteRemovalHandlerName, Payload: payload}
 }
 
-func removalHandlerWith(prompts ...string) (*quoteRemovalHandler, *newsLog, *string) {
+func removalHandlerWith(prompts ...string) (*quoteRemovalHandler, *statusline.NewsLog, *string) {
 	asked := new(string)
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	return &quoteRemovalHandler{
 		prompts: func(ns string) ([]string, error) {
 			*asked = ns
@@ -66,7 +67,7 @@ func TestQuoteRemovalReportsWhatTheUserSaid(t *testing.T) {
 	if *asked != "ground" {
 		t.Errorf("prompts were read in %q, not the namespace the commit landed in", *asked)
 	}
-	held := news.since("person-1", time.Now().UnixMilli())
+	held := news.Since("person-1", time.Now().UnixMilli())
 	if len(held) != 1 {
 		t.Fatalf("want one item for the person, got %d", len(held))
 	}
@@ -93,7 +94,7 @@ func TestQuoteRemovalOfUnsourcedLeavesNothing(t *testing.T) {
 	if err := h.Execute(ctx, removalJob(t, []string{"a.d"}, []string{"words the agent wrote itself"})); err != nil {
 		t.Fatal(err)
 	}
-	if held := news.since("person-1", time.Now().UnixMilli()); len(held) != 0 {
+	if held := news.Since("person-1", time.Now().UnixMilli()); len(held) != 0 {
 		t.Errorf("an unsourced removal left %d items", len(held))
 	}
 }
@@ -111,7 +112,7 @@ func TestQuoteRemovalReportsAStretchedQuote(t *testing.T) {
 	if err := h.Execute(ctx, removalJob(t, []string{"a.md"}, []string{span})); err != nil {
 		t.Fatal(err)
 	}
-	held := news.since("person-1", time.Now().UnixMilli())
+	held := news.Since("person-1", time.Now().UnixMilli())
 	if len(held) != 1 {
 		t.Fatalf("want one item, got %d", len(held))
 	}

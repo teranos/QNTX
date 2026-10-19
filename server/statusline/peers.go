@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"context"
@@ -14,11 +14,11 @@ import (
 // ug polls one node. A peer's built-ins leave what they concluded on the
 // peer's row, so the primary's row carries every peer's after its own.
 
-// peerRows asks every peer one path as the caller: auth.(*Handler).AskPeers.
-type peerRows func(ctx context.Context, a auth.Admission, path string) []auth.PeerAnswer
+// PeerRows asks every peer one path as the caller: auth.(*Handler).AskPeers.
+type PeerRows func(ctx context.Context, a auth.Admission, path string) []auth.PeerAnswer
 
-// noPeers is a node with no peers to ask: the row it draws is its own.
-func noPeers(context.Context, auth.Admission, string) []auth.PeerAnswer { return nil }
+// NoPeers is a node with no peers to ask: the row it draws is its own.
+func NoPeers(context.Context, auth.Admission, string) []auth.PeerAnswer { return nil }
 
 // forPrimary is the query a primary asks a peer's row with. The peer leaves its
 // caller item off: the primary drew the person already, leftmost.
@@ -28,7 +28,7 @@ const forPrimary = "primary"
 // peer, then the peer's items as the peer spelled them.
 func (h *StatusLineHandler) peerItems(ctx context.Context, a auth.Admission) []StatusItem {
 	var items []StatusItem
-	for _, answer := range h.peers(ctx, a, "/am/statusline?format="+FormatJSON+"&for="+forPrimary) {
+	for _, answer := range h.Peers(ctx, a, "/am/statusline?format="+FormatJSON+"&for="+forPrimary) {
 		items = append(items, peerRow(answer)...)
 	}
 	return items
@@ -60,7 +60,7 @@ func peerRow(answer auth.PeerAnswer) []StatusItem {
 // peerItemDetail asks each peer for one item by name; the first that holds
 // it answers, as the peer spelled it, naming the peer.
 func (h *StatusLineHandler) peerItemDetail(ctx context.Context, a auth.Admission, name string) (map[string]any, bool) {
-	for _, answer := range h.peers(ctx, a, "/am/statusline/"+name) {
+	for _, answer := range h.Peers(ctx, a, "/am/statusline/"+name) {
 		if answer.Err != nil || answer.Status != http.StatusOK {
 			continue
 		}

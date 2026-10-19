@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 // The status line shows spans as Rust writes them: every length in
 // crates/ats/testdata/spans.json, which crates/ats checks it writes too.
 func TestShortAgoWritesTheSpanVectors(t *testing.T) {
-	path := "../crates/ats/testdata/spans.json"
+	path := "../../crates/ats/testdata/spans.json"
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)

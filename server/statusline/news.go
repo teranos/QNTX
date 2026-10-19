@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"sort"
@@ -12,10 +12,10 @@ import (
 // once a second by a laptop that cannot be reached from here, so this is the
 // return leg: the node holds the item until that poll has had time to see it.
 
-// newsHold is how long an item stays on the row. The laptop polls each second
+// NewsHold is how long an item stays on the row. The laptop polls each second
 // and writes what it has not seen; two minutes is many polls, and a node that
 // was unreachable for a minute still hands it over.
-const newsHold = 2 * time.Minute
+const NewsHold = 2 * time.Minute
 
 // Bounded: a handler leaving news in a tight loop must not grow this without end.
 const newsLogSize = 256
@@ -41,9 +41,9 @@ type News struct {
 	AtMs int64
 }
 
-// newsLog holds recent news in memory. A restart empties it, which is correct:
+// NewsLog holds recent news in memory. A restart empties it, which is correct:
 // an item is a fact of this process having seen a run conclude.
-type newsLog struct {
+type NewsLog struct {
 	mu    sync.Mutex
 	items []News
 	// left is how many conclusions were left for each addressee since this
@@ -51,13 +51,10 @@ type newsLog struct {
 	left map[string]int64
 }
 
-func newNewsLog() *newsLog { return &newsLog{left: map[string]int64{}} }
+func NewNewsLog() *NewsLog { return &NewsLog{left: map[string]int64{}} }
 
 // leave puts one item on the row. The same id twice is the newer one once.
-func (l *newsLog) leave(n News) {
-	if l == nil {
-		return
-	}
+func (l *NewsLog) Leave(n News) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	n.AtMs = time.Now().UnixMilli()
@@ -77,10 +74,7 @@ func (l *newsLog) leave(n News) {
 }
 
 // drop takes an item off the row before its hold: what it said is over.
-func (l *newsLog) drop(id string) {
-	if l == nil {
-		return
-	}
+func (l *NewsLog) Drop(id string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for i := range l.items {
@@ -92,8 +86,8 @@ func (l *newsLog) drop(id string) {
 }
 
 // since is what is on the row for one caller now, oldest first.
-func (l *newsLog) since(caller string, nowMs int64) []News {
-	if l == nil || caller == "" {
+func (l *NewsLog) Since(caller string, nowMs int64) []News {
+	if caller == "" {
 		return nil
 	}
 	l.mu.Lock()
@@ -107,11 +101,11 @@ func (l *newsLog) since(caller string, nowMs int64) []News {
 	return out
 }
 
-// leftFor is everything the log still holds for one caller, newest first, on
+// LeftFor is everything the log still holds for one caller, newest first, on
 // the row or past its hold, and how many conclusions it left for them since
 // this process began. The log is bounded, so the count can pass what it holds.
-func (l *newsLog) leftFor(caller string) ([]News, int64) {
-	if l == nil || caller == "" {
+func (l *NewsLog) LeftFor(caller string) ([]News, int64) {
+	if caller == "" {
 		return nil, 0
 	}
 	l.mu.Lock()
@@ -126,11 +120,8 @@ func (l *newsLog) leftFor(caller string) ([]News, int64) {
 	return out, l.left[caller]
 }
 
-// byID is one item for one caller, held or not.
-func (l *newsLog) byID(caller, id string) (News, bool) {
-	if l == nil {
-		return News{}, false
-	}
+// ByID is one item for one caller, held or not.
+func (l *NewsLog) ByID(caller, id string) (News, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, n := range l.items {
@@ -141,12 +132,12 @@ func (l *newsLog) byID(caller, id string) (News, bool) {
 	return News{}, false
 }
 
-// newsKey is the name a caller's news is filed under: the person. A token
+// NewsKey is the name a caller's news is filed under: the person. A token
 // speaks for whoever minted it (ADR-025) and carries that as Identity, and
 // so does their session, so news left for a push one token attested is found
 // by another of theirs, or by them at the browser. The DID is the key only
 // for a caller that is nobody's.
-func newsKey(a auth.Admission) string {
+func NewsKey(a auth.Admission) string {
 	if a.Identity != "" {
 		return a.Identity
 	}
@@ -154,16 +145,13 @@ func newsKey(a auth.Admission) string {
 }
 
 // newsFor is the caller's items as the row draws them.
-func (h *StatusLineHandler) newsFor(a auth.Admission) []StatusItem {
+func (h *StatusLineHandler) NewsFor(a auth.Admission) []StatusItem {
 	return newsItems(h.heldNews(a))
 }
 
 // heldNews is what is on the row for the caller now.
 func (h *StatusLineHandler) heldNews(a auth.Admission) []News {
-	if h == nil || h.news == nil {
-		return nil
-	}
-	return h.news().since(newsKey(a), time.Now().UnixMilli())
+	return h.News().Since(NewsKey(a), time.Now().UnixMilli())
 }
 
 // newsItems is news as the row draws it.
@@ -181,10 +169,7 @@ func newsItems(held []News) []StatusItem {
 
 // newsDetail answers /am/statusline/{id} for a news item.
 func (h *StatusLineHandler) newsDetail(a auth.Admission, id string) (map[string]any, bool) {
-	if h == nil || h.news == nil {
-		return nil, false
-	}
-	n, ok := h.news().byID(newsKey(a), id)
+	n, ok := h.News().ByID(NewsKey(a), id)
 	if !ok {
 		return nil, false
 	}

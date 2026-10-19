@@ -91,7 +91,7 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 			},
 			"ground": s.amGround,
 			"item": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-				return s.statusLineHandler.item(ctx, sent["name"])
+				return s.statusLineHandler.Item(ctx, sent["name"])
 			},
 		},
 	}

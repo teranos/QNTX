@@ -1,9 +1,9 @@
-package server
+package statusline
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +35,7 @@ type StatusItem struct {
 }
 
 // StatusLineResponse carries the items in the order they should be read, and
-// each plugin's newest deploy (statusline_deploy.go).
+// each plugin's newest deploy (deploy.go).
 type StatusLineResponse struct {
 	Items   []StatusItem `json:"items"`
 	Deploys []DeployData `json:"deploys"`
@@ -120,36 +120,46 @@ func rangeName(name string) string {
 type StatusLineHandler struct {
 	registry *plugin.Registry
 	logger   *zap.SugaredLogger
-	health   func() pluginProbe
+	health   func() map[string]plugin.HealthStatus
 	// The watcher store, fetched per request because a backend supplies it
 	// after this handler is built. Nil draws no failure items.
 	watchers func() storage.Watchers
 	// Failed handler executions this process has seen. Nil draws none.
-	handlerFailures func() *handlerFailureLog
+	handlerFailures func() *HandlerFailureLog
 	// Which frame the rotating slot is on. The node holds it, so every surface
 	// drawing the row sees the same one.
 	carousel *carousel
 	// The plugin slots rotate on their own tick, so a plugin's handlers are not
 	// stepped by whatever the middle slot happens to be doing.
 	pluginCarousel *carousel
+	// The one slot the healthy plugins share, taking each plugin's frames in
+	// turn. It slows as the carousel does: a plugin that is well needs saying
+	// less often.
+	healthyCarousel *carousel
 	// What the rotating slot asks about. Nil draws no rotating slot at all.
 	node StatusLineNode
 	// What built-ins left for the caller. Nil draws none.
-	news func() *newsLog
-	// When each person's tmux bar last asked for the row (statusline_asks.go).
+	News func() *NewsLog
+	// When each person's tmux bar last asked for the row (asks.go).
 	tmux *rowAsks
-	// The peers' rows, asked as the caller (statusline_peers.go). Nil draws none.
-	peers peerRows
+	// The peers' rows, asked as the caller (peers.go). Nil draws none.
+	Peers PeerRows
 	// Each plugin's newest deploy (plugin_deploy.go). Nil draws none.
-	deploys func() []pluginDeploy
+	// Every deploy, and whether one is in flight: the carousel waits while one is.
+	Deploys func() ([]DeployData, bool)
 }
 
-// NewStatusLineHandler builds the handler behind /statusline.
+// NewStatusLineHandler builds the handler behind /statusline. Everything it
+// is given is read on every request, so none of it may be nil.
 func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
-	health func() pluginProbe,
-	watchers func() storage.Watchers, handlerFailures func() *handlerFailureLog,
+	health func() map[string]plugin.HealthStatus,
+	watchers func() storage.Watchers, handlerFailures func() *HandlerFailureLog,
 	node StatusLineNode) *StatusLineHandler {
+	// Until the node hands over its own, what is left is a log nothing has been
+	// left in.
+	unwritten := NewNewsLog()
 	return &StatusLineHandler{
+		News:            func() *NewsLog { return unwritten },
 		registry:        registry,
 		logger:          logger,
 		health:          health,
@@ -157,10 +167,11 @@ func NewStatusLineHandler(registry *plugin.Registry, logger *zap.SugaredLogger,
 		handlerFailures: handlerFailures,
 		carousel:        newCarousel(),
 		pluginCarousel:  newCarousel(),
+		healthyCarousel: newCarousel(),
 		node:            node,
 		tmux:            newRowAsks(),
-		peers:           noPeers,
-		deploys:         func() []pluginDeploy { return []pluginDeploy{} },
+		Peers:           NoPeers,
+		Deploys:         func() ([]DeployData, bool) { return []DeployData{}, false },
 	}
 }
 
@@ -171,18 +182,12 @@ const pluginFrameSlots = 12
 
 // pluginFrameIndex advances the plugin tick and returns where it landed.
 func (h *StatusLineHandler) pluginFrameIndex() int {
-	if h == nil || h.pluginCarousel == nil {
-		return 0
-	}
 	return h.pluginCarousel.frame(pluginFrameSlots)
 }
 
 // declaredHandlers is every handler the pulse registry holds, which is the
 // built-ins plus one per handler a plugin declared.
 func (h *StatusLineHandler) declaredHandlers() []string {
-	if h == nil || h.node == nil {
-		return nil
-	}
 	return h.node.HandlerNames()
 }
 
@@ -388,12 +393,8 @@ func readout(d time.Duration, finest time.Duration) string {
 	return said
 }
 
-// The one frame the row is showing. A handler with no node behind it draws
-// nothing here rather than guessing at values it cannot read.
+// The one frame the row is showing.
 func (h *StatusLineHandler) carouselItem() []StatusItem {
-	if h == nil || h.carousel == nil || h.node == nil {
-		return nil
-	}
 	// The sweep keeps its own pace; a frame with nothing to say is stepped past
 	// rather than drawn blank, so the slot never stutters.
 	at := h.carousel.frame(len(carouselFrames))
@@ -428,17 +429,13 @@ func well(healthy bool, state string) bool {
 }
 
 // HandleStatusLine returns the items a status line draws, unwell first.
-// GET /statusline
+// GET /statusline; the route refuses any other method.
 func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) {
-		return
-	}
-
 	// Named, never guessed. A caller that omits it is told what it may ask for
 	// rather than handed a row its surface cannot render.
 	format := r.URL.Query().Get("format")
 	if format != FormatJSON && format != FormatANSI && format != FormatTmux {
-		respond(w, h.log(), http.StatusBadRequest, map[string]any{
+		h.respond(w, http.StatusBadRequest, map[string]any{
 			"error":   "format is required",
 			"formats": []string{FormatJSON, FormatANSI, FormatTmux},
 		})
@@ -454,7 +451,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	}
 
 	if format == FormatTmux {
-		h.tmux.note(newsKey(admitted), time.Now())
+		h.tmux.note(NewsKey(admitted), time.Now())
 	}
 
 	// One plugin's own row, when that is what was asked for. A name the node
@@ -462,7 +459,7 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	if name := r.URL.Query().Get("plugin"); name != "" {
 		row, found := h.pluginRow(name)
 		if !found {
-			respond(w, h.log(), http.StatusNotFound, map[string]any{"error": "no such plugin: " + name})
+			h.respond(w, http.StatusNotFound, map[string]any{"error": "no such plugin: " + name})
 			return
 		}
 		h.noteWriteFailure(writeStatusLine(w, format, row))
@@ -472,11 +469,11 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	// Who is looking is pinned leftmost, what was left for them comes next, the
 	// plugins are pinned right; the rotating slot sits between.
 	items := []StatusItem{callerItem(admitted)}
-	// A primary asking for its own row drew the person already (statusline_peers.go).
+	// A primary asking for its own row drew the person already (peers.go).
 	if r.URL.Query().Get("for") == forPrimary {
 		items = []StatusItem{}
 	}
-	items = append(items, h.newsFor(admitted)...)
+	items = append(items, h.NewsFor(admitted)...)
 	carousel := h.carouselItem()
 
 	// A failing handler is a fix-now kind of event, and it is drawn inside its
@@ -487,13 +484,8 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 	failing := append(watcherFailureItemsFor(h.recentWatcherFailures(r.Context())),
 		handlerFailureItemsFor(builtinRuns(failures))...)
 
-	if h == nil || h.registry == nil {
-		h.noteWriteFailure(writeStatusLine(w, format, slices.Concat(items, carousel, failing)))
-		return
-	}
-
 	// The deploys go out as data; the carousel waits while one is in flight.
-	deploys, inFlight := deployData(h.deploys())
+	deploys, inFlight := h.Deploys()
 	if !inFlight {
 		items = append(items, carousel...)
 	}
@@ -501,19 +493,30 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 	// The last probe, not a fresh one. Probing per request cost gRPC calls and
 	// held the registry's read lock across them.
-	healthResults := healthOf(h.health())
+	healthResults := h.health()
 	stateResults := h.registry.GetAllStates()
 
 	type entry struct {
 		item StatusItem
 		well bool
 	}
-	entries := make([]entry, 0)
+	pinned := make([]entry, 0)
+	// The frames of every plugin that is well and failing nothing, one plugin
+	// after another.
+	var healthy []StatusItem
 
 	// Every handler the pulse registry holds, namespaced by whoever declared it,
 	// so each plugin's slot can rotate over its own.
 	allHandlers := h.declaredHandlers()
 	at := h.pluginFrameIndex()
+	failsHandlers := func(plugin string) bool {
+		for _, run := range failures {
+			if pluginOf(run.Handler) == plugin {
+				return true
+			}
+		}
+		return false
+	}
 
 	seen := make(map[string]bool)
 	for _, name := range h.registry.List() {
@@ -523,12 +526,18 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 			continue
 		}
 		meta := p.Metadata()
-		healthy := well(healthResults[name].Healthy, string(stateResults[name]))
-		entries = append(entries, entry{
-			item: pluginItem(at, meta.Name, meta.Version, healthy,
-				handlersOf(allHandlers, meta.Name), failures),
-			well: healthy,
-		})
+		isWell := well(healthResults[name].Healthy, string(stateResults[name]))
+		handlers := handlersOf(allHandlers, meta.Name)
+		// A failing handler is a fix-now kind of event, so its plugin keeps its
+		// own slot however well the plugin is.
+		if !isWell || failsHandlers(meta.Name) {
+			pinned = append(pinned, entry{
+				item: pluginItem(at, meta.Name, meta.Version, isWell, handlers, failures),
+				well: isWell,
+			})
+			continue
+		}
+		healthy = append(healthy, pluginFrames(meta.Name, meta.Version, handlers, nil)...)
 	}
 
 	// A plugin that never loaded has no metadata, so it is named and left at that.
@@ -536,20 +545,18 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 		if seen[name] {
 			continue
 		}
-		entries = append(entries, entry{
-			item: StatusItem{Name: name, Symbol: SymbolUnwell},
-			well: false,
-		})
+		pinned = append(pinned, entry{item: StatusItem{Name: name, Symbol: SymbolUnwell}, well: false})
 	}
 
 	// Two passes rather than a sort: the order is unwell then well.
 	for _, wantWell := range []bool{false, true} {
-		for _, e := range entries {
+		for _, e := range pinned {
 			if e.well == wantWell {
 				items = append(items, e.item)
 			}
 		}
 	}
+	items = append(items, pick(h.healthyCarousel, healthy)...)
 
 	// The peers' rows come last: the primary's own row reads as it did.
 	items = append(items, h.peerItems(r.Context(), admitted)...)
@@ -562,25 +569,16 @@ func (h *StatusLineHandler) HandleStatusLine(w http.ResponseWriter, r *http.Requ
 
 // A response that did not reach the client is not a response. There is no
 // client left to tell, so it goes where the operator can find it.
-// log tolerates a nil receiver: the format check runs before any state and
-// tests exercise it that way; respond accepts a nil logger.
-func (h *StatusLineHandler) log() *zap.SugaredLogger {
-	if h == nil {
-		return nil
-	}
-	return h.logger
-}
-
 func (h *StatusLineHandler) noteWriteFailure(err error) {
-	if err == nil || h == nil || h.logger == nil {
+	if err == nil {
 		return
 	}
 	h.logger.Errorw("status line not written", "error", err)
 }
 
-// item is what one item on the row is doing, in full: am_item's answer. The
+// Item is what one item on the row is doing, in full: am_item's answer. The
 // row has one line and cannot carry this; a click is where it goes.
-func (h *StatusLineHandler) item(ctx context.Context, name string) (any, *protocol.Refusal) {
+func (h *StatusLineHandler) Item(ctx context.Context, name string) (any, *protocol.Refusal) {
 	if name == "" {
 		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: "name is required"}
 	}
@@ -605,13 +603,9 @@ func (h *StatusLineHandler) item(ctx context.Context, name string) (any, *protoc
 		return detail, nil
 	}
 
-	if h == nil || h.registry == nil {
-		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "no such item"}
-	}
-
 	// The row truncates a long name to fit tmux's range argument, so what comes
 	// back is a prefix rather than the whole of it.
-	health := healthOf(h.health())
+	health := h.health()
 	states := h.registry.GetAllStates()
 
 	full := ""
@@ -661,4 +655,27 @@ func writeStatusLine(w http.ResponseWriter, format string, items []StatusItem) e
 		return errors.Wrap(err, "failed to write status line")
 	}
 	return nil
+}
+
+// writeJSON writes a JSON response with the given status code.
+func writeJSON(w http.ResponseWriter, status int, data any) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		return errors.Wrap(err, "failed to encode JSON")
+	}
+	return nil
+}
+
+// respond writes a JSON response and records a body that never reached the
+// client: the status is on the wire and the caller is gone.
+func (h *StatusLineHandler) respond(w http.ResponseWriter, status int, data any) {
+	h.noteWriteFailure(writeJSON(w, status, data))
+}
+
+// Asked is what one person's tmux bar has asked of the row: the last ask, the
+// count, and the asks of each minute still kept. False is a person whose bar
+// never asked.
+func (h *StatusLineHandler) Asked(who string) (lastMs, count int64, over map[string]int64, asked bool) {
+	return h.tmux.of(who)
 }

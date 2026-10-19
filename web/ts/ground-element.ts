@@ -38,7 +38,7 @@ import { readout, relative, shortAll } from './span';
 
 const ELEMENT_ID = 'ground-element';
 
-// One thing the node says of itself on its status line (server/statusline_handlers.go StatusItem).
+// One thing the node says of itself on its status line (server/statusline/handlers.go StatusItem).
 export interface Said {
     id?: string;
     name: string;
@@ -264,7 +264,7 @@ const COMET_SEEN = 'Observing a comet, and the build it starts, are not in the n
 const DROPS = [14, 104, 28, 118];
 
 // How long the node has been answering, in the words its own status line uses
-// (server/statusline_handlers.go shortDuration): two units to the minute, in
+// (server/statusline/handlers.go shortDuration): two units to the minute, in
 // the span grammar the ax language reads back (span.ts).
 export function upFor(started: string, now: number): string {
     return shortAll(readout(now - Date.parse(started), 'minute'));
@@ -849,7 +849,7 @@ export function drawGround(body: HTMLElement, onComet: (c: Comet) => void = open
             restar();
         },
         said: (items) => {
-            // The row names every plugin the node holds (server/statusline_handlers.go HandleStatusLine).
+            // The row names every plugin the node holds (server/statusline/handlers.go HandleStatusLine).
             const runs = items.find(item => item.name === 'scry');
             scry.section.classList.toggle('gr-unreal', !runs);
             inferring.textContent = runs ? `This node runs scry${runs.note ? ` ${runs.note}` : ''}.` : '';

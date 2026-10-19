@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"sync"
@@ -81,4 +81,11 @@ func (c *carousel) frame(items int) int {
 		c.movesAt = now.Add(carouselInterval(c.advances, items))
 	}
 	return c.at % items
+}
+
+// pick is the frame the carousel is on, as a slice: empty where there is
+// nothing to draw.
+func pick[T any](c *carousel, frames []T) []T {
+	at := c.frame(len(frames))
+	return frames[at:min(at+1, len(frames))]
 }

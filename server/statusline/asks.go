@@ -1,4 +1,4 @@
-package server
+package statusline
 
 import (
 	"sync"
@@ -33,7 +33,7 @@ func newRowAsks() *rowAsks { return &rowAsks{by: map[string]*rowAsk{}} }
 
 // note records one ask by one person. Nobody asking is nobody's bar.
 func (a *rowAsks) note(who string, at time.Time) {
-	if a == nil || who == "" {
+	if who == "" {
 		return
 	}
 	a.mu.Lock()
@@ -58,7 +58,7 @@ func (a *rowAsks) note(who string, at time.Time) {
 // each minute still kept, by the minute as `2026-10-03T22:47` in UTC. False is
 // a person whose bar never asked.
 func (a *rowAsks) of(who string) (lastMs, count int64, over map[string]int64, asked bool) {
-	if a == nil || who == "" {
+	if who == "" {
 		return 0, 0, nil, false
 	}
 	a.mu.Lock()
