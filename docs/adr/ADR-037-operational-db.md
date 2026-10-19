@@ -38,10 +38,7 @@ What bounds the store is this ADR's to answer, and it has not. [ADR-024](ADR-024
 
 "do the user slice now"
 
-Every gated request read the User from S3: one LIST and one GET per User, under one
-lock for the node, once at the gate and once more for standing. Ten Users made that a
-quarter second per request and four requests a second for the whole node. A User now
-lives in a `users` table in the operational db, on every backend, the way passkeys do.
+Every gated request read the User from S3: one LIST and one GET per User, under one lock for the node, once at the gate and once more for standing. Ten Users made that a quarter second per request and four requests a second for the whole node. A User now lives in a `users` table in the operational db, on every backend, the way passkeys do.
 Writing a User writes the table first, then its S3 object on parquet; S3 is the record
 for host loss, not for reading. The node reads S3 for Users once, when it opens: a User
 S3 holds and the table lacks is taken in, and a User the table holds is the truth,
