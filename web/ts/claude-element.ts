@@ -52,15 +52,16 @@ export interface NodeAgent {
     read(): Promise<TranscriptRead | undefined>;
 }
 
+// The Node Agent in Claude Code, at the agent signum's path.
 const theNode: NodeAgent = {
-    am: () => apiJson<ClaudeAm>('/api/claude'),
-    say: (says, mode) => apiJson<ClaudeSaid>('/api/claude/say', {
+    am: () => apiJson<{ claude: ClaudeAm }>('/api/agent?harness=claude').then(is => is.claude),
+    say: (says, mode) => apiJson<{ claude: ClaudeSaid }>('/api/agent/say', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mode ? { says, permission_mode: mode } : { says }),
-    }),
+        body: JSON.stringify(mode ? { harness: 'claude', says, permission_mode: mode } : { harness: 'claude', says }),
+    }).then(said => said.claude),
     // Its one session, read whole wherever whoever reads it stands.
-    read: () => apiJson<{ transcript: TranscriptRead }>('/api/claude/session')
+    read: () => apiJson<{ transcript: TranscriptRead }>('/api/agent/session?harness=claude')
         .then(answer => answer.transcript),
 };
 
@@ -214,7 +215,7 @@ export function drawClaude(body: HTMLElement, node: NodeAgent = theNode, every: 
 }
 
 // Who this is for: whoever reaches these (audience.ts).
-export const needs = ['/api/claude'] as const;
+export const needs = ['/api/agent'] as const;
 
 export function createClaudeElement(): Element {
     return {

@@ -48,7 +48,7 @@ func runningPiToo(t *testing.T) (s *QNTXServer, claudeRan, piRan string) {
 }
 
 func sayingToPi(s *QNTXServer, sent sigil.Sent) (*protocol.PiSaid, *protocol.Refusal) {
-	asked := httptest.NewRequest(http.MethodPost, "/api/pi/say", nil)
+	asked := httptest.NewRequest(http.MethodPost, "/api/agent/say", nil)
 	answer, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.piHarness(), sent)
 	if refused != nil {
 		return nil, refused
@@ -67,7 +67,7 @@ func TestWhatIsSaidToPiIsAnsweredByPi(t *testing.T) {
 	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
 	assert.False(t, answer.GetIsError())
 	assert.Equal(t, "anthropic/claude-sonnet-4.6", answer.GetModel())
-	holds(t, s.harnessSignum(s.piHarness()), "say", answer)
+	holds(t, s.nodeAgentSignum(), "say", &protocol.NodeAgentSaid{Pi: answer})
 
 	args := ranWith(t, ran, "0", "args")
 	assert.Equal(t, "json", after(args, "--mode"))
@@ -133,7 +133,7 @@ func TestPiDoesNotAnswerWhileClaudeCodeIsInATurn(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	asked := httptest.NewRequest(http.MethodPost, "/api/pi/say", nil)
+	asked := httptest.NewRequest(http.MethodPost, "/api/agent/say", nil)
 	_, refused := s.harnessSay(sigil.WithCaller(ctx, asked), s.piHarness(), sigil.Sent{"says": "hello"})
 	require.NotNil(t, refused)
 	assert.Contains(t, refused.GetSays(), "still answering")
@@ -144,7 +144,7 @@ func piSessionSaid(t *testing.T, s *QNTXServer) [][2]string {
 	t.Helper()
 	answer, refused := s.harnessSession(s.piHarness())
 	require.Nil(t, refused)
-	holds(t, s.harnessSignum(s.piHarness()), "session", answer)
+	holds(t, s.nodeAgentSignum(), "session", answer)
 	var said [][2]string
 	for _, turn := range answer.(*protocol.SessionTranscript).GetTranscript().GetTurns() {
 		said = append(said, [2]string{turn.GetSpeaker(), turn.GetText()})
@@ -172,8 +172,8 @@ func TestPiSaysWhoItIs(t *testing.T) {
 	assert.Equal(t, "anthropic/claude-sonnet-4.6", am.GetModel())
 	assert.Equal(t, "openrouter-qntx", am.GetGateway())
 	assert.Equal(t, pi.PinnedVersion, am.GetPiVersion())
-	holds(t, s.harnessSignum(s.piHarness()), "am", am)
-	require.NoError(t, s.harnessSignum(s.piHarness()).Check())
+	holds(t, s.nodeAgentSignum(), "am", &protocol.NodeAgentAm{Pi: am})
+	require.NoError(t, s.nodeAgentSignum().Check())
 }
 
 // Only ROOT talks to it, in Pi as in Claude Code.
@@ -181,7 +181,7 @@ func TestOnlyRootTalksToItInPi(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
 	s, _, _ := runningPiToo(t)
-	for _, held := range s.harnessSignum(s.piHarness()).GetSigils() {
+	for _, held := range s.nodeAgentSignum().GetSigils() {
 		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
 	}
 }

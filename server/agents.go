@@ -423,7 +423,7 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 		return append([]*protocol.Param{namespace}, params...)
 	}
 	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi}, Says: "The harness it runs in: claude for Claude Code, pi for Pi. A namespace holds an agent in each."}
-	login := s.loginSigil(h)
+	login := s.loginSigil()
 	login.sigil.Takes = with(login.sigil.Takes...)
 	login.sigil.Http = &protocol.Endpoint{Method: http.MethodPost, Path: at + "/login"}
 	login.sigil.Does = "Signs the namespace's agent in to Claude Code, by Claude Code's own flow, on the subscription of whoever sets it up. " + login.sigil.Does

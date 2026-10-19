@@ -55,8 +55,9 @@ func (s *signingIn) takeUnended() error {
 	return unended
 }
 
-// loginSigil is the Claude harness's own sigil: sign the agent in.
-func (s *QNTXServer) loginSigil(h *harness) harnessSigil {
+// loginSigil is Claude Code's own sigil: sign the Node Agent in.
+func (s *QNTXServer) loginSigil() harnessSigil {
+	h := s.claudeHarness()
 	return harnessSigil{
 		sigil: &protocol.Sigil{
 			Name: "login",
@@ -72,7 +73,7 @@ func (s *QNTXServer) loginSigil(h *harness) harnessSigil {
 				{Name: "auth_method", Says: "How it is signed in, as Claude Code names it."},
 				{Name: "api_provider", Says: "Whose API it is signed in to, as Claude Code names it."},
 			},
-			Http: &protocol.Endpoint{Method: http.MethodPost, Path: "/api/" + h.name + "/login"},
+			Http: &protocol.Endpoint{Method: http.MethodPost, Path: nodeAgentPath + "/login"},
 		},
 		answer: func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 			return s.claudeLogin(ctx, h, sent)

@@ -163,10 +163,9 @@ REACH is '/api/vault/unbind' '/api/vault/disable' '/api/vault/enable'     of ROO
 REACH is '/api/vault/send'                                                of ROOT
 REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
 
-# The Node Agent (the claude signum, ADR-048). Who may talk to it is the whole
-# of what guards it, and that is ROOT.
-REACH is '/api/claude' '/api/claude/say' '/api/claude/session' '/api/claude/login' of ROOT
-REACH is '/api/pi' '/api/pi/say' '/api/pi/session'                        of ROOT
+# The Node Agent (the agent signum, ADR-048), in Claude Code or in Pi. Who may
+# talk to it is the whole of what guards it, and that is ROOT.
+REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' of ROOT
 
 # The namespace agent (the agents signum, ADR-048): "shared amongst anyone who
 # has REACH on it". Who acts in the namespace reaches it, which the handler

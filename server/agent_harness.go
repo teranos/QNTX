@@ -21,11 +21,8 @@ type harness struct {
 	// file is where the agent's session in it is kept, under the agent's home.
 	file string
 
-	description, sayDoes, amDoes, sessionDoes string
-	// sayTakes is what say takes beyond says.
+	// sayTakes is what say takes beyond says, in this harness.
 	sayTakes []*protocol.Param
-	// sayAnswer and amAnswer are the messages say and am answer.
-	sayAnswer, amAnswer string
 
 	// named reports whether am.toml names the agent in it, and absent says why
 	// it cannot be spoken to there when it does not.
@@ -41,8 +38,6 @@ type harness struct {
 	// am is what am answers of an agent in it, running as spec says: what
 	// every harness says of the agent in it, and what is the harness's own.
 	am func(is agentIn, agent *rootAgent, spec agentSpec) proto.Message
-	// also is what this harness has beyond say, am and session.
-	also []harnessSigil
 }
 
 // harnessSigil is one sigil a harness has of its own, and what answers it.
@@ -56,57 +51,111 @@ func (s *QNTXServer) harnesses() []*harness {
 	return []*harness{s.claudeHarness(), s.piHarness()}
 }
 
-// harnessSigna is each harness's sigils.
-func (s *QNTXServer) harnessSigna() []sigil.Signum {
-	var signa []sigil.Signum
-	for _, h := range s.harnesses() {
-		signa = append(signa, s.harnessSignum(h))
-	}
-	return signa
-}
+// nodeAgentPath is where the Node Agent's sigils answer, whichever harness a turn runs in.
+const nodeAgentPath = "/api/agent"
 
-// harnessSignum is a harness's say, am and session.
-func (s *QNTXServer) harnessSignum(h *harness) sigil.Signum {
-	at := "/api/" + h.name
-	answers := map[string]sigil.Answer{
-		"say":     func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.harnessSay(ctx, h, sent) },
-		"am":      func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.harnessAm(h) },
-		"session": func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) { return s.harnessSession(h) },
-	}
-	var also []*protocol.Sigil
-	for _, own := range h.also {
-		also = append(also, own.sigil)
-		answers[own.sigil.GetName()] = own.answer
-	}
+// "Signa Claude and Pi should not exist"
+
+// "Node Agent is Node agent"
+
+// nodeAgentSignum is the Node Agent's say, am and session, in the harness named, and its sign-in
+// to Claude Code.
+func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
+	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi}, Says: "The harness it runs in: claude for Claude Code, pi for Pi."}
+	claude := s.claudeHarness()
+	login := s.loginSigil()
 	return sigil.Signum{
 		Signum: &protocol.Signum{
-			Name:        h.name,
-			Description: h.description,
-			Tags:        []string{"agent", h.name, "root"},
-			Sigils: append([]*protocol.Sigil{
+			Name:        "agent",
+			Description: "The Node Agent: QNTX itself as expressed to ROOT, run by the node in Claude Code or in Pi.",
+			Tags:        []string{"agent", "root"},
+			Sigils: []*protocol.Sigil{
 				{
 					Name:   "say",
-					Does:   h.sayDoes,
-					Takes:  append([]*protocol.Param{{Name: "says", Required: true, Says: "What is said to it."}}, h.sayTakes...),
-					Answer: h.sayAnswer,
-					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/say"},
+					Does:   "Says something to the Node Agent in the harness named and gives what it answered. In each harness it is one session that continues, written down by the agent as it goes and read with agent session.",
+					Takes:  append([]*protocol.Param{harness, {Name: "says", Required: true, Says: "What is said to it."}}, claude.sayTakes...),
+					Answer: "protocol.NodeAgentSaid",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: nodeAgentPath + "/say"},
 				},
 				{
 					Name:   "am",
-					Does:   h.amDoes,
-					Answer: h.amAnswer,
-					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: at},
+					Does:   "Who the Node Agent is and how the node runs it, in the harness named.",
+					Takes:  []*protocol.Param{harness},
+					Answer: "protocol.NodeAgentAm",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: nodeAgentPath},
 				},
 				{
 					Name:   "session",
-					Does:   h.sessionDoes,
+					Does:   "The Node Agent's one session in the harness named, whole: everything said to it there by whoever said it, as a transcript.",
+					Takes:  []*protocol.Param{harness},
 					Answer: "protocol.SessionTranscript",
-					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: at + "/session"},
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: nodeAgentPath + "/session"},
 				},
-			}, also...),
+				login.sigil,
+			},
 		},
-		Answers: answers,
+		Answers: map[string]sigil.Answer{
+			"say":     s.nodeAgentSay,
+			"am":      s.nodeAgentAm,
+			"session": s.nodeAgentSession,
+			"login":   login.answer,
+		},
 	}
+}
+
+// harnessNamed is the harness a call names.
+func (s *QNTXServer) harnessNamed(sent sigil.Sent) (*harness, *protocol.Refusal) {
+	switch sent["harness"] {
+	case agentLineClaude:
+		return s.claudeHarness(), nil
+	case agentLinePi:
+		return s.piHarness(), nil
+	}
+	return nil, notAHarness(sent)
+}
+
+func (s *QNTXServer) nodeAgentSay(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	h, refused := s.harnessNamed(sent)
+	if refused != nil {
+		return nil, refused
+	}
+	answer, refused := s.harnessSay(ctx, h, sent)
+	if refused != nil {
+		return nil, refused
+	}
+	switch said := answer.(type) {
+	case *protocol.ClaudeSaid:
+		return &protocol.NodeAgentSaid{Claude: said}, nil
+	case *protocol.PiSaid:
+		return &protocol.NodeAgentSaid{Pi: said}, nil
+	}
+	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent answered in " + h.called + " as neither Claude Code nor Pi"}
+}
+
+func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	h, refused := s.harnessNamed(sent)
+	if refused != nil {
+		return nil, refused
+	}
+	answer, refused := s.harnessAm(h)
+	if refused != nil {
+		return nil, refused
+	}
+	switch am := answer.(type) {
+	case *protocol.ClaudeAm:
+		return &protocol.NodeAgentAm{Claude: am}, nil
+	case *protocol.PiAm:
+		return &protocol.NodeAgentAm{Pi: am}, nil
+	}
+	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent said who it is in " + h.called + " as neither Claude Code nor Pi"}
+}
+
+func (s *QNTXServer) nodeAgentSession(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	h, refused := s.harnessNamed(sent)
+	if refused != nil {
+		return nil, refused
+	}
+	return s.harnessSession(h)
 }
 
 // harnessAgent is the agent, when it can be spoken to in h.

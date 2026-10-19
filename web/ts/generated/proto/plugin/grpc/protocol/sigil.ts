@@ -186,6 +186,32 @@ export interface NamespaceAgentSaid {
 }
 
 /**
+ * NodeAgentSaid is what agent say answers: what the Node Agent answered, in the
+ * harness it was said to.
+ */
+export interface NodeAgentSaid {
+  /** What it answered in Claude Code. */
+  claude:
+    | ClaudeSaid
+    | undefined;
+  /** What it answered in Pi. */
+  pi: PiSaid | undefined;
+}
+
+/**
+ * NodeAgentAm is what agent am answers: who the Node Agent is and how the node
+ * runs it, in the harness named.
+ */
+export interface NodeAgentAm {
+  /** In Claude Code. */
+  claude:
+    | ClaudeAm
+    | undefined;
+  /** In Pi. */
+  pi: PiAm | undefined;
+}
+
+/**
  * NamespaceKeys is what keys list, set and drop answer: the names of a
  * namespace's keys, never their values (ADR-051).
  */

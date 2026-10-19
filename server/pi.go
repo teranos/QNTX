@@ -22,13 +22,7 @@ func (s *QNTXServer) piHarness() *harness {
 	named := func() appcfg.PiConfig { return s.deps.cfg.Agent.Root.Pi }
 	return &harness{
 		name: "pi", called: "Pi", file: piSessionFile,
-		description: "The Node Agent in Pi: the same agent as in Claude Code, in its other harness and a session of its own.",
-		sayDoes:     "Says something to the Node Agent in Pi and gives what it answered. It is its session in Pi, beside the one in Claude Code, read with pi session.",
-		amDoes:      "Who the Node Agent is in Pi and how the node runs it there.",
-		sessionDoes: "The Node Agent's session in Pi, whole: everything said to it there, as a transcript.",
-		sayAnswer:   "protocol.PiSaid",
-		amAnswer:    "protocol.PiAm",
-		named:       func() bool { return named().Named() },
+		named: func() bool { return named().Named() },
 		absent:      s.thereIsNoPi,
 		fetching:    "Pi is still being built",
 		spec:        func() agentSpec { return agentSpec{} },

@@ -165,7 +165,7 @@ func runningTheNodeAgent(t *testing.T, named appcfg.NodeAgentConfig) (s *QNTXSer
 }
 
 func saying(s *QNTXServer, sent sigil.Sent) (*protocol.ClaudeSaid, *protocol.Refusal) {
-	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
+	asked := httptest.NewRequest(http.MethodPost, "/api/agent/say", nil)
 	answer, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sent)
 	if refused != nil {
 		return nil, refused
@@ -189,7 +189,7 @@ func TestWhatIsSaidToTheNodeAgentIsAnsweredByClaudeCode(t *testing.T) {
 	assert.Equal(t, "claude-opus-5-5", answer.GetModel())
 	assert.Equal(t, "dontAsk", answer.GetPermissionMode())
 	assert.Equal(t, []string{"Write"}, answer.GetDenied())
-	holds(t, s.harnessSignum(s.claudeHarness()), "say", answer)
+	holds(t, s.nodeAgentSignum(), "say", &protocol.NodeAgentSaid{Claude: answer})
 
 	args := ranWith(t, ran, "0", "args")
 	assert.Equal(t, "how long has the box been up?", after(args, "-p"))
@@ -260,7 +260,7 @@ func TestTheNodeAgentIsOneSessionWhereverItsSpeakersStand(t *testing.T) {
 	from := func(namespace, says string) {
 		root := auth.Admitted(auth.LevelRoot, namespace)
 		root.Identity = "https://example.org/" + namespace
-		asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
+		asked := httptest.NewRequest(http.MethodPost, "/api/agent/say", nil)
 		asked = asked.WithContext(auth.WithAdmission(asked.Context(), root))
 		_, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sigil.Sent{"says": says})
 		require.Nil(t, refused)
@@ -283,7 +283,7 @@ func sessionSaid(t *testing.T, s *QNTXServer) [][2]string {
 	t.Helper()
 	answer, refused := s.harnessSession(s.claudeHarness())
 	require.Nil(t, refused)
-	holds(t, s.harnessSignum(s.claudeHarness()), "session", answer)
+	holds(t, s.nodeAgentSignum(), "session", answer)
 	var said [][2]string
 	for _, turn := range answer.(*protocol.SessionTranscript).GetTranscript().GetTurns() {
 		said = append(said, [2]string{turn.GetSpeaker(), turn.GetText()})
@@ -313,7 +313,7 @@ func TestWhoSpokeToTheNodeAgentIsWrittenDown(t *testing.T) {
 	s, _ := runningTheNodeAgent(t, opusLow)
 	root := auth.Admitted(auth.LevelRoot)
 	root.Identity = "https://github.com/tim"
-	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
+	asked := httptest.NewRequest(http.MethodPost, "/api/agent/say", nil)
 	asked = asked.WithContext(auth.WithAdmission(asked.Context(), root))
 
 	answer, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sigil.Sent{"says": "hello"})
@@ -335,7 +335,7 @@ func TestTheNodeAgentDoesNotSpeakToItself(t *testing.T) {
 	s, ran := runningTheNodeAgent(t, opusLow)
 	itself := auth.Admitted(auth.LevelRoot)
 	itself.Grant = &auth.Grant{DID: s.nodeAgent.did}
-	asked := httptest.NewRequest(http.MethodPost, "/api/claude/say", nil)
+	asked := httptest.NewRequest(http.MethodPost, "/api/agent/say", nil)
 	asked = asked.WithContext(auth.WithAdmission(asked.Context(), itself))
 
 	_, refused := s.harnessSay(sigil.WithCaller(context.Background(), asked), s.claudeHarness(), sigil.Sent{"says": "hello me"})
@@ -385,7 +385,7 @@ func TestTheNodeAgentSaysWhoItIs(t *testing.T) {
 	assert.Equal(t, "dontAsk", is.GetPermissionMode())
 	assert.Equal(t, appcfg.PermissionModes, is.GetPermissionModes())
 	assert.Equal(t, "", is.GetSession())
-	holds(t, s.harnessSignum(s.claudeHarness()), "am", is)
+	holds(t, s.nodeAgentSignum(), "am", &protocol.NodeAgentAm{Claude: is})
 
 	answer, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
@@ -432,7 +432,7 @@ func TestTheNodeAgentIsItself(t *testing.T) {
 
 func TestTheClaudeSignumSaysWhatItHolds(t *testing.T) {
 	s, _ := runningTheNodeAgent(t, opusLow)
-	require.NoError(t, s.harnessSignum(s.claudeHarness()).Check())
+	require.NoError(t, s.nodeAgentSignum().Check())
 }
 
 // "remove SUPER"
@@ -441,7 +441,7 @@ func TestWhoMayTalkToTheNodeAgent(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
 	s, _ := runningTheNodeAgent(t, opusLow)
-	for _, held := range s.harnessSignum(s.claudeHarness()).GetSigils() {
+	for _, held := range s.nodeAgentSignum().GetSigils() {
 		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
 	}
 }
