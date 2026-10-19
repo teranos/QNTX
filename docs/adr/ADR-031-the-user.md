@@ -101,8 +101,7 @@ deployment keeps none, the way it keeps no tokens.
 
 `POST /auth/user/arrive` is where a person says a name, an email and a phone
 number, and requires none of them. The name is settled once; an email or a phone
-number that arrives later is added rather than refused, because a User has any
-number of each. A phone number is kept as its digits and the leading `+` the
+number that arrives later is added rather than refused, because a User has any number of each. A phone number is kept as its digits and the leading `+` the
 person typed, so one number is one string however it was spaced.
 
 `POST /auth/user/disable` and `POST /auth/user/enable` are the switch, reached
