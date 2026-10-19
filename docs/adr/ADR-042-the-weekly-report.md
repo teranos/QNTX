@@ -5,7 +5,7 @@ Status: Proposed
 
 
 
-
+brandon: "so, i do receive the e-mail, but there are errors in there about "
 
 "let's say QNTX also has it's own built in messages it would like to send sometimes via email"
 
