@@ -88,10 +88,6 @@ folder itself carries nothing.
 
 - A bound folder sends nothing until a branch is named for it in the element.
 
-"concept of default branch, not main or master"
-
-- A folder is bound to its repository's default branch, as GitHub names it.
-
 "it should show red, and have you redo the binding"
 
 - When the default branch is another, the binding is red until it is bound again.
