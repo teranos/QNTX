@@ -26,20 +26,20 @@ import (
 
 // "concept of default branch, not main or master"
 
-// repoDefaultBranch is the branch repo names its default, as GitHub says it now.
-func (s *QNTXServer) repoDefaultBranch(ctx context.Context, repo gitHubRepo) (string, error) {
-	answered, err := s.gitHubService().GetARepository(services.AsInstallation(ctx),
-		&protocol.GitHubGetARepositoryRequest{Owner: repo.Owner, Repo: repo.Name})
+// repoDefaultBranch is the branch repo names its default, as its forge says it now.
+func (s *QNTXServer) repoDefaultBranch(ctx context.Context, repo forge.Repo) (string, error) {
+	reader, err := s.readers().For(repo)
+	if err != nil {
+		return "", err
+	}
+	described, err := reader.Describe(ctx, forge.AsApp, repo)
 	if err != nil {
 		return "", errors.Wrapf(err, "the default branch of %s was not asked", repo)
 	}
-	if !answered.GetSuccess() {
-		return "", errors.New(answered.GetError())
+	if described.DefaultBranch == "" {
+		return "", errors.Newf("%s names no default branch", repo)
 	}
-	if answered.GetDefaultBranch() == "" {
-		return "", errors.Newf("GitHub named no default branch for %s", repo)
-	}
-	return answered.GetDefaultBranch(), nil
+	return described.DefaultBranch, nil
 }
 
 // repoOf reads the repository a sigil names, with its host.
@@ -49,20 +49,6 @@ func repoOf(said string) (forge.Repo, *protocol.Refusal) {
 		return forge.Repo{}, &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: err.Error()}
 	}
 	return repo, nil
-}
-
-// gitHubRepoOf reads the repository a sigil names, for a sigil that asks GitHub
-// and refuses one that is on another forge.
-func gitHubRepoOf(said string) (gitHubRepo, *protocol.Refusal) {
-	repo, refused := repoOf(said)
-	if refused != nil {
-		return gitHubRepo{}, refused
-	}
-	on, err := onGitHub(repo)
-	if err != nil {
-		return gitHubRepo{}, &protocol.Refusal{Why: sigil.Invalid, Param: "repo", Says: err.Error()}
-	}
-	return on, nil
 }
 
 // githubPage is as many as GitHub gives on one page.
@@ -190,27 +176,24 @@ func (s *QNTXServer) vaultRepos(ctx context.Context, sent sigil.Sent) (any, *pro
 }
 
 // repoDirs is the folders directly inside dir of repo on branch, or why they
-// are not: GitHub's own words, or dir being a file.
-func (s *QNTXServer) repoDirs(ctx context.Context, repo gitHubRepo, branch, dir string) ([]string, error) {
-	if dir == "" {
-		// GitHub lists a repository's top at ".".
-		dir = "."
-	}
-	answered, err := s.gitHubService().GetRepositoryContent(services.AsInstallation(ctx),
-		&protocol.GitHubGetRepositoryContentRequest{Owner: repo.Owner, Repo: repo.Name, Path: dir, Ref: branch})
+// are not: the forge's own words, or dir being a file.
+func (s *QNTXServer) repoDirs(ctx context.Context, repo forge.Repo, branch, dir string) ([]string, error) {
+	reader, err := s.readers().For(repo)
 	if err != nil {
-		return nil, errors.Wrapf(err, "%s of %s on %s was not asked", dir, repo, branch)
+		return nil, err
 	}
-	if !answered.GetSuccess() {
-		return nil, errors.New(answered.GetError())
+	entries, err := reader.Entries(ctx, forge.AsApp, repo, branch, dir)
+	var notADirectory forge.NotADirectory
+	if errors.As(err, &notADirectory) {
+		return nil, errors.Newf("%s is a %s of %s on %s, not a folder", dir, notADirectory.Kind, repo, branch)
 	}
-	if answered.GetType() == "file" {
-		return nil, errors.Newf("%s is a file of %s on %s, not a folder", dir, repo, branch)
+	if err != nil {
+		return nil, err
 	}
 	dirs := []string{}
-	for _, entry := range answered.GetItems() {
-		if entry.GetType() == "dir" {
-			dirs = append(dirs, entry.GetPath())
+	for _, entry := range entries {
+		if entry.Kind == forge.Dir {
+			dirs = append(dirs, entry.Path)
 		}
 	}
 	slices.Sort(dirs)
@@ -218,7 +201,7 @@ func (s *QNTXServer) repoDirs(ctx context.Context, repo gitHubRepo, branch, dir 
 }
 
 func (s *QNTXServer) vaultSubdirs(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	repo, refused := gitHubRepoOf(sent["repo"])
+	repo, refused := repoOf(sent["repo"])
 	if refused != nil {
 		return nil, refused
 	}
@@ -226,7 +209,7 @@ func (s *QNTXServer) vaultSubdirs(ctx context.Context, sent sigil.Sent) (any, *p
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	dirs, err := s.repoDirs(ctx, repo, branch, sent["path"])
+	dirs, err := s.repoDirs(ctx, repo, branch, path.Clean(sent["path"]))
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
@@ -246,7 +229,7 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	if !there {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is no folder of " + vault.Name + " at " + vault.Path}
 	}
-	repo, refused := gitHubRepoOf(sent["repo"])
+	repo, refused := repoOf(sent["repo"])
 	if refused != nil {
 		return nil, refused
 	}
@@ -258,7 +241,7 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	folder := repo.Forge().String() + "@" + branch + ":" + sent["path"] + "=" + place
+	folder := repo.String() + "@" + branch + ":" + sent["path"] + "=" + place
 	folders, err := vaultFoldersOf(append(slices.Clone(vault.Folders), folder))
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Says: err.Error()}
@@ -342,21 +325,16 @@ const (
 
 // foldersState is what an enabled folder whose place is on the box is now.
 func (s *QNTXServer) foldersState(ctx context.Context, vault Vault, source buildSource, place string, state *protocol.VaultFolderState) {
-	repo, err := source.onGitHub()
-	if err != nil {
-		state.State, state.Why = vaultInvalid, err.Error()
-		return
-	}
-	defaultBranch, err := s.repoDefaultBranch(ctx, repo)
+	defaultBranch, err := s.repoDefaultBranch(ctx, source.Repo)
 	if err != nil {
 		state.State, state.Why = vaultInvalid, err.Error()
 		return
 	}
 	if defaultBranch != source.Branch {
-		state.State, state.Why = vaultInvalid, "the default branch of "+repo.String()+" is now "+defaultBranch+", not "+source.Branch+": bind "+place+" again"
+		state.State, state.Why = vaultInvalid, "the default branch of "+source.Repo.String()+" is now "+defaultBranch+", not "+source.Branch+": bind "+place+" again"
 		return
 	}
-	if _, err := s.repoDirs(ctx, repo, source.Branch, source.Path); err != nil {
+	if _, err := s.repoDirs(ctx, source.Repo, source.Branch, source.Path); err != nil {
 		state.State, state.Why = vaultInvalid, err.Error()
 		return
 	}

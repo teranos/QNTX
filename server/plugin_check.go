@@ -1,17 +1,16 @@
 package server
 
-// Check, the first stage of adding a plugin, asked of GitHubService as the node (ADR-043).
+// Check, the first stage of adding a plugin, asked of the plugin's forge as the node (ADR-043).
 // "the node should be the root identity github for github as a base"
 
 import (
 	"context"
-	"encoding/base64"
 	"net/url"
 	"strings"
 
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -68,14 +67,19 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 	if name == "." {
 		return nil, errors.Newf("%q names no plugin", repo)
 	}
-	// The node's own GitHub is system's, named.
-	found, err := s.gitHubService().GetARepository(ctx, &protocol.GitHubGetARepositoryRequest{
-		Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo})
+	// The node reads as itself.
+	where := forge.Repo{Host: forge.GitHub, Path: source.Owner + "/" + source.Repo}
+	reader, err := s.readers().For(where)
 	if err != nil {
-		return nil, errors.Wrapf(err, "GitHubService did not answer for %s/%s", source.Owner, source.Repo)
+		return nil, err
 	}
-	if !found.Success {
-		return nil, errors.Newf("%s/%s: %s", source.Owner, source.Repo, found.Error)
+	var refused forge.Refused
+	found, err := reader.Describe(ctx, forge.AsNode, where)
+	if errors.As(err, &refused) {
+		return nil, errors.Newf("%s: %s", where.Path, refused.Says)
+	}
+	if err != nil {
+		return nil, err
 	}
 	// A URL naming no ref is the repository as its default branch is.
 	ref := found.DefaultBranch
@@ -88,70 +92,32 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 	}
 
 	if source.PathNamed {
-		held, err := s.gitHubService().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
-			Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo, Path: source.Path, Ref: ref})
+		kind, err := reader.KindAt(ctx, forge.AsNode, where, ref, source.Path)
+		if errors.As(err, &refused) {
+			return nil, errors.Newf("%s is not in %s at %s: %s", source.Path, found.FullName, ref, refused.Says)
+		}
 		if err != nil {
-			return nil, errors.Wrapf(err, "GitHubService did not answer for %s in %s at %s", source.Path, found.FullName, ref)
-		}
-		if !held.Success {
-			return nil, errors.Newf("%s is not in %s at %s: %s", source.Path, found.FullName, ref, held.Error)
-		}
-		if err := aDirectory(held); err != nil {
 			return nil, errors.Wrapf(err, "%s in %s at %s", source.Path, found.FullName, ref)
 		}
-	}
-
-	readme, err := s.pluginReadme(ctx, source, ref)
-	if err != nil {
-		return nil, err
-	}
-	if readme.Success {
-		text, err := readmeText(readme)
-		if err != nil {
-			return nil, errors.Wrapf(err, "the README at %s in %s at %s does not read", readme.Path, found.FullName, ref)
+		if kind != forge.Dir {
+			return nil, errors.Newf("%s in %s at %s: is not a directory, and a plugin is", source.Path, found.FullName, ref)
 		}
-		checked.Readme, checked.ReadmePath = text, readme.Path
-	} else {
-		checked.ReadmeSaid = readme.Error
 	}
-	return checked, nil
-}
 
-// aDirectory refuses what GitHub answered with anything but a directory's
-// entries: a plugin is a directory.
-func aDirectory(held *protocol.GitHubGetRepositoryContentResponse) error {
-	switch held.GetAnswered() {
-	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY:
-		return nil
-	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_ONE:
-		return errors.Newf("is a %s, and a plugin is a directory", held.GetType())
-	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED:
-		return errors.New("is answered by GitHubService without saying what GitHub answered with")
+	// The README of the plugin's directory, or of the repository when the
+	// plugin is the whole of it.
+	readmeOf := forge.Root
+	if source.PathNamed {
+		readmeOf = source.Path
 	}
-	return errors.Newf("is answered by GitHubService as %d, which this node does not know", held.GetAnswered())
-}
-
-// pluginReadme is the README of the plugin's directory, or of the repository
-// when the plugin is the whole of it.
-func (s *QNTXServer) pluginReadme(ctx context.Context, source gitHubSource, ref string) (*protocol.GitHubGetARepositoryREADMEResponse, error) {
-	if !source.PathNamed {
-		readme, err := s.gitHubService().GetARepositoryREADME(ctx, &protocol.GitHubGetARepositoryREADMERequest{
-			Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo, Ref: ref})
-		return readme, errors.Wrapf(err, "GitHubService did not answer for the README of %s/%s at %s", source.Owner, source.Repo, ref)
+	readme, err := reader.Readme(ctx, forge.AsNode, where, ref, readmeOf)
+	if errors.As(err, &refused) {
+		checked.ReadmeSaid = refused.Says
+		return checked, nil
 	}
-	readme, err := s.gitHubService().GetARepositoryREADMEForADirectory(ctx, &protocol.GitHubGetARepositoryREADMEForADirectoryRequest{
-		Namespace: auth.NamespaceSystem, Owner: source.Owner, Repo: source.Repo, Dir: source.Path, Ref: ref})
-	return readme, errors.Wrapf(err, "GitHubService did not answer for the README of %s in %s/%s at %s", source.Path, source.Owner, source.Repo, ref)
-}
-
-// readmeText is a README's content as text. GitHub sends it base64, wrapped in lines.
-func readmeText(readme *protocol.GitHubGetARepositoryREADMEResponse) (string, error) {
-	if readme.Encoding != "base64" {
-		return "", errors.Newf("it is encoded as %q, and base64 is what is read", readme.Encoding)
-	}
-	raw, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(readme.Content, "\n", ""))
 	if err != nil {
-		return "", errors.Wrap(err, "its base64 does not decode")
+		return nil, errors.Wrapf(err, "the README of %s in %s at %s does not read", readmeOf, found.FullName, ref)
 	}
-	return string(raw), nil
+	checked.Readme, checked.ReadmePath = readme.Text, readme.Path
+	return checked, nil
 }

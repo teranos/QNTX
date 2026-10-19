@@ -185,7 +185,7 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		sent.Refused = err
 		return sent
 	}
-	defaultBranch, err := s.repoDefaultBranch(ctx, on)
+	defaultBranch, err := s.repoDefaultBranch(ctx, source.Repo)
 	if err != nil {
 		sent.Refused = err
 		return sent
@@ -198,7 +198,7 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		sent.Refused = err
 		return sent
 	}
-	onBranch, err := s.repoNotes(ctx, on, branch, source.Path)
+	onBranch, err := s.repoNotes(ctx, source.Repo, branch, source.Path)
 	if err != nil {
 		sent.Refused = err
 		return sent

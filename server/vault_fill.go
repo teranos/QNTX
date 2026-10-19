@@ -14,7 +14,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1" //nolint:gosec // git names a blob by its SHA-1, used only to compare with GitHub's
-	"encoding/base64"
 	"encoding/hex"
 	"os"
 	"path"
@@ -26,8 +25,6 @@ import (
 
 	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/internal/sacred"
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/plugin/grpc/services"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -58,30 +55,31 @@ func gitBlobSHA(content []byte) string {
 
 // repoNotes is every note under folder of repo on branch, its folders'
 // own included.
-func (s *QNTXServer) repoNotes(ctx context.Context, repo gitHubRepo, branch, folder string) ([]repoNote, error) {
+func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, folder string) ([]repoNote, error) {
+	reader, err := s.readers().For(repo)
+	if err != nil {
+		return nil, err
+	}
 	var notes []repoNote
 	var walk func(dir string) error
 	walk = func(dir string) error {
-		answered, err := s.gitHubService().GetRepositoryContent(services.AsInstallation(ctx),
-			&protocol.GitHubGetRepositoryContentRequest{Owner: repo.Owner, Repo: repo.Name, Path: dir, Ref: branch})
+		entries, err := reader.Entries(ctx, forge.AsApp, repo, branch, dir)
+		var notADirectory forge.NotADirectory
+		if errors.As(err, &notADirectory) {
+			return errors.Newf("%s is a %s of %s on %s, not a folder", dir, notADirectory.Kind, repo, branch)
+		}
 		if err != nil {
-			return errors.Wrapf(err, "%s of %s on %s was not asked", dir, repo, branch)
+			return err
 		}
-		if !answered.GetSuccess() {
-			return errors.New(answered.GetError())
-		}
-		if answered.GetType() == "file" {
-			return errors.Newf("%s is a file of %s on %s, not a folder", dir, repo, branch)
-		}
-		for _, entry := range answered.GetItems() {
+		for _, entry := range entries {
 			switch {
-			case entry.GetType() == "dir":
-				if err := walk(entry.GetPath()); err != nil {
+			case entry.Kind == forge.Dir:
+				if err := walk(entry.Path); err != nil {
 					return err
 				}
-			case entry.GetType() == "file" && strings.HasSuffix(entry.GetName(), noteSuffix):
-				under := strings.TrimPrefix(entry.GetPath(), folder+"/")
-				notes = append(notes, repoNote{under: under, path: entry.GetPath(), sha: entry.GetSha()})
+			case entry.Kind == forge.File && strings.HasSuffix(entry.Name, noteSuffix):
+				under := strings.TrimPrefix(entry.Path, folder+"/")
+				notes = append(notes, repoNote{under: under, path: entry.Path, sha: entry.SHA})
 			}
 		}
 		return nil
@@ -92,25 +90,13 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo gitHubRepo, branch, fol
 	return notes, nil
 }
 
-// repoNoteContent is a note's content on branch, as GitHub gives it.
-func (s *QNTXServer) repoNoteContent(ctx context.Context, repo gitHubRepo, branch, file string) ([]byte, error) {
-	answered, err := s.gitHubService().GetRepositoryContent(services.AsInstallation(ctx),
-		&protocol.GitHubGetRepositoryContentRequest{Owner: repo.Owner, Repo: repo.Name, Path: file, Ref: branch})
+// repoNoteContent is a note's content on branch.
+func (s *QNTXServer) repoNoteContent(ctx context.Context, repo forge.Repo, branch, file string) ([]byte, error) {
+	reader, err := s.readers().For(repo)
 	if err != nil {
-		return nil, errors.Wrapf(err, "%s of %s on %s was not asked", file, repo, branch)
+		return nil, err
 	}
-	if !answered.GetSuccess() {
-		return nil, errors.New(answered.GetError())
-	}
-	if answered.GetEncoding() != "base64" {
-		return nil, errors.Newf("GitHub gave %s of %s on %s encoded as %q, which the node does not read; a file over 1 MB comes with none",
-			file, repo, branch, answered.GetEncoding())
-	}
-	content, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(answered.GetContent(), "\n", ""))
-	if err != nil {
-		return nil, errors.Wrapf(err, "%s of %s on %s did not decode", file, repo, branch)
-	}
-	return content, nil
+	return reader.File(ctx, forge.AsApp, repo, branch, file)
 }
 
 // vaultFilled is what filling one folder did: each note written as main has
@@ -159,12 +145,7 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		filled.Refused = err
 		return filled
 	}
-	on, err := source.onGitHub()
-	if err != nil {
-		filled.Refused = err
-		return filled
-	}
-	notes, err := s.repoNotes(ctx, on, source.Branch, source.Path)
+	notes, err := s.repoNotes(ctx, source.Repo, source.Branch, source.Path)
 	if err != nil {
 		filled.Refused = err
 		return filled
@@ -209,7 +190,7 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		if !inVault && hasBase {
 			continue
 		}
-		content, err := s.repoNoteContent(ctx, on, source.Branch, note.path)
+		content, err := s.repoNoteContent(ctx, source.Repo, source.Branch, note.path)
 		if err != nil {
 			filled.Refused = err
 			return filled

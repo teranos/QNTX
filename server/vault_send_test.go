@@ -150,7 +150,7 @@ func TestABindingWhoseDefaultBranchMovedIsInvalid(t *testing.T) {
 	require.Nil(t, refused, "%v", refused)
 	state := got.(*protocol.VaultStates).GetFolders()[0]
 	assert.Equal(t, vaultInvalid, state.State)
-	assert.Equal(t, "the default branch of abcd-nl/clean is now trunk, not main: bind Course Material again", state.Why)
+	assert.Equal(t, "the default branch of github.com/abcd-nl/clean is now trunk, not main: bind Course Material again", state.Why)
 }
 
 // "oh, require it to be a dir in the repo , not in its root"
