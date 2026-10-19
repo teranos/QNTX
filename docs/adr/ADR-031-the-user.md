@@ -104,8 +104,7 @@ number, and requires none of them. The name is settled once; an email or a phone
 number that arrives later is added rather than refused, because a User has any number of each. A phone number is kept as its digits and the leading `+` the
 person typed, so one number is one string however it was spaced.
 
-`POST /auth/user/disable` and `POST /auth/user/enable` are the switch, reached
-by the person's own session. Off, `disabled_by` names them, every gate refuses
+`POST /auth/user/disable` and `POST /auth/user/enable` are the switch, reached by the person's own session. Off, `disabled_by` names them, every gate refuses
 them as switched off, and the Self element offers to reawaken. Set by anyone else,
 enable is refused naming who, and the person stays off. The act is attested as
 `identity:disabled` and `identity:enabled`.
