@@ -9,7 +9,7 @@ import (
 
 func TestTheBuildKeysAndTheNamespaceAreNotThePluginsToValidate(t *testing.T) {
 	errs, refused := validateConfigAgainstSchema(map[string]string{
-		buildCore:                     "teranos/datapunt@main",
+		buildCore:                     "github.com/teranos/datapunt@main",
 		buildCommand:                  "dub build",
 		grpcplugin.PluginNamespaceKey: "Clean",
 		"typo":                        "x",
@@ -26,7 +26,7 @@ func TestValidationSeesTheConfigTheRecordHoldsAfter(t *testing.T) {
 		"bucket": {Type: "string", Required: true},
 		"region": {Type: "string"},
 	}
-	held := map[string]string{"bucket": "media", buildCore: "teranos/staands@main"}
+	held := map[string]string{"bucket": "media", buildCore: "github.com/teranos/staands@main"}
 
 	if errs, refused := validateConfigAgainstSchema(configAfter(held, map[string]string{"region": "eu"}), schema); refused != nil {
 		t.Fatalf("a PUT naming only region: %v (%v)", errs, refused)

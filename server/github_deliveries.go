@@ -119,16 +119,16 @@ func nextCursor(link string) string {
 // CatchUpDeliveries sends again what GitHub could not deliver while the node
 // was down. The mark moves only when the whole catch-up went through, so one
 // that failed is tried over the same window at the next start.
-func (s *QNTXServer) CatchUpDeliveries() {
-	logger := s.logger.Named("github")
-	if _, active := s.gitHubWebhook(); !active {
+func (g *gitHub) CatchUpDeliveries() {
+	logger := g.host.log().Named("github")
+	if _, active := g.gitHubWebhook(); !active {
 		return
 	}
-	if _, err := (gitHubCredentials{s: s}).AppToken(); err != nil {
+	if _, err := (gitHubCredentials{host: g.host}).AppToken(); err != nil {
 		logger.Infow("The App webhook's deliveries are not caught up", "why", err)
 		return
 	}
-	mark := filepath.Join(filepath.Dir(s.dbPath), caughtUpFile)
+	mark := filepath.Join(filepath.Dir(g.host.dbFile()), caughtUpFile)
 	var since time.Time
 	if kept, err := os.ReadFile(mark); err == nil {
 		if since, err = time.Parse(time.RFC3339Nano, strings.TrimSpace(string(kept))); err != nil {
@@ -139,7 +139,7 @@ func (s *QNTXServer) CatchUpDeliveries() {
 	}
 
 	began := time.Now().UTC()
-	redelivered, err := catchUpDeliveries(s.lifetime(), s.gitHubService(), since, logger)
+	redelivered, err := catchUpDeliveries(g.host.lifetime(), g.gitHubService(), since, logger)
 	if err != nil {
 		logger.Errorw("The App webhook's deliveries were not caught up", "since", since, "redelivered", len(redelivered), "error", err)
 		return

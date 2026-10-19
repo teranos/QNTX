@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	errors "github.com/teranos/sacred-error"
@@ -42,11 +43,12 @@ func (c *commitChecks) refuse(what string) {
 }
 
 // checksOn asks GitHub what Actions says of repo at sha.
-func (s *QNTXServer) checksOn(ctx context.Context, repo, sha string) (commitChecks, error) {
-	owner, name, ok := strings.Cut(repo, "/")
-	if !ok {
-		return commitChecks{}, errors.Newf("%q names no repository: owner/repo", repo)
+func (s *QNTXServer) checksOn(ctx context.Context, repo forge.Repo, sha string) (commitChecks, error) {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return commitChecks{}, err
 	}
+	owner, name := on.Owner, on.Name
 	ctx = services.AsInstallation(ctx)
 	suites, err := s.gitHubService().ListCheckSuitesForAGitReference(ctx, &protocol.GitHubListCheckSuitesForAGitReferenceRequest{
 		Owner: owner, Repo: name, Ref: sha, AppId: gitHubActionsApp, PerPage: 100,
@@ -98,13 +100,13 @@ func (s *QNTXServer) checksOn(ctx context.Context, repo, sha string) (commitChec
 // awaitChecks holds b's deploy at its checks until GitHub Actions passed every
 // one on the commit pushed, then builds it. A check that fails ends the deploy,
 // and so does a newer push.
-func (s *QNTXServer) awaitChecks(ctx context.Context, b pluginBuild, repo, sha string, logger *zap.SugaredLogger) {
+func (s *QNTXServer) awaitChecks(ctx context.Context, b pluginBuild, repo forge.Repo, sha string, logger *zap.SugaredLogger) {
 	began := time.Now()
 	for s.deploys.awaiting(b.name, sha) {
 		said, err := s.checksOn(ctx, repo, sha)
 		if err != nil {
 			s.deploys.fail(b.name, err)
-			logger.Errorw("A plugin's checks were not read, so it is not built", "plugin", b.name, "repo", repo, "sha", sha, "error", err)
+			logger.Errorw("A plugin's checks were not read, so it is not built", "plugin", b.name, "repo", repo.String(), "sha", sha, "error", err)
 			return
 		}
 		s.deploys.checksAre(b.name, sha, said.states)

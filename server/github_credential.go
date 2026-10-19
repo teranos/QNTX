@@ -23,7 +23,7 @@ const gitCredentialUser = "x-access-token"
 // HandleGitHubCredential mints a short-lived token of the App's installation
 // where one repository is, narrowed to it, and says what it may do with
 // contents: one that only reads them is refused by GitHub on a push.
-func (s *QNTXServer) HandleGitHubCredential(w http.ResponseWriter, r *http.Request) {
+func (g *gitHub) HandleGitHubCredential(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, githubCredentialPath+" answers POST, and this was "+r.Method)
 		return
@@ -42,7 +42,7 @@ func (s *QNTXServer) HandleGitHubCredential(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	minted, err := s.gitHubService().InstallationToken(r.Context(), asked.Owner, asked.Repo)
+	minted, err := g.gitHubService().InstallationToken(r.Context(), asked.Owner, asked.Repo)
 	var notInstalled services.NoInstallation
 	switch {
 	case err == nil:
@@ -55,7 +55,7 @@ func (s *QNTXServer) HandleGitHubCredential(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	respond(w, s.logger, http.StatusOK, map[string]any{
+	respond(w, g.host.log(), http.StatusOK, map[string]any{
 		"username":   gitCredentialUser,
 		"password":   minted.Token,
 		"expires_at": minted.ExpiresAt,

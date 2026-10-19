@@ -30,7 +30,7 @@ func TestTheNodeSignsAsTheAppOnceItsKeyReads(t *testing.T) {
 
 	h := bareAuthHandler(t)
 	setOperatorClients(h, cfg, zap.NewNop().Sugar())
-	var app services.GitHubApp = gitHubCredentials{s: &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), authHandler: h}}
+	var app services.GitHubApp = gitHubCredentials{host: &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), authHandler: h}}
 	signed, err := app.AppToken()
 	require.NoError(t, err)
 	assert.NotEmpty(t, signed)

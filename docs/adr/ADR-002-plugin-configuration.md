@@ -49,8 +49,8 @@ The plugin's own keys, which it reads through `config.GetString(key)`, and QNTX'
 | Key | |
 |---|---|
 | `namespace` | The namespace the plugin stands in ([ADR-046](./ADR-046-a-plugin-stands-in-a-namespace.md)). |
-| `build.core` | The source that is built: `owner/repo@branch`. |
-| `build.inputs` | Files from other repositories the build takes: `owner/repo@branch:path`, space-separated. |
+| `build.core` | The source that is built: `github.com/owner/repo@branch`. A repository names its forge. |
+| `build.inputs` | Files from other repositories the build takes: `owner/repo@branch:path`, space-separated, each naming its forge. |
 | `build.inputs_env` | The environment variable the build reads the input files' paths from. |
 | `build.packages` | nixpkgs packages the build runs with, space-separated. |
 | `build.command` | The build, run with `sh -c` at the root of `build.core`. |

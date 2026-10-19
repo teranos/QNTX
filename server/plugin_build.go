@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/sqlclose"
@@ -48,55 +49,73 @@ const nixBin = "/nix/var/nix/profiles/default/bin"
 // buildSource is one repository a build takes from, at a branch. An input
 // names a single file of it in Path; the source that is built names none.
 type buildSource struct {
-	Owner, Repo, Branch, Path string
-	PathNamed                 bool
+	Repo         forge.Repo
+	Branch, Path string
+	PathNamed    bool
 }
 
 func (b buildSource) String() string {
-	s := b.Owner + "/" + b.Repo + "@" + b.Branch
+	s := b.Repo.String() + "@" + b.Branch
 	if b.PathNamed {
 		s += ":" + b.Path
 	}
 	return s
 }
 
-// parseBuildSource reads owner/repo@branch, with :path when a file is named.
-// Each part is named, or the source is refused naming the part that is not.
+// gitHubRepo is a repository as GitHub's API names it: an owner and a name.
+type gitHubRepo struct{ Owner, Name string }
+
+func (g gitHubRepo) String() string { return g.Owner + "/" + g.Name }
+
+// Forge is the repository as records name it: with its forge.
+func (g gitHubRepo) Forge() forge.Repo { return forge.Repo{Host: forge.GitHub, Path: g.String()} }
+
+// onGitHub is the repository as GitHubService is asked about it. A repository
+// on another forge is refused here, naming it, and not asked of GitHub.
+func onGitHub(repo forge.Repo) (gitHubRepo, error) {
+	if !strings.EqualFold(repo.Host, forge.GitHub) {
+		return gitHubRepo{}, errors.Newf("%s is not on %s, and this asks GitHub", repo, forge.GitHub)
+	}
+	owner, name, ok := strings.Cut(repo.Path, "/")
+	if !ok || strings.Contains(name, "/") {
+		return gitHubRepo{}, errors.Newf("%s is not owner/repo: GitHub does not nest", repo)
+	}
+	return gitHubRepo{Owner: owner, Name: name}, nil
+}
+
+// onGitHub is the source's repository as GitHubService is asked about it.
+func (b buildSource) onGitHub() (gitHubRepo, error) { return onGitHub(b.Repo) }
+
+// parseBuildSource reads host/path@branch, with :path when a file is named, as
+// github.com/owner/repo@main:notes. Each part is named, or the source is
+// refused naming the part that is not.
 func parseBuildSource(s string, withPath bool) (buildSource, error) {
-	repo, at, ok := strings.Cut(strings.TrimSpace(s), "@")
+	repoText, at, ok := strings.Cut(strings.TrimSpace(s), "@")
 	if !ok {
-		return buildSource{}, errors.Newf("%q names no branch: owner/repo@branch", s)
+		return buildSource{}, errors.Newf("%q names no branch: host/path@branch", s)
 	}
 	file := buildSource{PathNamed: withPath}
 	if withPath {
 		var path string
 		at, path, ok = strings.Cut(at, ":")
 		if !ok {
-			return buildSource{}, errors.Newf("%q names no file: owner/repo@branch:path", s)
+			return buildSource{}, errors.Newf("%q names no file: host/path@branch:path", s)
 		}
 		pathText, err := named.TextOf("the file", path)
 		if err != nil {
-			return buildSource{}, errors.Wrapf(err, "%q names no file: owner/repo@branch:path", s)
+			return buildSource{}, errors.Wrapf(err, "%q names no file: host/path@branch:path", s)
 		}
 		file.Path = pathText.String()
 	}
 	branch, err := named.TextOf("the branch", at)
 	if err != nil {
-		return buildSource{}, errors.Wrapf(err, "%q names no branch: owner/repo@branch", s)
+		return buildSource{}, errors.Wrapf(err, "%q names no branch: host/path@branch", s)
 	}
-	ownerOf, nameOf, ok := strings.Cut(repo, "/")
-	if !ok || strings.Contains(nameOf, "/") {
-		return buildSource{}, errors.Newf("%q names no repository: owner/repo", s)
-	}
-	owner, err := named.TextOf("the owner", ownerOf)
+	repo, err := forge.ParseRepo(repoText)
 	if err != nil {
-		return buildSource{}, errors.Wrapf(err, "%q names no repository: owner/repo", s)
+		return buildSource{}, errors.Wrapf(err, "%q names no repository", s)
 	}
-	name, err := named.TextOf("the repository", nameOf)
-	if err != nil {
-		return buildSource{}, errors.Wrapf(err, "%q names no repository: owner/repo", s)
-	}
-	file.Owner, file.Repo, file.Branch = owner.String(), name.String(), branch.String()
+	file.Repo, file.Branch = repo, branch.String()
 	return file, nil
 }
 
@@ -454,10 +473,14 @@ func interrupted(err error) bool {
 // buildRev is the commit source's branch points at now, or the last commit
 // that touched its file.
 func (s *QNTXServer) buildRev(ctx context.Context, source buildSource) (string, error) {
+	repo, err := source.onGitHub()
+	if err != nil {
+		return "", err
+	}
 	said, err := s.gitHubService().ListCommits(ctx, &protocol.GitHubListCommitsRequest{
 		Namespace: auth.NamespaceSystem,
-		Owner:     source.Owner,
-		Repo:      source.Repo,
+		Owner:     repo.Owner,
+		Repo:      repo.Name,
 		Sha:       source.Branch,
 		Path:      source.Path,
 		PerPage:   1,
@@ -607,7 +630,11 @@ func builtVersion(ctx context.Context, name, binary string) (string, error) {
 
 // fetchCore writes the core's archive at rev to path.
 func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path string) error {
-	body, err := s.gitHubService().Tarball(ctx, auth.NamespaceSystem, core.Owner, core.Repo, rev)
+	repo, err := core.onGitHub()
+	if err != nil {
+		return err
+	}
+	body, err := s.gitHubService().Tarball(ctx, auth.NamespaceSystem, repo.Owner, repo.Name, rev)
 	if err != nil {
 		return errors.Wrapf(err, "failed to fetch %s at %s", core.String(), rev)
 	}
@@ -628,10 +655,14 @@ func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path 
 
 // fetchInput writes one input file at rev into work, and says where.
 func (s *QNTXServer) fetchInput(ctx context.Context, in buildSource, rev, work string) (string, error) {
+	repo, err := in.onGitHub()
+	if err != nil {
+		return "", err
+	}
 	said, err := s.gitHubService().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
 		Namespace: auth.NamespaceSystem,
-		Owner:     in.Owner,
-		Repo:      in.Repo,
+		Owner:     repo.Owner,
+		Repo:      repo.Name,
 		Path:      in.Path,
 		Ref:       rev,
 	})
@@ -652,7 +683,7 @@ func (s *QNTXServer) fetchInput(ctx context.Context, in buildSource, rev, work s
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", errors.Wrapf(err, "failed to make %s", dir)
 	}
-	file := filepath.Join(dir, in.Owner+"-"+in.Repo+"-"+filepath.Base(in.Path))
+	file := filepath.Join(dir, repo.Owner+"-"+repo.Name+"-"+filepath.Base(in.Path))
 	if err := os.WriteFile(file, data, 0o644); err != nil {
 		return "", errors.Wrapf(err, "failed to write %s", file)
 	}

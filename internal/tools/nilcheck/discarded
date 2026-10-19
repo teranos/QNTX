@@ -1,6 +1,6 @@
 # results assigned to _ or dropped, per file. Debt: each number may fall and may not rise.
 # Instead: read what came back; an error dropped is an error swallowed.
-# 285 in 124 files.
+# 284 in 123 files.
 # internal/config/environ.go: defaults.go renamed, 4 to none with its defaults gone.
 
 1	ats/attrs/attrs.go
@@ -94,7 +94,6 @@
 3	server/files.go
 2	server/github.go
 2	server/github_deliveries.go
-1	server/github_tag.go
 2	server/handlers.go
 1	server/host_gauges.go
 2	server/mcp.go

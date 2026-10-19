@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
@@ -25,7 +26,8 @@ import (
 // A follow's line is GITHUB follow:<owner/repo>@<branch>.
 const githubFollowLine = "follow:"
 
-// GitHubFollow is a push to Repo's Branch dispatching Workflow of Dispatches at Ref.
+// GitHubFollow is a push to Repo's Branch dispatching Workflow of Dispatches at
+// Ref. Repo and Dispatches name their forge: github.com/owner/repo.
 type GitHubFollow struct {
 	Repo       string            `json:"repo"`
 	Branch     string            `json:"branch"`
@@ -47,6 +49,9 @@ func (r NodeRecords) Follows() ([]GitHubFollow, error) {
 	follows := []GitHubFollow{}
 	for line, as := range newest {
 		if !strings.HasPrefix(line, githubFollowLine) {
+			continue
+		}
+		if retired, said := as.Attributes[retiredLine].(bool); said && retired {
 			continue
 		}
 		raw, err := json.Marshal(as.Attributes)
@@ -84,43 +89,58 @@ func (f GitHubFollow) inputs() map[string]any {
 	return inputs
 }
 
-// follows is whether the push lands on f's repo and branch.
-func (p gitHubPush) follows(f GitHubFollow) bool {
-	return f.Enabled && !p.Deleted && strings.EqualFold(p.Repository.FullName, f.Repo) && p.branch() == f.Branch
+// followed is whether the push lands on f's repo and branch.
+func followed(p forge.Push, f GitHubFollow) (bool, error) {
+	repo, err := forge.ParseRepo(f.Repo)
+	if err != nil {
+		return false, errors.Wrapf(err, "the follow %s names no repository", f.line())
+	}
+	return f.Enabled && !p.Deleted && repo.Is(p.Repo) && p.Branch() == f.Branch, nil
 }
 
 // followsMovedBy dispatches every follow the push lands on, and names them.
-func (s *QNTXServer) followsMovedBy(push gitHubPush) []string {
-	logger := s.logger.Named("follow")
-	follows, err := s.nodeRecords().Follows()
+func (g *gitHub) followsMovedBy(push forge.Push) []string {
+	logger := g.host.log().Named("follow")
+	follows, err := g.host.nodeRecords().Follows()
 	if err != nil {
-		logger.Errorw("A push arrived and the follows were not read", "repo", push.Repository.FullName, "ref", push.Ref, "error", err)
+		logger.Errorw("A push arrived and the follows were not read", "repo", push.Repo.String(), "ref", push.Ref, "error", err)
 		return []string{}
 	}
 	names := []string{}
 	for _, f := range follows {
-		if !push.follows(f) {
+		lands, err := followed(push, f)
+		if err != nil {
+			logger.Errorw("A push arrived and a follow could not be matched against it", "repo", push.Repo.String(), "error", err)
+			continue
+		}
+		if !lands {
 			continue
 		}
 		names = append(names, f.line())
-		sacred.Go("github."+f.line(), func() { s.dispatchFollow(f, push.After, logger) })
+		sacred.Go("github."+f.line(), func() { g.dispatchFollow(f, push.After, logger) })
 	}
 	return names
 }
 
 // dispatchFollow dispatches f's workflow for the push that landed at after.
-func (s *QNTXServer) dispatchFollow(f GitHubFollow, after string, logger *zap.SugaredLogger) {
-	owner, repo, named := repoNamed(f.Dispatches)
-	if !named {
-		logger.Errorw("A push landed and its follow names no repo to dispatch", "follow", f.line(), "after", after, "dispatches", f.Dispatches)
+func (g *gitHub) dispatchFollow(f GitHubFollow, after string, logger *zap.SugaredLogger) {
+	dispatches, err := forge.ParseRepo(f.Dispatches)
+	if err != nil {
+		logger.Errorw("A push landed and its follow names no repo to dispatch", "follow", f.line(), "after", after, "dispatches", f.Dispatches, "error", err)
 		return
 	}
+	on, err := onGitHub(dispatches)
+	if err != nil {
+		logger.Errorw("A push landed and its follow dispatches where GitHub does not", "follow", f.line(), "after", after, "dispatches", f.Dispatches, "error", err)
+		return
+	}
+	owner, repo := on.Owner, on.Name
 	inputs, err := structpb.NewStruct(f.inputs())
 	if err != nil {
 		logger.Errorw("A push landed and its follow's inputs are not a workflow's", "follow", f.line(), "after", after, "error", err)
 		return
 	}
-	said, err := s.gitHubService().CreateAWorkflowDispatchEvent(s.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
+	said, err := g.gitHubService().CreateAWorkflowDispatchEvent(g.host.lifetime(), &protocol.GitHubCreateAWorkflowDispatchEventRequest{
 		Namespace: auth.NamespaceSystem, Owner: owner, Repo: repo, WorkflowId: f.Workflow, Ref: f.Ref, Inputs: inputs,
 	})
 	if err != nil {
@@ -139,9 +159,9 @@ func githubFollowSigil() *protocol.Sigil {
 		Name: "follow",
 		Does: "Set what a push to a repo's branch dispatches: a workflow, run by the node's own GitHub when the push reaches the App's webhook. Turned off, the push dispatches nothing.",
 		Takes: []*protocol.Param{
-			{Name: "repo", Required: true, Says: "owner/repo the push lands on."},
+			{Name: "repo", Required: true, Says: "The repository the push lands on, with its host: github.com/owner/repo."},
 			{Name: "branch", Required: true, Says: "The branch the push lands on."},
-			{Name: "dispatches", Required: true, Says: "owner/repo whose workflow is dispatched."},
+			{Name: "dispatches", Required: true, Says: "The repository whose workflow is dispatched, with its host: github.com/owner/repo."},
 			{Name: "workflow", Required: true, Says: "The workflow's file name, as in deploy.yml."},
 			{Name: "ref", Required: true, Says: "The branch of dispatches the workflow runs from."},
 			{Name: "inputs", Required: true, Says: "The workflow's inputs as a JSON object of strings; {} for none."},
@@ -152,18 +172,18 @@ func githubFollowSigil() *protocol.Sigil {
 	}
 }
 
-func (s *QNTXServer) githubFollow(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (g *gitHub) githubFollow(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	on, err := strconv.ParseBool(sent["enabled"])
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "enabled", Says: "enabled is true or false, and this said " + sent["enabled"]}
 	}
 	f := GitHubFollow{Branch: sent["branch"], Workflow: sent["workflow"], Ref: sent["ref"], Enabled: on}
 	for param, into := range map[string]*string{"repo": &f.Repo, "dispatches": &f.Dispatches} {
-		owner, repo, named := repoNamed(sent[param])
-		if !named {
-			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: param, Says: sent[param] + " names no repository: owner/repo"}
+		named, err := forge.ParseRepo(sent[param])
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: param, Says: err.Error()}
 		}
-		*into = owner + "/" + repo
+		*into = named.String()
 	}
 	notObject := &protocol.Refusal{Why: sigil.Invalid, Param: "inputs", Says: "inputs is a JSON object of strings, and this said " + sent["inputs"]}
 	opens, err := json.NewDecoder(strings.NewReader(sent["inputs"])).Token()
@@ -173,7 +193,7 @@ func (s *QNTXServer) githubFollow(ctx context.Context, sent sigil.Sent) (any, *p
 	if err := json.Unmarshal([]byte(sent["inputs"]), &f.Inputs); err != nil {
 		return nil, notObject
 	}
-	if err := s.nodeRecords().SetFollow(actorOf(ctx), f); err != nil {
+	if err := g.host.nodeRecords().SetFollow(actorOf(ctx), f); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return map[string]GitHubFollow{"follow": f}, nil

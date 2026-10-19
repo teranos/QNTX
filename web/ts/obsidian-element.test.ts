@@ -109,9 +109,9 @@ describe('a folder is bound by clicking', () => {
     test('owner, repository, folder, and two presses of Confirm', async () => {
         answers = {
             '/api/vault/owners': { owners: [{ login: 'abcd-nl', type: 'Organization', installation: '7' }, { login: 'abcd', type: 'User', installation: '8' }] },
-            '/api/vault/repos?installation=7': { repos: ['abcd-nl/clean'] },
-            '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=': { dirs: ['cdr', 'docs'], branch: 'trunk' },
-            '/api/vault/subdirs?repo=abcd-nl%2Fclean&path=docs': { dirs: ['docs/adr'], branch: 'trunk' },
+            '/api/vault/repos?installation=7': { repos: ['github.com/abcd-nl/clean'] },
+            '/api/vault/subdirs?repo=github.com%2Fabcd-nl%2Fclean&path=': { dirs: ['cdr', 'docs'], branch: 'trunk' },
+            '/api/vault/subdirs?repo=github.com%2Fabcd-nl%2Fclean&path=docs': { dirs: ['docs/adr'], branch: 'trunk' },
         };
         let sent: unknown = null;
         answer = (path, init) => {
@@ -137,19 +137,19 @@ describe('a folder is bound by clicking', () => {
         // "concept of default branch, not main or master"
         expect(container.querySelector('.obsidian-list')?.textContent).toContain('on trunk, its default branch');
         click(container, 'adr');
-        expect(container.querySelector('.obsidian-panel')?.textContent).toContain('abcd-nl/clean@trunk:docs/adr=Course Material');
+        expect(container.querySelector('.obsidian-panel')?.textContent).toContain('github.com/abcd-nl/clean@trunk:docs/adr=Course Material');
 
         click(container, 'Confirm');
         await flush();
         expect(sent).toBeNull();
         click(container, 'Confirm');
         await flush();
-        expect(sent).toEqual({ path: '/api/vault/bind', body: { name: 'abcd', place: 'Course Material', repo: 'abcd-nl/clean', path: 'docs/adr' } });
+        expect(sent).toEqual({ path: '/api/vault/bind', body: { name: 'abcd', place: 'Course Material', repo: 'github.com/abcd-nl/clean', path: 'docs/adr' } });
     });
 
     test('a folder inside a bound one is not offered for binding, and says why', () => {
-        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
-            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
+        const container = shown({ vault: { ...vault, folders: ['github.com/abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
+            { folder: 'github.com/abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
         ] as never[] });
         row(container, 'ABCD').querySelector<HTMLButtonElement>('.obsidian-twist')!.click();
         row(container, 'ABCD/lttr').querySelector<HTMLButtonElement>('.obsidian-name')!.click();
@@ -161,8 +161,8 @@ describe('a folder is bound by clicking', () => {
 describe('a binding is always in sight', () => {
     // "and if there is a binding, i expect it to not be collapsed and hidden, all per dir bdingings to repo need to be visible at all times"
     test('the folders holding a bound one are open, and stay open', () => {
-        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD/lttr'] }, dirs, states: [
-            { folder: 'abcd-nl/clean@main:cdr=ABCD/lttr', place: 'ABCD/lttr', state: 'active', why: '' },
+        const container = shown({ vault: { ...vault, folders: ['github.com/abcd-nl/clean@main:cdr=ABCD/lttr'] }, dirs, states: [
+            { folder: 'github.com/abcd-nl/clean@main:cdr=ABCD/lttr', place: 'ABCD/lttr', state: 'active', why: '' },
         ] as never[] });
         expect(row(container, 'ABCD/lttr')).toBeTruthy();
         const twist = row(container, 'ABCD').querySelector<HTMLButtonElement>('.obsidian-twist')!;
@@ -181,11 +181,11 @@ describe('a bound folder is unbound', () => {
             sent = { path, body: JSON.parse(String(init?.body)) };
             return Promise.resolve(new Response('{}'));
         };
-        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
-            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
+        const container = shown({ vault: { ...vault, folders: ['github.com/abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
+            { folder: 'github.com/abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
         ] as never[] });
         row(container, 'ABCD').querySelector<HTMLButtonElement>('.obsidian-name')!.click();
-        expect(container.querySelector('.obsidian-panel')?.textContent).toContain('abcd-nl/clean@main:cdr=ABCD');
+        expect(container.querySelector('.obsidian-panel')?.textContent).toContain('github.com/abcd-nl/clean@main:cdr=ABCD');
 
         click(container, 'Unbind');
         await flush();
@@ -204,9 +204,9 @@ describe('a bound folder is disabled and enabled', () => {
             sent.push({ path, body: JSON.parse(String(init?.body)) });
             return Promise.resolve(new Response('{}'));
         };
-        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD', 'abcd-nl/clean@main:docs=Course Material'] }, dirs, states: [
-            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
-            { folder: 'abcd-nl/clean@main:docs=Course Material', place: 'Course Material', state: 'disabled', why: '' },
+        const container = shown({ vault: { ...vault, folders: ['github.com/abcd-nl/clean@main:cdr=ABCD', 'github.com/abcd-nl/clean@main:docs=Course Material'] }, dirs, states: [
+            { folder: 'github.com/abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
+            { folder: 'github.com/abcd-nl/clean@main:docs=Course Material', place: 'Course Material', state: 'disabled', why: '' },
         ] as never[] });
         expect(row(container, 'Course Material').classList.contains('obsidian-row-disabled')).toBe(true);
         expect(row(container, 'Course Material').title).toBe('disabled');
@@ -233,8 +233,8 @@ describe('a bound folder sends to a branch only when told to', () => {
             sent = { path, body: JSON.parse(String(init?.body)) };
             return Promise.resolve(new Response('{}'));
         };
-        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
-            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '', branch: '', pull: '' },
+        const container = shown({ vault: { ...vault, folders: ['github.com/abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
+            { folder: 'github.com/abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '', branch: '', pull: '' },
         ] });
         row(container, 'ABCD').querySelector<HTMLButtonElement>('.obsidian-name')!.click();
         expect(container.querySelector('.obsidian-sending')?.textContent).toContain('Sends nothing back.');
@@ -253,8 +253,8 @@ describe('a bound folder sends to a branch only when told to', () => {
             sent = { path, body: JSON.parse(String(init?.body)) };
             return Promise.resolve(new Response('{}'));
         };
-        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
-            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'changes', why: '', branch: 'obsidian-abcd', pull: 'https://github.com/abcd-nl/clean/pull/1' },
+        const container = shown({ vault: { ...vault, folders: ['github.com/abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
+            { folder: 'github.com/abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'changes', why: '', branch: 'obsidian-abcd', pull: 'https://github.com/abcd-nl/clean/pull/1' },
         ] });
         expect(row(container, 'ABCD').classList.contains('obsidian-row-changes')).toBe(true);
         expect(row(container, 'ABCD').title).toBe('PR has changes (obsidian-abcd)');
@@ -267,8 +267,8 @@ describe('a bound folder sends to a branch only when told to', () => {
     });
 
     test('one whose branch holds nothing more says so', () => {
-        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
-            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'unchanged', why: '', branch: 'obsidian-abcd', pull: '' },
+        const container = shown({ vault: { ...vault, folders: ['github.com/abcd-nl/clean@main:cdr=ABCD'] }, dirs, states: [
+            { folder: 'github.com/abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'unchanged', why: '', branch: 'obsidian-abcd', pull: '' },
         ] });
         expect(row(container, 'ABCD').classList.contains('obsidian-row-unchanged')).toBe(true);
         expect(row(container, 'ABCD').title).toBe('PR has no changes (obsidian-abcd)');
@@ -279,17 +279,17 @@ describe('a bound folder says what it is now', () => {
     // "what should a valid binding show? that its active, green dot,"
     // "let's say color state is part of the row itself, the round dot remains, but has no text, hover shows text or reason."
     test('the row is its state, and its dot says it only when hovered', () => {
-        const container = shown({ vault: { ...vault, folders: ['abcd-nl/clean@main:cdr=ABCD', 'abcd-nl/clean@main:gone=Course Material'] }, dirs, states: [
-            { folder: 'abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
-            { folder: 'abcd-nl/clean@main:gone=Course Material', place: 'Course Material', state: 'invalid', why: 'GitHub GET /repos/abcd-nl/clean/contents/gone answered 404: Not Found' },
+        const container = shown({ vault: { ...vault, folders: ['github.com/abcd-nl/clean@main:cdr=ABCD', 'github.com/abcd-nl/clean@main:gone=Course Material'] }, dirs, states: [
+            { folder: 'github.com/abcd-nl/clean@main:cdr=ABCD', place: 'ABCD', state: 'active', why: '' },
+            { folder: 'github.com/abcd-nl/clean@main:gone=Course Material', place: 'Course Material', state: 'invalid', why: 'GitHub GET /repos/abcd-nl/clean/contents/gone answered 404: Not Found' },
         ] as never[] });
         expect(row(container, 'ABCD').classList.contains('obsidian-row-active')).toBe(true);
         expect(row(container, 'ABCD').querySelector('.obsidian-state-active')?.textContent).toBe('');
         expect(row(container, 'ABCD').title).toBe('active');
-        expect(row(container, 'ABCD').querySelector('.obsidian-bound')?.textContent).toBe('⇄ abcd-nl/clean@main:cdr');
+        expect(row(container, 'ABCD').querySelector('.obsidian-bound')?.textContent).toBe('⇄ github.com/abcd-nl/clean@main:cdr');
         expect(row(container, 'Course Material').classList.contains('obsidian-row-invalid')).toBe(true);
         expect(row(container, 'Course Material').querySelector('.obsidian-state-invalid')?.textContent).toBe('');
         expect(row(container, 'Course Material').title).toBe('Invalid: GitHub GET /repos/abcd-nl/clean/contents/gone answered 404: Not Found');
-        expect(container.querySelector('.obsidian-record')?.textContent).toContain('abcd-nl/clean@main:gone=Course Material');
+        expect(container.querySelector('.obsidian-record')?.textContent).toContain('github.com/abcd-nl/clean@main:gone=Course Material');
     });
 });

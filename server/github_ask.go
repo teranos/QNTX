@@ -38,9 +38,9 @@ func githubAskSigils() []*protocol.Sigil {
 	}
 }
 
-func (s *QNTXServer) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (g *gitHub) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	operation := sent["operation"]
-	raw, err := s.gitHubService().Ask(services.AsInstallation(ctx), operation, []byte(sent["request"]))
+	raw, err := g.gitHubService().Ask(services.AsInstallation(ctx), operation, []byte(sent["request"]))
 	var noSuch services.NoSuchOperation
 	var notTaken services.NotWhatItTakes
 	switch {
@@ -73,6 +73,6 @@ func (s *QNTXServer) githubAsk(ctx context.Context, sent sigil.Sent) (any, *prot
 	return map[string]any{"answer": answered}, nil
 }
 
-func (s *QNTXServer) githubOperations(context.Context, sigil.Sent) (any, *protocol.Refusal) {
+func (g *gitHub) githubOperations(context.Context, sigil.Sent) (any, *protocol.Refusal) {
 	return &protocol.GitHubOperations{Operations: services.GitHubOperations()}, nil
 }

@@ -15,7 +15,7 @@ import (
 // contains the abcdsync diff, and people may merge it at times"
 func TestTheVaultReachesTheBranchItIsToldTo(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 
 	// Told to send, the branch is made from the default branch; the vault holds
@@ -63,7 +63,7 @@ func TestTheVaultReachesTheBranchItIsToldTo(t *testing.T) {
 // Stopping sends nothing more; the branch and its pull request stay.
 func TestAFolderStopsSending(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 	_, refused = askVault(t, s, "send", sigil.Sent{"name": "abcd", "place": "Course Material", "branch": "obsidian-abcd"})
 	require.Nil(t, refused, "%v", refused)
@@ -80,7 +80,7 @@ func TestAFolderStopsSending(t *testing.T) {
 // "i dont want that to be automatically opted in,"
 func TestABoundFolderSendsNothingUntilToldTo(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "new.md"), []byte("new\n"), 0o644))
 
@@ -92,7 +92,7 @@ func TestABoundFolderSendsNothingUntilToldTo(t *testing.T) {
 // "and i want to set what the name of the branch would be in the obsidian element in the binding."
 func TestABranchToSendToIsOneGitTakesAndNotTheDefault(t *testing.T) {
 	s, _ := vaultBindingServer(t)
-	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 	for _, branch := range []string{"main", "two words", "a..b", "-x", "x.lock", "a:b"} {
 		_, refused := askVault(t, s, "send", sigil.Sent{"name": "abcd", "place": "Course Material", "branch": branch})
@@ -107,7 +107,7 @@ func TestABranchToSendToIsOneGitTakesAndNotTheDefault(t *testing.T) {
 // A send that failed is the folder's state, red and in GitHub's words.
 func TestASendThatFailedIsWhatTheFolderIs(t *testing.T) {
 	s, _ := vaultBindingServer(t)
-	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 	// A branch under docs/ makes docs a folder of branches, which no branch can be named.
 	stand.branches["docs/watcher-dx"] = map[string]string{}
@@ -128,21 +128,21 @@ func TestAFolderIsBoundToItsRepositorysDefaultBranch(t *testing.T) {
 	stand.defaultBranch = "trunk"
 	stand.branches["trunk"] = stand.branches["main"]
 
-	got, refused := askVault(t, s, "subdirs", sigil.Sent{"repo": "abcd-nl/clean", "path": "docs/adr"})
+	got, refused := askVault(t, s, "subdirs", sigil.Sent{"repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 	assert.Equal(t, "trunk", got.(*protocol.VaultSubdirs).GetBranch())
 
-	_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": "docs/adr"})
+	_, refused = askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 	vaults, err := s.nodeRecords().Vaults()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"abcd-nl/clean@trunk:docs/adr=Course Material"}, vaults[0].Folders)
+	assert.Equal(t, []string{"github.com/abcd-nl/clean@trunk:docs/adr=Course Material"}, vaults[0].Folders)
 }
 
 // "it should show red, and have you redo the binding"
 func TestABindingWhoseDefaultBranchMovedIsInvalid(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material"}
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	stand.defaultBranch = "trunk"
 
@@ -157,7 +157,7 @@ func TestABindingWhoseDefaultBranchMovedIsInvalid(t *testing.T) {
 func TestAFolderIsBoundToAFolderInsideTheRepository(t *testing.T) {
 	s, _ := vaultBindingServer(t)
 	for _, top := range []string{"", ".", "/", "./", "../x"} {
-		_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "abcd-nl/clean", "path": top})
+		_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": top})
 		require.NotNil(t, refused, "%q", top)
 		assert.Equal(t, "path", refused.GetParam(), "%q", top)
 	}
