@@ -3,6 +3,11 @@
 Date: 2026-10-08
 Status: Proposed
 
+BRING YOUR OWN KEY
+BYOK
+
+USE INDUSTRY STANDARD LANGUAGE FOR THIS PLEASE, THIS IS NOT AN INVENTION, AND SHOULD NOT BE. GET RID OF THE VAGUENESS 
+
 "customer, or friend who helps ne test in this casem provide their own key"
 
 "User set's up other things that matter to them like sentry or they set the openrouter or anthropic api key."

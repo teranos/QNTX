@@ -1,23 +1,13 @@
 # ADR-052: Approvals
 
 Date: 2026-10-10
-Status: Proposed
+Status: Unpolished
 
-"There is an interactive element that I want to prototype here. It lets me
-approve something."
-
-"Do you hear how little it matters what the 'thing' is to approve?"
+"There is an interactive element, 
+It lets me approve something."
 
 "approvals are attestations obviously"
-
-"Approvals is human only"
-
 "And only through it's element"
-
-"approvals is ROOT only for now"
-
-"Two things, and right now only one is in scope: the github PR approval"
-
 "APPROVALS INTEGRATE DIRECTLY WITH THE GITHUB APP"
 
 ## The element
@@ -59,9 +49,8 @@ every tool. The reach table names it and the list of ROOT, and the handler
 refuses a token however ROOT the token is, and a session that names nobody. The actor on
 the line is the route the human logged in by.
 
-The node merges as the App's installation where the repository is (ADR-043),
-at the head the human saw: GitHub refuses a merge whose `sha` moved. The
-merge is written down by the human.
+The node merges as the App's installation where the repository is ([[ADR-043-github-service]]),
+at the head the human saw: GitHub refuses a merge whose `sha` moved. The merge is written down by the human.
 
 ## The PR story
 
@@ -82,10 +71,3 @@ NO."
 - Merge again: merges now.
 - Don't merge while a merge waits: cancels it. Again: definitely no.
 
-## Not here
-
-- Jev's confidence on a merge: "the percentage doesn't make sense" there.
-- A press from the element that already stood when the page opened: the card
-  starts undecided and says what stands in its context.
-- The second approval: "everyone get's their own mail address, and they get
-  it via ROOT approval" (ADR-047), and anything an agent asks. Out of scope.

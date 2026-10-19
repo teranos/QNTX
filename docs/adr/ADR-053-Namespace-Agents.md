@@ -3,8 +3,7 @@
 Date: 2026-10-18
 Status: Proposed
 
-"an agent session for a particular namespace, different concept from the ROOT
-host agent"
+"an agent session for a particular namespace, different concept from the ROOT host agent (see: [[ADR-048-Node-Agent]])"
 
 "The shared namespace agent, opted into"
 
@@ -14,11 +13,10 @@ it."
 
 - It is an agent the node hosts, reached over A2A by its tenant, and the
   tenant is its namespace. It stands in that namespace and nothing crosses
-  (ADR-026).
+  ([[ADR-026-Namespaces]]).
 - Who may see its Tasks is REACH on its namespace: A2A's "Project or workspace
   membership (project-based authorization)" (§13.1).
-- A namespace opts into a model, and its agent is that model there: a
-  namespace's Sonnet and ROOT's Sonnet are two agents.
+- A namespace opts into a model, and its agent is that model there: a  namespace's Sonnet and ROOT's Sonnet are two agents.
 
 "The one who set’s it up does, they provide their own Subscription or API key"
 
