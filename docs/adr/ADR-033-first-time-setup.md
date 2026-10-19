@@ -11,9 +11,9 @@
 A node with `auth.root_identities` set and no User belongs to nobody, and that is not an
 auth state.
 
-"Because this is a new root box without a user and only root_identities set, the first glyph you see isnt the auth glyph"
+"Because this is a new root box without a user and only root_identities set, the first glyph you see isn't the auth glyph"
 
-"Its a wizard anyone can see "
+"Its a wizard anyone can see over network"
 
 "only one of the root_identities are able to proof who they are so those are the only ones allowed o continue from here."
 
