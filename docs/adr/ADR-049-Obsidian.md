@@ -1,30 +1,23 @@
 # ADR-049: Obsidian
 
 Date: 2026-10-06
-Status: Developed in pr #1094 
+Status: Developed in pr #1094 - I think its merged because i am using obsidian to write this now.
 
-"i want to integrate better with Obsidian's sync service if possible, and have
-Obsidian be a QNTX thing, I would rather have that than to reinvent everything
-Obsidian does, i tried that before actually, and i got somewhere, but truth be
-told is that Obsidian is really good at what it is and I like using it as is."
+"i want to integrate better with Obsidian's sync service if possible, and have Obsidian be a QNTX thing, I would rather have that than to reinvent everything Obsidian does, i tried that before actually, and i got somewhere, but truth be told is that Obsidian is really good at what it is and I like using it as is."
 
 "..., their sync service is great, it never fails me"
 
 ## How it flows
 
-Both ways: what is written in the vault reaches QNTX, and what QNTX holds
-reaches the vault.
+Both ways: what is written in the vault reaches QNTX, and what QNTX holds reaches the vault.
 
-"1. a persistent branch exists for all repo's that the Vault we assign
-directory space to."
+"1. a persistent branch exists for all repo's that the Vault we assign directory space to."
 
-"2. meaning, for a given doc folder in one of our repositories, an indication
-of some sorts is made,"
+"2. meaning, for a given doc folder in one of our repositories, an indication of some sorts is made,"
 
 "3. QNTX receives webhooks on most events github dispatches"
 
-"4. And the persistent branch is obsidian-[nameofvault] and it always contains
-the abcdsync diff, and people may merge it at times"
+"4. And the persistent branch is obsidian-[nameofvault] and it always contains the abcdsync diff, and people may merge it at times"
 
 "5. And QNTX ensures changes flow back into the Obsidian Vault as well"
 
@@ -39,8 +32,7 @@ the abcdsync diff, and people may merge it at times"
 
 Obsidian Headless (`obsidian-headless`, open beta, Node.js 22 or later) is
 Obsidian's own client for Sync without the app: `ob login`, `ob sync-setup`,
-`ob sync --continuous`. On the box it keeps a copy of the vault, which is how
-the ROOT agent reaches it as files, and what is written into that copy reaches
+`ob sync --continuous`. On the box it keeps a copy of the vault, which is how the ROOT agent reaches it as files, and what is written into that copy reaches
 every device through Sync.
 
 "Fine, i will deal with this"
@@ -66,12 +58,6 @@ every device through Sync.
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
 
-## When both sides changed
-
-The same note changed in the vault and on the repository's main before either
-side has seen the other:
-
-"main wins"
 
 ## Which folders are the vault's
 
@@ -93,22 +79,14 @@ folder itself carries nothing.
 - Only notes: `.md` files. What else the repository's folder holds stays there.
 - Asked whether a note deleted on main is deleted from the vault too:
 
-"yes", "main wins"
 
-- A note main had and has no more is removed from the vault. A note main
-  never had is the vault's own and stays.
+- A note main had and has no more is removed from the vault. A note main  never had is the vault's own and stays.
 
 ## What reaches the repository
 
-"i don't want that to be automatically opted in,"
-
-"and i want to set what the name of the branch would be in the obsidian element in the binding."
+"i don't want that to be automatically opted in, and i want to set what the name of the branch would be in the obsidian element in the binding."
 
 - A bound folder sends nothing until a branch is named for it in the element.
-
-"concept of default branch, not main or master"
-
-- A folder is bound to its repository's default branch, as GitHub names it.
 
 "it should show red, and have you redo the binding"
 
@@ -120,9 +98,6 @@ folder itself carries nothing.
 
 ## Per namespace
 
-"and have the possibility to also set Obsidian per nanespace"
+"and have the possibility to also set Obsidian per namespace"
 
-- One vault today, synced by a systemd unit on the box as root. Every vault
-  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node
-  record (server/vault.go). A vault per namespace is that line in the
-  namespace, its reach lines there, and one sync process per vault.
+- One vault today, synced by a systemd unit on the box as root. Every vault  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node  record (server/vault.go). A vault per namespace is that line in the  namespace, its reach lines there, and one sync process per vault.
