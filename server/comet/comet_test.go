@@ -246,6 +246,31 @@ func TestAnAgentRunsUnderGroundOnceItsGroundAndSettingsStand(t *testing.T) {
 	assert.False(t, stop[1].AsyncRewake)
 }
 
+// A ritual starts its own agent with claude --bg in a tree under the agent's work, which Claude Code
+// refuses unless a directory above it is trusted; what the configuration holds already is kept.
+func TestAnAgentsWorkIsTrustedForTheRitualsItStarts(t *testing.T) {
+	home := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(home, "claude"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(home, "claude", ".claude.json"),
+		[]byte(`{"userID":"kept","projects":{"/elsewhere":{"hasTrustDialogAccepted":false}}}`), 0o600))
+	require.NoError(t, AgentSettings(home))
+
+	written, err := os.ReadFile(filepath.Join(home, "claude", ".claude.json"))
+	require.NoError(t, err)
+	var config struct {
+		UserID   string `json:"userID"`
+		Projects map[string]struct {
+			Trusted bool `json:"hasTrustDialogAccepted"`
+		} `json:"projects"`
+	}
+	require.NoError(t, json.Unmarshal(written, &config))
+	work, err := filepath.EvalSymlinks(filepath.Join(home, "work"))
+	require.NoError(t, err)
+	assert.True(t, config.Projects[work].Trusted)
+	assert.False(t, config.Projects["/elsewhere"].Trusted)
+	assert.Equal(t, "kept", config.UserID)
+}
+
 // "That is how the node knows which ground a session runs, and so which comet landed."
 func TestACometsRowsSayWhichRevsItWasBuiltFrom(t *testing.T) {
 	assert.Equal(t, "comet a798533 sbvh-nl/grove@2f81471\n", Version("a798533c1f2e3d4c5b6a7980", "sbvh-nl/grove@"+short("2f8147100aa")))

@@ -146,5 +146,49 @@ func AgentSettings(home string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return errors.Wrapf(err, "failed to make %s", filepath.Dir(path))
 	}
-	return errors.Wrapf(os.WriteFile(path, written, 0o600), "failed to write the agent's settings at %s", path)
+	if err := os.WriteFile(path, written, 0o600); err != nil {
+		return errors.Wrapf(err, "failed to write the agent's settings at %s", path)
+	}
+	return AgentTrust(home)
+}
+
+// AgentTrust trusts the agent's work directory in its Claude Code, and every tree under it: a ritual
+// starts its own agent with claude --bg, which refuses a workspace nobody trusted, and on q,
+// 2026-10-19, willow-1792407056 was left with no agent for that reason.
+func AgentTrust(home string) error {
+	work := filepath.Join(home, "work")
+	if err := os.MkdirAll(work, 0o700); err != nil {
+		return errors.Wrapf(err, "failed to make the agent's work directory %s", work)
+	}
+	resolved, err := filepath.EvalSymlinks(work)
+	if err != nil {
+		return errors.Wrapf(err, "the agent's work directory %s did not resolve", work)
+	}
+	path := filepath.Join(home, "claude", ".claude.json")
+	config := map[string]any{}
+	held, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "the agent's Claude Code configuration at %s was not read", path)
+	}
+	if err == nil {
+		if err := json.Unmarshal(held, &config); err != nil {
+			return errors.Wrapf(err, "the agent's Claude Code configuration at %s is not JSON", path)
+		}
+	}
+	projects, ok := config["projects"].(map[string]any)
+	if !ok {
+		projects = map[string]any{}
+	}
+	project, ok := projects[resolved].(map[string]any)
+	if !ok {
+		project = map[string]any{}
+	}
+	project["hasTrustDialogAccepted"] = true
+	projects[resolved] = project
+	config["projects"] = projects
+	written, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return errors.Wrap(err, "the agent's Claude Code configuration did not marshal")
+	}
+	return errors.Wrapf(os.WriteFile(path, written, 0o600), "failed to write the agent's Claude Code configuration at %s", path)
 }
