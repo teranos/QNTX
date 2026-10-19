@@ -69,7 +69,7 @@ func (s *QNTXServer) checkPlugin(ctx context.Context, repo string) (*protocol.Pl
 	}
 	// The node reads as itself.
 	where := forge.Repo{Host: forge.GitHub, Path: source.Owner + "/" + source.Repo}
-	reader, err := s.readers().For(where)
+	reader, err := s.forges().For(where)
 	if err != nil {
 		return nil, err
 	}

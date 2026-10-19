@@ -1,9 +1,10 @@
 package server
 
-// GitHub as a forge.Reader: the one place the core's reading of a repository
-// is put in GitHub's words. What GitHub has and another forge may not (the
-// App's installations, workflow-run artifacts, check suites) is not here, and
-// is asked of GitHubService where it is needed, by name.
+// GitHub as a forge.Forge: the one place the core's reading and writing of a
+// repository, and its asking after checks, is put in GitHub's words. What
+// GitHub has and another forge may not (the App's installations and the
+// repositories they reach, workflow-run artifacts) is not here, and is asked of
+// GitHubService where it is needed, by name.
 
 import (
 	"context"
@@ -18,21 +19,21 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// readers are the forges the node reads.
-func (s *QNTXServer) readers() forge.Readers {
-	return forge.ReadersOf(map[string]forge.Reader{forge.GitHub: gitHubReader{service: s.gitHubService}})
+// forges are the forges the node reaches.
+func (s *QNTXServer) forges() forge.Forges {
+	return forge.ForgesOf(map[string]forge.Forge{forge.GitHub: gitHubForge{service: s.gitHubService}})
 }
 
-// gitHubReader reads repositories on github.com through GitHubService.
-type gitHubReader struct {
+// gitHubForge is github.com, through GitHubService.
+type gitHubForge struct {
 	service func() *services.GitHubServer
 }
 
-var _ forge.Reader = gitHubReader{}
+var _ forge.Forge = gitHubForge{}
 
 // who is the context and the namespace GitHubService is asked with, as the
 // node is, or as the App's installation where the repository is.
-func (r gitHubReader) who(ctx context.Context, as forge.Acting) (context.Context, string, error) {
+func (r gitHubForge) who(ctx context.Context, as forge.Acting) (context.Context, string, error) {
 	switch as {
 	case forge.AsNode:
 		return ctx, auth.NamespaceSystem, nil
@@ -42,7 +43,7 @@ func (r gitHubReader) who(ctx context.Context, as forge.Acting) (context.Context
 	return ctx, "", errors.Newf("GitHub is not read %s", as)
 }
 
-func (r gitHubReader) Describe(ctx context.Context, as forge.Acting, repo forge.Repo) (forge.Repository, error) {
+func (r gitHubForge) Describe(ctx context.Context, as forge.Acting, repo forge.Repo) (forge.Repository, error) {
 	on, err := onGitHub(repo)
 	if err != nil {
 		return forge.Repository{}, err
@@ -61,7 +62,7 @@ func (r gitHubReader) Describe(ctx context.Context, as forge.Acting, repo forge.
 	return forge.Repository{FullName: found.GetFullName(), Private: found.GetPrivate(), DefaultBranch: found.GetDefaultBranch()}, nil
 }
 
-func (r gitHubReader) Head(ctx context.Context, as forge.Acting, repo forge.Repo, ref, path string) (string, error) {
+func (r gitHubForge) Head(ctx context.Context, as forge.Acting, repo forge.Repo, ref, path string) (string, error) {
 	on, err := onGitHub(repo)
 	if err != nil {
 		return "", err
@@ -86,7 +87,7 @@ func (r gitHubReader) Head(ctx context.Context, as forge.Acting, repo forge.Repo
 	return "", errors.Newf("GitHub has no commit for %s@%s", on, ref)
 }
 
-func (r gitHubReader) Archive(ctx context.Context, as forge.Acting, repo forge.Repo, rev string) (io.ReadCloser, error) {
+func (r gitHubForge) Archive(ctx context.Context, as forge.Acting, repo forge.Repo, rev string) (io.ReadCloser, error) {
 	on, err := onGitHub(repo)
 	if err != nil {
 		return nil, err
@@ -98,7 +99,7 @@ func (r gitHubReader) Archive(ctx context.Context, as forge.Acting, repo forge.R
 	return r.service().Tarball(ctx, namespace, on.Owner, on.Name, rev)
 }
 
-func (r gitHubReader) File(ctx context.Context, as forge.Acting, repo forge.Repo, ref, path string) ([]byte, error) {
+func (r gitHubForge) File(ctx context.Context, as forge.Acting, repo forge.Repo, ref, path string) ([]byte, error) {
 	on, err := onGitHub(repo)
 	if err != nil {
 		return nil, err
@@ -127,7 +128,7 @@ func (r gitHubReader) File(ctx context.Context, as forge.Acting, repo forge.Repo
 	return content, nil
 }
 
-func (r gitHubReader) KindAt(ctx context.Context, as forge.Acting, repo forge.Repo, ref, path string) (forge.EntryKind, error) {
+func (r gitHubForge) KindAt(ctx context.Context, as forge.Acting, repo forge.Repo, ref, path string) (forge.EntryKind, error) {
 	on, err := onGitHub(repo)
 	if err != nil {
 		return 0, err
@@ -159,7 +160,7 @@ func (r gitHubReader) KindAt(ctx context.Context, as forge.Acting, repo forge.Re
 	return 0, errors.Newf("%s of %s on %s is answered by GitHubService as %d, which this node does not know", path, on, ref, answered.GetAnswered())
 }
 
-func (r gitHubReader) Entries(ctx context.Context, as forge.Acting, repo forge.Repo, ref, dir string) ([]forge.Entry, error) {
+func (r gitHubForge) Entries(ctx context.Context, as forge.Acting, repo forge.Repo, ref, dir string) ([]forge.Entry, error) {
 	on, err := onGitHub(repo)
 	if err != nil {
 		return nil, err
@@ -203,7 +204,7 @@ func entryKind(github string) forge.EntryKind {
 	return forge.Other
 }
 
-func (r gitHubReader) Readme(ctx context.Context, as forge.Acting, repo forge.Repo, ref, dir string) (forge.Readme, error) {
+func (r gitHubForge) Readme(ctx context.Context, as forge.Acting, repo forge.Repo, ref, dir string) (forge.Readme, error) {
 	on, err := onGitHub(repo)
 	if err != nil {
 		return forge.Readme{}, err
@@ -237,4 +238,250 @@ func (r gitHubReader) Readme(ctx context.Context, as forge.Acting, repo forge.Re
 		return forge.Readme{}, errors.Wrapf(err, "the README at %s does not decode", readme.GetPath())
 	}
 	return forge.Readme{Path: readme.GetPath(), Text: string(text)}, nil
+}
+
+func (r gitHubForge) Branch(ctx context.Context, as forge.Acting, repo forge.Repo, branch string) (string, error) {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return "", err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return "", err
+	}
+	got, err := r.service().GetABranch(ctx, &protocol.GitHubGetABranchRequest{Namespace: namespace, Owner: on.Owner, Repo: on.Name, Branch: branch})
+	if err != nil {
+		return "", errors.Wrapf(err, "%s of %s was not asked", branch, on)
+	}
+	if !got.GetSuccess() {
+		return "", forge.Refused{Says: got.GetError()}
+	}
+	return got.GetCommit().GetSha(), nil
+}
+
+func (r gitHubForge) Compare(ctx context.Context, as forge.Acting, repo forge.Repo, base, head string) (forge.Comparison, error) {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return forge.Comparison{}, err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return forge.Comparison{}, err
+	}
+	compared, err := r.service().CompareTwoCommits(ctx, &protocol.GitHubCompareTwoCommitsRequest{
+		Namespace: namespace, Owner: on.Owner, Repo: on.Name, Basehead: base + "..." + head})
+	if err != nil {
+		return forge.Comparison{}, errors.Wrapf(err, "%s and %s of %s were not asked to be compared", base, head, on)
+	}
+	if !compared.GetSuccess() {
+		return forge.Comparison{}, forge.Refused{Says: compared.GetError()}
+	}
+	return forge.Comparison{Files: len(compared.GetFiles())}, nil
+}
+
+func (r gitHubForge) ChangeFrom(ctx context.Context, as forge.Acting, repo forge.Repo, head, base string) (forge.Change, bool, error) {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return forge.Change{}, false, err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return forge.Change{}, false, err
+	}
+	open, err := r.service().ListPullRequests(ctx, &protocol.GitHubListPullRequestsRequest{
+		Namespace: namespace, Owner: on.Owner, Repo: on.Name, State: "open", Head: on.Owner + ":" + head, Base: base})
+	if err != nil {
+		return forge.Change{}, false, errors.Wrapf(err, "the open pull requests from %s of %s were not asked", head, on)
+	}
+	if !open.GetSuccess() {
+		return forge.Change{}, false, forge.Refused{Says: open.GetError()}
+	}
+	for _, pull := range open.GetItems() {
+		return forge.Change{Number: pull.GetNumber(), URL: pull.GetHtmlUrl()}, true, nil
+	}
+	return forge.Change{}, false, nil
+}
+
+func (r gitHubForge) CreateBranch(ctx context.Context, as forge.Acting, repo forge.Repo, branch, from string) error {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return err
+	}
+	made, err := r.service().CreateAReference(ctx, &protocol.GitHubCreateAReferenceRequest{
+		Namespace: namespace, Owner: on.Owner, Repo: on.Name, Ref: "refs/heads/" + branch, Sha: from})
+	if err != nil {
+		return errors.Wrapf(err, "%s was not asked to be made on %s", branch, on)
+	}
+	if !made.GetSuccess() {
+		return forge.Refused{Says: made.GetError()}
+	}
+	return nil
+}
+
+// putFile commits content to path on branch, over the blob replaces when one is named.
+func (r gitHubForge) putFile(ctx context.Context, as forge.Acting, repo forge.Repo, branch, path string, content []byte, put func(*protocol.GitHubCreateOrUpdateFileContentsRequest), message string) error {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return err
+	}
+	request := &protocol.GitHubCreateOrUpdateFileContentsRequest{
+		Namespace: namespace, Owner: on.Owner, Repo: on.Name, Path: path, Branch: branch,
+		Message: message, Content: base64.StdEncoding.EncodeToString(content),
+	}
+	put(request)
+	answered, err := r.service().CreateOrUpdateFileContents(ctx, request)
+	if err != nil {
+		return errors.Wrapf(err, "%s was not asked to be committed to %s of %s", path, branch, on)
+	}
+	if !answered.GetSuccess() {
+		return forge.Refused{Says: answered.GetError()}
+	}
+	return nil
+}
+
+func (r gitHubForge) AddFile(ctx context.Context, as forge.Acting, repo forge.Repo, branch, path string, content []byte, message string) error {
+	return r.putFile(ctx, as, repo, branch, path, content, func(*protocol.GitHubCreateOrUpdateFileContentsRequest) {}, message)
+}
+
+func (r gitHubForge) ReplaceFile(ctx context.Context, as forge.Acting, repo forge.Repo, branch, path string, content []byte, replaces, message string) error {
+	return r.putFile(ctx, as, repo, branch, path, content, func(request *protocol.GitHubCreateOrUpdateFileContentsRequest) { request.Sha = replaces }, message)
+}
+
+func (r gitHubForge) DeleteFile(ctx context.Context, as forge.Acting, repo forge.Repo, branch, path, sha, message string) error {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return err
+	}
+	answered, err := r.service().DeleteAFile(ctx, &protocol.GitHubDeleteAFileRequest{
+		Namespace: namespace, Owner: on.Owner, Repo: on.Name, Path: path, Branch: branch, Sha: sha, Message: message,
+	})
+	if err != nil {
+		return errors.Wrapf(err, "%s was not asked to be removed from %s of %s", path, branch, on)
+	}
+	if !answered.GetSuccess() {
+		return forge.Refused{Says: answered.GetError()}
+	}
+	return nil
+}
+
+func (r gitHubForge) NewChange(ctx context.Context, as forge.Acting, repo forge.Repo, head, base, title, body string) (forge.Change, error) {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return forge.Change{}, err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return forge.Change{}, err
+	}
+	made, err := r.service().CreateAPullRequest(ctx, &protocol.GitHubCreateAPullRequestRequest{
+		Namespace: namespace, Owner: on.Owner, Repo: on.Name, Head: head, Base: base, Title: title, Body: body,
+	})
+	if err != nil {
+		return forge.Change{}, errors.Wrapf(err, "a pull request from %s of %s was not asked for", head, on)
+	}
+	if !made.GetSuccess() {
+		return forge.Change{}, forge.Refused{Says: made.GetError()}
+	}
+	return forge.Change{Number: made.GetNumber(), URL: made.GetHtmlUrl()}, nil
+}
+
+func (r gitHubForge) MergeChange(ctx context.Context, as forge.Acting, repo forge.Repo, number int64, sha string) (string, error) {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return "", err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return "", err
+	}
+	said, err := r.service().MergeAPullRequest(ctx, &protocol.GitHubMergeAPullRequestRequest{
+		Namespace: namespace, Owner: on.Owner, Repo: on.Name, PullNumber: number, Sha: sha, MergeMethod: "merge",
+	})
+	if err != nil {
+		return "", errors.Wrapf(err, "GitHub was not asked to merge %s#%d", on, number)
+	}
+	if !said.GetSuccess() {
+		return "", forge.Refused{Says: said.GetError()}
+	}
+	return said.GetSha(), nil
+}
+
+// Checks is what GitHub says of a commit's checks. OwnCI asks of Actions, by
+// its App, its suites and its runs; EveryCheck asks of every run.
+func (r gitHubForge) Checks(ctx context.Context, as forge.Acting, repo forge.Repo, ref string, scope forge.CheckScope) (forge.Checks, error) {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return forge.Checks{}, err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return forge.Checks{}, err
+	}
+	var actions int64
+	switch scope {
+	case forge.OwnCI:
+		actions = gitHubActionsApp
+	case forge.EveryCheck:
+	default:
+		return forge.Checks{}, errors.Newf("the checks of %s@%s are asked of scope %d, which GitHub does not know", on, ref, scope)
+	}
+
+	said := forge.Checks{States: map[string]forge.CheckState{}, Settled: true}
+	if scope == forge.OwnCI {
+		suites, err := r.service().ListCheckSuitesForAGitReference(ctx, &protocol.GitHubListCheckSuitesForAGitReferenceRequest{
+			Namespace: namespace, Owner: on.Owner, Repo: on.Name, Ref: ref, AppId: actions, PerPage: 100,
+		})
+		if err != nil {
+			return forge.Checks{}, errors.Wrapf(err, "GitHub was not asked about the check suites on %s@%s", repo, ref)
+		}
+		if !suites.GetSuccess() {
+			return forge.Checks{}, errors.Newf("the check suites on %s@%s were not listed: %s", repo, ref, suites.GetError())
+		}
+		for _, suite := range suites.GetCheckSuites() {
+			said.Ran = true
+			if suite.GetStatus() != "completed" {
+				said.Settled = false
+				continue
+			}
+			if !concludedWell(suite.GetConclusion()) {
+				said.Failed = append(said.Failed, "a suite concluded "+suite.GetConclusion())
+			}
+		}
+	}
+	runs, err := r.service().ListCheckRunsForAGitReference(ctx, &protocol.GitHubListCheckRunsForAGitReferenceRequest{
+		Namespace: namespace, Owner: on.Owner, Repo: on.Name, Ref: ref, AppId: actions, PerPage: 100,
+	})
+	if err != nil {
+		return forge.Checks{}, errors.Wrapf(err, "GitHub was not asked about the check runs on %s@%s", repo, ref)
+	}
+	if !runs.GetSuccess() {
+		return forge.Checks{}, errors.Newf("the check runs on %s@%s were not listed: %s", repo, ref, runs.GetError())
+	}
+	// A check run again is a newer run under the same name; the newest stands.
+	newest := map[string]int64{}
+	for _, run := range runs.GetCheckRuns() {
+		if seen, held := newest[run.GetName()]; held && seen > run.GetId() {
+			continue
+		}
+		newest[run.GetName()] = run.GetId()
+		said.States[run.GetName()] = forge.CheckState(checkState(run.GetStatus(), run.GetConclusion()))
+	}
+	for name, state := range said.States {
+		if state == forge.CheckFailed {
+			said.Failed = append(said.Failed, name)
+		}
+	}
+	return said, nil
 }

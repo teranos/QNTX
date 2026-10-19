@@ -3,8 +3,6 @@ package forge
 import (
 	"context"
 	"io"
-
-	errors "github.com/teranos/sacred-error"
 )
 
 // Acting is who the node acts as on a forge. A forge has both, and says which
@@ -96,21 +94,24 @@ type Reader interface {
 	Entries(ctx context.Context, as Acting, repo Repo, ref, dir string) ([]Entry, error)
 	// Readme is the README of dir on ref; Root is the repository's own.
 	Readme(ctx context.Context, as Acting, repo Repo, ref, dir string) (Readme, error)
+	// Branch is the commit a branch is at. A branch the forge has none of is a
+	// Refused, saying so in the forge's words.
+	Branch(ctx context.Context, as Acting, repo Repo, branch string) (string, error)
+	// Compare is how head differs from base.
+	Compare(ctx context.Context, as Acting, repo Repo, base, head string) (Comparison, error)
+	// ChangeFrom is the open change proposing head into base, and whether
+	// there is one.
+	ChangeFrom(ctx context.Context, as Acting, repo Repo, head, base string) (Change, bool, error)
 }
 
-// Readers are the forges the node can read, by host.
-type Readers struct {
-	by map[string]Reader
+// Comparison is how one ref differs from another.
+type Comparison struct {
+	// Files is how many files differ.
+	Files int
 }
 
-// ReadersOf are the readers named, by the host each reads.
-func ReadersOf(by map[string]Reader) Readers { return Readers{by: by} }
-
-// For is the reader of repo's forge, or why there is none.
-func (r Readers) For(repo Repo) (Reader, error) {
-	reader, ok := r.by[repo.Host]
-	if !ok {
-		return nil, errors.Newf("the node reads no repositories on %s, and %s is on it", repo.Host, repo)
-	}
-	return reader, nil
+// Change is a proposed change to a branch: a pull request, a merge request.
+type Change struct {
+	Number int64
+	URL    string
 }

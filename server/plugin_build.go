@@ -467,7 +467,7 @@ func interrupted(err error) bool {
 // buildRev is the commit source's branch points at now, or the last commit
 // that touched its file.
 func (s *QNTXServer) buildRev(ctx context.Context, source buildSource) (string, error) {
-	reader, err := s.readers().For(source.Repo)
+	reader, err := s.forges().For(source.Repo)
 	if err != nil {
 		return "", err
 	}
@@ -606,7 +606,7 @@ func builtVersion(ctx context.Context, name, binary string) (string, error) {
 
 // fetchCore writes the core's archive at rev to path.
 func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path string) error {
-	reader, err := s.readers().For(core.Repo)
+	reader, err := s.forges().For(core.Repo)
 	if err != nil {
 		return err
 	}
@@ -631,7 +631,7 @@ func (s *QNTXServer) fetchCore(ctx context.Context, core buildSource, rev, path 
 
 // fetchInput writes one input file at rev into work, and says where.
 func (s *QNTXServer) fetchInput(ctx context.Context, in buildSource, rev, work string) (string, error) {
-	reader, err := s.readers().For(in.Repo)
+	reader, err := s.forges().For(in.Repo)
 	if err != nil {
 		return "", err
 	}
