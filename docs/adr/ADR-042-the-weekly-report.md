@@ -3,6 +3,10 @@
 Date: 2026-09-25
 Status: Proposed
 
+
+
+brandon: "so, i do receive the e-mail, but there are errors in there about trying to reach sentry or something, so. yeah, and also, i do feel like the NODE Agent should be receiving this as well, so i receive it, and the NODE Agent at the same time, so, while it is working on it, i have a chance to direct it while it's going through some kind of weekly analysis. And this should by like, Dynamic, and, I guess as a USER i want to be able to interact with this and set it change the prompt, etc, in the Agent Element"
+
 "let's say QNTX also has it's own built in messages it would like to send sometimes via email"
 
 "for a user that is one of the root identities, i want to receive a weekly report."

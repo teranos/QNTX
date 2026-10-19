@@ -2,16 +2,18 @@
 
 **Status:** Accepted
 **Date:** 2026-08-22
-**Related:** ADR-027 (Permissions), ADR-030 (Identity Providers), ADR-031 (The User)
+**Related:** [[ADR-027-Permissions]] (Permissions), [[ADR-030-identity-providers]] (Identity Providers), [[ADR-031-the-user]] (The User)
 
+- The first User to prove they hold a root identity is the first User, and the first User is always the ROOT User. Proving a listed route is what creates them — there is no separate act, and nothing has to be seeded ahead of it.
+- A node is  the one thing that exists before any User does.
 ## Decision
 
 A node with `auth.root_identities` set and no User belongs to nobody, and that is not an
 auth state.
 
-"Because this is a new root box without a user and only root_identities set, the first glyph you see isnt the auth glyph"
+"Because this is a new root box without a user and only root_identities set, the first glyph you see isn't the auth glyph"
 
-"Its a wizard anyone can see"
+"Its a wizard anyone can see over network"
 
 "only one of the root_identities are able to proof who they are so those are the only ones allowed o continue from here."
 
@@ -86,3 +88,8 @@ deferred.
 An entry that is not a Mastodon profile URL is a valid way in but not a one-press one: a
 credential provider needs an app password, which is typing ([[ADR-030-identity-providers]]).
 
+## Open Idea's
+
+"The first time setup's real start begin's where?"
+"As in, how would anyone get to this in the first place?","First time setup for who?","People using Claude Code I guess","But they could use QuickDev"
+"Like i am doing inside of Claude Code mobile claude.ai sessions.","It's just, that you need to tell it, which is obviously not something people just come up with by themselves.","The first time setup, in my mind, is something you can easily try out in a claude.ai mobile container session.","So, in a sense, you could say, I want to be there, when you need it, and stick around because it's just too much value."

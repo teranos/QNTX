@@ -1,6 +1,6 @@
 # ADR-034: Roles as Attestations
 
-**Status:** Accepted
+**Status:** Accepted, with regret
 **Date:** 2026-09-06
 **Related:** ADR-025 (Access Tokens), ADR-027 (Permissions), ADR-031 (The User), #899, #909, #914
 

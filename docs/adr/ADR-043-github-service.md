@@ -3,6 +3,8 @@
 Date: 2026-09-28
 Status: Proposed
 
+brandon: "So, this concept, it will be called Forge in the future, 1356, 1352, 1349 are where work already started."
+
 "GitHubService needs to be a thing, and QNTX should own it."
 
 "because of the GitHubService the ratelimit is kept in one place"

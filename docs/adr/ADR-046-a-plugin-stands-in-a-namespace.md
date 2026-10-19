@@ -3,13 +3,9 @@
 Date: 2026-09-30
 Status: Proposed
 
-Asked on 2026-09-30 whether cleanAPI belongs in the Clean namespace, and
-answered yes, by ROOT, in that business's own week file.
-
 ## The problem
 
-Every plugin's services are started on the served universe, which is default
-(server/sub_plugins.go). The shared token a plugin is handed at Initialize
+Every plugin's services are started on the served universe, which is default (server/sub_plugins.go). The shared token a plugin is handed at Initialize
 reaches that store and no other. cleanAPI wrote every me-save, me-claim,
 coverage-set and rates row into default, while the site's Users, the stand's
 arrivals and the ROOT session at the site's door stand in Clean. Its
