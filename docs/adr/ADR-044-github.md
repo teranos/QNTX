@@ -1,5 +1,6 @@
 # ADR-044: GitHub
 
+Status: Accepted
 
 The identity provider; [[ADR-030-identity-providers]]
 
