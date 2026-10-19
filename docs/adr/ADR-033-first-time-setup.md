@@ -97,4 +97,5 @@ credential provider needs an app password, which is typing ([[ADR-030-identity-p
 "But they could use QuickDev"
 "Like i am doing inside of Claude Code mobile claude.ai sessions."
 "It's just, that you need to tell it, which is obviously not something people just come up with by themselves."
-"The first time setup, in my mind, is something you c"
+"The first time setup, in my mind, is something you can easily try out in a claude.ai mobile container session."
+""
