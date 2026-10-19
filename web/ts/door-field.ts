@@ -4,6 +4,7 @@
 
 import createREGL from 'regl';
 import { log, SEG } from './logger';
+import { meterField } from './door-metrics';
 
 // The door is a page someone is reading, not a game. Thirty is plenty and it
 // halves the work.
@@ -376,7 +377,24 @@ export function startField(canvas: HTMLCanvasElement): Field {
         canvas.height = tall;
     }
 
+    // "The suspicion that it keeps persisting on the background." What this
+    // field costs is counted here and said when it stops, when the page is
+    // hidden and when it is left (door-meter.ts); nothing about how it runs
+    // depends on it.
+    const meterOf = meterField(() => ({
+        'door.buffer': `${canvas.width}x${canvas.height}`,
+        'door.dpr': window.devicePixelRatio,
+        'door.depth': fullFloat ? 'float' : 'half float',
+    }));
+    const onHidden = () => {
+        if (document.visibilityState === 'hidden') meterOf.report('hidden');
+    };
+    const onPageHide = () => meterOf.report('pagehide');
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pagehide', onPageHide);
+
     const loop = regl.frame(({ time }) => {
+        meterOf.called();
         if (time - last < 1 / FPS) return;
         const step = lastTime === 0 ? 0 : time - lastTime;
         lastTime = time;
@@ -421,8 +439,10 @@ export function startField(canvas: HTMLCanvasElement): Field {
             regl.clear({ framebuffer: store, color: [0, 0, 0, 1] });
         }
 
+        const drawing = performance.now();
         gather();
         present();
+        meterOf.drew(performance.now() - drawing, canvas.getClientRects().length > 0);
     });
 
     return {
@@ -479,6 +499,9 @@ export function startField(canvas: HTMLCanvasElement): Field {
             held = next;
         },
         stop() {
+            document.removeEventListener('visibilitychange', onHidden);
+            window.removeEventListener('pagehide', onPageHide);
+            meterOf.report('stop');
             loop.cancel();
             regl.destroy();
         },
