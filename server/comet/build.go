@@ -311,13 +311,14 @@ func (b Builder) buildLinux(ctx context.Context, src string, env []string, platf
 		return errors.Wrapf(err, "failed to make %s", libs)
 	}
 	held := map[string]string{}
-	for _, lib := range []string{"glibc.out", "sqlite.out", "curl.out", "libgit2.lib", "gcc.cc"} {
+	// nix names an out-link for an output other than out after it: libgit2's lib lands at <link>-lib.
+	for lib, landed := range map[string]string{"glibc.out": "", "sqlite.out": "", "curl.out": "", "libgit2.lib": "-lib", "gcc.cc": ""} {
 		link := filepath.Join(libs, lib)
 		if err := b.step(ctx, src, env, []string{"build", "--out-link", link, "--max-jobs", "0", "--system", platform,
 			"--inputs-from", src, "nixpkgs#" + lib}); err != nil {
 			return errors.Wrapf(err, "%s for %s is not in the binary cache at ground's pin", lib, platform)
 		}
-		path, err := filepath.EvalSymlinks(link)
+		path, err := filepath.EvalSymlinks(link + landed)
 		if err != nil {
 			return errors.Wrapf(err, "the %s nix fetched was not read at %s", lib, link)
 		}
