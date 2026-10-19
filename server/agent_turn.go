@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -92,8 +93,13 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 		if itsGit, err = s.gitEnvironment(agent); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's git was not set up, so nothing was said to it: " + err.Error()}
 		}
-		// Its ground is the one its hooks and its Pi extension run (ADR-050, Hosted agents under ground).
-		itsGit = append(itsGit, "PATH="+comet.AgentPath(agent.home, os.Getenv("PATH")))
+		// Its ground is the one its hooks and its Pi extension run (ADR-050, Hosted agents under ground),
+		// and the node's Claude Code the one a ritual it performs starts its agent with (ground ritual/run.d).
+		claude, err := s.harnessHeldBy("claude").Path(ctx)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Claude Code for a ritual the Node Agent performs to start: " + err.Error()}
+		}
+		itsGit = append(itsGit, "PATH="+comet.AgentPath(agent.home, filepath.Dir(claude)+":"+os.Getenv("PATH")))
 	}
 	told, err := writes.told(says, spokenBy(caller), time.Now())
 	write([]*types.As{told}, err)
