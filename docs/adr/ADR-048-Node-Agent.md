@@ -17,6 +17,8 @@ QNTX interacts with a Node Agent; Claude Code in this case.
 
 ## An agent per model - Nope
 
+Brandon: Update, 1 Node agent please, with option to switch models.
+
 "I feel like Opus and Fable are two distinct identities"
 
 "each model would be its own agent session, independent of each other but still
