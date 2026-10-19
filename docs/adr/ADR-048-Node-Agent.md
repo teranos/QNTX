@@ -3,7 +3,7 @@
 Date: 2026-10-19
 Status: Revised Again
 
-QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi more properly. This Document should be j
+QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi more properly. This Document should be just about the Claude Code Node Agent, at some point 
 ### A2A
 - In A2A's terms QNTX is the A2A Server: the endpoint, authentication and authorization are the node's. Each agent it hosts is described by an Agent Card and reached by its tenant (AgentInterface.tenant).
 - An agent has its own DID and attests as itself: `by` on what it writes is the agent.
