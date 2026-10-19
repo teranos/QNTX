@@ -7,6 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -15,7 +16,7 @@ import (
 // nothing to wait for — it is held or the name is wrong.
 type builtinExecutor struct {
 	registry    *async.HandlerRegistry
-	noteFailure func(HandlerFailure)
+	noteFailure func(statusline.HandlerFailure)
 }
 
 // ExecuteBuiltin runs the named handler with the attestation as the job's
@@ -55,7 +56,7 @@ func (b *builtinExecutor) ExecuteBuiltin(ctx context.Context, handlerName string
 		// The row reads this the way it reads a scheduled handler's failure:
 		// same log, same slot.
 		if b.noteFailure != nil {
-			b.noteFailure(HandlerFailure{
+			b.noteFailure(statusline.HandlerFailure{
 				Handler:     handlerName,
 				ExecutionID: job.ID,
 				Error:       err.Error(),

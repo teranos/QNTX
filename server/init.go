@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
@@ -132,9 +133,9 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		consoleBuffer:  consoleBuffer,
 		// What built-ins leave on the status row, and the handlers that failed:
 		// the node has both from its start, so nothing makes one when it is late.
-		news:            newNewsLog(),
-		askPeers:        noPeers,
-		handlerFailures: newHandlerFailureLog(),
+		news:            statusline.NewNewsLog(),
+		askPeers:        statusline.NoPeers,
+		handlerFailures: statusline.NewHandlerFailureLog(),
 		// GitHub is asked with this node's own token until the auth subsystem
 		// says this node is a peer, which asks through its primary.
 		ciGitHubGet:   githubGet,

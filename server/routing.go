@@ -112,7 +112,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/prompt/", s.HandlePrompt)                                           // Prompt operations (preview/execute/list/save/get/versions)
 	s.answer("/api/plugins/{name}/logs", s.HandlePluginLogs)                           // Plugin log stream (SSE)
 	s.answer("/api/plugins/{name}/config", s.HandlePluginConfig)                       // Plugin configuration (GET/PUT)
-	s.answer("/am/statusline", s.statusLineHandler.HandleStatusLine)                   // What a status line draws (GET)
+	s.answer("/am/statusline", s.statusLine)                                           // What a status line draws (GET)
 	s.answer("/api/types/", s.HandleTypes)                                             // Get specific type (GET /api/types/{typename})
 	s.answer("/api/types", s.HandleTypes)                                              // List/create types (GET/POST)
 	s.answer("/api/watchers/queue/stats", s.watcherHandler.HandleWatcherQueueStats)    // Watcher execution queue stats (GET)
@@ -457,4 +457,12 @@ func (rr *responseRecorder) flush(logger *zap.SugaredLogger) {
 				"status", rr.statusCode, "bytes", len(rr.body), "error", err)
 		}
 	}
+}
+
+// statusLine answers /am/statusline, which takes GET alone.
+func (s *QNTXServer) statusLine(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	s.statusLineHandler.HandleStatusLine(w, r)
 }

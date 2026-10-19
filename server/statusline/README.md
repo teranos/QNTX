@@ -69,7 +69,7 @@ the answer to the sieve being the same move as ritual_position.
 ## A plugin's deploy
 
 Built. `/am/statusline?format=json` carries `deploys` beside `items`
-(server/statusline_deploy.go); ug draws each on its plugin's name (ground, ug/tmux.d).
+(server/statusline/deploy.go); ug draws each on its plugin's name (ground, ug/tmux.d).
 
 "i wish ug would poll from QNTX some kind of indication that it knows a new plugin build and version is underway"
 
@@ -136,3 +136,13 @@ Three sweeps of the whole set at two seconds a frame, which is how the set becom
 then doubling until it rests at five minutes, which is how it stops being noise. A node
 nobody looked at for an hour advances once — what is owed is a fresh frame, not a replay
 of the ones that went unseen.
+
+## The plugins
+
+"plugins take a lot of space"
+
+"we don’t need to report about healthy plugins as often, healthy plugins can be their own carrousel of plugin carrousels if you will"
+
+Built. A plugin that is unwell, or has a failing handler, keeps its own slot on the right.
+The plugins that are well share one slot, which takes each plugin's frames in turn on the
+carousel's pacing (`healthyCarousel`).

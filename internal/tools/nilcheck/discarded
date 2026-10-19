@@ -115,9 +115,9 @@
 1	server/server.go
 1	server/signa.go
 3	server/staand.go
-4	server/statusline_handler_failures.go
-4	server/statusline_handlers.go
-2	server/statusline_plugin_frames.go
+4	server/statusline/handler_failures.go
+4	server/statusline/handlers.go
+2	server/statusline/plugin_frames.go
 1	server/sub_auth.go
 1	server/sub_canvas.go
 1	server/syscap/parser_qntx.go

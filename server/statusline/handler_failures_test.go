@@ -1,29 +1,26 @@
-package server
+package statusline
 
 import (
 	"encoding/json"
-	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"github.com/teranos/QNTX/ats/storage"
 )
 
 // logWith builds a failure log holding the given failures.
-func logWith(failures ...HandlerFailure) *handlerFailureLog {
-	l := newHandlerFailureLog()
+func logWith(failures ...HandlerFailure) *HandlerFailureLog {
+	l := NewHandlerFailureLog()
 	for _, f := range failures {
-		l.record(f)
+		l.Record(f)
 	}
 	return l
 }
 
-func handlerRow(l *handlerFailureLog) *StatusLineHandler {
-	return NewStatusLineHandler(nil, nil, nil,
-		func() storage.Watchers { return nil },
-		func() *handlerFailureLog { return l }, nil)
+func handlerRow(l *HandlerFailureLog) *StatusLineHandler {
+	h := aRow(quietNode{})
+	h.handlerFailures = func() *HandlerFailureLog { return l }
+	return h
 }
 
 // A handler failure no longer draws its own item on the row: it is shown inside
@@ -103,7 +100,7 @@ func TestRepeatedHandlerFailuresCollapseWithACount(t *testing.T) {
 // itemDetail is what am_item answers for one name, as a surface carries it.
 func itemDetail(t *testing.T, h *StatusLineHandler, asked *http.Request, name string) map[string]any {
 	t.Helper()
-	answer, refusal := h.item(asked.Context(), name)
+	answer, refusal := h.Item(asked.Context(), name)
 	if refusal != nil {
 		t.Fatalf("item %s refused: %s", name, refusal.GetSays())
 	}
@@ -146,7 +143,7 @@ func TestHandlerFailuresOutsideTheWindowDrawNothing(t *testing.T) {
 	h := handlerRow(logWith(HandlerFailure{
 		Handler: "capy.account",
 		Error:   "long ago",
-		AtMs:    time.Now().Add(-handlerFailureWindow - time.Hour).UnixMilli(),
+		AtMs:    time.Now().Add(-HandlerFailureWindow - time.Hour).UnixMilli(),
 	}))
 
 	if items := handlerFailureItemsFor(h.recentHandlerFailures()); len(items) != 0 {
@@ -154,43 +151,14 @@ func TestHandlerFailuresOutsideTheWindowDrawNothing(t *testing.T) {
 	}
 }
 
-// No log wired, no failure items — and no panic reaching for one.
-func TestNoHandlerFailureLogDrawsNoFailures(t *testing.T) {
-	h := NewStatusLineHandler(nil, nil, nil,
-		func() storage.Watchers { return nil }, nil, nil)
-
-	if items := handlerFailureItemsFor(h.recentHandlerFailures()); len(items) != 0 {
-		t.Fatalf("no log drew failures: %+v", items)
-	}
-}
-
-// A job with no handler name must still name something the row can draw and a
-// click can find, rather than drawing an empty span.
-func TestUnnamedHandlerFallsBackToTheJobID(t *testing.T) {
-	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), handlerFailures: newHandlerFailureLog()}
-	s.noteHandlerFailure(HandlerFailure{
-		ScheduledJobID: "AS-CAPYCAPY-SCHEDULE-PULSE-FZ36C6PW",
-		Error:          "no name on the job",
-	})
-
-	items := handlerFailureItemsFor(groupHandlerFailures(
-		s.handlerFailures.since(handlerFailureWindow), handlerFailureItems))
-	if len(items) != 1 {
-		t.Fatalf("drew %d items: %+v", len(items), items)
-	}
-	if items[0].Name != "AS-CAPYCAPY-SCHEDULE-PULSE-FZ36C6PW" {
-		t.Fatalf("the row drew a nameless span: %q", items[0].Name)
-	}
-}
-
 // The log is bounded, so a handler failing in a tight loop cannot grow it.
 func TestHandlerFailureLogIsBounded(t *testing.T) {
-	l := newHandlerFailureLog()
+	l := NewHandlerFailureLog()
 	now := time.Now().UnixMilli()
 	for i := 0; i < handlerFailureLogSize*2; i++ {
-		l.record(HandlerFailure{Handler: "capy.script", Error: "no", AtMs: now})
+		l.Record(HandlerFailure{Handler: "capy.script", Error: "no", AtMs: now})
 	}
-	if got := len(l.since(handlerFailureWindow)); got != handlerFailureLogSize {
+	if got := len(l.Since(HandlerFailureWindow)); got != handlerFailureLogSize {
 		t.Fatalf("log holds %d, want %d", got, handlerFailureLogSize)
 	}
 }

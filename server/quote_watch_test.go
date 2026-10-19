@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/statusline"
 	"go.uber.org/zap"
 )
 
@@ -34,9 +35,9 @@ func claimJob(t *testing.T, spans ...string) *async.Job {
 	return &async.Job{ID: "builtin:quote", HandlerName: watcher.QuoteProvenanceHandlerName, Payload: payload}
 }
 
-func quoteHandlerWith(prompts ...string) (*quoteHandler, *newsLog, *string) {
+func quoteHandlerWith(prompts ...string) (*quoteHandler, *statusline.NewsLog, *string) {
 	asked := new(string)
-	news := newNewsLog()
+	news := statusline.NewNewsLog()
 	return &quoteHandler{
 		prompts: func(ns string) ([]string, error) {
 			*asked = ns
@@ -57,7 +58,7 @@ func TestQuoteProvenanceSaysWhatHasNoSource(t *testing.T) {
 	if *asked != "ground" {
 		t.Errorf("prompts were read in %q, not the namespace the claim landed in", *asked)
 	}
-	held := news.since("person-1", time.Now().UnixMilli())
+	held := news.Since("person-1", time.Now().UnixMilli())
 	if len(held) != 1 {
 		t.Fatalf("want one item for the person, got %d", len(held))
 	}
@@ -87,7 +88,7 @@ func TestQuoteProvenanceSourcedLeavesNothing(t *testing.T) {
 	if err := h.Execute(ctx, claimJob(t, "said this exactly")); err != nil {
 		t.Fatal(err)
 	}
-	if held := news.since("person-1", time.Now().UnixMilli()); len(held) != 0 {
+	if held := news.Since("person-1", time.Now().UnixMilli()); len(held) != 0 {
 		t.Errorf("a sourced quote left %d items", len(held))
 	}
 }

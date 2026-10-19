@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -153,13 +154,13 @@ func (s *QNTXServer) amGround(ctx context.Context, _ sigil.Sent) (any, *protocol
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what the node watches for Ground did not read: " + err.Error()}
 	}
 
-	var held []News
+	var held []statusline.News
 	var left int64
 	tmux := map[string]any{"asked": int64(0), "last": "", "over": map[string]int64{}}
 	if admitted, ok := auth.AdmissionFrom(ctx); ok {
-		held, left = s.news.leftFor(newsKey(admitted))
+		held, left = s.news.LeftFor(statusline.NewsKey(admitted))
 		if s.statusLineHandler != nil {
-			if lastMs, count, over, asked := s.statusLineHandler.tmux.of(newsKey(admitted)); asked {
+			if lastMs, count, over, asked := s.statusLineHandler.Asked(statusline.NewsKey(admitted)); asked {
 				tmux = map[string]any{"asked": count, "last": time.UnixMilli(lastMs).UTC().Format(time.RFC3339), "over": over}
 			}
 		}
@@ -200,7 +201,7 @@ func (s *QNTXServer) amGround(ctx context.Context, _ sigil.Sent) (any, *protocol
 	}
 
 	failed := []map[string]any{}
-	for _, f := range s.handlerFailures.since(handlerFailureWindow) {
+	for _, f := range s.handlerFailures.Since(statusline.HandlerFailureWindow) {
 		if f.Handler != watcher.CIWatchHandlerName {
 			continue
 		}
