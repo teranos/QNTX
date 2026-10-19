@@ -6,10 +6,9 @@ Date: 2026-08-18
 
 - A User in QNTX is a human being with an ASUID under the `US` prefix ([[ADR-010-identity-system]]). The name segment is a snapshot
   taken at registration; the random suffix is what makes it unique,
-- A User holds keys and accounts. laye mints a key per browser, an authenticator derives
-  one per device, and a provider names an account its own way. A User holds several of each, so none of them is the User.
-  phone numbers.
-- `auth.root_identities` lists ways to reach a User, not Users (ADR-030).
+- A User holds keys and accounts. laye mints a key per browser, an authenticator derives one per device, and a provider names an account its own way. A User holds several of each, so none of them is the User.
+- phone numbers.
+- `auth.root_identities` lists ways to reach a User, not Users ([[ADR-030-identity-providers]]).
 - There is one ROOT User. A SUPER User is created by it and by nobody else (ADR-027).
 - The first User to prove they hold a root identity is the first User, and the first User
   is always the ROOT User. Proving a listed route is what creates them — there is no
