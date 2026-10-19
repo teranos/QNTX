@@ -345,7 +345,12 @@ func (s *QNTXServer) holdNamespaceAgent(namespace, model, setBy string) (*rootAg
 	if err := s.authHandler.HoldNamespaceAgent(agent.token, agent.did, purpose, setBy, namespace); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the token of the agent of " + namespace + " is not held, so it would reach none of the node's sigils: " + err.Error()}
 	}
-	return s.namespaceAgents.hold(purpose, agent), nil
+	held := s.namespaceAgents.hold(purpose, agent)
+	// It runs under ground as the Node Agent does: its ground built in its home (ADR-050).
+	if s.underGround.add(held.home) {
+		s.groundAgent(held.home)
+	}
+	return held, nil
 }
 
 // agentsHeld is each namespace agent the node has held, by its purpose: one

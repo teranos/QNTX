@@ -107,7 +107,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 
 	// Where an agent the node runs reaches the node's own MCP.
 	s.ownURL = ownURLOf(s.bindAddress, port)
-	s.groundTheNodeAgent()
+	s.groundTheAgents()
 
 	// What this node can answer, and then what the table grants reach to. A
 	// compiled grant naming a path nothing answers stops the node here.

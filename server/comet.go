@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/internal/forge"
@@ -31,21 +33,54 @@ func (s *QNTXServer) cometHandler() comet.Handler {
 
 // "AS AN A2A AGENT, IT ALSO NEEDS TO SHACKLE ITSELF UNDER GROUND"
 
-// groundTheNodeAgent builds the ground each agent runs under, where it does not run under one yet.
+// "i wanted ground for the namespace agent under claude first"
+
+// groundHomes is the homes of the agents the node runs under ground: the Node Agent's from its boot,
+// a namespace agent's from the first time it is held.
+type groundHomes struct {
+	mu    sync.Mutex
+	homes []string
+}
+
+// add keeps home, and says whether it is new.
+func (g *groundHomes) add(home string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if slices.Contains(g.homes, home) {
+		return false
+	}
+	g.homes = append(g.homes, home)
+	return true
+}
+
+// all is every home kept so far.
+func (g *groundHomes) all() []string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return slices.Clone(g.homes)
+}
+
+// groundTheAgents builds the ground each agent runs under, where it does not run under one yet.
 // Until it does, no turn is said to it (claudePart's ready).
-func (s *QNTXServer) groundTheNodeAgent() {
-	for _, home := range s.underGround {
-		err := comet.Under(home)
-		if err != nil {
-			s.logger.Named("comet").Infow("An agent's ground is built", "home", home, "because", err.Error())
-			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
-			continue
-		}
-		// A ground that stands is run by the settings this node writes, not by those an older one wrote.
-		if err := comet.AgentSettings(home); err != nil {
-			s.logger.Named("comet").Infow("An agent's ground is built again: its settings did not write", "home", home, "because", err.Error())
-			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
-		}
+func (s *QNTXServer) groundTheAgents() {
+	for _, home := range s.underGround.all() {
+		s.groundAgent(home)
+	}
+}
+
+// groundAgent builds the ground of the agent in home, unless it runs under one, whose settings
+// it then writes again.
+func (s *QNTXServer) groundAgent(home string) {
+	err := comet.Under(home)
+	if err != nil {
+		s.logger.Named("comet").Infow("An agent's ground is built", "home", home, "because", err.Error())
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
+		return
+	}
+	// A ground that stands is run by the settings this node writes, not by those an older one wrote.
+	if err := comet.AgentSettings(home); err != nil {
+		s.logger.Named("comet").Infow("An agent's ground is built again: its settings did not write", "home", home, "because", err.Error())
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
 	}
 }
 
@@ -65,7 +100,7 @@ func (s *QNTXServer) cometsMovedBy(push forge.Push) []string {
 	rebuilding := []string{}
 	// An agent's ground is built from ground's main as every comet is.
 	if strings.EqualFold(push.Repo.Path, comet.Ground.Owner+"/"+comet.Ground.Repo) && push.Branch() == comet.Ground.Branch {
-		for _, home := range s.underGround {
+		for _, home := range s.underGround.all() {
 			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL)
 			rebuilding = append(rebuilding, "the ground of the agent in "+home)
 		}

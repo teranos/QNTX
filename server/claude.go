@@ -267,10 +267,8 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no Claude Code to run: " + err.Error()}
 			}
 			// "which is for A2A agents to receive a coment first, or be known that they run under ground before they do A2A shut"
-			if agent.namespace == auth.NamespaceSystem {
-				if err := comet.Under(agent.home); err != nil {
-					return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " is said nothing until it runs under ground (ADR-050): " + err.Error()}
-				}
+			if err := comet.Under(agent.home); err != nil {
+				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " is said nothing until it runs under ground (ADR-050): " + err.Error()}
 			}
 			if plan, err = secretref.Resolve(ctx, named.TokenRef); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "the Claude plan token am.toml names did not resolve: " + err.Error()}
