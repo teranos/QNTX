@@ -34,14 +34,13 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 - What it is told, what it reaches for and what it answers, it attests under
   its session by its own DID, as the hook events a transcript is read from.
 
-"NDOE is ROOT"
+"NODE is ROOT"
 
 "i want to be able to do anything"
 
-- It is privileged, and it has hands on the box as well as sigils: a package
-  installed, an address reached, a plugin developed against the node it is.
+- It is privileged, and it has hands on the box as well as sigils: a package installed, an address reached, a plugin developed against the node it is.
 
-"anything that can talk to the ROOT agent can say anything to it"
+"anything that can talk to the NODE agent can say anything to it"
 
 - Who may talk to it is the whole of what guards it.
 
