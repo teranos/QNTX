@@ -28,7 +28,7 @@ let
   ];
 
   # The PR QNTX opens from the vault is not built or checked, as the Nix workflow says it.
-  notTheVault = (import ./nix.nix).jobs.lint."if";
+  notTheVault = (import ./nix.nix).jobs.build-go."if";
 in
 {
   name = "Docs";

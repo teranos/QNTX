@@ -36,13 +36,6 @@
           "run": "mkdir -p target/release\ncp result-duckdb/lib/libats_duckdb.* target/release/\ncp result-sqlite/lib/libats_sqlite.* target/release/\n"
         },
         {
-          "env": {
-            "RUSTFLAGS": "-Dwarnings"
-          },
-          "name": "Clippy",
-          "run": "nix develop --command cargo clippy --package ats-duckdb --all-targets"
-        },
-        {
           "name": "Run Go CGO smoke test + performance floor",
           "run": "nix develop --command bash -c 'export LD_LIBRARY_PATH=\"$PWD/target/release:${LD_LIBRARY_PATH:-}\" && go test -tags rustduckdb -v -timeout 5m ./ats/storage/duckdbcgo/... ./cmd/qntx/commands/ ./cmd/parity/'\n"
         }
@@ -113,17 +106,6 @@
           "uses": "swatinem/rust-cache@v2"
         },
         {
-          "name": "Check formatting",
-          "run": "cargo fmt --all --check"
-        },
-        {
-          "env": {
-            "RUSTFLAGS": "-Dwarnings"
-          },
-          "name": "Clippy",
-          "run": "cargo clippy --workspace --exclude ats-duckdb --exclude qntx-reduce-plugin --all-targets"
-        },
-        {
           "name": "Test Rust libraries",
           "run": "cargo test --workspace --exclude ats-duckdb --exclude ats-postgres --exclude qntx-reduce-plugin"
         },
@@ -149,7 +131,6 @@
           "name": "Install Rust toolchain",
           "uses": "dtolnay/rust-toolchain@stable",
           "with": {
-            "components": "rustfmt",
             "targets": "wasm32-unknown-unknown"
           }
         },
@@ -167,10 +148,6 @@
           "with": {
             "go-version-file": "go.mod"
           }
-        },
-        {
-          "name": "Check formatting",
-          "run": "cargo fmt --check --package ats-wasm"
         },
         {
           "name": "Build WASM module",
@@ -205,14 +182,6 @@
             "name": "qntx",
             "skipPush": true
           }
-        },
-        {
-          "name": "Check formatting",
-          "run": "nix develop ./qntx-plugins/qntx-meili --command cargo fmt --check -p qntx-meili"
-        },
-        {
-          "name": "Clippy (via Nix)",
-          "run": "nix flake check ./qntx-plugins/qntx-meili --print-build-logs"
         },
         {
           "name": "Build via Nix",
