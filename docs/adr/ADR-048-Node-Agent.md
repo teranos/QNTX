@@ -18,12 +18,10 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 
 ## The host agent
 
-"the ROOT host agent is QNTX as ROOT would talk to it."
-"NODE agent, one persistent session agent that is QNTX itself as
-expressed to ROOT."
+"NODE agent, one persistent session agent that is QNTX itself as expressed to ROOT."
 
 - It has a DID of its own and attests as itself, as any agent does.
-- It is not one of the agents the node hosts. A ritual's performer is an agent
+
   of its own.
 
 "we cant just have any ai be the ROOT agent"
