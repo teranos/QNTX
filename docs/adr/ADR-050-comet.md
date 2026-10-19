@@ -193,9 +193,18 @@ Even faster when the builds are done by QNTX as Comet
 - Under `-p` Claude Code waits for an asyncRewake hook to end: q's agent turn
   held on its sky's day-long timeout. An agent's sky is spawned apart.
 
+- The sand on the node, configured by a person: a POST names the machine
+  repository, and its controls/ fold in beside ground's own and the project's.
+  grove's comet for k's machine names its three revs in its rows and k's node
+  in its sand.
+- aarch64-linux from the box: ld.lld links against that platform's libraries
+  from the binary cache at ground's pin. q's build of grove ran under
+  qemu-aarch64 on k as grove's ground.
+
 ## Not done
 
-- The sand on the node, configured by a person.
-- aarch64-linux from the box.
+- A comet lands from its machine's node: l's and k's nodes refuse a request
+  without a token with 401, whatever their machine repository's qntx.pbt says,
+  and a token is minted from a passkey session (ADR-025).
 - Rituals on the box.
 - ground as a Pi extension.
