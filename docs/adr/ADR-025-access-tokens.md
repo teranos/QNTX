@@ -31,7 +31,9 @@ Add a second auth path: **access tokens**, presented as `Authorization: Bearer <
 	- Person approves at `/auth/device/approve` with passkey. 
 	- Machine polls the token endpoint 
 		- `grant_type=urn:ietf:params:oauth:grant-type:device_code` 
-	- The token's DID is its own client, admitted as the person, for 30 days; it lands in the same store as one minted at `/auth/tokens` (`server/auth/device.go`).
+	- The token's DID is its own client, 
+		- admitted as the person, for 30 days
+		- it lands in the same store as one minted at `/auth/tokens` (`server/auth/device.go`).
 
 - `Handler.Middleware` gains a bearer-header path before the cookie check.
 - UI surfaces create / list / revoke / enable.
