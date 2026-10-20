@@ -1,0 +1,11 @@
+Codex CLI
+
+Release: https://github.com/openai/codex/releases/tag/rust-v0.163.0
+Git tag: rust-v0.163.0
+Commit: 83086188ae0614bd882818ff1aa23f3194962012
+Published: 2026-10-15
+
+manifest.json records the release archives and SHA-256 digests reported by
+GitHub's release asset metadata. These are checksums of compressed archives,
+not of extracted binaries. No executable is bundled and this pin alone
+does not install, run, or select a Codex model.
