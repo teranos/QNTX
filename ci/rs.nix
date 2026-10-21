@@ -52,7 +52,6 @@ in
         "crates/ats-duckdb/Cargo.toml"
         "crates/ats-postgres/Cargo.toml"
         "crates/ats-wasm/Cargo.toml"
-        "qntx-plugins/qntx-meili/Cargo.toml"
         "ats/storage/duckdbcgo/**"
         "cmd/qntx/commands/database_parquet.go"
         "cmd/qntx/commands/landing_queries_test.go"
@@ -77,7 +76,6 @@ in
         "**/*.rs"
         "crates/qntx/Cargo.toml"
         "crates/ats-wasm/Cargo.toml"
-        "qntx-plugins/qntx-meili/Cargo.toml"
       ];
     };
     workflow_dispatch = null;
@@ -269,31 +267,6 @@ in
         {
           name = "Test Go integration";
           run = "go test -v ./ats/wasm/...";
-        }
-      ];
-    };
-
-    qntx-meili = {
-      name = "MeiliSearch Plugin";
-      runs-on = "ubuntu-latest";
-
-      steps = [
-        checkout
-
-        installNix
-
-        (cachix // {
-          "with" = cachix."with" // { skipPush = true; };
-        })
-
-        {
-          name = "Build via Nix";
-          run = "nix build ./qntx-plugins/qntx-meili --print-build-logs";
-        }
-
-        {
-          name = "Verify binary works";
-          run = "./result/bin/qntx-meili --version";
         }
       ];
     };

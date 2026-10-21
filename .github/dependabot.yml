@@ -10,10 +10,3 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
-
-  # Bun dependencies for web frontend (uses npm ecosystem - Bun is package.json compatible)
-  - package-ecosystem: "npm"
-    directory: "/web"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10

@@ -107,6 +107,52 @@ in
       ];
     };
 
+    # QNTX-Web depends on the browser WASM by the release it is attached to:
+    # "QNTX-Web needs to be easy to be developed on, so need to be a way to
+    # develop on it without needing to build ATS or Laye"
+    browser-wasm = {
+      runs-on = "ubuntu-latest";
+      needs = "create-release";
+      "if" = onTag;
+      permissions.contents = "write";
+
+      steps = [
+        checkout
+
+        {
+          name = "Setup Rust";
+          uses = "dtolnay/rust-toolchain@stable";
+          "with".targets = "wasm32-unknown-unknown";
+        }
+
+        {
+          name = "Setup wasm-pack";
+          uses = "jetli/wasm-pack-action@v0.4.0";
+          "with".version = "v0.13.1";
+        }
+
+        {
+          name = "Setup Bun";
+          uses = "oven-sh/setup-bun@v2";
+          "with".bun-version = "1.3.9";
+        }
+
+        {
+          name = "Pack ats-wasm and laye-p2p";
+          run = "make wasm-tarballs";
+        }
+
+        {
+          name = "Attach to the release";
+          uses = "softprops/action-gh-release@v2";
+          "with" = {
+            tag_name = "\${{ github.ref_name }}";
+            files = "tmp/wasm/*.tgz";
+          };
+        }
+      ];
+    };
+
     build-linux = {
       runs-on = "\${{ matrix.runner }}";
       needs = "create-release";

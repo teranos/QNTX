@@ -16,7 +16,7 @@ A sigil handles a server capability, the reach table governs it with attestation
 
 ## Testing
 
-`make test` runs both backend (Go) and frontend (TypeScript) tests. See [web/TESTING.md](web/TESTING.md) for frontend testing patterns.
+`make test` runs the Go tests and the parquet and postgres backends. The frontend is [QNTX-Web](https://github.com/teranos/QNTX-Web), tested there; `web/` here is the CSS QNTX itself reads ([web/README.md](web/README.md)).
 
 **Tests passing ≠ feature is correct.** Only manual verification by the developer confirms behavior matches intent.
 
@@ -31,6 +31,10 @@ Who may log in, the provider ceremony, and what a passkey carries: [ADR-030](doc
 **ANY edit to a plugin MUST bump its version in `Metadata().Version`.** Plugins run as separate processes.
 
 **Hot-swap:** Plugins are added, configured, enabled and disabled in the plugin element, at runtime. See [ADR-002](docs/adr/ADR-002-plugin-configuration.md).
+
+Every plugin is its own repository; none lives in this one.
+
+> each plugin needs to move into their own respective repo as well
 
 
 1. `plugins_add` a repo or tree URL. Its last segment is the plugin's name, and equals `Metadata().Name`; the binary is `qntx-<name>-plugin`.

@@ -20,21 +20,13 @@ node_modules/
 
 # Build artifacts
 dist/
-internal/server/dist/
 # No slash: a worktree shares one build directory by symlinking to it, and a
 # trailing slash matches only a real directory.
 target
 tmp/
 *.log
-web/wasm/*.js
-web/wasm/*.d.ts
-
-# Test coverage
-web/coverage/
-web/browser/test-results/
-web/browser/playwright-report/
-# The gate answers every call from these, session.json among them (sess* above)
-!web/browser/fixtures/**
+crates/ats-wasm/pkg/
+crates/laye-p2p/pkg/
 
 # Binaries (NEVER commit these!)
 *.exe
@@ -46,9 +38,6 @@ web/browser/playwright-report/
 *.out
 *.bin
 *.wasm
-qntx-code-plugin
-qntx-webscraper-plugin
-qntx-plugins/ix-json/qntx-ix-json-plugin
 
 # IDE
 .vscode/
@@ -62,11 +51,6 @@ qntx-plugins/ix-json/qntx-ix-json-plugin
 bin/
 coverage*.out
 /qntx
-
-# Tauri
-web/src-tauri/target/
-web/src-tauri/bin/
-web/src-tauri/gen/
 
 # Generated Rust types (library crate - ignore build artifacts and Cargo.lock)
 types/generated/rust/target/
@@ -86,19 +70,10 @@ ats/embeddings/models/
 
 # CTP prototypes (gitignored - for local development)
 ctp/
-web/ctpm1/
-web/css/ctpm1.css
-web/ctp2/
-web/css/ctp2.css
 
 # CTP2 test files (domain-specific, not for open source)
 **/*ctp2*_test.go
 test_fuzzy
-qntx-plugins/scry/build/
-qntx-plugins/scry/.cache/
-qntx-plugins/scry/vendor/
-qntx-plugins/scry/compile_commands.json
-qntx-plugins/qntx-scry-plugin
 ctp/Voor/_build/
 
 # What the deploy last stamped as live — a local readout, not a fact about the tree
