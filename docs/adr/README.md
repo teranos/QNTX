@@ -6,7 +6,8 @@
 "Meaning it's fully decided. it's settled." 
 
 "The Quoted text is the one source of truth, 
-rephrasing it is entirely banned,"
+rephrasing it is entirely banned,
+instead, reference the agreed truth source."
 
 And a `>` block-quote is not. 
 Neither is anything unquoted. 
