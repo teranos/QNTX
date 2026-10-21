@@ -107,9 +107,7 @@ enable is refused naming who, and the person stays off. The act is attested as
 ## Not done
 
 A User holds no first name and no last name. 
-A Dutch name has three parts, and
-the middle one is the person's to write: `van Doorn` files under D, `Van Doorn`
-under V, and the string alone does not say which.
+A Dutch name has three parts, and the middle one is the person's to write: `van Doorn` files under D, `Van Doorn` under V, and the string alone does not say which.
 
 A User reaches namespaces through permission, and nothing records which yet.
 
