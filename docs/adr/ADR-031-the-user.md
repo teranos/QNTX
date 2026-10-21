@@ -76,7 +76,7 @@ one that isn't ROOT, but also be able to go back."
 
 "can i still not change the role of a User ?"
 
-- ROOT sets the level a User holds, to USER or PUBLIC_REGISTRATION, the rungs a route
+- ROOT can set the level a User holds, to any level, the rungs a route
   reaching a User is admitted at: `POST /auth/users/{id}/level`, from the User in the
   Users element.
 - Nobody is made ROOT, and ROOT stays ROOT: there is one ROOT User. A User at SUPER or
