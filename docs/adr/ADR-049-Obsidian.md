@@ -57,13 +57,12 @@ every device through Sync.
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
 
-
 ## Which folders are the vault's
 
 "So, we could do the Same for Obsidian"
 
 As datapunt's inputs are named on its plugin record, `github.com/owner/repo@branch:path`
-(ADR-002), the vault's folders are named on a record on the node, and the
+([[ADR-002-plugin-configuration]]), the vault's folders are named on a record on the node, and the
 folder itself carries nothing.
 
 "name both ends"
