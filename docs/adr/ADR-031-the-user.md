@@ -44,14 +44,13 @@ You claim the ROOT User by proving you own a root identity. It happens once and
 cannot happen again, so it is attested as `node:claimed`. Recording never fails
 the thing it records ([[ADR-030-identity-providers]]), which makes this the one attestation whose loss cannot be made up later.
 
-## Becoming and Unbecoming (remove pre-1.0.0)
+## Becoming and Unbecoming (!!remove pre-1.0.0)
 
-"i wish i was able to assume the identity of another user, one that isnt ROOT, but also be able to go back."
+"i wish i was able to assume the identity of another user, 
+one that isn't ROOT, but also be able to go back."
 
 "but its attested that they have been becoming and unbecoming"
-
 "and while ROOT is them, they cannot be themselves"
-
 "until ROOT unbecomes that user and is itself again."
 
 - ROOT becomes a User that is not ROOT, and unbecomes them. Both are attested.
