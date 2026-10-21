@@ -42,10 +42,9 @@ the one name no other User may take.
 
 You claim the ROOT User by proving you own a root identity. It happens once and
 cannot happen again, so it is attested as `node:claimed`. Recording never fails
-the thing it records (ADR-030), which makes this the one attestation whose loss
-cannot be made up later.
+the thing it records ([[ADR-030-identity-providers]]), which makes this the one attestation whose loss cannot be made up later.
 
-## Becoming
+## Becoming and Unbecoming
 
 "i wish i was able to assume the identity of another user, one that isnt ROOT, but also be able to go back."
 
