@@ -27,8 +27,7 @@ Date: 2026-08-18
 
 ## name
 
-A User has a display_name, and it is a name rather than half a login. Not unique,
-
+A User has a display_name, and it is a name rather than half a login. Not unique.
 What identifies a User is a key they hold or an identity they control.
 
 ## root
