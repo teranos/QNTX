@@ -76,9 +76,7 @@ one that isn't ROOT, but also be able to go back."
 
 "can i still not change the role of a User ?"
 
-- ROOT can set the level a User holds, to any level, the rungs a route
-  reaching a User is admitted at: `POST /auth/users/{id}/level`, from the User in the
-  Users element.
+- ROOT can set the level a User holds, to any level, the rungs a route  reaching a User is admitted at: `POST /auth/users/{id}/level`, from the User in the Users element.
 - Nobody is made ROOT, and ROOT stays ROOT: there is one ROOT User. A User at SUPER or
   ATTESTOR is admitted at no gate yet, so neither is set.
 - The act is attested as `identity:leveled`, naming who, the level they had and the
