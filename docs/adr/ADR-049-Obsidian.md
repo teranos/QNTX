@@ -38,9 +38,9 @@ every device through Sync.
 "Fine, i will deal with this"
 
 - Sync is end-to-end encrypted, and the box is one of the ends: the vault is
-  readable there, by the node and by the ROOT agent (ADR-048).
+  readable there, by the node and by the NODE agent ([[ADR-048-Node-Agent]]).
 
-"but you make a good point about ROOT agent"
+"but you make a good point about NODE agent"
 
 "just make it do everything essentially"
 
