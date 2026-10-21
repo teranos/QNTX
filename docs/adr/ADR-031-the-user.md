@@ -1,7 +1,7 @@
 # ADR-031: The User
 
 Date: 2026-08-18
-Status: Implemented mostly, 
+Status: Implemented mostly, Next up is to be more clear in this document about what is about the ROOT user, and 
 
 ## Statements
 
