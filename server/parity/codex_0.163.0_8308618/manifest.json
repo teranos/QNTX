@@ -1,0 +1,23 @@
+{
+  "version": "0.163.0",
+  "tag": "rust-v0.163.0",
+  "commit": "83086188ae0614bd882818ff1aa23f3194962012",
+  "artifacts": {
+    "linux-x64": {
+      "file": "codex-x86_64-unknown-linux-musl.tar.gz",
+      "sha256": "beb339e8ecd9ba057a6bb2dc81ad8ca474812edfbf0fc5056ca818797648dde4"
+    },
+    "linux-arm64": {
+      "file": "codex-aarch64-unknown-linux-musl.tar.gz",
+      "sha256": "a7261e65f4a96d8f4ca65a069c6cf2dc2c33defc341e48078acefda9461fffe4"
+    },
+    "darwin-x64": {
+      "file": "codex-x86_64-apple-darwin.tar.gz",
+      "sha256": "562a1aea0e5686283a467687d268ae33705f02fd4d40f1bc4110a415c5c1c7b1"
+    },
+    "darwin-arm64": {
+      "file": "codex-aarch64-apple-darwin.tar.gz",
+      "sha256": "61c4d9a92521bdb42b0c1d9f87c673f6da628a06de5945cbdd9a0010632f6d10"
+    }
+  }
+}
