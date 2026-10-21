@@ -11,7 +11,8 @@ rephrasing it is entirely banned in favour of simple ref's"
 And a `>` block-quote is not. 
 Neither is anything unquoted. 
 Both are written by whatever drafted it, 
-and stay in flight until 
-a quoted line settles it with higher authority.
+and stay in flight 
+until a quoted line settles it 
+with human authority.
 
 
