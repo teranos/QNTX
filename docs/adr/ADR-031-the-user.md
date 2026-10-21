@@ -1,7 +1,7 @@
 # ADR-031: The User
 
 Date: 2026-08-18
-Status: Implemented mostly, Next up is to be more clear in this document about what is about the ROOT user, and 
+Status: Implemented mostly, Next up is to be more clear in this document about what is about the ROOT user, and what is about the User in general. 
 
 ## Statements
 
@@ -106,7 +106,8 @@ enable is refused naming who, and the person stays off. The act is attested as
 
 ## Not done
 
-A User holds no first name and no last name. A Dutch name has three parts, and
+A User holds no first name and no last name. 
+A Dutch name has three parts, and
 the middle one is the person's to write: `van Doorn` files under D, `Van Doorn`
 under V, and the string alone does not say which.
 
