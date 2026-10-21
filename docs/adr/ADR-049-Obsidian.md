@@ -44,7 +44,7 @@ every device through Sync.
 
 "just make it do everything essentially"
 
-- The ROOT agent sets the vault up on the box and keeps it syncing: `ob login`,
+- The NODE agent sets the vault up on the box and keeps it syncing: `ob login`,
   `ob sync-setup`, `ob sync --continuous`. Each takes its answers as flags
   (`--email`, `--password`, `--mfa`, `--vault`, `--path`), so none of it waits
   on a prompt.
