@@ -30,13 +30,12 @@ Date: 2026-08-18
 A User has a display_name, and it is a name rather than half a login. Not unique.
 What identifies a User is a key they hold or an identity they control.
 
-## root
+## ROOT
 
 "display_name of root cannot be changed anymore when set"
-
 "if display_name of root is unset, it becomes root"
 
-"regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they dont need to set their display name as root"
+"regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they don't need to set their display name as root"
 
 So the ROOT User is `root` from the moment they exist, without choosing it, and `root` is
 the one name no other User may take.
