@@ -3,7 +3,3 @@ web/site/** linguist-generated=true
 
 # Generated Rust types - collapse in GitHub PR diffs
 types/generated/rust/** linguist-generated=true
-
-# Generated WASM glue and bundled plugin modules
-web/wasm/ats_wasm.js linguist-generated=true
-qntx-plugins/pty-element/web/pty-element-module.js linguist-generated=true

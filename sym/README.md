@@ -18,4 +18,4 @@
 | `so` | Therefore — consequent action |
 | `se` | Semantic — meaning-based search and entailment |
 
-Glyphs are the UI's: [`web/ts/sym.ts`](../web/ts/sym.ts) is the symbol, the one place a segment is mapped to a glyph.
+Glyphs are the UI's: [`ts/sym.ts` in QNTX-Web](https://github.com/teranos/QNTX-Web/blob/main/ts/sym.ts) is the symbol, the one place a segment is mapped to a glyph.
