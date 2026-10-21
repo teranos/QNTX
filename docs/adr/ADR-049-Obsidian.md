@@ -79,21 +79,17 @@ folder itself carries nothing.
 - Only notes: `.md` files. What else the repository's folder holds stays there.
 - Asked whether a note deleted on main is deleted from the vault too:
 
-
 - A note main had and has no more is removed from the vault. A note main  never had is the vault's own and stays.
 
 ## What reaches the repository
 
 "i don't want that to be automatically opted in, and i want to set what the name of the branch would be in the obsidian element in the binding."
-
 - A bound folder sends nothing until a branch is named for it in the element.
 
 "it should show red, and have you redo the binding"
-
 - When the default branch is another, the binding is red until it is bound again.
 
 "oh, require it to be a dir in the repo , not in its root"
-
 - A folder is bound to a folder inside the repository, never to its top.
 
 ## Per namespace
