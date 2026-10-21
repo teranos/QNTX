@@ -1,6 +1,7 @@
 # ADR-031: The User
 
 Date: 2026-08-18
+Status: Implemented mostly, 
 
 ## Statements
 
