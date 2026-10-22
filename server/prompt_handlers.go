@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/ai/provider"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	errors "github.com/teranos/sacred-error"
 )

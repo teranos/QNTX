@@ -4,9 +4,9 @@ import (
 	"context"
 	"sort"
 
-	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/ats/types"
 	elementstorage "github.com/teranos/QNTX/element/storage"
+	"github.com/teranos/QNTX/internal/ai/provider"
 	"github.com/teranos/QNTX/internal/logger"
 )
 
