@@ -32,7 +32,7 @@ Current subsystems:
 | 4 | **Semantic clarity** | Symbols (⋈ ⨳ ⌬ ✦ ꩜) as namespaces. Meaning over decoration. |
 | 5 | **Extensibility** | Core is minimal. Everything else is a plugin via gRPC. Grammar itself is attestable. |
 
-See [Design Philosophy](design-philosophy.md).
+See [Design Philosophy](https://github.com/teranos/QNTX-Web/blob/main/design-philosophy.md).
 
 ### Stakeholders
 
@@ -116,7 +116,7 @@ Key technical decisions and why:
 - **Local-first** — storage and inference on your machine. Cloud is opt-in, not required.
 - **Core is minimal** — [ATS](https://github.com/teranos/QNTX/blob/main/ats/README.md) (incl. ⋈ ax), DB, ≡ config, ꩜ Pulse. Everything else is a plugin over gRPC.
 - **One core for every runtime** — parsing, filters, query resolution, watcher matching, identity and signing are implemented once, in Rust, and the node and the browser run the same code.
-See [Design Philosophy](design-philosophy.md) and [Release](release.md).
+See [Design Philosophy](https://github.com/teranos/QNTX-Web/blob/main/design-philosophy.md) and [Release](release.md).
 
 ---
 
@@ -277,7 +277,7 @@ Extensibility
 └── One core shared across platforms
 ```
 
-See [Design Philosophy](design-philosophy.md).
+See [Design Philosophy](https://github.com/teranos/QNTX-Web/blob/main/design-philosophy.md).
 
 ---
 
