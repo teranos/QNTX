@@ -13,8 +13,21 @@
 
 use serde::{Deserialize, Serialize};
 
+// The numbers the rules are made of, all of them, so none is read out of a
+// formula below.
+
 /// The longest span measured, as in ground.
 pub const SPAN_MAX: usize = 8192;
+
+/// The rules are rates per this many characters of the span.
+const WINDOW: usize = 40;
+
+/// Corrections per window that still pass clean.
+const CLEAN_PER_WINDOW: usize = 4;
+
+/// Corrections per window that still pass, said rather than silent. Past it
+/// the span has no source.
+const WARN_PER_WINDOW: usize = 6;
 
 /// What the prompts say about a quoted span.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,13 +54,13 @@ impl Verdict {
 /// Four corrections per forty characters of the span, floored. A span under
 /// ten characters buys none and must be verbatim.
 pub fn correction_budget(length: usize) -> usize {
-    length.saturating_mul(4) / 40
+    length.saturating_mul(CLEAN_PER_WINDOW) / WINDOW
 }
 
 /// The band above it that still passes, said rather than silent: five and six
 /// per forty. Past it the span has no source.
 pub fn warn_budget(length: usize) -> usize {
-    length.saturating_mul(6) / 40
+    length.saturating_mul(WARN_PER_WINDOW) / WINDOW
 }
 
 /// One pass of the table over `text`, handing each stretch's best distance to

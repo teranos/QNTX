@@ -3,11 +3,11 @@ package quote
 import (
 	"context"
 	"encoding/json"
-	quoted "github.com/teranos/QNTX/ats/quote"
 	"strconv"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
+	quoted "github.com/teranos/QNTX/ats/quote"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
@@ -17,16 +17,23 @@ import (
 	"go.uber.org/zap"
 )
 
-// quote.provenance is the built-in the standing quote row reaches. ground's
-// PostToolUse attests the quoted spans a write carried, sky streams the row
-// here, and each span is asked of the prompts in the namespace it landed in.
+// The numbers this package is made of, so none is read out of the code below.
+const (
+	// noteSpan is how much of a span the row's note carries; the detail has
+	// every span whole.
+	noteSpan = 80
+
+	// promptsCeiling is a read of every prompt a namespace holds. Zero would be
+	// none of them.
+	promptsCeiling = 1_000_000
+)
 
 // promptPredicates are the rows that hold what the person typed.
 var promptPredicates = []string{"UserPromptSubmit", "QueuedPromptSubmit"}
 
-// promptsCeiling is a read of every prompt a namespace holds. Zero would be
-// none of them.
-const promptsCeiling = 1_000_000
+// quote.provenance is the built-in the standing quote row reaches. ground's
+// PostToolUse attests the quoted spans a write carried, sky streams the row
+// here, and each span is asked of the prompts in the namespace it landed in.
 
 // Namespaces is what the prompts are read from: the node's held universes.
 type Namespaces interface {
@@ -145,10 +152,6 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 	h.leave(as, namespace, unsourced, stretched, degrees, len(said))
 	return nil
 }
-
-// noteSpan is how much of a span the row's note carries; the detail has
-// every span whole.
-const noteSpan = 80
 
 func (h *Watch) leave(as types.As, namespace string, unsourced, stretched []string, degrees []degree, read int) {
 	caller := as.Actors[0]
