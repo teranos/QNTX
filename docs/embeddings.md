@@ -91,9 +91,9 @@ Without the `rustembeddings` build tag, all endpoints return 503.
 
 ## 2D Projection (UMAP)
 
-Embeddings are 384-dimensional — too high to visualize directly. The `qntx-reduce` plugin projects them to 2D via UMAP for canvas visualization.
+Embeddings are 384-dimensional — too high to visualize directly. The `reduce` plugin projects them to 2D via UMAP for canvas visualization.
 
-See [qntx-reduce/README.md](../qntx-plugins/qntx-reduce/README.md) for setup and API details.
+See [teranos/reduce](https://github.com/teranos/reduce) for setup and API details.
 
 **Flow:** `POST /api/embeddings/project` reads embeddings for the specified model (or all if omitted), calls the reduce plugin's `/fit` endpoint, and writes `projection_x`/`projection_y` back to the embeddings table. New attestations are auto-projected via `/transform` if the model is fitted.
 
