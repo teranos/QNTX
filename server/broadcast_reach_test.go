@@ -31,8 +31,6 @@ var nodeWideBroadcasts = map[string]string{
 		"namespaces it runs",
 	"broadcastLLMStream": "an LLM stream is addressed by job id, and the job it belongs " +
 		"to came off the node's own queue",
-	"BroadcastPluginHealth": "plugins are loaded once however many namespaces the node " +
-		"runs, so one going unhealthy is the same fact for every reader",
 
 	// The four Pulse ones are the same claim: an execution is a run of the
 	// node's scheduler, reported by scheduled-job id.

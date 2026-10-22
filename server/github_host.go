@@ -107,7 +107,6 @@ func (s *QNTXServer) buildLanded(name string) {
 		return
 	}
 	s.deploys.stage(name, deployLive)
-	s.BroadcastPluginHealth(name, true, "running", "Started from the build the runner delivered")
 }
 
 // buildsMovedBy starts the build of every enabled plugin push moves, and names them.

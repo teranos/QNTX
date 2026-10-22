@@ -338,9 +338,6 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 		}
 		s.logger.Infow("Plugin paused", "plugin", name)
-		// Broadcast plugin health update to all clients
-		// healthy=true because paused is intentional, not a failure
-		s.BroadcastPluginHealth(name, true, string(plugin.StatePaused), "Plugin paused")
 
 	case "resume":
 		err = s.pluginRegistry.Resume(ctx, name)
@@ -349,8 +346,6 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 		}
 		s.logger.Infow("Plugin resumed", "plugin", name)
-		// Broadcast plugin health update to all clients
-		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin resumed")
 
 	case "restart":
 		pm, err := s.getPluginManager()
@@ -386,7 +381,6 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 				return
 			}
 			s.refreshPluginHealth()
-			s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin restarted")
 		}()
 
 	case "enable":
@@ -414,7 +408,6 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 		// The list reads the last probe. Probed now, so the list asked right
 		// after Enable holds this plugin's health, not the probe from before it ran.
 		s.refreshPluginHealth()
-		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin enabled")
 
 	case "disable", "archive":
 		pm, err := s.getPluginManager()
@@ -459,7 +452,6 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 			acc.SetHealth(name, true, status, nil)
 			acc.Emit(name, plugingrpc.BannerDisabled)
 		}
-		s.BroadcastPluginHealth(name, false, string(plugin.StateStopped), "Plugin "+action+"d")
 
 	default:
 		return nil, &protocol.Refusal{Why: sigil.Failed,

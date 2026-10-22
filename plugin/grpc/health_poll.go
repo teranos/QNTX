@@ -23,14 +23,6 @@ const (
 	maxRestartBackoff = 640 * time.Second
 )
 
-// HealthEvent describes a plugin health state change for UI notification.
-type HealthEvent struct {
-	Name    string
-	Healthy bool
-	State   string // plugin.PluginState as string
-	Message string
-}
-
 // healthPollState tracks consecutive failures and restart backoff per plugin
 type healthPollState struct {
 	mu            sync.Mutex
@@ -103,9 +95,8 @@ func (h *healthPollState) inCooldown(name string) bool {
 // StartHealthPolling begins periodic health checks on all running plugins.
 // When a plugin fails consecutiveFailuresBeforeRestart health checks in a row,
 // it is automatically restarted with exponential backoff (disable + enable).
-// onEvent is called on health state changes for UI broadcast.
 // Stops when shutdownCtx is cancelled. See ADR-018 for health polling behavior.
-func (m *PluginManager) StartHealthPolling(registry *plugin.Registry, services plugin.ServiceRegistry, onEvent func(HealthEvent)) {
+func (m *PluginManager) StartHealthPolling(registry *plugin.Registry, services plugin.ServiceRegistry) {
 	state := newHealthPollState()
 
 	go func() {
@@ -123,14 +114,14 @@ func (m *PluginManager) StartHealthPolling(registry *plugin.Registry, services p
 				m.logger.Info("Health polling stopped (shutdown)")
 				return
 			case <-ticker.C:
-				m.pollAllPlugins(registry, services, state, onEvent)
+				m.pollAllPlugins(registry, services, state)
 			}
 		}
 	}()
 }
 
 // pollAllPlugins checks health of all managed plugins and restarts unhealthy ones.
-func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugin.ServiceRegistry, state *healthPollState, onEvent func(HealthEvent)) {
+func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugin.ServiceRegistry, state *healthPollState) {
 	// Snapshot current plugins under lock
 	m.mu.RLock()
 	names := make([]string, 0, len(m.plugins))
@@ -191,18 +182,12 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 		}
 
 		backoff := state.recordRestart(name)
-		// The failure is said where the plugin is shown: the registry holds it
-		// and the UI is told the plugin failed. A restart that does not take
-		// is the error.
+		// The failure is said where the plugin is shown: the registry holds it,
+		// and the plugin element reads it from /api/plugins. A restart that does
+		// not take is the error.
 		m.logger.Infow("Plugin failed consecutive health checks, restarting",
 			append(base, "next_backoff", backoff)...)
 		registry.MarkFailed(name, health.Message)
-		onEvent(HealthEvent{
-			Name:    name,
-			Healthy: false,
-			State:   string(plugin.StateFailed),
-			Message: health.Message,
-		})
 
 		// Restart in a goroutine so we don't block the polling loop
 		go func(pluginName, why string, failures int) {
@@ -214,13 +199,6 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 				return
 			}
 			// Banner is emitted by registerRestarted's health goroutine
-			// Notify UI that plugin recovered
-			onEvent(HealthEvent{
-				Name:    pluginName,
-				Healthy: true,
-				State:   string(plugin.StateRunning),
-				Message: "Plugin restarted after health check failure",
-			})
 		}(name, health.Message, count)
 	}
 }

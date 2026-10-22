@@ -47,12 +47,9 @@ type cachedDaemonStatus struct {
 
 // QueryMessage represents a client message
 type QueryMessage struct {
-	Type      string `json:"type"`      // "ping", "set_verbosity", "upload", "job_control", "rich_search"
+	Type      string `json:"type"`      // "ping", "set_verbosity", "job_control", "rich_search"
 	Query     string `json:"query"`     // Query text for rich_search
 	Verbosity int    `json:"verbosity"` // Verbosity level for set_verbosity
-	Filename  string `json:"filename"`  // For upload messages
-	FileType  string `json:"fileType"`  // For upload messages: "linkedin", "vcf", etc.
-	Data      string `json:"data"`      // For upload messages: base64 encoded file content
 	Action    string `json:"action"`    // For job_control/visibility messages: "pause", "resume", "details", "toggle_node_type", "toggle_isolated"
 	JobID     string `json:"job_id"`    // For job_control messages
 	// Watcher fields (for watcher_upsert messages)
@@ -63,28 +60,6 @@ type QueryMessage struct {
 	SemanticQuery     string  `json:"semantic_query"`      // For watcher_upsert: Natural language query for semantic matching
 	SemanticThreshold float32 `json:"semantic_threshold"`  // For watcher_upsert: Minimum similarity score (0-1)
 	SemanticClusterID *int    `json:"semantic_cluster_id"` // For watcher_upsert: Cluster scope (nil = all clusters)
-}
-
-// ProgressMessage represents an import progress message
-type ProgressMessage struct {
-	Type    string `json:"type"`    // "import_progress"
-	Current int    `json:"current"` // Current item being processed
-	Total   int    `json:"total"`   // Total items to process
-	Message string `json:"message"` // Status message
-}
-
-// StatsMessage represents import statistics
-type StatsMessage struct {
-	Type         string `json:"type"`         // "import_stats"
-	Contacts     int    `json:"contacts"`     // Number of contacts imported
-	Attestations int    `json:"attestations"` // Number of attestations created
-	Companies    int    `json:"companies"`    // Number of companies found
-}
-
-// CompleteMessage represents import completion
-type CompleteMessage struct {
-	Type    string `json:"type"`    // "import_complete"
-	Message string `json:"message"` // Completion message
 }
 
 // JobUpdateMessage represents async IX job update
@@ -189,17 +164,6 @@ type PulseExecutionLogStreamMessage struct {
 	ExecutionID    string `json:"execution_id"`     // Execution record ID
 	LogChunk       string `json:"log_chunk"`        // Log text chunk
 	Timestamp      int64  `json:"timestamp"`        // Unix timestamp
-}
-
-// PluginHealthMessage represents a plugin health status update
-// Broadcast when plugin state changes (pause/resume) or health check fails
-type PluginHealthMessage struct {
-	Type      string `json:"type"`      // "plugin_health"
-	Name      string `json:"name"`      // Plugin name
-	Healthy   bool   `json:"healthy"`   // Current health status
-	State     string `json:"state"`     // "running", "paused", "stopped"
-	Message   string `json:"message"`   // Status message
-	Timestamp int64  `json:"timestamp"` // Unix timestamp
 }
 
 // WatcherMatchMessage represents a watcher match event
