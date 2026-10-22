@@ -3,6 +3,7 @@ package quote
 import (
 	"context"
 	"encoding/json"
+	quoted "github.com/teranos/QNTX/ats/quote"
 	"strings"
 	"testing"
 	"time"
@@ -104,7 +105,7 @@ func TestQuoteRemovalOfUnsourcedLeavesNothing(t *testing.T) {
 func TestQuoteRemovalReportsAStretchedQuote(t *testing.T) {
 	said := "you replace something i said with something else, this is a different kind of violation"
 	span := "you replac somethin i sai wth somethng els, ths is a diferent knd of violaton"
-	if v := VerdictOf(span, []string{said}); v != Stretched {
+	if v := quoted.VerdictOf(span, []string{said}); v != quoted.Stretched {
 		t.Fatalf("the fixture is %s, not stretched", v)
 	}
 	h, news, _ := removalWith(said)

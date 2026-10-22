@@ -3,6 +3,7 @@ package quote
 import (
 	"context"
 	"encoding/json"
+	quoted "github.com/teranos/QNTX/ats/quote"
 	"strconv"
 	"time"
 
@@ -65,8 +66,8 @@ func (h *Removal) Execute(ctx context.Context, job *async.Job) error {
 
 	var removed []removedQuote
 	for i, span := range spans {
-		v := VerdictOf(span, said)
-		if v == Unsourced {
+		v := quoted.VerdictOf(span, said)
+		if v == quoted.Unsourced {
 			continue
 		}
 		removed = append(removed, removedQuote{File: files[i], Span: span, Verdict: v.String()})

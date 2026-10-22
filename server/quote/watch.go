@@ -3,6 +3,7 @@ package quote
 import (
 	"context"
 	"encoding/json"
+	quoted "github.com/teranos/QNTX/ats/quote"
 	"strconv"
 	"time"
 
@@ -115,17 +116,17 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 	var unsourced, stretched []string
 	var degrees []degree
 	for _, span := range spans {
-		v := VerdictOf(span, said)
+		v := quoted.VerdictOf(span, said)
 		switch v {
-		case Unsourced:
+		case quoted.Unsourced:
 			unsourced = append(unsourced, span)
-		case Stretched:
+		case quoted.Stretched:
 			stretched = append(stretched, span)
 		default:
 			continue
 		}
 		degrees = append(degrees, degree{Span: span, Verdict: v.String(),
-			Corrections: DegreeOf(span, said), Length: len(span)})
+			Corrections: quoted.DegreeOf(span, said), Length: len(span)})
 	}
 	if len(degrees) == 0 {
 		return nil
