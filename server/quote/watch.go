@@ -84,7 +84,9 @@ type degree struct {
 type Watch struct {
 	// prompts is every prompt the namespace holds, as typed.
 	prompts func(namespace string) ([]string, error)
-	news    *statusline.NewsLog
+	// judge is what the prompts say of each span (ats/quote), which is Rust's.
+	judge func(spans, said []string) ([]quoted.Judgement, error)
+	news  *statusline.NewsLog
 	// Who the token that attested the claim speaks for, as ci.watch files it.
 	mintedBy func(did string) (string, bool)
 	logger   *zap.SugaredLogger
@@ -113,11 +115,16 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrapf(err, "quote.provenance: reading the prompts of %s for %s", namespace, as.ID)
 	}
 
+	judgements, err := h.judge(spans, said)
+	if err != nil {
+		return errors.Wrapf(err, "quote.provenance: judging the spans of %s against the prompts of %s", as.ID, namespace)
+	}
+
 	var unsourced, stretched []string
 	var degrees []degree
-	for _, span := range spans {
-		v := quoted.VerdictOf(span, said)
-		switch v {
+	for i, span := range spans {
+		j := judgements[i]
+		switch j.Verdict {
 		case quoted.Unsourced:
 			unsourced = append(unsourced, span)
 		case quoted.Stretched:
@@ -125,8 +132,12 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 		default:
 			continue
 		}
-		degrees = append(degrees, degree{Span: span, Verdict: v.String(),
-			Corrections: quoted.DegreeOf(span, said), Length: len(span)})
+		corrections, measured := j.Corrections()
+		if !measured {
+			return errors.Newf("quote.provenance: %s span %d of %s was judged %s and not measured", as.ID, i+1, namespace, j.Verdict)
+		}
+		degrees = append(degrees, degree{Span: span, Verdict: j.Verdict.String(),
+			Corrections: corrections, Length: len(span)})
 	}
 	if len(degrees) == 0 {
 		return nil
@@ -206,7 +217,8 @@ func attrString(attrs map[string]any, key string) string {
 }
 
 // NewWatch is quote.provenance, asking prompts for what a namespace was told.
-func NewWatch(prompts func(namespace string) ([]string, error), news *statusline.NewsLog,
+func NewWatch(prompts func(namespace string) ([]string, error),
+	judge func(spans, said []string) ([]quoted.Judgement, error), news *statusline.NewsLog,
 	mintedBy func(did string) (string, bool), logger *zap.SugaredLogger) *Watch {
-	return &Watch{prompts: prompts, news: news, mintedBy: mintedBy, logger: logger}
+	return &Watch{prompts: prompts, judge: judge, news: news, mintedBy: mintedBy, logger: logger}
 }
