@@ -69,7 +69,7 @@ which is why the middleware could only ever say "someone authenticated".
 
 "and removing this will be a 1.0.0 blocker"
 
-A ROOT session mints a ROOT token at `/auth/tokens`. It names no namespace.
+Not done. `/auth/tokens` mints SUPER, ATTESTOR or OAUTH and refuses ROOT (`mintable`, server/auth/handlers_tokens.go); a SUPER token names no namespace. Intended: a ROOT session mints a ROOT token at `/auth/tokens`, naming no namespace.
 
 ## CI by OIDC
 
@@ -83,7 +83,7 @@ A ROOT session mints a ROOT token at `/auth/tokens`. It names no namespace.
 
 "can this be another 1.0.0 blocker please"
 
-A CI job presents its own OIDC ID token at the token endpoint as an RFC 7523
+Not done. The token endpoint serves authorization_code, refresh_token, client_credentials and the device grant (server/auth/oauth.go): no JWT-bearer grant, no issuer keys. Intended: a CI job presents its own OIDC ID token at the token endpoint as an RFC 7523
 JWT-bearer grant. QNTX checks it against the issuer's keys; a REACH line names
 the repository the node admits. Nothing is minted, pasted or rotated.
 
