@@ -297,7 +297,7 @@ When an element fails to sync (after retries exhausted):
 
 ## References
 
-- Design Philosophy: `docs/design-philosophy.md`
+- Design Philosophy: [QNTX-Web/design-philosophy.md](https://github.com/teranos/QNTX-Web/blob/main/design-philosophy.md)
 - Existing Element System: [`teranos/elements` VISION.md](https://github.com/teranos/elements/blob/main/VISION.md)
 - Canvas State Management: `web/ts/state/ui.ts`
 - Element Interaction
