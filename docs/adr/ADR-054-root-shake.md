@@ -42,6 +42,13 @@ screenshot pasted right there."
   read it. The agent reads it as an image, in its own working directory, so no
   permission rule is added for it.
 
+"say being able to carry an image sounds usefull to me, and being able to
+attach an imagine whne in a mobile chat"
+
+- `say` takes `file_id` with no element too: a picture attached in chat, put
+  where the agent works the same way, and the prompt says a picture is there
+  and to read it.
+
 ## Not done
 
 - The native shake: QNTX-App, a separate PR.

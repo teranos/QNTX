@@ -136,17 +136,39 @@ func TestAShakenScreenshotIsPutWhereTheAgentReadsIt(t *testing.T) {
 	assert.Equal(t, at, told[0].Attributes["screenshot"])
 }
 
-// A screenshot is of an element, and one the node does not hold is no screenshot.
-func TestAScreenshotIsOfAnElementTheNodeHolds(t *testing.T) {
+// "say being able to carry an image sounds usefull to me, and being able to
+// attach an imagine whne in a mobile chat"
+// A picture attached in a chat with no element is carried the same way.
+func TestAPictureAttachedInChatIsCarriedToTheAgent(t *testing.T) {
+	s, ran := runningTheNodeAgent(t, opusLow)
+	s.dbPath = filepath.Join(t.TempDir(), "qntx.db")
+	files, err := s.filesDir()
+	require.NoError(t, err)
+	const id = "7c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f"
+	require.NoError(t, os.WriteFile(filepath.Join(files, id+".png"), []byte("PNG bytes"), 0o644))
+
+	answer, refused := saying(s, sigil.Sent{"says": "what is in this?", "file_id": id})
+	require.Nil(t, refused)
+
+	at := filepath.Join(s.nodeAgent.home, "work", "shake", id+".png")
+	_, err = os.Stat(at)
+	require.NoError(t, err)
+	args, err := os.ReadFile(filepath.Join(ran, "0", "args"))
+	require.NoError(t, err)
+	assert.Contains(t, string(args), "-p\nwhat is in this?\n\nA picture is at "+at+". Read it.\n--output-format\n")
+
+	told := toldRows(t, s, answer.GetSession())
+	require.Len(t, told, 1)
+	assert.Equal(t, at, told[0].Attributes["screenshot"])
+	assert.NotContains(t, told[0].Attributes, "element")
+}
+
+// A picture the node does not hold is no picture.
+func TestAPictureIsOneTheNodeHolds(t *testing.T) {
 	s, ran := runningTheNodeAgent(t, opusLow)
 	s.dbPath = filepath.Join(t.TempDir(), "qntx.db")
 
-	_, refused := saying(s, sigil.Sent{"says": "why?", "file_id": "0b6e9a3c-1f5d-4c2e-9a7b-2d3e4f5a6b7c"})
-	require.NotNil(t, refused)
-	assert.Equal(t, sigil.Missing, refused.GetWhy())
-	assert.Equal(t, "element", refused.GetParam())
-
-	_, refused = saying(s, sigil.Sent{"says": "why?", "element": "agent-element", "file_id": "0b6e9a3c-1f5d-4c2e-9a7b-2d3e4f5a6b7c"})
+	_, refused := saying(s, sigil.Sent{"says": "why?", "element": "agent-element", "file_id": "0b6e9a3c-1f5d-4c2e-9a7b-2d3e4f5a6b7c"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.GetWhy())
 	assert.Equal(t, "file_id", refused.GetParam())

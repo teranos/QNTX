@@ -22,7 +22,7 @@ func elementParam() *protocol.Param {
 
 // screenshotParam is the screenshot a call hands the agent, by its file id.
 func screenshotParam() *protocol.Param {
-	return &protocol.Param{Name: "file_id", Says: "The id /api/files gave a PNG screenshot of the element. The node puts it where the agent works and the prompt says to read it. Takes element."}
+	return &protocol.Param{Name: "file_id", Says: "The id /api/files gave a picture: the screenshot of the element named, or a picture attached in chat. The node puts it where the agent works and the prompt says to read it."}
 }
 
 // shakeDir is where screenshots are put under the agent's work, which is its
@@ -50,9 +50,6 @@ func (s *QNTXServer) screenshotFor(agent *rootAgent, element string, sent sigil.
 	if id == "" {
 		return "", nil
 	}
-	if element == "" {
-		return "", &protocol.Refusal{Why: sigil.Missing, Param: "element", Says: "a screenshot is of an element, and none was named"}
-	}
 	if id != filepath.Base(id) {
 		return "", &protocol.Refusal{Why: sigil.Invalid, Param: "file_id", Says: "a file is named by the id /api/files gave it, and " + id + " is a path"}
 	}
@@ -70,11 +67,16 @@ func (s *QNTXServer) screenshotFor(agent *rootAgent, element string, sent sigil.
 	return at, nil
 }
 
-// shakePrompt is what the harness is handed when a screenshot is: what was said,
-// then where the screenshot of the element is, and to read it.
+// "say being able to carry an image sounds usefull to me, and being able to attach an imagine whne in a mobile chat"
+
+// shakePrompt is what the harness is handed when a picture is: what was said,
+// then where the picture is, of the element when one is named, and to read it.
 func shakePrompt(says, element, screenshot string) string {
-	if screenshot == "" {
+	switch {
+	case screenshot == "":
 		return says
+	case element == "":
+		return says + "\n\nA picture is at " + screenshot + ". Read it."
 	}
 	return says + "\n\nA screenshot of element " + element + " is at " + screenshot + ". Read it."
 }
