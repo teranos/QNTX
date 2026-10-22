@@ -30,7 +30,9 @@ type removedQuote struct {
 type Removal struct {
 	// prompts is every prompt the namespace holds, as typed.
 	prompts func(namespace string) ([]string, error)
-	news    *statusline.NewsLog
+	// judge is what the prompts say of each span (ats/quote), which is Rust's.
+	judge func(spans, said []string) ([]quoted.Judgement, error)
+	news  *statusline.NewsLog
 	// Who the token that attested the removal speaks for, as ci.watch files it.
 	mintedBy func(did string) (string, bool)
 	logger   *zap.SugaredLogger
@@ -64,9 +66,14 @@ func (h *Removal) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrapf(err, "quote.removal: reading the prompts of %s for %s", namespace, as.ID)
 	}
 
+	judgements, err := h.judge(spans, said)
+	if err != nil {
+		return errors.Wrapf(err, "quote.removal: judging the spans of %s against the prompts of %s", as.ID, namespace)
+	}
+
 	var removed []removedQuote
 	for i, span := range spans {
-		v := quoted.VerdictOf(span, said)
+		v := judgements[i].Verdict
 		if v == quoted.Unsourced {
 			continue
 		}
@@ -113,7 +120,8 @@ func (h *Removal) leave(as types.As, namespace, commit string, removed []removed
 }
 
 // NewRemoval is quote.removal, asking prompts for what a namespace was told.
-func NewRemoval(prompts func(namespace string) ([]string, error), news *statusline.NewsLog,
+func NewRemoval(prompts func(namespace string) ([]string, error),
+	judge func(spans, said []string) ([]quoted.Judgement, error), news *statusline.NewsLog,
 	mintedBy func(did string) (string, bool), logger *zap.SugaredLogger) *Removal {
-	return &Removal{prompts: prompts, news: news, mintedBy: mintedBy, logger: logger}
+	return &Removal{prompts: prompts, judge: judge, news: news, mintedBy: mintedBy, logger: logger}
 }

@@ -311,6 +311,22 @@ mod wazero {
     }
 
     // ============================================================================
+    // Quote
+    // ============================================================================
+
+    /// Judge quoted spans against what a namespace's prompts hold. Takes JSON:
+    /// ```json
+    /// {"spans": ["..."], "said": ["..."]}
+    /// ```
+    /// Returns: `{"judgements": [{"verdict": "sourced"}, {"verdict": "stretched",
+    /// "corrections": 5}]}`, one per span in order, or `{"error": "..."}`.
+    #[no_mangle]
+    pub extern "C" fn quote_judge(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&ats::quote::judge_json(input))
+    }
+
+    // ============================================================================
     // Classification
     // ============================================================================
 
