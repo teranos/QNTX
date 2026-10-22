@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	"go.uber.org/zap/zaptest"
@@ -222,6 +223,39 @@ func TestAnAPIErrorIsATurnInItsOwnWords(t *testing.T) {
 	last := read[0].Turns[len(read[0].Turns)-1]
 	assert.Equal(t, "error", last.Speaker)
 	assert.Equal(t, "server_error: API Error: Unable to connect to API (ENOTFOUND)", last.Text)
+}
+
+// Spike: a message typed while a turn ran fired no hook; ground reads it from
+// Claude Code's file as QueuedPromptSubmit, and the person said it all the same.
+func TestAQueuedPromptIsTheHumanSpeaking(t *testing.T) {
+	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
+	rows := append(aSession(at), streamed("ground:queued:1", "QueuedPromptSubmit", "s-1", at.Add(3500*time.Millisecond),
+		map[string]any{"prompt": "and also, check open pr's"}))
+
+	read := transcriptsOf(rows, 10)
+	require.Len(t, read, 1)
+	assert.Equal(t, "human", read[0].Turns[4].Speaker)
+	assert.Equal(t, "and also, check open pr's", read[0].Turns[4].Text)
+}
+
+// Jenny: a quote is asked of what the person said, and that is the human turns
+// of the namespace's transcripts: nothing the agent said, nothing outside a session.
+// "make quote read the transcript's human turns?"
+func TestQuoteReadsTheTranscriptsHumanTurns(t *testing.T) {
+	store, db := qntxtest.CreateTestStore(t)
+	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
+	stray := streamed("c", "UserPromptSubmit", "", at, map[string]any{"prompt": "nowhere"})
+	stray.Contexts = []string{"project:teranos/QNTX"}
+	rows := append(aSession(at), stray,
+		streamed("ground:queued:1", "QueuedPromptSubmit", "s-2", at.Add(time.Hour), map[string]any{"prompt": "and also, check open pr's"}))
+	for _, as := range rows {
+		require.NoError(t, store.CreateAttestation(as))
+	}
+	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
+
+	said, err := s.namespacePrompts(auth.NamespaceDefault)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"Build QNTX here", "and also, check open pr's"}, said)
 }
 
 // "if SUPER cant access transcripts, make it so SUPER can access it"

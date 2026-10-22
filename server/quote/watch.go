@@ -7,11 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -20,39 +18,6 @@ import (
 // quote.provenance is the built-in the standing quote row reaches. ground's
 // PostToolUse attests the quoted spans a write carried, sky streams the row
 // here, and each span is asked of the prompts in the namespace it landed in.
-
-// promptPredicates are the rows that hold what the person typed.
-var promptPredicates = []string{"UserPromptSubmit", "QueuedPromptSubmit"}
-
-// promptsCeiling is a read of every prompt a namespace holds. Zero would be
-// none of them.
-const promptsCeiling = 1_000_000
-
-// Namespaces is what the prompts are read from: the node's held universes.
-type Namespaces interface {
-	Read(namespace string) (namespaces.Reading, error)
-}
-
-// PromptsIn is every prompt a namespace holds, as typed. A store that will not
-// answer is an error, not no prompts: the two read the same, and one of them
-// calls every quote invented.
-func PromptsIn(held Namespaces, namespace string) ([]string, error) {
-	store, err := held.Read(namespace)
-	if err != nil {
-		return nil, errors.Wrapf(err, "opening %s to read its prompts", namespace)
-	}
-	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: promptPredicates, Limit: promptsCeiling})
-	if err != nil {
-		return nil, errors.Wrapf(err, "reading the prompts of %s", namespace)
-	}
-	prompts := make([]string, 0, len(found))
-	for _, as := range found {
-		if p := attrString(as.Attributes, "prompt"); p != "" {
-			prompts = append(prompts, p)
-		}
-	}
-	return prompts, nil
-}
 
 // The namespace a standing row fired in, carried to the built-in it reaches.
 type namespaceKey struct{}
