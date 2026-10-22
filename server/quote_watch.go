@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -86,17 +87,17 @@ func (h *quoteHandler) Execute(ctx context.Context, job *async.Job) error {
 	var unsourced, stretched []string
 	var degrees []quoteDegree
 	for _, span := range spans {
-		v := verdictOf(span, said)
+		v := quote.VerdictOf(span, said)
 		switch v {
-		case quoteUnsourced:
+		case quote.Unsourced:
 			unsourced = append(unsourced, span)
-		case quoteStretched:
+		case quote.Stretched:
 			stretched = append(stretched, span)
 		default:
 			continue
 		}
 		degrees = append(degrees, quoteDegree{Span: span, Verdict: v.String(),
-			Corrections: degreeOf(span, said), Length: len(span)})
+			Corrections: quote.DegreeOf(span, said), Length: len(span)})
 	}
 	if len(degrees) == 0 {
 		return nil

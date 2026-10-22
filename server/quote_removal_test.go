@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/statusline"
 	"go.uber.org/zap"
 )
@@ -104,7 +105,7 @@ func TestQuoteRemovalOfUnsourcedLeavesNothing(t *testing.T) {
 func TestQuoteRemovalReportsAStretchedQuote(t *testing.T) {
 	said := "you replace something i said with something else, this is a different kind of violation"
 	span := "you replac somethin i sai wth somethng els, ths is a diferent knd of violaton"
-	if v := verdictOf(span, []string{said}); v != quoteStretched {
+	if v := quote.VerdictOf(span, []string{said}); v != quote.Stretched {
 		t.Fatalf("the fixture is %s, not stretched", v)
 	}
 	h, news, _ := removalHandlerWith(said)

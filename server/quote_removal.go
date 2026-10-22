@@ -9,6 +9,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -64,8 +65,8 @@ func (h *quoteRemovalHandler) Execute(ctx context.Context, job *async.Job) error
 
 	var removed []quoteRemoved
 	for i, span := range spans {
-		v := verdictOf(span, said)
-		if v == quoteUnsourced {
+		v := quote.VerdictOf(span, said)
+		if v == quote.Unsourced {
 			continue
 		}
 		removed = append(removed, quoteRemoved{File: files[i], Span: span, Verdict: v.String()})
