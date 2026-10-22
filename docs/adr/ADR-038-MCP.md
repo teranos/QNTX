@@ -52,3 +52,13 @@ To a connector the namespace does not exist: it is offered no namespace tool, an
 "the conenctor, to the connector, the namespace should be invisible"
 
 The server is stateless, so a tool is served under the context of the request that carried it and acts as the caller in front of it rather than as whoever opened the session.
+
+"I actually think this part should be split up into, Node MCP server and Namespace MCP server's"
+
+The node's MCP server is `/mcp`, and a namespace's is `/mcp/<namespace>`, as A2A's node is `/a2a/` and a namespace's agent `/a2a/<tenant>/`.
+
+A connector answers at the server of the namespace its client was minted in, and anywhere else is refused with where its own is. Anyone else is the node's.
+
+"i wish it was easier to find out, when logged in, what the mcp url is."
+
+The MCP element in [QNTX-Web](https://github.com/teranos/QNTX-Web) is where a person finds the servers they reach and mints a connector for one.

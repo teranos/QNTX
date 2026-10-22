@@ -289,6 +289,54 @@ func TestAnMCPCallWithoutTheSlashIsAnswered(t *testing.T) {
 	assert.NotEqual(t, http.StatusMovedPermanently, w.Code, "redirected to %s", w.Header().Get("Location"))
 }
 
+// mcpAskedAs is one MCP request to path, as admitted.
+func mcpAskedAs(admitted auth.Admission, path string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`))
+	req = req.WithContext(auth.WithAdmission(req.Context(), admitted))
+	w := httptest.NewRecorder()
+	bareNode().HandleMCP(w, req)
+	return w
+}
+
+// "I actually think this part should be split up into, Node MCP server and Namespace MCP server's"
+//
+// A connector answers at the MCP server of the namespace its client was minted
+// in, and the refusal anywhere else says where that is.
+func TestAConnectorAnswersAtItsNamespacesMCPServer(t *testing.T) {
+	connector := auth.Admitted(auth.LevelRoot, "Clean")
+	connector.ClientDID = "did:key:zconnector"
+
+	at := mcpAskedAs(connector, "/mcp/Clean")
+	assert.NotEqual(t, http.StatusNotFound, at.Code, at.Body.String())
+	for _, elsewhere := range []string{"/mcp", "/mcp/", "/mcp/default"} {
+		refused := mcpAskedAs(connector, elsewhere)
+		assert.Equal(t, http.StatusNotFound, refused.Code, elsewhere)
+		assert.Contains(t, refused.Body.String(), "/mcp/Clean", elsewhere)
+	}
+}
+
+// The node's MCP server is /mcp, for every caller that is no connector, as before.
+func TestTheNodesMCPServerIsEveryCallerButAConnector(t *testing.T) {
+	person := auth.Admitted(auth.LevelRoot)
+
+	at := mcpAskedAs(person, "/mcp")
+	assert.NotEqual(t, http.StatusNotFound, at.Code, at.Body.String())
+	refused := mcpAskedAs(person, "/mcp/Clean")
+	assert.Equal(t, http.StatusNotFound, refused.Code)
+	assert.Contains(t, refused.Body.String(), "the node's MCP server is /mcp")
+}
+
+// A connector acts in one namespace (ADR-038): one naming none or several has
+// no namespace MCP server to answer at.
+func TestAConnectorNamingNoOneNamespaceIsRefused(t *testing.T) {
+	for _, named := range [][]string{nil, {"Clean", "default"}} {
+		connector := auth.Admitted(auth.LevelRoot, named...)
+		connector.ClientDID = "did:key:zconnector"
+		refused := mcpAskedAs(connector, "/mcp/Clean")
+		assert.Equal(t, http.StatusForbidden, refused.Code, "%v", named)
+	}
+}
+
 // "the conenctor, to the connector, the namespace should be invisible"
 func TestAConnectorIsOfferedNoNamespaceTool(t *testing.T) {
 	srv := servedForTest(t)
