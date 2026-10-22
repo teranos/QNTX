@@ -450,23 +450,23 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 				},
 				{
 					Name:   "am",
-					Does:   "Who the namespace's agent is and how it runs, in the harness named.",
-					Takes:  with(harness),
+					Does:   "Who the namespace's agent is and how it runs, in the harness named; the session said is the element's when one is named.",
+					Takes:  with(harness, elementParam()),
 					Answer: "protocol.NamespaceAgentAm",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: at},
 				},
 				login.sigil,
 				{
 					Name:   "say",
-					Does:   "Says something to the namespace's agent and gives what it answered. One session that continues, shared by everyone who has reach on the namespace, written down in the namespace by the agent as it goes.",
-					Takes:  with(append([]*protocol.Param{harness, {Name: "says", Required: true, Says: "What is said to it."}}, h.sayTakes...)...),
+					Does:   "Says something to the namespace's agent and gives what it answered. One session that continues, shared by everyone who has reach on the namespace, written down in the namespace by the agent as it goes; an element named has its own session that continues (ADR-054).",
+					Takes:  with(append([]*protocol.Param{harness, {Name: "says", Required: true, Says: "What is said to it."}, elementParam(), screenshotParam()}, h.sayTakes...)...),
 					Answer: "protocol.NamespaceAgentSaid",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/say"},
 				},
 				{
 					Name:   "session",
-					Does:   "The namespace agent's one session in the harness named, whole: everything said to it there by whoever said it, as a transcript.",
-					Takes:  with(harness),
+					Does:   "The namespace agent's one session in the harness named, or the element's when one is named, whole: everything said to it there by whoever said it, as a transcript.",
+					Takes:  with(harness, elementParam()),
 					Answer: "protocol.SessionTranscript",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: at + "/session"},
 				},
@@ -558,11 +558,15 @@ func (s *QNTXServer) setPiAgent(sent sigil.Sent, admitted auth.Admission, namesp
 }
 
 func (s *QNTXServer) agentsAm(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	element, refused := elementNamed(sent)
+	if refused != nil {
+		return nil, refused
+	}
 	switch sent["harness"] {
 	case agentLineClaude:
 		held, refused := s.namespaceAgent(ctx, sent)
 		return then(held, refused, func(held anAgentHeld) (any, *protocol.Refusal) {
-			am, isClaude := s.amOf(s.claudeHarness(), held.agent, held.line.spec).(*protocol.ClaudeAm)
+			am, isClaude := s.amOf(s.claudeHarness(), held.agent, held.line.spec, element).(*protocol.ClaudeAm)
 			if !isClaude {
 				return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the namespace agent in " + held.agent.namespace + " did not answer as Claude Code"}
 			}
@@ -571,7 +575,7 @@ func (s *QNTXServer) agentsAm(ctx context.Context, sent sigil.Sent) (any, *proto
 	case agentLinePi:
 		held, refused := s.namespacePiAgent(ctx, sent)
 		return then(held, refused, func(held aPiAgentHeld) (any, *protocol.Refusal) {
-			am, isPi := s.amOf(s.namespacePiHarness(held), held.agent, agentSpec{}).(*protocol.PiAm)
+			am, isPi := s.amOf(s.namespacePiHarness(held), held.agent, agentSpec{}, element).(*protocol.PiAm)
 			if !isPi {
 				return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the namespace agent in " + held.agent.namespace + " did not answer as Pi"}
 			}
@@ -619,16 +623,20 @@ func (s *QNTXServer) agentsSay(ctx context.Context, sent sigil.Sent) (any, *prot
 }
 
 func (s *QNTXServer) agentsSession(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	element, refused := elementNamed(sent)
+	if refused != nil {
+		return nil, refused
+	}
 	switch sent["harness"] {
 	case agentLineClaude:
 		held, refused := s.namespaceAgent(ctx, sent)
 		return then(held, refused, func(held anAgentHeld) (any, *protocol.Refusal) {
-			return s.readAgentSession(held.agent, held.agent.in(s.claudeHarness()))
+			return s.readAgentSession(held.agent, held.agent.inElement(s.claudeHarness(), element))
 		})
 	case agentLinePi:
 		held, refused := s.namespacePiAgent(ctx, sent)
 		return then(held, refused, func(held aPiAgentHeld) (any, *protocol.Refusal) {
-			return s.readAgentSession(held.agent, held.agent.in(s.piHarness()))
+			return s.readAgentSession(held.agent, held.agent.inElement(s.piHarness(), element))
 		})
 	}
 	return nil, notAHarness(sent)

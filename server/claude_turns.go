@@ -23,6 +23,9 @@ type sessionWriter struct {
 	// effort is the effort the node ran this turn at, said on how it ended as
 	// a transcript reads it.
 	effort string
+	// element is the element the turn is said in, and screenshot where the
+	// screenshot of it was put for the agent, each empty when none (ADR-054).
+	element, screenshot string
 }
 
 // agentSubject is what an agent's rows are about: where it works.
@@ -100,9 +103,16 @@ func (w sessionWriter) row(predicate string, at time.Time, attrs map[string]any)
 	}, nil
 }
 
-// told is what was said to the agent, and by whom.
+// told is what was said to the agent, by whom, and in which element when one.
 func (w sessionWriter) told(says, by string, at time.Time) (*types.As, error) {
-	return w.row("UserPromptSubmit", at, map[string]any{"prompt": says, "said_by": by})
+	attrs := map[string]any{"prompt": says, "said_by": by}
+	if w.element != "" {
+		attrs["element"] = w.element
+	}
+	if w.screenshot != "" {
+		attrs["screenshot"] = w.screenshot
+	}
+	return w.row("UserPromptSubmit", at, attrs)
 }
 
 // rowsOf is what one message of the stream says happened: the run starting,

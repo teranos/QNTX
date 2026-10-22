@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/internal/claudecode"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/secretref"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/comet"
@@ -70,21 +71,35 @@ func specOf(root appcfg.NodeAgentConfig) agentSpec {
 	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef}
 }
 
-// in is the agent's session in h.
-func (a *rootAgent) in(h *harness) *inHarness {
+// in is the agent's session in h: the one it continues when no element is named.
+func (a *rootAgent) in(h *harness) *inHarness { return a.inElement(h, "") }
+
+// "each element is an agent as well"
+
+// inElement is the agent's session in h with the element named (ADR-054): the
+// element's own continuing session with the same agent, kept under
+// elements/<element> in its home. The turn is the agent's, in every element.
+func (a *rootAgent) inElement(h *harness, element string) *inHarness {
 	a.sessionsMu.Lock()
 	defer a.sessionsMu.Unlock()
 	if a.sessions == nil {
 		a.sessions = map[string]*inHarness{}
 		a.turn = make(chan struct{}, 1)
 	}
-	held, ok := a.sessions[h.name]
+	key, file := h.name, h.file
+	if element != "" {
+		key, file = h.name+"/"+slug.Of(element), filepath.Join(elementsDir, slug.Of(element), h.file)
+	}
+	held, ok := a.sessions[key]
 	if !ok {
-		held = &inHarness{file: h.file, turn: a.turn}
-		a.sessions[h.name] = held
+		held = &inHarness{file: file, turn: a.turn}
+		a.sessions[key] = held
 	}
 	return held
 }
+
+// elementsDir is where an agent's sessions by element are kept, under its home.
+const elementsDir = "elements"
 
 // inHarness is the Node Agent's session in one harness: where it is kept, and
 // the turn it is in.
@@ -156,10 +171,10 @@ func (a *rootAgent) sessionIn(file string) (id string, kept bool, err error) {
 
 // keepIn writes id down in file as the session continued from here on.
 func (a *rootAgent) keepIn(file, id string) error {
-	if err := os.MkdirAll(a.home, 0o700); err != nil {
-		return errors.Wrapf(err, "could not create %s", a.home)
-	}
 	path := filepath.Join(a.home, file)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return errors.Wrapf(err, "could not create %s", filepath.Dir(path))
+	}
 	return errors.Wrapf(os.WriteFile(path, []byte(id+"\n"), 0o600), "could not write %s", path)
 }
 
