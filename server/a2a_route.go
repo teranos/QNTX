@@ -24,12 +24,16 @@ import (
 // over A2A is a2a:<signum> lines (ADR-039), asked when a message reaches one.
 const a2aPrefix = "/a2a/"
 
-// getExtendedAgentCard is the one operation the node does: the card its
-// caller reaches (§3.1.11).
-const getExtendedAgentCard = "GetExtendedAgentCard"
+// The operations the node does: the card its caller reaches (§3.1.11), and at
+// no tenant a message sent to the Node Agent and the Task it is (§3.1.1, §3.1.3).
+const (
+	getExtendedAgentCard = "GetExtendedAgentCard"
+	sendMessage          = "SendMessage"
+	getTask              = "GetTask"
+)
 
-// a2aHTTP is the binding with every operation in scope but the extended card
-// answering UnsupportedOperationError, until the node does it.
+// a2aHTTP is the binding with every operation in scope, those the node does
+// not do answering UnsupportedOperationError.
 func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	operations, err := a2a.Operations()
 	if err != nil {
@@ -81,10 +85,16 @@ func (s *QNTXServer) a2aServed(r *http.Request) a2a.Served {
 // a2aAnswer answers the operations for the caller of r.
 func (s *QNTXServer) a2aAnswer(r *http.Request) a2a.Answer {
 	return func(_ context.Context, op a2a.Operation, request proto.Message) (proto.Message, *a2a.Error) {
-		if op.Name != getExtendedAgentCard {
+		tenant, named := a2a.TenantOf(request)
+		switch {
+		case op.Name == sendMessage && !named:
+			return s.sendToNodeAgent(r, request)
+		case op.Name == getTask && !named:
+			return s.getNodeAgentsTask(r, request)
+		case op.Name != getExtendedAgentCard:
 			return nil, a2a.Unsupported(op)
 		}
-		if tenant, named := a2a.TenantOf(request); named {
+		if named {
 			peers := s.peers()
 			if at := slices.IndexFunc(peers, serving(tenant)); at >= 0 {
 				return s.peersAgentCard(r, peers[at], tenant)
