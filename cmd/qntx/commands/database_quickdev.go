@@ -7,7 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"

@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/db/rustdriver"
+	"github.com/teranos/QNTX/internal/db/rustdriver"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/syscap"

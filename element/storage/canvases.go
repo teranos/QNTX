@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	errors "github.com/teranos/sacred-error"
 )

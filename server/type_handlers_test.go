@@ -12,7 +12,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 )
 
 // TypeRequest represents the JSON request for creating/updating types

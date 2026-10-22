@@ -5,7 +5,7 @@ package server
 import (
 	"database/sql"
 
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 )
 
 // quickdev is true: this node is the QuickDev distribution, built with

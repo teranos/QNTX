@@ -11,11 +11,11 @@ use crate::error::Result;
 const MIGRATIONS: &[(&str, &str)] = &[
     (
         "000",
-        include_str!("../../../db/duckdb/migrations/000_create_schema_migrations.sql"),
+        include_str!("../../../internal/db/duckdb/migrations/000_create_schema_migrations.sql"),
     ),
     (
         "001",
-        include_str!("../../../db/duckdb/migrations/001_create_attestations_table.sql"),
+        include_str!("../../../internal/db/duckdb/migrations/001_create_attestations_table.sql"),
     ),
 ];
 

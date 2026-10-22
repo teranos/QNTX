@@ -12,10 +12,10 @@
 package rustdriver
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../crates/ats-sqlite/include
-#cgo linux LDFLAGS: -L${SRCDIR}/../../target/release -lats_sqlite -lpthread -ldl -lm
-#cgo darwin LDFLAGS: -L${SRCDIR}/../../target/release -lats_sqlite -lpthread -ldl -lm
-#cgo windows LDFLAGS: -L${SRCDIR}/../../target/release -lats_sqlite -lws2_32 -luserenv
+#cgo CFLAGS: -I${SRCDIR}/../../../crates/ats-sqlite/include
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../target/release -lats_sqlite -lpthread -ldl -lm
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../target/release -lats_sqlite -lpthread -ldl -lm
+#cgo windows LDFLAGS: -L${SRCDIR}/../../../target/release -lats_sqlite -lws2_32 -luserenv
 
 #include "storage_ffi.h"
 #include <stdlib.h>

@@ -17,7 +17,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/ats/types"
-	dbpkg "github.com/teranos/QNTX/db"
+	dbpkg "github.com/teranos/QNTX/internal/db"
 )
 
 func TestAxCommand_Integration(t *testing.T) {

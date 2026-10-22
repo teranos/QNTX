@@ -156,7 +156,7 @@ This avoids burdening every PR with model download/caching and inference time. I
 - Error handling standardization across Rust/Go FFI boundary
 
 ### Design decision: unconditional sqlite-vec
-`db/connection.go` imports `sqlite-vec` CGO bindings unconditionally — every Go build pays the CGO compilation cost, even builds that don't use embeddings. This is coupled to migration 024, which creates a `vec0` virtual table that requires the extension to be loaded. The migration runs unconditionally via `//go:embed sqlite/migrations/*.sql`.
+`internal/db/connection.go` imports `sqlite-vec` CGO bindings unconditionally — every Go build pays the CGO compilation cost, even builds that don't use embeddings. This is coupled to migration 024, which creates a `vec0` virtual table that requires the extension to be loaded. The migration runs unconditionally via `//go:embed sqlite/migrations/*.sql`.
 
 Making this conditional requires solving both sides together:
 - Move the `sqlite_vec` import behind a build tag

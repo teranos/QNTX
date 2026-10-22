@@ -143,8 +143,9 @@ mod tests {
         let conn = Connection::open_in_memory()?;
 
         // Run the embeddings migration
-        let migration_sql =
-            include_str!("../../../db/sqlite/migrations/024_optional_create_embeddings_table.sql");
+        let migration_sql = include_str!(
+            "../../../internal/db/sqlite/migrations/024_optional_create_embeddings_table.sql"
+        );
         conn.execute_batch(migration_sql)?;
 
         // Verify tables were created
