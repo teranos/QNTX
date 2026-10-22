@@ -245,7 +245,11 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// A sqlite deployment has no token store (ADR-025: parquet ships first),
 	// and the bool says so by name. The nil store makes Middleware skip the
 	// bearer path and /auth/tokens answer 503.
-	tokenRecord, hasTokenStore, err := newTokenRecord(s.deps.cfg)
+	spent, err := auth.ExpiredTokenHashes(s.nodeDB, time.Now().UTC().UnixMilli())
+	if err != nil {
+		return errors.Wrap(err, "failed to read which access tokens the operational db holds as expired")
+	}
+	tokenRecord, hasTokenStore, err := newTokenRecord(s.deps.cfg, spent)
 	if err != nil {
 		return errors.Wrap(err, "failed to open the access token record")
 	}

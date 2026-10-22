@@ -14,6 +14,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -86,6 +87,22 @@ func NewTokenStore(location string) (*TokenStore, error) {
 
 	var said *C.char
 	ptr := C.duckdb_tokens_new(cLocation, &said)
+	if ptr == nil {
+		return nil, reasonf(said, "failed to open the access token store at %s", location)
+	}
+	return &TokenStore{ptr: unsafe.Pointer(ptr)}, nil
+}
+
+// NewTokenStoreSkipping opens the token store leaving unread every token whose
+// hash is in skip: its object is named by the hash, so it costs no GET.
+func NewTokenStoreSkipping(location string, skip []string) (*TokenStore, error) {
+	cLocation := C.CString(location)
+	defer C.free(unsafe.Pointer(cLocation))
+	cSkip := C.CString(strings.Join(skip, "\n"))
+	defer C.free(unsafe.Pointer(cSkip))
+
+	var said *C.char
+	ptr := C.duckdb_tokens_new_skipping(cLocation, cSkip, &said)
 	if ptr == nil {
 		return nil, reasonf(said, "failed to open the access token store at %s", location)
 	}
@@ -213,10 +230,11 @@ func (s *TokenStore) put(spec access.IssuedToken, returnAddress string) (string,
 		ScopeWrite: []string{},
 		CreatedAt:  time.Now().UTC().UnixMilli(),
 	}
-	if spec.ExpiresAt != nil {
-		ms := spec.ExpiresAt.UTC().UnixMilli()
-		record.ExpiresAt = &ms
+	if spec.ExpiresAt == nil {
+		return "", errors.Newf("token %q says nothing of when it ends; one that does not end says never", spec.Label)
 	}
+	ms := spec.ExpiresAt.UTC().UnixMilli()
+	record.ExpiresAt = &ms
 	// A token naming no namespace acts wherever its person reaches. A nil list
 	// marshals as null and the store reads a list, so none is written as none.
 	if record.Namespaces == nil {

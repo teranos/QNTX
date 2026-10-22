@@ -97,12 +97,14 @@ func OpenTokenTable(db *sql.DB, record TokenRecordStore) (*TokenTable, TookIn, e
 	}
 	// A token whose record write failed when it was issued is in the table
 	// alone, and the record lacking it disagrees as much as one that differs.
+	// An expired one is what the record was opened without reading.
 	theirs := map[string]bool{}
 	for _, one := range recorded {
 		theirs[one.Hash] = true
 	}
+	now := time.Now().UTC().UnixMilli()
 	for _, mine := range held {
-		if theirs[mine.Hash] {
+		if theirs[mine.Hash] || expired(mine, now) {
 			continue
 		}
 		if err := record.PutRecord(mine); err != nil {
@@ -111,6 +113,32 @@ func OpenTokenTable(db *sql.DB, record TokenRecordStore) (*TokenTable, TookIn, e
 		done.WrittenBack++
 	}
 	return t, done, nil
+}
+
+// ExpiredTokenHashes is every token the operational db holds as past its
+// expiry at nowMS: what the record is opened without reading.
+func ExpiredTokenHashes(db *sql.DB, nowMS int64) ([]string, error) {
+	t := &TokenTable{db: db, used: map[string]int64{}}
+	if err := t.load(); err != nil {
+		return nil, err
+	}
+	held, err := t.records()
+	if err != nil {
+		return nil, err
+	}
+	var hashes []string
+	for _, one := range held {
+		if expired(one, nowMS) {
+			hashes = append(hashes, one.Hash)
+		}
+	}
+	return hashes, nil
+}
+
+// expired is whether a token's end has passed. Revoked is not expired: a
+// revoked token can be enabled again, and an expired one cannot.
+func expired(t TokenRecord, nowMS int64) bool {
+	return t.ExpiresAt != nil && *t.ExpiresAt <= nowMS
 }
 
 // Lookup resolves a presented hash. The table answers; the record is not

@@ -150,6 +150,9 @@ typedef struct {
 } TokensResultC;
 
 TokenStore *duckdb_tokens_new(const char *location, char **error_out);
+/** Open the token store, leaving unread the tokens whose hashes skip names,
+ *  one per line. An empty skip reads every token, as duckdb_tokens_new. */
+TokenStore *duckdb_tokens_new_skipping(const char *location, const char *skip, char **error_out);
 void        duckdb_tokens_free(TokenStore *store);
 
 /** Store a token. record_json is a TokenRecord (crates/ats-duckdb/src/tokens.rs).
