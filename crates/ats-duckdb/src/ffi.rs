@@ -663,6 +663,8 @@ pub extern "C" fn duckdb_storage_file_count(store: *const DuckdbStore) -> CountR
 // name the instant a token expired.
 
 use crate::namespace_store::{Definition, NamespaceStore};
+use std::collections::HashSet;
+
 use crate::tokens::{TokenRecord, TokenStore};
 use crate::users::{UserRecord, UserStore};
 
@@ -1102,6 +1104,42 @@ pub extern "C" fn duckdb_tokens_new(
                 Err(e) => return fail_with(error_out, CALL, e),
             };
             match TokenStore::open(loc) {
+                Ok(store) => Box::into_raw(Box::new(store)),
+                Err(e) => fail_with(error_out, CALL, open_failed(Object::Tokens, loc, None, e)),
+            }
+        },
+        |_| std::ptr::null_mut(),
+    )
+}
+
+/// Open the token store, leaving unread the tokens whose hashes `skip` names,
+/// one per line. Not held to MAX_JSON_LENGTH: it is not JSON, and it grows
+/// with every token the operational db holds as expired.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_tokens_new_skipping(
+    location: *const c_char,
+    skip: *const c_char,
+    error_out: *mut *mut c_char,
+) -> *mut TokenStore {
+    qntx_ffi_common::guarded(
+        "duckdb_tokens_new_skipping",
+        || {
+            const CALL: &str = "duckdb_tokens_new_skipping";
+            let loc = match unsafe { argument(CALL, "location", location) } {
+                Ok(s) => s,
+                Err(e) => return fail_with(error_out, CALL, e),
+            };
+            let skip = match unsafe { argument(CALL, "skip", skip) } {
+                Ok(s) => s,
+                Err(e) => return fail_with(error_out, CALL, e),
+            };
+            let skip: HashSet<String> = skip
+                .lines()
+                .filter(|hash| !hash.is_empty())
+                .map(str::to_string)
+                .collect();
+            match TokenStore::open_skipping(loc, &skip) {
                 Ok(store) => Box::into_raw(Box::new(store)),
                 Err(e) => fail_with(error_out, CALL, open_failed(Object::Tokens, loc, None, e)),
             }

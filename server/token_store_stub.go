@@ -15,7 +15,7 @@ import (
 // still run on sqlite, where there is no token store either — but a parquet
 // deployment built this way would silently have no bearer auth, so say so
 // rather than return nil and let it look configured.
-func newTokenRecord(cfg *appcfg.Config) (auth.TokenRecordStore, bool, error) {
+func newTokenRecord(cfg *appcfg.Config, _ []string) (auth.TokenRecordStore, bool, error) {
 	if cfg.Storage.Backend != "parquet" {
 		return nil, false, nil
 	}
