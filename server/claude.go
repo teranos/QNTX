@@ -292,7 +292,8 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
 				// "on a redeploy NODE agent would still be alive, which is the
 				// intended state, rather than being killed mid-turn" (#1256).
-				Apart: s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,
+				Apart:   s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,
+				Started: t.started,
 			}
 			if s.ownURL != "" {
 				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
