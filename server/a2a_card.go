@@ -80,9 +80,14 @@ func (s *QNTXServer) nodeKey() (*nodedid.Handler, bool) {
 	return nil, false
 }
 
-// skillOf is a signum as a skill. Its id is the signum.
+// skillOf is a signum as a skill. Its id is the signum. The Node Agent is what
+// a message sent to the node reaches, and it takes text and gives text.
 func skillOf(signum *protocol.Signum) a2a.Skill {
-	return a2a.Skill{ID: signum.GetName(), Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags()}
+	skill := a2a.Skill{ID: signum.GetName(), Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags()}
+	if signum.GetName() == nodeAgentSignumName {
+		skill.Modes = []string{a2a.Text}
+	}
+	return skill
 }
 
 // a2aCard is the card the node can give the caller of r, with a skill per

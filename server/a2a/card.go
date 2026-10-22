@@ -24,6 +24,10 @@ type Skill struct {
 	// Bearer says calling the skill takes the node's bearer token, for a card
 	// that shows a skill to whoever reads it and not only to who reaches it.
 	Bearer bool
+	// Modes is the media types the skill takes and gives, in place of the
+	// card's (AgentSkill.input_modes, output_modes). Nil is none said, and the
+	// card's hold.
+	Modes []string
 }
 
 // Extension is one AgentExtension the card declares (§4.6): what a field of
@@ -69,6 +73,9 @@ func (c Card) Message() (protoreflect.Message, error) {
 		skill := map[string]any{"id": s.ID, "name": s.Name, "description": s.Description, "tags": tags}
 		if s.Bearer {
 			skill["securityRequirements"] = bearerRequired
+		}
+		if len(s.Modes) > 0 {
+			skill["inputModes"], skill["outputModes"] = s.Modes, s.Modes
 		}
 		skills = append(skills, skill)
 	}
