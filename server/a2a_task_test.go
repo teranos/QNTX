@@ -155,17 +155,26 @@ func TestTheNextMessageIsANewTaskInTheSameContext(t *testing.T) {
 }
 
 // With return_immediately the Task is answered as it stands while its turn
-// runs, and GetTask answers it when the turn has ended (§3.2.2).
+// runs, working once Claude Code runs it, in the session it runs in, and GetTask
+// answers it when the turn has ended (§3.2.2).
 func TestATaskReturnedImmediatelyIsAnsweredByItsIdWhenItEnds(t *testing.T) {
 	held := filepath.Join(t.TempDir(), "held")
 	require.NoError(t, os.WriteFile(held, nil, 0o600))
-	srv, tokens, _ := nodeAgentOverA2A(t, held)
+	srv, tokens, ran := nodeAgentOverA2A(t, held)
 
 	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("how long has the box been up?", `{"returnImmediately": true}`), tokens[auth.LevelRoot])
 	require.Equal(t, http.StatusOK, code, sent)
-	assert.Equal(t, "TASK_STATE_SUBMITTED", at(sent, "task.status.state"))
+	assert.Contains(t, []any{"TASK_STATE_SUBMITTED", "TASK_STATE_WORKING"}, at(sent, "task.status.state"))
 	assert.Nil(t, at(sent, "task.artifacts"))
 	id := at(sent, "task.id").(string)
+
+	// "Indicates that a task is actively being processed by the agent."
+	var working map[string]any
+	require.Eventually(t, func() bool {
+		_, working = a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+		return at(working, "status.state") == "TASK_STATE_WORKING"
+	}, 10*time.Second, 20*time.Millisecond)
+	assert.Nil(t, at(working, "artifacts"))
 
 	require.NoError(t, os.Remove(held))
 	require.Eventually(t, func() bool {
@@ -174,6 +183,8 @@ func TestATaskReturnedImmediatelyIsAnsweredByItsIdWhenItEnds(t *testing.T) {
 	}, 10*time.Second, 20*time.Millisecond)
 	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
 	assert.Equal(t, "Up 3 days.", at(got, "artifacts.0.parts.0.text"))
+	// Working, it was in the session its turn ran in.
+	assert.Equal(t, after(ranWith(t, ran, "0", "args"), "--session-id"), at(working, "contextId"))
 }
 
 // What the Node Agent does not take is refused before anything is said to it.
@@ -245,4 +256,97 @@ func TestTheNodeAgentsSkillTakesText(t *testing.T) {
 	require.NotNil(t, agent, "ROOT's card has no skill for the Node Agent")
 	assert.Equal(t, []any{"text/plain"}, at(agent, "inputModes"))
 	assert.Equal(t, []any{"text/plain"}, at(agent, "outputModes"))
+}
+
+// leftTurn is a turn the node's last process left in agent's home: its stream,
+// printed whole, by a process that is gone.
+func leftTurn(t *testing.T, agent *rootAgent, session, printed string) string {
+	t.Helper()
+	stream := filepath.Join(agent.home, "turns", session+".1"+".stream")
+	require.NoError(t, os.MkdirAll(filepath.Dir(stream), 0o700))
+	require.NoError(t, os.WriteFile(stream, []byte(printed), 0o600))
+	return stream
+}
+
+// readingOn is a node reading on what its last process left, as one started
+// at since does.
+func readingOn(srv *QNTXServer, since time.Time) {
+	in := srv.nodeAgent.in(srv.claudeHarness())
+	in.turn <- struct{}{}
+	srv.followLeftTurns(srv.nodeAgent, in, "low", since)
+}
+
+// A Task whose turn was running when the node stopped is settled by the node
+// after it, from what the turn printed (ADR-048: the node "starts it, resumes
+// it and stops it").
+func TestATaskWhoseTurnTheLastNodeLeftIsSettledFromItsStream(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	before := time.Now().Add(-time.Minute)
+	stream := leftTurn(t, srv.nodeAgent, "s-left", claudeAnswered)
+	require.NoError(t, srv.writeTaskLine("left", "TASK_STATE_SUBMITTED", "someone", before, map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
+	require.NoError(t, srv.writeTaskLine("left", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-left", "stream": filepath.Base(stream)}, streamContext(stream)))
+
+	readingOn(srv, time.Now())
+
+	code, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/left", "", tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, got)
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(got, "status.state"))
+	assert.Equal(t, "Up 3 days.", at(got, "artifacts.0.parts.0.text"))
+	assert.Equal(t, "s-left", at(got, "contextId"))
+}
+
+// What no turn is left to end is failed, saying why: a Task submitted and never
+// started, and one working with no stream left to read. One submitted to this
+// node is its own, and is left as it is.
+func TestATaskNoTurnIsLeftToEndIsFailed(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	before, since := time.Now().Add(-time.Minute), time.Now()
+	message := map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}
+	require.NoError(t, srv.writeTaskLine("waiting", "TASK_STATE_SUBMITTED", "someone", before, message))
+	require.NoError(t, srv.writeTaskLine("running", "TASK_STATE_SUBMITTED", "someone", before, message))
+	require.NoError(t, srv.writeTaskLine("running", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-gone", "stream": "s-gone.1.stream"}, streamContext("s-gone.1.stream")))
+	require.NoError(t, srv.writeTaskLine("mine", "TASK_STATE_SUBMITTED", "someone", since.Add(time.Second), message))
+
+	readingOn(srv, since)
+
+	for task, why := range map[string]string{
+		"waiting": "the node stopped before its turn started",
+		"running": "no stream was left to read how it ended",
+	} {
+		_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+task, "", tokens[auth.LevelRoot])
+		assert.Equal(t, "TASK_STATE_FAILED", at(got, "status.state"), task)
+		assert.Contains(t, at(got, "status.message.parts.0.text"), why, task)
+	}
+	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/mine", "", tokens[auth.LevelRoot])
+	assert.Equal(t, "TASK_STATE_SUBMITTED", at(got, "status.state"))
+}
+
+// The node stopping while a Task's turn runs is not the Task failing: it stays
+// working, and the node after it reads the turn on and settles it.
+func TestTheNodeStoppingIsNotATasksTurnEnding(t *testing.T) {
+	held := filepath.Join(t.TempDir(), "held")
+	require.NoError(t, os.WriteFile(held, nil, 0o600))
+	srv, tokens, _ := nodeAgentOverA2A(t, held)
+	running, stop := context.WithCancel(context.Background())
+	srv.ctx = running
+
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("how long has the box been up?", `{"returnImmediately": true}`), tokens[auth.LevelRoot])
+	id := at(sent, "task.id").(string)
+	require.Eventually(t, func() bool {
+		_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+		return at(got, "status.state") == "TASK_STATE_WORKING"
+	}, 10*time.Second, 20*time.Millisecond)
+
+	stop()
+	require.Eventually(t, func() bool { return srv.nodeAgent.in(srv.claudeHarness()).answering.Load() == nil }, 10*time.Second, 20*time.Millisecond)
+	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	assert.Equal(t, "TASK_STATE_WORKING", at(got, "status.state"), "the node stopping failed the task")
+
+	// The node after it: the turn it left was stopped with the node, and ended
+	// with no result.
+	srv.ctx = context.Background()
+	readingOn(srv, time.Now())
+	_, got = a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	assert.Equal(t, "TASK_STATE_FAILED", at(got, "status.state"))
+	assert.Contains(t, at(got, "status.message.parts.0.text"), "Claude Code ended with no result")
 }

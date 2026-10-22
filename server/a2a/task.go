@@ -22,9 +22,16 @@ import (
 // The states a Task here reaches, as TaskState names them.
 const (
 	Submitted = "TASK_STATE_SUBMITTED"
+	Working   = "TASK_STATE_WORKING"
 	Completed = "TASK_STATE_COMPLETED"
 	Failed    = "TASK_STATE_FAILED"
 )
+
+// Terminal is whether a Task in state has ended, and takes no further message
+// (§3.1.1).
+func Terminal(state string) bool {
+	return state == Completed || state == Failed || state == "TASK_STATE_CANCELED" || state == "TASK_STATE_REJECTED"
+}
 
 // Text is the media type of what a text part carries.
 const Text = "text/plain"

@@ -14,8 +14,9 @@ import (
 
 // followLeftTurns reads on each turn the node's last process left, oldest
 // first, holding the session in so nothing new is said to it over a turn
-// still going. One not read to its end leaves the ones after it.
-func (s *QNTXServer) followLeftTurns(agent *rootAgent, in *inHarness, effort string) {
+// still going. One not read to its end leaves the ones after it. Once every one
+// is read, a Task from before since that no turn is left to end is settled.
+func (s *QNTXServer) followLeftTurns(agent *rootAgent, in *inHarness, effort string, since time.Time) {
 	defer func() { <-in.turn }()
 	turns, err := claudecode.Pending(agent.home)
 	if err != nil {
@@ -34,6 +35,9 @@ func (s *QNTXServer) followLeftTurns(agent *rootAgent, in *inHarness, effort str
 			return
 		}
 	}
+	if err := s.settleTasksNoTurnLeft(agent, since); err != nil {
+		s.logger.Errorw("The tasks the node's last process left with no turn to end them were not settled", "agent", agent.did, "error", err)
+	}
 }
 
 // followLeftTurn reads turn on to how it ends, writing what it did as the
@@ -51,6 +55,9 @@ func (s *QNTXServer) followLeftTurn(agent *rootAgent, in *inHarness, store ats.A
 			return errors.WithSecondaryError(errors.Wrap(nodeErr, "the node stopped again while it read the turn, and the next node reads it on"), err)
 		}
 		write(writes.rowsOf(claudecode.Message{Type: "result", Subtype: "no_result", IsError: true, Result: err.Error()}, time.Now()))
+	}
+	if settleErr := s.settleLeftTask(agent, turn.Session, turn.Stream, answer, err); settleErr != nil {
+		return errors.Wrapf(settleErr, "the turn in %s was read to its end, and the task it was is not settled", turn.Session)
 	}
 
 	continued, held, err := agent.sessionIn(in.file)

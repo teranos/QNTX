@@ -49,6 +49,8 @@ type turnRun struct {
 	// unwritten is why a row of the session was not written down, when one
 	// was not, as of the rows written so far.
 	unwritten func() string
+	// started is told the stream the turn prints to once it runs.
+	started func(stream string)
 }
 
 func (turnRun) now() time.Time { return time.Now() }
@@ -104,8 +106,14 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	told, err := writes.told(says, spokenBy(caller), time.Now())
 	write([]*types.As{told}, err)
 
+	// A turn asked for a Task is told to it as it starts (A2A §3.1.1); a say
+	// that is no Task's tells nobody.
+	started := func(string) {}
+	if starts, forATask := taskStartsIn(ctx); forATask {
+		started = func(stream string) { starts(session, stream) }
+	}
 	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
-		unwritten: unwritten})
+		unwritten: unwritten, started: started})
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: t.called + " did not answer: " + err.Error()}
 	}

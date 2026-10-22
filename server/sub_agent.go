@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/teranos/QNTX/internal/claudecode"
 	errors "github.com/teranos/sacred-error"
@@ -125,7 +126,9 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	in := agent.in(s.claudeHarness())
 	in.turn <- struct{}{}
 	effort := s.deps.cfg.Agent.Root.Effort
-	s.wg.Go("agent.follow", func() { s.followLeftTurns(agent, in, effort) })
+	// A Task is settled by this node only when the node before it held it.
+	since := time.Now()
+	s.wg.Go("agent.follow", func() { s.followLeftTurns(agent, in, effort, since) })
 	return nil
 }
 

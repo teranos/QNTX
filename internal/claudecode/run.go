@@ -51,6 +51,9 @@ type Said struct {
 	// scope of its own where systemd keeps the node, and in a process group of
 	// its own elsewhere, so the node stopping is not the turn stopping.
 	Apart bool
+	// Started is told the stream the turn prints to, once its process runs:
+	// the moment the turn is being done, and where it can be read on from.
+	Started func(stream string)
 }
 
 // MCPServer is one MCP server the session reaches over HTTP, and the bearer it
@@ -133,6 +136,9 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	if s.Mode == "" {
 		return Answer{}, errors.New("no permission mode was named for the session, and none is assumed")
 	}
+	if s.Started == nil {
+		return Answer{}, errors.New("nothing is told where the turn prints once it runs, and nobody is assumed")
+	}
 	config, work := filepath.Join(s.Home, "claude"), filepath.Join(s.Home, "work")
 	for _, dir := range []string{config, work} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -212,6 +218,7 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(cmd.Process.Pid)), 0o600); err != nil {
 		return Answer{}, errors.Wrapf(err, "the pid of %s was not kept", stream)
 	}
+	s.Started(stream)
 	var exited atomic.Bool
 	waited := make(chan error, 1)
 	sacred.Go("waiting on a Claude Code turn's process", func() {

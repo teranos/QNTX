@@ -3,13 +3,16 @@ package server
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/claudecode"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/a2a"
@@ -143,7 +146,20 @@ func (s *QNTXServer) sendToNodeAgent(r *http.Request, request proto.Message) (pr
 // performTask is one turn of the Node Agent, asked of its say over A2A, and
 // the line of how it ended.
 func (s *QNTXServer) performTask(ctx context.Context, caller *http.Request, say heldBy, id, contextID, says string) error {
+	// Its turn running is the Task working: "actively being processed by the
+	// agent" (TaskState), in the session it runs in and the stream it prints to.
+	ctx = context.WithValue(ctx, taskStartsKey{}, func(session, stream string) {
+		if err := s.writeTaskLine(id, a2a.Working, s.nodeAgent.did, time.Now(),
+			map[string]any{"context_id": session, "stream": filepath.Base(stream)}, streamContext(stream)); err != nil {
+			s.logger.Errorw("a task of the Node Agent is working and was not written down as working", "task", id, "stream", stream, "error", err)
+		}
+	})
 	asked := say.asking(reach.OverA2A, s.gate, s.reachingOver, caller).Ask(ctx, map[string]any{"harness": agentLineClaude, "says": says})
+	// The node stopping is not its turn ending: the next node reads the turn
+	// on from its stream and settles the Task (settleLeftTask).
+	if s.ctx.Err() != nil {
+		return nil
+	}
 	state, ended := a2a.Failed, map[string]any{"context_id": contextID}
 	switch {
 	case asked.Rejected != nil:
@@ -218,9 +234,20 @@ func (s *QNTXServer) nodeAgentsSay() (heldBy, bool) {
 	return heldBy{}, false
 }
 
+// taskStartsKey is where a Task's turn finds what to tell once it runs.
+type taskStartsKey struct{}
+
+// taskStartsIn is what the turn ctx asks for tells once it runs, when ctx asks
+// it for a Task.
+func taskStartsIn(ctx context.Context) (func(session, stream string), bool) {
+	starts, forATask := ctx.Value(taskStartsKey{}).(func(session, stream string))
+	return starts, forATask
+}
+
 // writeTaskLine writes that task id reached state, as by: who sent it, for the
-// state it was submitted in, and the agent for the state it ended in.
-func (s *QNTXServer) writeTaskLine(id, state, by string, at time.Time, attributes map[string]any) error {
+// state it was submitted in, and the agent for the states after. also is what
+// else the line is in.
+func (s *QNTXServer) writeTaskLine(id, state, by string, at time.Time, attributes map[string]any, also ...string) error {
 	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
 		return errors.Wrapf(err, "no store to write task %s in", id)
@@ -230,13 +257,19 @@ func (s *QNTXServer) writeTaskLine(id, state, by string, at time.Time, attribute
 		return errors.Wrapf(err, "failed to name the %s line of task %s", state, id)
 	}
 	return errors.Wrapf(store.CreateAttestation(&types.As{
-		ID: line, Subjects: []string{taskLineSubject}, Predicates: []string{state}, Contexts: []string{taskContext(id)},
+		ID: line, Subjects: []string{taskLineSubject}, Predicates: []string{state}, Contexts: append([]string{taskContext(id)}, also...),
 		Actors: []string{by}, Timestamp: at, CreatedAt: at, Source: "a2a", Attributes: attributes,
 	}), "the %s line of task %s was not written", state, id)
 }
 
 // taskContext is what a task's lines are in.
-func taskContext(id string) string { return "task:" + id }
+func taskContext(id string) string { return taskContextPrefix + id }
+
+const taskContextPrefix = "task:"
+
+// streamContext is what the line of a Task whose turn prints to stream is in
+// beside its task, so the turn is found by its stream after a restart.
+func streamContext(stream string) string { return "stream:" + filepath.Base(stream) }
 
 // taskOf is the task id names, as its lines say it. False is no task by that id.
 func (s *QNTXServer) taskOf(id string) (a2a.Task, bool, error) {
@@ -263,6 +296,8 @@ func (s *QNTXServer) taskOf(id string) (a2a.Task, bool, error) {
 			return a2a.Task{}, false, err
 		}
 		switch task.State {
+		case a2a.Working:
+			// What it says is the session it runs in, read above.
 		case a2a.Submitted:
 			message, err := oneText(line.Attributes, "message", taskLineSubject, line.ID, id)
 			if err != nil {
@@ -282,4 +317,95 @@ func (s *QNTXServer) taskOf(id string) (a2a.Task, bool, error) {
 		}
 	}
 	return task, true, nil
+}
+
+// settleLeftTask writes how the Task whose turn printed to stream ended, once
+// the node read on the turn its last process left: what Claude Code answered,
+// or why it did not. A turn no Task asked for settles none.
+func (s *QNTXServer) settleLeftTask(agent *rootAgent, session, stream string, answer claudecode.Answer, unanswered error) error {
+	reading, err := s.held.Read(auth.NamespaceSystem)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read which task the turn printing to %s is", stream)
+	}
+	lines, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
+		Subjects: []string{taskLineSubject}, Contexts: []string{streamContext(stream)}, Limit: ats.EveryRow})
+	if err != nil {
+		return errors.Wrapf(err, "failed to read which task the turn printing to %s is", stream)
+	}
+	for _, line := range lines {
+		id, found := taskIn(line)
+		if !found {
+			return errors.Newf("%s line %s names the stream %s and no task", taskLineSubject, line.ID, stream)
+		}
+		state, ended := a2a.Failed, map[string]any{"context_id": session}
+		switch {
+		case unanswered != nil:
+			ended["why"] = masked(unanswered.Error())
+		case answer.IsError:
+			ended["why"] = masked(answer.Text)
+		default:
+			state, ended["answer"] = a2a.Completed, masked(answer.Text)
+		}
+		if err := s.writeTaskLine(id, state, agent.did, time.Now(), ended); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// settleTasksNoTurnLeft fails each Task from before since that no turn is left
+// to end: submitted and never started, its turn waiting on the node that
+// stopped; or working with no stream left to read how it ended. Nothing
+// stands behind either state once the node that held it is gone.
+func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) error {
+	reading, err := s.held.Read(auth.NamespaceSystem)
+	if err != nil {
+		return errors.Wrap(err, "failed to read the tasks the node's last process left")
+	}
+	lines, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
+		Subjects: []string{taskLineSubject}, Limit: ats.EveryRow})
+	if err != nil {
+		return errors.Wrap(err, "failed to read the tasks the node's last process left")
+	}
+	why := map[string]string{
+		a2a.Submitted: "the node stopped before its turn started",
+		a2a.Working:   "the node stopped while its turn ran, and no stream was left to read how it ended",
+	}
+	newest := map[string]*types.As{}
+	for _, line := range lines {
+		id, found := taskIn(line)
+		if !found {
+			return errors.Newf("%s line %s names no task", taskLineSubject, line.ID)
+		}
+		if held, seen := newest[id]; !seen || line.Timestamp.After(held.Timestamp) {
+			newest[id] = line
+		}
+	}
+	for id, line := range newest {
+		if len(line.Predicates) != 1 {
+			return errors.Newf("%s line %s of task %s names %d states, and a line is one", taskLineSubject, line.ID, id, len(line.Predicates))
+		}
+		said, left := why[line.Predicates[0]]
+		if !left || !line.Timestamp.Before(since) {
+			continue
+		}
+		contextID, err := oneText(line.Attributes, "context_id", taskLineSubject, line.ID, id)
+		if err != nil {
+			return err
+		}
+		if err := s.writeTaskLine(id, a2a.Failed, agent.did, time.Now(), map[string]any{"context_id": contextID, "why": said}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// taskIn is the task a TASK line is of.
+func taskIn(line *types.As) (string, bool) {
+	for _, context := range line.Contexts {
+		if id, isTask := strings.CutPrefix(context, taskContextPrefix); isTask {
+			return id, true
+		}
+	}
+	return "", false
 }
