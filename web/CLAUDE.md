@@ -12,7 +12,7 @@ All tray creation via `tray.add`; canvas via `canvasPlaced`. Register new types 
 
 ## Controls
 
-**A control is @teranos/elements'.** A button is `pressFrom`: the same size at every stage, white at rest, red armed only when its second press cannot be undone (`irrevocable`), green and shimmering armed only when it creates (`creates`); no colour, size or variant to choose, and misuse does not compile. A `button`, `input`, `select` or `textarea` made by hand (`createElement`, or markup in a string), or an import of `components/button`, stops the build (ESLint `NO_RAW_CONTROL`). What stands is in `eslint-suppressions.json` and only falls. The rules: the QNTX Design System's Press component.
+**A control is @teranos/elements'.** A button is `pressFrom`: the same size at every stage, white at rest, red armed only when its second press cannot be undone (`irrevocable`), green and shimmering armed only when it creates (`creates`); no colour, size or variant to choose, and misuse does not compile. A `button`, `input`, `select` or `textarea` made by hand (`createElement`, or markup in a string), or an import of `components/button`, stops the build (ESLint `NO_RAW_CONTROL`). What stands is in `eslint-suppressions.json` and only falls. The rules: the Press in the Design Element (`ts/design-element.ts`).
 
 ## WASM
 

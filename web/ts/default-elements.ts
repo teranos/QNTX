@@ -30,6 +30,7 @@ import { createAgentElement, needs as agentNeeds } from './agent-element.ts';
 import { createIElement, needs as iNeeds } from './i-element.ts';
 import { createAmElement, needs as amNeeds } from './am-element.ts';
 import { createParityElement, needs as parityNeeds } from './parity-element.ts';
+import { createDesignElement } from './design-element.ts';
 import { log, SEG } from './logger.ts';
 
 export { updateDatabaseStats, recordEviction } from './db-element';
@@ -93,8 +94,12 @@ export async function registerDefaultElements(hasCanvas: boolean = true): Promis
     const forThem = await forTheViewer(offered, askTheNode);
     for (const each of forThem) tray.add(each.create());
 
+    // ◈ — what the page is drawn with. It asks the node nothing, so there is no path to ask
+    // `i reaches` about: it is the page's, and whoever has the page has it.
+    tray.add(createDesignElement());
+
     log.debug(SEG.UI, 'Default elements registered:', {
         offered: offered.length,
-        added: forThem.length,
+        added: forThem.length + 1,
     });
 }
