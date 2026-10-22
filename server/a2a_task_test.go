@@ -9,12 +9,15 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/auth"
 )
@@ -349,4 +352,33 @@ func TestTheNodeStoppingIsNotATasksTurnEnding(t *testing.T) {
 	_, got = a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
 	assert.Equal(t, "TASK_STATE_FAILED", at(got, "status.state"))
 	assert.Contains(t, at(got, "status.message.parts.0.text"), "Claude Code ended with no result")
+}
+
+// stoppingAtTheStop is a store that stops the node as a turn's Stop is written:
+// Claude Code has printed its result, and its stream is about to be gone.
+type stoppingAtTheStop struct {
+	ats.AttestationStore
+	stop func()
+}
+
+func (s stoppingAtTheStop) CreateAttestation(as *types.As) error {
+	if slices.Contains(as.Predicates, "Stop") {
+		s.stop()
+	}
+	return s.AttestationStore.CreateAttestation(as)
+}
+
+// A turn that answered as the node stopped is its Task's answer. Its stream was
+// read to its end and removed, so no node after it reads the answer again.
+func TestATurnThatAnsweredAsTheNodeStoppedCompletesItsTask(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	running, stop := context.WithCancel(context.Background())
+	srv.ctx = running
+	system, _ := createTestStore(t)
+	srv.held.SetSystem(oneNamespace("system", stoppingAtTheStop{AttestationStore: system, stop: stop}))
+
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("how long has the box been up?", ""), tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, sent)
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(sent, "task.status.state"))
+	assert.Equal(t, "Up 3 days.", at(sent, "task.artifacts.0.parts.0.text"))
 }

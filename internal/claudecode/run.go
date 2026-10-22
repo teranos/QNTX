@@ -227,8 +227,9 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	})
 	answer, err := follow(ctx, stream, func() bool { return !exited.Load() }, each)
 	// A process of the node's own, not apart, stops when the node does, the
-	// way a person stops it, so the session is left as written.
-	if ctxErr := ctx.Err(); ctxErr != nil && !s.Apart {
+	// way a person stops it, so the session is left as written. One that
+	// already printed its result has answered, and its answer is returned.
+	if ctxErr := ctx.Err(); ctxErr != nil && err != nil && !s.Apart {
 		signalled := cmd.Process.Signal(os.Interrupt)
 		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(err, signalled), <-waited)
 	}

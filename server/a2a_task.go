@@ -156,8 +156,9 @@ func (s *QNTXServer) performTask(ctx context.Context, caller *http.Request, say 
 	})
 	asked := say.asking(reach.OverA2A, s.gate, s.reachingOver, caller).Ask(ctx, map[string]any{"harness": agentLineClaude, "says": says})
 	// The node stopping is not its turn ending: the next node reads the turn
-	// on from its stream and settles the Task (settleLeftTask).
-	if s.ctx.Err() != nil {
+	// on from its stream and settles the Task (settleLeftTask). A turn that
+	// answered has no stream left, so its answer is written here.
+	if asked.Answer == nil && s.ctx.Err() != nil {
 		return nil
 	}
 	state, ended := a2a.Failed, map[string]any{"context_id": contextID}
