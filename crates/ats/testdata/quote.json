@@ -1,0 +1,184 @@
+{
+  "budgets": [
+    {
+      "length": 40,
+      "clean": 4,
+      "warn": 6
+    },
+    {
+      "length": 39,
+      "clean": 3,
+      "warn": 5
+    },
+    {
+      "length": 41,
+      "clean": 4,
+      "warn": 6
+    },
+    {
+      "length": 80,
+      "clean": 8,
+      "warn": 12
+    },
+    {
+      "length": 10,
+      "clean": 1,
+      "warn": 1
+    },
+    {
+      "length": 9,
+      "clean": 0,
+      "warn": 1
+    },
+    {
+      "length": 1,
+      "clean": 0,
+      "warn": 0
+    },
+    {
+      "length": 0,
+      "clean": 0,
+      "warn": 0
+    }
+  ],
+  "within": [
+    {
+      "text": "the user typed this",
+      "span": "typed",
+      "budget": 0,
+      "want": true
+    },
+    {
+      "text": "the user typed this",
+      "span": "tyPed",
+      "budget": 0,
+      "want": false
+    },
+    {
+      "text": "the user typed this",
+      "span": "tyPed",
+      "budget": 1,
+      "want": true
+    },
+    {
+      "text": "the user typed this",
+      "span": "tYPed",
+      "budget": 1,
+      "want": false
+    },
+    {
+      "text": "the user typed this",
+      "span": "tYPed",
+      "budget": 2,
+      "want": true
+    },
+    {
+      "text": "the user typed this",
+      "span": "wrote that",
+      "budget": 2,
+      "want": false
+    },
+    {
+      "text": "the user typed this",
+      "span": "",
+      "budget": 4,
+      "want": false
+    },
+    {
+      "text": "the user typd this",
+      "span": "typed",
+      "budget": 1,
+      "want": true
+    },
+    {
+      "text": "the user typeed this",
+      "span": "typed",
+      "budget": 1,
+      "want": true
+    }
+  ],
+  "verdicts": [
+    {
+      "said": [
+        "nothing near",
+        "this is what the user actually typed ok!"
+      ],
+      "span": "what the user actually typed",
+      "verdict": "sourced",
+      "degree": 0
+    },
+    {
+      "said": [
+        "nothing near",
+        "this is what the user actually typed ok!"
+      ],
+      "span": "This is what the user actuaIIy typed ok?",
+      "verdict": "sourced",
+      "degree": 4
+    },
+    {
+      "said": [
+        "nothing near",
+        "this is what the user actually typed ok!"
+      ],
+      "span": "This is what the user actuaIIy tiped ok?",
+      "verdict": "stretched",
+      "degree": 5
+    },
+    {
+      "said": [
+        "nothing near",
+        "this is what the user actually typed ok!"
+      ],
+      "span": "This is What the user actuaIIy tiped ok?",
+      "verdict": "stretched"
+    },
+    {
+      "said": [
+        "nothing near",
+        "this is what the user actually typed ok!"
+      ],
+      "span": "This is What the User actuaIIy tiped ok?",
+      "verdict": "unsourced",
+      "degree": 7
+    },
+    {
+      "said": [
+        "nothing near",
+        "this is what the user actually typed ok!"
+      ],
+      "span": "no prompt says anything like this at all",
+      "verdict": "unsourced"
+    },
+    {
+      "said": [
+        "This is What the user actuaIIy tiped ok?",
+        "this is what the user actually typed ok!"
+      ],
+      "span": "This is what the user actuaIIy typed ok?",
+      "verdict": "sourced"
+    },
+    {
+      "said": [],
+      "span": "abc",
+      "verdict": "unsourced",
+      "degree": 3
+    },
+    {
+      "said": [
+        "nothing near",
+        "this is what the user actually typed ok!"
+      ],
+      "span": "",
+      "verdict": "unsourced"
+    },
+    {
+      "said": [
+        "the user typed this"
+      ],
+      "span": "never said",
+      "verdict": "unsourced",
+      "degree": 7
+    }
+  ]
+}

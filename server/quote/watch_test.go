@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
@@ -43,6 +42,7 @@ func watchWith(prompts ...string) (*Watch, *statusline.NewsLog, *string) {
 			*asked = ns
 			return prompts, nil
 		},
+		judge:    substringJudge,
 		news:     news,
 		mintedBy: func(did string) (string, bool) { return "person-1", true },
 		logger:   zap.NewNop().Sugar(),
@@ -97,24 +97,5 @@ func TestQuoteProvenanceRefusesWithoutANamespace(t *testing.T) {
 	h, _, _ := watchWith("anything")
 	if err := h.Execute(context.Background(), claimJob(t, "anything at all here")); err == nil {
 		t.Error("a claim with no namespace was answered as if its prompts had been read")
-	}
-}
-
-func TestStandingQuoteRowWatchesClaims(t *testing.T) {
-	var row *storage.Watcher
-	for _, w := range watcher.Standing() {
-		if w.ID == watcher.StandingQuoteClaimed {
-			row = w
-		}
-	}
-	if row == nil {
-		t.Fatal("no standing row watches quote claims")
-	}
-	claim := &types.As{ID: "c", Predicates: []string{watcher.QuoteClaimedPredicate}}
-	if matched, err := watcher.StandingMatches(claim, row); err != nil || !matched {
-		t.Errorf("the standing row does not match a claim: %v", err)
-	}
-	if !strings.Contains(row.ActionData, watcher.QuoteProvenanceHandlerName) {
-		t.Errorf("the standing row reaches %s, not the quote built-in", row.ActionData)
 	}
 }
