@@ -566,26 +566,6 @@ func (s *QNTXServer) BroadcastPulseExecutionLogStream(scheduledJobID, executionI
 	)
 }
 
-// BroadcastPluginHealth sends a plugin health update to all connected clients
-// Used to notify UI when plugin state changes (pause/resume) or health check fails
-func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, message string) {
-	msg := PluginHealthMessage{
-		Type:      "plugin_health",
-		Name:      name,
-		Healthy:   healthy,
-		State:     state,
-		Message:   message,
-		Timestamp: time.Now().Unix(),
-	}
-
-	s.broadcastMessage(msg)
-	s.logger.Debugw("Broadcasted plugin health update",
-		"plugin", name,
-		"healthy", healthy,
-		"state", state,
-	)
-}
-
 // startWatcherQueueBroadcaster periodically broadcasts queue status.
 // Sends updates while queue is non-empty, plus one final total_queued:0 when it drains.
 func (s *QNTXServer) startWatcherQueueBroadcaster() {

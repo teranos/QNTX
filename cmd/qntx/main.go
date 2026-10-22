@@ -437,9 +437,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 
 	// Start health polling — detect plugin crashes and restart automatically
 	if defaultServer != nil && defaultServer.GetServices() != nil {
-		manager.StartHealthPolling(registry, defaultServer.GetServices(), func(event grpc.HealthEvent) {
-			defaultServer.BroadcastPluginHealth(event.Name, event.Healthy, event.State, event.Message)
-		})
+		manager.StartHealthPolling(registry, defaultServer.GetServices())
 	}
 
 	// A plugin's new build is taken from the runner the moment it lands (ADR-043).
