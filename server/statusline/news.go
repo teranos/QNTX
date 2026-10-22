@@ -2,6 +2,7 @@ package statusline
 
 import (
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -185,4 +186,15 @@ func (h *StatusLineHandler) newsDetail(a auth.Admission, id string) (map[string]
 		detail[k] = v
 	}
 	return detail, true
+}
+
+// SessionOf is the session context ground wrote, so the laptop can hand the
+// item to the session that pushed rather than to every session in the project.
+func SessionOf(contexts []string) string {
+	for _, c := range contexts {
+		if strings.HasPrefix(c, "session:") {
+			return strings.TrimPrefix(c, "session:")
+		}
+	}
+	return ""
 }

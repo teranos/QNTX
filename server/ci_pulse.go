@@ -738,24 +738,13 @@ func (h *ciWatchHandler) leave(as types.As, addressee, caller, repo, branch, sha
 			"url":        url,
 			"pushed_at":  pushedAt.UTC().Format(time.RFC3339),
 			"took_s":     int64(now.Sub(pushedAt).Seconds()),
-			"session":    sessionOf(as.Contexts),
+			"session":    statusline.SessionOf(as.Contexts),
 		},
 		UntilMs: now.Add(holdFor(conclusion)).UnixMilli(),
 	})
 	h.logger.Infow("ci.watch left news on the row",
 		"repo", repo, "branch", branch, "sha", shortSha, "conclusion", conclusion,
 		"workflows", len(runs), "failed", len(failed), "for", addressee, "attested_by", caller)
-}
-
-// sessionOf is the session context ground wrote, so the laptop can hand the
-// item to the session that pushed rather than to every session in the project.
-func sessionOf(contexts []string) string {
-	for _, c := range contexts {
-		if strings.HasPrefix(c, "session:") {
-			return strings.TrimPrefix(c, "session:")
-		}
-	}
-	return ""
 }
 
 // ciWatchRearmWindow is how far back the store is read at boot. A restart

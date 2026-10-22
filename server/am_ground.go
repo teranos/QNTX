@@ -99,7 +99,7 @@ func ugReadings(store ats.AttestationStore, since time.Time) (sessions, windows 
 			window := as.Subjects[0]
 			byWindow[window] = append(byWindow[window], map[string]any{"at": at.Format(time.RFC3339), "used": used})
 		}
-		session := sessionOf(as.Contexts)
+		session := statusline.SessionOf(as.Contexts)
 		if session == "" {
 			continue
 		}

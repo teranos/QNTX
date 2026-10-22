@@ -1,4 +1,4 @@
-package server
+package quote
 
 import "testing"
 
@@ -63,11 +63,11 @@ func TestQuoteDegree(t *testing.T) {
 		{"This is What the User actuaIIy tiped ok?", 7},
 	}
 	for _, c := range cases {
-		if got := degreeOf(c.span, said); got != c.want {
-			t.Errorf("degreeOf(%q) = %d, want %d", c.span, got, c.want)
+		if got := DegreeOf(c.span, said); got != c.want {
+			t.Errorf("DegreeOf(%q) = %d, want %d", c.span, got, c.want)
 		}
 	}
-	if got := degreeOf("abc", nil); got != 3 {
+	if got := DegreeOf("abc", nil); got != 3 {
 		t.Errorf("no prompt at all is every character corrected: %d", got)
 	}
 }
@@ -76,23 +76,23 @@ func TestQuoteVerdict(t *testing.T) {
 	said := []string{"nothing near", "this is what the user actually typed ok!"}
 	cases := []struct {
 		span string
-		want quoteVerdict
+		want Verdict
 	}{
-		{"what the user actually typed", quoteSourced},
-		{"This is what the user actuaIIy typed ok?", quoteSourced},
-		{"This is what the user actuaIIy tiped ok?", quoteStretched},
-		{"This is What the user actuaIIy tiped ok?", quoteStretched},
-		{"This is What the User actuaIIy tiped ok?", quoteUnsourced},
-		{"no prompt says anything like this at all", quoteUnsourced},
+		{"what the user actually typed", Sourced},
+		{"This is what the user actuaIIy typed ok?", Sourced},
+		{"This is what the user actuaIIy tiped ok?", Stretched},
+		{"This is What the user actuaIIy tiped ok?", Stretched},
+		{"This is What the User actuaIIy tiped ok?", Unsourced},
+		{"no prompt says anything like this at all", Unsourced},
 	}
 	for _, c := range cases {
-		if got := verdictOf(c.span, said); got != c.want {
-			t.Errorf("verdictOf(%q) = %v, want %v", c.span, got, c.want)
+		if got := VerdictOf(c.span, said); got != c.want {
+			t.Errorf("VerdictOf(%q) = %v, want %v", c.span, got, c.want)
 		}
 	}
 	// The nearest prompt decides, wherever it falls among them.
 	near := []string{"This is What the user actuaIIy tiped ok?", "this is what the user actually typed ok!"}
-	if got := verdictOf("This is what the user actuaIIy typed ok?", near); got != quoteSourced {
+	if got := VerdictOf("This is what the user actuaIIy typed ok?", near); got != Sourced {
 		t.Errorf("a later, nearer prompt was not the one that decided: %v", got)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/statusline"
 	"go.uber.org/zap"
 )
@@ -80,7 +81,7 @@ func (o *standingObserver) OnAttestationCreated(as *types.As) {
 			o.failed(action.HandlerName, "a push matched the standing row and no executor was wired to run it", as)
 			continue
 		}
-		if err := exec.ExecuteBuiltin(withNamespace(o.ctx, o.namespace), action.HandlerName, as); err != nil {
+		if err := exec.ExecuteBuiltin(quote.WithNamespace(o.ctx, o.namespace), action.HandlerName, as); err != nil {
 			// The executor has noted it for the row already; this is the log's copy.
 			o.logger.Warnw("A standing built-in failed",
 				"watcher_id", w.ID, "attestation_id", as.ID, "handler", action.HandlerName, "error", err)

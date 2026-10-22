@@ -1,8 +1,9 @@
-package server
+package quote
 
 import (
 	"context"
 	"encoding/json"
+	quoted "github.com/teranos/QNTX/ats/quote"
 	"strconv"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -19,23 +21,50 @@ import (
 // PostToolUse attests the quoted spans a write carried, sky streams the row
 // here, and each span is asked of the prompts in the namespace it landed in.
 
-// quotePromptPredicates are the rows that hold what the person typed.
-var quotePromptPredicates = []string{"UserPromptSubmit", "QueuedPromptSubmit"}
+// promptPredicates are the rows that hold what the person typed.
+var promptPredicates = []string{"UserPromptSubmit", "QueuedPromptSubmit"}
 
-// quotePromptsCeiling is a read of every prompt a namespace holds. Zero would
-// be none of them.
-const quotePromptsCeiling = 1_000_000
+// promptsCeiling is a read of every prompt a namespace holds. Zero would be
+// none of them.
+const promptsCeiling = 1_000_000
+
+// Namespaces is what the prompts are read from: the node's held universes.
+type Namespaces interface {
+	Read(namespace string) (namespaces.Reading, error)
+}
+
+// PromptsIn is every prompt a namespace holds, as typed. A store that will not
+// answer is an error, not no prompts: the two read the same, and one of them
+// calls every quote invented.
+func PromptsIn(held Namespaces, namespace string) ([]string, error) {
+	store, err := held.Read(namespace)
+	if err != nil {
+		return nil, errors.Wrapf(err, "opening %s to read its prompts", namespace)
+	}
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: promptPredicates, Limit: promptsCeiling})
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading the prompts of %s", namespace)
+	}
+	prompts := make([]string, 0, len(found))
+	for _, as := range found {
+		if p := attrString(as.Attributes, "prompt"); p != "" {
+			prompts = append(prompts, p)
+		}
+	}
+	return prompts, nil
+}
 
 // The namespace a standing row fired in, carried to the built-in it reaches.
 type namespaceKey struct{}
 
-func withNamespace(ctx context.Context, namespace string) context.Context {
+// WithNamespace carries the namespace a standing row fired in.
+func WithNamespace(ctx context.Context, namespace string) context.Context {
 	return context.WithValue(ctx, namespaceKey{}, namespace)
 }
 
-// namespaceOf is the namespace carried, or the empty string when none was,
+// NamespaceOf is the namespace carried, or the empty string when none was,
 // which the caller refuses out loud.
-func namespaceOf(ctx context.Context) string {
+func NamespaceOf(ctx context.Context) string {
 	ns, ok := ctx.Value(namespaceKey{}).(string)
 	if !ok {
 		return ""
@@ -43,15 +72,16 @@ func namespaceOf(ctx context.Context) string {
 	return ns
 }
 
-// quoteDegree is one span that did not comply, and by how much.
-type quoteDegree struct {
+// degree is one span that did not comply, and by how much.
+type degree struct {
 	Span        string `json:"span"`
 	Verdict     string `json:"verdict"`
 	Corrections int    `json:"corrections"`
 	Length      int    `json:"length"`
 }
 
-type quoteHandler struct {
+// Watch is quote.provenance: the claims a write carried, asked of the prompts.
+type Watch struct {
 	// prompts is every prompt the namespace holds, as typed.
 	prompts func(namespace string) ([]string, error)
 	news    *statusline.NewsLog
@@ -60,9 +90,9 @@ type quoteHandler struct {
 	logger   *zap.SugaredLogger
 }
 
-func (h *quoteHandler) Name() string { return watcher.QuoteProvenanceHandlerName }
+func (h *Watch) Name() string { return watcher.QuoteProvenanceHandlerName }
 
-func (h *quoteHandler) Execute(ctx context.Context, job *async.Job) error {
+func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 	var as types.As
 	if err := json.Unmarshal(job.Payload, &as); err != nil {
 		return errors.Wrap(err, "quote.provenance payload is not an attestation")
@@ -70,7 +100,7 @@ func (h *quoteHandler) Execute(ctx context.Context, job *async.Job) error {
 	if len(as.Actors) == 0 || as.Actors[0] == "" {
 		return errors.Newf("quote.provenance: attestation %s has no actor to address the verdict to", as.ID)
 	}
-	namespace := namespaceOf(ctx)
+	namespace := NamespaceOf(ctx)
 	if namespace == "" {
 		return errors.Newf("quote.provenance: attestation %s reached the built-in with no namespace to read prompts in", as.ID)
 	}
@@ -84,19 +114,19 @@ func (h *quoteHandler) Execute(ctx context.Context, job *async.Job) error {
 	}
 
 	var unsourced, stretched []string
-	var degrees []quoteDegree
+	var degrees []degree
 	for _, span := range spans {
-		v := verdictOf(span, said)
+		v := quoted.VerdictOf(span, said)
 		switch v {
-		case quoteUnsourced:
+		case quoted.Unsourced:
 			unsourced = append(unsourced, span)
-		case quoteStretched:
+		case quoted.Stretched:
 			stretched = append(stretched, span)
 		default:
 			continue
 		}
-		degrees = append(degrees, quoteDegree{Span: span, Verdict: v.String(),
-			Corrections: degreeOf(span, said), Length: len(span)})
+		degrees = append(degrees, degree{Span: span, Verdict: v.String(),
+			Corrections: quoted.DegreeOf(span, said), Length: len(span)})
 	}
 	if len(degrees) == 0 {
 		return nil
@@ -105,11 +135,11 @@ func (h *quoteHandler) Execute(ctx context.Context, job *async.Job) error {
 	return nil
 }
 
-// quoteNoteSpan is how much of a span the row's note carries; the detail has
+// noteSpan is how much of a span the row's note carries; the detail has
 // every span whole.
-const quoteNoteSpan = 80
+const noteSpan = 80
 
-func (h *quoteHandler) leave(as types.As, namespace string, unsourced, stretched []string, degrees []quoteDegree, read int) {
+func (h *Watch) leave(as types.As, namespace string, unsourced, stretched []string, degrees []degree, read int) {
 	caller := as.Actors[0]
 	addressee := caller
 	if h.mintedBy != nil {
@@ -122,8 +152,8 @@ func (h *quoteHandler) leave(as types.As, namespace string, unsourced, stretched
 		first, word, more = stretched, "stretched past four per forty", len(stretched)-1
 	}
 	shown := first[0]
-	if len(shown) > quoteNoteSpan {
-		shown = shown[:quoteNoteSpan]
+	if len(shown) > noteSpan {
+		shown = shown[:noteSpan]
 	}
 	note := word + ": \"" + shown + "\", " + strconv.Itoa(degrees[0].Corrections) +
 		" corrections over " + strconv.Itoa(degrees[0].Length) + " characters"
@@ -135,7 +165,7 @@ func (h *quoteHandler) leave(as types.As, namespace string, unsourced, stretched
 		For:  addressee,
 		Item: statusline.StatusItem{Name: "quote", Note: note, Symbol: statusline.SymbolUnwell},
 		Detail: map[string]any{
-			"session":      sessionOf(as.Contexts),
+			"session":      statusline.SessionOf(as.Contexts),
 			"file_path":    attrString(as.Attributes, "file_path"),
 			"unsourced":    unsourced,
 			"stretched":    stretched,
@@ -166,37 +196,17 @@ func attrStrings(attrs map[string]any, key string) []string {
 	return out
 }
 
-// namespacePrompts is every prompt a namespace holds. A store that will not
-// answer is an error, not no prompts: the two read the same, and one of them
-// calls every quote invented.
-func (s *QNTXServer) namespacePrompts(namespace string) ([]string, error) {
-	if s.held == nil {
-		return nil, errors.New("no namespaces are held to read prompts from")
+// attrString reads a string attribute, and the empty string when it is absent
+// or not a string.
+func attrString(attrs map[string]any, key string) string {
+	if v, ok := attrs[key].(string); ok {
+		return v
 	}
-	store, err := s.held.Read(namespace)
-	if err != nil {
-		return nil, errors.Wrapf(err, "opening %s to read its prompts", namespace)
-	}
-	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: quotePromptPredicates, Limit: quotePromptsCeiling})
-	if err != nil {
-		return nil, errors.Wrapf(err, "reading the prompts of %s", namespace)
-	}
-	prompts := make([]string, 0, len(found))
-	for _, as := range found {
-		if p := attrString(as.Attributes, "prompt"); p != "" {
-			prompts = append(prompts, p)
-		}
-	}
-	return prompts, nil
+	return ""
 }
 
-// setupQuoteProvenance registers the built-in. No schedule: the standing row
-// reaches it when a claim arrives.
-func (s *QNTXServer) setupQuoteProvenance() {
-	s.daemon.Registry().Register(&quoteHandler{
-		prompts:  s.namespacePrompts,
-		news:     s.news,
-		mintedBy: s.authHandler.MintedBy,
-		logger:   s.logger.Named("quote.provenance"),
-	})
+// NewWatch is quote.provenance, asking prompts for what a namespace was told.
+func NewWatch(prompts func(namespace string) ([]string, error), news *statusline.NewsLog,
+	mintedBy func(did string) (string, bool), logger *zap.SugaredLogger) *Watch {
+	return &Watch{prompts: prompts, news: news, mintedBy: mintedBy, logger: logger}
 }

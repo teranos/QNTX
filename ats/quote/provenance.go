@@ -1,4 +1,4 @@
-package server
+package quote
 
 import "strings"
 
@@ -6,20 +6,20 @@ import "strings"
 // that blocked the write for up to twelve seconds; now the write passes, and
 // the claim is checked here, against the prompts this node holds.
 
-// quoteVerdict is what the prompts say about a quoted span.
-type quoteVerdict int
+// Verdict is what the prompts say about a quoted span.
+type Verdict int
 
 const (
-	quoteUnsourced quoteVerdict = iota
-	quoteStretched
-	quoteSourced
+	Unsourced Verdict = iota
+	Stretched
+	Sourced
 )
 
-func (v quoteVerdict) String() string {
+func (v Verdict) String() string {
 	switch v {
-	case quoteSourced:
+	case Sourced:
 		return "sourced"
-	case quoteStretched:
+	case Stretched:
 		return "stretched"
 	default:
 		return "unsourced"
@@ -34,15 +34,15 @@ func correctionBudget(length int) int { return length * 4 / 40 }
 // five and six per forty. Past it the span has no source.
 func warnBudget(length int) int { return length * 6 / 40 }
 
-// quoteSpanMax is the longest span measured, as in ground.
-const quoteSpanMax = 8192
+// spanMax is the longest span measured, as in ground.
+const spanMax = 8192
 
 // withinCorrections: whether some stretch of text sits within budget edits of
 // span. Free to start and end anywhere, so the span is measured against the
 // stretch it matches best rather than the whole prompt.
 func withinCorrections(text, span string, budget int) bool {
 	m := len(span)
-	if m == 0 || m > quoteSpanMax {
+	if m == 0 || m > spanMax {
 		return false
 	}
 	prev := make([]int, m+1)
@@ -74,9 +74,9 @@ func withinCorrections(text, span string, budget int) bool {
 	return false
 }
 
-// degreeOf is how many corrections separate the span from the nearest stretch
+// DegreeOf is how many corrections separate the span from the nearest stretch
 // of any prompt. With nothing to compare against, every character is one.
-func degreeOf(span string, said []string) int {
+func DegreeOf(span string, said []string) int {
 	best := len(span)
 	for _, p := range said {
 		if d := nearestCorrections(p, span); d < best {
@@ -123,30 +123,30 @@ func nearestCorrections(text, span string) int {
 	return best
 }
 
-// verdictOf is the nearest any prompt comes to the span: verbatim, inside the
+// VerdictOf is the nearest any prompt comes to the span: verbatim, inside the
 // correction budget, inside the warn budget only, or not near at all.
-func verdictOf(span string, said []string) quoteVerdict {
+func VerdictOf(span string, said []string) Verdict {
 	if span == "" {
-		return quoteUnsourced
+		return Unsourced
 	}
 	for _, p := range said {
 		if strings.Contains(p, span) {
-			return quoteSourced
+			return Sourced
 		}
 	}
 	clean, warn := correctionBudget(len(span)), warnBudget(len(span))
 	if warn == 0 {
-		return quoteUnsourced
+		return Unsourced
 	}
-	nearest := quoteUnsourced
+	nearest := Unsourced
 	for _, p := range said {
 		if !withinCorrections(p, span, warn) {
 			continue
 		}
 		if withinCorrections(p, span, clean) {
-			return quoteSourced
+			return Sourced
 		}
-		nearest = quoteStretched
+		nearest = Stretched
 	}
 	return nearest
 }

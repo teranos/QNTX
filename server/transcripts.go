@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/QNTX/server/statusline"
 )
 
 // Transcripts are loom's job, done by the node.
@@ -172,7 +173,7 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 			continue
 		}
 		read[as.ID] = true
-		session := sessionOf(as.Contexts)
+		session := statusline.SessionOf(as.Contexts)
 		if session == "" {
 			continue
 		}
