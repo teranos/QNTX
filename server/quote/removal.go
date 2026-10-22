@@ -1,4 +1,4 @@
-package server
+package quote
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -19,14 +18,15 @@ import (
 // spans a commit took out and put back nowhere, asked of the namespace's
 // prompts, and the ones the person said go back to them.
 
-// quoteRemoved is one of the person's quotes a commit took out.
-type quoteRemoved struct {
+// removedQuote is one of the person's quotes a commit took out.
+type removedQuote struct {
 	File    string `json:"file"`
 	Span    string `json:"span"`
 	Verdict string `json:"verdict"`
 }
 
-type quoteRemovalHandler struct {
+// Removal is quote.removal: the quotes a commit took out, asked of the prompts.
+type Removal struct {
 	// prompts is every prompt the namespace holds, as typed.
 	prompts func(namespace string) ([]string, error)
 	news    *statusline.NewsLog
@@ -35,9 +35,9 @@ type quoteRemovalHandler struct {
 	logger   *zap.SugaredLogger
 }
 
-func (h *quoteRemovalHandler) Name() string { return watcher.QuoteRemovalHandlerName }
+func (h *Removal) Name() string { return watcher.QuoteRemovalHandlerName }
 
-func (h *quoteRemovalHandler) Execute(ctx context.Context, job *async.Job) error {
+func (h *Removal) Execute(ctx context.Context, job *async.Job) error {
 	var as types.As
 	if err := json.Unmarshal(job.Payload, &as); err != nil {
 		return errors.Wrap(err, "quote.removal payload is not an attestation")
@@ -45,7 +45,7 @@ func (h *quoteRemovalHandler) Execute(ctx context.Context, job *async.Job) error
 	if len(as.Actors) == 0 || as.Actors[0] == "" {
 		return errors.Newf("quote.removal: attestation %s has no actor to address the verdict to", as.ID)
 	}
-	namespace := namespaceOf(ctx)
+	namespace := NamespaceOf(ctx)
 	if namespace == "" {
 		return errors.Newf("quote.removal: attestation %s reached the built-in with no namespace to read prompts in", as.ID)
 	}
@@ -63,13 +63,13 @@ func (h *quoteRemovalHandler) Execute(ctx context.Context, job *async.Job) error
 		return errors.Wrapf(err, "quote.removal: reading the prompts of %s for %s", namespace, as.ID)
 	}
 
-	var removed []quoteRemoved
+	var removed []removedQuote
 	for i, span := range spans {
-		v := quote.VerdictOf(span, said)
-		if v == quote.Unsourced {
+		v := VerdictOf(span, said)
+		if v == Unsourced {
 			continue
 		}
-		removed = append(removed, quoteRemoved{File: files[i], Span: span, Verdict: v.String()})
+		removed = append(removed, removedQuote{File: files[i], Span: span, Verdict: v.String()})
 	}
 	if len(removed) == 0 {
 		return nil
@@ -78,15 +78,15 @@ func (h *quoteRemovalHandler) Execute(ctx context.Context, job *async.Job) error
 	return nil
 }
 
-func (h *quoteRemovalHandler) leave(as types.As, namespace, commit string, removed []quoteRemoved, read int) {
+func (h *Removal) leave(as types.As, namespace, commit string, removed []removedQuote, read int) {
 	caller := as.Actors[0]
 	addressee := caller
 	if who, ok := h.mintedBy(caller); ok {
 		addressee = who
 	}
 	shown := removed[0].Span
-	if len(shown) > quoteNoteSpan {
-		shown = shown[:quoteNoteSpan]
+	if len(shown) > noteSpan {
+		shown = shown[:noteSpan]
 	}
 	note := "commit " + commit + " removed what you said from " + removed[0].File + ": \"" + shown + "\""
 	if more := len(removed) - 1; more > 0 {
@@ -97,7 +97,7 @@ func (h *quoteRemovalHandler) leave(as types.As, namespace, commit string, remov
 		For:  addressee,
 		Item: statusline.StatusItem{Name: "quote", Note: note, Symbol: statusline.SymbolUnwell},
 		Detail: map[string]any{
-			"session":      sessionOf(as.Contexts),
+			"session":      statusline.SessionOf(as.Contexts),
 			"commit":       commit,
 			"removed":      removed,
 			"prompts_read": read,
@@ -111,13 +111,8 @@ func (h *quoteRemovalHandler) leave(as types.As, namespace, commit string, remov
 		"prompts_read", read, "namespace", namespace, "for", addressee)
 }
 
-// setupQuoteRemoval registers the built-in. No schedule: the standing row
-// reaches it when a commit's removals arrive.
-func (s *QNTXServer) setupQuoteRemoval() {
-	s.daemon.Registry().Register(&quoteRemovalHandler{
-		prompts:  s.namespacePrompts,
-		news:     s.news,
-		mintedBy: s.authHandler.MintedBy,
-		logger:   s.logger.Named("quote.removal"),
-	})
+// NewRemoval is quote.removal, asking prompts for what a namespace was told.
+func NewRemoval(prompts func(namespace string) ([]string, error), news *statusline.NewsLog,
+	mintedBy func(did string) (string, bool), logger *zap.SugaredLogger) *Removal {
+	return &Removal{prompts: prompts, news: news, mintedBy: mintedBy, logger: logger}
 }

@@ -1,4 +1,4 @@
-package server
+package quote
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/statusline"
 	"go.uber.org/zap"
 )
@@ -42,10 +41,10 @@ func removalJob(t *testing.T, files, spans []string) *async.Job {
 	return &async.Job{ID: "builtin:quote-removal", HandlerName: watcher.QuoteRemovalHandlerName, Payload: payload}
 }
 
-func removalHandlerWith(prompts ...string) (*quoteRemovalHandler, *statusline.NewsLog, *string) {
+func removalWith(prompts ...string) (*Removal, *statusline.NewsLog, *string) {
 	asked := new(string)
 	news := statusline.NewNewsLog()
-	return &quoteRemovalHandler{
+	return &Removal{
 		prompts: func(ns string) ([]string, error) {
 			*asked = ns
 			return prompts, nil
@@ -57,8 +56,8 @@ func removalHandlerWith(prompts ...string) (*quoteRemovalHandler, *statusline.Ne
 }
 
 func TestQuoteRemovalReportsWhatTheUserSaid(t *testing.T) {
-	h, news, asked := removalHandlerWith("the max time on phases is ideally lower than 5s always")
-	ctx := withNamespace(context.Background(), "ground")
+	h, news, asked := removalWith("the max time on phases is ideally lower than 5s always")
+	ctx := WithNamespace(context.Background(), "ground")
 	job := removalJob(t,
 		[]string{"source/a.d", "source/b.d"},
 		[]string{"the max time on phases is ideally lower than 5s always", "words the agent wrote itself"})
@@ -82,7 +81,7 @@ func TestQuoteRemovalReportsWhatTheUserSaid(t *testing.T) {
 	if held[0].Detail["session"] != "sess-1" {
 		t.Errorf("the item is not for the session that committed: %v", held[0].Detail["session"])
 	}
-	removed, _ := held[0].Detail["removed"].([]quoteRemoved)
+	removed, _ := held[0].Detail["removed"].([]removedQuote)
 	if len(removed) != 1 || removed[0].File != "source/a.d" || removed[0].Verdict != "sourced" {
 		t.Errorf("removed = %+v", removed)
 	}
@@ -90,8 +89,8 @@ func TestQuoteRemovalReportsWhatTheUserSaid(t *testing.T) {
 
 // A quote the user never said was not theirs to lose.
 func TestQuoteRemovalOfUnsourcedLeavesNothing(t *testing.T) {
-	h, news, _ := removalHandlerWith("something else entirely")
-	ctx := withNamespace(context.Background(), "ground")
+	h, news, _ := removalWith("something else entirely")
+	ctx := WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, removalJob(t, []string{"a.d"}, []string{"words the agent wrote itself"})); err != nil {
 		t.Fatal(err)
 	}
@@ -105,11 +104,11 @@ func TestQuoteRemovalOfUnsourcedLeavesNothing(t *testing.T) {
 func TestQuoteRemovalReportsAStretchedQuote(t *testing.T) {
 	said := "you replace something i said with something else, this is a different kind of violation"
 	span := "you replac somethin i sai wth somethng els, ths is a diferent knd of violaton"
-	if v := quote.VerdictOf(span, []string{said}); v != quote.Stretched {
+	if v := VerdictOf(span, []string{said}); v != Stretched {
 		t.Fatalf("the fixture is %s, not stretched", v)
 	}
-	h, news, _ := removalHandlerWith(said)
-	ctx := withNamespace(context.Background(), "ground")
+	h, news, _ := removalWith(said)
+	ctx := WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, removalJob(t, []string{"a.md"}, []string{span})); err != nil {
 		t.Fatal(err)
 	}
@@ -120,11 +119,11 @@ func TestQuoteRemovalReportsAStretchedQuote(t *testing.T) {
 }
 
 func TestQuoteRemovalRefusesWhatItCannotRead(t *testing.T) {
-	h, _, _ := removalHandlerWith("anything")
+	h, _, _ := removalWith("anything")
 	if err := h.Execute(context.Background(), removalJob(t, []string{"a.d"}, []string{"anything at all"})); err == nil {
 		t.Error("a removal with no namespace was answered as if its prompts had been read")
 	}
-	ctx := withNamespace(context.Background(), "ground")
+	ctx := WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, removalJob(t, []string{"a.d"}, []string{"one", "two"})); err == nil {
 		t.Error("spans with no file each to name were answered")
 	}

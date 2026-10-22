@@ -1,4 +1,4 @@
-package server
+package quote
 
 import (
 	"context"
@@ -35,10 +35,10 @@ func claimJob(t *testing.T, spans ...string) *async.Job {
 	return &async.Job{ID: "builtin:quote", HandlerName: watcher.QuoteProvenanceHandlerName, Payload: payload}
 }
 
-func quoteHandlerWith(prompts ...string) (*quoteHandler, *statusline.NewsLog, *string) {
+func watchWith(prompts ...string) (*Watch, *statusline.NewsLog, *string) {
 	asked := new(string)
 	news := statusline.NewNewsLog()
-	return &quoteHandler{
+	return &Watch{
 		prompts: func(ns string) ([]string, error) {
 			*asked = ns
 			return prompts, nil
@@ -50,8 +50,8 @@ func quoteHandlerWith(prompts ...string) (*quoteHandler, *statusline.NewsLog, *s
 }
 
 func TestQuoteProvenanceSaysWhatHasNoSource(t *testing.T) {
-	h, news, asked := quoteHandlerWith("i said this exactly once")
-	ctx := withNamespace(context.Background(), "ground")
+	h, news, asked := watchWith("i said this exactly once")
+	ctx := WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, claimJob(t, "said this exactly", "nobody ever typed these words")); err != nil {
 		t.Fatal(err)
 	}
@@ -76,15 +76,15 @@ func TestQuoteProvenanceSaysWhatHasNoSource(t *testing.T) {
 	if !strings.Contains(held[0].Item.Note, "corrections over 29 characters") {
 		t.Errorf("the note does not say to what degree: %q", held[0].Item.Note)
 	}
-	degrees, _ := held[0].Detail["degrees"].([]quoteDegree)
+	degrees, _ := held[0].Detail["degrees"].([]degree)
 	if len(degrees) != 1 || degrees[0].Span != "nobody ever typed these words" || degrees[0].Length != 29 || degrees[0].Corrections <= 0 {
 		t.Errorf("degrees = %+v", degrees)
 	}
 }
 
 func TestQuoteProvenanceSourcedLeavesNothing(t *testing.T) {
-	h, news, _ := quoteHandlerWith("i said this exactly once")
-	ctx := withNamespace(context.Background(), "ground")
+	h, news, _ := watchWith("i said this exactly once")
+	ctx := WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, claimJob(t, "said this exactly")); err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestQuoteProvenanceSourcedLeavesNothing(t *testing.T) {
 }
 
 func TestQuoteProvenanceRefusesWithoutANamespace(t *testing.T) {
-	h, _, _ := quoteHandlerWith("anything")
+	h, _, _ := watchWith("anything")
 	if err := h.Execute(context.Background(), claimJob(t, "anything at all here")); err == nil {
 		t.Error("a claim with no namespace was answered as if its prompts had been read")
 	}
@@ -116,27 +116,5 @@ func TestStandingQuoteRowWatchesClaims(t *testing.T) {
 	}
 	if !strings.Contains(row.ActionData, watcher.QuoteProvenanceHandlerName) {
 		t.Errorf("the standing row reaches %s, not the quote built-in", row.ActionData)
-	}
-}
-
-// fakeBuiltins records the namespace each built-in was run in.
-type fakeBuiltins struct{ namespaces []string }
-
-func (f *fakeBuiltins) ExecuteBuiltin(ctx context.Context, name string, as *types.As) error {
-	f.namespaces = append(f.namespaces, namespaceOf(ctx))
-	return nil
-}
-
-func TestStandingObserverNamesItsNamespace(t *testing.T) {
-	f := &fakeBuiltins{}
-	o := &standingObserver{
-		ctx:       context.Background(),
-		builtins:  func() watcher.BuiltinExecutor { return f },
-		namespace: "ground",
-		logger:    zap.NewNop().Sugar(),
-	}
-	o.OnAttestationCreated(&types.As{ID: "c", Predicates: []string{watcher.QuoteClaimedPredicate}})
-	if len(f.namespaces) != 1 || f.namespaces[0] != "ground" {
-		t.Errorf("the built-in ran in %v, not in the namespace the row landed in", f.namespaces)
 	}
 }
