@@ -22,7 +22,7 @@ Add a second auth path: **access tokens**, presented as `Authorization: Bearer <
 
 - Raw token is 32 random bytes, hex-encoded, `qntx_`-prefixed. Shown once at creation.
 
-- Persisted per backend: on SQLite via a new `access_tokens` table (`db/sqlite/migrations/`); on parquet as one object per token under `<location>/system/access_tokens/`, matching the "small config" shape in ADR-024. Only the SHA-256 hash is stored.
+- Persisted per backend: on SQLite via a new `access_tokens` table (`internal/db/sqlite/migrations/`); on parquet as one object per token under `<location>/system/access_tokens/`, matching the "small config" shape in ADR-024. Only the SHA-256 hash is stored.
 
 - Issued from a passkey-authenticated session via `/auth/tokens` (POST create / GET list / DELETE revoke / POST enable). Bearer tokens cannot mint new tokens.
 

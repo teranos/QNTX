@@ -148,7 +148,7 @@ func TestATokenFromBeforeExpiriesWereSaidNeverEnds(t *testing.T) {
 	_, err := db.Exec(`INSERT INTO access_tokens (hash, id, record) VALUES (?, ?, ?)`, "old",
 		"T-OLD", `{"id":"T-OLD","hash":"old","label":"old","level":"ATTESTOR","namespaces":["default"],"created_at":1}`)
 	require.NoError(t, err)
-	written, err := os.ReadFile("../../db/sqlite/migrations/076_a_token_says_when_it_ends.sql")
+	written, err := os.ReadFile("../../internal/db/sqlite/migrations/076_a_token_says_when_it_ends.sql")
 	require.NoError(t, err)
 	_, err = db.Exec(string(written))
 	require.NoError(t, err)

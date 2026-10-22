@@ -83,7 +83,7 @@ Hard limits with oldest deletion by default. Future versions will support user-d
 Flexible based on predicate - can be single timestamp, range, or point-in-time with duration.
 
 ### Database Schema
-Versioned with migrations using the migration system in `db/sqlite/migrations/`
+Versioned with migrations using the migration system in `internal/db/sqlite/migrations/`
 
 ## Development Philosophy
 

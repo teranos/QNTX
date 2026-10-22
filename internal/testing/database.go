@@ -15,7 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 )
 
 func init() {

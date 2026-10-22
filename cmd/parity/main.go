@@ -45,7 +45,7 @@ import (
 	"sync/atomic"
 
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
-	"github.com/teranos/QNTX/db/rustdriver"
+	"github.com/teranos/QNTX/internal/db/rustdriver"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/server/parity"
 	errors "github.com/teranos/sacred-error"

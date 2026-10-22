@@ -46,7 +46,7 @@ use std::collections::HashMap;
 
 /// Column tuple returned from the `attestations` table `SELECT` in
 /// query paths. Mirrors the migration schema at
-/// `db/duckdb/migrations/001_create_attestations_table.sql`. Aliased to
+/// `internal/db/duckdb/migrations/001_create_attestations_table.sql`. Aliased to
 /// keep `row_to_attestation`'s signature readable and satisfy clippy's
 /// `type_complexity` lint.
 type AttestationRow = (
@@ -374,7 +374,7 @@ pub struct DuckdbStore {
 
 impl DuckdbStore {
     /// Open a store at the given location URL. Schema is applied through
-    /// migrations at `db/duckdb/migrations/` — no DDL in application code.
+    /// migrations at `internal/db/duckdb/migrations/` — no DDL in application code.
     /// Loads the DuckDB extensions returned by `remote_extensions(location)`
     /// — scheme-driven, see that function's doc comment.
     ///

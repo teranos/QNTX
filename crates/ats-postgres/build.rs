@@ -1,11 +1,11 @@
-// The migration list is generated from db/postgres/migrations/, as ats-sqlite's
-// is from db/sqlite/migrations/: adding a .sql file is the whole job.
+// The migration list is generated from internal/db/postgres/migrations/, as ats-sqlite's
+// is from internal/db/sqlite/migrations/: adding a .sql file is the whole job.
 
 use std::fs;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let dir = Path::new("../../db/postgres/migrations");
+    let dir = Path::new("../../internal/db/postgres/migrations");
     println!("cargo:rerun-if-changed={}", dir.display());
 
     let mut files: Vec<String> = fs::read_dir(dir)

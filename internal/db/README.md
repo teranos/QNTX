@@ -8,7 +8,7 @@
 
 SQLite fits this philosophy: single file, no dependencies, runs anywhere. This aligns with the "almost no configuration required" ideal.
 
-## Why `db/sqlite/` Structure?
+## Why `internal/db/sqlite/` Structure?
 
 Future vision: QNTX running on AWS for 2-3 hours daily, writing attestations to DynamoDB or S3, then local QNTX pulls them into local SQLite.
 
@@ -38,8 +38,4 @@ db.Migrate(database, logger)
 
 ## Migrations
 
-Located in `db/sqlite/migrations/`, named `NNN_description.sql`. Run via `db.Migrate()`.
-
----
-
-TODO: INTERNAL: Move db/ package to internal.
+Located in `internal/db/sqlite/migrations/`, named `NNN_description.sql`. Run via `db.Migrate()`.

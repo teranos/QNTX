@@ -1,4 +1,4 @@
-// The migration list is generated from db/sqlite/migrations/ rather than
+// The migration list is generated from internal/db/sqlite/migrations/ rather than
 // hand-written. A hand-written list can drift from the directory, and it did:
 // 051 was never added, so a column existed in Go's runner and not in Rust's.
 
@@ -10,7 +10,7 @@ use std::fs;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let dir = Path::new("../../db/sqlite/migrations");
+    let dir = Path::new("../../internal/db/sqlite/migrations");
     println!("cargo:rerun-if-changed={}", dir.display());
 
     let mut files: Vec<String> = fs::read_dir(dir)
