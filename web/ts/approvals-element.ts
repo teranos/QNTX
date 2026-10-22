@@ -7,14 +7,13 @@
 // "And only through it's element"
 // "approvals is ROOT only for now"
 
-// A panel, reached from ⍟ by ROOT. The element is @teranos/elements' (Rubidium:
-// every option visible, the checks as segments in the GitHub button, the
-// countdown in the buttons, the film roll); this is the host playing it with
-// what the node says. Asked on open, after each press, and when the node tells
-// the page an approval moved; nothing polls.
+// A panel, reached from ⍟ by ROOT. The roll is QNTX's own (approvals-roll.ts);
+// this is it played with what the node says. Asked on open, after each press,
+// and when the node tells the page an approval moved; nothing polls.
 
-import type { Element, Approval as Card, ApprovalHandle, ApprovalOption, ApprovalStep, SegmentState } from '@teranos/elements';
-import { tray, renderApprovals } from '@teranos/elements';
+import type { Element, SegmentState } from '@teranos/elements';
+import { tray } from '@teranos/elements';
+import { renderApprovals, type Approval as Card, type ApprovalHandle, type ApprovalOption, type ApprovalStep } from './approvals-roll';
 import { apiFetch, apiJson } from './client';
 import { jsonBody } from './http-utils';
 import { refusal } from './self-person';
@@ -31,13 +30,13 @@ const ANSWER_PATH = '/api/approvals/answer';
 // The node takes these words and no others (server/approvals.go).
 const MERGE_OPTIONS: ApprovalOption[] = [
     {
-        label: 'YES', means: 'yes', steps: [
+        label: 'YES', means: 'yes', confidence: 'none', steps: [
             { says: 'merge when main CI passes', settles: 'when-ready' },
             { says: 'force merge', settles: 'now' },
         ],
     },
     {
-        label: 'NO', means: 'no', steps: [
+        label: 'NO', means: 'no', confidence: 'none', steps: [
             { says: 'cancel the merge' },
             { says: 'definitely no' },
         ],
@@ -85,8 +84,10 @@ export function cardOf(approval: Approval, said: HTMLElement, now = Date.now()):
             return context;
         },
         options: MERGE_OPTIONS,
+        asides: [],
+        openFor: { kind: 'until-decided' },
         checks: approval.checks.map((c) => ({ name: c.name, state: stateOf(c.state) })),
-        merges: { label: 'main CI' },
+        merges: { kind: 'until-host', label: 'main CI' },
     };
 }
 
@@ -127,6 +128,9 @@ export function approvalsRoll(): { body: HTMLElement; load: () => Promise<void> 
             log.error(SEG.UI, 'The press was refused:', why);
             one.said.textContent = why;
             one.said.className = 'element-error';
+            // "adn yet the approval dissapears as if its done"
+            // Refused, the roll keeps the card where it stood (approvals-roll.ts).
+            throw err;
         });
     };
     const roll = renderApprovals({

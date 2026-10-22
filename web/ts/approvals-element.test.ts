@@ -80,7 +80,7 @@ describe('Tim: what the node says is a card', () => {
         expect(card.arrivedMinutesAgo).toBe(15);
         expect(card.checks).toEqual([{ name: 'TypeScript', state: 'done' }, { name: 'Browser', state: 'done' }]);
         expect(card.options.map((o) => o.label)).toEqual(['YES', 'NO']);
-        expect(card.merges).toEqual({ label: 'main CI' });
+        expect(card.merges).toEqual({ kind: 'until-host', label: 'main CI' });
     });
 
     test('a moment that does not read, or is to come, is now', () => {
