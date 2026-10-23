@@ -432,6 +432,7 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 			Name:        "agents",
 			Description: "The namespace agent: a common agent of the namespace it is opted into, shared by everyone who has reach on it, on its own sign-in.",
 			Tags:        []string{"agent", "namespaces"},
+			Oasf:        []string{"ai_ml_engineering/agent_orchestration/multi_agent_coordination"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "set",

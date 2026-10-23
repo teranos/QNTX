@@ -34,6 +34,7 @@ func (s *QNTXServer) reachSignum() sigil.Signum {
 			Name:        "reach",
 			Description: "Who reaches what at runtime: the reach lines in the store, granted and revoked, beside what the compiled-in table says.",
 			Tags:        []string{"reach", "access", "lines"},
+			Oasf:        []string{"cybersecurity/identity_access_management/authorization_access_control"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "list",

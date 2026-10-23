@@ -23,6 +23,7 @@ func (s *QNTXServer) rolesSignum() sigil.Signum {
 			Name:        "roles",
 			Description: "The lines the gate reads about roles: REACH, WRITE and READ lines, and each grant and revoke.",
 			Tags:        []string{"roles", "reach", "lines"},
+			Oasf:        []string{"cybersecurity/identity_access_management/authorization_access_control"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "list",

@@ -17,6 +17,7 @@ func (s *QNTXServer) openapiSignum() sigil.Signum {
 			Name:        "openapi",
 			Description: "The document of what the node serves: every path the reach table names, who reaches it, and what each sigil does there.",
 			Tags:        []string{"openapi", "document", "reach"},
+			Oasf:        []string{"software_engineering/api_development/api_specification"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "document",

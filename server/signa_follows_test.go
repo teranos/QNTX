@@ -30,6 +30,18 @@ func resolvesTo(name string) protoreflect.MessageDescriptor {
 	return nil
 }
 
+// A skill a signum names of OASF's taxonomy is one the pinned taxonomy holds.
+func TestASignumsOASFSkillIsInTheTaxonomy(t *testing.T) {
+	skills, refused := parity.OASFSkills()
+	require.Nil(t, refused)
+	for _, signum := range bareNode().signa() {
+		for _, skill := range signum.GetOasf() {
+			_, held := skills[skill]
+			assert.True(t, held, "%s names %s, which OASF's taxonomy holds no skill at", signum.GetName(), skill)
+		}
+	}
+}
+
 // A field that says which message it carries names one that exists, on every
 // signum the node holds.
 func TestAFieldsMessageExists(t *testing.T) {

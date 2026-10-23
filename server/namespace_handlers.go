@@ -26,6 +26,7 @@ func (s *QNTXServer) namespacesSignum() sigil.Signum {
 			Name:        "namespaces",
 			Description: "The namespaces the node keeps, who owns each, whether it is switched on and where it keeps its attestations: listed, made, given storage, switched off and on, ended, and default emptied.",
 			Tags:        []string{"namespaces", "tenancy", "ownership"},
+			Oasf:        []string{"cybersecurity/identity_access_management/identity_administration"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "list",
