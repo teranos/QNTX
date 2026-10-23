@@ -456,6 +456,14 @@
           qntx-image-amd64 = mkQNTXImage "amd64";
           qntx-image-arm64 = mkQNTXImage "arm64";
         } // pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
+          # Hermes is a separate agent runtime, not a Pyre PythonService provider.
+          # getFlake uses an immutable upstream commit; Hermes' own flake.lock
+          # supplies its uv2nix, npm and Nix dependency graph. No system Python.
+          # Keep the revision identical to server/parity/hermes_*/manifest.json.
+          hermes = (builtins.getFlake
+            "github:NousResearch/hermes-agent/bf0203a794a07aac3ff764972ab9087baa4e4f4e"
+          ).packages.${system}.minimal;
+pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
           # The pinned Supabase Postgres server, which make parity runs
           # ats-postgres's migrations in: postgresql_17, the server psql_17 is
           # built on, without its extensions. ats-postgres uses none, and the
