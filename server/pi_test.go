@@ -142,7 +142,7 @@ func TestPiDoesNotAnswerWhileClaudeCodeIsInATurn(t *testing.T) {
 // piSessionSaid is the agent's session in Pi as pi session reads it.
 func piSessionSaid(t *testing.T, s *QNTXServer) [][2]string {
 	t.Helper()
-	answer, refused := s.harnessSession(s.piHarness(), nil)
+	answer, refused := s.harnessSession(s.piHarness())
 	require.Nil(t, refused)
 	holds(t, s.nodeAgentSignum(), "session", answer)
 	var said [][2]string
@@ -165,7 +165,7 @@ func TestANodeThatNamesNoPiHasNoneToSpeakTo(t *testing.T) {
 // Pi says who answers in it and how it is run, which the Pi element draws.
 func TestPiSaysWhoItIs(t *testing.T) {
 	s, _, _ := runningPiToo(t)
-	is, refused := s.harnessAm(s.piHarness(), nil)
+	is, refused := s.harnessAm(s.piHarness())
 	require.Nil(t, refused)
 	am := is.(*protocol.PiAm)
 	assert.Equal(t, s.nodeAgent.did, am.GetDid())

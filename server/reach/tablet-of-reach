@@ -170,6 +170,10 @@ REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROO
 # talk to it is the whole of what guards it, and that is ROOT.
 REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' of ROOT
 
+# The element agent (the elements signum, ADR-054): each element is its own
+# agent and its own conversation, and ROOT SHAKE is ROOT's.
+REACH is '/api/elements/{element}' '/api/elements/{element}/say' '/api/elements/{element}/session' of ROOT
+
 # The namespace agent (the agents signum, ADR-048): "shared amongst anyone who
 # has REACH on it". Who acts in the namespace reaches it, which the handler
 # asks of the admission; who may opt the namespace into one is its owner, ROOT

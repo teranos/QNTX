@@ -1,6 +1,9 @@
 package server
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,61 +17,29 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// "each element is an agent as well, we default to claude"
-// An element named has its own continuing session with the agent, kept under
-// the agent's home by the element, beside the one session the agent continues
-// when no element is named (ADR-054).
-func TestAnElementIsItsOwnSessionWithTheAgent(t *testing.T) {
-	s, ran := runningTheNodeAgent(t, opusLow)
-
-	first, refused := saying(s, sigil.Sent{"says": "what is this?", "element": "agent-element"})
-	require.Nil(t, refused)
-	again, refused := saying(s, sigil.Sent{"says": "and this?", "element": "agent-element"})
-	require.Nil(t, refused)
-	alone, refused := saying(s, sigil.Sent{"says": "hello"})
-	require.Nil(t, refused)
-	other, refused := saying(s, sigil.Sent{"says": "what is this?", "element": "canvas-7"})
-	require.Nil(t, refused)
-
-	assert.Equal(t, first.GetSession(), again.GetSession())
-	assert.Equal(t, first.GetSession(), after(ranWith(t, ran, "1", "args"), "--resume"))
-	assert.NotEqual(t, first.GetSession(), alone.GetSession())
-	assert.NotEqual(t, first.GetSession(), other.GetSession())
-	assert.NotEqual(t, alone.GetSession(), other.GetSession())
-
-	home := s.nodeAgent.home
-	kept, err := os.ReadFile(filepath.Join(home, "elements", "agent-element", claudeSessionFile))
-	require.NoError(t, err)
-	assert.Equal(t, first.GetSession(), strings.TrimSpace(string(kept)))
-	kept, err = os.ReadFile(filepath.Join(home, claudeSessionFile))
-	require.NoError(t, err)
-	assert.Equal(t, alone.GetSession(), strings.TrimSpace(string(kept)))
-
-	// session and am, asked of the element, answer the element's session.
-	assert.Equal(t, []string{"what is this?", "and this?"}, toldIn(t, s, sigil.Sent{"element": "agent-element"}))
-	assert.Equal(t, []string{"hello"}, toldIn(t, s, nil))
-	is, refused := s.harnessAm(s.claudeHarness(), sigil.Sent{"element": "agent-element"})
-	require.Nil(t, refused)
-	assert.Equal(t, first.GetSession(), is.(*protocol.ClaudeAm).GetSession())
-	is, refused = s.harnessAm(s.claudeHarness(), nil)
-	require.Nil(t, refused)
-	assert.Equal(t, alone.GetSession(), is.(*protocol.ClaudeAm).GetSession())
-
-	// The row of what was said carries the element it was said in.
-	told := toldRows(t, s, first.GetSession())
-	require.Len(t, told, 2)
-	for _, row := range told {
-		assert.Equal(t, "agent-element", row.Attributes["element"])
-	}
-	for _, row := range toldRows(t, s, alone.GetSession()) {
-		assert.NotContains(t, row.Attributes, "element")
-	}
+// runningElementAgents is a node running the Node Agent, with a key, a place
+// for agents and a gate, so an element's agent can be held.
+func runningElementAgents(t *testing.T) (*QNTXServer, string) {
+	t.Helper()
+	s, ran, _ := runningNamespaceAgents(t)
+	return s, ran
 }
 
-// toldIn is what was said to the agent in the session named, as agent session reads it.
-func toldIn(t *testing.T, s *QNTXServer, sent sigil.Sent) []string {
+// sayingTo says something to the element's agent, as ROOT at its path.
+func sayingTo(s *QNTXServer, element string, sent sigil.Sent) (*protocol.ClaudeSaid, *protocol.Refusal) {
+	asked := httptest.NewRequest(http.MethodPost, "/api/elements/"+element+"/say", nil)
+	sent["element"], sent["harness"] = element, "claude"
+	answer, refused := s.elementsSignum().Answers["say"](sigil.WithCaller(context.Background(), asked), sent)
+	if refused != nil {
+		return nil, refused
+	}
+	return answer.(*protocol.NodeAgentSaid).GetClaude(), nil
+}
+
+// toldTo is what was said to the element's agent, as elements session reads it.
+func toldTo(t *testing.T, s *QNTXServer, element string) []string {
 	t.Helper()
-	answer, refused := s.harnessSession(s.claudeHarness(), sent)
+	answer, refused := s.elementsSignum().Answers["session"](context.Background(), sigil.Sent{"element": element, "harness": "claude"})
 	require.Nil(t, refused)
 	var said []string
 	for _, turn := range answer.(*protocol.SessionTranscript).GetTranscript().GetTurns() {
@@ -79,7 +50,7 @@ func toldIn(t *testing.T, s *QNTXServer, sent sigil.Sent) []string {
 	return said
 }
 
-// toldRows is each row of what was said to the Node Agent in session, as it wrote them down.
+// toldRows is each row of what was said to an agent of ROOT's in session, as it wrote them down.
 func toldRows(t *testing.T, s *QNTXServer, session string) []*types.As {
 	t.Helper()
 	told, err := s.held.TheNodesOwnRecords().GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
@@ -88,57 +59,44 @@ func toldRows(t *testing.T, s *QNTXServer, session string) []*types.As {
 	return told
 }
 
-// An element is kept under the agent's home by its id, so an id that is a path
-// is not an element.
-func TestAnElementIsNoPath(t *testing.T) {
-	s, ran := runningTheNodeAgent(t, opusLow)
-	for _, element := range []string{"../root", "a/b", ".", ".."} {
-		_, refused := saying(s, sigil.Sent{"says": "hello", "element": element})
-		require.NotNil(t, refused, element)
-		assert.Equal(t, sigil.Invalid, refused.GetWhy(), element)
-		assert.Equal(t, "element", refused.GetParam(), element)
-	}
-	runs, err := os.ReadDir(ran)
-	require.NoError(t, err)
-	assert.Empty(t, runs, "Claude Code was run for an element that is a path")
-}
+// "and its not the user Feedback form but literally an agent prompt, with the screenshot pasted right there."
 
-// "and its not the user Feedback form but literally an agent prompt, with the
-// screenshot pasted right there."
-// The screenshot uploaded to /api/files is put where the agent works, and the
-// prompt says where it is and to read it (ADR-054).
-func TestAShakenScreenshotIsPutWhereTheAgentReadsIt(t *testing.T) {
-	s, ran := runningTheNodeAgent(t, opusLow)
+// The screenshot uploaded to /api/files is put where the element's agent
+// works, and the prompt says where it is and to read it (ADR-054).
+func TestAShakenScreenshotIsPutWhereTheElementReadsIt(t *testing.T) {
+	s, ran := runningElementAgents(t)
+	home := filepath.Join(s.agentsDir, "elements", "note-1")
+	underGround(t, home)
 	s.dbPath = filepath.Join(t.TempDir(), "qntx.db")
 	files, err := s.filesDir()
 	require.NoError(t, err)
 	const id = "0b6e9a3c-1f5d-4c2e-9a7b-2d3e4f5a6b7c"
 	require.NoError(t, os.WriteFile(filepath.Join(files, id+".png"), []byte("PNG bytes"), 0o644))
 
-	answer, refused := saying(s, sigil.Sent{"says": "why is this red?", "element": "agent-element", "file_id": id})
+	answer, refused := sayingTo(s, "note-1", sigil.Sent{"says": "why is this red?", "file_id": id})
 	require.Nil(t, refused)
 	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
 
-	at := filepath.Join(s.nodeAgent.home, "work", "shake", id+".png")
+	at := filepath.Join(home, "work", "shake", id+".png")
 	copied, err := os.ReadFile(at)
 	require.NoError(t, err)
 	assert.Equal(t, "PNG bytes", string(copied))
 	// The stand-in writes one argument per line, and this one spans three.
-	args, err := os.ReadFile(filepath.Join(ran, "0", "args"))
+	args, err := os.ReadFile(filepath.Join(ran, theRunSaying(t, ran), "args"))
 	require.NoError(t, err)
-	assert.Contains(t, string(args), "-p\nwhy is this red?\n\nA screenshot of element agent-element is at "+at+". Read it.\n--output-format\n")
+	assert.Contains(t, string(args), "-p\nwhy is this red?\n\nA screenshot of element note-1 is at "+at+". Read it.\n--output-format\n")
 
 	// What was said is written down as it was said, and where the screenshot went.
 	told := toldRows(t, s, answer.GetSession())
 	require.Len(t, told, 1)
 	assert.Equal(t, "why is this red?", told[0].Attributes["prompt"])
-	assert.Equal(t, "agent-element", told[0].Attributes["element"])
+	assert.Equal(t, "note-1", told[0].Attributes["element"])
 	assert.Equal(t, at, told[0].Attributes["screenshot"])
 }
 
-// "say being able to carry an image sounds usefull to me, and being able to
-// attach an imagine whne in a mobile chat"
-// A picture attached in a chat with no element is carried the same way.
+// "say being able to carry an image sounds usefull to me, and being able to attach an imagine whne in a mobile chat"
+
+// A picture attached in the Node Agent's chat is carried the same way.
 func TestAPictureAttachedInChatIsCarriedToTheAgent(t *testing.T) {
 	s, ran := runningTheNodeAgent(t, opusLow)
 	s.dbPath = filepath.Join(t.TempDir(), "qntx.db")
@@ -168,12 +126,12 @@ func TestAPictureIsOneTheNodeHolds(t *testing.T) {
 	s, ran := runningTheNodeAgent(t, opusLow)
 	s.dbPath = filepath.Join(t.TempDir(), "qntx.db")
 
-	_, refused := saying(s, sigil.Sent{"says": "why?", "element": "agent-element", "file_id": "0b6e9a3c-1f5d-4c2e-9a7b-2d3e4f5a6b7c"})
+	_, refused := saying(s, sigil.Sent{"says": "why?", "file_id": "0b6e9a3c-1f5d-4c2e-9a7b-2d3e4f5a6b7c"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.GetWhy())
 	assert.Equal(t, "file_id", refused.GetParam())
 
-	_, refused = saying(s, sigil.Sent{"says": "why?", "element": "agent-element", "file_id": "../qntx.db"})
+	_, refused = saying(s, sigil.Sent{"says": "why?", "file_id": "../qntx.db"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.Invalid, refused.GetWhy())
 	assert.Equal(t, "file_id", refused.GetParam())
@@ -181,4 +139,85 @@ func TestAPictureIsOneTheNodeHolds(t *testing.T) {
 	runs, err := os.ReadDir(ran)
 	require.NoError(t, err)
 	assert.Empty(t, runs, "Claude Code was run with no screenshot to read")
+}
+
+// "AGENT PER ELEMENT, EACH ELEMENT IS ITS OWN CONVERSATION"
+
+// "DAY 3 SHAKE AGAIN, SAME ELEMENT"
+
+// "YES, WHERE WE LEFT OFF, SEPARATE FROM THE NODE AGENT"
+func TestEachElementIsItsOwnAgentAndItsOwnConversation(t *testing.T) {
+	s, ran := runningElementAgents(t)
+	noteHome := filepath.Join(s.agentsDir, "elements", "note-1")
+	axHome := filepath.Join(s.agentsDir, "elements", "ax-element")
+	underGround(t, noteHome)
+	underGround(t, axHome)
+
+	day1, refused := sayingTo(s, "note-1", sigil.Sent{"says": "the note is too wide"})
+	require.Nil(t, refused)
+	assert.Equal(t, "Up 3 days.", day1.GetAnswer())
+	day3, refused := sayingTo(s, "note-1", sigil.Sent{"says": "still too wide"})
+	require.Nil(t, refused)
+	other, refused := sayingTo(s, "ax-element", sigil.Sent{"says": "what is this?"})
+	require.Nil(t, refused)
+	node, refused := saying(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.Nil(t, refused)
+
+	// Day 3 goes on from day 1: one session, resumed.
+	assert.Equal(t, day1.GetSession(), day3.GetSession())
+	assert.NotEqual(t, day1.GetSession(), other.GetSession())
+	assert.NotEqual(t, day1.GetSession(), node.GetSession())
+	assert.NotEqual(t, other.GetSession(), node.GetSession())
+	kept, err := os.ReadFile(filepath.Join(noteHome, claudeSessionFile))
+	require.NoError(t, err)
+	assert.Equal(t, day1.GetSession(), strings.TrimSpace(string(kept)))
+	resumed := false
+	runs, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	for _, run := range runs {
+		if after(ranWith(t, ran, run.Name(), "args"), "--resume") == day1.GetSession() {
+			resumed = true
+		}
+	}
+	assert.True(t, resumed, "day 3 did not resume day 1's session")
+
+	// Each element is its own agent: its own key, told it is that element, run as [agent.root] says.
+	note, refused := s.holdElementAgent("note-1")
+	require.Nil(t, refused)
+	ax, refused := s.holdElementAgent("ax-element")
+	require.Nil(t, refused)
+	assert.NotEqual(t, note.did, ax.did)
+	assert.NotEqual(t, note.did, s.nodeAgent.did)
+	assert.Equal(t, noteHome, note.home)
+	args := ranWith(t, ran, theRunSaying(t, ran), "args")
+	assert.Contains(t, after(args, "--append-system-prompt"), "You are the element note-1")
+	assert.Contains(t, after(args, "--append-system-prompt"), note.did)
+	assert.Equal(t, opusLow.Model, after(args, "--model"))
+	assert.Contains(t, ranWith(t, ran, theRunSaying(t, ran), "env"), "CLAUDE_CODE_OAUTH_TOKEN=the-plan-token")
+
+	// Its conversation is the node's own record, and each row names the element.
+	told := toldRows(t, s, day1.GetSession())
+	require.Len(t, told, 2)
+	for _, row := range told {
+		assert.Equal(t, "note-1", row.Attributes["element"])
+	}
+	for _, row := range toldRows(t, s, node.GetSession()) {
+		assert.NotContains(t, row.Attributes, "element")
+	}
+	assert.Equal(t, []string{"the note is too wide", "still too wide"}, toldTo(t, s, "note-1"))
+}
+
+// An element's agent is kept under the node's agents by the element's id, so
+// an id that is a path is not an element.
+func TestAnElementIsNoPath(t *testing.T) {
+	s, ran := runningElementAgents(t)
+	for _, element := range []string{"../root", "a/b", ".", ".."} {
+		_, refused := sayingTo(s, element, sigil.Sent{"says": "hello"})
+		require.NotNil(t, refused, element)
+		assert.Equal(t, sigil.Invalid, refused.GetWhy(), element)
+		assert.Equal(t, "element", refused.GetParam(), element)
+	}
+	runs, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	assert.Empty(t, runs, "Claude Code was run for an element that is a path")
 }

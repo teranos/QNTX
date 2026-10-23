@@ -16,7 +16,6 @@ import (
 	"github.com/teranos/QNTX/internal/claudecode"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/secretref"
-	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/comet"
@@ -54,6 +53,8 @@ type rootAgent struct {
 	namespace string
 	// called is the agent as a sentence names it.
 	called string
+	// element is the element this agent is, for an element's agent (ADR-054); empty for the others.
+	element string
 }
 
 // agentSpec is how an agent runs in Claude Code: am.toml's [agent.root] for
@@ -71,34 +72,23 @@ func specOf(root appcfg.NodeAgentConfig) agentSpec {
 	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef}
 }
 
-// in is the agent's session in h: the one it continues when no element is named.
-func (a *rootAgent) in(h *harness) *inHarness { return a.inElement(h, "") }
-
-// "each element is an agent as well"
-
-// inElement is the agent's session in h with the element named (ADR-054): the
-// element's own continuing session with the same agent, kept under
-// elements/<element> in its home. The turn is the agent's, in every element.
-func (a *rootAgent) inElement(h *harness, element string) *inHarness {
+// in is the agent's session in h: the one it continues.
+func (a *rootAgent) in(h *harness) *inHarness {
 	a.sessionsMu.Lock()
 	defer a.sessionsMu.Unlock()
 	if a.sessions == nil {
 		a.sessions = map[string]*inHarness{}
 		a.turn = make(chan struct{}, 1)
 	}
-	key, file := h.name, h.file
-	if element != "" {
-		key, file = h.name+"/"+slug.Of(element), filepath.Join(elementsDir, slug.Of(element), h.file)
-	}
-	held, ok := a.sessions[key]
+	held, ok := a.sessions[h.name]
 	if !ok {
-		held = &inHarness{file: file, turn: a.turn}
-		a.sessions[key] = held
+		held = &inHarness{file: h.file, turn: a.turn}
+		a.sessions[h.name] = held
 	}
 	return held
 }
 
-// elementsDir is where an agent's sessions by element are kept, under its home.
+// elementsDir is where the node keeps each element's agent, beside ROOT's (ADR-054).
 const elementsDir = "elements"
 
 // inHarness is the Node Agent's session in one harness: where it is kept, and
@@ -181,6 +171,16 @@ func (a *rootAgent) keepIn(file, id string) error {
 // isSaidToBe is what the Node Agent additionally is, said to Claude Code with
 // everything said to it.
 func (a *rootAgent) isSaidToBe() string {
+	// "THE CONVERSATION IS WITH THE ELEMENT"
+	if a.element != "" {
+		return "You are the element " + a.element + " of a QNTX node's page, as ROOT speaks to it: one element, one conversation, continued every time ROOT shakes the phone with you on screen. " +
+			"ROOT says what they see, with a screenshot of you; what you do about it is the prompt. " +
+			"You run on the machine the node runs on, as the user the node runs as. " +
+			"Your DID is " + a.did + ". " +
+			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
+			"Your git is your own: commits are authored as you, and when you push to GitHub your git asks the node for what carries the push. " +
+			"Never ask for, read, print or store a GitHub credential yourself."
+	}
 	if a.namespace != auth.NamespaceSystem {
 		return "You are the agent of the namespace " + a.namespace + " on a QNTX node, shared by everyone who has reach on that namespace. " +
 			"Your DID is " + a.did + ". " +

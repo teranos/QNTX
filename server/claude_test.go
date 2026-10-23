@@ -281,7 +281,7 @@ func TestTheNodeAgentIsOneSessionWhereverItsSpeakersStand(t *testing.T) {
 // speaker and text.
 func sessionSaid(t *testing.T, s *QNTXServer) [][2]string {
 	t.Helper()
-	answer, refused := s.harnessSession(s.claudeHarness(), nil)
+	answer, refused := s.harnessSession(s.claudeHarness())
 	require.Nil(t, refused)
 	holds(t, s.nodeAgentSignum(), "session", answer)
 	var said [][2]string
@@ -366,7 +366,7 @@ func TestANodeAgentThatDidNotStartSaysWhy(t *testing.T) {
 	assert.Equal(t, sigil.Failed, refused.GetWhy())
 	assert.Contains(t, refused.GetSays(), "tok-1 is switched off")
 
-	_, refused = s.harnessAm(s.claudeHarness(), nil)
+	_, refused = s.harnessAm(s.claudeHarness())
 	require.NotNil(t, refused)
 	assert.Contains(t, refused.GetSays(), "tok-1 is switched off")
 }
@@ -376,7 +376,7 @@ func TestANodeAgentThatDidNotStartSaysWhy(t *testing.T) {
 func TestTheNodeAgentSaysWhoItIs(t *testing.T) {
 	s, _ := runningTheNodeAgent(t, opusLow)
 
-	before, refused := s.harnessAm(s.claudeHarness(), nil)
+	before, refused := s.harnessAm(s.claudeHarness())
 	require.Nil(t, refused)
 	is := before.(*protocol.ClaudeAm)
 	assert.Equal(t, s.nodeAgent.did, is.GetDid())
@@ -389,7 +389,7 @@ func TestTheNodeAgentSaysWhoItIs(t *testing.T) {
 
 	answer, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
-	after, refused := s.harnessAm(s.claudeHarness(), nil)
+	after, refused := s.harnessAm(s.claudeHarness())
 	require.Nil(t, refused)
 	assert.Equal(t, answer.GetSession(), after.(*protocol.ClaudeAm).GetSession())
 }
@@ -399,7 +399,7 @@ func TestTheNodeAgentSaysWhoItIs(t *testing.T) {
 func TestTheNodeAgentSaysWhenItIsAnswering(t *testing.T) {
 	s, _ := runningTheNodeAgent(t, opusLow)
 	am := func() *protocol.ClaudeAm {
-		is, refused := s.harnessAm(s.claudeHarness(), nil)
+		is, refused := s.harnessAm(s.claudeHarness())
 		require.Nil(t, refused)
 		return is.(*protocol.ClaudeAm)
 	}
