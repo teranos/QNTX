@@ -78,6 +78,33 @@ func (t Turn) Follow(ctx context.Context, each func(Message)) (Answer, error) {
 	return follow(ctx, t.Stream, func() bool { return pidRuns(t.Stream) }, each)
 }
 
+// Interrupt stops the turn printing to the stream named name under home, the
+// way a person stops it: an interrupt, to its process group when it leads one
+// of its own. What it printed until then stays in the stream, and whoever
+// follows it reads it ending unanswered. A turn already gone is no error.
+func Interrupt(home, name string) error {
+	stream := filepath.Join(turnsDir(home), name)
+	held, err := os.ReadFile(stream + ".pid")
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return errors.Wrapf(err, "the pid of the turn printing to %s did not read", stream)
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(held)))
+	if err != nil {
+		return errors.Wrapf(err, "%s.pid holds no pid", stream)
+	}
+	to := pid
+	if group, err := syscall.Getpgid(pid); err == nil && group == pid {
+		to = -pid
+	}
+	if err := syscall.Kill(to, syscall.SIGINT); err != nil && !errors.Is(err, syscall.ESRCH) {
+		return errors.Wrapf(err, "the turn printing to %s, process %d, was not interrupted", stream, pid)
+	}
+	return nil
+}
+
 // pidRuns is whether the process the stream names is still there.
 func pidRuns(stream string) bool {
 	held, err := os.ReadFile(stream + ".pid")

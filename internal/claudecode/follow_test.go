@@ -3,10 +3,14 @@ package claudecode
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"testing"
 	"time"
+
+	errors "github.com/teranos/sacred-error"
 )
 
 // A node that stopped reading a turn leaves its stream where it was, and the
@@ -75,5 +79,38 @@ func TestATurnTheNodeStoppedReadingIsReadOnByTheNext(t *testing.T) {
 	}
 	if len(left) != 0 {
 		t.Errorf("a turn read to its end is still pending: %+v", left)
+	}
+}
+
+// A turn is interrupted the way a person stops it, its whole process group
+// when it leads one, and one already gone is no error.
+func TestATurnIsInterruptedTheWayAPersonStopsIt(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(turnsDir(home), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	name := "s.1" + streamExt
+	if err := Interrupt(home, name); err != nil {
+		t.Fatalf("a turn with no process was not left be: %v", err)
+	}
+
+	cmd := exec.Command("sleep", "30")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(turnsDir(home), name+".pid"), []byte(strconv.Itoa(cmd.Process.Pid)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Interrupt(home, name); err != nil {
+		t.Fatal(err)
+	}
+	err := cmd.Wait()
+	var exited *exec.ExitError
+	if !errors.As(err, &exited) || exited.Sys().(syscall.WaitStatus).Signal() != syscall.SIGINT {
+		t.Fatalf("the turn did not end on an interrupt: %v", err)
+	}
+	if err := Interrupt(home, name); err != nil {
+		t.Fatalf("a turn already gone was an error: %v", err)
 	}
 }
