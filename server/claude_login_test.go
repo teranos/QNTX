@@ -56,7 +56,7 @@ func TestSigningInIsClaudeCodesOwnFlow(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "the-code-shown\n", string(kept), "what the sign-in leaves is Claude Code's, in the agent's config dir")
 
-	is, refused := s.harnessAm(s.claudeHarness(), nil)
+	is, refused := s.harnessAm(s.claudeHarness())
 	require.Nil(t, refused)
 	am := is.(*protocol.ClaudeAm)
 	assert.True(t, am.GetSignedIn())

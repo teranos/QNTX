@@ -72,22 +72,22 @@ func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "say",
-					Does:   "Says something to the Node Agent in the harness named and gives what it answered. In each harness it is one session that continues, written down by the agent as it goes and read with agent session; an element named has its own session that continues (ADR-054).",
-					Takes:  append([]*protocol.Param{harness, {Name: "says", Required: true, Says: "What is said to it."}, elementParam(), screenshotParam()}, claude.sayTakes...),
+					Does:   "Says something to the Node Agent in the harness named and gives what it answered. In each harness it is one session that continues, written down by the agent as it goes and read with agent session. A picture attached travels by its file id (ADR-054).",
+					Takes:  append([]*protocol.Param{harness, {Name: "says", Required: true, Says: "What is said to it."}, screenshotParam()}, claude.sayTakes...),
 					Answer: "protocol.NodeAgentSaid",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: nodeAgentPath + "/say"},
 				},
 				{
 					Name:   "am",
-					Does:   "Who the Node Agent is and how the node runs it, in the harness named; the session said is the element's when one is named.",
-					Takes:  []*protocol.Param{harness, elementParam()},
+					Does:   "Who the Node Agent is and how the node runs it, in the harness named.",
+					Takes:  []*protocol.Param{harness},
 					Answer: "protocol.NodeAgentAm",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: nodeAgentPath},
 				},
 				{
 					Name:   "session",
-					Does:   "The Node Agent's one session in the harness named, or the element's when one is named, whole: everything said to it there by whoever said it, as a transcript.",
-					Takes:  []*protocol.Param{harness, elementParam()},
+					Does:   "The Node Agent's one session in the harness named, whole: everything said to it there by whoever said it, as a transcript.",
+					Takes:  []*protocol.Param{harness},
 					Answer: "protocol.SessionTranscript",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: nodeAgentPath + "/session"},
 				},
@@ -137,7 +137,7 @@ func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *prot
 	if refused != nil {
 		return nil, refused
 	}
-	answer, refused := s.harnessAm(h, sent)
+	answer, refused := s.harnessAm(h)
 	if refused != nil {
 		return nil, refused
 	}
@@ -155,7 +155,7 @@ func (s *QNTXServer) nodeAgentSession(_ context.Context, sent sigil.Sent) (any, 
 	if refused != nil {
 		return nil, refused
 	}
-	return s.harnessSession(h, sent)
+	return s.harnessSession(h)
 }
 
 // harnessAgent is the agent, when it can be spoken to in h.
@@ -183,11 +183,7 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	if caller == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to " + agent.called + " is written down with who said it, and this asking carried no request"}
 	}
-	element, refused := elementNamed(sent)
-	if refused != nil {
-		return nil, refused
-	}
-	screenshot, refused := s.screenshotFor(agent, element, sent)
+	screenshot, refused := s.screenshotFor(agent, sent)
 	if refused != nil {
 		return nil, refused
 	}
@@ -195,47 +191,16 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	if refused != nil {
 		return nil, refused
 	}
-	t.in, t.called, t.element, t.screenshot = agent.inElement(h, element), h.called, element, screenshot
+	t.in, t.called, t.element, t.screenshot = agent.in(h), h.called, agent.element, screenshot
 	return s.sayInHarness(ctx, caller, agent, sent["says"], t)
 }
 
-func (s *QNTXServer) harnessAm(h *harness, sent sigil.Sent) (any, *protocol.Refusal) {
+func (s *QNTXServer) harnessAm(h *harness) (any, *protocol.Refusal) {
 	agent, refused := s.harnessAgent(h)
 	if refused != nil {
 		return nil, refused
 	}
-	element, refused := elementNamed(sent)
-	if refused != nil {
-		return nil, refused
-	}
-	return s.amOf(h, agent, h.spec(), element), nil
-}
-
-// amOf is who one agent in h is and how the node runs it, and the session it
-// is in: the element's when one is named.
-func (s *QNTXServer) amOf(h *harness, agent *rootAgent, spec agentSpec, element string) proto.Message {
-	in := agent.inElement(h, element)
-	is := agentIn{did: agent.did}
-	session, kept, err := agent.sessionIn(in.file)
-	if err != nil {
-		is.notReady = err.Error()
-	} else if kept {
-		is.session = session
-	}
-	// A first turn is in a session not kept yet, and is read all the same.
-	if going := in.answering.Load(); going != nil {
-		is.answering, is.session = true, going.session
-	}
-	// Asked without waiting: a fetch still going is said, not sat through.
-	switch path, arrived, err := s.harnessHeldBy(h.name).Now(); {
-	case !arrived:
-		is.notReady = h.fetching
-	case err != nil:
-		is.notReady = err.Error()
-	default:
-		is.path = path
-	}
-	return h.am(is, agent, spec)
+	return s.amOf(h, agent, h.spec()), nil
 }
 
 // agentIn is what am says of the agent in every harness: its DID, the session
@@ -248,16 +213,12 @@ type agentIn struct {
 
 // harnessSession reads the agent's session in h from where it is written, so
 // whoever may talk to it reads all of it, wherever they stand.
-func (s *QNTXServer) harnessSession(h *harness, sent sigil.Sent) (any, *protocol.Refusal) {
+func (s *QNTXServer) harnessSession(h *harness) (any, *protocol.Refusal) {
 	agent, refused := s.harnessAgent(h)
 	if refused != nil {
 		return nil, refused
 	}
-	element, refused := elementNamed(sent)
-	if refused != nil {
-		return nil, refused
-	}
-	return s.readAgentSession(agent, agent.inElement(h, element))
+	return s.readAgentSession(agent, agent.in(h))
 }
 
 // harnessesHeld is each harness's binary on this node, by the harness's name.

@@ -252,6 +252,21 @@
         "ROOT"
       ]
     },
+    "/api/elements/{element}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/elements/{element}/say": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/elements/{element}/session": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/embeddings/batch": {
       "x-qntx-reach": [
         "ROOT"
