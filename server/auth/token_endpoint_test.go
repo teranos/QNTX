@@ -33,7 +33,7 @@ func codeFor(t *testing.T, h *Handler, did string) (code, verifier string) {
 	finish.AddCookie(&http.Cookie{Name: homewardCookieName, Value: ticket.Value})
 	session, err := h.sessions.create(mastodonAccount, User{ID: "US-1", DisplayName: "onf"})
 	require.NoError(t, err)
-	next := h.finished(httptest.NewRecorder(), finish, session, mastodonAccount)["return"].(string)
+	next := finishedReturn(t, h, finish, session)
 	done := httptest.NewRecorder()
 	h.handleAuthorizeDone(done, httptest.NewRequest(http.MethodGet, next, nil))
 	require.Equal(t, http.StatusSeeOther, done.Code, done.Body.String())

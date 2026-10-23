@@ -85,8 +85,8 @@ func (h *Handler) assertedClient(form url.Values, now time.Time) (fosite.Client,
 		if !ok {
 			return nil, errors.Newf("no client answers to %q", subject)
 		}
-		if !found.Node {
-			return nil, errors.Newf("%s is sent codes; only a node signs as its key", found.DID)
+		if !found.Node && !found.App {
+			return nil, errors.Newf("%s is sent codes; only a node or an App signs as its key", found.DID)
 		}
 		key, err := DecodeUserDID(found.DID)
 		if err != nil {

@@ -204,7 +204,8 @@ func TestTheWayHomeCarriesThePicture(t *testing.T) {
 
 	finish := httptest.NewRequest(http.MethodPost, "/auth/login/finish", nil)
 	finish.AddCookie(&http.Cookie{Name: homewardCookieName, Value: "the-ticket"})
-	h.sentHome(httptest.NewRecorder(), finish, "s3ss", "google:110")
+	_, err := h.sentHome(httptest.NewRecorder(), finish, "s3ss", "google:110", "")
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodGet, homewardResultPath+"?home=the-ticket", nil)
 	r.Header.Set("Origin", "https://portal.garden.test")

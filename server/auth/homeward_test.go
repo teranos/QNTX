@@ -78,7 +78,8 @@ func TestAPasskeyDoneAtHomeSendsThePersonBackToTheDoor(t *testing.T) {
 	r.AddCookie(&http.Cookie{Name: homewardCookieName, Value: "the-ticket"})
 	w := httptest.NewRecorder()
 
-	back := h.sentHome(w, r, "s3ss", mastodonAccount)
+	back, err := h.sentHome(w, r, "s3ss", mastodonAccount, "")
+	require.NoError(t, err)
 
 	assert.Equal(t, "https://portal.garden.test?home=the-ticket", back)
 	val, ok := h.heldSessions.Load("the-ticket")
@@ -93,7 +94,9 @@ func TestAFinishWithNoTicketStaysHome(t *testing.T) {
 	h := handlerWithDoors(t, garden())
 	r := httptest.NewRequest(http.MethodPost, "/auth/login/finish", nil)
 	w := httptest.NewRecorder()
-	assert.Equal(t, "", h.sentHome(w, r, "s3ss", mastodonAccount))
+	back, err := h.sentHome(w, r, "s3ss", mastodonAccount, "")
+	require.NoError(t, err)
+	assert.Equal(t, "", back)
 }
 
 // Only the door the journey started from collects the session, and once.

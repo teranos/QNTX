@@ -516,7 +516,9 @@ func namespacesOf(session *TokenSession) []string {
 
 // clientFor is the client as fosite holds it. A node is sent a code for the
 // people it sends here to log in, at its own way back. It signs as its key
-// each time, so it is handed no refresh token.
+// each time, so it is handed no refresh token. An App is the person's own
+// device and stays signed in: its refresh token is spent signing as its key,
+// so the token alone is not enough.
 func clientFor(found Client) *fosite.DefaultClient {
 	if found.Node {
 		return &fosite.DefaultClient{
@@ -705,6 +707,11 @@ func (h *Handler) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusInternalServerError, "the ticket was not made")
 		return
 	}
+	// The App proves its key in its own WebView, and the passkey is done in
+	// the sheet, which holds no half-admission of its own. It carries what it
+	// proved here, the way a door's way home carries it.
+	h.carryPending(w, r)
+
 	now := time.Now()
 	h.authorizings.Store(ticket, authorizing{request: request, startedAt: now})
 	// The client is the door. The journey's door is the node's own done page:
