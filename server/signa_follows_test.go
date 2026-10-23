@@ -12,19 +12,21 @@ import (
 )
 
 // resolvesTo is the message a full name names, or nil: QNTX's own, or one the
-// pinned A2A spec declares, which a card is read through.
+// pinned A2A or OASF spec declares, which a card or a record is read through.
 func resolvesTo(name string) protoreflect.MessageDescriptor {
 	found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(name))
 	if err == nil {
 		return found.Descriptor()
 	}
-	files, refused := parity.Descriptors("a2a")
-	if refused != nil {
-		return nil
-	}
-	for _, file := range files {
-		if declared := file.Messages().ByName(protoreflect.FullName(name).Name()); declared != nil && string(declared.FullName()) == name {
-			return declared
+	for _, reference := range []string{"a2a", "oasf"} {
+		files, refused := parity.Descriptors(reference)
+		if refused != nil {
+			continue
+		}
+		for _, file := range files {
+			if declared := file.Messages().ByName(protoreflect.FullName(name).Name()); declared != nil && string(declared.FullName()) == name {
+				return declared
+			}
 		}
 	}
 	return nil
