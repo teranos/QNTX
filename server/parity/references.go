@@ -27,9 +27,9 @@ import (
 // to, a schema.json as JSON Schema, a .d.ts as the TypeScript types it
 // declares, an openapi.json as the operations and schemas of an OpenAPI
 // description. A .proto that imports by its path is pinned at that path:
-// oasf's are under agntcy/.
+// oasf's are under agntcy/, and its skill taxonomy under schema/skills/.
 //
-//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy
+//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory

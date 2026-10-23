@@ -69,6 +69,7 @@ func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
 			Name:        "agent",
 			Description: "The Node Agent: QNTX itself as expressed to ROOT, run by the node in Claude Code or in Pi.",
 			Tags:        []string{"agent", "root"},
+			Oasf:        []string{"ai_ml_engineering/agent_orchestration/multi_agent_coordination"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "say",

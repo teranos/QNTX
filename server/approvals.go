@@ -238,6 +238,7 @@ func (s *QNTXServer) approvalsSignum() sigil.Signum {
 			Name:        "approvals",
 			Description: "Approvals: every pull request against main that waits on ROOT, with the checks on its head and what stands. The answer is the human's, through the approvals element, and no sigil.",
 			Tags:        []string{"approval", "pull request", "merge"},
+			Oasf:        []string{"software_engineering/version_control/pull_request_management"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "list",
