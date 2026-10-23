@@ -463,7 +463,7 @@
           hermes = (builtins.getFlake
             "github:NousResearch/hermes-agent/bf0203a794a07aac3ff764972ab9087baa4e4f4e"
           ).packages.${system}.minimal;
-pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
+        } // pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
           # The pinned Supabase Postgres server, which make parity runs
           # ats-postgres's migrations in: postgresql_17, the server psql_17 is
           # built on, without its extensions. ats-postgres uses none, and the
