@@ -1,6 +1,9 @@
 package parity
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 // A skill is named by its path in the taxonomy, and its id is derived from
 // that path as OASF derives it.
@@ -28,5 +31,35 @@ func TestOASFSkills(t *testing.T) {
 			t.Errorf("%s and %s are both %d", name, other, id)
 		}
 		ids[id] = name
+	}
+}
+
+// A module is named and numbered as a skill is: integration/a2a is 203 and
+// core/observability 101, as OASF's own server answers them.
+func TestOASFModules(t *testing.T) {
+	modules, refused := OASFModules()
+	if refused != nil {
+		t.Fatal(refused)
+	}
+	for name, id := range map[string]uint32{"integration/a2a": 203, "integration/mcp": 202, "core/observability": 101} {
+		if got, found := modules[name]; !found || got != id {
+			t.Errorf("%s is %d (held: %v), and OASF derives %d", name, got, found, id)
+		}
+	}
+}
+
+// What OASF requires of a Record, and the schema version it names, are read
+// from the pin.
+func TestOASFRecordRequirements(t *testing.T) {
+	required, refused := OASFRequired("record")
+	if refused != nil {
+		t.Fatal(refused)
+	}
+	if !slices.Equal(required, []string{"name", "version", "schema_version", "description", "authors", "created_at", "skills"}) {
+		t.Errorf("a Record requires %v", required)
+	}
+	version, refused := OASFSchemaVersion()
+	if refused != nil || version != "1.1.0" {
+		t.Errorf("the schema version is %q: %v", version, refused)
 	}
 }

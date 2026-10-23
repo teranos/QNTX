@@ -1,0 +1,9 @@
+{
+  "uid": 1,
+  "caption": "Core",
+  "description": "Modules that provide essential functionalities and services.",
+  "extends": "base_module",
+  "name": "core",
+  "category": true,
+  "attributes": {}
+}

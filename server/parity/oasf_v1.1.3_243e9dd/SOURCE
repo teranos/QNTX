@@ -20,3 +20,13 @@ commit: git tree 369dbe85b1086315e3cacaadd29dea6e2dfedd45
 A Record names a skill by its path in it and the id derived from that path
 (server/lib/schema/types.ex: class_uid(category_uid, class_id) =
 category_uid * 100 + class_id).
+
+schema/modules is its module taxonomy, the same way: git tree
+bd97cf285a47628f44687bd4cbf3ba71cce1e7a6. A Record names a module by its
+path and the id derived from it, integration/a2a as 203.
+
+d80d02f02fbd89f5361ab1ff8ad9089e6f1b5f3df60f44397959d92006c70655  schema/objects/record.json
+de76543832fed28163b6108c2401b41d8052b7db1989fb621a0a4e314b8551e5  schema/version.json
+
+record.json is what OASF requires of a Record, and version.json the schema
+version a Record names.
