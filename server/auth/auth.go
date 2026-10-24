@@ -27,6 +27,10 @@ var loginHTML []byte
 
 const sessionCookieName = "qntx_session"
 
+// SessionCookie is the cookie a passkey session is carried in, as the agent
+// card declares it (A2A §13.3).
+const SessionCookie = sessionCookieName
+
 // Handler provides WebAuthn authentication endpoints and middleware.
 type Handler struct {
 	webauthn *webauthn.WebAuthn

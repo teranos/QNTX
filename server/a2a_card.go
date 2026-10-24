@@ -44,6 +44,7 @@ func (s *QNTXServer) cardBase(r *http.Request) a2a.Card {
 		URL:         a2aURL(r),
 		Skills:      []a2a.Skill{},
 		Extensions:  []a2a.Extension{s.nodeExtension(r)},
+		Session:     auth.SessionCookie,
 	}
 }
 
