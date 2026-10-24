@@ -2516,8 +2516,12 @@ type PluginInfo struct {
 	SignaRefused []string `protobuf:"bytes,15,rep,name=signa_refused,json=signaRefused,proto3" json:"signa_refused,omitempty"`
 	// The plugin's record: where it was added from, and whether it is switched
 	// on.
-	Repo          string `protobuf:"bytes,16,opt,name=repo,proto3" json:"repo,omitempty"`
-	Enabled       bool   `protobuf:"varint,17,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Repo    string `protobuf:"bytes,16,opt,name=repo,proto3" json:"repo,omitempty"`
+	Enabled bool   `protobuf:"varint,17,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// What still stands between this plugin and its tools working, besides
+	// enabling it: each thing its record lacks, as the node reads it. Empty is
+	// nothing.
+	Setup         []string `protobuf:"bytes,18,rep,name=setup,proto3" json:"setup,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2669,6 +2673,13 @@ func (x *PluginInfo) GetEnabled() bool {
 		return x.Enabled
 	}
 	return false
+}
+
+func (x *PluginInfo) GetSetup() []string {
+	if x != nil {
+		return x.Setup
+	}
+	return nil
 }
 
 // PluginHealthProbe is when the health in plugins list was probed. Health here
@@ -3439,7 +3450,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\n" +
 	"ReachEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12*\n" +
-	"\x05value\x18\x02 \x01(\v2\x14.protocol.SigilReachR\x05value:\x028\x01\"\xcc\x04\n" +
+	"\x05value\x18\x02 \x01(\v2\x14.protocol.SigilReachR\x05value:\x028\x01\"\xe2\x04\n" +
 	"\n" +
 	"PluginInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
@@ -3459,7 +3470,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x06sigils\x18\x0e \x03(\v2\x12.protocol.SigilRowR\x06sigils\x12#\n" +
 	"\rsigna_refused\x18\x0f \x03(\tR\fsignaRefused\x12\x12\n" +
 	"\x04repo\x18\x10 \x01(\tR\x04repo\x12\x18\n" +
-	"\aenabled\x18\x11 \x01(\bR\aenabled\x1a:\n" +
+	"\aenabled\x18\x11 \x01(\bR\aenabled\x12\x14\n" +
+	"\x05setup\x18\x12 \x03(\tR\x05setup\x1a:\n" +
 	"\fDetailsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"G\n" +
