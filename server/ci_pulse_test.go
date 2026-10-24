@@ -1,17 +1,24 @@
 package server
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/statusline"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
 
@@ -21,8 +28,14 @@ type scriptedGitHub struct {
 	history    string
 	commits    []string
 	dispatched []string
-	asked      []string
-	tokens     []string
+	// artifacts is a run's artifact listing, by run id. zips is what each
+	// archive_download_url holds, served by blobs where locate points.
+	artifacts map[string]string
+	zips      map[string][]byte
+	blobs     *httptest.Server
+	located   []string
+	asked     []string
+	tokens    []string
 }
 
 const wholeSha = "abc123def4567890abc123def4567890abc123de"
@@ -32,6 +45,13 @@ func (g *scriptedGitHub) get(_ context.Context, token, url string) ([]byte, erro
 	g.tokens = append(g.tokens, token)
 	if strings.Contains(url, "branch=") {
 		return []byte(g.history), nil
+	}
+	if before, _, ok := strings.Cut(url, "/artifacts"); ok {
+		_, run, _ := strings.Cut(before, "/actions/runs/")
+		if listed, ok := g.artifacts[run]; ok {
+			return []byte(listed), nil
+		}
+		return []byte(`{"total_count":0,"artifacts":[]}`), nil
 	}
 	// The commits endpoint answers a prefix with the whole sha.
 	if strings.Contains(url, "/commits/abc123") {
@@ -52,6 +72,34 @@ func (g *scriptedGitHub) get(_ context.Context, token, url string) ([]byte, erro
 	next := g.commits[0]
 	g.commits = g.commits[1:]
 	return []byte(next), nil
+}
+
+// locate points an archive_download_url at blobs, as GitHub points it at a
+// signed URL.
+func (g *scriptedGitHub) locate(_ context.Context, token, archive string) (string, error) {
+	g.located = append(g.located, archive)
+	g.tokens = append(g.tokens, token)
+	if _, ok := g.zips[archive]; !ok || g.blobs == nil {
+		return "", errors.Newf("github answered 404 for %s", archive)
+	}
+	return g.blobs.URL + "/?zip=" + url.QueryEscape(archive), nil
+}
+
+// servingZips starts the blob store locate points at.
+func servingZips(t *testing.T, g *scriptedGitHub) {
+	t.Helper()
+	g.blobs = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			t.Errorf("the token went to the signed URL")
+		}
+		zipped, ok := g.zips[r.URL.Query().Get("zip")]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(zipped)
+	}))
+	t.Cleanup(g.blobs.Close)
 }
 
 func noHistory() string { return `{"workflow_runs":[]}` }
@@ -89,10 +137,11 @@ func jobFor(t *testing.T, as *types.As) *async.Job {
 
 func handlerOver(gh *scriptedGitHub, news *statusline.NewsLog) *ciWatchHandler {
 	return &ciWatchHandler{
-		get:   gh.get,
-		token: func(context.Context) (string, error) { return "tok-1", nil },
-		sleep: func(context.Context, time.Duration) error { return nil },
-		news:  news,
+		get:    gh.get,
+		locate: gh.locate,
+		token:  func(context.Context) (string, error) { return "tok-1", nil },
+		sleep:  func(context.Context, time.Duration) error { return nil },
+		news:   news,
 		// The push was attested by alice's ground token; the news is hers.
 		mintedBy: func(did string) (string, bool) {
 			if did == "did:key:alice" {
@@ -149,7 +198,8 @@ func TestCIWatchLeavesNewsWhenTheRunConcludes(t *testing.T) {
 	if n.UntilMs <= time.Now().UnixMilli() {
 		t.Errorf("news left already expired: until=%d", n.UntilMs)
 	}
-	if len(gh.asked) != 4 {
+	// History, the commit, the runs twice, and each green run's artifacts.
+	if len(gh.asked) != 6 {
 		t.Errorf("github was asked %d times: %v", len(gh.asked), gh.asked)
 	}
 	for _, tok := range gh.tokens {
@@ -573,5 +623,173 @@ func TestCIWatchSaysWhenAPushStartedNoRun(t *testing.T) {
 	}
 	if !got[0].Quiet {
 		t.Error("no run is not a verdict, and no session is woken for it")
+	}
+}
+
+// "can we use a github runner, hosted public one, to do ci benchmarking of the
+// CTFE, and make sure those results end up in QNTX"
+// ground's bench workflow uploads its row as an artifact; the node takes it.
+
+const benchRun = "https://github.com/teranos/ground/actions/runs/41"
+
+const benchArchive = "https://api.github.com/repos/teranos/ground/actions/artifacts/77/zip"
+
+var benchConcluded = time.Date(2026, 10, 24, 9, 0, 0, 0, time.UTC)
+
+const benchJSON = `{"subjects":["ground:v0.9.1"],"predicates":["bench:ctfe"],"contexts":["github:ubuntu"],"actors":["ground-ci"],"source":"ground-ci","attributes":{"seconds":38.82,"peak_kib":472848,"ldc":"LDC - the LLVM D compiler (1.41.0):","sha":"` + wholeSha + `","version":"v0.9.1","runner":"ubuntu","run":"` + benchRun + `"}}`
+
+func aRunWithID(id, name, conclusion, url string, updated time.Time) string {
+	return `{"id":` + id + `,"name":"` + name + `","status":"completed","conclusion":"` + conclusion + `","html_url":"` + url + `","updated_at":"` + updated.UTC().Format(time.RFC3339) + `"}`
+}
+
+func artifactsJSON(name, archive string) string {
+	return `{"total_count":1,"artifacts":[{"id":77,"name":"` + name + `","archive_download_url":"` + archive + `"}]}`
+}
+
+func zipOf(t *testing.T, name, content string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	f, err := w.Create(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write([]byte(content)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// A GitHub whose push ran bench, green, with its artifact holding content.
+func benchGitHub(t *testing.T, artifact, file, content string, pushes int) *scriptedGitHub {
+	gh := &scriptedGitHub{
+		history:   noHistory(),
+		artifacts: map[string]string{"41": artifactsJSON(artifact, benchArchive)},
+		zips:      map[string][]byte{benchArchive: zipOf(t, file, content)},
+	}
+	for range pushes {
+		gh.commits = append(gh.commits, runsJSON(aRunWithID("41", "bench", "success", benchRun, benchConcluded)))
+	}
+	servingZips(t, gh)
+	return gh
+}
+
+// The store of the push row's namespace, refusing any other.
+func groundStore(t *testing.T, h *ciWatchHandler) ats.AttestationStore {
+	t.Helper()
+	store, _ := createTestStore(t)
+	h.store = func(namespace string) (ats.AttestationStore, error) {
+		if namespace != "Ground" {
+			t.Errorf("the bench was written to %q; the push row is in Ground", namespace)
+		}
+		return store, nil
+	}
+	return store
+}
+
+func benchesIn(t *testing.T, store ats.AttestationStore) []*types.As {
+	t.Helper()
+	got, err := store.GetAttestations(ats.AttestationFilter{Predicates: []string{"bench:ctfe"},
+		TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+// "ground things need to go to ground namespace on k"
+// The row lands in the namespace the push row did, as the artifact gave it,
+// dated when the run concluded.
+func TestCIWatchTakesARunsBenchAsAnAttestation(t *testing.T) {
+	gh := benchGitHub(t, "bench-ctfe", "bench-ctfe.json", benchJSON, 1)
+	h := handlerOver(gh, statusline.NewNewsLog())
+	store := groundStore(t, h)
+
+	if err := h.Execute(quote.WithNamespace(context.Background(), "Ground"), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	got := benchesIn(t, store)
+	if len(got) != 1 {
+		t.Fatalf("%d bench rows, want 1: %+v", len(got), got)
+	}
+	as := got[0]
+	if strings.Join(as.Subjects, ",") != "ground:v0.9.1" || strings.Join(as.Predicates, ",") != "bench:ctfe" ||
+		strings.Join(as.Contexts, ",") != "github:ubuntu" || strings.Join(as.Actors, ",") != "ground-ci" {
+		t.Errorf("the row is not the artifact's: %v %v %v %v", as.Subjects, as.Predicates, as.Contexts, as.Actors)
+	}
+	if as.Source != "ground-ci" {
+		t.Errorf("source %q", as.Source)
+	}
+	if !as.Timestamp.Equal(benchConcluded) {
+		t.Errorf("timestamp %s; the run concluded %s", as.Timestamp, benchConcluded)
+	}
+	if as.Attributes["seconds"] != 38.82 || as.Attributes["peak_kib"] != float64(472848) ||
+		as.Attributes["sha"] != wholeSha || as.Attributes["run"] != benchRun ||
+		as.Attributes["ldc"] != "LDC - the LLVM D compiler (1.41.0):" {
+		t.Errorf("attributes %v", as.Attributes)
+	}
+	if len(gh.located) != 1 || gh.located[0] != benchArchive {
+		t.Errorf("located %v; wanted the artifact's archive once", gh.located)
+	}
+}
+
+// Most runs upload no bench; a run without one writes nothing and is no error.
+func TestCIWatchARunWithoutTheBenchWritesNothing(t *testing.T) {
+	gh := benchGitHub(t, "something-else", "bench-ctfe.json", benchJSON, 1)
+	h := handlerOver(gh, statusline.NewNewsLog())
+	store := groundStore(t, h)
+
+	if err := h.Execute(quote.WithNamespace(context.Background(), "Ground"), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("a run with no bench failed the push: %v", err)
+	}
+	if got := benchesIn(t, store); len(got) != 0 {
+		t.Fatalf("a run with no bench wrote %+v", got)
+	}
+	if len(gh.located) != 0 {
+		t.Errorf("an artifact that is not the bench was downloaded: %v", gh.located)
+	}
+}
+
+// A push re-armed at boot reads the same artifact again, and writes it once.
+func TestCIWatchARearmedPushWritesTheBenchOnce(t *testing.T) {
+	gh := benchGitHub(t, "bench-ctfe", "bench-ctfe.json", benchJSON, 2)
+	h := handlerOver(gh, statusline.NewNewsLog())
+	h.booted = benchConcluded.Add(-time.Minute)
+	store := groundStore(t, h)
+	ctx := quote.WithNamespace(context.Background(), "Ground")
+
+	if err := h.Execute(ctx, jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if err := h.Execute(ctx, rearmJobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+		t.Fatalf("Execute, re-armed: %v", err)
+	}
+	if got := benchesIn(t, store); len(got) != 1 {
+		t.Fatalf("%d bench rows after a re-arm, want 1: %+v", len(got), got)
+	}
+}
+
+// An artifact named the bench that does not hold a row is said, with the run.
+func TestCIWatchABenchThatIsNoRowIsAnError(t *testing.T) {
+	for name, held := range map[string][2]string{
+		"no file":    {"other.json", benchJSON},
+		"not a row":  {"bench-ctfe.json", `["ground:v0.9.1"]`},
+		"no subject": {"bench-ctfe.json", `{"predicates":["bench:ctfe"],"contexts":["github:ubuntu"],"actors":["ground-ci"]}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			gh := benchGitHub(t, "bench-ctfe", held[0], held[1], 1)
+			h := handlerOver(gh, statusline.NewNewsLog())
+			store := groundStore(t, h)
+			err := h.Execute(quote.WithNamespace(context.Background(), "Ground"), jobFor(t, ciStatusAs("did:key:alice")))
+			if err == nil || !strings.Contains(err.Error(), benchRun) {
+				t.Fatalf("got %v; wanted an error naming %s", err, benchRun)
+			}
+			if got := benchesIn(t, store); len(got) != 0 {
+				t.Fatalf("wrote %+v", got)
+			}
+		})
 	}
 }

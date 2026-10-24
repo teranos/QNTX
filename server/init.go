@@ -138,15 +138,16 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		handlerFailures: statusline.NewHandlerFailureLog(),
 		// GitHub is asked with this node's own token until the auth subsystem
 		// says this node is a peer, which asks through its primary.
-		ciGitHubGet:   githubGet,
-		ciGitHubToken: githubToken,
-		rlAuth:        newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
-		rlWS:          newRateLimitGroup(rl.WSRate, rl.WSBurst),
-		rlWrite:       newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
-		rlRead:        newRateLimitGroup(rl.ReadRate, rl.ReadBurst),
-		rlPublic:      newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
-		rlStaand:      newRateLimitGroup(rl.StaandRate, rl.StaandBurst),
-		rlOpened:      newRateLimitGroup(rl.OpenedRate, rl.OpenedBurst),
+		ciGitHubGet:    githubGet,
+		ciGitHubToken:  githubToken,
+		ciGitHubLocate: githubLocate,
+		rlAuth:         newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
+		rlWS:           newRateLimitGroup(rl.WSRate, rl.WSBurst),
+		rlWrite:        newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
+		rlRead:         newRateLimitGroup(rl.ReadRate, rl.ReadBurst),
+		rlPublic:       newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
+		rlStaand:       newRateLimitGroup(rl.StaandRate, rl.StaandBurst),
+		rlOpened:       newRateLimitGroup(rl.OpenedRate, rl.OpenedBurst),
 		// The node's mail is its mail service's, which starts with the
 		// plugin services.
 		nodeMailer: notMailing{why: errors.New("the node's mail service has not started: it starts with the plugin services")},

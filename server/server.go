@@ -200,6 +200,8 @@ type QNTXServer struct {
 	// How ci.watch asks GitHub and with what: this node's own token, or its primary's way (sub_auth.go).
 	ciGitHubGet   func(ctx context.Context, token, url string) ([]byte, error)
 	ciGitHubToken func(ctx context.Context) (string, error)
+	// Where GitHub points an artifact's archive, asked the same way.
+	ciGitHubLocate func(ctx context.Context, token, url string) (string, error)
 	// How a comet's build asks GitHub on a peer: through its primary (sub_auth.go, comet.go).
 	primaryGitHub      primaryGitHub
 	watcherDB          *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)
