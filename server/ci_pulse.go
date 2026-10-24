@@ -1,6 +1,8 @@
 package server
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -16,9 +18,11 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/secretref"
+	"github.com/teranos/QNTX/internal/sqlclose"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -129,6 +133,11 @@ func githubThroughThePrimary(through auth.GitHubGet) func(ctx context.Context, t
 	return func(ctx context.Context, _ string, url string) ([]byte, error) { return through(ctx, url) }
 }
 
+// locatesThroughThePrimary is where GitHub points, as a peer's primary asks it.
+func locatesThroughThePrimary(locate auth.GitHubLocate) func(ctx context.Context, token, url string) (string, error) {
+	return func(ctx context.Context, _ string, url string) (string, error) { return locate(ctx, url) }
+}
+
 // noGitHubToken is the credential of a node that asks through its primary: none.
 func noGitHubToken(context.Context) (string, error) { return "", nil }
 
@@ -233,6 +242,10 @@ type ciWatchHandler struct {
 	// credential for github.com, resolved once per push.
 	get   func(ctx context.Context, token, url string) ([]byte, error)
 	token func(ctx context.Context) (string, error)
+	// locate is where GitHub points an artifact's archive: a signed URL.
+	locate func(ctx context.Context, token, url string) (string, error)
+	// store is the namespace a push row landed in, for the bench it carried.
+	store func(namespace string) (ats.AttestationStore, error)
 	sleep func(ctx context.Context, d time.Duration) error
 	news  *statusline.NewsLog
 	// Who the token that attested the push speaks for. The row is asked as a
@@ -263,6 +276,7 @@ func (h *ciWatchHandler) Name() string { return watcher.CIWatchHandlerName }
 
 // ciRun is what is read of a workflow run, in GitHub's own field names.
 type ciRun struct {
+	ID           int64     `json:"id"`
 	Status       string    `json:"status"`
 	Conclusion   string    `json:"conclusion"`
 	Name         string    `json:"name"`
@@ -369,7 +383,7 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 				return nil
 			}
 			h.leave(as, addressee, caller, repo, branch, sha, runs, pushedAt)
-			return nil
+			return h.takeBenches(ctx, token, repo, fullSha, quote.NamespaceOf(ctx), runs)
 		}
 		// A push no workflow runs on lists no run, and waiting on it was two
 		// hours and then a failure. Not there a minute on is not coming.
@@ -747,6 +761,166 @@ func (h *ciWatchHandler) leave(as types.As, addressee, caller, repo, branch, sha
 		"workflows", len(runs), "failed", len(failed), "for", addressee, "attested_by", caller)
 }
 
+// "can we use a github runner, hosted public one, to do ci benchmarking of the
+// CTFE, and make sure those results end up in QNTX"
+
+// A hosted runner cannot reach the node the bench belongs on; the node reads
+// the run instead, the way it reads the verdict.
+
+// benchArtifact is the artifact ground's bench workflow uploads, holding one
+// file: a row shaped as POST /api/attestations takes one.
+const (
+	benchArtifact = "bench-ctfe"
+	benchFile     = "bench-ctfe.json"
+	benchSource   = "ground-ci"
+)
+
+// ciArtifact is what is read of a run's artifact, in GitHub's own field names.
+type ciArtifact struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	ArchiveURL string `json:"archive_download_url"`
+}
+
+// benchRow is the row a bench artifact holds.
+type benchRow struct {
+	Subjects   []string       `json:"subjects"`
+	Predicates []string       `json:"predicates"`
+	Contexts   []string       `json:"contexts"`
+	Actors     []string       `json:"actors"`
+	Attributes map[string]any `json:"attributes"`
+}
+
+// takeBenches writes the bench of every green run that uploaded one into the
+// namespace the push row landed in. Most runs upload none.
+func (h *ciWatchHandler) takeBenches(ctx context.Context, token, repo, sha, namespace string, runs []ciRun) error {
+	for _, r := range runs {
+		if r.Conclusion != "success" {
+			continue
+		}
+		// TODO(forge): Forge: the artifacts of a pipeline run.
+		url := githubAPI + "/repos/" + repo + "/actions/runs/" + strconv.FormatInt(r.ID, 10) + "/artifacts?per_page=100"
+		out, err := h.get(ctx, token, url)
+		if err != nil {
+			return errors.Wrapf(err, "ci.watch: asking github for the artifacts of %s", r.URL)
+		}
+		var listed struct {
+			Artifacts []ciArtifact `json:"artifacts"`
+		}
+		if err := json.Unmarshal(out, &listed); err != nil {
+			return errors.Wrapf(err, "ci.watch: github answered for the artifacts of %s with something other than artifacts: %q", r.URL, statusline.FirstN(string(out), 200))
+		}
+		for _, a := range listed.Artifacts {
+			if a.Name != benchArtifact {
+				continue
+			}
+			if err := h.takeBench(ctx, token, sha, namespace, r, a); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// takeBench writes one run's bench as the attestation it holds, dated when the
+// run concluded, under an id of the commit and the artifact.
+func (h *ciWatchHandler) takeBench(ctx context.Context, token, sha, namespace string, r ciRun, a ciArtifact) error {
+	if namespace == "" {
+		return errors.Newf("ci.watch: %s uploaded %s and the push reached ci.watch from no namespace to write it in", r.URL, a.Name)
+	}
+	store, err := h.store(namespace)
+	if err != nil {
+		return errors.Wrapf(err, "ci.watch: the bench of %s has no store in %s", r.URL, namespace)
+	}
+	// A push re-armed at boot, or streamed twice, reads the same artifact again.
+	id := "ci.watch:" + a.Name + ":" + sha + ":" + strconv.FormatInt(a.ID, 10)
+	if store.AttestationExists(id) {
+		return nil
+	}
+	location, err := h.locate(ctx, token, a.ArchiveURL)
+	if err != nil {
+		return errors.Wrapf(err, "ci.watch: where github keeps artifact %s of %s", a.Name, r.URL)
+	}
+	zipped, err := fetchSigned(ctx, location)
+	if err != nil {
+		return errors.Wrapf(err, "ci.watch: artifact %s of %s", a.Name, r.URL)
+	}
+	row, err := benchOf(zipped)
+	if err != nil {
+		return errors.Wrapf(err, "ci.watch: artifact %s of %s", a.Name, r.URL)
+	}
+	if err := store.CreateAttestation(&types.As{
+		ID:         id,
+		Subjects:   row.Subjects,
+		Predicates: row.Predicates,
+		Contexts:   row.Contexts,
+		Actors:     row.Actors,
+		Attributes: row.Attributes,
+		Source:     benchSource,
+		Timestamp:  r.UpdatedAt,
+	}); err != nil {
+		return errors.Wrapf(err, "ci.watch: writing the bench of %s in %s", r.URL, namespace)
+	}
+	h.logger.Infow("ci.watch wrote a run's bench", "run", r.URL, "id", id, "namespace", namespace)
+	return nil
+}
+
+// fetchSigned is what a signed URL GitHub pointed at holds. The URL carries
+// its own authority, so no token goes with it.
+func fetchSigned(ctx context.Context, location string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, location, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "where github keeps the archive is no request")
+	}
+	resp, err := (&http.Client{Timeout: 2 * time.Minute}).Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "the archive did not come")
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, errors.Wrapf(err, "the archive stopped after %d bytes", len(body))
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Newf("the archive answered %d: %s", resp.StatusCode, statusline.FirstN(string(body), 200))
+	}
+	return body, nil
+}
+
+// benchOf is the row the artifact's one file holds. A zip without it, or a
+// file that is not a row naming all four, is not a bench.
+func benchOf(zipped []byte) (benchRow, error) {
+	read, err := zip.NewReader(bytes.NewReader(zipped), int64(len(zipped)))
+	if err != nil {
+		return benchRow{}, errors.Wrap(err, "the artifact is not a zip")
+	}
+	for _, file := range read.File {
+		if file.Name != benchFile {
+			continue
+		}
+		opened, err := file.Open()
+		if err != nil {
+			return benchRow{}, errors.Wrapf(err, "failed to open %s in the artifact", benchFile)
+		}
+		held, err := io.ReadAll(opened)
+		if err != nil {
+			err = errors.Wrapf(err, "failed to read %s out of the artifact after %d bytes", benchFile, len(held))
+		}
+		if err := sqlclose.With(err, opened.Close(), benchFile+" in the artifact"); err != nil {
+			return benchRow{}, err
+		}
+		var row benchRow
+		if err := json.Unmarshal(held, &row); err != nil {
+			return benchRow{}, errors.Wrapf(err, "%s is not a row: %q", benchFile, statusline.FirstN(string(held), 200))
+		}
+		if len(row.Subjects) == 0 || len(row.Predicates) == 0 || len(row.Contexts) == 0 || len(row.Actors) == 0 {
+			return benchRow{}, errors.Newf("%s names no subjects, predicates, contexts or actors: %q", benchFile, statusline.FirstN(string(held), 200))
+		}
+		return row, nil
+	}
+	return benchRow{}, errors.Newf("the artifact holds no %s", benchFile)
+}
+
 // ciWatchRearmWindow is how far back the store is read at boot. A restart
 // loses the goroutine that was waiting on a run and the news log with it, and
 // every push to QNTX itself restarts this node before its own CI concludes —
@@ -809,6 +983,8 @@ func (s *QNTXServer) setupCIWatch() {
 		// A node with a primary was handed its primary's way to GitHub (sub_auth.go).
 		get:      s.ciGitHubGet,
 		token:    s.ciGitHubToken,
+		locate:   s.ciGitHubLocate,
+		store:    s.held.OfStandingRow,
 		sleep:    sleepUnder,
 		news:     s.news,
 		mintedBy: s.authHandler.MintedBy,
@@ -821,13 +997,23 @@ func (s *QNTXServer) setupCIWatch() {
 	// Every namespace the node knows, not the one it serves by default: the
 	// ground token attests in its own, and a push is wherever its token acts.
 	since := time.Now().Add(-ciWatchRearmWindow)
-	var recent []*types.As
+	// Each push with the namespace it landed in, as a live one reaches the handler.
+	type landed struct {
+		as        *types.As
+		namespace string
+	}
+	var recent []landed
+	in := func(namespace string, found []*types.As) {
+		for _, as := range found {
+			recent = append(recent, landed{as: as, namespace: namespace})
+		}
+	}
 	if s.held != nil {
 		found, err := ciStatusSince(s.held.Served(), since)
 		if err != nil {
 			s.rearmFailed(auth.NamespaceDefault, err)
 		}
-		recent = append(recent, found...)
+		in(auth.NamespaceDefault, found)
 		if known := s.held.Known(); known != nil {
 			listed, err := known.List()
 			if err != nil {
@@ -847,23 +1033,24 @@ func (s *QNTXServer) setupCIWatch() {
 					s.rearmFailed(ns.Name, err)
 					continue
 				}
-				recent = append(recent, found...)
+				in(ns.Name, found)
 			}
 		} else {
 			s.logger.Infow("ci.watch re-arms on the served namespace only; this backend keeps one")
 		}
 	}
-	for _, as := range recent {
-		as := as
+	for _, push := range recent {
+		as := push.as
 		payload, err := json.Marshal(as)
 		if err != nil {
 			s.logger.Warnw("ci.watch could not re-arm a push", "id", as.ID, "error", err)
 			continue
 		}
+		ctx := quote.WithNamespace(s.ctx, push.namespace)
 		sacred.Go("ci.watch rearm "+as.ID, func() {
 			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: rearmSource,
 				MadeBy: async.MadeByNoCaller, Pulse: async.NoPulse(), Started: async.At(time.Now()), Completed: async.NotYet()}
-			if err := h.Execute(s.ctx, job); err != nil {
+			if err := h.Execute(ctx, job); err != nil {
 				s.noteHandlerFailure(statusline.HandlerFailure{Handler: watcher.CIWatchHandlerName, ExecutionID: job.ID,
 					Error: err.Error(), Details: errors.GetAllDetails(err)})
 			}
