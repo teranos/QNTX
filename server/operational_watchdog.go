@@ -24,20 +24,33 @@ const operationalCheckInterval = 5 * time.Second
 // But 3+ sec is sentry, and QNTX should send an email at 10 sec, 20 sec, 30 sec
 // up to a minute. And also an email if it recovered back to below 3 sec and how
 // long it took."
+// "its not indicated to me, which node its talking about"
+// nodeNamed is which node a mail about this one is about: auth.rp_id, the
+// name the mail is already sent from.
+func (s *QNTXServer) nodeNamed() string {
+	if s.nodeName == "" {
+		return "a node with no rp_id"
+	}
+	return s.nodeName
+}
+
 type operationalPatience struct {
 	every     time.Duration // How often the store is asked.
 	sentry    time.Duration // A wait this long is an issue in Sentry.
 	mailEvery time.Duration // ROOT is mailed each time the wait grows by this.
-	die       time.Duration // A wait this long ends the process.
-	lastWords time.Duration // How long the mail saying so may take before it does.
+	// "i dont think i need to receive it more often than once per 20 min"
+	mailAtMost time.Duration // No second mail about a wait within this of the last.
+	die        time.Duration // A wait this long ends the process.
+	lastWords  time.Duration // How long the mail saying so may take before it does.
 }
 
 var operationalPatienceDefault = operationalPatience{
-	every:     operationalCheckInterval,
-	sentry:    3 * time.Second,
-	mailEvery: 10 * time.Second,
-	die:       time.Minute,
-	lastWords: 10 * time.Second,
+	every:      operationalCheckInterval,
+	sentry:     3 * time.Second,
+	mailEvery:  10 * time.Second,
+	mailAtMost: 20 * time.Minute,
+	die:        time.Minute,
+	lastWords:  10 * time.Second,
 }
 
 // WatchOperationalStore ends the process when the operational store stops being
@@ -72,7 +85,8 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 
 	var stalled time.Time // When the store stopped answering within p.sentry; zero while it does.
 	var longest time.Duration
-	var told bool // ROOT was mailed that the store is not answering, so is mailed when it does.
+	var told bool            // ROOT was mailed that the store is not answering, so is mailed when it does.
+	var lastMailed time.Time // When ROOT was last mailed about a wait; the next is p.mailAtMost on.
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -81,7 +95,7 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 		}
 
 		asked := clock.Now()
-		took, mailed, err := s.askOperationalStore(p, clock, asked, root.Load)
+		took, mailed, err := s.askOperationalStore(p, clock, asked, root.Load, &lastMailed)
 		told = told || mailed
 		if s.ctx.Err() != nil {
 			return
@@ -94,7 +108,7 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 				"holds", "passkeys, jobs, schedules, canvas",
 			)
 			if errors.Is(err, context.DeadlineExceeded) {
-				s.lastWords(p, root.Load(), stalledMail(took, p, s.operationalPool(), s.turnedAway(), true))
+				s.lastWords(p, root.Load(), stalledMail(s.nodeNamed(), took, p, s.operationalPool(), s.turnedAway(), true))
 			}
 			stop(err)
 			return
@@ -117,7 +131,7 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 				"within", p.sentry, "since", stalled, "took", answered.Sub(stalled), "longest_wait", longest,
 				"let_back_in", lifted)
 			if told {
-				s.mailRoot(root.Load(), recoveredMail(stalled, answered, longest, lifted, p))
+				s.mailRoot(root.Load(), recoveredMail(s.nodeNamed(), stalled, answered, longest, lifted, p))
 			}
 			stalled, longest, told = time.Time{}, 0, false
 		}
@@ -127,7 +141,7 @@ func (s *QNTXServer) watchOperationalStore(stop func(reason error), p operationa
 // askOperationalStore pings the operational store and waits up to p.die for
 // the answer, saying so at p.sentry and mailing ROOT every p.mailEvery. It says
 // whether ROOT was mailed.
-func (s *QNTXServer) askOperationalStore(p operationalPatience, clock watchClock, asked time.Time, root func() *services.MailRecipient) (time.Duration, bool, error) {
+func (s *QNTXServer) askOperationalStore(p operationalPatience, clock watchClock, asked time.Time, root func() *services.MailRecipient, lastMailed *time.Time) (time.Duration, bool, error) {
 	ctx, cancel := context.WithCancel(s.ctx)
 	defer cancel()
 
@@ -161,7 +175,13 @@ func (s *QNTXServer) askOperationalStore(p operationalPatience, clock watchClock
 				continue
 			}
 			s.turnAwayHeaviest()
-			s.mailRoot(root(), stalledMail(waited, p, s.operationalPool(), s.turnedAway(), false))
+			// A wait inside the window of the last mail is logged above and
+			// turned away here; it is not another mail.
+			if !lastMailed.IsZero() && clock.Now().Sub(*lastMailed) < p.mailAtMost {
+				continue
+			}
+			s.mailRoot(root(), stalledMail(s.nodeNamed(), waited, p, s.operationalPool(), s.turnedAway(), false))
+			*lastMailed = clock.Now()
 			mailed = true
 		}
 	}
@@ -278,16 +298,17 @@ func (s *QNTXServer) lastWords(p operationalPatience, root *services.MailRecipie
 }
 
 // stalledMail is the mail a wait on the operational store is, to ROOT.
-func stalledMail(waited time.Duration, p operationalPatience, pool operationalPool, turned []string, dies bool) services.NodeMail {
+func stalledMail(node string, waited time.Duration, p operationalPatience, pool operationalPool, turned []string, dies bool) services.NodeMail {
 	waited = waited.Truncate(time.Second)
 	var text strings.Builder
-	subject := fmt.Sprintf("The operational store has not answered for %s", waited)
+	subject := fmt.Sprintf("%s: The operational store has not answered for %s", node, waited)
 	if dies {
-		subject = fmt.Sprintf("QNTX stops: the operational store has not answered for %s", waited)
-		fmt.Fprintf(&text, "The operational store has not answered for %s, so the node stops.\n\n", waited)
+		subject = fmt.Sprintf("%s: QNTX stops: the operational store has not answered for %s", node, waited)
+		fmt.Fprintf(&text, "On %s, the operational store has not answered for %s, so the node stops.\n\n", node, waited)
 	} else {
-		fmt.Fprintf(&text, "The operational store has not answered for %s.\n", waited)
-		fmt.Fprintf(&text, "The node stops if it has not answered at %s.\n\n", p.die)
+		fmt.Fprintf(&text, "On %s, the operational store has not answered for %s.\n", node, waited)
+		fmt.Fprintf(&text, "The node stops if it has not answered at %s.\n", p.die)
+		fmt.Fprintf(&text, "Another wait within %s of this mail is not mailed.\n\n", p.mailAtMost)
 	}
 	fmt.Fprintf(&text, "It holds the passkeys, jobs, schedules and canvas.\n\n%s\n", pool)
 	if len(turned) > 0 {
@@ -301,10 +322,10 @@ func stalledMail(waited time.Duration, p operationalPatience, pool operationalPo
 }
 
 // recoveredMail is the mail saying the operational store answers in time again.
-func recoveredMail(stalled, answered time.Time, longest time.Duration, lifted []string, p operationalPatience) services.NodeMail {
+func recoveredMail(node string, stalled, answered time.Time, longest time.Duration, lifted []string, p operationalPatience) services.NodeMail {
 	took := answered.Sub(stalled).Round(time.Second)
 	var text strings.Builder
-	fmt.Fprintf(&text, "The operational store answers within %s again.\n\n", p.sentry)
+	fmt.Fprintf(&text, "On %s, the operational store answers within %s again.\n\n", node, p.sentry)
 	fmt.Fprintf(&text, "It stopped doing so at %s and did again at %s: %s.\n",
 		stalled.UTC().Format(time.RFC3339), answered.UTC().Format(time.RFC3339), took)
 	fmt.Fprintf(&text, "The longest it kept the node waiting was %s.\n", longest.Round(time.Millisecond))
@@ -313,7 +334,7 @@ func recoveredMail(stalled, answered time.Time, longest time.Duration, lifted []
 	}
 	return services.NodeMail{
 		Name:    "operational.recovered",
-		Subject: fmt.Sprintf("The operational store answers again, after %s", took),
+		Subject: fmt.Sprintf("%s: The operational store answers again, after %s", node, took),
 		Bodies:  []services.MailBody{services.TextBody(text.String()), services.HTMLBody("<pre>" + html.EscapeString(text.String()) + "</pre>")},
 	}
 }

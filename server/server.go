@@ -85,6 +85,8 @@ type QNTXServer struct {
 	// What the mail service was wired with (ADR-041), read back by the mail
 	// signum so ROOT sees what sends and not what am.toml says since.
 	mailConfig config.MailConfig
+	// auth.rp_id, the node's name: what a mail about this node names as the node.
+	nodeName string
 	// Sentry as am.toml names it, read back for the weekly report (ADR-042).
 	// The token is resolved when a report is written, so one created after the
 	// node started is read by the next report.
