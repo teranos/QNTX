@@ -287,12 +287,13 @@ type memTokenStore struct {
 }
 
 type memToken struct {
-	id        string
-	label     string
-	grant     Grant
-	createdAt time.Time
-	expiresAt *time.Time
-	revoked   bool
+	id           string
+	label        string
+	grant        Grant
+	instructions string
+	createdAt    time.Time
+	expiresAt    *time.Time
+	revoked      bool
 }
 
 func newMemTokenStore() *memTokenStore {
@@ -321,8 +322,9 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 			Namespaces:          spec.Namespaces,
 			ReturnAddress:       spec.ReturnAddress,
 		},
-		createdAt: time.Now().UTC(),
-		expiresAt: spec.ExpiresAt,
+		instructions: spec.Instructions,
+		createdAt:    time.Now().UTC(),
+		expiresAt:    spec.ExpiresAt,
 	}
 	return raw, id, nil
 }
@@ -409,6 +411,7 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 			ReturnAddress: tok.grant.ReturnAddress,
 			ClientDID:     tok.grant.ClientDID,
 			RequestID:     tok.grant.RequestID,
+			Instructions:  tok.instructions,
 			CreatedAt:     tok.createdAt.Format(time.RFC3339Nano),
 		}
 		if tok.expiresAt != nil {
@@ -440,6 +443,17 @@ func (m *memTokenStore) SetNamespaces(id string, namespaces []string) error {
 	for _, tok := range m.tokens {
 		if tok.id == id {
 			tok.grant.Namespaces = namespaces
+		}
+	}
+	return nil
+}
+
+func (m *memTokenStore) SetInstructions(id string, instructions string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, tok := range m.tokens {
+		if tok.id == id {
+			tok.instructions = instructions
 		}
 	}
 	return nil

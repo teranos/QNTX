@@ -91,6 +91,7 @@ func (h *PluginHandler) list() *protocol.PluginsList {
 		}
 		info.Sigils, info.SignaRefused = h.sigils(name)
 		info.Repo, info.Enabled = known[name].Repo, known[name].Enabled
+		info.Setup = setupOf(known[name])
 		answer.Plugins = append(answer.Plugins, info)
 	}
 
@@ -109,6 +110,7 @@ func (h *PluginHandler) list() *protocol.PluginsList {
 		}
 		seen[name] = true
 		info.Repo, info.Enabled = known[name].Repo, known[name].Enabled
+		info.Setup = setupOf(known[name])
 		answer.Plugins = append(answer.Plugins, info)
 	}
 
@@ -119,7 +121,7 @@ func (h *PluginHandler) list() *protocol.PluginsList {
 			continue
 		}
 		record := known[name]
-		info := &protocol.PluginInfo{Name: name, State: "disabled", Repo: record.Repo, Enabled: record.Enabled}
+		info := &protocol.PluginInfo{Name: name, State: "disabled", Repo: record.Repo, Enabled: record.Enabled, Setup: setupOf(record)}
 		if record.Enabled {
 			info.State = string(plugin.StateFailed)
 			if errMsg, ok := h.registry.GetError(name); ok {

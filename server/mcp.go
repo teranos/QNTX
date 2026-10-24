@@ -192,6 +192,12 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			c.CacheScope = "private"
 		}
 	}}
+	// A connector's server tells the agent what its client says to: the
+	// instructions on the client it was minted through, read now, so a change
+	// holds from the connector's next initialize. Nobody else is told anything.
+	if known && admitted.ClientDID != "" && s.authHandler != nil {
+		options.Instructions = s.authHandler.ConnectorInstructions(admitted.ClientDID)
+	}
 	server := mcp.NewServer(&mcp.Implementation{Name: "qntx", Version: version.VersionTag}, options)
 	// A sigil is one tool, read from the sigil itself (ADR-039). Its path gates
 	// itself and is no route tool below, so one thing is offered once.

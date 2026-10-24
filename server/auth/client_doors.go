@@ -25,6 +25,11 @@ type Client struct {
 	// was minted at, or the namespaces a peer serves.
 	Namespaces    []string
 	ReturnAddress string
+	// Instructions is what the connector's MCP server tells the agent on
+	// initialize (ADR-038).
+	//
+	// "guide your agent is easy to add"
+	Instructions string
 	// Origin is where a peer answers, which requests for it are carried to.
 	Origin *url.URL
 	// Node is a peer nodes.peers declares by its did:key.
@@ -66,9 +71,21 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 			MintedBy:      t.MintedBy,
 			Namespaces:    []string{namespace},
 			ReturnAddress: t.ReturnAddress,
+			Instructions:  t.Instructions,
 		}, true
 	}
 	return Client{}, false
+}
+
+// ConnectorInstructions is what a connector's MCP server tells the agent on
+// initialize: the instructions on the client it was minted through, and none
+// for a DID no live client answers to.
+func (h *Handler) ConnectorInstructions(clientDID string) string {
+	client, ok := h.clientByDID(clientDID)
+	if !ok {
+		return ""
+	}
+	return client.Instructions
 }
 
 // expiredAt is whether an RFC3339 expiry has passed. An expiry that does not

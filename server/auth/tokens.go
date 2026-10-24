@@ -60,6 +60,12 @@ type NamespaceMover interface {
 	SetNamespaces(id string, namespaces []string) error
 }
 
+// InstructionsSetter is a TokenStore that can change what a client's connector
+// is told on initialize (ADR-038). The operational table is one.
+type InstructionsSetter interface {
+	SetInstructions(id string, instructions string) error
+}
+
 // TokenRecordStore is the record behind the table: on parquet, one object per
 // token under system/access_tokens/. It is what the table is rebuilt from
 // after host loss, and nothing a request touches.
