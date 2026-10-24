@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/pulse/async"
@@ -23,15 +24,28 @@ var ErrNoCheckpointer = errors.New("no WAL checkpointer is wired")
 // moved. A later tick may win, but this one did not do the work it reported.
 var ErrCheckpointBlocked = errors.New("WAL checkpoint blocked by readers")
 
-// WALCheckpointer runs a TRUNCATE WAL checkpoint.
-// Implemented by RustStore.WALCheckpointTruncate (closes read conns, checkpoints, reopens).
+// WALCheckpointer checkpoints the WAL of each file a node writes: TRUNCATE for
+// one whose WAL has reached truncateAt, PASSIVE for every other.
+// Implemented by RustStore.WALCheckpoint and, per landing file, parquetHandles.
 type WALCheckpointer interface {
-	WALCheckpointTruncate() (busy, walPages, checkpointedPages int, err error)
+	WALCheckpoint(truncateAt int64) (busy, walPages, checkpointedPages int, err error)
 }
 
-// checkpointHandler runs WAL TRUNCATE checkpoint periodically through Rust FFI.
-// Rust closes all read connections, runs the checkpoint, and reopens them.
-// References the server's walCheckpointer field so late wiring (after NewQNTXServer) works.
+// checkpointIntervalSeconds is how often the schedule checkpoints. Hourly,
+// beside the PASSIVE checkpoint the store runs every 5000 puts.
+const checkpointIntervalSeconds = 3600
+
+// checkpointIntervalBefore is what setupCheckpointSchedule used to create the
+// job with. A job still at it is moved to checkpointIntervalSeconds at boot.
+const checkpointIntervalBefore = 300
+
+// walTruncateAtBytes is the WAL size from which a file is TRUNCATEd, which
+// closes every reader for its length; PASSIVE waits on none. Past 64 MiB the
+// store's own PASSIVE, which it says keeps the WAL near 20 MB, is behind.
+const walTruncateAtBytes = 64 << 20
+
+// checkpointHandler runs the scheduled checkpoint through Rust FFI. References
+// the server's walCheckpointer field so late wiring (after NewQNTXServer) works.
 type checkpointHandler struct {
 	server *QNTXServer
 	logger *zap.SugaredLogger
@@ -49,7 +63,7 @@ func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 
 	before := walBytes(h.server.dbPath)
 	start := time.Now()
-	busy, _, _, err := checkpointer.WALCheckpointTruncate()
+	busy, _, _, err := checkpointer.WALCheckpoint(walTruncateAtBytes)
 	dur := time.Since(start)
 	if err != nil {
 		h.logger.Warnw("WAL checkpoint failed",
@@ -92,18 +106,32 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 	registry := s.daemon.Registry()
 	registry.Register(handler)
 
-	schedStore := s.held.ServedUniverse().Schedules()
+	s.ensureCheckpointSchedule(s.held.ServedUniverse().Schedules())
+}
 
-	// Check for existing schedule
+// ensureCheckpointSchedule creates the checkpoint job, or moves the one this
+// file auto-created at checkpointIntervalBefore to checkpointIntervalSeconds.
+func (s *QNTXServer) ensureCheckpointSchedule(schedStore *schedule.Store) {
 	existing, err := schedStore.ListAllScheduledJobs()
 	if err != nil {
 		s.logger.Errorw("Failed to list scheduled jobs for checkpoint", "error", err)
 		return
 	}
 	for _, j := range existing {
-		if j.HandlerName == checkpointHandlerName && j.State == schedule.StateActive {
-			return
+		if j.HandlerName != checkpointHandlerName || j.State != schedule.StateActive {
+			continue
 		}
+		// An interval other than the old default was chosen by someone, and stays.
+		if strings.HasPrefix(j.Id, "SPJ_checkpoint_") && j.IntervalSeconds == checkpointIntervalBefore {
+			if err := schedStore.UpdateJobInterval(j.Id, checkpointIntervalSeconds); err != nil {
+				s.logger.Errorw("The WAL checkpoint schedule kept its old interval",
+					"job_id", j.Id, "interval_seconds", j.IntervalSeconds, "error", err)
+				return
+			}
+			s.logger.Infow("Moved the WAL checkpoint schedule to its new interval",
+				"job_id", j.Id, "was_seconds", j.IntervalSeconds, "interval_seconds", checkpointIntervalSeconds)
+		}
+		return
 	}
 
 	now := time.Now()
@@ -111,7 +139,7 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 		MadeBy:          string(async.MadeByNoCaller),
 		Id:              fmt.Sprintf("SPJ_checkpoint_%d", now.Unix()),
 		HandlerName:     checkpointHandlerName,
-		IntervalSeconds: 300, // every 5 minutes
+		IntervalSeconds: checkpointIntervalSeconds,
 		State:           schedule.StateActive,
 		NextRunAt:       now.Format(time.RFC3339),
 	}
@@ -120,5 +148,5 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 		s.logger.Errorw("Failed to create checkpoint schedule", "error", err)
 		return
 	}
-	s.logger.Infow("Auto-created WAL checkpoint schedule", "interval_seconds", 300)
+	s.logger.Infow("Auto-created WAL checkpoint schedule", "interval_seconds", checkpointIntervalSeconds)
 }
