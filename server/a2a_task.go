@@ -71,7 +71,7 @@ func (s *QNTXServer) sendToNodeAgent(r *http.Request, request proto.Message) (pr
 		return nil, a2a.Invalid("a message sent to the Node Agent is the user's, and this one's role is " + sent.Role)
 	}
 	if sent.Push {
-		return nil, &a2a.Error{Name: "PushNotificationNotSupportedError", Message: "the node sends no push notifications (capabilities.pushNotifications is false)"}
+		return nil, a2a.PushNotificationNotSupported()
 	}
 	says, refused := sent.Said()
 	if refused != nil {

@@ -202,19 +202,48 @@ func TestAGetReadsItsQuery(t *testing.T) {
 	}
 }
 
-// A path no operation in scope answers is not found, and that includes the
-// operations named out of scope.
+// A path no operation in scope answers is not found, and that includes
+// SubscribeToTask, named out of scope.
 func TestWhatIsNoOperationIsNotFound(t *testing.T) {
 	for _, r := range []struct{ method, path string }{
 		{"GET", "/nothing"},
 		{"DELETE", "/tasks/abc"},
 		{"GET", "/tasks/abc:subscribe"},
-		{"GET", "/tasks/abc/pushNotificationConfigs"},
+		{"PUT", "/tasks/abc/pushNotificationConfigs"},
+		{"GET", "/orchard/tasks/abc/pushNotificationConfigs"},
 	} {
 		w, said := serve(t, unsupported, r.method, r.path, "", v1)
 		if w.Code != http.StatusNotFound || said.Error.Status != "NOT_FOUND" {
 			t.Errorf("%s %s answered %d %s", r.method, r.path, w.Code, w.Body.String())
 		}
+	}
+}
+
+// §3.3.4: the card says capabilities.pushNotifications is false, so every
+// push notification config operation answers PushNotificationNotSupportedError,
+// at no tenant and at one an agent is served at, with nothing asked of what
+// answers.
+func TestPushNotificationConfigIsNotSupported(t *testing.T) {
+	reached := false
+	answer := func(_ context.Context, op Operation, _ proto.Message) (proto.Message, *Error) {
+		reached = true
+		return nil, Unsupported(op)
+	}
+	for _, r := range []struct{ method, path string }{
+		{"POST", "/tasks/abc/pushNotificationConfigs"},
+		{"GET", "/tasks/abc/pushNotificationConfigs/c1"},
+		{"GET", "/tasks/abc/pushNotificationConfigs"},
+		{"DELETE", "/tasks/abc/pushNotificationConfigs/c1"},
+		{"POST", "/garden/tasks/abc/pushNotificationConfigs"},
+		{"DELETE", "/garden/tasks/abc/pushNotificationConfigs/c1"},
+	} {
+		w, said := serve(t, answer, r.method, r.path, `{}`, v1)
+		if w.Code != http.StatusBadRequest || said.Error.Status != "FAILED_PRECONDITION" || !strings.Contains(w.Body.String(), "PUSH_NOTIFICATION_NOT_SUPPORTED") {
+			t.Errorf("%s %s answered %d %s", r.method, r.path, w.Code, w.Body.String())
+		}
+	}
+	if reached {
+		t.Error("a push notification config operation was asked of what answers")
 	}
 }
 
