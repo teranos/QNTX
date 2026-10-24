@@ -362,6 +362,12 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// is — narrowed by what lines grant its label, never by what the
 		// person who minted the door may do.
 		if grant.ClientDID != "" && grant.Level != LevelToken {
+			// Through a minted client it is a connector, and reaches what the
+			// lines grant the client's label (ADR-038). A device sign-in is its
+			// own client, and a peer is a node: both stay the person.
+			if client, minted := h.clientByDID(grant.ClientDID); minted && !client.Node {
+				return h.admittedAsConnector(*grant), true
+			}
 			return h.admittedAsThePerson(*grant), true
 		}
 		// What kind of token this is was decided when it was minted, so it is
@@ -444,6 +450,31 @@ func (h *Handler) admittedAsThePerson(grant Grant) Admission {
 	}
 	roles, seesSystem := h.holdingsOf(grant.MintedBy, namespaceOf(grant))
 	return admission.Granted(admitted, h.levelOf(grant.MintedBy), roles, seesSystem, h.WordsOf(roles))
+}
+
+// admittedAsConnector is a connector: the person who said yes is who it is,
+// and what it reaches is what the lines grant its client's label (ADR-038).
+//
+// "DEFAULT DENY"
+func (h *Handler) admittedAsConnector(grant Grant) Admission {
+	admitted := Admission{
+		Namespaces:  grant.Namespaces,
+		Identity:    grant.MintedBy,
+		UserID:      grant.MintedByUser,
+		DisplayName: grant.MintedByDisplayName,
+		ClientDID:   grant.ClientDID,
+		TokenDID:    grant.DID,
+		TokenLabel:  grant.Label,
+	}
+	// The token's label is its client's (CreateAccessTokenSession), so a grant
+	// to the client is what it holds.
+	var roles []string
+	for _, namespace := range grant.Namespaces {
+		roles = append(roles, h.RolesOfToken(grant.Label, namespace)...)
+	}
+	seesSystem := len(h.RolesOfToken(grant.Label, NamespaceSystem)) > 0
+	// CONNECTOR is a rung no line names, so a label holding nothing is offered nothing.
+	return admission.Granted(admitted, LevelConnector, roles, seesSystem, h.WordsOf(roles))
 }
 
 // holdingsOf is the roles an identity's User holds in a namespace, and

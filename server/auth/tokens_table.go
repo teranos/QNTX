@@ -180,6 +180,7 @@ func (t *TokenTable) Create(spec NewToken) (string, string, error) {
 		Namespaces:          spec.Namespaces,
 		ExpiresAt:           spec.ExpiresAt,
 		ReturnAddress:       spec.ReturnAddress,
+		Instructions:        spec.Instructions,
 	})
 	if err != nil {
 		return "", "", err
@@ -204,6 +205,7 @@ func (t *TokenTable) Issue(spec IssuedToken) (string, error) {
 		ClientDID:           spec.ClientDID,
 		ReturnAddress:       spec.ReturnAddress,
 		RequestID:           spec.RequestID,
+		Instructions:        spec.Instructions,
 		// The lines say what a token may touch (ADR-034). The two lists stay on
 		// the record so what was written before still reads, and carry nothing.
 		ScopeRead:  []string{},
@@ -255,6 +257,12 @@ func (t *TokenTable) Enable(id string) error {
 // SetNamespaces changes where a token acts, in the table and then the record.
 func (t *TokenTable) SetNamespaces(id string, namespaces []string) error {
 	return t.change(id, func(held *TokenRecord) { held.Namespaces = namespaces })
+}
+
+// SetInstructions changes what a client's connector is told, in the table and
+// then the record.
+func (t *TokenTable) SetInstructions(id string, instructions string) error {
+	return t.change(id, func(held *TokenRecord) { held.Instructions = instructions })
 }
 
 // Touch records that this token was presented now.

@@ -23,7 +23,7 @@ QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://githu
 
 "WE USE IT"
 
-The token the OAuth flow issues is the person who said yes at the passkey, so a connector may do what that person may do and nothing else.
+The token the OAuth flow issues is the person who said yes at the passkey; what it reaches is the lines about its client's label, below.
 
 "my oauth should hjust have that permission"
 
@@ -62,3 +62,9 @@ A connector answers at the server of the namespace its client was minted in, and
 "i wish it was easier to find out, when logged in, what the mcp url is."
 
 The MCP element in [QNTX-Web](https://github.com/teranos/QNTX-Web) is where a person finds the servers they reach and mints a connector for one.
+
+"guide your agent is easy to add"
+
+A client carries instructions, set at minting and changed at `POST /auth/tokens/{id}/instructions`; its connector's server says them to the agent on initialize, and nobody else is told anything.
+
+A connector stands at CONNECTOR, a rung no line names, and is offered what REACH lines grant the roles its client's label holds ([[ADR-034-roles-as-attestations]]): a client whose label holds nothing is a connector offered nothing, however the person who said yes stands. Picking what a connector reaches is two lines, `REACH is 'staands' of APP` and `app is APP of <namespace>`.

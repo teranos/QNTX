@@ -139,13 +139,14 @@ func TestTheCodeIsExchangedForTheTokenTheStoreWrites(t *testing.T) {
 	assert.Equal(t, "app", issued.Label)
 	assert.NotNil(t, issued.ExpiresAt)
 
-	// And it is a bearer the middleware admits as that person: the admission
-	// their passkey session gets, not a token's.
+	// And it is a bearer the middleware admits as a connector: the person is
+	// who it is, and CONNECTOR is how much, a rung no line names (ADR-038).
 	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
 	req.Header.Set("Authorization", "Bearer "+answer.AccessToken)
 	admission, admitted := h.admissionOf(h.presented(req))
 	require.True(t, admitted, "the issued token is not admitted as a bearer")
-	assert.Equal(t, string(LevelRoot), admission.LevelName())
+	assert.Equal(t, string(LevelConnector), admission.LevelName())
+	assert.Empty(t, admission.Roles(), "a connector whose label holds nothing holds something")
 	assert.Equal(t, mastodonAccount, admission.Identity)
 	assert.Equal(t, []string{NamespaceDefault}, admission.Namespaces)
 	assert.Nil(t, admission.Grant, "the token was admitted as a token rather than as the person")
