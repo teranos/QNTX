@@ -1,7 +1,10 @@
 package a2a
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -104,6 +107,9 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			(&Error{Name: "InvalidAgentResponseError", Message: err.Error()}).write(w, undelivered)
 			return
 		}
+		if op.Name == getExtendedAgentCard && cached(w, r, body) {
+			return
+		}
 		w.Header().Set("Content-Type", contentType)
 		if _, err := w.Write(body); err != nil {
 			undelivered(op.Name, err)
@@ -143,6 +149,48 @@ func pushConfigured(r *http.Request, served Served) *Error {
 		return PushNotificationNotSupported()
 	}
 	return nil
+}
+
+// getExtendedAgentCard is the operation whose card is the caller's own.
+const getExtendedAgentCard = "GetExtendedAgentCard"
+
+// extendedCardMaxAge is how long a client keeps an extended card, short as the
+// public card's is: health is on the card.
+const extendedCardMaxAge = "60"
+
+// cached sets how a client caches an extended card, and answers 304 when the
+// card it holds is the one it would be sent: "Agents SHOULD implement
+// appropriate caching headers to control client-side caching of extended
+// cards", and "honor client cache invalidation" (§13.3). The card is the
+// caller's, what they reach, so it is private and kept by no shared cache.
+func cached(w http.ResponseWriter, r *http.Request, body []byte) bool {
+	// marshalled varies its whitespace as protojson does; compacted, the ETag
+	// is the card's and not the encoder's.
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, body); err != nil {
+		return false
+	}
+	sum := sha256.Sum256(compact.Bytes())
+	etag := `"` + hex.EncodeToString(sum[:]) + `"`
+	w.Header().Set("Cache-Control", "private, max-age="+extendedCardMaxAge)
+	w.Header().Set("ETag", etag)
+	if Matches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return true
+	}
+	return false
+}
+
+// Matches is If-None-Match against one strong ETag (RFC 9110 §13.1.2): a list
+// of tags, a weak one compared by its opaque part, or *.
+func Matches(header, etag string) bool {
+	for _, tag := range strings.Split(header, ",") {
+		tag = strings.TrimPrefix(strings.TrimSpace(tag), "W/")
+		if tag == "*" || tag == etag {
+			return true
+		}
+	}
+	return false
 }
 
 // marshalled is response as JSON, each REQUIRED field of it present though
