@@ -60,7 +60,7 @@ func TestAPushedDeployIsOneDeployFromQueuedToFailed(t *testing.T) {
 	lines, err := newestLines(s, "datapunt@c0ffee", "deploys")
 	require.NoError(t, err)
 	for _, predicate := range []string{deployPredicate + deployQueued, deployPredicate + deployBuilding, deployPredicate + deployFailed} {
-		assert.Contains(t, lines, predicate, "no %s line about datapunt@c0ffee", predicate)
+		require.Contains(t, lines, predicate, "no %s line about datapunt@c0ffee", predicate)
 	}
 	assert.Equal(t, deployBuilding, lines[deployPredicate+deployFailed].Attributes["failed_at"])
 }
