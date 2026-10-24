@@ -55,6 +55,8 @@ type rootAgent struct {
 	called string
 	// element is the element this agent is, for an element's agent (ADR-054); empty for the others.
 	element string
+	// sessionDir is where its sessions are kept under its home: elements/<element> for an element's agent, the home itself for the others.
+	sessionDir string
 }
 
 // agentSpec is how an agent runs in Claude Code: am.toml's [agent.root] for
@@ -82,7 +84,7 @@ func (a *rootAgent) in(h *harness) *inHarness {
 	}
 	held, ok := a.sessions[h.name]
 	if !ok {
-		held = &inHarness{file: h.file, turn: a.turn}
+		held = &inHarness{file: filepath.Join(a.sessionDir, h.file), turn: a.turn}
 		a.sessions[h.name] = held
 	}
 	return held

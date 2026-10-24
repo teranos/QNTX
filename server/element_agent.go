@@ -30,24 +30,8 @@ func elementPurpose(element string) string {
 	return "agent:element:" + slug.Of(element)
 }
 
-// elementHome is where the node keeps an element's agent: beside ROOT's, under
-// elements, by the element.
-func (s *QNTXServer) elementHome(element string) (string, error) {
-	if s.agentsDir == "" {
-		return "", &noAgentsDir{}
-	}
-	return filepath.Join(s.agentsDir, elementsDir, slug.Of(element)), nil
-}
-
-// noAgentsDir is a node that keeps agents nowhere.
-type noAgentsDir struct{}
-
-func (*noAgentsDir) Error() string {
-	return "this node keeps agents nowhere: am.toml names no [agent.root], which is what sets where they are kept"
-}
-
-// elementOf is the element a call names. An agent is kept under the node's
-// agents by its id, so an id that is a path is not an element.
+// elementOf is the element a call names. An element's session is kept under
+// the Node Agent's home by the element's id, so an id that is a path is not an element.
 func elementOf(sent sigil.Sent) (string, *protocol.Refusal) {
 	element := sent["element"]
 	if element == "" {
@@ -59,9 +43,9 @@ func elementOf(sent sigil.Sent) (string, *protocol.Refusal) {
 	return element, nil
 }
 
-// holdElementAgent is the agent of element: held once per element, its token
-// held where the gate reads tokens, its ground built in its home. It runs as
-// [agent.root] says, so it answers from the first shake.
+// holdElementAgent is the agent of element, held once per element. It stands
+// where the Node Agent stands: its home, its ground, its credential, its git.
+// Its own are its DID (ADR-048), its token, and its session under elements/<element>/.
 
 // "I SHAKE THE PHONE ON DAY 1"
 
@@ -74,26 +58,22 @@ func (s *QNTXServer) holdElementAgent(element string) (*rootAgent, *protocol.Ref
 	if s.nodeDID == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no key of its own to derive the agent of " + element + " from"}
 	}
-	home, err := s.elementHome(element)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
 	}
-	agent, err := theAgent(s.nodeDID.PrivateKey, purpose, home)
+	agent, err := theAgent(s.nodeDID.PrivateKey, purpose, s.nodeAgent.home)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + element + " has no key of its own: " + err.Error()}
 	}
 	agent.namespace, agent.called, agent.element = auth.NamespaceSystem, "the element "+element, element
+	agent.sessionDir = filepath.Join(elementsDir, slug.Of(element))
 	// Its token is ROOT's kind, as the Node Agent's is: the element is ROOT's to shake.
 	if s.authHandler != nil {
 		if err := s.authHandler.HoldElementAgent(agent.token, agent.did, element); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the token of the agent of " + element + " is not held, so it would reach none of the node's sigils: " + err.Error()}
 		}
 	}
-	held := s.elementAgents.hold(purpose, agent)
-	if s.underGround.add(held.home) {
-		s.groundAgent(held.home)
-	}
-	return held, nil
+	return s.elementAgents.hold(purpose, agent), nil
 }
 
 // elementsSignum is an element's agent: say, am and session, each at the element's path.
