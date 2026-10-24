@@ -501,6 +501,10 @@ message PluginInfo {
   // on.
   string repo = 16;
   bool enabled = 17;
+  // What still stands between this plugin and its tools working, besides
+  // enabling it: each thing its record lacks, as the node reads it. Empty is
+  // nothing.
+  repeated string setup = 18;
 }
 
 // PluginHealthProbe is when the health in plugins list was probed. Health here
