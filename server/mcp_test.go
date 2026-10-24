@@ -9,13 +9,16 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	"go.uber.org/zap/zaptest"
 )
 
 // "a new thing is a new handler is a new mcp tool is a new api endpoint"
@@ -511,4 +514,99 @@ func TestAToolGivesWhatItSaysItGives(t *testing.T) {
 	refusedByIt := ask()
 	assert.True(t, refusedByIt.IsError)
 	assert.Equal(t, "not found (kind): no such kind", textOf(t, refusedByIt))
+}
+
+// "guide your agent is easy to add"
+//
+// A connector's MCP server tells the agent what its client says to, on
+// initialize (ADR-038). Anyone else is told nothing.
+func TestAConnectorIsToldItsClientsInstructions(t *testing.T) {
+	_, db := createTestStore(t)
+	tokens, _, err := auth.OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	h, err := auth.New(db, "localhost", nil, 8770, 8820, 24, zaptest.NewLogger(t).Sugar(),
+		func(next http.HandlerFunc) http.HandlerFunc { return next },
+		tokens, testUsers(t), false, []string{rootAccount}, nil)
+	require.NoError(t, err)
+	_, _, err = tokens.Create(auth.NewToken{
+		Label: "app", MintedBy: rootAccount, Level: auth.LevelOAuth, ExpiresAt: auth.NeverEnds(),
+		Namespaces: []string{auth.NamespaceDefault}, ReturnAddress: "https://app.example/callback",
+		Instructions: "Always show drafts before sending.",
+	})
+	require.NoError(t, err)
+	listed, err := tokens.List()
+	require.NoError(t, err)
+	require.Len(t, listed, 1)
+	srv := servedForTest(t)
+	srv.authHandler = h
+
+	told := func(admitted auth.Admission) string {
+		asked := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+		asked = asked.WithContext(auth.WithAdmission(asked.Context(), admitted))
+		return initializedFor(t, srv, asked).Instructions
+	}
+	connector := auth.Admitted(auth.LevelRoot, auth.NamespaceDefault)
+	connector.ClientDID = listed[0].DID
+	assert.Equal(t, "Always show drafts before sending.", told(connector))
+
+	stranger := auth.Admitted(auth.LevelRoot, auth.NamespaceDefault)
+	stranger.ClientDID = "did:key:znobody"
+	assert.Equal(t, "", told(stranger), "a connector through no live client was told something")
+	assert.Equal(t, "", told(auth.Admitted(auth.LevelRoot)), "a person was told a client's instructions")
+}
+
+// A connector is offered what the lines grant its client's label, and a
+// connector whose label holds nothing is offered nothing (ADR-038, ADR-034):
+//
+// "DEFAULT DENY"
+func TestAConnectorIsOfferedWhatItsLabelReaches(t *testing.T) {
+	srv := servedForTest(t)
+	picked := reach.Line{Paths: []string{"staands"}, Roles: []string{"APP"}, Actor: rootAccount, At: time.Now()}
+	_, err := srv.served.Reopen(srv.answering, srv.wrapping(), reach.Runtime{
+		Lines:  []reach.Line{picked},
+		IsRoot: func(actor string) bool { return actor == rootAccount },
+		Plugin: srv.pluginRoute,
+	})
+	require.NoError(t, err)
+
+	offered := func(admitted auth.Admission) []string {
+		asked := httptest.NewRequest(http.MethodPost, "/mcp/", nil)
+		asked = asked.WithContext(auth.WithAdmission(asked.Context(), admitted))
+		var names []string
+		for _, tool := range toolsOfferedFor(t, srv, asked) {
+			names = append(names, tool.Name)
+		}
+		return names
+	}
+	nobody := auth.Admitted(auth.LevelConnector, auth.NamespaceDefault)
+	nobody.ClientDID = "did:key:zconnector"
+	assert.Empty(t, offered(nobody), "a connector holding nothing was offered a tool")
+
+	app := auth.Holding(nobody, "APP")
+	tools := offered(app)
+	require.NotEmpty(t, tools, "the line granting APP the staands signum offered nothing")
+	for _, name := range tools {
+		assert.True(t, strings.HasPrefix(name, "staands_"), name+" is not staands', and APP holds staands alone")
+	}
+}
+
+// initializedFor is what the client learns on initialize from the server one
+// request would be answered by.
+func initializedFor(t *testing.T, s *QNTXServer, asked *http.Request) *mcp.InitializeResult {
+	t.Helper()
+	ctx := context.Background()
+
+	server := s.mcpServerFor(asked)
+	clientSide, serverSide := mcp.NewInMemoryTransports()
+
+	serving, err := server.Connect(ctx, serverSide, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = serving.Close() })
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	asking, err := client.Connect(ctx, clientSide, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = asking.Close() })
+
+	return asking.InitializeResult()
 }
