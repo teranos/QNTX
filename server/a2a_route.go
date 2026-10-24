@@ -25,11 +25,14 @@ import (
 const a2aPrefix = "/a2a/"
 
 // The operations the node does: the card its caller reaches (§3.1.11), and at
-// no tenant a message sent to the Node Agent and the Task it is (§3.1.1, §3.1.3).
+// no tenant a message sent to the Node Agent and the Tasks it is (§3.1.1,
+// §3.1.3, §3.1.4, §3.1.5).
 const (
 	getExtendedAgentCard = "GetExtendedAgentCard"
 	sendMessage          = "SendMessage"
 	getTask              = "GetTask"
+	listTasks            = "ListTasks"
+	cancelTask           = "CancelTask"
 )
 
 // a2aHTTP is the binding with every operation in scope, those the node does
@@ -91,6 +94,10 @@ func (s *QNTXServer) a2aAnswer(r *http.Request) a2a.Answer {
 			return s.sendToNodeAgent(r, request)
 		case op.Name == getTask && !named:
 			return s.getNodeAgentsTask(r, request)
+		case op.Name == listTasks && !named:
+			return s.listNodeAgentsTasks(r, request)
+		case op.Name == cancelTask && !named:
+			return s.cancelNodeAgentsTask(r, request)
 		case op.Name != getExtendedAgentCard:
 			return nil, a2a.Unsupported(op)
 		}

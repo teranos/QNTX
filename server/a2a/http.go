@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/teranos/QNTX/server/parity"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -98,7 +99,7 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			(&Error{Name: "InvalidAgentResponseError", Message: op.Name + " answered without a stream"}).write(w, undelivered)
 			return
 		}
-		body, err := protojson.Marshal(response)
+		body, err := marshalled(response)
 		if err != nil {
 			(&Error{Name: "InvalidAgentResponseError", Message: err.Error()}).write(w, undelivered)
 			return
@@ -142,6 +143,41 @@ func pushConfigured(r *http.Request, served Served) *Error {
 		return PushNotificationNotSupported()
 	}
 	return nil
+}
+
+// marshalled is response as JSON, each REQUIRED field of it present though
+// it holds its default: "The nextPageToken field MUST always be present in the
+// response" (§3.1.4), and protojson leaves out what holds its default.
+func marshalled(response proto.Message) ([]byte, error) {
+	body, err := protojson.Marshal(response)
+	if err != nil {
+		return nil, err
+	}
+	whole, err := protojson.MarshalOptions{EmitDefaultValues: true}.Marshal(response)
+	if err != nil {
+		return nil, err
+	}
+	var given, defaulted map[string]json.RawMessage
+	if err := json.Unmarshal(body, &given); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(whole, &defaulted); err != nil {
+		return nil, err
+	}
+	fields := response.ProtoReflect().Descriptor().Fields()
+	added := false
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		value, held := defaulted[field.JSONName()]
+		if _, given := given[field.JSONName()]; given || !held || !parity.Required(field) {
+			continue
+		}
+		given[field.JSONName()], added = value, true
+	}
+	if !added {
+		return body, nil
+	}
+	return json.Marshal(given)
 }
 
 // TenantOf is the tenant a request message names, when it names one: the
@@ -258,7 +294,11 @@ func read(op Operation, r *http.Request, params map[string]string) (proto.Messag
 	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: true}
 	switch r.Method {
 	case http.MethodGet, http.MethodDelete:
-		body, err := json.Marshal(queried(op.request, r))
+		values, refused := queried(op.request, r)
+		if refused != nil {
+			return nil, refused
+		}
+		body, err := json.Marshal(values)
 		if err != nil {
 			return nil, invalid(err.Error())
 		}
@@ -288,8 +328,10 @@ func read(op Operation, r *http.Request, params map[string]string) (proto.Messag
 
 // queried is the query parameters the request has fields for, as JSON values
 // protojson reads: a list for a repeated field, true or false for a bool, and
-// the string as written otherwise (§11.5).
-func queried(message protoreflect.MessageDescriptor, r *http.Request) map[string]any {
+// the string as written otherwise (§11.5). An enum's value is one of its
+// names, which the unknown are not discarded as: "Invalid status value
+// 'TASK_STATE_RUNNING'" is refused (§6.5).
+func queried(message protoreflect.MessageDescriptor, r *http.Request) (map[string]any, *Error) {
 	values := map[string]any{}
 	for name, said := range r.URL.Query() {
 		field := message.Fields().ByJSONName(name)
@@ -303,6 +345,8 @@ func queried(message protoreflect.MessageDescriptor, r *http.Request) map[string
 				all = append(all, strings.Split(one, ",")...)
 			}
 			values[name] = slices.DeleteFunc(all, func(v string) bool { return v == "" })
+		case field.Kind() == protoreflect.EnumKind && field.Enum().Values().ByName(protoreflect.Name(said[0])) == nil:
+			return nil, invalid("invalid " + name + " value '" + said[0] + "': it is no " + string(field.Enum().FullName()))
 		case field.Kind() == protoreflect.BoolKind:
 			if b, err := strconv.ParseBool(said[0]); err == nil {
 				values[name] = b
@@ -313,5 +357,5 @@ func queried(message protoreflect.MessageDescriptor, r *http.Request) map[string
 			values[name] = said[0]
 		}
 	}
-	return values
+	return values, nil
 }
