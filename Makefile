@@ -40,7 +40,9 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 # QuickDev: "One of the distributions of QNTX, purpose is to build FAST, help
 # with plugin development, for use by Claude Code Web and Mobile sessions.
 # Doesn't need ATS or wasm"
-quickdev: ## Build QuickDev, as bin/qntx-quickdev: no ATS, no WASM, loopback only
+# Nor the Tablet of Reach: on loopback without auth every caller is ROOT, so
+# there it is "just friction without reward".
+quickdev: ## Build QuickDev, as bin/qntx-quickdev: no ATS, no WASM, no Tablet of Reach, no auth, loopback only
 	@go build -tags quickdev $(GO_LDFLAGS) -o bin/qntx-quickdev ./cmd/qntx
 
 openapi: ## Write what the node serves, from the reach table and the handlers' own prose
