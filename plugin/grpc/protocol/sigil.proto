@@ -170,6 +170,8 @@ message NamespaceAgentSaid {
   ClaudeSaid claude = 1;
   // What it answered in Pi.
   PiSaid pi = 2;
+  // What the namespace agent answered in Codex.
+  CodexSaid codex = 3;
 }
 
 // NodeAgentSaid is what agent say answers: what the Node Agent answered, in the
@@ -194,7 +196,7 @@ message NodeAgentAm {
   CodexAm codex = 3;
 }
 
-// CodexSaid is what the Node Agent answered in codex.
+// CodexSaid is what an agent answered in codex.
 message CodexSaid {
   // What it answered.
   string answer = 1;
@@ -211,9 +213,11 @@ message CodexSaid {
   double took_ms = 7;
   // Why a row of the session was not written down, when one was not.
   string unwritten = 8;
+  // The CLI thread used to resume, distinct from the transcript session.
+  string thread = 9;
 }
 
-// CodexAm is who the Node Agent is in codex and how the node runs it.
+// CodexAm is who an agent is in codex and how the node runs it.
 message CodexAm {
   // Its own DID, which signs what it writes down.
   string did = 1;
@@ -292,6 +296,8 @@ message NamespaceAgentAm {
   ClaudeAm agent = 3;
   // Who the agent is and how it runs, in Pi.
   PiAm pi = 4;
+  // Who the namespace agent is in Codex.
+  CodexAm codex = 5;
 }
 
 // Follows says which column of a reference each of a signum's fields is. The

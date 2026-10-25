@@ -59,11 +59,10 @@ func agentPurpose(namespace, model string) string {
 }
 
 // agentHome is where the node keeps a namespace's agent: beside ROOT's, by the
-// namespace and the model. Where agents are kept is set with the Node Agent
-// (nameNodeAgent), and a node that set none keeps them nowhere.
+// namespace and the model. The agent subsystem sets this directory even when no Node Agent is named.
 func (s *QNTXServer) agentHome(namespace, model string) (string, error) {
 	if s.agentsDir == "" {
-		return "", errors.Newf("this node keeps agents nowhere: am.toml names no [agent.root], which is what sets where they are kept")
+		return "", errors.Newf("this node keeps agents nowhere: the agent subsystem has not initialized its directory")
 	}
 	return filepath.Join(s.agentsDir, slug.Of(namespace), slug.Of(model)), nil
 }
@@ -182,7 +181,9 @@ func (s *QNTXServer) optedIntoAgent(namespace string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return slices.ContainsFunc(found, func(as *types.As) bool { return slices.Contains(as.Predicates, agentLineClaude) }), nil
+	return slices.ContainsFunc(found, func(as *types.As) bool {
+		return slices.Contains(as.Predicates, agentLineClaude) || slices.Contains(as.Predicates, agentLineCodex)
+	}), nil
 }
 
 // textOf is a line's attribute that is one text, and a line without it is a
@@ -422,7 +423,7 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 	with := func(params ...*protocol.Param) []*protocol.Param {
 		return append([]*protocol.Param{namespace}, params...)
 	}
-	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi}, Says: "The harness it runs in: claude for Claude Code, pi for Pi. A namespace holds an agent in each."}
+	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi, agentLineCodex}, Says: "The harness it runs in: claude, pi or codex. A namespace holds an agent in each."}
 	login := s.loginSigil()
 	login.sigil.Takes = with(login.sigil.Takes...)
 	login.sigil.Http = &protocol.Endpoint{Method: http.MethodPost, Path: at + "/login"}
@@ -439,10 +440,11 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 					Does: "Opts the namespace into an agent: the model it is, and how it runs. Set by the namespace's owner, ROOT or SUPER. A different model is a different agent.",
 					Takes: with(
 						harness,
-						&protocol.Param{Name: "model", Required: true, Says: "The model it is: Claude's full name in Claude Code, the id the gateway knows it as in Pi."},
+						&protocol.Param{Name: "model", Required: true, Says: "The model it is: Claude's full name in Claude Code, the provider model id in Pi or Codex."},
 						&protocol.Param{Name: "effort", Says: "In Claude Code, the effort it runs at: low, medium, high, xhigh or max."},
 						&protocol.Param{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs in when whoever speaks names none."},
 						&protocol.Param{Name: "allow", Says: "In Claude Code, the tools it may use without being asked, by Claude Code's own names, comma-separated."},
+						&protocol.Param{Name: "sandbox", OneOf: []string{"read-only", "workspace-write"}, Says: "In Codex, the explicitly selected sandbox."},
 						&protocol.Param{Name: "thinking", OneOf: appcfg.ThinkingLevels, Says: "In Pi, the thinking level it runs at."},
 						&protocol.Param{Name: "provider", OneOf: piProviderNames(), Says: "In Pi, the provider its model calls are made at, on the namespace's key of that name (keys set)."},
 					),
@@ -497,12 +499,14 @@ func (s *QNTXServer) agentsSet(ctx context.Context, sent sigil.Sent) (any, *prot
 		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "model", Says: err.Error() + ": the agent is the model named, and nothing stands in for it"}
 	}
 	switch sent["harness"] {
+	case agentLineCodex:
+		return s.setCodexAgent(sent, admitted, namespace, model.String())
 	case agentLineClaude:
 		return s.setClaudeAgent(ctx, sent, admitted, namespace, model.String())
 	case agentLinePi:
 		return s.setPiAgent(sent, admitted, namespace, model.String())
 	}
-	return nil, notAHarness(sent)
+	return nil, notANamespaceHarness(sent)
 }
 
 // setClaudeAgent opts the namespace into its agent in Claude Code.
@@ -560,6 +564,8 @@ func (s *QNTXServer) setPiAgent(sent sigil.Sent, admitted auth.Admission, namesp
 
 func (s *QNTXServer) agentsAm(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	switch sent["harness"] {
+	case agentLineCodex:
+		return s.codexAm(ctx, sent)
 	case agentLineClaude:
 		held, refused := s.namespaceAgent(ctx, sent)
 		return then(held, refused, func(held anAgentHeld) (any, *protocol.Refusal) {
@@ -579,7 +585,7 @@ func (s *QNTXServer) agentsAm(ctx context.Context, sent sigil.Sent) (any, *proto
 			return &protocol.NamespaceAgentAm{Namespace: held.agent.namespace, SetBy: held.line.setBy, Pi: am}, nil
 		})
 	}
-	return nil, notAHarness(sent)
+	return nil, notANamespaceHarness(sent)
 }
 
 func (s *QNTXServer) agentsLogin(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -591,6 +597,8 @@ func (s *QNTXServer) agentsLogin(ctx context.Context, sent sigil.Sent) (any, *pr
 
 func (s *QNTXServer) agentsSay(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	switch sent["harness"] {
+	case agentLineCodex:
+		return s.codexSay(ctx, sent)
 	case agentLineClaude:
 		held, refused := s.namespaceAgent(ctx, sent)
 		return then(held, refused, func(held anAgentHeld) (any, *protocol.Refusal) {
@@ -616,11 +624,16 @@ func (s *QNTXServer) agentsSay(ctx context.Context, sent sigil.Sent) (any, *prot
 			})
 		})
 	}
-	return nil, notAHarness(sent)
+	return nil, notANamespaceHarness(sent)
 }
 
 func (s *QNTXServer) agentsSession(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	switch sent["harness"] {
+	case agentLineCodex:
+		held, refused := s.namespaceCodexAgent(ctx, sent)
+		return then(held, refused, func(held aCodexAgentHeld) (any, *protocol.Refusal) {
+			return s.readAgentSession(held.agent, held.agent.in(namespaceCodexHarness()))
+		})
 	case agentLineClaude:
 		held, refused := s.namespaceAgent(ctx, sent)
 		return then(held, refused, func(held anAgentHeld) (any, *protocol.Refusal) {
@@ -632,12 +645,12 @@ func (s *QNTXServer) agentsSession(ctx context.Context, sent sigil.Sent) (any, *
 			return s.readAgentSession(held.agent, held.agent.in(s.piHarness()))
 		})
 	}
-	return nil, notAHarness(sent)
+	return nil, notANamespaceHarness(sent)
 }
 
-// notAHarness is the refusal of a Coding Agent Harness this node does not run.
-func notAHarness(sent sigil.Sent) *protocol.Refusal {
-	return &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "harness is claude or pi, and " + sent["harness"] + " is neither"}
+// notANamespaceHarness refuses an unknown namespace harness.
+func notANamespaceHarness(sent sigil.Sent) *protocol.Refusal {
+	return &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "harness is claude, pi or codex, and " + sent["harness"] + " is not one of them"}
 }
 
 // namespacePiHarness is Pi as a namespace's agent runs in it: its session and
@@ -656,4 +669,8 @@ func (s *QNTXServer) namespacePiHarness(held aPiAgentHeld) *harness {
 		return s.namespacePiPart(held)
 	}
 	return &h
+}
+
+func notAHarness(sent sigil.Sent) *protocol.Refusal {
+	return &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "Node Agent harness is claude, pi or codex, got " + sent["harness"]}
 }

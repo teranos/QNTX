@@ -23,7 +23,11 @@ import (
 
 // aTurn is a harness's part of one turn.
 type aTurn struct {
-	in *inHarness
+	// Codex owns its thread ID and process environment; it needs no Claude binary.
+	withoutClaude bool
+	// Keep the QNTX transcript session even when the first provider turn fails.
+	keepBeforeRun bool
+	in            *inHarness
 	// called is the harness as a refusal names it.
 	called string
 	// effort is what the harness runs the turn at, as a transcript reads it.
@@ -101,11 +105,20 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	}
 	// Its ground is the one its hooks run (ADR-050, Hosted agents under ground),
 	// and the node's Claude Code the one a ritual it performs starts its agent with (ground ritual/run.d).
-	claude, err := s.harnessHeldBy("claude").Path(ctx)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Claude Code for a ritual " + agent.called + " performs to start: " + err.Error()}
+	if !t.withoutClaude {
+		claude, err := s.harnessHeldBy("claude").Path(ctx)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Claude Code for a ritual " + agent.called + " performs to start: " + err.Error()}
+		}
+		itsGit = append(itsGit, "PATH="+comet.AgentPath(agent.home, filepath.Dir(claude)+":"+os.Getenv("PATH")))
 	}
-	itsGit = append(itsGit, "PATH="+comet.AgentPath(agent.home, filepath.Dir(claude)+":"+os.Getenv("PATH")))
+
+	if t.keepBeforeRun && !kept {
+		if err := agent.keepIn(t.in.file, session); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		}
+	}
+
 	told, err := writes.told(says, spokenBy(caller), time.Now())
 	write([]*types.As{told}, err)
 
@@ -117,6 +130,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	}
 	answer, err := t.run(turnRun{says: shakePrompt(says, t.element, t.screenshot), session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
 		unwritten: unwritten, started: started})
+
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: t.called + " did not answer: " + err.Error()}
 	}
