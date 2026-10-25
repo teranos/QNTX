@@ -30,7 +30,7 @@ func TestPinnedCLIWithLocalModelAndHooks(t *testing.T) {
 		events := []map[string]any{
 			{"type": "response.created", "response": map[string]any{"id": "resp_test"}},
 			{"type": "response.output_item.done", "item": map[string]any{"id": "msg_test", "type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": "local answer"}}}},
-			{"type": "response.completed", "response": map[string]any{"id": "resp_test", "status": "completed", "output": []any{}, "usage": map[string]any{"input_tokens": 2, "output_tokens": 3, "input_tokens_details": map[string]any{"cached_tokens": 0}}}},
+			{"type": "response.completed", "response": map[string]any{"id": "resp_test", "status": "completed", "output": []any{}, "usage": map[string]any{"input_tokens": 2, "output_tokens": 3, "total_tokens": 5, "input_tokens_details": map[string]any{"cached_tokens": 0}}}},
 		}
 		for _, event := range events {
 			data, _ := json.Marshal(event)
