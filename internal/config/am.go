@@ -42,6 +42,24 @@ type NodeAgentConfig struct {
 	Allow []string `mapstructure:"allow"`
 	// Pi is the other harness it runs in, from the Pi element (ADR-048).
 	Pi PiConfig `mapstructure:"pi"`
+	// "Codex Agent runtime as another first class citizen in QNTX besides Claude"
+	Codex CodexConfig `mapstructure:"codex"`
+}
+
+// CodexConfig names how the Node Agent runs in codex. A node that names no
+// model runs it without codex.
+type CodexConfig struct {
+	Model string `mapstructure:"model"` // The model, by the id the gateway knows it as.
+	// Gateway is the plugin whose /v1 answers OpenAI's Responses API, the only
+	// wire codex speaks, and which every model call codex makes goes through.
+	Gateway string `mapstructure:"gateway"`
+	// Sandbox is codex's own: read-only or workspace-write.
+	Sandbox string `mapstructure:"sandbox"`
+}
+
+// Named reports whether am.toml names codex for the Node Agent.
+func (c CodexConfig) Named() bool {
+	return c.Model != "" || c.Gateway != ""
 }
 
 // PiConfig names how the Node Agent runs in Pi. A node that names no model

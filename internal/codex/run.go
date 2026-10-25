@@ -20,6 +20,11 @@ import (
 // This foundation runs headlessly; it does not implement approval callbacks.
 type Said struct {
 	Binary, Home, Session, Says, Model, Sandbox, APIKey string
+	// TrustHooks runs the hooks Home/codex/config.toml names without codex's
+	// /hooks trust: they are the node's, written there by the node.
+	TrustHooks bool
+	// Env is what the agent's turn carries beyond its own home, as its git.
+	Env []string
 }
 
 // Event preserves complete items for the future QNTX transcript adapter.
@@ -71,6 +76,9 @@ func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
 		}
 	}
 	args := []string{"exec", "--json", "--model", s.Model, "--sandbox", s.Sandbox, "--skip-git-repo-check"}
+	if s.TrustHooks {
+		args = append(args, "--dangerously-bypass-hook-trust")
+	}
 	if s.Session != "" {
 		args = append(args, "resume", "--", s.Session, "-")
 	} else {
@@ -78,7 +86,7 @@ func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
 	}
 	cmd := exec.CommandContext(ctx, s.Binary, args...)
 	cmd.Dir = work
-	cmd.Env = append(agentenv.Carried(), "HOME="+home, "CODEX_HOME="+config)
+	cmd.Env = append(append(agentenv.Carried(), s.Env...), "HOME="+home, "CODEX_HOME="+config)
 	if s.APIKey != "" {
 		cmd.Env = append(cmd.Env, "CODEX_API_KEY="+s.APIKey)
 	}

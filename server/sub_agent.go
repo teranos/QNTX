@@ -105,6 +105,9 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 		return err
 	}
 	s.holdHarness("claude", holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger))
+	if s.deps.cfg.Agent.Root.Codex.Named() {
+		s.holdHarness("codex", holdCodex(s.ctx, filepath.Join(filepath.Dir(dir), "codex"), s.wg.Go, s.logger))
+	}
 	// No node holds Pi, so neither the Node Agent nor a namespace's agent runs in it:
 	// "disable Pi tmp as a Namespace Agent and as a Node Agent"
 
