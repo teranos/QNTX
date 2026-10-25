@@ -259,6 +259,13 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	if req.Root {
 		resp["root"] = true
 	}
+	// A client's id is its DID, which an app is set up with beside the secret,
+	// so it is said here rather than looked up elsewhere.
+	//
+	// "AND I SHOULD NOT NEED TO OPEN UP THE TOKEN ELEMENT SEPARATELY TO CREATE THE TOKEN"
+	if minted, ok := h.tokens.Lookup(sha256Hex(raw)); ok {
+		resp["did"] = minted.DID
+	}
 	resp["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
 	h.writeJSON(w, http.StatusOK, resp)
 }

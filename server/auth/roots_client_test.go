@@ -46,6 +46,15 @@ func TestROOTMintsROOTsClient(t *testing.T) {
 	require.Len(t, listed, 1)
 	assert.True(t, listed[0].Root)
 	assert.Empty(t, listed[0].Namespaces)
+
+	// "AND I SHOULD NOT NEED TO OPEN UP THE TOKEN ELEMENT SEPARATELY TO CREATE THE TOKEN"
+	//
+	// The client id an app is set up with is said where it is minted.
+	var resp struct {
+		DID string `json:"did"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.Equal(t, listed[0].DID, resp.DID)
 }
 
 func TestROOTsClientIsNobodyElsesToMint(t *testing.T) {
