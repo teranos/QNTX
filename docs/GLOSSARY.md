@@ -27,7 +27,7 @@ Identified by `_distill: true` in attributes, `source: "distill"`, and predicate
 
 ### Codex runtime
 
-“making an early start on the Codex Agent runtime”: the [initial runtime package](../internal/codex/README.md), beside Claude Code and Pi. It is not yet a registered Node Agent or namespace harness.
+“making an early start on the Codex Agent runtime”: the [initial runtime package](https://github.com/teranos/QNTX/blob/main/internal/codex/README.md), beside Claude Code and Pi. It is not yet a registered Node Agent or namespace harness.
 
 ## Symbols
 
