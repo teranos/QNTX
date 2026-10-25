@@ -196,7 +196,8 @@ func (s *QNTXServer) performTask(ctx context.Context, caller *http.Request, say 
 		claude := said.GetClaude()
 		switch {
 		case !isSaid || claude == nil:
-			ended["why"] = "the Node Agent answered as neither Claude Code nor Pi"
+			// A Task asks in Claude Code (above), so any other answer is not its.
+			ended["why"] = "the Node Agent did not answer in Claude Code, which a Task asks it in"
 		case claude.GetIsError():
 			ended["why"], ended["context_id"] = masked(claude.GetAnswer()), claude.GetSession()
 		default:
