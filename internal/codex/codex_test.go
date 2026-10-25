@@ -87,6 +87,37 @@ func TestEnsureVerifiesArchiveAndRepairsExecutable(t *testing.T) {
 	}
 }
 
+// "bubblewrap is unavailable: no system bwrap was found on PATH and no bundled
+// codex-resources/bwrap binary was found next to the Codex executable"
+func TestEnsureInstallsTheSandboxBesideTheExecutable(t *testing.T) {
+	platform, err := Platform()
+	if err != nil {
+		t.Fatal(err)
+	}
+	served := map[string][]byte{
+		"/rust-vtest/codex-test.tar.gz": archive(t, "codex-test", tar.TypeReg),
+		"/rust-vtest/bwrap-test.tar.gz": archive(t, "bwrap-test", tar.TypeReg),
+	}
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(served[r.URL.Path]) }))
+	defer host.Close()
+	sum := func(path string) string { return fmt.Sprintf("%x", sha256.Sum256(served[path])) }
+	p := Pin{Base: host.URL, Version: "test", Artifacts: map[string]Artifact{platform: {
+		File: "codex-test.tar.gz", SHA256: sum("/rust-vtest/codex-test.tar.gz"),
+		Sandbox: &Artifact{File: "bwrap-test.tar.gz", SHA256: sum("/rust-vtest/bwrap-test.tar.gz")},
+	}}}
+	binary, err := p.Ensure(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(filepath.Join(filepath.Dir(binary), "codex-resources", "bwrap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&0111 == 0 {
+		t.Fatal("bwrap is not executable")
+	}
+}
+
 func TestEnsureRejectsUntrustedArchives(t *testing.T) {
 	platform, err := Platform()
 	if err != nil {

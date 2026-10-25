@@ -5,11 +5,19 @@
   "artifacts": {
     "linux-x64": {
       "file": "codex-x86_64-unknown-linux-musl.tar.gz",
-      "sha256": "beb339e8ecd9ba057a6bb2dc81ad8ca474812edfbf0fc5056ca818797648dde4"
+      "sha256": "beb339e8ecd9ba057a6bb2dc81ad8ca474812edfbf0fc5056ca818797648dde4",
+      "sandbox": {
+        "file": "bwrap-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "bcc196b1d25dc2c2b912dcedf780b562deb0552f3c50648761ced145c3466a23"
+      }
     },
     "linux-arm64": {
       "file": "codex-aarch64-unknown-linux-musl.tar.gz",
-      "sha256": "a7261e65f4a96d8f4ca65a069c6cf2dc2c33defc341e48078acefda9461fffe4"
+      "sha256": "a7261e65f4a96d8f4ca65a069c6cf2dc2c33defc341e48078acefda9461fffe4",
+      "sandbox": {
+        "file": "bwrap-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "953647c6f8c8adc1b8fc6534ff283bf95e6ba0230274a70a9eda33bb2c8e6a82"
+      }
     },
     "darwin-x64": {
       "file": "codex-x86_64-apple-darwin.tar.gz",

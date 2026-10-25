@@ -18,7 +18,10 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-type Artifact struct{ File, SHA256 string }
+type Artifact struct {
+	File, SHA256 string
+	Sandbox      *Artifact
+}
 type Pin struct {
 	Base, Version string
 	Artifacts     map[string]Artifact
@@ -40,7 +43,11 @@ func Pinned() (Pin, error) {
 	}
 	p := Pin{Base: "https://github.com/openai/codex/releases/download", Version: version, Artifacts: map[string]Artifact{}}
 	for platform, a := range artifacts {
-		p.Artifacts[platform] = Artifact(a)
+		pinned := Artifact{File: a.File, SHA256: a.SHA256}
+		if a.Sandbox != nil {
+			pinned.Sandbox = &Artifact{File: a.Sandbox.File, SHA256: a.Sandbox.SHA256}
+		}
+		p.Artifacts[platform] = pinned
 	}
 	return p, nil
 }
@@ -64,16 +71,39 @@ func (p Pin) Ensure(ctx context.Context, dir string) (string, error) {
 	if !ok {
 		return "", errors.Newf("Codex %s has no archive for %s", p.Version, platform)
 	}
-	if filepath.Base(p.Version) != p.Version || p.Version == "." || p.Version == ".." || p.Version == "" || filepath.Base(a.File) != a.File || !strings.HasPrefix(a.File, "codex-") || !strings.HasSuffix(a.File, ".tar.gz") {
+	if filepath.Base(p.Version) != p.Version || p.Version == "." || p.Version == ".." || p.Version == "" || !strings.HasPrefix(a.File, "codex-") {
 		return "", errors.Newf("invalid Codex version %q or archive %q", p.Version, a.File)
-	}
-	digest, err := hex.DecodeString(a.SHA256)
-	if err != nil || len(digest) != sha256.Size {
-		return "", errors.Newf("Codex %s archive %s has invalid sha256 %q", p.Version, a.File, a.SHA256)
 	}
 	dest := filepath.Join(dir, p.Version)
 	if err := os.MkdirAll(dest, 0700); err != nil {
 		return "", errors.Wrapf(err, "could not create %s", dest)
+	}
+	target := filepath.Join(dest, "codex")
+	if err := p.install(ctx, dest, a, target); err != nil {
+		return "", err
+	}
+	// codex looks for its sandbox at codex-resources/bwrap beside itself.
+	if a.Sandbox != nil {
+		resources := filepath.Join(dest, "codex-resources")
+		if err := os.MkdirAll(resources, 0700); err != nil {
+			return "", errors.Wrapf(err, "could not create %s", resources)
+		}
+		if err := p.install(ctx, dest, *a.Sandbox, filepath.Join(resources, "bwrap")); err != nil {
+			return "", err
+		}
+	}
+	return target, nil
+}
+
+// install verifies a's archive, fetching it when the cached one is not the
+// pinned one, and extracts its one executable to target.
+func (p Pin) install(ctx context.Context, dest string, a Artifact, target string) error {
+	if filepath.Base(a.File) != a.File || !strings.HasSuffix(a.File, ".tar.gz") {
+		return errors.Newf("invalid Codex %s archive %q", p.Version, a.File)
+	}
+	digest, err := hex.DecodeString(a.SHA256)
+	if err != nil || len(digest) != sha256.Size {
+		return errors.Newf("Codex %s archive %s has invalid sha256 %q", p.Version, a.File, a.SHA256)
 	}
 	cached := filepath.Join(dest, a.File)
 	f, err := os.Open(cached)
@@ -88,19 +118,18 @@ func (p Pin) Ensure(ctx context.Context, dir string) (string, error) {
 	}
 	if err != nil {
 		if err := download(ctx, p.Base+"/rust-v"+p.Version+"/"+a.File, cached, a.SHA256); err != nil {
-			return "", err
+			return err
 		}
 		f, err = os.Open(cached)
 		if err != nil {
-			return "", errors.Wrapf(err, "could not open verified archive %s", cached)
+			return errors.Wrapf(err, "could not open verified archive %s", cached)
 		}
 	}
 	defer f.Close()
-	target := filepath.Join(dest, "codex")
 	if err := extract(f, strings.TrimSuffix(a.File, ".tar.gz"), target); err != nil {
-		return "", errors.Wrapf(err, "could not install Codex %s from %s", p.Version, cached)
+		return errors.Wrapf(err, "could not install Codex %s from %s", p.Version, cached)
 	}
-	return target, nil
+	return nil
 }
 
 func verify(f *os.File, want string) error {

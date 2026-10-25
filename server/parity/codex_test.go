@@ -19,5 +19,13 @@ func TestCodexIsPinned(t *testing.T) {
         if len(artifact.SHA256) != 64 || strings.Trim(artifact.SHA256, "0123456789abcdef") != "" {
             t.Errorf("%s has no valid archive SHA-256", platform)
         }
+        // Linux runs a command in bubblewrap; macOS in its own sandbox.
+        linux := strings.HasPrefix(platform, "linux-")
+        if (artifact.Sandbox != nil) != linux {
+            t.Errorf("%s pins a sandbox archive: %v", platform, artifact.Sandbox != nil)
+        }
+        if linux && (artifact.Sandbox == nil || !strings.HasPrefix(artifact.Sandbox.File, "bwrap-") || len(artifact.Sandbox.SHA256) != 64) {
+            t.Errorf("%s has no pinned bwrap release archive", platform)
+        }
     }
 }
