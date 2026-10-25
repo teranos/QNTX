@@ -862,6 +862,7 @@ pub extern "C" fn duckdb_namespaces_set_record(
 /// Empty default without ending it. The one place data leaves, so the level
 /// that reaches it is the caller's to check.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn duckdb_namespaces_nuke(store: *const NamespaceStore) -> StorageResultC {
     qntx_ffi_common::guarded_result("duckdb_namespaces_nuke", || {
         if store.is_null() {
