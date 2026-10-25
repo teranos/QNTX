@@ -67,8 +67,9 @@ func declaredBy(signa []sigil.Signum, path string, pluginRoute func(string) bool
 
 // namespaced is a path that says or moves where its caller acts. To a
 // connector the namespace does not exist (ADR-038), so none is offered to one.
+// ROOT's client is ROOT, and reaches every namespace by its level.
 func namespaced(admitted auth.Admission, path string) bool {
-	if admitted.ClientDID == "" {
+	if admitted.ClientDID == "" || admitted.IsRoot() {
 		return false
 	}
 	return path == "/i/" || path == "/i/standing" || strings.HasPrefix(path, "/api/namespaces")

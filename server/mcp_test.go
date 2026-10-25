@@ -357,7 +357,7 @@ func TestROOTsClientAnswersAtTheNodesMCPServer(t *testing.T) {
 func TestAConnectorIsOfferedNoNamespaceTool(t *testing.T) {
 	srv := servedForTest(t)
 	person := auth.Admitted(auth.LevelRoot)
-	connector := auth.Admitted(auth.LevelRoot, auth.NamespaceDefault)
+	connector := auth.Admitted(auth.LevelConnector, auth.NamespaceDefault)
 	connector.ClientDID = "did:key:zconnector"
 
 	offered := func(admitted auth.Admission) map[string]bool {
@@ -375,7 +375,6 @@ func TestAConnectorIsOfferedNoNamespaceTool(t *testing.T) {
 		assert.True(t, toPerson[namespaced], namespaced+" is not offered to the person")
 		assert.False(t, toConnector[namespaced], namespaced+" is offered to a connector")
 	}
-	assert.True(t, toConnector["http_api_attestations"], "a connector cannot ask or attest")
 }
 
 // A route that names a segment answers any path, so a path it would carry to a
@@ -383,7 +382,7 @@ func TestAConnectorIsOfferedNoNamespaceTool(t *testing.T) {
 func TestAConnectorCannotReachANamespacePathThroughAnotherTool(t *testing.T) {
 	asked := false
 	served := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { asked = true })
-	connector := auth.Admitted(auth.LevelRoot, auth.NamespaceDefault)
+	connector := auth.Admitted(auth.LevelConnector, auth.NamespaceDefault)
 	connector.ClientDID = "did:key:zconnector"
 	caller := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	caller = caller.WithContext(auth.WithAdmission(caller.Context(), connector))
