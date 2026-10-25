@@ -17,5 +17,5 @@ As USER i press one, and its own story starts:
 - ChatGPT: [11](11-user-connects-chatgpt.md)
 - Claude: [12](12-user-connects-claude.md)
 - Obsidian: [13](13-user-connects-obsidian.md)
-- OpenRouter: [14](14-user-sets-an-openrouter-key.md)
+- OpenRouter, Anthropic, OpenAI: [14](14-user-sets-an-openrouter-key.md)
 - GitHub: [5](5-user-connects-github.md)
