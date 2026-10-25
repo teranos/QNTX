@@ -55,6 +55,7 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/node"},
 				},
+				amOASFSigil(),
 				{
 					Name:   "syscap",
 					Does:   "What this build can do: the storage backend and the parser it was built against. What the connect frame pushes, asked for.",
@@ -87,6 +88,7 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 		Answers: map[string]sigil.Answer{
 			"version": func(context.Context, sigil.Sent) (any, *protocol.Refusal) { return versionInfo(version.Get()), nil },
 			"node":    s.amNode,
+			"oasf":    s.amOASF,
 			"syscap": func(context.Context, sigil.Sent) (any, *protocol.Refusal) {
 				return capabilities(syscap.Get(s.store)), nil
 			},

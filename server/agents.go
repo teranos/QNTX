@@ -432,6 +432,7 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 			Name:        "agents",
 			Description: "The namespace agent: a common agent of the namespace it is opted into, shared by everyone who has reach on it, on its own sign-in.",
 			Tags:        []string{"agent", "namespaces"},
+			Oasf:        []string{"ai_ml_engineering/agent_orchestration/multi_agent_coordination"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "set",
@@ -634,7 +635,7 @@ func (s *QNTXServer) agentsSession(ctx context.Context, sent sigil.Sent) (any, *
 	return nil, notAHarness(sent)
 }
 
-// notAHarness is the refusal of a harness that is neither Claude Code nor Pi.
+// notAHarness is the refusal of a Coding Agent Harness this node does not run.
 func notAHarness(sent sigil.Sent) *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "harness is claude or pi, and " + sent["harness"] + " is neither"}
 }

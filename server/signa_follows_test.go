@@ -12,22 +12,36 @@ import (
 )
 
 // resolvesTo is the message a full name names, or nil: QNTX's own, or one the
-// pinned A2A spec declares, which a card is read through.
+// pinned A2A or OASF spec declares, which a card or a record is read through.
 func resolvesTo(name string) protoreflect.MessageDescriptor {
 	found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(name))
 	if err == nil {
 		return found.Descriptor()
 	}
-	files, refused := parity.Descriptors("a2a")
-	if refused != nil {
-		return nil
-	}
-	for _, file := range files {
-		if declared := file.Messages().ByName(protoreflect.FullName(name).Name()); declared != nil && string(declared.FullName()) == name {
-			return declared
+	for _, reference := range []string{"a2a", "oasf"} {
+		files, refused := parity.Descriptors(reference)
+		if refused != nil {
+			continue
+		}
+		for _, file := range files {
+			if declared := file.Messages().ByName(protoreflect.FullName(name).Name()); declared != nil && string(declared.FullName()) == name {
+				return declared
+			}
 		}
 	}
 	return nil
+}
+
+// A skill a signum names of OASF's taxonomy is one the pinned taxonomy holds.
+func TestASignumsOASFSkillIsInTheTaxonomy(t *testing.T) {
+	skills, refused := parity.OASFSkills()
+	require.Nil(t, refused)
+	for _, signum := range bareNode().signa() {
+		for _, skill := range signum.GetOasf() {
+			_, held := skills[skill]
+			assert.True(t, held, "%s names %s, which OASF's taxonomy holds no skill at", signum.GetName(), skill)
+		}
+	}
 }
 
 // A field that says which message it carries names one that exists, on every

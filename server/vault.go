@@ -164,6 +164,7 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 			Name:        "vault",
 			Description: "Every Obsidian vault the node keeps a copy of, and each of its folders bound to a folder of a GitHub repository.",
 			Tags:        []string{"vault", "obsidian", "github"},
+			Oasf:        []string{"research_knowledge_productivity/knowledge_management/knowledge_base_management"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "list",

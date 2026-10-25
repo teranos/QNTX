@@ -33,8 +33,12 @@ type Signum struct {
 	Follows []*Follows `protobuf:"bytes,3,rep,name=follows,proto3" json:"follows,omitempty"`
 	// What it is for, in words, and the words it is found by. To A2A these are
 	// a skill's description and tags.
-	Description   string   `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	Tags          []string `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
+	Description string   `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Tags        []string `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
+	// The skills of OASF's taxonomy it performs, each by its path there:
+	// software_engineering/version_control/pull_request_management. A Record
+	// names a skill by that path and the id derived from it.
+	Oasf          []string `protobuf:"bytes,6,rep,name=oasf,proto3" json:"oasf,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -100,6 +104,13 @@ func (x *Signum) GetDescription() string {
 func (x *Signum) GetTags() []string {
 	if x != nil {
 		return x.Tags
+	}
+	return nil
+}
+
+func (x *Signum) GetOasf() []string {
+	if x != nil {
+		return x.Oasf
 	}
 	return nil
 }
@@ -1263,7 +1274,7 @@ func (x *PiAm) GetProvider() string {
 }
 
 // NamespaceAgentAm is what agents am and agents set answer: the namespace's
-// agent, who opted the namespace into it, and who it is in Claude Code or in Pi.
+// agent, who opted the namespace into it, and who it is in a Coding Agent Harness.
 type NamespaceAgentAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The namespace it stands in.
@@ -1878,13 +1889,14 @@ var File_plugin_grpc_protocol_sigil_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\n" +
-	" plugin/grpc/protocol/sigil.proto\x12\bprotocol\"\xa8\x01\n" +
+	" plugin/grpc/protocol/sigil.proto\x12\bprotocol\"\xbc\x01\n" +
 	"\x06Signum\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12'\n" +
 	"\x06sigils\x18\x02 \x03(\v2\x0f.protocol.SigilR\x06sigils\x12+\n" +
 	"\afollows\x18\x03 \x03(\v2\x11.protocol.FollowsR\afollows\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x12\n" +
-	"\x04tags\x18\x05 \x03(\tR\x04tags\"d\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\x12\x12\n" +
+	"\x04oasf\x18\x06 \x03(\tR\x04oasf\"d\n" +
 	"\x04Node\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12&\n" +

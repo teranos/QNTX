@@ -36,6 +36,7 @@ func (s *QNTXServer) staandsSignum() sigil.Signum {
 			Name:        "staands",
 			Description: "Stands: a market's public pixel, created and taken down, and what arrived at each, read as metrics, activity and visits.",
 			Tags:        []string{"analytics", "pixel", "visits"},
+			Oasf:        []string{"data_engineering_analytics/data_analytics/product_analytics"},
 			Follows:     []*protocol.Follows{staandsFollowUmami()},
 			Sigils: []*protocol.Sigil{
 				{

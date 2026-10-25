@@ -18,7 +18,7 @@ type agentSubsystem struct{}
 
 func (agentSubsystem) Name() string { return "agent" }
 
-// harnessHeld is a pinned harness on this node, Claude Code or Pi: fetched
+// harnessHeld is a pinned Coding Agent Harness on this node: fetched
 // once at start, and asked for by whatever runs it.
 type harnessHeld struct {
 	name    string

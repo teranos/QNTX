@@ -21,6 +21,7 @@ func (s *QNTXServer) iSignum() sigil.Signum {
 			Name:        "i",
 			Description: "The person asking: the namespace they stand in, and a step to another.",
 			Tags:        []string{"identity", "standing", "namespace"},
+			Oasf:        []string{"cybersecurity/identity_access_management/identity_administration"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "standing",

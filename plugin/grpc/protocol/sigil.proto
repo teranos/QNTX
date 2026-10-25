@@ -24,6 +24,10 @@ message Signum {
   // a skill's description and tags.
   string description = 4;
   repeated string tags = 5;
+  // The skills of OASF's taxonomy it performs, each by its path there:
+  // software_engineering/version_control/pull_request_management. A Record
+  // names a skill by that path and the id derived from it.
+  repeated string oasf = 6;
 }
 
 // Node is the node about itself: what it is called, what it is for, and the
@@ -233,7 +237,7 @@ message PiAm {
 }
 
 // NamespaceAgentAm is what agents am and agents set answer: the namespace's
-// agent, who opted the namespace into it, and who it is in Claude Code or in Pi.
+// agent, who opted the namespace into it, and who it is in a Coding Agent Harness.
 message NamespaceAgentAm {
   // The namespace it stands in.
   string namespace = 1;

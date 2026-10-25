@@ -1,7 +1,10 @@
 package a2a
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/teranos/QNTX/server/parity"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -54,6 +58,10 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			found = at
 		}
 		if !found {
+			if refused := pushConfigured(r, served); refused != nil {
+				refused.write(w, undelivered)
+				return
+			}
 			notFound(r.Method+" "+r.URL.Path+" is no A2A operation").write(w, undelivered)
 			return
 		}
@@ -94,9 +102,12 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			(&Error{Name: "InvalidAgentResponseError", Message: op.Name + " answered without a stream"}).write(w, undelivered)
 			return
 		}
-		body, err := protojson.Marshal(response)
+		body, err := marshalled(response)
 		if err != nil {
 			(&Error{Name: "InvalidAgentResponseError", Message: err.Error()}).write(w, undelivered)
+			return
+		}
+		if op.Name == getExtendedAgentCard && cached(w, r, body) {
 			return
 		}
 		w.Header().Set("Content-Type", contentType)
@@ -104,6 +115,117 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			undelivered(op.Name, err)
 		}
 	})
+}
+
+// pushConfigured is how a push notification config operation is answered,
+// nil for a request that is none: PushNotificationNotSupportedError, as the
+// card says capabilities.pushNotifications is false, and not found at a tenant
+// no agent is served at (§3.3.2).
+func pushConfigured(r *http.Request, served Served) *Error {
+	routes, err := pushConfigRoutes()
+	if err != nil {
+		return &Error{Message: "the push notification config routes did not read from the pinned spec: " + err.Error()}
+	}
+	for _, route := range routes {
+		if route.Method != r.Method {
+			continue
+		}
+		params, ok := matchPath(route.Path, r.URL.Path)
+		if !ok {
+			continue
+		}
+		if tenant, named := params["tenant"]; named {
+			at, err := served(tenant)
+			if err != nil {
+				return &Error{Message: "whether an agent is served at tenant " + tenant + " was not answered: " + err.Error()}
+			}
+			if !at {
+				return notFound("no agent is served at tenant " + tenant)
+			}
+		}
+		if refused := version(r); refused != nil {
+			return refused
+		}
+		return PushNotificationNotSupported()
+	}
+	return nil
+}
+
+// getExtendedAgentCard is the operation whose card is the caller's own.
+const getExtendedAgentCard = "GetExtendedAgentCard"
+
+// extendedCardMaxAge is how long a client keeps an extended card, short as the
+// public card's is: health is on the card.
+const extendedCardMaxAge = "60"
+
+// cached sets how a client caches an extended card, and answers 304 when the
+// card it holds is the one it would be sent: "Agents SHOULD implement
+// appropriate caching headers to control client-side caching of extended
+// cards", and "honor client cache invalidation" (§13.3). The card is the
+// caller's, what they reach, so it is private and kept by no shared cache.
+func cached(w http.ResponseWriter, r *http.Request, body []byte) bool {
+	// marshalled varies its whitespace as protojson does; compacted, the ETag
+	// is the card's and not the encoder's.
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, body); err != nil {
+		return false
+	}
+	sum := sha256.Sum256(compact.Bytes())
+	etag := `"` + hex.EncodeToString(sum[:]) + `"`
+	w.Header().Set("Cache-Control", "private, max-age="+extendedCardMaxAge)
+	w.Header().Set("ETag", etag)
+	if Matches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return true
+	}
+	return false
+}
+
+// Matches is If-None-Match against one strong ETag (RFC 9110 §13.1.2): a list
+// of tags, a weak one compared by its opaque part, or *.
+func Matches(header, etag string) bool {
+	for _, tag := range strings.Split(header, ",") {
+		tag = strings.TrimPrefix(strings.TrimSpace(tag), "W/")
+		if tag == "*" || tag == etag {
+			return true
+		}
+	}
+	return false
+}
+
+// marshalled is response as JSON, each REQUIRED field of it present though
+// it holds its default: "The nextPageToken field MUST always be present in the
+// response" (§3.1.4), and protojson leaves out what holds its default.
+func marshalled(response proto.Message) ([]byte, error) {
+	body, err := protojson.Marshal(response)
+	if err != nil {
+		return nil, err
+	}
+	whole, err := protojson.MarshalOptions{EmitDefaultValues: true}.Marshal(response)
+	if err != nil {
+		return nil, err
+	}
+	var given, defaulted map[string]json.RawMessage
+	if err := json.Unmarshal(body, &given); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(whole, &defaulted); err != nil {
+		return nil, err
+	}
+	fields := response.ProtoReflect().Descriptor().Fields()
+	added := false
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		value, held := defaulted[field.JSONName()]
+		if _, given := given[field.JSONName()]; given || !held || !parity.Required(field) {
+			continue
+		}
+		given[field.JSONName()], added = value, true
+	}
+	if !added {
+		return body, nil
+	}
+	return json.Marshal(given)
 }
 
 // TenantOf is the tenant a request message names, when it names one: the
@@ -220,7 +342,11 @@ func read(op Operation, r *http.Request, params map[string]string) (proto.Messag
 	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: true}
 	switch r.Method {
 	case http.MethodGet, http.MethodDelete:
-		body, err := json.Marshal(queried(op.request, r))
+		values, refused := queried(op.request, r)
+		if refused != nil {
+			return nil, refused
+		}
+		body, err := json.Marshal(values)
 		if err != nil {
 			return nil, invalid(err.Error())
 		}
@@ -250,8 +376,10 @@ func read(op Operation, r *http.Request, params map[string]string) (proto.Messag
 
 // queried is the query parameters the request has fields for, as JSON values
 // protojson reads: a list for a repeated field, true or false for a bool, and
-// the string as written otherwise (§11.5).
-func queried(message protoreflect.MessageDescriptor, r *http.Request) map[string]any {
+// the string as written otherwise (§11.5). An enum's value is one of its
+// names, which the unknown are not discarded as: "Invalid status value
+// 'TASK_STATE_RUNNING'" is refused (§6.5).
+func queried(message protoreflect.MessageDescriptor, r *http.Request) (map[string]any, *Error) {
 	values := map[string]any{}
 	for name, said := range r.URL.Query() {
 		field := message.Fields().ByJSONName(name)
@@ -265,6 +393,8 @@ func queried(message protoreflect.MessageDescriptor, r *http.Request) map[string
 				all = append(all, strings.Split(one, ",")...)
 			}
 			values[name] = slices.DeleteFunc(all, func(v string) bool { return v == "" })
+		case field.Kind() == protoreflect.EnumKind && field.Enum().Values().ByName(protoreflect.Name(said[0])) == nil:
+			return nil, invalid("invalid " + name + " value '" + said[0] + "': it is no " + string(field.Enum().FullName()))
 		case field.Kind() == protoreflect.BoolKind:
 			if b, err := strconv.ParseBool(said[0]); err == nil {
 				values[name] = b
@@ -275,5 +405,5 @@ func queried(message protoreflect.MessageDescriptor, r *http.Request) map[string
 			values[name] = said[0]
 		}
 	}
-	return values
+	return values, nil
 }

@@ -1,0 +1,32 @@
+OASF v1.1.3, schema version 1.1.0 (schema/version.json), whose types/v1 is
+the proto for schema v1.0.0 onward (proto/README.md): a Record and the Skills
+it names.
+
+Each file is at its import path under
+https://raw.githubusercontent.com/agntcy/oasf/243e9dd1562529fdf59e3eb06db442d69330b14b/proto/ (the commit v1.1.3 points to)
+
+4452b94edacda4e83881463dfb536a181fc35ffe0ea9abc77fe579731189de9f  agntcy/oasf/types/v1/descriptor.proto
+acba7e7e25e276a87a9e87b5cc0acdd4fa61bf848ea29645523b256784a2798a  agntcy/oasf/types/v1/domain.proto
+672ede8e96b50a1e3230ee0438e1d4cd34d27bf3318c968375afc97ef763aa01  agntcy/oasf/types/v1/locator.proto
+90e53866cf2218e79e516c0300d78934cb0959edea4d5859f22392ff0ac6b93f  agntcy/oasf/types/v1/module.proto
+7bb7b0f87fdd267d949bb337e749e8ace1d843b10ea869ce1368a8433da69426  agntcy/oasf/types/v1/record.proto
+818dcb9f6860a87effb681f07ef5e94d83ebdce0d9fe21dd835b61e5b1486384  agntcy/oasf/types/v1/skill.proto
+
+Its google/protobuf import is protocompile's standard imports.
+
+schema/skills is OASF's skill taxonomy, the directory as it is at that
+commit: git tree 369dbe85b1086315e3cacaadd29dea6e2dfedd45
+(git rev-parse 243e9dd1562529fdf59e3eb06db442d69330b14b:schema/skills).
+A Record names a skill by its path in it and the id derived from that path
+(server/lib/schema/types.ex: class_uid(category_uid, class_id) =
+category_uid * 100 + class_id).
+
+schema/modules is its module taxonomy, the same way: git tree
+bd97cf285a47628f44687bd4cbf3ba71cce1e7a6. A Record names a module by its
+path and the id derived from it, integration/a2a as 203.
+
+d80d02f02fbd89f5361ab1ff8ad9089e6f1b5f3df60f44397959d92006c70655  schema/objects/record.json
+de76543832fed28163b6108c2401b41d8052b7db1989fb621a0a4e314b8551e5  schema/version.json
+
+record.json is what OASF requires of a Record, and version.json the schema
+version a Record names.

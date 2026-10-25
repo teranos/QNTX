@@ -22,12 +22,14 @@ import (
 // the reference, its version and the commit it was taken at, with SOURCE
 // saying where it came from: umami is umami_v3.3.1_ca661c7, a2a is
 // a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b, github is
-// github_2026-03-10_7bdf5f0. A reference is read as it is: a schema.prisma as
-// Prisma, a .proto as the descriptors it compiles to, a schema.json as JSON
-// Schema, a .d.ts as the TypeScript types it declares, an openapi.json as the
-// operations and schemas of an OpenAPI description.
+// github_2026-03-10_7bdf5f0, oasf is oasf_v1.1.3_243e9dd. A reference is read
+// as it is: a schema.prisma as Prisma, a .proto as the descriptors it compiles
+// to, a schema.json as JSON Schema, a .d.ts as the TypeScript types it
+// declares, an openapi.json as the operations and schemas of an OpenAPI
+// description. A .proto that imports by its path is pinned at that path:
+// oasf's are under agntcy/, and its skill taxonomy under schema/skills/.
 //
-//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json
+//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory
@@ -116,13 +118,18 @@ func pinnedAt(name string) (string, []string, *protocol.Refusal) {
 	default:
 		return "", nil, failed("%s is pinned more than once: %s", name, strings.Join(found, ", "))
 	}
-	entries, err = fs.ReadDir(pinned, found[0])
+	// A file is named by its path in the directory, which for a .proto is the
+	// path it is imported by.
+	var files []string
+	err = fs.WalkDir(pinned, found[0], func(at string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		files = append(files, strings.TrimPrefix(at, found[0]+"/"))
+		return nil
+	})
 	if err != nil {
 		return "", nil, failed("%s did not read: %v", found[0], err)
-	}
-	var files []string
-	for _, entry := range entries {
-		files = append(files, entry.Name())
 	}
 	return found[0], files, nil
 }

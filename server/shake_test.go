@@ -65,8 +65,7 @@ func toldRows(t *testing.T, s *QNTXServer, session string) []*types.As {
 // works, and the prompt says where it is and to read it (ADR-054).
 func TestAShakenScreenshotIsPutWhereTheElementReadsIt(t *testing.T) {
 	s, ran := runningElementAgents(t)
-	home := filepath.Join(s.agentsDir, "elements", "note-1")
-	underGround(t, home)
+	home := s.nodeAgent.home
 	s.dbPath = filepath.Join(t.TempDir(), "qntx.db")
 	files, err := s.filesDir()
 	require.NoError(t, err)
@@ -148,10 +147,6 @@ func TestAPictureIsOneTheNodeHolds(t *testing.T) {
 // "YES, WHERE WE LEFT OFF, SEPARATE FROM THE NODE AGENT"
 func TestEachElementIsItsOwnAgentAndItsOwnConversation(t *testing.T) {
 	s, ran := runningElementAgents(t)
-	noteHome := filepath.Join(s.agentsDir, "elements", "note-1")
-	axHome := filepath.Join(s.agentsDir, "elements", "ax-element")
-	underGround(t, noteHome)
-	underGround(t, axHome)
 
 	day1, refused := sayingTo(s, "note-1", sigil.Sent{"says": "the note is too wide"})
 	require.Nil(t, refused)
@@ -168,7 +163,7 @@ func TestEachElementIsItsOwnAgentAndItsOwnConversation(t *testing.T) {
 	assert.NotEqual(t, day1.GetSession(), other.GetSession())
 	assert.NotEqual(t, day1.GetSession(), node.GetSession())
 	assert.NotEqual(t, other.GetSession(), node.GetSession())
-	kept, err := os.ReadFile(filepath.Join(noteHome, claudeSessionFile))
+	kept, err := os.ReadFile(filepath.Join(s.nodeAgent.home, "elements", "note-1", claudeSessionFile))
 	require.NoError(t, err)
 	assert.Equal(t, day1.GetSession(), strings.TrimSpace(string(kept)))
 	resumed := false
@@ -181,14 +176,14 @@ func TestEachElementIsItsOwnAgentAndItsOwnConversation(t *testing.T) {
 	}
 	assert.True(t, resumed, "day 3 did not resume day 1's session")
 
-	// Each element is its own agent: its own key, told it is that element, run as [agent.root] says.
+	// Each element is its own agent, its own key, told it is that element; it stands where the Node Agent stands, run as [agent.root] says.
 	note, refused := s.holdElementAgent("note-1")
 	require.Nil(t, refused)
 	ax, refused := s.holdElementAgent("ax-element")
 	require.Nil(t, refused)
 	assert.NotEqual(t, note.did, ax.did)
 	assert.NotEqual(t, note.did, s.nodeAgent.did)
-	assert.Equal(t, noteHome, note.home)
+	assert.Equal(t, s.nodeAgent.home, note.home)
 	args := ranWith(t, ran, theRunSaying(t, ran), "args")
 	assert.Contains(t, after(args, "--append-system-prompt"), "You are the element note-1")
 	assert.Contains(t, after(args, "--append-system-prompt"), note.did)

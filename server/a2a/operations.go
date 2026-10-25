@@ -8,6 +8,7 @@ package a2a
 import (
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/teranos/QNTX/server/parity"
 	errors "github.com/teranos/sacred-error"
@@ -23,14 +24,8 @@ const Service = "lf.a2a.v1.A2AService"
 // OutOfScope is what the table leaves out: "The parts where you think that the
 // spec disagrees with itself, those specific parts will not be in scope".
 // SubscribeToTask is get in a2a.proto:78 and POST in specification.md:1169 and
-// 2795; the push notification config operations are the others.
-var OutOfScope = []string{
-	"SubscribeToTask",
-	"CreateTaskPushNotificationConfig",
-	"GetTaskPushNotificationConfig",
-	"ListTaskPushNotificationConfigs",
-	"DeleteTaskPushNotificationConfig",
-}
+// 2795; the push notification config operations, pushConfig, are the others.
+var OutOfScope = append([]string{"SubscribeToTask"}, pushConfig...)
 
 // Route is one HTTP method and path. A path parameter is written as the proto
 // names it, {id=*} as {id}.
@@ -93,6 +88,44 @@ func Operations() ([]Operation, error) {
 	}
 	return operations, nil
 }
+
+// pushConfig is the push notification config operations, out of scope. The
+// spec disagrees on which field each segment of their paths fills, and an
+// operation that reads none is the same under both: "If
+// AgentCard.capabilities.pushNotifications is false or not present, operations
+// related to push notification configuration (Create, Get, List, Delete) MUST
+// return PushNotificationNotSupportedError" (§3.3.4).
+var pushConfig = []string{
+	"CreateTaskPushNotificationConfig",
+	"GetTaskPushNotificationConfig",
+	"ListTaskPushNotificationConfigs",
+	"DeleteTaskPushNotificationConfig",
+}
+
+// pushConfigRoutes is every route of the push notification config
+// operations, at no tenant and under /{tenant}.
+var pushConfigRoutes = sync.OnceValues(func() ([]Route, error) {
+	service, err := service()
+	if err != nil {
+		return nil, err
+	}
+	var routes []Route
+	for _, name := range pushConfig {
+		method := service.Methods().ByName(protoreflect.Name(name))
+		if method == nil {
+			return nil, errors.Newf("%s declares no %s", Service, name)
+		}
+		rule, err := httpRule(method)
+		if err != nil {
+			return nil, err
+		}
+		routes = append(routes, routeOf(rule))
+		for _, binding := range rule.GetAdditionalBindings() {
+			routes = append(routes, routeOf(binding))
+		}
+	}
+	return routes, nil
+})
 
 // Declared is the name of every rpc A2AService declares, in or out of scope.
 func Declared() ([]string, error) {
