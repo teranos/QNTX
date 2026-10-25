@@ -105,6 +105,10 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		cancel()
 		return nil, err
 	}
+	if err := refuseQuickDevAuth(quickdev, deps.cfg.Auth); err != nil {
+		cancel()
+		return nil, err
+	}
 
 	rl := deps.cfg.Server.RateLimit
 
