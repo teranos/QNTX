@@ -12,11 +12,16 @@ import (
 //go:embed codex_*/manifest.json
 var codexPin embed.FS
 
-// CodexArchive is one upstream release archive and its SHA-256. On Linux the
-// executable's archive names the sandbox it runs commands in.
+// CodexArchive is one upstream release archive and its SHA-256, and the
+// archives whose executables codex runs from beside itself.
 type CodexArchive struct {
     File, SHA256 string
-    Sandbox      *CodexArchive
+    Beside       []CodexBeside
+}
+
+// CodexBeside is an archive installed at Path, relative to codex.
+type CodexBeside struct {
+    File, SHA256, Path string
 }
 
 // Codex is the single pinned Codex CLI release and the SHA-256 of its
@@ -34,16 +39,17 @@ func Codex() (version string, artifacts map[string]CodexArchive, err error) {
     if err != nil {
         return "", nil, errors.Wrapf(err, "%s/manifest.json did not read", dir)
     }
-    type archive struct {
-        File string `json:"file"`
-        SHA256 string `json:"sha256"`
-    }
     var pinned struct {
         Version string `json:"version"`
         Commit string `json:"commit"`
         Artifacts map[string]struct {
-            archive
-            Sandbox *archive `json:"sandbox"`
+            File string `json:"file"`
+            SHA256 string `json:"sha256"`
+            Beside []struct {
+                File string `json:"file"`
+                SHA256 string `json:"sha256"`
+                Path string `json:"path"`
+            } `json:"beside"`
         } `json:"artifacts"`
     }
     if err := json.Unmarshal(raw, &pinned); err != nil {
@@ -56,8 +62,8 @@ func Codex() (version string, artifacts map[string]CodexArchive, err error) {
     artifacts = make(map[string]CodexArchive, len(pinned.Artifacts))
     for platform, artifact := range pinned.Artifacts {
         a := CodexArchive{File: artifact.File, SHA256: artifact.SHA256}
-        if artifact.Sandbox != nil {
-            a.Sandbox = &CodexArchive{File: artifact.Sandbox.File, SHA256: artifact.Sandbox.SHA256}
+        for _, b := range artifact.Beside {
+            a.Beside = append(a.Beside, CodexBeside(b))
         }
         artifacts[platform] = a
     }

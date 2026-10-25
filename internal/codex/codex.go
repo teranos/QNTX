@@ -20,7 +20,13 @@ import (
 
 type Artifact struct {
 	File, SHA256 string
-	Sandbox      *Artifact
+	Beside       []Beside
+}
+
+// Beside is an archive whose one executable codex runs from beside itself, at Path.
+type Beside struct {
+	Artifact
+	Path string
 }
 type Pin struct {
 	Base, Version string
@@ -44,8 +50,8 @@ func Pinned() (Pin, error) {
 	p := Pin{Base: "https://github.com/openai/codex/releases/download", Version: version, Artifacts: map[string]Artifact{}}
 	for platform, a := range artifacts {
 		pinned := Artifact{File: a.File, SHA256: a.SHA256}
-		if a.Sandbox != nil {
-			pinned.Sandbox = &Artifact{File: a.Sandbox.File, SHA256: a.Sandbox.SHA256}
+		for _, b := range a.Beside {
+			pinned.Beside = append(pinned.Beside, Beside{Artifact: Artifact{File: b.File, SHA256: b.SHA256}, Path: b.Path})
 		}
 		p.Artifacts[platform] = pinned
 	}
@@ -82,13 +88,15 @@ func (p Pin) Ensure(ctx context.Context, dir string) (string, error) {
 	if err := p.install(ctx, dest, a, target); err != nil {
 		return "", err
 	}
-	// codex looks for its sandbox at codex-resources/bwrap beside itself.
-	if a.Sandbox != nil {
-		resources := filepath.Join(dest, "codex-resources")
-		if err := os.MkdirAll(resources, 0700); err != nil {
-			return "", errors.Wrapf(err, "could not create %s", resources)
+	for _, b := range a.Beside {
+		if !filepath.IsLocal(b.Path) {
+			return "", errors.Newf("Codex %s would install %s outside %s", p.Version, b.Path, dest)
 		}
-		if err := p.install(ctx, dest, *a.Sandbox, filepath.Join(resources, "bwrap")); err != nil {
+		at := filepath.Join(dest, b.Path)
+		if err := os.MkdirAll(filepath.Dir(at), 0700); err != nil {
+			return "", errors.Wrapf(err, "could not create %s", filepath.Dir(at))
+		}
+		if err := p.install(ctx, dest, b.Artifact, at); err != nil {
 			return "", err
 		}
 	}

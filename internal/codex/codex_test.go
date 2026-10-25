@@ -89,7 +89,8 @@ func TestEnsureVerifiesArchiveAndRepairsExecutable(t *testing.T) {
 
 // "bubblewrap is unavailable: no system bwrap was found on PATH and no bundled
 // codex-resources/bwrap binary was found next to the Codex executable"
-func TestEnsureInstallsTheSandboxBesideTheExecutable(t *testing.T) {
+// "failed to spawn code-mode host /home/kapteyn/.qntx/codex/0.163.0/codex-code-mode-host: No such file or directory (os error 2)"
+func TestEnsureInstallsWhatCodexRunsBesideIt(t *testing.T) {
 	platform, err := Platform()
 	if err != nil {
 		t.Fatal(err)
@@ -97,24 +98,53 @@ func TestEnsureInstallsTheSandboxBesideTheExecutable(t *testing.T) {
 	served := map[string][]byte{
 		"/rust-vtest/codex-test.tar.gz": archive(t, "codex-test", tar.TypeReg),
 		"/rust-vtest/bwrap-test.tar.gz": archive(t, "bwrap-test", tar.TypeReg),
+		"/rust-vtest/host-test.tar.gz":  archive(t, "host-test", tar.TypeReg),
 	}
 	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(served[r.URL.Path]) }))
 	defer host.Close()
 	sum := func(path string) string { return fmt.Sprintf("%x", sha256.Sum256(served[path])) }
 	p := Pin{Base: host.URL, Version: "test", Artifacts: map[string]Artifact{platform: {
 		File: "codex-test.tar.gz", SHA256: sum("/rust-vtest/codex-test.tar.gz"),
-		Sandbox: &Artifact{File: "bwrap-test.tar.gz", SHA256: sum("/rust-vtest/bwrap-test.tar.gz")},
+		Beside: []Beside{
+			{Artifact: Artifact{File: "bwrap-test.tar.gz", SHA256: sum("/rust-vtest/bwrap-test.tar.gz")}, Path: "codex-resources/bwrap"},
+			{Artifact: Artifact{File: "host-test.tar.gz", SHA256: sum("/rust-vtest/host-test.tar.gz")}, Path: "codex-code-mode-host"},
+		},
 	}}}
 	binary, err := p.Ensure(context.Background(), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(filepath.Join(filepath.Dir(binary), "codex-resources", "bwrap"))
+	for _, path := range []string{"codex-resources/bwrap", "codex-code-mode-host"} {
+		info, err := os.Stat(filepath.Join(filepath.Dir(binary), path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode()&0111 == 0 {
+			t.Fatalf("%s is not executable", path)
+		}
+	}
+}
+
+// What the pin installs stays beside codex.
+func TestEnsureRefusesToInstallOutsideItsDirectory(t *testing.T) {
+	platform, err := Platform()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode()&0111 == 0 {
-		t.Fatal("bwrap is not executable")
+	data := archive(t, "codex-test", tar.TypeReg)
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(data) }))
+	defer host.Close()
+	sum := fmt.Sprintf("%x", sha256.Sum256(data))
+	p := Pin{Base: host.URL, Version: "test", Artifacts: map[string]Artifact{platform: {
+		File: "codex-test.tar.gz", SHA256: sum,
+		Beside: []Beside{{Artifact: Artifact{File: "codex-test.tar.gz", SHA256: sum}, Path: "../escaped"}},
+	}}}
+	dir := t.TempDir()
+	if _, err := p.Ensure(context.Background(), dir); err == nil {
+		t.Fatal("installed outside its directory")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "escaped")); !os.IsNotExist(err) {
+		t.Fatalf("wrote outside: %v", err)
 	}
 }
 
