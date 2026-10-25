@@ -249,37 +249,50 @@ var mimeByExtension = map[string]string{
 	".txt":  "text/plain",
 }
 
-// readFileBase64 reads a stored file by ID, detects its MIME type, and returns
-// the content as a base64-encoded string suitable for data URI construction.
-func (s *QNTXServer) readFileBase64(fileID string) (mimeType, b64Data string, err error) {
+// storedFile is where the file with this ID is kept, by the ID alone or with
+// its extension, and whether one is. An ID that is not one is an error.
+func (s *QNTXServer) storedFile(fileID string) (path string, found bool, err error) {
 	// Defence-in-depth: Clean then Base to strip any path traversal
 	fileID = filepath.Base(filepath.Clean(fileID))
 	for _, c := range fileID {
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '.') {
-			return "", "", errors.Newf("invalid file ID %q", fileID)
+			return "", false, errors.Newf("invalid file ID %q", fileID)
 		}
 	}
 
 	dir, err := s.filesDir()
 	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to resolve files directory for %s", fileID)
+		return "", false, errors.Wrapf(err, "failed to resolve files directory for %s", fileID)
 	}
 
 	// Try exact match first (id already includes extension)
-	path := filepath.Clean(filepath.Join(dir, fileID))
+	path = filepath.Clean(filepath.Join(dir, fileID))
 	if !strings.HasPrefix(path, dir) {
-		return "", "", errors.Newf("invalid file ID %q", fileID)
+		return "", false, errors.Newf("invalid file ID %q", fileID)
 	}
-	if _, statErr := os.Stat(path); statErr != nil {
-		// Try globbing for id.* (bare UUID without extension)
-		matches, globErr := filepath.Glob(filepath.Join(dir, fileID+".*"))
-		if globErr != nil {
-			return "", "", errors.Wrapf(globErr, "malformed file ID %q", fileID)
-		}
-		if len(matches) != 1 {
-			return "", "", errors.Newf("file not found: %s", fileID)
-		}
-		path = matches[0]
+	if _, statErr := os.Stat(path); statErr == nil {
+		return path, true, nil
+	}
+	// Try globbing for id.* (bare UUID without extension)
+	matches, globErr := filepath.Glob(filepath.Join(dir, fileID+".*"))
+	if globErr != nil {
+		return "", false, errors.Wrapf(globErr, "malformed file ID %q", fileID)
+	}
+	if len(matches) != 1 {
+		return "", false, nil
+	}
+	return matches[0], true, nil
+}
+
+// readFileBase64 reads a stored file by ID, detects its MIME type, and returns
+// the content as a base64-encoded string suitable for data URI construction.
+func (s *QNTXServer) readFileBase64(fileID string) (mimeType, b64Data string, err error) {
+	path, found, err := s.storedFile(fileID)
+	if err != nil {
+		return "", "", err
+	}
+	if !found {
+		return "", "", errors.Newf("file not found: %s", fileID)
 	}
 
 	data, err := os.ReadFile(path)

@@ -2,7 +2,7 @@
 
 [![Go Tests](https://github.com/teranos/QNTX/actions/workflows/go.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/go.yml)
 [![Rust](https://github.com/teranos/QNTX/actions/workflows/rs.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/rs.yml)
-[![TypeScript](https://github.com/teranos/QNTX/actions/workflows/ts.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/ts.yml)
+[![TypeScript](https://github.com/teranos/QNTX-Web/actions/workflows/ts.yml/badge.svg)](https://github.com/teranos/QNTX-Web/actions/workflows/ts.yml)
 [![Nix Image](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml)
 
 ## Installation
@@ -18,8 +18,10 @@ See [config package](internal/config/README.md) for details on multi-source conf
 ```bash
 # first make ats
 make ats
-# go and typescript, fast tests during development.
+# go, fast tests during development.
 make test
 ```
+
+The frontend is [QNTX-Web](https://github.com/teranos/QNTX-Web); the phone and desktop shell is [QNTX-App](https://github.com/teranos/QNTX-App).
 
 Works with: [https://nixos.org/](Nix) [https://obsidian.md/](Obsidian), [https://sentry.io/](Sentry), [https://aws.amazon.com/](AWS), [https://github.com/](GitHub), [https://claude.com/product/claude-code](Claude), [https://typesafe.ai/blog/introducing-system-one-models-and-jev](Jev), [https://pi.dev/](Pi), [https://openrouter.ai/](openrouter), [https://duckdb.org/](DuckDB), [https://github.com/teranos/ground](ground), [https://github.com/teranos/elements](elements)

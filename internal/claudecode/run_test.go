@@ -59,7 +59,7 @@ func TestSaidStartsASessionAndAnswers(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	home := t.TempDir()
 	said := Said{
-		Binary: binary, Home: home, Session: "s-1", Says: "what does uname -s print?",
+		Started: noted, Binary: binary, Home: home, Session: "s-1", Says: "what does uname -s print?",
 		Model: "claude-opus-5-5", Effort: "low", Mode: "dontAsk", Token: "the-plan-token", System: "You are the Node Agent.",
 	}
 
@@ -126,7 +126,7 @@ func TestASessionMayDoWhatItWasAllowedAndTheRestIsSaid(t *testing.T) {
 {"type":"result","subtype":"success","session_id":"s-1","is_error":false,"result":"I could not write the file.","permission_denials":[{"tool_name":"Write","tool_use_id":"toolu_1","tool_input":{"file_path":"/etc/x"}},{"tool_name":"Write","tool_use_id":"toolu_2","tool_input":{}},{"tool_name":"WebFetch","tool_use_id":"toolu_3","tool_input":{}}]}
 `
 	binary, ran := standIn(t, stream, 0, "")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "write it", Model: "m", Effort: "low", Mode: "dontAsk",
+	said := Said{Started: noted, Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "write it", Model: "m", Effort: "low", Mode: "dontAsk",
 		Allow: []string{"Bash", "Read", "mcp__qntx"}}
 	answer, err := said.Run(context.Background(), func(Message) {})
 	if err != nil {
@@ -146,7 +146,7 @@ func TestASessionMayDoWhatItWasAllowedAndTheRestIsSaid(t *testing.T) {
 // handed to Claude Code as named. One that names none is not run.
 func TestTheModeNamedIsTheModeRunIn(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "plan"}
+	said := Said{Started: noted, Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "plan"}
 	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestTheModeNamedIsTheModeRunIn(t *testing.T) {
 // to the node, reaches it as environment, and what it runs inherits it.
 func TestSaidHandsOverTheEnvironmentItWasGiven(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk",
+	said := Said{Started: noted, Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk",
 		Env: []string{"GIT_CONFIG_GLOBAL=/agents/root/gitconfig", "QNTX_TOKEN=qntx_its_own"}}
 	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -181,7 +181,7 @@ func TestSaidHandsOverTheEnvironmentItWasGiven(t *testing.T) {
 
 func TestSaidResumesASessionThatExists(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "and again", Model: "m", Effort: "low", Mode: "dontAsk"}
+	said := Said{Started: noted, Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "and again", Model: "m", Effort: "low", Mode: "dontAsk"}
 	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestSaidResumesASessionThatExists(t *testing.T) {
 
 func TestARunWithNoResultSaysWhatClaudeCodeSaid(t *testing.T) {
 	binary, _ := standIn(t, "", 1, "No conversation found with session ID: s-1")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
+	said := Said{Started: noted, Binary: binary, Home: t.TempDir(), Session: "s-1", Resumes: true, Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
 	_, err := said.Run(context.Background(), func(Message) {})
 	if err == nil {
 		t.Fatal("a run that printed no result was taken as answered")
@@ -212,7 +212,7 @@ func TestAnErrorResultIsAnAnswerThatSaysSo(t *testing.T) {
 {"type":"result","subtype":"error_during_execution","session_id":"s-1","is_error":true,"result":"API Error: 529 overloaded"}
 `
 	binary, _ := standIn(t, stream, 1, "")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
+	said := Said{Started: noted, Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
 	answer, err := said.Run(context.Background(), func(Message) {})
 	if err != nil {
 		t.Fatalf("an error Claude Code reported as its result is an answer, not a failed run: %v", err)
@@ -226,7 +226,7 @@ func TestAnMCPServerIsNamedWithoutItsSecret(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	home := t.TempDir()
 	said := Said{
-		Binary: binary, Home: home, Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk",
+		Started: noted, Binary: binary, Home: home, Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk",
 		MCP: []MCPServer{{Name: "qntx", URL: "http://127.0.0.1:8770/mcp", Bearer: "qntx_secret"}},
 	}
 	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
@@ -258,7 +258,7 @@ func TestALineLongerThanABufferIsStillRead(t *testing.T) {
 {"type":"result","subtype":"success","session_id":"s-1","is_error":false,"result":"done"}
 `
 	binary, _ := standIn(t, stream, 0, "")
-	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
+	said := Said{Started: noted, Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
 	var texts []string
 	answer, err := said.Run(context.Background(), func(m Message) {
 		for _, block := range m.Blocks() {
@@ -270,5 +270,36 @@ func TestALineLongerThanABufferIsStillRead(t *testing.T) {
 	}
 	if answer.Text != "done" || len(texts) != 1 || len(texts[0]) != len(long) {
 		t.Errorf("the long line was not read whole: answer %q, %d texts", answer.Text, len(texts))
+	}
+}
+
+// noted is told where a turn prints, and keeps nothing of it.
+func noted(string) {}
+
+// A turn tells its caller the stream it prints to once its process runs, and
+// that is the stream the node reads it on from.
+func TestATurnSaysWhereItPrints(t *testing.T) {
+	binary, _ := standIn(t, answered, 0, "")
+	home := t.TempDir()
+	var told []string
+	said := Said{Binary: binary, Home: home, Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk",
+		Started: func(stream string) { told = append(told, stream) }}
+	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(told) != 1 || filepath.Dir(told[0]) != turnsDir(home) || !strings.HasPrefix(filepath.Base(told[0]), "s-1.") {
+		t.Fatalf("told %v, want the one stream of s-1 under %s", told, turnsDir(home))
+	}
+}
+
+// Nobody told where a turn prints is not assumed.
+func TestATurnNobodyIsToldOfIsNotRun(t *testing.T) {
+	binary, ran := standIn(t, answered, 0, "")
+	said := Said{Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk"}
+	if _, err := said.Run(context.Background(), func(Message) {}); err == nil {
+		t.Fatal("a turn ran that told nobody where it prints")
+	}
+	if _, err := os.Stat(filepath.Join(ran, "args")); !os.IsNotExist(err) {
+		t.Fatalf("Claude Code was run: %v", err)
 	}
 }

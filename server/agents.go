@@ -432,6 +432,7 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 			Name:        "agents",
 			Description: "The namespace agent: a common agent of the namespace it is opted into, shared by everyone who has reach on it, on its own sign-in.",
 			Tags:        []string{"agent", "namespaces"},
+			Oasf:        []string{"ai_ml_engineering/agent_orchestration/multi_agent_coordination"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "set",
@@ -458,8 +459,8 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 				login.sigil,
 				{
 					Name:   "say",
-					Does:   "Says something to the namespace's agent and gives what it answered. One session that continues, shared by everyone who has reach on the namespace, written down in the namespace by the agent as it goes.",
-					Takes:  with(append([]*protocol.Param{harness, {Name: "says", Required: true, Says: "What is said to it."}}, h.sayTakes...)...),
+					Does:   "Says something to the namespace's agent and gives what it answered. One session that continues, shared by everyone who has reach on the namespace, written down in the namespace by the agent as it goes. A picture attached travels by its file id (ADR-054).",
+					Takes:  with(append([]*protocol.Param{harness, {Name: "says", Required: true, Says: "What is said to it."}, screenshotParam()}, h.sayTakes...)...),
 					Answer: "protocol.NamespaceAgentSaid",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/say"},
 				},

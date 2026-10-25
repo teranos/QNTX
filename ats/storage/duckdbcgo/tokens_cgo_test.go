@@ -78,6 +78,45 @@ func TestAClientKeepsItsReturnAddress(t *testing.T) {
 	}
 }
 
+// A token whose hash the open is handed is left unread; the rest load.
+func TestATokenTheOpenSkipsIsNotRead(t *testing.T) {
+	dir := "file://" + t.TempDir()
+	first, err := NewTokenStore(dir)
+	if err != nil {
+		t.Fatalf("NewTokenStore: %v", err)
+	}
+	spent, _, err := first.Create(access.NewToken{Label: "carried", MintedBy: "https://mastodon.example/@tim", ExpiresAt: &neverEnds, Namespaces: []string{NamespaceDefault}})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	live, _, err := first.Create(access.NewToken{Label: "kept", MintedBy: "https://mastodon.example/@tim", ExpiresAt: &neverEnds, Namespaces: []string{NamespaceDefault}})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	first.Close()
+
+	second, err := NewTokenStoreSkipping(dir, []string{hashOf(spent)})
+	if err != nil {
+		t.Fatalf("NewTokenStoreSkipping: %v", err)
+	}
+	defer second.Close()
+	held, err := second.Records()
+	if err != nil {
+		t.Fatalf("Records: %v", err)
+	}
+	if len(held) != 1 || held[0].Hash != hashOf(live) {
+		t.Fatalf("the open read %+v", held)
+	}
+}
+
+// A token saying nothing of when it ends is refused, as the table refuses it.
+func TestATokenSayingNothingOfItsEndIsRefused(t *testing.T) {
+	store := newStore(t)
+	if _, err := store.Issue(access.IssuedToken{Hash: "abc", DID: "did:key:zabc", Label: "unsaid", Namespaces: []string{NamespaceDefault}}); err == nil {
+		t.Fatal("a token with no end was written")
+	}
+}
+
 // fosite exchanges the code for the token the strategy already mints, and the
 // store writes it with the DID the session carries (ADR-025). What it wrote
 // is found by the hash the strategy named it by, as a token of the kind and

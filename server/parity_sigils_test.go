@@ -141,7 +141,7 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 		if len(held.Required) != 0 {
 			t.Errorf("%s: required and unfollowed is %v", name, held.Required)
 		}
-		if strings.Join(held.Unfollowed["protocol.Signum"], " ") != "follows sigils" {
+		if strings.Join(held.Unfollowed["protocol.Signum"], " ") != "follows oasf sigils" {
 			t.Errorf("%s: Signum unfollowed is %v", name, held.Unfollowed["protocol.Signum"])
 		}
 		holds(t, signum, "hold", answer)

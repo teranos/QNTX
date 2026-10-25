@@ -28,6 +28,9 @@ type aTurn struct {
 	called string
 	// effort is what the harness runs the turn at, as a transcript reads it.
 	effort string
+	// element is the element the turn is said in, and screenshot where its
+	// screenshot was put for the agent, each empty when none (ADR-054).
+	element, screenshot string
 	// ready is what the harness needs before anything is said to it, and
 	// whether it resumes session. A refusal here says nothing to it.
 	ready func(ctx context.Context, session string, kept bool) (resumes bool, refused *protocol.Refusal)
@@ -49,6 +52,8 @@ type turnRun struct {
 	// unwritten is why a row of the session was not written down, when one
 	// was not, as of the rows written so far.
 	unwritten func() string
+	// started is told the stream the turn prints to once it runs.
+	started func(stream string)
 }
 
 func (turnRun) now() time.Time { return time.Now() }
@@ -84,7 +89,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	t.in.answering.Store(&turnInSession{session: session})
 	defer t.in.answering.Store(nil)
 
-	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: t.effort}
+	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: t.effort, element: t.element, screenshot: t.screenshot}
 	write, unwritten := s.sessionRows(agent, store, session, t.called)
 	// The Node Agent's git is its own (ADR-048, Its git). A namespace agent has
 	// none: its ground is handed the agent's own token, and writes in its namespace.
@@ -104,8 +109,14 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	told, err := writes.told(says, spokenBy(caller), time.Now())
 	write([]*types.As{told}, err)
 
-	answer, err := t.run(turnRun{says: says, session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
-		unwritten: unwritten})
+	// A turn asked for a Task is told to it as it starts (A2A §3.1.1); a say
+	// that is no Task's tells nobody.
+	started := func(string) {}
+	if starts, forATask := taskStartsIn(ctx); forATask {
+		started = func(stream string) { starts(session, stream) }
+	}
+	answer, err := t.run(turnRun{says: shakePrompt(says, t.element, t.screenshot), session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
+		unwritten: unwritten, started: started})
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: t.called + " did not answer: " + err.Error()}
 	}

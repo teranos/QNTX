@@ -33,16 +33,16 @@
     type = "app";
     program = toString (pkgs.writeShellScript "generate-proto-typescript" ''
       set -e
-      echo "Generating TypeScript proto code..."
+      # The TypeScript lands in a QNTX-Web checkout, named by QNTX_WEB; it is committed there.
+      web="''${QNTX_WEB:-../QNTX-Web}"
+      test -d "$web/ts" || { echo "no QNTX-Web at $web: set QNTX_WEB=<checkout>"; exit 1; }
+      echo "Generating TypeScript proto code into $web/ts/generated/proto..."
 
-      # Ensure output directory exists
-      mkdir -p web/ts/generated/proto
+      mkdir -p "$web/ts/generated/proto"
 
-      # Install ts-proto locally if not present
-      if ! [ -d web/node_modules/ts-proto ]; then
-        echo "Installing ts-proto..."
-        cd web && ${pkgs.bun}/bin/bun add -d ts-proto
-        cd ..
+      # ts-proto is a devDependency of QNTX-Web
+      if ! [ -d "$web/node_modules/ts-proto" ]; then
+        (cd "$web" && ${pkgs.bun}/bin/bun install --frozen-lockfile)
       fi
 
       # Generate TypeScript using ts-proto (minimal - interfaces only)
@@ -55,7 +55,7 @@
       # - onlyTypes=true: only generate type definitions
       # - snakeToCamel=false: keep snake_case field names to match Go JSON
       ${pkgs.protobuf}/bin/protoc \
-        --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
+        --plugin=protoc-gen-ts_proto="$web/node_modules/.bin/protoc-gen-ts_proto" \
         --ts_proto_opt=esModuleInterop=true \
         --ts_proto_opt=outputEncodeMethods=false \
         --ts_proto_opt=outputJsonMethods=false \
@@ -63,15 +63,15 @@
         --ts_proto_opt=outputServices=false \
         --ts_proto_opt=onlyTypes=true \
         --ts_proto_opt=snakeToCamel=false \
-        --ts_proto_out=web/ts/generated/proto \
+        --ts_proto_out="$web/ts/generated/proto" \
         plugin/grpc/protocol/*.proto
 
-      echo "✓ Plugin proto files generated in web/ts/generated/proto/"
+      echo "✓ Plugin proto files generated in $web/ts/generated/proto/"
 
       # Generate TypeScript for element proto (canvas compositions + events)
       # useDate=string: google.protobuf.Timestamp → string (ISO 8601, matches Go JSON output)
       ${pkgs.protobuf}/bin/protoc \
-        --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
+        --plugin=protoc-gen-ts_proto="$web/node_modules/.bin/protoc-gen-ts_proto" \
         --ts_proto_opt=esModuleInterop=true \
         --ts_proto_opt=outputEncodeMethods=false \
         --ts_proto_opt=outputJsonMethods=false \
@@ -80,10 +80,10 @@
         --ts_proto_opt=onlyTypes=true \
         --ts_proto_opt=snakeToCamel=false \
         --ts_proto_opt=useDate=string \
-        --ts_proto_out=web/ts/generated/proto \
+        --ts_proto_out="$web/ts/generated/proto" \
         element/proto/*.proto
 
-      echo "✓ Element proto TypeScript files generated in web/ts/generated/proto/"
+      echo "✓ Element proto TypeScript files generated in $web/ts/generated/proto/"
     '');
   };
 

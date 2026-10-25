@@ -13,6 +13,8 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/QNTX/server/statusline"
+	errors "github.com/teranos/sacred-error"
 )
 
 // Transcripts are loom's job, done by the node.
@@ -28,7 +30,7 @@ import (
 // transcriptPredicates are the hook events a session is found by. Each is asked
 // for on its own: a store's filter may AND predicates rather than OR them.
 var transcriptPredicates = []string{
-	"UserPromptSubmit", "Stop", "PreToolUse",
+	"UserPromptSubmit", "QueuedPromptSubmit", "Stop", "PreToolUse",
 	"SessionStart", "SessionEnd", "PreCompact",
 	"SubagentStart", "SubagentStop", "TaskCompleted", "StopFailure",
 	"GroundedUserPromptSubmit", "GroundedPreToolUse", "GroundedPostToolUse", "GroundedStop",
@@ -146,6 +148,36 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 	return answer, nil
 }
 
+// humanPredicates are the events a transcript reads as the person speaking.
+var humanPredicates = []string{"UserPromptSubmit", "QueuedPromptSubmit"}
+
+// maxHumanRead is a read of every human turn a namespace holds. Zero would be
+// none of them.
+const maxHumanRead = 1_000_000
+
+// humanTurnsIn is everything the person said in the store: the human turns of
+// its transcripts, as typed. A store that will not answer is an error, not no
+// turns: the two read the same, and one of them calls every quote invented.
+func humanTurnsIn(store namespaces.Reading) ([]string, error) {
+	var events []*types.As
+	for _, predicate := range humanPredicates {
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: maxHumanRead})
+		if err != nil {
+			return nil, errors.Wrapf(err, "reading %s", predicate)
+		}
+		events = append(events, found...)
+	}
+	var said []string
+	for _, t := range transcriptsOf(events, len(events)) {
+		for _, turn := range t.Turns {
+			if turn.Speaker == "human" && turn.Text != "" {
+				said = append(said, turn.Text)
+			}
+		}
+	}
+	return said, nil
+}
+
 // sessionsIn reads each session whole, by its context. Ground names a control's
 // row Grounded and the event, for any event, so no list of predicates holds them all.
 func sessionsIn(store namespaces.Reading, sessions []string, limit int) ([]transcript, *protocol.Refusal) {
@@ -172,7 +204,7 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 			continue
 		}
 		read[as.ID] = true
-		session := sessionOf(as.Contexts)
+		session := statusline.SessionOf(as.Contexts)
 		if session == "" {
 			continue
 		}
@@ -260,7 +292,9 @@ func turnOf(as *types.As) (transcriptTurn, bool) {
 	predicate := as.Predicates[0]
 	attr := func(key string) string { return attrString(as.Attributes, key) }
 	switch predicate {
-	case "UserPromptSubmit":
+	case "UserPromptSubmit", "QueuedPromptSubmit":
+		// A message typed while a turn ran fires no hook; ground reads it from
+		// Claude Code's own file (ground source/queued.d). The person said it.
 		turn.Speaker, turn.Text = "human", attr("prompt")
 	case "Stop":
 		turn.Speaker, turn.Text = "assistant", attr("last_assistant_message")

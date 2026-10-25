@@ -1,4 +1,7 @@
-.PHONY: cli web run-web test-web test-jsdom testtest-suite test-parquet test-postgres test-d test-coverage test-verbose clean server dev install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin pty-element-plugin llama-cpp-plugin meili-plugin rust-sqlite ats laye rust-reduce parity says openapi quickdev publish-crates
+.PHONY: cli web-css test test-suite test-parquet test-postgres test-coverage test-verbose clean server dev install proto rust-sqlite ats laye wasm-tarballs parity says openapi quickdev publish-crates
+
+# The frontend is teranos/QNTX-Web. web/ here is the CSS QNTX itself reads (web/README.md).
+QNTX_WEB ?= ../QNTX-Web
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -65,88 +68,28 @@ server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
 	@./bin/qntx server
 
-dev: ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
+dev: cli ## Build the CLI and start the node in dev mode; the page is QNTX-Web's `bun run dev`
 	$(call ground-notify,rebuilding,make dev: rebuilding QNTX)
-	@$(MAKE) web cli
-	@# Read ports from am.toml if exists, otherwise use defaults
 	@TOML_BACKEND_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
-	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-8770}}; \
-	FRONTEND_PORT=$${FRONTEND_PORT:-$${TOML_FRONTEND_PORT:-8820}}; \
-	echo "🚀 Starting development environment..."; \
+	echo "🚀 Starting development node..."; \
 	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
-	echo "  Frontend: http://localhost:$$FRONTEND_PORT (with live reload)"; \
+	echo "  Frontend: cd $(QNTX_WEB) && QNTX_AM_TOML=$(CURDIR)/am.toml bun run dev"; \
 	echo "  Database: Uses am.toml configuration"; \
-	echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"; \
 	echo ""; \
 	lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
-	lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
-	trap "echo ''; echo 'Shutting down dev servers...'; \
-		test -n \"\$$BACKEND_PID\" && kill -TERM -\$$BACKEND_PID 2>/dev/null || true; \
-		test -n \"\$$FRONTEND_PID\" && kill -TERM -\$$FRONTEND_PID 2>/dev/null || true; \
-		sleep 1; \
-		test -n \"\$$BACKEND_PID\" && kill -9 -\$$BACKEND_PID 2>/dev/null || true; \
-		test -n \"\$$FRONTEND_PID\" && kill -9 -\$$FRONTEND_PID 2>/dev/null || true; \
-		echo '✓ Servers stopped'" EXIT INT TERM; \
-	set -m; \
-	GOTRACEBACK=crash ./bin/qntx server --dev --no-browser -vvv 2> tmp/qntx-crash.log & \
-	BACKEND_PID=$$!; \
-	cd web && bun run dev & \
-	FRONTEND_PID=$$!; \
-	echo "✨ Development servers running"; \
-	echo "Press Ctrl+C to stop both servers"; \
-	wait
+	GOTRACEBACK=crash ./bin/qntx server --dev --no-browser -vvv 2> tmp/qntx-crash.log
 
-demo: web cli ## Start QNTX in demo mode with canvas export enabled
-	@BACKEND_PORT=$${BACKEND_PORT:-8770}; \
-	FRONTEND_PORT=$${FRONTEND_PORT:-8820}; \
-	echo "📋 Starting demo canvas environment..."; \
-	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
-	echo "  Frontend: http://localhost:$$FRONTEND_PORT (with live reload)"; \
-	echo "  Database: demo.db (persistent demo state)"; \
-	echo "  Features: Canvas export enabled"; \
-	echo ""; \
-	lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
-	lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
-	trap "echo ''; echo 'Shutting down demo servers...'; \
-		test -n \"\$$BACKEND_PID\" && kill -TERM -\$$BACKEND_PID 2>/dev/null || true; \
-		test -n \"\$$FRONTEND_PID\" && kill -TERM -\$$FRONTEND_PID 2>/dev/null || true; \
-		sleep 1; \
-		test -n \"\$$BACKEND_PID\" && kill -9 -\$$BACKEND_PID 2>/dev/null || true; \
-		test -n \"\$$FRONTEND_PID\" && kill -9 -\$$FRONTEND_PID 2>/dev/null || true; \
-		echo '✓ Demo servers stopped'" EXIT INT TERM; \
-	set -m; \
-	QNTX_DEMO=1 ./bin/qntx server --dev --no-browser --db-path demo.db -vvv & \
-	BACKEND_PID=$$!; \
-	cd web && VITE_QNTX_DEMO=1 bun run dev & \
-	FRONTEND_PID=$$!; \
-	echo "✨ Demo environment running"; \
-	echo "Press Ctrl+C to stop"; \
-	wait
-
-web: ats laye ## Build web assets with Bun (requires WASM)
-	@echo "Building web assets..."
-	@cd web && bun install && bun run build
-
-run-web: ## Run web dev server
-	@echo "Starting web dev server..."
-	@cd web && bun run dev
-
-test-web: ## Run web UI tests
-	@echo "Running web UI tests..."
-	@cd web && bun test
-
-test-jsdom: ## Run web UI tests including JSDOM DOM tests
-	@echo "Running web UI tests with JSDOM..."
-	@if [ ! -d "web/node_modules" ]; then \
-		echo "Installing web dependencies..."; \
-		cd web && bun install; \
-	fi
-	@cd web && USE_JSDOM=1 bun test
+web-css: ## Copy the CSS QNTX itself reads from a QNTX-Web checkout (web/README.md)
+	@test -d $(QNTX_WEB)/css || { echo "no QNTX-Web at $(QNTX_WEB): set QNTX_WEB=<checkout>"; exit 1; }
+	@for f in css/tokens.css css/canvas.css css/window.css css/core.css css/utilities.css css/docs.css css/element/title-bar.css css/element/states/window.css qntx.jpg; do \
+		cp $(QNTX_WEB)/$$f web/$$f; \
+	done
+	@git status --short web/
 
 # A verdict on both paths. Piping this to anything hands the reader the pipe's
 # exit code, not make's, so the last line has to carry the answer by itself.
-test: ## Run all tests (Go + TypeScript + parquet backend)
+test: ## Run all tests (Go + parquet + postgres backends)
 	@$(MAKE) --no-print-directory test-suite || { echo "✗ TESTS FAILED"; exit 1; }
 	@echo "✓ All tests complete"
 
@@ -154,10 +97,6 @@ test-suite: ## The suite itself. Run `make test`, which reports a verdict.
 	@go test -tags "rustsqlite,qntxwasm" -short ./...
 	@$(MAKE) --no-print-directory test-parquet
 	@$(MAKE) --no-print-directory test-postgres
-	@if [ ! -d "web/node_modules" ]; then \
-		cd web && bun install; \
-	fi
-	@cd web && USE_JSDOM=1 bun test
 
 # The parquet backend is behind `rustduckdb` and dynamically links Nix's
 # libduckdb, so it cannot ride along in the default tags without making every
@@ -181,46 +120,23 @@ test-postgres: rust-sqlite ## Run postgres backend tests against the pinned Supa
 	@scripts/with-postgres.sh result-postgres/bin cargo test -p ats-postgres
 	@scripts/with-postgres.sh result-postgres/bin nix develop .#default --command env LD_LIBRARY_PATH=$(CURDIR)/target/release DYLD_LIBRARY_PATH=$(CURDIR)/target/release go test -tags "rustsqlite,qntxwasm,rustduckdb,rustpostgres" -short ./ats/storage/postgrescgo/... ./cmd/qntx/commands/ ./cmd/parity/
 
-test-d: ## Run D plugin tests (ix-net)
-	@echo "Running D tests..."
-	@$(MAKE) -C qntx-plugins/ix-net test
-	@echo "✓ D tests complete"
-
-test-coverage: ## Run all tests (Go + TypeScript) with coverage
+test-coverage: ## Run Go tests with coverage
 	@echo "Running Go tests with coverage..."
 	@mkdir -p tmp
 	@# Test with core tags to ensure we test what we ship
 	@go test -tags "rustsqlite,qntxwasm" -short -coverprofile=tmp/coverage.out -covermode=count ./...
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
-	@echo ""
-	@echo "Running TypeScript tests with coverage..."
-	@if [ ! -d "web/node_modules" ]; then \
-		echo "Installing web dependencies..."; \
-		cd web && bun install; \
-	fi
-	@cd web && bun test --coverage
-	@echo "✓ All tests complete"
 
-test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverage
+test-verbose: ## Run Go tests with verbose output and coverage
 	@echo "Running Go tests with verbose output..."
 	@mkdir -p tmp
 	@go test -v -coverprofile=tmp/coverage.out -covermode=count ./...
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
-	@echo ""
-	@echo "Running TypeScript tests with coverage..."
-	@if [ ! -d "web/node_modules" ]; then \
-		echo "Installing web dependencies..."; \
-		cd web && bun install; \
-	fi
-	@cd web && bun test --coverage
-	@echo "✓ All tests complete"
 
 clean: ## Clean build artifacts
-	@rm -rf internal/server/dist
-	@rm -rf web/node_modules
-	@rm -rf plugins/qntx-fuzzy/target
+	@rm -rf crates/ats-wasm/pkg crates/laye-p2p/pkg tmp/wasm
 
 install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom/path)
 	@echo "Installing qntx to $(PREFIX)/bin..."
@@ -238,88 +154,8 @@ install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom
 proto: ## Generate Go code from protobuf definitions (via Nix)
 	@nix run .#generate-proto
 
-# restart-plugin NAME
-# Tells running QNTX to kill and relaunch a plugin. Silent no-op if QNTX isn't running.
-define restart-plugin
-	@TOML_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
-	 PORT=$${BACKEND_PORT:-$${TOML_PORT:-8770}}; \
-	 curl -sf -X POST http://127.0.0.1:$$PORT/api/plugins/$(1)/restart > /dev/null 2>&1 || { \
-		echo "  ⊘ QNTX not running — start QNTX to pick up new binary"; exit 0; }; \
-	 echo "  ↻ RESTARTING $(1)..."; \
-	 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do \
-		STATE=$$(curl -sf http://127.0.0.1:$$PORT/api/plugins 2>/dev/null \
-			| python3 -c "import sys,json; plugins=json.load(sys.stdin).get('plugins',[]); p=[x for x in plugins if x.get('name')=='$(1)']; print(p[0].get('state','') if p else '')" 2>/dev/null); \
-		if [ "$$STATE" = "running" ]; then \
-			VERSION=$$(curl -sf http://127.0.0.1:$$PORT/api/plugins 2>/dev/null \
-				| python3 -c "import sys,json; plugins=json.load(sys.stdin).get('plugins',[]); p=[x for x in plugins if x.get('name')=='$(1)']; print(p[0].get('version','') if p else '')" 2>/dev/null); \
-			echo "  ✓ LOADED — $(1) $$VERSION live at http://127.0.0.1:$$PORT"; exit 0; \
-		fi; \
-		sleep 1; \
-	 done; \
-	 echo "  ✗ $(1) did not reach running state within 20s"
-endef
-
-# check-plugin-version DIR EXT VERSION_FILE
-# Fails the build if source files changed but version file didn't.
-# Usage: @$(call check-plugin-version,qntx-plugins/ix-bin,d,qntx-plugins/ix-bin/source/ixbin/version_.d)
-define check-plugin-version
-	@git diff --name-only HEAD -- $(1)/ | grep -q '\.$(2)$$' && \
-	 ! git diff --name-only HEAD -- $(3) | grep -q . && \
-	 echo "" && \
-	 echo "  Impossible to debug or develop if we don't know what version is running." && \
-	 echo "  You did not modify the version of this plugin in order to differentiate it." && \
-	 echo "  Do at least a patch or debug bump to $(3)" && \
-	 echo "" && \
-	 exit 1 || true
-endef
-
-# TODO: each plugin should have their own ci, i think this Makefile should have the focus on QNTX only.
-
-atproto-plugin: ## Build, install, and restart AT Protocol plugin
-	$(call check-plugin-version,qntx-plugins/qntx-atproto,go,qntx-plugins/qntx-atproto/plugin.go)
-	@$(MAKE) -C qntx-plugins/qntx-atproto install PREFIX=$(PREFIX)
-	$(call restart-plugin,atproto)
-
-github-plugin: ## Build, install, and restart GitHub plugin
-	$(call check-plugin-version,qntx-plugins/qntx-github,go,qntx-plugins/qntx-github/plugin.go)
-	@$(MAKE) -C qntx-plugins/qntx-github install PREFIX=$(PREFIX)
-	$(call restart-plugin,github)
-
-ix-json-plugin: ## Build, install, and restart ix-json plugin
-	@$(MAKE) -C qntx-plugins/ix-json install PREFIX=$(PREFIX)
-	$(call restart-plugin,ix-json)
-
-ix-bin-plugin: ## Build, install, and restart ix-bin D plugin
-	$(call check-plugin-version,qntx-plugins/ix-bin,d,qntx-plugins/ix-bin/source/ixbin/version_.d)
-	@$(MAKE) -C qntx-plugins/ix-bin install PREFIX=$(PREFIX)
-	$(call restart-plugin,ix-bin)
-
-ix-net-plugin: ## Build, install, and restart ix-net D plugin
-	$(call check-plugin-version,qntx-plugins/ix-net,d,qntx-plugins/ix-net/source/ixnet/version_.d)
-	@$(MAKE) -C qntx-plugins/ix-net install PREFIX=$(PREFIX)
-	$(call restart-plugin,ix-net)
-
-faal-plugin: ## Build, install, and restart faal chaos testing D plugin
-	$(call check-plugin-version,qntx-plugins/faal,d,qntx-plugins/faal/source/faal/version_.d)
-	@$(MAKE) -C qntx-plugins/faal install PREFIX=$(PREFIX)
-	$(call restart-plugin,faal)
-
-pty-element-plugin: ## Build, install, and restart pty-element plugin
-	$(call check-plugin-version,qntx-plugins/pty-element,rs,qntx-plugins/pty-element/Cargo.toml)
-	@$(MAKE) -C qntx-plugins/pty-element install PREFIX=$(PREFIX)
-	$(call restart-plugin,pty-element)
-
-meili-plugin: ## Build, install, and restart MeiliSearch plugin
-	$(call check-plugin-version,qntx-plugins/qntx-meili,rs,qntx-plugins/qntx-meili/Cargo.toml)
-	@$(MAKE) -C qntx-plugins/qntx-meili install PREFIX=$(PREFIX)
-	$(call restart-plugin,meili)
-
-llama-cpp-plugin: ## Build, install, and restart llama-cpp plugin (C++ local LLM)
-	$(call check-plugin-version,qntx-plugins/llama-cpp,cpp,qntx-plugins/llama-cpp/src/plugin.h)
-	$(call check-plugin-version,qntx-plugins/llama-cpp,h,qntx-plugins/llama-cpp/src/plugin.h)
-	@$(MAKE) -C qntx-plugins/llama-cpp install PREFIX=$(PREFIX)
-	$(call restart-plugin,llama-cpp)
-
+# Plugins are their own repositories, on a node through their record (ADR-002).
+# "each plugin needs to move into their own respective repo as well"
 
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
 	@echo "Building Rust SQLite storage library..."
@@ -344,23 +180,26 @@ ats: ## Build ats as WASM module (for wazero integration + browser)
 		exit 1; \
 	fi
 	@cd crates/ats-wasm && wasm-pack build --target web --features browser
-	@cp -r crates/ats-wasm/pkg/* web/wasm/
-	@echo "  ✓ Browser WASM built and copied to web/wasm/"
-	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
+	@ls -lh crates/ats-wasm/pkg/*.wasm 2>/dev/null | awk '{print "  ✓ " $$9 " " $$5}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 
 # Built from crates/laye-p2p, not fetched. The hash-pinning this replaces
 # existed only because the artifact came from a deploy we did not build.
-laye: ## Build laye-p2p as browser WASM into web/wasm/
+laye: ## Build laye-p2p as browser WASM into crates/laye-p2p/pkg/
 	@echo "Building laye-p2p browser WASM..."
 	@if ! command -v wasm-pack >/dev/null 2>&1; then \
 		echo "  ⚠️  wasm-pack not found. Install with: cargo install wasm-pack"; \
 		exit 1; \
 	fi
 	@cd crates/laye-p2p && wasm-pack build --target web
-	@cp crates/laye-p2p/pkg/laye_p2p.js crates/laye-p2p/pkg/laye_p2p.d.ts \
-		crates/laye-p2p/pkg/laye_p2p_bg.wasm crates/laye-p2p/pkg/laye_p2p_bg.wasm.d.ts \
-		web/wasm/
-	@ls -lh web/wasm/laye_p2p_bg.wasm | awk '{print "  ✓ laye_p2p_bg.wasm " $$5}'
+	@ls -lh crates/laye-p2p/pkg/laye_p2p_bg.wasm | awk '{print "  ✓ laye_p2p_bg.wasm " $$5}'
+
+# QNTX-Web depends on these two by the release they are attached to:
+# "QNTX-Web needs to be easy to be developed on, so need to be a way to develop on it without needing to build ATS or Laye"
+wasm-tarballs: ats laye ## Pack the browser WASM as the two tarballs a release attaches, into tmp/wasm/
+	@mkdir -p tmp/wasm
+	@cd crates/ats-wasm/pkg && bun pm pack --quiet --destination $(CURDIR)/tmp/wasm
+	@cd crates/laye-p2p/pkg && bun pm pack --quiet --destination $(CURDIR)/tmp/wasm
+	@ls -lh tmp/wasm/*.tgz
 
 
 # TODO: move to its own plugin Makefile:
@@ -369,16 +208,3 @@ publish-crates: ## Stamp the tag into Cargo.toml and publish qntx-ats, qntx-prot
 	@cargo publish -p qntx-ats
 	@cargo publish -p qntx-proto
 	@cargo publish -p qntx-grpc
-
-# Rust Reduce plugin (PyO3-based UMAP dimensionality reduction)
-# REQUIRES Nix: Python linking + umap-learn dependency
-rust-reduce: ## Build and install Rust Reduce plugin to ~/.qntx/plugins/
-	@echo "Building qntx-reduce-plugin via Nix..."
-	@nix build ./qntx-plugins/qntx-reduce#qntx-reduce-plugin
-	@mkdir -p bin $(PREFIX)/plugins
-	@rm -f bin/qntx-reduce-plugin $(PREFIX)/plugins/qntx-reduce-plugin
-	@cp -L result/bin/qntx-reduce-plugin bin/
-	@chmod +x bin/qntx-reduce-plugin
-	@cp bin/qntx-reduce-plugin $(PREFIX)/plugins/
-	@chmod +x $(PREFIX)/plugins/qntx-reduce-plugin
-	@echo "✓ qntx-reduce-plugin built and installed to $(PREFIX)/plugins/"

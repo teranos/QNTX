@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	errors "github.com/teranos/sacred-error"
 )
@@ -128,7 +128,7 @@ func (s *CanvasStore) Create(ctx context.Context, name, by, byName string) error
 	return err
 }
 
-// ProseSymbol is the Note element's symbol (Prose in web/ts/sym.ts), as the browser saves it.
+// ProseSymbol is the Note element's symbol (Prose in QNTX-Web's ts/sym.ts), as the browser saves it.
 const ProseSymbol = "▣"
 
 // firstNote is what a new canvas opens with.

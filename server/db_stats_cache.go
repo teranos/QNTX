@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/db/rustdriver"
+	"github.com/teranos/QNTX/internal/db/rustdriver"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/syscap"
@@ -26,6 +27,29 @@ type WriteLockInspector interface {
 }
 
 const dbStatsRefreshInterval = 30 * time.Second
+
+// dbStatsPace is the multiple of a refresh's duration the refresher waits after
+// it. At 10 the refresher is reading at most a tenth of the time.
+const dbStatsPace = 10
+
+// nextRefreshIn is the wait after a refresh: the interval, or ten times what
+// the refresh took when that is longer.
+func nextRefreshIn(took, interval time.Duration) time.Duration {
+	return max(interval, took*dbStatsPace)
+}
+
+// paceRefreshes runs refresh, waits nextRefreshIn of what it says it took, and
+// again, until ctx ends. One goroutine does both, so no refresh overlaps another.
+func paceRefreshes(ctx context.Context, interval time.Duration, refresh func() (took time.Duration)) {
+	for {
+		took := refresh()
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(nextRefreshIn(took, interval)):
+		}
+	}
+}
 
 // attestationCounter is a backend that counts the attestations it holds.
 // RustStore and DuckdbStore both implement it.
@@ -48,180 +72,23 @@ type LandingReporter interface {
 }
 
 // A Landing is one namespace's database: where it is, how big it and its
-// write-ahead log have grown, and how many attestations it answers from.
-//
-// The dimensions are filled by the server rather than the backend, because
-// they are read with the same driver the stats connection already uses.
+// write-ahead log have grown, and how many attestations it answers from. Each
+// is a stat or the backend's own count; nothing here scans a table.
 type Landing struct {
 	Namespace    string `json:"namespace"`
 	Path         string `json:"path"`
 	Bytes        int64  `json:"bytes"`
 	WalBytes     int64  `json:"wal_bytes"`
 	Attestations int    `json:"attestations"`
-	Actors       int    `json:"actors"`
-	Subjects     int    `json:"subjects"`
-	Contexts     int    `json:"contexts"`
 
-	TopPredicates []Common `json:"top_predicates"`
-	TopContexts   []Common `json:"top_contexts"`
-
-	// Over is when this namespace's attestations landed, by the hour, which is
-	// the line the chart draws for it.
-	Over map[string]int64 `json:"over"`
-
-	// DB is the file's own tables, held open by the backend. The driver opens
-	// the store it was registered with whatever path it is given, so a file
-	// opened by its path read the node's store under every namespace's name.
-	DB *sql.DB `json:"-"`
+	// CountTook is how long the backend took to count Attestations, which is
+	// what the refresher names when a refresh overruns its interval.
+	CountTook time.Duration `json:"-"`
 }
 
-// A Common is one value a namespace uses: when it was last used, and when it
-// was used by the hour. "The axis of time is more useful than a tally."
-type Common struct {
-	Name string           `json:"name"`
-	Last string           `json:"last"`
-	Over map[string]int64 `json:"over"`
-}
-
-// commonTo is the values one junction column holds, the most recently used
-// first, each with when it was used from the hour since on. Which are shown
-// follows when, not how many. Every value is cut at the same hour, so a busy
-// one is not drawn shorter than a quiet one. The table and column are this
-// file's constants, never a request's.
-func commonTo(db *sql.DB, table, column string, most int, since string) (_ []Common, err error) {
-	common, err := recentIn(db,
-		"SELECT j."+column+", MAX(strftime('%Y-%m-%dT%H:%M:%SZ', a.timestamp)) AS last "+
-			"FROM "+table+" j JOIN attestations a ON a.id = j.attestation_id "+
-			"GROUP BY j."+column+" HAVING last IS NOT NULL ORDER BY last DESC LIMIT ?", most)
-	if err != nil {
-		return nil, err
-	}
-
-	// recentIn has closed its rows: a second query on a single connection
-	// would wait on the first for ever.
-	for i := range common {
-		common[i].Over, err = bucketsOf(db,
-			"SELECT strftime('%Y-%m-%dT%H', a.timestamp) AS bucket, COUNT(*) "+
-				"FROM "+table+" j JOIN attestations a ON a.id = j.attestation_id "+
-				"WHERE j."+column+" = ? AND bucket >= ? "+
-				"GROUP BY bucket", common[i].Name, since)
-		if err != nil {
-			return nil, errors.Wrapf(err, "when %s %s was used did not answer", column, common[i].Name)
-		}
-	}
-	return common, nil
-}
-
-// recentIn reads (name, when last) rows.
-func recentIn(db *sql.DB, query string, args ...any) (_ []Common, err error) {
-	rows, err := db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for recentIn") }()
-
-	var common []Common
-	for rows.Next() {
-		var one Common
-		if err := rows.Scan(&one.Name, &one.Last); err != nil {
-			return nil, err
-		}
-		common = append(common, one)
-	}
-	return common, rows.Err()
-}
-
-// earliest is the first hour a chart line starts at, or "" for no line.
-func earliest(over map[string]int64) string {
-	first := ""
-	for bucket := range over {
-		if first == "" || bucket < first {
-			first = bucket
-		}
-	}
-	return first
-}
-
-// bucketsOf reads (bucket, how many) rows into the shape the chart draws.
-func bucketsOf(db *sql.DB, query string, args ...any) (_ map[string]int64, err error) {
-	rows, err := db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for bucketsOf") }()
-
-	over := map[string]int64{}
-	for rows.Next() {
-		var bucket string
-		var held int64
-		if err := rows.Scan(&bucket, &held); err != nil {
-			return nil, err
-		}
-		over[bucket] = held
-	}
-	return over, rows.Err()
-}
-
-// dimensionsOf counts the distinct actors, subjects and contexts one landing
-// file holds. These are its own tables (ADR-037): the file answers every read
-// of that namespace, so it is the file that describes it.
-func (s *QNTXServer) dimensionsOf(landing *Landing) (err error) {
-	db := landing.DB
-	if db == nil {
-		return errors.Newf("the backend handed no database for the landing file of %s at %s", landing.Namespace, landing.Path)
-	}
-
-	for _, counting := range []struct {
-		query string
-		into  *int
-	}{
-		{"SELECT COUNT(DISTINCT actor) FROM attestation_actors", &landing.Actors},
-		{"SELECT COUNT(DISTINCT subject) FROM attestation_subjects", &landing.Subjects},
-		{"SELECT COUNT(DISTINCT context) FROM attestation_contexts", &landing.Contexts},
-	} {
-		if err := db.QueryRow(counting.query).Scan(counting.into); err != nil {
-			return errors.Wrapf(err, "%s did not answer for %s", counting.query, landing.Namespace)
-		}
-	}
-
-	landing.Over, err = overTime(db)
-	if err != nil {
-		return errors.Wrapf(err, "when the attestations of %s landed did not answer", landing.Namespace)
-	}
-	since := earliest(landing.Over)
-
-	landing.TopPredicates, err = commonTo(db, "attestation_predicates", "predicate", commonAtMost, since)
-	if err != nil {
-		return errors.Wrapf(err, "the predicates of %s did not answer", landing.Namespace)
-	}
-
-	landing.TopContexts, err = commonTo(db, "attestation_contexts", "context", commonAtMost, since)
-	if err != nil {
-		return errors.Wrapf(err, "the contexts of %s did not answer", landing.Namespace)
-	}
-	return nil
-}
-
-// commonAtMost is how many of each a row shows. Enough to say what a namespace
-// is about; more is a list nobody reads.
-const commonAtMost = 8
-
-// overAtMost is how many buckets one namespace's line is drawn from. Hours,
-// so a fortnight fits and the chart still has a shape.
+// overAtMost is how many hourly buckets a rich field's line is drawn from, so
+// a fortnight fits and the chart still has a shape.
 const overAtMost = 336
-
-// overTime is when a namespace's attestations landed, by the hour. The old
-// chart read distillation output, which a node that persists cheaply to the
-// record does not produce; this reads the attestations themselves.
-func overTime(db *sql.DB) (map[string]int64, error) {
-	return bucketsOf(db, `
-		SELECT strftime('%Y-%m-%dT%H', timestamp) AS bucket, COUNT(*) AS held
-		FROM attestations
-		WHERE bucket IS NOT NULL
-		GROUP BY bucket
-		ORDER BY bucket DESC
-		LIMIT ?`, overAtMost)
-}
 
 // Spend is one reader and what it has cost against the record: the name make
 // parity gives it, the request, and how many. HeldOnNode is filled by heldOnNode.
@@ -363,33 +230,49 @@ func (s *QNTXServer) publishStatsFailure(surface string, err error) {
 	}})
 }
 
-// startDBStatsRefresher launches a background goroutine that refreshes
-// the database stats cache every 30 seconds.
+// startDBStatsRefresher launches a background goroutine that refreshes the
+// database stats cache, paced by paceRefreshes.
 func (s *QNTXServer) startDBStatsRefresher() {
 	s.wg.Go("dbStats.refresher", func() {
 		// First refresh runs async — doesn't block startup.
-		s.refreshDBStats()
-
-		ticker := time.NewTicker(dbStatsRefreshInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-s.ctx.Done():
-				return
-			case <-ticker.C:
-				s.refreshDBStats()
+		paceRefreshes(s.ctx, dbStatsRefreshInterval, func() time.Duration {
+			started := time.Now()
+			landings := s.refreshDBStats()
+			took := time.Since(started)
+			if took > dbStatsRefreshInterval {
+				s.sayOverran(took, landings)
 			}
-		}
+			return took
+		})
 	})
 }
 
-func (s *QNTXServer) refreshDBStats() {
-	var totalAttestations, uniqueActors, uniqueSubjects, uniqueContexts int
+// sayOverran names a refresh that took longer than its interval, and the
+// landing whose count took longest within it.
+func (s *QNTXServer) sayOverran(took time.Duration, landings []Landing) {
+	var slowest Landing
+	for _, one := range landings {
+		if one.CountTook >= slowest.CountTook {
+			slowest = one
+		}
+	}
+	s.logger.Infow("A database stats refresh took longer than its interval",
+		"took", took,
+		"interval", dbStatsRefreshInterval,
+		"next_in", nextRefreshIn(took, dbStatsRefreshInterval),
+		"landing", slowest.Namespace,
+		"landing_path", slowest.Path,
+		"landing_count_took", slowest.CountTook)
+}
+
+// refreshDBStats fills the cache, and hands back the landings it read.
+func (s *QNTXServer) refreshDBStats() []Landing {
+	var totalAttestations int
 
 	statsDB, err := openSQLite(s.dbPath)
 	if err != nil {
 		s.publishStatsFailure("open stats connection", err)
-		return
+		return nil
 	}
 	defer func() { sqlclose.Log(statsDB.Close(), s.logger, "the stats db") }()
 
@@ -405,31 +288,12 @@ func (s *QNTXServer) refreshDBStats() {
 	case errors.Is(countErr, ErrNoAttestationCounter):
 		if err := statsDB.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&totalAttestations); err != nil {
 			s.publishStatsFailure("count attestations", err)
-			return
+			return nil
 		}
 		dimensionsDescribeTheCount = true
 	default:
 		s.publishStatsFailure("count attestations", countErr)
-		return
-	}
-
-	// A count that failed and a count of zero are the same number on the way
-	// out, so the cache would publish "no actors" for a query that never ran.
-	for _, count := range []struct {
-		query string
-		into  *int
-	}{
-		{"SELECT COUNT(DISTINCT actor) FROM attestation_actors", &uniqueActors},
-		{"SELECT COUNT(DISTINCT subject) FROM attestation_subjects", &uniqueSubjects},
-		{"SELECT COUNT(DISTINCT context) FROM attestation_contexts", &uniqueContexts},
-	} {
-		if !dimensionsDescribeTheCount {
-			break
-		}
-		if err := statsDB.QueryRow(count.query).Scan(count.into); err != nil {
-			s.publishStatsFailure("count "+count.query, err)
-			return
-		}
+		return nil
 	}
 	s.logger.Debugw("DB stats queries complete", "elapsed", time.Since(queryStart), "attestations", totalAttestations)
 
@@ -483,14 +347,6 @@ func (s *QNTXServer) refreshDBStats() {
 	var landingsErr error
 	if s.landingReporter != nil {
 		landings, landingsErr = s.landingReporter.Landings()
-		for at := range landings {
-			// One that will not say its dimensions still says its size and its
-			// count, so the row is drawn with what it did answer.
-			if err := s.dimensionsOf(&landings[at]); err != nil {
-				s.logger.Warnw("A landing file did not say what it holds",
-					"namespace", landings[at].Namespace, "error", err)
-			}
-		}
 	}
 
 	// What the node holds is every database it answers from and not the one it
@@ -546,19 +402,15 @@ func (s *QNTXServer) refreshDBStats() {
 	// Zero says they do and the answer is none.
 	if !dimensionsDescribeTheCount {
 		s.dbStatsCache.Store(&cachedDBStats{response: response})
-		return
+		return landings
 	}
-
-	response["unique_actors"] = uniqueActors
-	response["unique_subjects"] = uniqueSubjects
-	response["unique_contexts"] = uniqueContexts
 
 	// Distillation folds attestations held in this database. A backend keeping
 	// them elsewhere has no distillation to report and no key for it.
 	distillStats, err := queryDistillStats(statsDB)
 	if err != nil {
 		s.publishStatsFailure("distillation stats", err)
-		return
+		return landings
 	}
 	if len(distillStats) > 0 {
 		response["distillation"] = distillStats
@@ -577,6 +429,7 @@ func (s *QNTXServer) refreshDBStats() {
 	}
 
 	s.dbStatsCache.Store(&cachedDBStats{response: response})
+	return landings
 }
 
 // buildLiveStatus collects real-time system metrics for the frontend:

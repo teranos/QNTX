@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
@@ -192,8 +191,6 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 	switch msg.Type {
 	case "set_verbosity":
 		c.handleSetVerbosity(msg.Verbosity)
-	case "upload":
-		c.handleUpload(msg.Filename, msg.FileType, msg.Data)
 	case "job_control":
 		c.handleJobControl(*msg)
 	case "rich_search":
@@ -261,48 +258,6 @@ func (c *Client) handleSetVerbosity(verbosity int) {
 		"new_verbosity", verbosity,
 		"level_name", logger.LevelName(verbosity),
 	)
-}
-
-// handleUpload processes file uploads from the client
-func (c *Client) handleUpload(filename, fileType, data string) {
-	c.server.logger.Infow("File upload received",
-		"client_id", c.id,
-		"filename", filename,
-		"fileType", fileType,
-		"data_length", len(data),
-	)
-
-	// Process upload in a goroutine to avoid blocking the WebSocket
-	c.server.wg.Go("ws.upload", func() {
-		// Decode base64 data (but don't process it yet - handler not implemented)
-		_, err := base64Decode(data)
-		if err != nil {
-			c.server.logger.Errorw("Failed to decode upload data",
-				"client_id", c.id,
-				"filename", filename,
-				"error", err,
-			)
-			return
-		}
-
-		// TODO: Implement file upload handler
-		// if err := c.server.handleFileUpload(filename, fileType, decodedData); err != nil {
-		// 	c.server.logger.Errorw("File upload processing failed",
-		// 		"client_id", c.id,
-		// 		"filename", filename,
-		// 		"error", err,
-		// 	)
-		// } else {
-		// 	c.server.logger.Infow("File upload processed successfully",
-		// 		"client_id", c.id,
-		// 		"filename", filename,
-		// 	)
-		// }
-		c.server.logger.Infow("File upload received but not processed (handler not implemented)",
-			"client_id", c.id,
-			"filename", filename,
-		)
-	})
 }
 
 // sendJSON is a helper to send JSON messages to the client
@@ -706,31 +661,6 @@ func mergeSearchResults(text, semantic []storage.RichSearchMatch) []storage.Rich
 	})
 
 	return result
-}
-
-// base64Decode decodes a base64 string (helper for file uploads)
-func base64Decode(data string) (string, error) {
-	const maxUploadSize = 512 * 1024 * 1024 // 512MB limit
-
-	// Check size before decoding to prevent memory exhaustion
-	// Base64 encoding adds ~33% overhead, so decoded size = len(data) * 3/4
-	estimatedSize := (len(data) * 3) / 4
-	if estimatedSize > maxUploadSize {
-		return "", errors.Newf("upload too large: estimated %d bytes exceeds %d byte limit", estimatedSize, maxUploadSize)
-	}
-
-	// Decode from base64
-	bytes, err := base64.StdEncoding.DecodeString(data)
-	if err != nil {
-		return "", errors.Wrap(err, "base64 decode failed")
-	}
-
-	// Verify actual decoded size doesn't exceed limit
-	if len(bytes) > maxUploadSize {
-		return "", errors.Newf("upload too large: %d bytes exceeds %d byte limit", len(bytes), maxUploadSize)
-	}
-
-	return string(bytes), nil
 }
 
 // close safely closes the client's channels using sync.Once to prevent double-close panics.

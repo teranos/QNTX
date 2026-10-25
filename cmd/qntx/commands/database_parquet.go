@@ -21,9 +21,9 @@ import (
 	"github.com/teranos/QNTX/ats/storage/duckdbcgo"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/db/rustdriver"
 	elementstorage "github.com/teranos/QNTX/element/storage"
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/db/rustdriver"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/sacred"
@@ -386,12 +386,12 @@ func openLandingFile(dbPath, name string) (*landed, error) {
 	return &landed{RustStore: store, db: db, name: name, sent: storage.FileSentMark{Path: path + ".sent"}}, nil
 }
 
-// WALCheckpointTruncate checkpoints the operational db and every landing file.
-// The pulse checkpoints one handle, and a parquet node keeps a WAL per
-// namespace: a landing file nobody checkpoints grows without bound, and
-// default.db-wal reached 680 MB on its first take-in.
-func (h *parquetHandles) WALCheckpointTruncate() (busy, walPages, checkpointedPages int, err error) {
-	busy, walPages, checkpointedPages, err = h.RustStore.WALCheckpointTruncate()
+// WALCheckpoint checkpoints the operational db and every landing file, each by
+// its own WAL's size. The pulse checkpoints one handle, and a parquet node
+// keeps a WAL per namespace: a landing file nobody checkpoints grows without
+// bound, and default.db-wal reached 680 MB on its first take-in.
+func (h *parquetHandles) WALCheckpoint(truncateAt int64) (busy, walPages, checkpointedPages int, err error) {
+	busy, walPages, checkpointedPages, err = h.RustStore.WALCheckpoint(truncateAt)
 	if err != nil {
 		return busy, walPages, checkpointedPages, err
 	}
@@ -400,13 +400,13 @@ func (h *parquetHandles) WALCheckpointTruncate() (busy, walPages, checkpointedPa
 	files := maps.Clone(h.landings)
 	h.mu.Unlock()
 	for _, name := range names {
-		b, w, c, lerr := files[name].WALCheckpointTruncate()
+		b, w, c, lerr := files[name].WALCheckpoint(truncateAt)
 		if lerr != nil {
 			return busy, walPages, checkpointedPages, errors.Wrapf(lerr, "the landing file of %s did not checkpoint", name)
 		}
-		// A TRUNCATE that worked reports all three as zero, every tick, for
-		// every namespace. Only a landing file that reports something is said.
-		if b != 0 || w != 0 || c != 0 {
+		// A checkpoint that copied every page reports as many checkpointed as
+		// are in the WAL. Only a landing file that left pages behind is said.
+		if b != 0 || c != w {
 			logger.Logger.Infow("Landing file checkpointed",
 				"namespace", name, "busy", b, "wal_pages", w, "checkpointed_pages", c)
 		}
@@ -749,6 +749,7 @@ func (h *parquetHandles) Landings() ([]server.Landing, error) {
 	for _, name := range names {
 		path := landingPath(h.dbPath, name)
 
+		counting := time.Now()
 		held, err := files[name].CountAttestations()
 		if err != nil {
 			return nil, errors.Wrapf(err, "the landing file of %s at %s did not count", name, path)
@@ -760,7 +761,7 @@ func (h *parquetHandles) Landings() ([]server.Landing, error) {
 			Bytes:        sizeOf(path),
 			WalBytes:     sizeOf(path + "-wal"),
 			Attestations: held,
-			DB:           files[name].db,
+			CountTook:    time.Since(counting),
 		})
 	}
 	return landings, nil

@@ -91,9 +91,9 @@ Without the `rustembeddings` build tag, all endpoints return 503.
 
 ## 2D Projection (UMAP)
 
-Embeddings are 384-dimensional — too high to visualize directly. The `qntx-reduce` plugin projects them to 2D via UMAP for canvas visualization.
+Embeddings are 384-dimensional — too high to visualize directly. The `reduce` plugin projects them to 2D via UMAP for canvas visualization.
 
-See [qntx-reduce/README.md](../qntx-plugins/qntx-reduce/README.md) for setup and API details.
+See [teranos/reduce](https://github.com/teranos/reduce) for setup and API details.
 
 **Flow:** `POST /api/embeddings/project` reads embeddings for the specified model (or all if omitted), calls the reduce plugin's `/fit` endpoint, and writes `projection_x`/`projection_y` back to the embeddings table. New attestations are auto-projected via `/transform` if the model is fitted.
 
@@ -156,7 +156,7 @@ This avoids burdening every PR with model download/caching and inference time. I
 - Error handling standardization across Rust/Go FFI boundary
 
 ### Design decision: unconditional sqlite-vec
-`db/connection.go` imports `sqlite-vec` CGO bindings unconditionally — every Go build pays the CGO compilation cost, even builds that don't use embeddings. This is coupled to migration 024, which creates a `vec0` virtual table that requires the extension to be loaded. The migration runs unconditionally via `//go:embed sqlite/migrations/*.sql`.
+`internal/db/connection.go` imports `sqlite-vec` CGO bindings unconditionally — every Go build pays the CGO compilation cost, even builds that don't use embeddings. This is coupled to migration 024, which creates a `vec0` virtual table that requires the extension to be loaded. The migration runs unconditionally via `//go:embed sqlite/migrations/*.sql`.
 
 Making this conditional requires solving both sides together:
 - Move the `sqlite_vec` import behind a build tag

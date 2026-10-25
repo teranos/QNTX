@@ -1,3 +1,0 @@
-[submodule "qntx-plugins/scry/vendor/llama.cpp"]
-	path = qntx-plugins/scry/vendor/llama.cpp
-	url = https://github.com/ggml-org/llama.cpp.git

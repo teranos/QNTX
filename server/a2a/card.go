@@ -24,6 +24,10 @@ type Skill struct {
 	// Bearer says calling the skill takes the node's bearer token, for a card
 	// that shows a skill to whoever reads it and not only to who reaches it.
 	Bearer bool
+	// Modes is the media types the skill takes and gives, in place of the
+	// card's (AgentSkill.input_modes, output_modes). Nil is none said, and the
+	// card's hold.
+	Modes []string
 }
 
 // Extension is one AgentExtension the card declares (§4.6): what a field of
@@ -51,6 +55,11 @@ type Card struct {
 	Tenant     string
 	Skills     []Skill
 	Extensions []Extension
+	// Session is the cookie a person's passkey session is carried in: the
+	// node admits it as it admits the bearer token, so the card declares both
+	// ("Agents MUST authenticate requests using one of the schemes declared",
+	// §13.3).
+	Session string
 }
 
 // Message is the card as lf.a2a.v1.AgentCard, read through the pinned spec, so
@@ -70,6 +79,9 @@ func (c Card) Message() (protoreflect.Message, error) {
 		if s.Bearer {
 			skill["securityRequirements"] = bearerRequired
 		}
+		if len(s.Modes) > 0 {
+			skill["inputModes"], skill["outputModes"] = s.Modes, s.Modes
+		}
 		skills = append(skills, skill)
 	}
 	extensions := []map[string]any{}
@@ -82,6 +94,14 @@ func (c Card) Message() (protoreflect.Message, error) {
 	interfaces := []map[string]any{
 		{"url": c.URL, "protocolBinding": "HTTP+JSON", "protocolVersion": Version, "tenant": c.Tenant},
 	}
+	schemes := map[string]any{"bearer": map[string]any{"httpAuthSecurityScheme": map[string]any{"scheme": "Bearer"}}}
+	required := append([]map[string]any{}, bearerRequired...)
+	if c.Session != "" {
+		schemes["session"] = map[string]any{"apiKeySecurityScheme": map[string]any{
+			"description": "A person's passkey session", "location": "cookie", "name": c.Session}}
+		// Either one: each SecurityRequirement is an alternative.
+		required = append(required, sessionRequired...)
+	}
 	body, err := json.Marshal(map[string]any{
 		"name":                c.Name,
 		"description":         c.Description,
@@ -92,10 +112,8 @@ func (c Card) Message() (protoreflect.Message, error) {
 		"capabilities": map[string]any{"streaming": false, "pushNotifications": false, "extendedAgentCard": true, "extensions": extensions},
 		// The node's token is a bearer token (§3.1.11: the extended card is
 		// authenticated with a scheme the card declares).
-		"securitySchemes": map[string]any{
-			"bearer": map[string]any{"httpAuthSecurityScheme": map[string]any{"scheme": "Bearer"}},
-		},
-		"securityRequirements": bearerRequired,
+		"securitySchemes":      schemes,
+		"securityRequirements": required,
 		"defaultInputModes":    Modes,
 		"defaultOutputModes":   Modes,
 		"skills":               skills,
@@ -127,6 +145,10 @@ func ReadCard(body []byte) (protoreflect.Message, error) {
 // bearerRequired is a SecurityRequirement naming the bearer scheme the card
 // declares, with no scopes.
 var bearerRequired = []map[string]any{{"schemes": map[string]any{"bearer": map[string]any{"list": []string{}}}}}
+
+// sessionRequired is a SecurityRequirement naming the session scheme the card
+// declares, with no scopes.
+var sessionRequired = []map[string]any{{"schemes": map[string]any{"session": map[string]any{"list": []string{}}}}}
 
 // Missing is every field the card leaves empty that the spec requires: a
 // REQUIRED field unset or empty, and a REQUIRED list with no element (§5.7).

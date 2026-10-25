@@ -158,40 +158,6 @@
           "run": "go test -v ./ats/wasm/..."
         }
       ]
-    },
-    "qntx-meili": {
-      "name": "MeiliSearch Plugin",
-      "runs-on": "ubuntu-latest",
-      "steps": [
-        {
-          "name": "Checkout repository",
-          "uses": "actions/checkout@v5"
-        },
-        {
-          "name": "Install Nix",
-          "uses": "cachix/install-nix-action@v26",
-          "with": {
-            "extra_nix_config": "experimental-features = nix-command flakes\n"
-          }
-        },
-        {
-          "name": "Setup Cachix",
-          "uses": "cachix/cachix-action@v14",
-          "with": {
-            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
-            "name": "qntx",
-            "skipPush": true
-          }
-        },
-        {
-          "name": "Build via Nix",
-          "run": "nix build ./qntx-plugins/qntx-meili --print-build-logs"
-        },
-        {
-          "name": "Verify binary works",
-          "run": "./result/bin/qntx-meili --version"
-        }
-      ]
     }
   },
   "name": "Rust",
@@ -208,16 +174,15 @@
         "crates/ats-duckdb/Cargo.toml",
         "crates/ats-postgres/Cargo.toml",
         "crates/ats-wasm/Cargo.toml",
-        "qntx-plugins/qntx-meili/Cargo.toml",
         "ats/storage/duckdbcgo/**",
         "cmd/qntx/commands/database_parquet.go",
         "cmd/qntx/commands/landing_queries_test.go",
-        "db/duckdb/migrations/**",
+        "internal/db/duckdb/migrations/**",
         "ats/storage/postgrescgo/**",
         "cmd/qntx/commands/namespace_postgres.go",
         "cmd/qntx/commands/namespace_postgres_test.go",
         "cmd/qntx/commands/namespace_record_test.go",
-        "db/postgres/migrations/**",
+        "internal/db/postgres/migrations/**",
         "cmd/parity/**",
         "scripts/with-postgres.sh",
         "flake.lock",
@@ -232,8 +197,7 @@
       "paths": [
         "**/*.rs",
         "crates/qntx/Cargo.toml",
-        "crates/ats-wasm/Cargo.toml",
-        "qntx-plugins/qntx-meili/Cargo.toml"
+        "crates/ats-wasm/Cargo.toml"
       ]
     },
     "workflow_dispatch": null

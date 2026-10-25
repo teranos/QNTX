@@ -15,7 +15,7 @@
 //! at creation and never persisted. A GITHUB token (ADR-043) is the exception:
 //! the node spends it at GitHub, so its record holds the credential.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -334,6 +334,13 @@ impl From<TokenObject> for TokenRecord {
 impl TokenStore {
     /// Open the store at `location`, loading every token already there.
     pub fn open(location: impl Into<String>) -> Result<Self> {
+        Self::open_skipping(location, &HashSet::new())
+    }
+
+    /// Open the store at `location`, leaving unread every token whose hash is
+    /// in `skip`: the object is named by the hash, so a skipped token costs
+    /// its line in the listing and no GET.
+    pub fn open_skipping(location: impl Into<String>, skip: &HashSet<String>) -> Result<Self> {
         let location = location.into();
         if location.contains('\'') {
             return Err(DuckdbError::BadName {
@@ -349,7 +356,7 @@ impl TokenStore {
             location,
             by_hash: HashMap::new(),
         };
-        store.load()?;
+        store.load(skip)?;
         Ok(store)
     }
 
@@ -492,10 +499,18 @@ impl TokenStore {
     /// Read every token object at the location: list the prefix, then fetch
     /// each object. A prefix holding nothing is a store that has never issued
     /// a token, which is empty and not broken. Any other failure is real and
-    /// surfaces with what S3 said.
-    fn load(&mut self) -> Result<()> {
+    /// surfaces with what S3 said. A token whose hash is in `skip` is not
+    /// fetched.
+    fn load(&mut self, skip: &HashSet<String>) -> Result<()> {
         for path in self.objects.list(Object::Tokens, &self.prefix)? {
-            if !path.ends_with(".json") {
+            let Some(hash) = path
+                .rsplit('/')
+                .next()
+                .and_then(|name| name.strip_suffix(".json"))
+            else {
+                continue;
+            };
+            if skip.contains(hash) {
                 continue;
             }
             let Some(bytes) = self.objects.get(Object::Token, &path)? else {
@@ -702,6 +717,24 @@ mod tests {
 
         assert!(dir.path().join("system").join("access_tokens").exists());
         assert!(!dir.path().join(NS).exists());
+    }
+
+    // A skipped token is left unread, and its object stays for an open that
+    // skips nothing: a host that lost its db takes every token back in.
+    #[test]
+    fn a_skipped_token_is_not_read_and_the_rest_are() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut writer = self::store(&dir);
+        writer.put(record("AT-SPENT", "spenthash")).expect("put");
+        writer.put(record("AT-LIVE", "livehash")).expect("put");
+
+        let skip = HashSet::from(["spenthash".to_string()]);
+        let opened =
+            TokenStore::open_skipping(format!("file://{}", dir.path().display()), &skip).unwrap();
+
+        let held: Vec<String> = opened.list().into_iter().map(|t| t.id).collect();
+        assert_eq!(held, vec!["AT-LIVE".to_string()]);
+        assert_eq!(self::store(&dir).list().len(), 2, "nothing skipped reads every token");
     }
 
     // A token object written before the node recorded who minted it, and

@@ -38,6 +38,7 @@ const (
 // who sent. What it was wired with is kept, so the window says what sends.
 func (s *QNTXServer) mailWiring() services.MailWiring {
 	s.mailConfig = s.deps.cfg.Mail
+	s.nodeName = s.deps.cfg.Auth.RPID
 	w := services.MailWiring{
 		From:       services.MailFrom(s.mailConfig.From),
 		Transport:  services.HavingNot[services.MailTransport](errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")),
@@ -93,6 +94,7 @@ func (s *QNTXServer) mailSignum() sigil.Signum {
 			Name:        "mail",
 			Description: "Mail the node sends on plugins' behalf: every mail sent or refused, one mail whole, the templates mail is filled from, the account it goes through, and the weekly report to ROOT.",
 			Tags:        []string{"mail", "templates", "report"},
+			Oasf:        []string{"research_knowledge_productivity/office_productivity/email_management"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "sent",

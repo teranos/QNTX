@@ -236,3 +236,35 @@ func TestReference_A2A(t *testing.T) {
 		t.Errorf("tags is %+v", skill.Columns[3])
 	}
 }
+
+// oasf is read from its .proto files, which import each other by path: a
+// Skill is a name and an id, and a Record lists the Skills it can perform.
+func TestReference_OASF(t *testing.T) {
+	schema, refused := Reference("oasf")
+	if refused != nil {
+		t.Fatal(refused)
+	}
+	models := map[string]Model{}
+	for _, m := range schema.Models {
+		models[m.Name] = m
+	}
+	skill, ok := models["Skill"]
+	if !ok {
+		t.Fatalf("oasf has no Skill: %v", schema.Models)
+	}
+	var columns []string
+	for _, c := range skill.Columns {
+		columns = append(columns, c.Name+" "+c.Type)
+	}
+	if !slices.Equal(columns, []string{"annotations map", "name string", "id uint32"}) {
+		t.Errorf("Skill is %v", columns)
+	}
+	record, ok := models["Record"]
+	if !ok {
+		t.Fatal("oasf has no Record")
+	}
+	at := slices.IndexFunc(record.Columns, func(c Column) bool { return c.Name == "skills" })
+	if at < 0 || !record.Columns[at].List {
+		t.Errorf("Record lists no skills: %+v", record.Columns)
+	}
+}

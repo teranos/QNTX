@@ -17,13 +17,14 @@ import (
 // backend wired today. On sqlite the result is nil, which makes the bearer
 // path skip and /auth/tokens answer 503 — nothing mints a credential that
 // cannot be looked up again.
-func newTokenRecord(cfg *appcfg.Config) (auth.TokenRecordStore, bool, error) {
+func newTokenRecord(cfg *appcfg.Config, skip []string) (auth.TokenRecordStore, bool, error) {
 	if cfg.Storage.Backend != "parquet" {
 		return nil, false, nil
 	}
 
 	location := cfg.Storage.Parquet.Location
-	store, err := duckdbcgo.NewTokenStore(location)
+	// What the operational db holds as expired is left unread: a GET each.
+	store, err := duckdbcgo.NewTokenStoreSkipping(location, skip)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to open the access token record at %s", location)
 	}

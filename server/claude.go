@@ -53,6 +53,10 @@ type rootAgent struct {
 	namespace string
 	// called is the agent as a sentence names it.
 	called string
+	// element is the element this agent is, for an element's agent (ADR-054); empty for the others.
+	element string
+	// sessionDir is where its sessions are kept under its home: elements/<element> for an element's agent, the home itself for the others.
+	sessionDir string
 }
 
 // agentSpec is how an agent runs in Claude Code: am.toml's [agent.root] for
@@ -70,7 +74,7 @@ func specOf(root appcfg.NodeAgentConfig) agentSpec {
 	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef}
 }
 
-// in is the agent's session in h.
+// in is the agent's session in h: the one it continues.
 func (a *rootAgent) in(h *harness) *inHarness {
 	a.sessionsMu.Lock()
 	defer a.sessionsMu.Unlock()
@@ -80,11 +84,14 @@ func (a *rootAgent) in(h *harness) *inHarness {
 	}
 	held, ok := a.sessions[h.name]
 	if !ok {
-		held = &inHarness{file: h.file, turn: a.turn}
+		held = &inHarness{file: filepath.Join(a.sessionDir, h.file), turn: a.turn}
 		a.sessions[h.name] = held
 	}
 	return held
 }
+
+// elementsDir is where the node keeps each element's agent, beside ROOT's (ADR-054).
+const elementsDir = "elements"
 
 // inHarness is the Node Agent's session in one harness: where it is kept, and
 // the turn it is in.
@@ -156,16 +163,26 @@ func (a *rootAgent) sessionIn(file string) (id string, kept bool, err error) {
 
 // keepIn writes id down in file as the session continued from here on.
 func (a *rootAgent) keepIn(file, id string) error {
-	if err := os.MkdirAll(a.home, 0o700); err != nil {
-		return errors.Wrapf(err, "could not create %s", a.home)
-	}
 	path := filepath.Join(a.home, file)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return errors.Wrapf(err, "could not create %s", filepath.Dir(path))
+	}
 	return errors.Wrapf(os.WriteFile(path, []byte(id+"\n"), 0o600), "could not write %s", path)
 }
 
 // isSaidToBe is what the Node Agent additionally is, said to Claude Code with
 // everything said to it.
 func (a *rootAgent) isSaidToBe() string {
+	// "THE CONVERSATION IS WITH THE ELEMENT"
+	if a.element != "" {
+		return "You are the element " + a.element + " of a QNTX node's page, as ROOT speaks to it: one element, one conversation, continued every time ROOT shakes the phone with you on screen. " +
+			"ROOT says what they see, with a screenshot of you; what you do about it is the prompt. " +
+			"You run on the machine the node runs on, as the user the node runs as. " +
+			"Your DID is " + a.did + ". " +
+			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
+			"Your git is your own: commits are authored as you, and when you push to GitHub your git asks the node for what carries the push. " +
+			"Never ask for, read, print or store a GitHub credential yourself."
+	}
 	if a.namespace != auth.NamespaceSystem {
 		return "You are the agent of the namespace " + a.namespace + " on a QNTX node, shared by everyone who has reach on that namespace. " +
 			"Your DID is " + a.did + ". " +
@@ -292,7 +309,8 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
 				// "on a redeploy NODE agent would still be alive, which is the
 				// intended state, rather than being killed mid-turn" (#1256).
-				Apart: s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,
+				Apart:   s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,
+				Started: t.started,
 			}
 			if s.ownURL != "" {
 				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}

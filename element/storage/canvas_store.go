@@ -6,8 +6,8 @@ import (
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
-	"github.com/teranos/QNTX/db"
 	pb "github.com/teranos/QNTX/element/proto"
+	"github.com/teranos/QNTX/internal/db"
 	errors "github.com/teranos/sacred-error"
 )
 

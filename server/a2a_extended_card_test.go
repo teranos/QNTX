@@ -118,3 +118,32 @@ func TestTheExtendedCardRequiresAnAdmittedCaller(t *testing.T) {
 	require.NotNil(t, refused)
 	assert.Contains(t, refused.Message, "no gate")
 }
+
+// "Agents SHOULD implement appropriate caching headers to control client-side
+// caching of extended cards", and "honor client cache invalidation" (§13.3).
+// The card is the caller's own, so no shared cache keeps it.
+func TestTheExtendedCardSaysHowItIsCached(t *testing.T) {
+	namedNode(t)
+	srv, tokens := pluginServingServer(t, "fake")
+
+	w := askingTheExtendedCard(srv, "/a2a/extendedAgentCard", tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "private, max-age=60", w.Header().Get("Cache-Control"))
+	etag := w.Header().Get("ETag")
+	require.NotEmpty(t, etag)
+
+	again := asBearer(http.MethodGet, "/a2a/extendedAgentCard", tokens[auth.LevelRoot])
+	again.Header.Set("A2A-Version", "1.0")
+	again.Header.Set("If-None-Match", etag)
+	w = httptest.NewRecorder()
+	srv.served.ServeHTTP(w, again)
+	assert.Equal(t, http.StatusNotModified, w.Code)
+	assert.Empty(t, w.Body.String())
+	assert.Equal(t, etag, w.Header().Get("ETag"))
+
+	// A tag the card no longer is gets the card.
+	again.Header.Set("If-None-Match", `"another"`)
+	w = httptest.NewRecorder()
+	srv.served.ServeHTTP(w, again)
+	assert.Equal(t, http.StatusOK, w.Code)
+}

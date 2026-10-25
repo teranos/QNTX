@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 	errors "github.com/teranos/sacred-error"
 )
 

@@ -1155,6 +1155,53 @@ func (rs *RustStore) WALCheckpointTruncate() (busy, walPages, checkpointedPages 
 	return 0, 0, 0, nil
 }
 
+// WALCheckpointPassive runs a PASSIVE WAL checkpoint on the write connection.
+// It copies the pages no reader still holds and waits on none, so the read
+// pool stays open. Acquires muWrite, which the write connection is held by.
+func (rs *RustStore) WALCheckpointPassive() (busy, walPages, checkpointedPages int, err error) {
+	rs.muWrite.Lock()
+	rs.SetWriteHolder("wal-checkpoint")
+	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
+
+	if rs.closed {
+		return 0, 0, 0, errors.New("store is closed")
+	}
+
+	cSQL := C.CString("PRAGMA wal_checkpoint(PASSIVE)")
+	defer C.free(unsafe.Pointer(cSQL))
+	cParams := C.CString("[]")
+	defer C.free(unsafe.Pointer(cParams))
+
+	result := C.sql_query(rs.store, cSQL, cParams)
+	defer C.query_result_free(result)
+	if !result.success {
+		return 0, 0, 0, errors.Newf("PASSIVE WAL checkpoint failed: %s", C.GoString(result.error_msg))
+	}
+
+	var rows [][3]int
+	if err := json.Unmarshal([]byte(C.GoString(result.rows_json)), &rows); err != nil {
+		return 0, 0, 0, errors.Wrap(err, "the PASSIVE WAL checkpoint answered rows that do not parse")
+	}
+	if len(rows) != 1 {
+		return 0, 0, 0, errors.Newf("the PASSIVE WAL checkpoint answered %d rows, want 1", len(rows))
+	}
+	return rows[0][0], rows[0][1], rows[0][2], nil
+}
+
+// WALCheckpoint is TRUNCATE once this file's WAL has reached truncateAt, and
+// PASSIVE before that: TRUNCATE closes every reader for its length.
+func (rs *RustStore) WALCheckpoint(truncateAt int64) (busy, walPages, checkpointedPages int, err error) {
+	info, err := os.Stat(rs.dbPath + "-wal")
+	switch {
+	case err == nil && info.Size() >= truncateAt:
+		return rs.WALCheckpointTruncate()
+	case err == nil, os.IsNotExist(err):
+		return rs.WALCheckpointPassive()
+	default:
+		return 0, 0, 0, errors.Wrapf(err, "the WAL of %s could not be measured", rs.dbPath)
+	}
+}
+
 // Version returns the library version.
 func Version() string {
 	return C.GoString(C.storage_version())

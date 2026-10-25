@@ -13,9 +13,9 @@ import (
 )
 
 // The binding is served at /a2a/ behind its reach line: ROOT reaches every
-// operation in scope and is told it is not one the node does yet, but for the
-// extended card (TestTheExtendedCardIsWhatTheCallerReaches), and a tenant
-// no agent is served at is not found (§3.3.2); SUPER is refused at the gate
+// operation in scope and is told what the node does not do, a message to a
+// node that names no Node Agent and its tasks among them, and a tenant no
+// agent is served at is not found (§3.3.2). SUPER is refused at the gate
 // before any operation is asked.
 func TestA2AIsServedToRootAlone(t *testing.T) {
 	srv, tokens := pluginServingServer(t, "fake")
@@ -29,34 +29,34 @@ func TestA2AIsServedToRootAlone(t *testing.T) {
 		}
 		return r
 	}
-	for _, route := range []struct{ method, path, body string }{
-		{http.MethodPost, "/a2a/message:send", sent},
-		{http.MethodPost, "/a2a/message:stream", sent},
-		{http.MethodGet, "/a2a/tasks/abc", ""},
-		{http.MethodGet, "/a2a/tasks", ""},
-		{http.MethodPost, "/a2a/tasks/abc:cancel", ""},
-		{http.MethodPost, "/a2a/garden/tasks/abc:cancel", ""},
-		{http.MethodGet, "/a2a/garden/extendedAgentCard", ""},
+	unsupported, noOperation := "UNSUPPORTED_OPERATION", "is no A2A operation"
+	for _, route := range []struct {
+		method, path, body string
+		code               int
+		says               string
+	}{
+		{http.MethodPost, "/a2a/message:send", sent, http.StatusBadRequest, unsupported},
+		{http.MethodPost, "/a2a/message:stream", sent, http.StatusBadRequest, unsupported},
+		{http.MethodGet, "/a2a/tasks/abc", "", http.StatusBadRequest, unsupported},
+		{http.MethodGet, "/a2a/tasks", "", http.StatusBadRequest, unsupported},
+		{http.MethodPost, "/a2a/tasks/abc:cancel", "", http.StatusBadRequest, unsupported},
+		{http.MethodPost, "/a2a/garden/tasks/abc:cancel", "", http.StatusNotFound, noOperation},
+		{http.MethodPost, "/a2a/tasks/abc/pushNotificationConfigs", "{}", http.StatusBadRequest, "PUSH_NOTIFICATION_NOT_SUPPORTED"},
+		{http.MethodGet, "/a2a/garden/extendedAgentCard", "", http.StatusNotFound, noOperation},
 	} {
-		tenant := strings.HasPrefix(route.path, "/a2a/garden/")
 		r := asked(route.method, route.path, route.body, tokens[auth.LevelRoot])
 		r.Header.Set("A2A-Version", "1.0")
 		w := httptest.NewRecorder()
 		srv.served.ServeHTTP(w, r)
-		if tenant {
-			assert.Equal(t, http.StatusNotFound, w.Code, route.path+" for ROOT: "+w.Body.String())
-			assert.Contains(t, w.Body.String(), "is no A2A operation", route.path+" for ROOT")
-		} else {
-			assert.Equal(t, http.StatusBadRequest, w.Code, route.path+" for ROOT: "+w.Body.String())
-			assert.Contains(t, w.Body.String(), "UNSUPPORTED_OPERATION", route.path+" for ROOT")
-		}
+		assert.Equal(t, route.code, w.Code, route.path+" for ROOT: "+w.Body.String())
+		assert.Contains(t, w.Body.String(), route.says, route.path+" for ROOT")
 
 		r = asked(route.method, route.path, route.body, tokens[auth.LevelSuper])
 		r.Header.Set("A2A-Version", "1.0")
 		w = httptest.NewRecorder()
 		srv.served.ServeHTTP(w, r)
 		assert.Equal(t, http.StatusForbidden, w.Code, route.path+" for SUPER: "+w.Body.String())
-		assert.False(t, strings.Contains(w.Body.String(), "UNSUPPORTED_OPERATION"), route.path+" for SUPER reached an operation")
+		assert.False(t, strings.Contains(w.Body.String(), route.says), route.path+" for SUPER reached an operation")
 		// §11.6: the gate's refusal is a google.rpc.Status too.
 		var said struct {
 			Error struct {

@@ -11,7 +11,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 )
 
 func init() {

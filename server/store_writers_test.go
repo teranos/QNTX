@@ -79,6 +79,11 @@ var storeWriters = map[string]string{
 		"the setter is admitted, after keysAsking refuses a token or a connector and mayHandleKeys says " +
 		"they own the namespace, or are ROOT or SUPER",
 
+	"writeTaskLine": "a Task of the Node Agent (A2A §3.4.2) lands in system, where the Node Agent's " +
+		"session is written, what the node knows of itself. Reached from SendMessage at no tenant, " +
+		"which '/a2a/' gives to ROOT alone, after the lines say the sender reaches agent say over A2A, " +
+		"and from CancelTask at no tenant, which '/a2a/' gives to ROOT alone: \"ROOT can do anything\"",
+
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +
 		"stands behind this one. The closed predicate vocabulary in server/auth does",

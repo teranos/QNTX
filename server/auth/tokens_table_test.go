@@ -3,6 +3,7 @@ package auth
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -148,7 +149,7 @@ func TestATokenFromBeforeExpiriesWereSaidNeverEnds(t *testing.T) {
 	_, err := db.Exec(`INSERT INTO access_tokens (hash, id, record) VALUES (?, ?, ?)`, "old",
 		"T-OLD", `{"id":"T-OLD","hash":"old","label":"old","level":"ATTESTOR","namespaces":["default"],"created_at":1}`)
 	require.NoError(t, err)
-	written, err := os.ReadFile("../../db/sqlite/migrations/076_a_token_says_when_it_ends.sql")
+	written, err := os.ReadFile("../../internal/db/sqlite/migrations/076_a_token_says_when_it_ends.sql")
 	require.NoError(t, err)
 	_, err = db.Exec(string(written))
 	require.NoError(t, err)
@@ -210,6 +211,37 @@ func TestOpeningWritesBackATokenTheRecordLacks(t *testing.T) {
 	assert.Equal(t, 1, done.WrittenBack)
 	require.Len(t, record.held, 1)
 	assert.Equal(t, "abc", record.held[0].Hash)
+}
+
+// The record is opened without reading what the table holds as expired, so
+// its lacking one is no disagreement: nothing is written back, and the table
+// still lists it.
+func TestAnExpiredTokenTheRecordWasNotReadForIsNotWrittenBack(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	first, _, err := OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	spent := aToken("spent", "carried")
+	ended := time.Now().Add(-time.Minute)
+	spent.ExpiresAt = &ended
+	_, err = first.Issue(spent)
+	require.NoError(t, err)
+	_, err = first.Issue(aToken("live", "kept"))
+	require.NoError(t, err)
+
+	skipped, err := ExpiredTokenHashes(db, time.Now().UTC().UnixMilli())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"spent"}, skipped)
+
+	record := &countingTokens{}
+	reopened, done, err := OpenTokenTable(db, record)
+	require.NoError(t, err)
+	assert.Equal(t, 1, done.WrittenBack)
+	require.Len(t, record.held, 1)
+	assert.Equal(t, "live", record.held[0].Hash)
+
+	listed, err := reopened.List()
+	require.NoError(t, err)
+	assert.Len(t, listed, 2, "an expired token left the table's list")
 }
 
 // "we need to keep users in mem"

@@ -44,6 +44,7 @@ func (s *QNTXServer) cardBase(r *http.Request) a2a.Card {
 		URL:         a2aURL(r),
 		Skills:      []a2a.Skill{},
 		Extensions:  []a2a.Extension{s.nodeExtension(r)},
+		Session:     auth.SessionCookie,
 	}
 }
 
@@ -80,9 +81,14 @@ func (s *QNTXServer) nodeKey() (*nodedid.Handler, bool) {
 	return nil, false
 }
 
-// skillOf is a signum as a skill. Its id is the signum.
+// skillOf is a signum as a skill. Its id is the signum. The Node Agent is what
+// a message sent to the node reaches, and it takes text and gives text.
 func skillOf(signum *protocol.Signum) a2a.Skill {
-	return a2a.Skill{ID: signum.GetName(), Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags()}
+	skill := a2a.Skill{ID: signum.GetName(), Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags()}
+	if signum.GetName() == nodeAgentSignumName {
+		skill.Modes = []string{a2a.Text}
+	}
+	return skill
 }
 
 // a2aCard is the card the node can give the caller of r, with a skill per
@@ -185,7 +191,7 @@ func (s *QNTXServer) HandleAgentCard(w http.ResponseWriter, r *http.Request) {
 	// §8.6.1. Short, because health is on the card.
 	w.Header().Set("Cache-Control", "public, max-age=60")
 	w.Header().Set("ETag", etag)
-	if matches(r.Header.Get("If-None-Match"), etag) {
+	if a2a.Matches(r.Header.Get("If-None-Match"), etag) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
@@ -193,18 +199,6 @@ func (s *QNTXServer) HandleAgentCard(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(body.Bytes()); err != nil {
 		s.logger.Warnw("The agent card was not delivered", "peer", r.RemoteAddr, "error", err)
 	}
-}
-
-// matches is If-None-Match against one strong ETag (RFC 9110 §13.1.2): a list
-// of tags, a weak one compared by its opaque part, or *.
-func matches(header, etag string) bool {
-	for _, tag := range strings.Split(header, ",") {
-		tag = strings.TrimPrefix(strings.TrimSpace(tag), "W/")
-		if tag == "*" || tag == etag {
-			return true
-		}
-	}
-	return false
 }
 
 // mcpProtocolVersion is the newest MCP the go-sdk this node is built with

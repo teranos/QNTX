@@ -69,11 +69,12 @@ func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
 			Name:        "agent",
 			Description: "The Node Agent: QNTX itself as expressed to ROOT, run by the node in Claude Code or in Pi.",
 			Tags:        []string{"agent", "root"},
+			Oasf:        []string{"ai_ml_engineering/agent_orchestration/multi_agent_coordination"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name:   "say",
-					Does:   "Says something to the Node Agent in the harness named and gives what it answered. In each harness it is one session that continues, written down by the agent as it goes and read with agent session.",
-					Takes:  append([]*protocol.Param{harness, {Name: "says", Required: true, Says: "What is said to it."}}, claude.sayTakes...),
+					Does:   "Says something to the Node Agent in the harness named and gives what it answered. In each harness it is one session that continues, written down by the agent as it goes and read with agent session. A picture attached travels by its file id (ADR-054).",
+					Takes:  append([]*protocol.Param{harness, {Name: "says", Required: true, Says: "What is said to it."}, screenshotParam()}, claude.sayTakes...),
 					Answer: "protocol.NodeAgentSaid",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: nodeAgentPath + "/say"},
 				},
@@ -183,11 +184,15 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	if caller == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to " + agent.called + " is written down with who said it, and this asking carried no request"}
 	}
+	screenshot, refused := s.screenshotFor(agent, sent)
+	if refused != nil {
+		return nil, refused
+	}
 	t, refused := h.part(ctx, sent, agent, spec)
 	if refused != nil {
 		return nil, refused
 	}
-	t.in, t.called = agent.in(h), h.called
+	t.in, t.called, t.element, t.screenshot = agent.in(h), h.called, agent.element, screenshot
 	return s.sayInHarness(ctx, caller, agent, sent["says"], t)
 }
 
@@ -197,32 +202,6 @@ func (s *QNTXServer) harnessAm(h *harness) (any, *protocol.Refusal) {
 		return nil, refused
 	}
 	return s.amOf(h, agent, h.spec()), nil
-}
-
-// amOf is who one agent in h is and how the node runs it.
-func (s *QNTXServer) amOf(h *harness, agent *rootAgent, spec agentSpec) proto.Message {
-	in := agent.in(h)
-	is := agentIn{did: agent.did}
-	session, kept, err := agent.sessionIn(in.file)
-	if err != nil {
-		is.notReady = err.Error()
-	} else if kept {
-		is.session = session
-	}
-	// A first turn is in a session not kept yet, and is read all the same.
-	if going := in.answering.Load(); going != nil {
-		is.answering, is.session = true, going.session
-	}
-	// Asked without waiting: a fetch still going is said, not sat through.
-	switch path, arrived, err := s.harnessHeldBy(h.name).Now(); {
-	case !arrived:
-		is.notReady = h.fetching
-	case err != nil:
-		is.notReady = err.Error()
-	default:
-		is.path = path
-	}
-	return h.am(is, agent, spec)
 }
 
 // agentIn is what am says of the agent in every harness: its DID, the session

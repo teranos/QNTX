@@ -1,6 +1,7 @@
 # ADR-031: The User
 
 Date: 2026-08-18
+Status: Implemented mostly, Next up is to be more clear in this document about what is about the ROOT user, and what is about the User in general. 
 
 ## Statements
 
@@ -23,40 +24,34 @@ Date: 2026-08-18
   is the person, not the door.
 - Ownership is recorded on the namespace, not on the User. The namespace's own record is  what refuses a second create; a list on the User would be a second answer.
 - A User record lives in `system`, where the token objects already are ([[ADR-027-Permissions]]).
-- No User is visible below SUPER, because `system` is not ([[ADR-026-Namespaces]]). An ATTESTOR sees no
-  User record: not another's, and not their own. There is no directory of people at that  level. What an ATTESTOR sees inside a namespace is what signed something, and `by` is
-  the signer (ADR-026) — never the person behind it.
+- No User is visible below SUPER, because `system` is not ([[ADR-026-Namespaces]]). An ATTESTOR sees no User record: not another's, and not their own. There is no directory of people at that  level. What an ATTESTOR sees inside a namespace is what signed something, and `by` is  the signer ([[ADR-026-Namespaces]]) — never the person behind it.
 
 ## name
 
-A User has a display_name, and it is a name rather than half a login. Not unique,
-
+A User has a display_name, and it is a name rather than half a login. Not unique.
 What identifies a User is a key they hold or an identity they control.
 
-## root
+## ROOT
 
 "display_name of root cannot be changed anymore when set"
-
 "if display_name of root is unset, it becomes root"
 
-"regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they dont need to set their display name as root"
+"regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they don't need to set their display name as root"
 
 So the ROOT User is `root` from the moment they exist, without choosing it, and `root` is
 the one name no other User may take.
 
 You claim the ROOT User by proving you own a root identity. It happens once and
 cannot happen again, so it is attested as `node:claimed`. Recording never fails
-the thing it records (ADR-030), which makes this the one attestation whose loss
-cannot be made up later.
+the thing it records ([[ADR-030-identity-providers]]), which makes this the one attestation whose loss cannot be made up later.
 
-## Becoming
+## Becoming and Unbecoming (!!remove pre-1.0.0)
 
-"i wish i was able to assume the identity of another user, one that isnt ROOT, but also be able to go back."
+"i wish i was able to assume the identity of another user, 
+one that isn't ROOT, but also be able to go back."
 
 "but its attested that they have been becoming and unbecoming"
-
 "and while ROOT is them, they cannot be themselves"
-
 "until ROOT unbecomes that user and is itself again."
 
 - ROOT becomes a User that is not ROOT, and unbecomes them. Both are attested.
@@ -79,11 +74,9 @@ cannot be made up later.
 
 ## level
 
-"can i still not change the role of a User ?"
+"Change the role of a User."
 
-- ROOT sets the level a User holds, to USER or PUBLIC_REGISTRATION, the rungs a route
-  reaching a User is admitted at: `POST /auth/users/{id}/level`, from the User in the
-  Users element.
+- ROOT can set the level a User holds, to any level, the rungs a route  reaching a User is admitted at: `POST /auth/users/{id}/level`, from the User in the Users element.
 - Nobody is made ROOT, and ROOT stays ROOT: there is one ROOT User. A User at SUPER or
   ATTESTOR is admitted at no gate yet, so neither is set.
 - The act is attested as `identity:leveled`, naming who, the level they had and the
@@ -111,9 +104,8 @@ enable is refused naming who, and the person stays off. The act is attested as
 
 ## Not done
 
-A User holds no first name and no last name. A Dutch name has three parts, and
-the middle one is the person's to write: `van Doorn` files under D, `Van Doorn`
-under V, and the string alone does not say which.
+A User holds no first name and no last name. 
+A Dutch name has three parts, and the middle one is the person's to write: `van Doorn` files under D, `Van Doorn` under V, and the string alone does not say which.
 
 A User reaches namespaces through permission, and nothing records which yet.
 

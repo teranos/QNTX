@@ -21,7 +21,7 @@ Plugins implement the [`UIPlugin`](https://github.com/teranos/QNTX/blob/main/plu
 
 ## Example
 
-AT Protocol plugin ([`qntx-atproto`](https://github.com/teranos/QNTX/tree/main/qntx-atproto)) provides a feed element (🦋) showing Bluesky posts.
+AT Protocol plugin ([`atproto`](https://github.com/teranos/atproto)) provides a feed element (🦋) showing Bluesky posts.
 
 ## TODO
 

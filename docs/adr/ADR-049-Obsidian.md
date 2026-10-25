@@ -38,13 +38,13 @@ every device through Sync.
 "Fine, i will deal with this"
 
 - Sync is end-to-end encrypted, and the box is one of the ends: the vault is
-  readable there, by the node and by the ROOT agent (ADR-048).
+  readable there, by the node and by the NODE agent ([[ADR-048-Node-Agent]]).
 
-"but you make a good point about ROOT agent"
+"but you make a good point about NODE agent"
 
 "just make it do everything essentially"
 
-- The ROOT agent sets the vault up on the box and keeps it syncing: `ob login`,
+- The NODE agent sets the vault up on the box and keeps it syncing: `ob login`,
   `ob sync-setup`, `ob sync --continuous`. Each takes its answers as flags
   (`--email`, `--password`, `--mfa`, `--vault`, `--path`), so none of it waits
   on a prompt.
@@ -54,17 +54,15 @@ every device through Sync.
 "you would think there would be a Obsidian Element to make it a bit easier"
 
 "and i guess i want to do the docs tracking in that Element as well"
-
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
-
 
 ## Which folders are the vault's
 
 "So, we could do the Same for Obsidian"
 
 As datapunt's inputs are named on its plugin record, `github.com/owner/repo@branch:path`
-(ADR-002), the vault's folders are named on a record on the node, and the
+([[ADR-002-plugin-configuration]]), the vault's folders are named on a record on the node, and the
 folder itself carries nothing.
 
 "name both ends"
@@ -79,25 +77,21 @@ folder itself carries nothing.
 - Only notes: `.md` files. What else the repository's folder holds stays there.
 - Asked whether a note deleted on main is deleted from the vault too:
 
-
 - A note main had and has no more is removed from the vault. A note main  never had is the vault's own and stays.
 
 ## What reaches the repository
 
 "i don't want that to be automatically opted in, and i want to set what the name of the branch would be in the obsidian element in the binding."
-
 - A bound folder sends nothing until a branch is named for it in the element.
 
 "it should show red, and have you redo the binding"
-
 - When the default branch is another, the binding is red until it is bound again.
 
 "oh, require it to be a dir in the repo , not in its root"
-
 - A folder is bound to a folder inside the repository, never to its top.
 
 ## Per namespace
 
-"and have the possibility to also set Obsidian per namespace"
-
-- One vault today, synced by a systemd unit on the box as root. Every vault  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node  record (server/vault.go). A vault per namespace is that line in the  namespace, its reach lines there, and one sync process per vault.
+"and as a USER, have the possibility to also set Obsidian per namespace"
+- One vault today, synced by a systemd unit on the box as root. Every vault  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node  record (server/vault.go). 
+- A vault per namespace is that line in the  namespace, its reach lines there, and one sync process per vault.

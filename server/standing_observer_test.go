@@ -7,6 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/server/quote"
 	"go.uber.org/zap"
 )
 
@@ -69,4 +70,26 @@ func TestStandingObserverIgnoresWhatNoStandingRowWatches(t *testing.T) {
 func TestStandingObserverWithNoExecutorFiresNothing(t *testing.T) {
 	o := &standingObserver{ctx: context.Background(), builtins: func() watcher.BuiltinExecutor { return nil }, logger: zap.NewNop().Sugar()}
 	o.OnAttestationCreated(&types.As{ID: "x", Predicates: []string{watcher.CIPushedPredicate}})
+}
+
+// fakeBuiltins records the namespace each built-in was run in.
+type fakeBuiltins struct{ namespaces []string }
+
+func (f *fakeBuiltins) ExecuteBuiltin(ctx context.Context, name string, as *types.As) error {
+	f.namespaces = append(f.namespaces, quote.NamespaceOf(ctx))
+	return nil
+}
+
+func TestStandingObserverNamesItsNamespace(t *testing.T) {
+	f := &fakeBuiltins{}
+	o := &standingObserver{
+		ctx:       context.Background(),
+		builtins:  func() watcher.BuiltinExecutor { return f },
+		namespace: "ground",
+		logger:    zap.NewNop().Sugar(),
+	}
+	o.OnAttestationCreated(&types.As{ID: "c", Predicates: []string{watcher.QuoteClaimedPredicate}})
+	if len(f.namespaces) != 1 || f.namespaces[0] != "ground" {
+		t.Errorf("the built-in ran in %v, not in the namespace the row landed in", f.namespaces)
+	}
 }

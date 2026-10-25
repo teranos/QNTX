@@ -122,11 +122,49 @@ var calledThroughSchema = map[string]any{
 	},
 }
 
+// "I actually think this part should be split up into, Node MCP server and Namespace MCP server's"
+
+// mcpNamespaceOf is the namespace an MCP URL names: /mcp/<namespace> is that
+// namespace's server, as /a2a/<tenant>/ is its agent, and /mcp is the node's.
+func mcpNamespaceOf(path string) (string, bool) {
+	rest, under := strings.CutPrefix(path, "/mcp/")
+	if !under {
+		return "", false
+	}
+	namespace, _, _ := strings.Cut(rest, "/")
+	return namespace, namespace != ""
+}
+
+// mcpServerRefuses is why the MCP server r asks is not its caller's, or zero.
+// A connector answers at the server of the namespace it was minted in (ADR-038).
+func mcpServerRefuses(r *http.Request) (int, string) {
+	named, namesOne := mcpNamespaceOf(r.URL.Path)
+	admitted, known := auth.AdmissionFrom(r.Context())
+	if known && admitted.ClientDID != "" {
+		if len(admitted.Namespaces) != 1 {
+			return http.StatusForbidden, fmt.Sprintf("a connector acts in one namespace, and this one names %d", len(admitted.Namespaces))
+		}
+		if own := admitted.Namespaces[0]; !namesOne || named != own {
+			return http.StatusNotFound, fmt.Sprintf("this connector was minted in %s: its MCP server is /mcp/%s", own, own)
+		}
+		return 0, ""
+	}
+	// Anyone but a connector is the node's.
+	if namesOne {
+		return http.StatusNotFound, fmt.Sprintf("/mcp/%s serves a connector minted in %s, and this caller is none: the node's MCP server is /mcp", named, named)
+	}
+	return 0, ""
+}
+
 // HandleMCP answers an MCP client with the API as tools.
 //
 // Stateless: a call is served under the request that carried it, so it is
 // asked of the API with that request's credential and nobody else's.
 func (s *QNTXServer) HandleMCP(w http.ResponseWriter, r *http.Request) {
+	if status, why := mcpServerRefuses(r); status != 0 {
+		writeError(w, status, why)
+		return
+	}
 	s.mcpOnce.Do(func() {
 		s.mcpHTTP = mcp.NewStreamableHTTPHandler(s.mcpServerFor, &mcp.StreamableHTTPOptions{
 			Stateless: true,

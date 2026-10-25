@@ -10,7 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	errors "github.com/teranos/sacred-error"
 )

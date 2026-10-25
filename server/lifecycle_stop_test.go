@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/internal/db"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"go.uber.org/zap"
 )

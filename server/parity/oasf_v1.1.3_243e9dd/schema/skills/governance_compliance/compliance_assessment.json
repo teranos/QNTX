@@ -1,0 +1,8 @@
+{
+  "uid": 1,
+  "caption": "Compliance Assessment",
+  "description": "Assess compliance against regulations/standards.",
+  "extends": "governance_compliance",
+  "name": "compliance_assessment",
+  "attributes": {}
+}
