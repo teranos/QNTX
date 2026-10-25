@@ -207,6 +207,7 @@ func (t *TokenTable) Issue(spec IssuedToken) (string, error) {
 		ReturnAddress:       spec.ReturnAddress,
 		RequestID:           spec.RequestID,
 		Instructions:        spec.Instructions,
+		Root:                spec.Root,
 		// The lines say what a token may touch (ADR-034). The two lists stay on
 		// the record so what was written before still reads, and carry nothing.
 		ScopeRead:  []string{},

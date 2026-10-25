@@ -126,6 +126,27 @@ func TestAMoveReachesTheTableAndTheRecord(t *testing.T) {
 	assert.Equal(t, []string{"vakconnectie"}, record.held[0].Namespaces, "the record kept the namespace the client was moved away from")
 }
 
+// ROOT's client is ROOT's in the table and in the record. Dropped on write, its
+// token was a connector's, and /mcp refused it.
+func TestROOTsClientIsROOTsInTheTableAndTheRecord(t *testing.T) {
+	record := &countingTokens{}
+	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), record)
+	require.NoError(t, err)
+
+	_, _, err = table.Create(NewToken{
+		Label: "chatgpt", MintedBy: "https://mastodon.example/@tim", Level: LevelOAuth,
+		ReturnAddress: "https://chatgpt.com/connector/oauth/abc", ExpiresAt: NeverEnds(), Root: true,
+	})
+	require.NoError(t, err)
+
+	listed, err := table.List()
+	require.NoError(t, err)
+	require.Len(t, listed, 1)
+	assert.True(t, listed[0].Root, "the table dropped ROOT's client")
+	require.Len(t, record.held, 1)
+	assert.True(t, record.held[0].Root, "the record dropped ROOT's client")
+}
+
 // A token the record holds and the table lacks is what rebuilds the table
 // after host loss.
 func TestOpeningTakesInTheTokensTheRecordHoldsAndTheTableLacks(t *testing.T) {
