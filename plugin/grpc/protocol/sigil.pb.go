@@ -862,7 +862,9 @@ type NamespaceAgentSaid struct {
 	// What it answered in Claude Code.
 	Claude *ClaudeSaid `protobuf:"bytes,1,opt,name=claude,proto3" json:"claude,omitempty"`
 	// What it answered in Pi.
-	Pi            *PiSaid `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
+	Pi *PiSaid `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
+	// What the namespace agent answered in Codex.
+	Codex         *CodexSaid `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -907,6 +909,13 @@ func (x *NamespaceAgentSaid) GetClaude() *ClaudeSaid {
 func (x *NamespaceAgentSaid) GetPi() *PiSaid {
 	if x != nil {
 		return x.Pi
+	}
+	return nil
+}
+
+func (x *NamespaceAgentSaid) GetCodex() *CodexSaid {
+	if x != nil {
+		return x.Codex
 	}
 	return nil
 }
@@ -1041,7 +1050,7 @@ func (x *NodeAgentAm) GetCodex() *CodexAm {
 	return nil
 }
 
-// CodexSaid is what the Node Agent answered in codex.
+// CodexSaid is what an agent answered in codex.
 type CodexSaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// What it answered.
@@ -1058,7 +1067,9 @@ type CodexSaid struct {
 	// How long the turn took.
 	TookMs float64 `protobuf:"fixed64,7,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
 	// Why a row of the session was not written down, when one was not.
-	Unwritten     string `protobuf:"bytes,8,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
+	Unwritten string `protobuf:"bytes,8,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
+	// The CLI thread used to resume, distinct from the transcript session.
+	Thread        string `protobuf:"bytes,9,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1149,7 +1160,14 @@ func (x *CodexSaid) GetUnwritten() string {
 	return ""
 }
 
-// CodexAm is who the Node Agent is in codex and how the node runs it.
+func (x *CodexSaid) GetThread() string {
+	if x != nil {
+		return x.Thread
+	}
+	return ""
+}
+
+// CodexAm is who an agent is in codex and how the node runs it.
 type CodexAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Its own DID, which signs what it writes down.
@@ -1528,7 +1546,9 @@ type NamespaceAgentAm struct {
 	// Who the agent is and how it runs, in Claude Code.
 	Agent *ClaudeAm `protobuf:"bytes,3,opt,name=agent,proto3" json:"agent,omitempty"`
 	// Who the agent is and how it runs, in Pi.
-	Pi            *PiAm `protobuf:"bytes,4,opt,name=pi,proto3" json:"pi,omitempty"`
+	Pi *PiAm `protobuf:"bytes,4,opt,name=pi,proto3" json:"pi,omitempty"`
+	// Who the namespace agent is in Codex.
+	Codex         *CodexAm `protobuf:"bytes,5,opt,name=codex,proto3" json:"codex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1587,6 +1607,13 @@ func (x *NamespaceAgentAm) GetAgent() *ClaudeAm {
 func (x *NamespaceAgentAm) GetPi() *PiAm {
 	if x != nil {
 		return x.Pi
+	}
+	return nil
+}
+
+func (x *NamespaceAgentAm) GetCodex() *CodexAm {
+	if x != nil {
+		return x.Codex
 	}
 	return nil
 }
@@ -2207,10 +2234,11 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	" \x01(\tR\bnotReady\x12\x1b\n" +
 	"\tsigned_in\x18\v \x01(\bR\bsignedIn\x12\x1f\n" +
 	"\vauth_method\x18\f \x01(\tR\n" +
-	"authMethod\"d\n" +
+	"authMethod\"\x8f\x01\n" +
 	"\x12NamespaceAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
-	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\"\x8a\x01\n" +
+	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
+	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\"\x8a\x01\n" +
 	"\rNodeAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
@@ -2218,7 +2246,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\vNodeAgentAm\x12*\n" +
 	"\x06claude\x18\x01 \x01(\v2\x12.protocol.ClaudeAmR\x06claude\x12\x1e\n" +
 	"\x02pi\x18\x02 \x01(\v2\x0e.protocol.PiAmR\x02pi\x12'\n" +
-	"\x05codex\x18\x03 \x01(\v2\x11.protocol.CodexAmR\x05codex\"\xf7\x01\n" +
+	"\x05codex\x18\x03 \x01(\v2\x11.protocol.CodexAmR\x05codex\"\x8f\x02\n" +
 	"\tCodexSaid\x12\x16\n" +
 	"\x06answer\x18\x01 \x01(\tR\x06answer\x12\x18\n" +
 	"\asession\x18\x02 \x01(\tR\asession\x12\x14\n" +
@@ -2227,7 +2255,8 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\finput_tokens\x18\x05 \x01(\x03R\vinputTokens\x12#\n" +
 	"\routput_tokens\x18\x06 \x01(\x03R\foutputTokens\x12\x17\n" +
 	"\atook_ms\x18\a \x01(\x01R\x06tookMs\x12\x1c\n" +
-	"\tunwritten\x18\b \x01(\tR\tunwritten\"\xf5\x01\n" +
+	"\tunwritten\x18\b \x01(\tR\tunwritten\x12\x16\n" +
+	"\x06thread\x18\t \x01(\tR\x06thread\"\xf5\x01\n" +
 	"\aCodexAm\x12\x10\n" +
 	"\x03did\x18\x01 \x01(\tR\x03did\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x18\n" +
@@ -2257,12 +2286,13 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"pi_version\x18\b \x01(\tR\tpiVersion\x12\x1b\n" +
 	"\tnot_ready\x18\t \x01(\tR\bnotReady\x12\x1a\n" +
 	"\bprovider\x18\n" +
-	" \x01(\tR\bprovider\"\x91\x01\n" +
+	" \x01(\tR\bprovider\"\xba\x01\n" +
 	"\x10NamespaceAgentAm\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x15\n" +
 	"\x06set_by\x18\x02 \x01(\tR\x05setBy\x12(\n" +
 	"\x05agent\x18\x03 \x01(\v2\x12.protocol.ClaudeAmR\x05agent\x12\x1e\n" +
-	"\x02pi\x18\x04 \x01(\v2\x0e.protocol.PiAmR\x02pi\"~\n" +
+	"\x02pi\x18\x04 \x01(\v2\x0e.protocol.PiAmR\x02pi\x12'\n" +
+	"\x05codex\x18\x05 \x01(\v2\x11.protocol.CodexAmR\x05codex\"~\n" +
 	"\aFollows\x12\x1c\n" +
 	"\treference\x18\x01 \x01(\tR\treference\x12/\n" +
 	"\acolumns\x18\x02 \x03(\v2\x15.protocol.CorrespondsR\acolumns\x12$\n" +
@@ -2349,25 +2379,27 @@ var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	2,  // 5: protocol.SessionTranscript.transcript:type_name -> protocol.Transcript
 	6,  // 6: protocol.NamespaceAgentSaid.claude:type_name -> protocol.ClaudeSaid
 	7,  // 7: protocol.NamespaceAgentSaid.pi:type_name -> protocol.PiSaid
-	6,  // 8: protocol.NodeAgentSaid.claude:type_name -> protocol.ClaudeSaid
-	7,  // 9: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
-	12, // 10: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
-	8,  // 11: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
-	16, // 12: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
-	13, // 13: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
-	15, // 14: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
-	8,  // 15: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
-	16, // 16: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
-	19, // 17: protocol.Follows.columns:type_name -> protocol.Corresponds
-	20, // 18: protocol.Follows.folds:type_name -> protocol.Fold
-	22, // 19: protocol.Sigil.takes:type_name -> protocol.Param
-	23, // 20: protocol.Sigil.gives:type_name -> protocol.Field
-	24, // 21: protocol.Sigil.http:type_name -> protocol.Endpoint
-	22, // [22:22] is the sub-list for method output_type
-	22, // [22:22] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	12, // 8: protocol.NamespaceAgentSaid.codex:type_name -> protocol.CodexSaid
+	6,  // 9: protocol.NodeAgentSaid.claude:type_name -> protocol.ClaudeSaid
+	7,  // 10: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
+	12, // 11: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
+	8,  // 12: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
+	16, // 13: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
+	13, // 14: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
+	15, // 15: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
+	8,  // 16: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
+	16, // 17: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
+	13, // 18: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
+	19, // 19: protocol.Follows.columns:type_name -> protocol.Corresponds
+	20, // 20: protocol.Follows.folds:type_name -> protocol.Fold
+	22, // 21: protocol.Sigil.takes:type_name -> protocol.Param
+	23, // 22: protocol.Sigil.gives:type_name -> protocol.Field
+	24, // 23: protocol.Sigil.http:type_name -> protocol.Endpoint
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }

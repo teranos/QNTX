@@ -127,3 +127,35 @@ func TestDiagnosticsStayBounded(t *testing.T) {
 		t.Fatalf("retained %d diagnostic bytes", len(b.data))
 	}
 }
+
+func TestRunCarriesOnlyAgentMCPBearer(t *testing.T) {
+	home := t.TempDir()
+	binary := fake(t, `printf '%s\n' "$@" > args
+printf '%s' "$QNTX_CODEX_MCP_BEARER" > bearer
+printf '%s' "$QNTX_TOKEN" > ground-token
+cat >/dev/null
+cat <<'JSON'
+`+success+"JSON\n")
+	_, err := (Said{Binary: binary, Home: home, Model: "test", Sandbox: "read-only", System: "namespace instructions", MCPURL: "http://127.0.0.1:8770/mcp", MCPBearer: "agent-own-token", Ground: filepath.Join(home, "ground's tool"), TrustHooks: true}).Run(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args, err := os.ReadFile(filepath.Join(home, "work", "args"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(args), "--dangerously-bypass-hook-trust") || !strings.Contains(string(args), "hooks.Stop=") || strings.Contains(string(args), "agent-own-token") || !strings.Contains(string(args), "bearer_token_env_var") || !strings.Contains(string(args), "developer_instructions") {
+		t.Fatalf("args: %s", args)
+	}
+	bearer, err := os.ReadFile(filepath.Join(home, "work", "bearer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	groundToken, err := os.ReadFile(filepath.Join(home, "work", "ground-token"))
+	if err != nil || string(groundToken) != "agent-own-token" {
+		t.Fatalf("agent Ground token not carried: %v", err)
+	}
+	if string(bearer) != "agent-own-token" {
+		t.Fatal("agent MCP bearer was not carried")
+	}
+}
