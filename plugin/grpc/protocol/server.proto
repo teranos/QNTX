@@ -375,6 +375,9 @@ message Vault {
   // By place, the branch the vault's changes there are committed to. A place
   // not in it sends nothing: it is opted into, never assumed.
   map<string, string> sends = 5;
+  // What still stands between this vault and its folders working: its copy
+  // not being on the box at path (#1091). Empty is nothing.
+  string setup = 6;
 }
 
 // Vaults is what vault list answers, and what every vault sigil that changes

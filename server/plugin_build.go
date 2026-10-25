@@ -198,6 +198,26 @@ func buildOf(record grpcplugin.PluginRecord) (pluginBuild, bool, error) {
 	return b, true, nil
 }
 
+// setupOf is what still stands between a plugin and its tools working, besides
+// enabling it, read off its record. A plugin QNTX does not build needs nothing here.
+//
+// "you can now immediately see, you need to do some separate shit first"
+func setupOf(record grpcplugin.PluginRecord) []string {
+	build, built, err := buildOf(record)
+	if err != nil {
+		return []string{err.Error()}
+	}
+	if !built {
+		return nil
+	}
+	// What a running plugin's schema requires is asked of the plugin
+	// (ConfigSchema), and is not known from the record.
+	if _, installed := installedRevs(record.Name); !installed {
+		return []string{fmt.Sprintf("no build of %s is installed yet: it is built when a push to %s passes every check", record.Name, build.core)}
+	}
+	return nil
+}
+
 // enabledBuilds is each enabled plugin QNTX builds, and why any record's build,
 // by plugin, is not one QNTX can run.
 func enabledBuilds(records []grpcplugin.PluginRecord) ([]pluginBuild, map[string]error) {

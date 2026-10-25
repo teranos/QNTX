@@ -294,7 +294,11 @@ func (s *oauthStore) CreateAccessTokenSession(_ context.Context, signature strin
 	// kind any program holds — what it reaches is what lines grant its label,
 	// never what whoever minted the door may do. The person is still asked
 	// after, just above: struck out of am.toml, their client's tokens stop.
-	if session.ClientItself {
+	//
+	// ROOT's client asking for itself is ROOT, whose client it is (ADR-038):
+	//
+	// "THIS IS MY TOKEN"
+	if session.ClientItself && !client.Root {
 		level = LevelToken
 	}
 	var expiresAt *time.Time
@@ -758,6 +762,14 @@ func (h *Handler) handleAuthorizeDone(w http.ResponseWriter, r *http.Request) {
 		h.logger.Infow("A code was refused at the end of the journey",
 			"admitted_as", held.identity, "client", parked.request.GetClient().GetID(),
 			"reason", "the client no longer answers")
+		h.writeError(w, http.StatusUnauthorized, "refused")
+		return
+	}
+	// ROOT's client is sent a code for ROOT and nobody else (ADR-038).
+	if client.Root && h.levelOf(held.identity) != LevelRoot {
+		h.logger.Infow("A code was refused at the end of the journey",
+			"admitted_as", held.identity, "client", client.DID,
+			"reason", "ROOT's client and somebody who is not ROOT")
 		h.writeError(w, http.StatusUnauthorized, "refused")
 		return
 	}

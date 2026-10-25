@@ -66,6 +66,10 @@ ROOT generates the webhook's secret with the `github` signum's webhook sigil, se
 
 "I expected to also see the plugin README if there is one."
 
+"you can now immediately see, you need to do some separate shit first"
+
+`plugins_list` says per plugin, as `setup`, what still stands between it and its tools working besides Enable: a build its record names and cannot run, or one that has not landed yet. Empty is nothing. What a running plugin's schema requires is the schema's, not the record's.
+
 **Check:** GitHubService is asked, as the node, whether the repository and the plugin's directory in it are there, and for its README ([ADR-043](./ADR-043-github-service.md)). Check only reads.
 
 **Add:** the plugin is recorded with its repository URL, disabled, in the system store.

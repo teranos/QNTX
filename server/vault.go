@@ -6,7 +6,9 @@ package server
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -291,9 +293,27 @@ func (s *QNTXServer) vaultList(context.Context, sigil.Sent) (any, *protocol.Refu
 	}
 	answer := &protocol.Vaults{Vaults: make([]*protocol.Vault, 0, len(vaults))}
 	for _, v := range vaults {
-		answer.Vaults = append(answer.Vaults, &protocol.Vault{Name: v.Name, Path: v.Path, Folders: v.Folders, Disabled: v.Disabled, Sends: v.Sends})
+		answer.Vaults = append(answer.Vaults, &protocol.Vault{Name: v.Name, Path: v.Path, Folders: v.Folders, Disabled: v.Disabled, Sends: v.Sends, Setup: vaultSetup(v)})
 	}
 	return answer, nil
+}
+
+// vaultSetup is what still stands between a vault and its folders working: its
+// copy not being a folder on the box at its path. Empty is nothing.
+//
+// "you need to do some separate shit first before you can use your synced obsidian vault"
+func vaultSetup(vault Vault) string {
+	info, err := os.Stat(vault.Path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		// Set up by hand until #1091.
+		return "the vault's copy is not on the box at " + vault.Path + ": sign in to Obsidian Sync there and keep it syncing, by hand until #1091"
+	case err != nil:
+		return "whether the vault's copy is at " + vault.Path + " was not read: " + err.Error()
+	case !info.IsDir():
+		return vault.Path + " is on the box and is no folder, so it is not the vault's copy"
+	}
+	return ""
 }
 
 func (s *QNTXServer) vaultSet(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
