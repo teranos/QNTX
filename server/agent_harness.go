@@ -67,7 +67,7 @@ func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "agent",
-			Description: "The Node Agent: QNTX itself as expressed to ROOT, run by the node in Claude Code or in Pi.",
+			Description: "The Node Agent: QNTX itself as expressed to ROOT, run by the node in a Coding Agent Harness.",
 			Tags:        []string{"agent", "root"},
 			Oasf:        []string{"ai_ml_engineering/agent_orchestration/multi_agent_coordination"},
 			Sigils: []*protocol.Sigil{
@@ -130,7 +130,7 @@ func (s *QNTXServer) nodeAgentSay(ctx context.Context, sent sigil.Sent) (any, *p
 	case *protocol.PiSaid:
 		return &protocol.NodeAgentSaid{Pi: said}, nil
 	}
-	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent answered in " + h.called + " as neither Claude Code nor Pi"}
+	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent answered in " + h.called + " as no Coding Agent Harness this node runs"}
 }
 
 func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -148,7 +148,7 @@ func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *prot
 	case *protocol.PiAm:
 		return &protocol.NodeAgentAm{Pi: am}, nil
 	}
-	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent said who it is in " + h.called + " as neither Claude Code nor Pi"}
+	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent said who it is in " + h.called + " as no Coding Agent Harness this node runs"}
 }
 
 func (s *QNTXServer) nodeAgentSession(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {

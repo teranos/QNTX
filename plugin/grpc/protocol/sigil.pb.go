@@ -1274,7 +1274,7 @@ func (x *PiAm) GetProvider() string {
 }
 
 // NamespaceAgentAm is what agents am and agents set answer: the namespace's
-// agent, who opted the namespace into it, and who it is in Claude Code or in Pi.
+// agent, who opted the namespace into it, and who it is in a Coding Agent Harness.
 type NamespaceAgentAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The namespace it stands in.

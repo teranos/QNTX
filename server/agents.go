@@ -635,7 +635,7 @@ func (s *QNTXServer) agentsSession(ctx context.Context, sent sigil.Sent) (any, *
 	return nil, notAHarness(sent)
 }
 
-// notAHarness is the refusal of a harness that is neither Claude Code nor Pi.
+// notAHarness is the refusal of a Coding Agent Harness this node does not run.
 func notAHarness(sent sigil.Sent) *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "harness is claude or pi, and " + sent["harness"] + " is neither"}
 }

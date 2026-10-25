@@ -156,7 +156,7 @@ func (s *QNTXServer) elementSay(ctx context.Context, sent sigil.Sent) (any, *pro
 	case *protocol.PiSaid:
 		return &protocol.NodeAgentSaid{Pi: said}, nil
 	}
-	return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " answered in " + h.called + " as neither Claude Code nor Pi"}
+	return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " answered in " + h.called + " as no Coding Agent Harness this node runs"}
 }
 
 func (s *QNTXServer) elementAm(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -170,7 +170,7 @@ func (s *QNTXServer) elementAm(_ context.Context, sent sigil.Sent) (any, *protoc
 	case *protocol.PiAm:
 		return &protocol.NodeAgentAm{Pi: am}, nil
 	}
-	return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " said who it is in " + h.called + " as neither Claude Code nor Pi"}
+	return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " said who it is in " + h.called + " as no Coding Agent Harness this node runs"}
 }
 
 func (s *QNTXServer) elementSession(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
