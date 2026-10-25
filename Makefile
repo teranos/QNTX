@@ -38,7 +38,7 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 		exit 1; }
 
 # QuickDev: "One of the distributions of QNTX, purpose is to build FAST, help
-# with plugin development, for use by Claude Code Web and Mobile sessions.
+# with plugin development, for use by Coding Agent Web and Mobile sessions.
 # Doesn't need ATS or wasm"
 # Nor the Tablet of Reach: on loopback without auth every caller is ROOT, so
 # there it is "just friction without reward".
