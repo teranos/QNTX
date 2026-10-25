@@ -46,7 +46,7 @@ func (f GitHubFollow) line() string {
 	return githubFollowLine + f.Repo + "@" + f.Branch + ">" + f.Dispatches + "/" + f.Workflow
 }
 
-// Follows are the node's follows, the newest line per repo and branch.
+// Follows are the node's follows, the newest line per repo, branch and workflow it dispatches.
 func (r NodeRecords) Follows() ([]GitHubFollow, error) {
 	newest, err := r.newest(githubSubject)
 	if err != nil {
