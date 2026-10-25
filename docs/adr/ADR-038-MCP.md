@@ -73,7 +73,7 @@ A connector stands at CONNECTOR, a rung no line names, and is offered what REACH
 
 "as ROOT, everything ROOT reaches"
 
-A client minted with no namespace is the node's: only ROOT mints it, only ROOT's yes at the passkey sends it a code, and every token it is issued is ROOT, the one it asks for itself included.
+ROOT's client is minted as one (`"root": true`) and names no namespace: only ROOT mints it, only ROOT's yes at the passkey sends it a code, and every token it is issued is ROOT, the one it asks for itself included.
 
 "THIS IS MY TOKEN"
 
@@ -83,6 +83,6 @@ A client minted with no namespace is the node's: only ROOT mints it, only ROOT's
 
 "THE WHOLE THING"
 
-ROOT is answered at every MCP server: `/mcp` and every `/mcp/<namespace>`.
+ROOT's client answers at `/mcp`, the node's MCP server.
 
 "all clients can die"

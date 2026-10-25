@@ -85,6 +85,9 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		// What a client's connector is told on initialize (ADR-038). A
 		// client's, and only a client's.
 		Instructions string `json:"instructions,omitempty"`
+		// ROOT's client for the node's MCP server (ADR-038). A client's, and
+		// only ROOT's to mint.
+		Root bool `json:"root,omitempty"`
 	}
 	// Bounded like every other body in this package. A session holder is not a
 	// stranger, but a label is a string and nothing capped how long.
@@ -143,11 +146,25 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		return
 	}
 	namespaces := req.Namespaces
+	if req.Root && level != LevelOAuth {
+		h.writeError(w, http.StatusBadRequest, "only a client is ROOT's client")
+		return
+	}
+	// "but i want a MCP specifically for the Node, only for ROOT"
+	if req.Root && h.levelOf(mintedBy) != LevelRoot {
+		h.writeError(w, http.StatusForbidden, "ROOT's client is ROOT's to mint")
+		return
+	}
+	if req.Root && len(namespaces) != 0 {
+		h.writeError(w, http.StatusBadRequest,
+			"ROOT's client answers at /mcp, the node's, and this named "+strconv.Itoa(len(namespaces))+" namespaces")
+		return
+	}
 	if level == LevelOAuth {
 		// A client is a door (ADR-025): ROOT writes its return address here the
 		// way it writes a door's origin in am.toml. Its connector acts in the one
 		// namespace picked here (ADR-038).
-		if len(namespaces) != 1 {
+		if len(namespaces) != 1 && !req.Root {
 			h.writeError(w, http.StatusBadRequest,
 				"a client acts in one namespace, picked at minting, and this named "+strconv.Itoa(len(namespaces)))
 			return
@@ -198,6 +215,7 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		Namespaces:          namespaces,
 		ReturnAddress:       returnAddress,
 		Instructions:        instructions,
+		Root:                req.Root,
 	})
 	if err != nil {
 		h.attest(PredicateUnanswered, mintedBy, map[string]any{
@@ -219,6 +237,9 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	if instructions != "" {
 		minted["instructions"] = instructions
 	}
+	if req.Root {
+		minted["root"] = true
+	}
 	h.attest(PredicateMinted, mintedBy, minted)
 	resp := map[string]any{
 		"id":         id,
@@ -234,6 +255,9 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 	if instructions != "" {
 		resp["instructions"] = instructions
+	}
+	if req.Root {
+		resp["root"] = true
 	}
 	resp["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
 	h.writeJSON(w, http.StatusOK, resp)

@@ -291,6 +291,7 @@ type memToken struct {
 	label        string
 	grant        Grant
 	instructions string
+	root         bool
 	createdAt    time.Time
 	expiresAt    *time.Time
 	revoked      bool
@@ -323,6 +324,7 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 			ReturnAddress:       spec.ReturnAddress,
 		},
 		instructions: spec.Instructions,
+		root:         spec.Root,
 		createdAt:    time.Now().UTC(),
 		expiresAt:    spec.ExpiresAt,
 	}
@@ -412,6 +414,7 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 			ClientDID:     tok.grant.ClientDID,
 			RequestID:     tok.grant.RequestID,
 			Instructions:  tok.instructions,
+			Root:          tok.root,
 			CreatedAt:     tok.createdAt.Format(time.RFC3339Nano),
 		}
 		if tok.expiresAt != nil {

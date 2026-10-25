@@ -306,7 +306,7 @@ func mcpAskedAs(admitted auth.Admission, path string) *httptest.ResponseRecorder
 // A connector answers at the MCP server of the namespace its client was minted
 // in, and the refusal anywhere else says where that is.
 func TestAConnectorAnswersAtItsNamespacesMCPServer(t *testing.T) {
-	connector := auth.Admitted(auth.LevelRoot, "Clean")
+	connector := auth.Admitted(auth.LevelConnector, "Clean")
 	connector.ClientDID = "did:key:zconnector"
 
 	at := mcpAskedAs(connector, "/mcp/Clean")
@@ -333,11 +333,24 @@ func TestTheNodesMCPServerIsEveryCallerButAConnector(t *testing.T) {
 // no namespace MCP server to answer at.
 func TestAConnectorNamingNoOneNamespaceIsRefused(t *testing.T) {
 	for _, named := range [][]string{nil, {"Clean", "default"}} {
-		connector := auth.Admitted(auth.LevelRoot, named...)
+		connector := auth.Admitted(auth.LevelConnector, named...)
 		connector.ClientDID = "did:key:zconnector"
 		refused := mcpAskedAs(connector, "/mcp/Clean")
 		assert.Equal(t, http.StatusForbidden, refused.Code, "%v", named)
 	}
+}
+
+// "but i want a MCP specifically for the Node, only for ROOT"
+func TestROOTsClientAnswersAtTheNodesMCPServer(t *testing.T) {
+	client := auth.Admitted(auth.LevelRoot)
+	client.ClientDID = "did:key:zroot"
+
+	at := mcpAskedAs(client, "/mcp")
+	assert.NotEqual(t, http.StatusNotFound, at.Code, at.Body.String())
+	assert.NotEqual(t, http.StatusForbidden, at.Code, at.Body.String())
+	refused := mcpAskedAs(client, "/mcp/Clean")
+	assert.Equal(t, http.StatusNotFound, refused.Code)
+	assert.Contains(t, refused.Body.String(), "the node's MCP server is /mcp")
 }
 
 // "the conenctor, to the connector, the namespace should be invisible"

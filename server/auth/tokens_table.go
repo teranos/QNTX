@@ -181,6 +181,7 @@ func (t *TokenTable) Create(spec NewToken) (string, string, error) {
 		ExpiresAt:           spec.ExpiresAt,
 		ReturnAddress:       spec.ReturnAddress,
 		Instructions:        spec.Instructions,
+		Root:                spec.Root,
 	})
 	if err != nil {
 		return "", "", err

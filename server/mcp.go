@@ -140,7 +140,9 @@ func mcpNamespaceOf(path string) (string, bool) {
 func mcpServerRefuses(r *http.Request) (int, string) {
 	named, namesOne := mcpNamespaceOf(r.URL.Path)
 	admitted, known := auth.AdmissionFrom(r.Context())
-	if known && admitted.ClientDID != "" {
+	// A connector stands at CONNECTOR. ROOT through a client is ROOT's client,
+	// and is the node's like anyone but a connector (ADR-038).
+	if known && admitted.ClientDID != "" && !admitted.IsRoot() {
 		if len(admitted.Namespaces) != 1 {
 			return http.StatusForbidden, fmt.Sprintf("a connector acts in one namespace, and this one names %d", len(admitted.Namespaces))
 		}

@@ -365,7 +365,20 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			// Through a minted client it is a connector, and reaches what the
 			// lines grant the client's label (ADR-038). A device sign-in is its
 			// own client, and a peer is a node: both stay the person.
-			if client, minted := h.clientByDID(grant.ClientDID); minted && !client.Node {
+			client, minted := h.clientByDID(grant.ClientDID)
+			// ROOT's client is ROOT, and nobody once its ROOT is not (ADR-038).
+			//
+			// "as ROOT, everything ROOT reaches"
+			if minted && client.Root {
+				if h.levelOf(grant.MintedBy) != LevelRoot {
+					h.logger.Infow("Bearer token refused",
+						"minted_by", quoteIdentity(grant.MintedBy),
+						"reason", "issued through ROOT's client, to somebody who is not ROOT")
+					return Admission{}, false
+				}
+				return h.admittedAsThePerson(*grant), true
+			}
+			if minted && !client.Node {
 				return h.admittedAsConnector(*grant), true
 			}
 			return h.admittedAsThePerson(*grant), true
