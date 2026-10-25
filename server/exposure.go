@@ -78,6 +78,15 @@ func RefuseUnsaid(cfg *appcfg.Config) error {
 	return cfg.RefuseUnsaid("the node does not run on what it was not told", keys...)
 }
 
+// refuseQuickDevAuth refuses auth on QuickDev: it compiles in no Tablet of
+// Reach, so every path is ROOT's, and with auth on nobody could log in.
+func refuseQuickDevAuth(isQuickDev bool, auth appcfg.AuthConfig) error {
+	if isQuickDev && auth.Enabled {
+		return errors.New("QuickDev runs without auth: it compiles in no Tablet of Reach, so with auth.enabled = true nobody could log in")
+	}
+	return nil
+}
+
 // refusePublicDeploy names what a deployment on this bind address has not said
 // yet. A non-nil return stops startup. Loopback answers nil to all of it.
 func refusePublicDeploy(bindAddr string, auth appcfg.AuthConfig) error {

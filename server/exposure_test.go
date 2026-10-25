@@ -21,6 +21,19 @@ func publicAuth() appcfg.AuthConfig {
 	}
 }
 
+// QuickDev compiles in no Tablet of Reach, so with auth on nobody could log in.
+func TestQuickDevRefusesAuth(t *testing.T) {
+	if err := refuseQuickDevAuth(true, appcfg.AuthConfig{Enabled: true}); err == nil {
+		t.Fatal("QuickDev started with auth.enabled = true")
+	}
+	if err := refuseQuickDevAuth(true, appcfg.AuthConfig{}); err != nil {
+		t.Fatalf("QuickDev refused auth.enabled = false: %v", err)
+	}
+	if err := refuseQuickDevAuth(false, appcfg.AuthConfig{Enabled: true}); err != nil {
+		t.Fatalf("a node that is not QuickDev refused auth.enabled = true: %v", err)
+	}
+}
+
 // The redirect_uri a provider delivers an authorization code to is built from
 // this, and unset it used to be read off a header the caller wrote.
 func TestPublicBindRefusesEmptyPublicOrigin(t *testing.T) {
