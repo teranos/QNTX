@@ -23,7 +23,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-// A follow's line is GITHUB follow:<owner/repo>@<branch>.
+// A follow's line is GITHUB follow:<repo>@<branch>><dispatches>/<workflow>,
+// so one push can dispatch more than one workflow.
 const githubFollowLine = "follow:"
 
 // TODO(forge): A follow is not GitHub's: Follow. Its record is the GITHUB subject with a follow: predicate (see node_records.go), so naming it anew is a record migration like forge_names.go.
@@ -37,9 +38,13 @@ type GitHubFollow struct {
 	Ref        string            `json:"ref"`
 	Inputs     map[string]string `json:"inputs"`
 	Enabled    bool              `json:"enabled"`
+	// kept is the line it was read under, which an older follow names otherwise.
+	kept string
 }
 
-func (f GitHubFollow) line() string { return githubFollowLine + f.Repo + "@" + f.Branch }
+func (f GitHubFollow) line() string {
+	return githubFollowLine + f.Repo + "@" + f.Branch + ">" + f.Dispatches + "/" + f.Workflow
+}
 
 // Follows are the node's follows, the newest line per repo and branch.
 func (r NodeRecords) Follows() ([]GitHubFollow, error) {
@@ -63,6 +68,7 @@ func (r NodeRecords) Follows() ([]GitHubFollow, error) {
 		if err := json.Unmarshal(raw, &f); err != nil {
 			return nil, errors.Wrapf(err, "the %s line %s did not read", githubSubject, line)
 		}
+		f.kept = line
 		follows = append(follows, f)
 	}
 	slices.SortFunc(follows, func(a, b GitHubFollow) int { return strings.Compare(a.line(), b.line()) })
