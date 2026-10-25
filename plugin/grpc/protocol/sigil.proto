@@ -237,7 +237,7 @@ message PiAm {
 }
 
 // NamespaceAgentAm is what agents am and agents set answer: the namespace's
-// agent, who opted the namespace into it, and who it is in Claude Code or in Pi.
+// agent, who opted the namespace into it, and who it is in a Coding Agent Harness.
 message NamespaceAgentAm {
   // The namespace it stands in.
   string namespace = 1;
