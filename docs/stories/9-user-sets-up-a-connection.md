@@ -2,10 +2,20 @@
 
 "THE USER SETUP'S UP CONNECTIONS"
 
-As USER i open the Connector element
+"AS A USER I EXPECT TO SEE THE CONNECTORS ELEMENT"
 
-As USER i pick the namespace, name the connection, and give the return address the app shows me
+As USER i open Connectors, and see each thing i can connect, with its own logo and colors
 
-As USER i get the server URL, the client id and the client secret right there, without opening the token element
+"AND IN THE CONNECTORS ELEMENT, IF THE SYSTEM CAN COMPUTE IT FOR ME, I EXPECT NOT TO HAVE TO TYPE AND FILL IN DETAILS"
 
-As USER i set the app up with those three
+As USER i connect in the namespace i am standing in, and pick no namespace
+
+"EACH LEADING UP TO THEIR OWN STORY."
+
+As USER i press one, and its own story starts:
+
+- ChatGPT: [11](11-user-connects-chatgpt.md)
+- Claude: [12](12-user-connects-claude.md)
+- Obsidian: [13](13-user-connects-obsidian.md)
+- OpenRouter: [14](14-user-sets-an-openrouter-key.md)
+- GitHub: [5](5-user-connects-github.md)
