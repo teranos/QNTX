@@ -101,7 +101,7 @@ func (s *QNTXServer) codexPart(named appcfg.CodexConfig, agent *rootAgent) (aTur
 			if err := comet.Under(agent.home); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " is said nothing until it runs under ground: " + err.Error()}
 			}
-			if err := comet.AgentCodexConfig(agent.home, s.ownURL+"/api/"+named.Gateway+"/v1"); err != nil {
+			if err := comet.AgentCodexConfig(agent.home, codexGateway(s.ownURL, named.Gateway)); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 			}
 			return kept, nil
@@ -135,6 +135,15 @@ func (s *QNTXServer) codexPart(named appcfg.CodexConfig, agent *rootAgent) (aTur
 			}, nil
 		},
 	}, nil
+}
+
+// codexGateway is where codex makes its model calls: a gateway named by its
+// URL is that URL, and one named as a plugin is that plugin on this node.
+func codexGateway(own, gateway string) string {
+	if strings.Contains(gateway, "://") {
+		return gateway
+	}
+	return own + "/api/" + gateway + "/v1"
 }
 
 // rowsOfCodex is one record of codex's stream as the hook events Claude Code's
