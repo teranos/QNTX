@@ -14,6 +14,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -116,6 +118,25 @@ func TestSpikeAScannerThatDidNotRunHandsNothingOn(t *testing.T) {
 	assert.True(t, answered.IsError)
 	assert.Contains(t, spoken(answered), "could not be made into fixtures")
 	assert.Contains(t, spoken(answered), "no scanner")
+}
+
+// A ground from before scrub prints nothing to stdout: that is no answer.
+func TestSpikeAGroundThatAnswersNothingIsNoScanner(t *testing.T) {
+	s, _ := fixturesServer(t)
+	s.scrubWith = nil
+	home := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(home, "bin"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(home, "bin", "ground"), []byte("#!/bin/sh\ncat >/dev/null\nexit 0\n"), 0o700))
+	s.underGround.add(home)
+	_, _, err := s.scrub(context.Background(), "a line")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "answered nothing")
+
+	require.NoError(t, os.WriteFile(filepath.Join(home, "bin", "ground"), []byte("#!/bin/sh\ncat\necho 'ground scrub: 1 mail address' >&2\n"), 0o700))
+	scrubbed, found, err := s.scrub(context.Background(), "a line")
+	require.NoError(t, err)
+	assert.Equal(t, "a line", scrubbed)
+	assert.Equal(t, "1 mail address", found)
 }
 
 func TestTimAPullRequestsBodyIsWrittenBackAsFixtures(t *testing.T) {

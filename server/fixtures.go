@@ -60,6 +60,11 @@ func (s *QNTXServer) groundScrub(ctx context.Context, text string) (string, stri
 	if err := cmd.Run(); err != nil {
 		return "", "", errors.Wrapf(err, "%s scrub did not run: %s", ground, strings.TrimSpace(said.String()))
 	}
+	// A ground from before scrub reads stdin as a hook event and prints nothing:
+	// that is no answer, not a clean one.
+	if len(text) > 0 && out.Len() == 0 {
+		return "", "", errors.Newf("%s scrub answered nothing, so it is a ground from before scrub: the agent's ground has to be built again", ground)
+	}
 	found := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(said.String()), "ground scrub:"))
 	return out.String(), found, nil
 }
