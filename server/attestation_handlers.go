@@ -390,6 +390,14 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return
 	}
+	if refused := validateNamed(req.Predicates); refused != "" {
+		writeError(w, http.StatusBadRequest, refused)
+		return
+	}
+	if refused := validateTagging(req.Subjects, req.Predicates, req.Contexts); refused != "" {
+		writeError(w, http.StatusBadRequest, refused)
+		return
+	}
 
 	// A signature is the writer's own, so the node signs nothing on its behalf
 	// and stores what was signed as it was signed: the id, the moment and the
@@ -557,6 +565,10 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		return
 	}
 
+	// "a tag is a type": the key is attested before the thing tagged with it,
+	// so nothing is ever tagged with a key that does not exist yet.
+	s.attestTagKeys(r, req.Predicates)
+
 	// Auto-generate vanity ASID when client omits ID
 	existsAt := time.Now()
 	if req.ID == "" {
@@ -714,4 +726,95 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	}
 
 	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
+}
+
+// attestTagKeys attests the keys these predicates name as types, in the
+// universe of the writer who named them.
+//
+// It asks storeFor for that universe rather than being handed a store. A role
+// write in createAttestation lands in the node's own records whatever
+// namespace its writer is in, and it is the one write there the predicate gate
+// does not run on — so a key handed that store would be a type in nobody's
+// universe, minted by somebody nothing checked. Asking is what makes that
+// unreachable: there is no store to pass in wrongly. The gate is asked here
+// too, for the same reason.
+//
+// EnsureTypesExist and not EnsureTypes: the colour is attested, so it is
+// somebody's to say, and this leaves alone whatever a key already says.
+//
+// Non-fatal. A key that was not attested is still a predicate the write may
+// carry — what is lost is the key having a definition, not the tagging.
+func (s *QNTXServer) attestTagKeys(r *http.Request, predicates []string) {
+	keys := types.TagKeys(theseMayBeWritten(r, predicates))
+	if len(keys) == 0 {
+		return
+	}
+
+	store, err := s.storeFor(r)
+	if err != nil {
+		s.logger.Warnw("A tag key was named by a writer who reaches no universe",
+			"keys", keys, "error", err)
+		return
+	}
+
+	says := ats.TypesSaid(store, keys...)
+	if err := types.EnsureTypesExist(store, says, "tagging", types.TagDefs(keys)...); err != nil {
+		s.logger.Warnw("A tag key was written without a definition",
+			"keys", keys, "error", err)
+	}
+}
+
+// theseMayBeWritten is the predicates this request's admission may write.
+//
+// A request carrying no admission is the node asking itself, which storeFor
+// answers with the namespace it serves; what it may write is what it asked to.
+func theseMayBeWritten(r *http.Request, predicates []string) []string {
+	admitted, ok := auth.AdmissionFrom(r.Context())
+	if !ok {
+		return predicates
+	}
+	var written []string
+	for _, predicate := range predicates {
+		if admitted.MayWrite(predicate) {
+			written = append(written, predicate)
+		}
+	}
+	return written
+}
+
+// validateNamed refuses a predicate that names a namespace rather than a thing.
+//
+// A word ending in the namespace marker is every predicate under it: `tag:` is
+// every key there will ever be. That is a word a WRITE line says, and an
+// attestation cannot make a claim about all of them at once — what it carries
+// is `tag:Name`, the one it means.
+//
+// Trimmed first, so a key named by a space is refused with the key named by
+// nothing: neither is a key anybody named.
+func validateNamed(predicates []string) string {
+	for _, predicate := range predicates {
+		if auth.Names([]string{strings.TrimSpace(predicate)}) {
+			return fmt.Sprintf("the predicate %q names every predicate under it rather than one of them", predicate)
+		}
+	}
+	return ""
+}
+
+// validateTagging refuses a tag that does not say one value of something.
+//
+// "v is tag:k of subject": the value is the subject and the thing tagged is the
+// context. One value per key per thing, so a tag naming two values names one
+// too many, and a tag of nothing tags nothing.
+func validateTagging(subjects, predicates, contexts []string) string {
+	keys := types.TagKeys(predicates)
+	if len(keys) == 0 {
+		return ""
+	}
+	if len(subjects) != 1 {
+		return fmt.Sprintf("%v is tag:%v: a tag holds one value, and this names %d", subjects, keys, len(subjects))
+	}
+	if len(contexts) == 0 {
+		return fmt.Sprintf("%s is tag:%v of nothing: a tag is of the thing it tags", subjects[0], keys)
+	}
+	return ""
 }
