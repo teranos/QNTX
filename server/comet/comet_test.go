@@ -9,8 +9,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -245,9 +248,22 @@ func TestAnAgentRunsUnderGroundOnceItsGroundAndSettingsStand(t *testing.T) {
 	// Under -p a hook that does not end holds the turn, so the agent's sky is spawned apart.
 	stop := settings.Hooks["Stop"][0].Hooks
 	require.Len(t, stop, 2)
-	assert.Equal(t, AgentSky(home)+` "$PWD" </dev/null >/dev/null 2>&1 &`, stop[1].Command)
+	assert.Equal(t, AgentSky(home)+` "$PWD" <&0 >/dev/null 2>&1 &`, stop[1].Command)
 	assert.Zero(t, stop[1].Timeout)
 	assert.False(t, stop[1].AsyncRewake)
+
+	// Spawned apart, sky still hears the event it was spawned on: with no session on its stdin it
+	// took whichever session's claim was listed first, another session's on k (2026-10-26).
+	heard := filepath.Join(home, "heard")
+	require.NoError(t, os.WriteFile(AgentSky(home), []byte("#!/bin/sh\ncat > "+heard+".part && mv "+heard+".part "+heard+"\n"), 0o755))
+	run := exec.Command("sh", "-c", stop[1].Command)
+	run.Dir = home
+	run.Stdin = strings.NewReader(`{"session_id":"sess-sky","hook_event_name":"Stop"}`)
+	require.NoError(t, run.Run())
+	require.Eventually(t, func() bool { _, err := os.Stat(heard); return err == nil }, 5*time.Second, 20*time.Millisecond)
+	got, err := os.ReadFile(heard)
+	require.NoError(t, err)
+	assert.Contains(t, string(got), `"session_id":"sess-sky"`)
 }
 
 // A ritual starts its own agent with claude --bg in a tree under the agent's work, which Claude Code

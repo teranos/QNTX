@@ -146,7 +146,8 @@ func AgentSettings(home string) error {
 	for _, event := range agentHooks {
 		run := []any{map[string]any{"type": "command", "command": AgentHook(home)}}
 		if skyHooks[event] {
-			run = append(run, map[string]any{"type": "command", "command": AgentSky(home) + " \"$PWD\" </dev/null >/dev/null 2>&1 &"})
+			// The event goes with it, named <&0, since sh hands a command put in the background /dev/null.
+			run = append(run, map[string]any{"type": "command", "command": AgentSky(home) + " \"$PWD\" <&0 >/dev/null 2>&1 &"})
 		}
 		hooks[event] = []any{map[string]any{"matcher": "", "hooks": run}}
 	}
