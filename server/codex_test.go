@@ -87,7 +87,7 @@ func TestWhatIsSaidToCodexIsAnsweredByCodex(t *testing.T) {
 	for _, event := range []string{"SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "Stop"} {
 		assert.Contains(t, string(config), "[[hooks."+event+"]]")
 	}
-	assert.Contains(t, string(config), `command = "`+comet.AgentGround(home)+`"`)
+	assert.Contains(t, string(config), `command = "`+comet.AgentHook(home)+`"`)
 }
 
 // "keep Codex's thread ID distinct from QNTX's current preallocated session ID"

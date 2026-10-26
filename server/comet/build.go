@@ -85,7 +85,8 @@ func (b Builder) buildIn(ctx context.Context, n Name, work string) error {
 		return err
 	}
 	of := n.Owner + "/" + n.Repo + "@" + short(rev) + " " + n.Machine + "@" + short(machineRev)
-	if err := b.ground(ctx, work, n.Platform, sand, of, kept); err != nil {
+	// A comet answers its project's hooks (ground source/comet.d handOff): it is ground_hook.
+	if err := b.ground(ctx, work, n.Platform, sand, of, map[string]string{"ground_hook": kept}); err != nil {
 		return errors.Wrapf(err, "the comet of %s did not build", n.Key())
 	}
 	return errors.Wrapf(os.WriteFile(kept+".machine", []byte(n.Machine), 0o644), "the comet of %s was kept, and the machine it carries was not written beside it", n.Key())
@@ -143,8 +144,9 @@ func (b Builder) unpack(ctx context.Context, source Source, work, dir string) (s
 }
 
 // ground builds ground's main in work with sand beside its own controls, for platform, and keeps
-// it at kept with its digest beside it. of names what the sand was built from, for its version.
-func (b Builder) ground(ctx context.Context, work, platform string, sand map[string]string, of, kept string) error {
+// each binary kept names at its path, with its digest beside it. of names what the sand was built
+// from, for its version.
+func (b Builder) ground(ctx context.Context, work, platform string, sand map[string]string, of string, kept map[string]string) error {
 	src := filepath.Join(work, "ground")
 	groundRev, err := b.unpack(ctx, Ground, work, src)
 	if err != nil {
@@ -171,28 +173,37 @@ func (b Builder) ground(ctx context.Context, work, platform string, sand map[str
 	if err != nil {
 		return err
 	}
-	if platform == native {
-		if err := b.step(ctx, src, env, b.inGround(src, "make", "build")); err != nil {
+	for name, path := range kept {
+		if platform == native {
+			if err := b.step(ctx, src, env, b.inGround(src, "make", goalOf(name))); err != nil {
+				return err
+			}
+		}
+		if _, linux := linuxTargets[platform]; linux && platform != native {
+			if err := b.buildLinux(ctx, src, env, platform, name); err != nil {
+				return err
+			}
+		}
+		if _, darwin := darwinTargets[platform]; darwin {
+			if err := b.buildDarwin(ctx, src, env, platform, name); err != nil {
+				return err
+			}
+		}
+		if err := keepBuilt(src, name, path); err != nil {
 			return err
 		}
 	}
-	if _, linux := linuxTargets[platform]; linux && platform != native {
-		if err := b.buildLinux(ctx, src, env, platform); err != nil {
-			return err
-		}
-	}
-	if _, darwin := darwinTargets[platform]; darwin {
-		if err := b.buildDarwin(ctx, src, env, platform); err != nil {
-			return err
-		}
-	}
+	return nil
+}
 
+// keepBuilt puts the binary built in src as name at kept, with its digest beside it.
+func keepBuilt(src, name, kept string) error {
 	if err := os.MkdirAll(filepath.Dir(kept), 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s", filepath.Dir(kept))
 	}
-	binary, err := os.ReadFile(filepath.Join(src, "ground"))
+	binary, err := os.ReadFile(filepath.Join(src, name))
 	if err != nil {
-		return errors.Wrapf(err, "the built ground was not found in %s", src)
+		return errors.Wrapf(err, "the built %s was not found in %s", name, src)
 	}
 	// Renamed into place, never written over: a GET reading the old one reads it whole.
 	staged := kept + ".new"
@@ -200,9 +211,26 @@ func (b Builder) ground(ctx context.Context, work, platform string, sand map[str
 		return errors.Wrapf(err, "failed to write %s", staged)
 	}
 	if err := os.Rename(staged, kept); err != nil {
-		return errors.Wrapf(err, "failed to put the built ground in place at %s", kept)
+		return errors.Wrapf(err, "failed to put the built %s in place at %s", name, kept)
 	}
 	return KeepDigest(kept)
+}
+
+// entryOf is the module a binary of ground's is built from: ground from source/main.d, each
+// other from bin/<name>.d (ground's Makefile).
+func entryOf(name string) string {
+	if name == "ground" {
+		return "source/main.d"
+	}
+	return "bin/" + name + ".d"
+}
+
+// goalOf is the make goal that builds a binary of ground's natively.
+func goalOf(name string) string {
+	if name == "ground" {
+		return "build"
+	}
+	return name
 }
 
 // inGround is args run in ground's own dev shell, the toolchain its flake.lock pins.
@@ -252,10 +280,10 @@ func Stubs(platform string) (DarwinStubs, error) {
 	return stubs, nil
 }
 
-// buildDarwin builds ground in src for a Darwin platform: wind folds the sand, LDC compiles
+// buildDarwin builds name in src for a Darwin platform: wind folds the sand, LDC compiles
 // for the target's triple, and ld64.lld links against Apple's stubs. With -betterC ground
 // links no druntime and no Phobos, so the stubs are the whole of what it links.
-func (b Builder) buildDarwin(ctx context.Context, src string, env []string, platform string) error {
+func (b Builder) buildDarwin(ctx context.Context, src string, env []string, platform, name string) error {
 	target := darwinTargets[platform]
 	stubs, err := Stubs(platform)
 	if err != nil {
@@ -265,17 +293,12 @@ func (b Builder) buildDarwin(ctx context.Context, src string, env []string, plat
 	if err := os.WriteFile(filepath.Join(src, ".builddate"), stamp, 0o644); err != nil {
 		return errors.Wrapf(err, "failed to write the build date in %s", src)
 	}
-	sources, err := Sources(src)
-	if err != nil {
-		return err
-	}
 	steps := [][]string{
 		b.inGround(src, "make", "wind"),
 		b.inGround(src, "tools/wind"),
-		b.inGround(src, append([]string{"ldc2", "-betterC", "--lowmem", "-mtriple=" + target.triple, "-O", "-release",
-			"-I=source", "-J=.", "-c", "--singleobj", "-of=ground.o"}, sources...)...),
+		b.inGround(src, compiled(target.triple, name)...),
 		{"shell", "--inputs-from", src, "nixpkgs#lld_21", "-c", "ld64.lld", "-arch", target.arch,
-			"-platform_version", "macos", "14.0", "14.0", "-syslibroot", stubs.SDK, "-o", "ground", "ground.o",
+			"-platform_version", "macos", "14.0", "14.0", "-syslibroot", stubs.SDK, "-o", name, name + ".o",
 			"-lSystem", "-lobjc", "-lsqlite3", "-lcurl", "-lpthread", "-lm", stubs.Git2},
 	}
 	for _, args := range steps {
@@ -293,18 +316,14 @@ var linuxTargets = map[string]struct{ triple, loader string }{
 	"x86_64-linux":  {"x86_64-linux-gnu", "ld-linux-x86-64.so.2"},
 }
 
-// buildLinux builds ground in src for a Linux platform the node does not run: LDC compiles for its
+// buildLinux builds name in src for a Linux platform the node does not run: LDC compiles for its
 // triple, and ld.lld links against that platform's glibc, sqlite, curl, libgit2 and libgcc, fetched
 // from the binary cache at ground's pin and built nowhere.
-func (b Builder) buildLinux(ctx context.Context, src string, env []string, platform string) error {
+func (b Builder) buildLinux(ctx context.Context, src string, env []string, platform, name string) error {
 	target := linuxTargets[platform]
 	stamp := []byte(time.Now().UTC().Format("2006-01-02T15:04:05Z") + "\n")
 	if err := os.WriteFile(filepath.Join(src, ".builddate"), stamp, 0o644); err != nil {
 		return errors.Wrapf(err, "failed to write the build date in %s", src)
-	}
-	sources, err := Sources(src)
-	if err != nil {
-		return err
 	}
 	libs := filepath.Join(src, ".comet-libs")
 	if err := os.MkdirAll(libs, 0o755); err != nil {
@@ -331,9 +350,9 @@ func (b Builder) buildLinux(ctx context.Context, src string, env []string, platf
 	libgcc := filepath.Dir(found[0])
 	glibc := filepath.Join(held["glibc.out"], "lib")
 	paths := []string{glibc, filepath.Join(held["sqlite.out"], "lib"), filepath.Join(held["curl.out"], "lib"), filepath.Join(held["libgit2.lib"], "lib")}
-	link := []string{"shell", "--inputs-from", src, "nixpkgs#lld_21", "-c", "ld.lld", "-o", "ground",
+	link := []string{"shell", "--inputs-from", src, "nixpkgs#lld_21", "-c", "ld.lld", "-o", name,
 		"-dynamic-linker", filepath.Join(glibc, target.loader),
-		filepath.Join(glibc, "crt1.o"), filepath.Join(glibc, "crti.o"), filepath.Join(libgcc, "crtbegin.o"), "ground.o",
+		filepath.Join(glibc, "crt1.o"), filepath.Join(glibc, "crti.o"), filepath.Join(libgcc, "crtbegin.o"), name + ".o",
 		"-rpath", strings.Join(paths, ":")}
 	for _, p := range append(paths, libgcc) {
 		link = append(link, "-L"+p)
@@ -343,8 +362,7 @@ func (b Builder) buildLinux(ctx context.Context, src string, env []string, platf
 	steps := [][]string{
 		b.inGround(src, "make", "wind"),
 		b.inGround(src, "tools/wind"),
-		b.inGround(src, append([]string{"ldc2", "-betterC", "--lowmem", "-mtriple=" + target.triple, "-O", "-release",
-			"-I=source", "-J=.", "-c", "--singleobj", "-of=ground.o"}, sources...)...),
+		b.inGround(src, compiled(target.triple, name)...),
 		link,
 	}
 	for _, args := range steps {
@@ -355,26 +373,9 @@ func (b Builder) buildLinux(ctx context.Context, src string, env []string, platf
 	return nil
 }
 
-// Sources are ground's sources as its production build takes them: every module under
-// source/, and none of the tests (ground dub.json).
-func Sources(src string) ([]string, error) {
-	sources := []string{}
-	err := filepath.WalkDir(filepath.Join(src, "source"), func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() || !strings.HasSuffix(path, ".d") || strings.HasSuffix(path, "_test.d") {
-			return nil
-		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		sources = append(sources, rel)
-		return nil
-	})
-	if err != nil {
-		return nil, errors.Wrapf(err, "ground's sources under %s were not listed", src)
-	}
-	return sources, nil
+// compiled is the LDC invocation that compiles name for triple into name.o: its entry point and
+// the modules it imports (-i), as ground's Makefile builds it.
+func compiled(triple, name string) []string {
+	return []string{"ldc2", "-betterC", "--lowmem", "-mtriple=" + triple, "-O", "-release",
+		"-I=source", "-J=.", "-i", "-c", "--singleobj", "-of=" + name + ".o", entryOf(name)}
 }
