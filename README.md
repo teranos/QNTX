@@ -24,4 +24,20 @@ make test
 
 The frontend is [QNTX-Web](https://github.com/teranos/QNTX-Web); the phone and desktop shell is [QNTX-App](https://github.com/teranos/QNTX-App).
 
-Works with: [https://nixos.org/](Nix) [https://obsidian.md/](Obsidian), [https://sentry.io/](Sentry), [https://aws.amazon.com/](AWS), [https://github.com/](GitHub), [https://claude.com/product/claude-code](Claude), [https://typesafe.ai/blog/introducing-system-one-models-and-jev](Jev), [https://pi.dev/](Pi), [https://openrouter.ai/](openrouter), [https://duckdb.org/](DuckDB), [https://github.com/teranos/ground](ground), [https://github.com/teranos/elements](elements) 
+Works with:
+
+- [Nix](https://nixos.org/)
+- [Obsidian](https://obsidian.md/)
+- [Sentry](https://sentry.io/)
+- [AWS](https://aws.amazon.com/)
+- [GitHub](https://github.com/)
+- [Claude](https://claude.com/product/claude-code)
+- [Codex](https://github.com/openai/codex)
+- [Agy](https://antigravity.google/)
+- [Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
+- [Pi](https://pi.dev/)
+- [OpenRouter](https://openrouter.ai/)
+- [Supabase](https://supabase.com/)
+- [DuckDB](https://duckdb.org/)
+- [ground](https://github.com/teranos/ground)
+- [elements](https://github.com/teranos/elements)
