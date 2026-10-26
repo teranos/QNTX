@@ -1,12 +1,19 @@
 Feature: USER connects Anthropic
 
-  Scenario: USER connects Claude
+  "QNTX AS A CONNECTOR IN YOUR CLAUDE CODE"
+
+  "CLAUDE CODE INSIDE OF QNTX"
+
+  "AND THE API KEY"
+
+  Scenario Outline: Anthropic leads to three stories
     Given I am in Connectors
-    And I see the server MCP URL of the namespace I am standing in
     When I press Anthropic
-    And I press Claude
-    Then I type nothing, because Claude's callback is always https://claude.ai/api/mcp/auth_callback
-    And I get the client id and the client secret, right there
-    And I am told to go to https://claude.ai/new?modal=add-custom-connector#customize/connectors/yours
-    When I set Claude up with those, and say yes at my passkey
-    Then Claude reaches the namespace I am standing in
+    And I press <part>
+    Then <story> starts
+
+    Examples:
+      | part              | story                                                     |
+      | Claude            | 20-user-connects-claude.feature                           |
+      | Claude Code       | 19-the-namespace-agent-runs-on-subscription-and-key.feature |
+      | Anthropic API key | 21-user-sets-the-anthropic-key.feature                    |
