@@ -165,7 +165,12 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		respond(w, g.host.log(), http.StatusOK, map[string][]string{"approvals": touched})
+		fixed, err := g.host.fixturesFromGitHub(r.Context(), event, body)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		respond(w, g.host.log(), http.StatusOK, map[string][]string{"approvals": touched, "fixtures": fixed})
 		return
 	}
 	var push gitHubPush
@@ -181,5 +186,10 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	filling := g.host.vaultsMovedBy(landed)
 	dispatching := g.followsMovedBy(landed)
 	rebuilding := g.host.cometsMovedBy(landed)
-	respond(w, g.host.log(), http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding})
+	fixed, err := g.host.fixturesFromGitHub(r.Context(), event, body)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	respond(w, g.host.log(), http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding, "fixtures": fixed})
 }
