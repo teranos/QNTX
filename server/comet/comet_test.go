@@ -248,7 +248,7 @@ func TestAnAgentRunsUnderGroundOnceItsGroundAndSettingsStand(t *testing.T) {
 	// Under -p a hook that does not end holds the turn, so the agent's sky is spawned apart.
 	stop := settings.Hooks["Stop"][0].Hooks
 	require.Len(t, stop, 2)
-	assert.Equal(t, AgentSky(home)+` "$PWD" <&0 >/dev/null 2>&1 &`, stop[1].Command)
+	assert.Equal(t, `exec 3<&0; `+AgentSky(home)+` "$PWD" <&3 >/dev/null 2>&1 &`, stop[1].Command)
 	assert.Zero(t, stop[1].Timeout)
 	assert.False(t, stop[1].AsyncRewake)
 
