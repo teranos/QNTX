@@ -58,6 +58,7 @@ type QNTXServer struct {
 	providersAt         map[string]string             // Where each provider a key is asked of answers; nil is providersAt (provider_keys.go)
 	agentsDir           string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL              string                        // Where this node answers on its own machine; empty until it listens
+	anthropicBaseURL    string                        // Where Anthropic's API is; empty is api.anthropic.com
 	underGround         groundHomes                   // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)
 	scrubWith           scrubber                      // A test's scanner in place of ground's (fixtures.go); nil is ground's
 	daemon              *async.WorkerPool             // Background job processor (daemon)

@@ -35,6 +35,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	s.answer("/.well-known/did.json", s.nodeDID.HandleDIDDocument)
 
+	// The node as an OIDC issuer, where Anthropic reads the key its identity tokens are signed with.
+	s.answer(oidcDiscoveryPath, s.HandleOIDCDiscovery)
+	s.answer(oidcKeysPath, s.HandleOIDCKeys)
+
 	// The A2A agent card, where an agent that has never seen the node looks.
 	s.answer(agentCardPath, s.HandleAgentCard)
 

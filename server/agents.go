@@ -422,7 +422,7 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 	with := func(params ...*protocol.Param) []*protocol.Param {
 		return append([]*protocol.Param{namespace}, params...)
 	}
-	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi}, Says: "The harness it runs in: claude for Claude Code, pi for Pi. A namespace holds an agent in each."}
+	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi, agentLineManaged}, Says: "The harness it runs in: claude for Claude Code, pi for Pi, managed for Claude Managed Agents. A namespace holds an agent in each."}
 	login := s.loginSigil()
 	login.sigil.Takes = with(login.sigil.Takes...)
 	login.sigil.Http = &protocol.Endpoint{Method: http.MethodPost, Path: at + "/login"}
@@ -445,6 +445,10 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 						&protocol.Param{Name: "allow", Says: "In Claude Code, the tools it may use without being asked, by Claude Code's own names, comma-separated."},
 						&protocol.Param{Name: "thinking", OneOf: appcfg.ThinkingLevels, Says: "In Pi, the thinking level it runs at."},
 						&protocol.Param{Name: "provider", OneOf: piProviderNames(), Says: "In Pi, the provider its model calls are made at, on the namespace's key of that name (keys set)."},
+						&protocol.Param{Name: "organization_id", Says: "In Claude Managed Agents, the Anthropic organization whose federation rule trades the node's identity token."},
+						&protocol.Param{Name: "federation_rule_id", Says: "In Claude Managed Agents, the federation rule (fdrl_) the node's identity token is traded at."},
+						&protocol.Param{Name: "service_account_id", Says: "In Claude Managed Agents, the service account (svac_) the traded token acts as."},
+						&protocol.Param{Name: "workspace_id", Says: "In Claude Managed Agents, the workspace (wrkspc_) the traded token is scoped to, when the rule covers more than one."},
 					),
 					Answer: "protocol.NamespaceAgentAm",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at},
@@ -501,6 +505,8 @@ func (s *QNTXServer) agentsSet(ctx context.Context, sent sigil.Sent) (any, *prot
 		return s.setClaudeAgent(ctx, sent, admitted, namespace, model.String())
 	case agentLinePi:
 		return s.setPiAgent(sent, admitted, namespace, model.String())
+	case agentLineManaged:
+		return s.setManagedAgent(ctx, sent, admitted, namespace, model.String())
 	}
 	return nil, notAHarness(sent)
 }
@@ -578,6 +584,12 @@ func (s *QNTXServer) agentsAm(ctx context.Context, sent sigil.Sent) (any, *proto
 			}
 			return &protocol.NamespaceAgentAm{Namespace: held.agent.namespace, SetBy: held.line.setBy, Pi: am}, nil
 		})
+	case agentLineManaged:
+		held, refused := s.namespaceManagedAgent(ctx, sent)
+		return then(held, refused, func(held aManagedAgentHeld) (any, *protocol.Refusal) {
+			am := managedAm(held.agent, held.line, held.agent.in(s.managedHarness(held.line)))
+			return &protocol.NamespaceAgentAm{Namespace: held.agent.namespace, SetBy: held.line.setBy, Managed: am}, nil
+		})
 	}
 	return nil, notAHarness(sent)
 }
@@ -615,6 +627,18 @@ func (s *QNTXServer) agentsSay(ctx context.Context, sent sigil.Sent) (any, *prot
 				return &protocol.NamespaceAgentSaid{Pi: said}, nil
 			})
 		})
+	case agentLineManaged:
+		held, refused := s.namespaceManagedAgent(ctx, sent)
+		return then(held, refused, func(held aManagedAgentHeld) (any, *protocol.Refusal) {
+			answer, refused := s.sayTo(ctx, s.managedHarness(held.line), held.agent, agentSpec{}, sent)
+			return then(answer, refused, func(answer any) (any, *protocol.Refusal) {
+				said, isManaged := answer.(*protocol.ManagedSaid)
+				if !isManaged {
+					return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the namespace agent in " + held.agent.namespace + " did not answer as Claude Managed Agents"}
+				}
+				return &protocol.NamespaceAgentSaid{Managed: said}, nil
+			})
+		})
 	}
 	return nil, notAHarness(sent)
 }
@@ -631,13 +655,18 @@ func (s *QNTXServer) agentsSession(ctx context.Context, sent sigil.Sent) (any, *
 		return then(held, refused, func(held aPiAgentHeld) (any, *protocol.Refusal) {
 			return s.readAgentSession(held.agent, held.agent.in(s.piHarness()))
 		})
+	case agentLineManaged:
+		held, refused := s.namespaceManagedAgent(ctx, sent)
+		return then(held, refused, func(held aManagedAgentHeld) (any, *protocol.Refusal) {
+			return s.readAgentSession(held.agent, held.agent.in(s.managedHarness(held.line)))
+		})
 	}
 	return nil, notAHarness(sent)
 }
 
 // notAHarness is the refusal of a Coding Agent Harness this node does not run.
 func notAHarness(sent sigil.Sent) *protocol.Refusal {
-	return &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "harness is claude or pi, and " + sent["harness"] + " is neither"}
+	return &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "harness is claude, pi or managed, and " + sent["harness"] + " is none of them"}
 }
 
 // namespacePiHarness is Pi as a namespace's agent runs in it: its session and

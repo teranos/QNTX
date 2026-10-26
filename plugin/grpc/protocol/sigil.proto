@@ -170,6 +170,29 @@ message NamespaceAgentSaid {
   ClaudeSaid claude = 1;
   // What it answered in Pi.
   PiSaid pi = 2;
+  // What it answered in Claude Managed Agents.
+  ManagedSaid managed = 3;
+}
+
+// ManagedSaid is what a namespace's agent answered in Claude Managed Agents,
+// run in Anthropic's environment on the namespace's anthropic key.
+message ManagedSaid {
+  // What it answered.
+  string answer = 1;
+  // Whether the turn ended in error, in the answer's words.
+  bool is_error = 2;
+  // Why the session went idle.
+  string stop = 3;
+  // The session it was said in, as the node writes it down.
+  string session = 4;
+  // The session it was said in, as Anthropic names it.
+  string managed_session = 5;
+  // The model that answered.
+  string model = 6;
+  // How long the turn took.
+  double took_ms = 7;
+  // Why a row of the session was not written down, when one was not.
+  string unwritten = 8;
 }
 
 // NodeAgentSaid is what agent say answers: what the Node Agent answered, in the
@@ -300,6 +323,32 @@ message NamespaceAgentAm {
   ClaudeAm agent = 3;
   // Who the agent is and how it runs, in Pi.
   PiAm pi = 4;
+  // Who the agent is and how it runs, in Claude Managed Agents.
+  ManagedAm managed = 5;
+}
+
+// ManagedAm is a namespace's agent in Claude Managed Agents: the agent,
+// environment and vault Anthropic holds for it, by Anthropic's ids.
+message ManagedAm {
+  // Its own DID, which signs what it writes down.
+  string did = 1;
+  // The model it is.
+  string model = 2;
+  // The agent Anthropic holds, and its version.
+  string agent_id = 3;
+  int64 agent_version = 4;
+  // The environment its sessions run in.
+  string environment_id = 5;
+  // The vault holding the token it reaches the node's MCP with.
+  string vault_id = 6;
+  // The session it continues, as the node writes it down.
+  string session = 7;
+  // The session it continues, as Anthropic names it.
+  string managed_session = 8;
+  // Whether it is in a turn now.
+  bool answering = 9;
+  // Why it cannot be spoken to, when it cannot.
+  string not_ready = 10;
 }
 
 // Follows says which column of a reference each of a signum's fields is. The
