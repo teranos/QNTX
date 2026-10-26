@@ -1,7 +1,6 @@
 package server
 
-// A key named after a provider is asked of that provider, and the answer is
-// the light in Connectors.
+// "can't we  just have an indicator   that shows if the key is OK?"
 
 // "kept with red light"
 
@@ -25,7 +24,7 @@ var providersAt = map[string]string{
 }
 
 // providerKeyAsked is how the provider named is asked whether a key is one it
-// issued: a read that needs nothing but the key and spends nothing.
+// issued: a free read on the key alone.
 func providerKeyAsked(ctx context.Context, name, base, key string) (*http.Request, error) {
 	switch name {
 	case "anthropic":
@@ -75,8 +74,7 @@ func (s *QNTXServer) checkProviderKey(ctx context.Context, name, base, key strin
 }
 
 // askProviders asks the provider each key of kept is named after whether it
-// accepts the key, all at once, and writes the answer on the key. A key named
-// after no provider is asked of nobody.
+// accepts the key, all at once, and writes the answer on the key.
 func (s *QNTXServer) askProviders(ctx context.Context, kept *protocol.NamespaceKeys) {
 	at := s.providersAt
 	if at == nil {

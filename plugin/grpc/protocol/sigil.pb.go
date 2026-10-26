@@ -1333,7 +1333,7 @@ type NamespaceKey struct {
 	// When it was set, RFC 3339.
 	At string `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
 	// Whether the provider it is named after was asked about it as this was
-	// answered. A key named after no provider is asked of nobody.
+	// answered.
 	Asked bool `protobuf:"varint,4,opt,name=asked,proto3" json:"asked,omitempty"`
 	// Whether that provider accepts it: the light in Connectors.
 	Accepted bool `protobuf:"varint,5,opt,name=accepted,proto3" json:"accepted,omitempty"`

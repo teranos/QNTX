@@ -643,7 +643,7 @@
   "protocol.NamespaceDefinition.record": "Where its attestations are kept.",
   "protocol.NamespaceKey": "NamespaceKey is one key a namespace holds, by its name: who set it and when.",
   "protocol.NamespaceKey.accepted": "Whether that provider accepts it: the light in Connectors.",
-  "protocol.NamespaceKey.asked": "Whether the provider it is named after was asked about it as this was answered. A key named after no provider is asked of nobody.",
+  "protocol.NamespaceKey.asked": "Whether the provider it is named after was asked about it as this was answered.",
   "protocol.NamespaceKey.at": "When it was set, RFC 3339.",
   "protocol.NamespaceKey.name": "Its name, e.g. openrouter.",
   "protocol.NamespaceKey.set_by": "Who set it.",

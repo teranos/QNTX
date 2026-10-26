@@ -253,7 +253,7 @@ message NamespaceKey {
   // When it was set, RFC 3339.
   string at = 3;
   // Whether the provider it is named after was asked about it as this was
-  // answered. A key named after no provider is asked of nobody.
+  // answered.
   bool asked = 4;
   // Whether that provider accepts it: the light in Connectors.
   bool accepted = 5;

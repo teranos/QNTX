@@ -115,9 +115,6 @@ func providerIssuing(t *testing.T, issued string) string {
 	return at.URL
 }
 
-// A key is kept whatever its provider says, and keys set and keys list say
-// whether the provider it is named after accepts it: the light in Connectors.
-//
 // "kept with red light"
 func TestAProvidersKeyIsKeptAndSaysWhetherItsProviderAcceptsIt(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
@@ -146,7 +143,7 @@ func TestAProvidersKeyIsKeptAndSaysWhetherItsProviderAcceptsIt(t *testing.T) {
 	require.Nil(t, refused)
 	for _, key := range listed.(*protocol.NamespaceKeys).GetKeys() {
 		if key.GetName() == "sentry" {
-			assert.False(t, key.GetAsked(), "a key named after no provider is asked of nobody")
+			assert.False(t, key.GetAsked())
 		}
 	}
 }

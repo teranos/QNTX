@@ -85,7 +85,7 @@ func runningNamespaceAgents(t *testing.T) (s *QNTXServer, ran string, in gardens
 	}
 	s.held.SetKnown(in)
 	s.held.SetOpener(in)
-	// A key set here is asked of a provider that issued none, never of the real one.
+	// A key set here is asked of a stand-in provider that issued none.
 	issuedNone := providerIssuing(t, "issued-none")
 	s.providersAt = map[string]string{"anthropic": issuedNone, "openai": issuedNone, "openrouter": issuedNone}
 	return s, ran, in
