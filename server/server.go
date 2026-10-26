@@ -58,6 +58,7 @@ type QNTXServer struct {
 	agentsDir           string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL              string                        // Where this node answers on its own machine; empty until it listens
 	underGround         groundHomes                   // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)
+	scrubWith           scrubber                      // A test's scanner in place of ground's (fixtures.go); nil is ground's
 	daemon              *async.WorkerPool             // Background job processor (daemon)
 	scheduleStore       *schedule.Store               // Schedule persistence (shared with ticker)
 	tickerCfg           schedule.TickerConfig         // Ticker configuration (resolved at init)

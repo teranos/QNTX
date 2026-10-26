@@ -258,7 +258,7 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				}
 				// Who reaches it is asked again on the call, so a line written
 				// since the list was drawn holds, and a listed tool is still gated.
-				return overMCP(ctx, s.gate, s.reachingOver, r, held, args, given), nil
+				return s.fixtured(ctx, admitted, overMCP(ctx, s.gate, s.reachingOver, r, held, args, given)), nil
 			})
 		}
 	}
@@ -302,7 +302,7 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				return refusal, nil
 			}
 			op := operation{Path: path, Method: strings.ToUpper(in.Method), Prefix: prefix}
-			return callThrough(ctx, s.served, r, op, in), nil
+			return s.fixtured(ctx, admitted, callThrough(ctx, s.served, r, op, in)), nil
 		})
 	}
 	return server
