@@ -55,6 +55,7 @@ type QNTXServer struct {
 	noNodeAgent         error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents     agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
 	elementAgents       agentsHeld                    // Each element's agent this node has held, by its purpose (ADR-054)
+	providersAt         map[string]string             // Where each provider a key is asked of answers; nil is providersAt (provider_keys.go)
 	agentsDir           string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL              string                        // Where this node answers on its own machine; empty until it listens
 	underGround         groundHomes                   // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)

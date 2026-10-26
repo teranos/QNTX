@@ -24,8 +24,6 @@ A sigil handles a server capability, the reach table governs it with attestation
 
 ## Stories
 
-"stories should live in QNTX-Web,"
-
 [QNTX-Web/stories](https://github.com/teranos/QNTX-Web/tree/main/stories)
 
 ## Identity

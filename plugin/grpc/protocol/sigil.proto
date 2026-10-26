@@ -252,6 +252,14 @@ message NamespaceKey {
   string set_by = 2;
   // When it was set, RFC 3339.
   string at = 3;
+  // Whether the provider it is named after was asked about it as this was
+  // answered.
+  bool asked = 4;
+  // Whether that provider accepts it: the light in Connectors.
+  bool accepted = 5;
+  // What the provider answered when it did not accept it, or why it was not
+  // reached.
+  string why = 6;
 }
 
 // PiAm is what pi am answers.
