@@ -2,12 +2,22 @@ Feature: USER goes on to the namespace agent
 
   "THE NAMESPACE AGENT, IS A STORY YOU CAN OPTIONALLY END UP IN AFTER DOING THE CONNECTOR"
 
-  Scenario: USER goes on to the namespace agent
-    Given I connected Claude, as 20-user-adds-qntx-mcp-to-claude.feature says
-    When I go on
-    Then I am at the agent of the namespace I am standing in
+  "you completed the anthropickey, you CAN end up here"
 
-  Scenario: USER stops after the connector
-    Given I connected Claude, as 20-user-adds-qntx-mcp-to-claude.feature says
+  "you dont choose, the system should know you camefrom either OpenAI, Google Agy, etc. etc..     the ystem computes what it cancompute"
+
+  Scenario Outline: USER goes on to the namespace agent of <platform>
+    Given I finished a story of <platform> in Connectors
+    When I go on
+    Then <story> starts, because the system knows I came from <platform>
+
+    Examples:
+      | platform  | story                                             |
+      | Anthropic | 22-user-signs-claude-code-in.feature              |
+      | OpenAI    | 23-user-runs-the-namespace-agent-in-codex.feature |
+      | Google    | 24-user-runs-the-namespace-agent-in-agy.feature   |
+
+  Scenario: USER stops there
+    Given I finished a story of a platform in Connectors
     When I stop there
-    Then the connector is done, and no agent is set up
+    Then no agent is set up
