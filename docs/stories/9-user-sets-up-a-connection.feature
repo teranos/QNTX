@@ -1,30 +1,28 @@
 Feature: USER sets up a connection
 
-  "THE USER SETUP'S UP CONNECTIONS"
+  "THE USER SETS UP their CONNECTIONS"
 
-  "AS A USER I EXPECT TO SEE THE CONNECTORS ELEMENT"
+  "AS A USER I EXPECT TO be able to get to THE CONNECTORS ELEMENT"
 
-  "AND IN THE CONNECTORS ELEMENT, IF THE SYSTEM CAN COMPUTE IT FOR ME, I EXPECT NOT TO HAVE TO TYPE AND FILL IN DETAILS"
+  "IN THE CONNECTORS ELEMENT, IF THE SYSTEM CAN COMPUTE information FOR ME, I EXPECT it to compute for me."
+  "If the system can compute it for the USER, the USER isn't expected to know and have perfect information"
 
-  "EACH LEADING UP TO THEIR OWN STORY."
+  "EACH CONNECTOR LEADS TO THEIR OWN STORY."
 
   Scenario: USER sees what can be connected
     Given I am standing in a namespace
     When I open Connectors
-    Then I see ChatGPT, Claude, Obsidian, OpenRouter, Anthropic, OpenAI and GitHub, each with its own logo and colors
-    And I am not asked which namespace
+    Then I see rows for each platform we can integrate with, each with its own logo and color
 
   Scenario Outline: Each connection leads to its own story
     Given I am in Connectors
-    When I press <connection>
+    When I press <platform>
     Then <story> starts
 
     Examples:
-      | connection | story                                  |
-      | ChatGPT    | 11-user-connects-chatgpt.feature       |
-      | Claude     | 12-user-connects-claude.feature        |
+      | platform | story                                  |
       | Obsidian   | 13-user-connects-obsidian.feature      |
       | OpenRouter | 14-user-sets-an-openrouter-key.feature |
-      | Anthropic  | 14-user-sets-an-openrouter-key.feature |
-      | OpenAI     | 14-user-sets-an-openrouter-key.feature |
+      | Anthropic  | 12-user-connects-anthropic.feature |
+      | OpenAI     | 11-user-connects-openai.feature |
       | GitHub     | 5-user-connects-github.feature         |
