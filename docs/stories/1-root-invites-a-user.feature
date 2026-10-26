@@ -3,6 +3,7 @@ Feature: ROOT invites a user
   Scenario: ROOT sends an invite link to a friend
     Given I am ROOT
     When I open the Users element
+    And I press the +
     And I enter my friend's e-mail address
     And I send the invite link
     Then a mail goes out to my friend

@@ -1,5 +1,7 @@
 Feature: ROOT connects an app to the node
 
+  "ROOT WANTS AN MCP OVER THE ENTIRE SERVER, SET VIA EITHER I OR AM"
+
   Scenario: ROOT mints ROOT's client on am
     Given I am ROOT, on am
     When I name ROOT's client and give the return address the app shows me

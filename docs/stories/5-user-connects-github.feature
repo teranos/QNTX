@@ -1,5 +1,7 @@
 Feature: USER connects GitHub
 
+  "same for the github element, is also a connector thing"
+
   Scenario: USER connects GitHub during namespace setup
     Given I am at the GitHub step of namespace setup
     When I press Connect
@@ -11,3 +13,8 @@ Feature: USER connects GitHub
     Given I am at the GitHub step of namespace setup
     When I skip it
     Then I am at the next step
+
+  Scenario: USER opens GitHub from Connectors
+    Given I am in Connectors
+    When I press GitHub
+    Then the GitHub element opens
