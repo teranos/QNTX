@@ -1331,7 +1331,15 @@ type NamespaceKey struct {
 	// Who set it.
 	SetBy string `protobuf:"bytes,2,opt,name=set_by,json=setBy,proto3" json:"set_by,omitempty"`
 	// When it was set, RFC 3339.
-	At            string `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
+	At string `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
+	// Whether the provider it is named after was asked about it as this was
+	// answered. A key named after no provider is asked of nobody.
+	Asked bool `protobuf:"varint,4,opt,name=asked,proto3" json:"asked,omitempty"`
+	// Whether that provider accepts it: the light in Connectors.
+	Accepted bool `protobuf:"varint,5,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	// What the provider answered when it did not accept it, or why it was not
+	// reached.
+	Why           string `protobuf:"bytes,6,opt,name=why,proto3" json:"why,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1383,6 +1391,27 @@ func (x *NamespaceKey) GetSetBy() string {
 func (x *NamespaceKey) GetAt() string {
 	if x != nil {
 		return x.At
+	}
+	return ""
+}
+
+func (x *NamespaceKey) GetAsked() bool {
+	if x != nil {
+		return x.Asked
+	}
+	return false
+}
+
+func (x *NamespaceKey) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+func (x *NamespaceKey) GetWhy() string {
+	if x != nil {
+		return x.Why
 	}
 	return ""
 }
@@ -2240,11 +2269,14 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tnot_ready\x18\t \x01(\tR\bnotReady\"Y\n" +
 	"\rNamespaceKeys\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12*\n" +
-	"\x04keys\x18\x02 \x03(\v2\x16.protocol.NamespaceKeyR\x04keys\"I\n" +
+	"\x04keys\x18\x02 \x03(\v2\x16.protocol.NamespaceKeyR\x04keys\"\x8d\x01\n" +
 	"\fNamespaceKey\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x15\n" +
 	"\x06set_by\x18\x02 \x01(\tR\x05setBy\x12\x0e\n" +
-	"\x02at\x18\x03 \x01(\tR\x02at\"\x84\x02\n" +
+	"\x02at\x18\x03 \x01(\tR\x02at\x12\x14\n" +
+	"\x05asked\x18\x04 \x01(\bR\x05asked\x12\x1a\n" +
+	"\baccepted\x18\x05 \x01(\bR\baccepted\x12\x10\n" +
+	"\x03why\x18\x06 \x01(\tR\x03why\"\x84\x02\n" +
 	"\x04PiAm\x12\x10\n" +
 	"\x03did\x18\x01 \x01(\tR\x03did\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x1a\n" +
