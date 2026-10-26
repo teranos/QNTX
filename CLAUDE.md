@@ -24,9 +24,9 @@ A sigil handles a server capability, the reach table governs it with attestation
 
 ## Stories
 
-"exclusively gherkin, gherkin owns stories"
+"stories should live in QNTX-Web,"
 
-A story is one `.feature` file in `docs/stories/`, and nothing else holds it.
+[QNTX-Web/stories](https://github.com/teranos/QNTX-Web/tree/main/stories)
 
 ## Identity
 
