@@ -26,6 +26,15 @@ func AgentDeclaration(work, url string) string {
 // AgentGround is where an agent's ground is kept: in its home, beside its Claude Code configuration.
 func AgentGround(home string) string { return filepath.Join(home, "bin", "ground") }
 
+// AgentHook is where the binary that answers the agent's hooks is kept, beside its ground.
+func AgentHook(home string) string { return filepath.Join(home, "bin", "ground_hook") }
+
+// AgentSky is where the agent's courier is kept, beside its ground.
+func AgentSky(home string) string { return filepath.Join(home, "bin", "ground_sky") }
+
+// AgentDrive is where the driver of a ritual the agent performs is kept: beside the ground that started it.
+func AgentDrive(home string) string { return filepath.Join(home, "bin", "ground_drive") }
+
 // BuildAgent builds the ground an agent runs under, for the node's own platform, and keeps it in
 // the agent's home: the agent's comet is the box's own (ADR-050, The ROOT agent).
 func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
@@ -47,7 +56,9 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 		return errors.Wrapf(err, "failed to make %s to build the agent's ground in", work)
 	}
 	sand := map[string]string{"comet.pbt": AgentDeclaration(filepath.Join(home, "work"), url)}
-	return b.ground(ctx, work, platform, sand, "agent:"+filepath.Base(home), AgentGround(home))
+	kept := map[string]string{"ground": AgentGround(home), "ground_hook": AgentHook(home),
+		"ground_sky": AgentSky(home), "ground_drive": AgentDrive(home)}
+	return b.ground(ctx, work, platform, sand, "agent:"+filepath.Base(home), kept)
 }
 
 // AgentPath is the PATH an agent's turn runs with: its own ground first, which its hooks and a
@@ -87,21 +98,23 @@ func Under(home string) error {
 	if last, building := agentBuilds.Load(home); building {
 		why = last.(string)
 	}
-	ground := AgentGround(home)
-	info, err := os.Stat(ground)
-	if err != nil {
-		return errors.Wrapf(err, "the agent does not run under ground: %s", why)
-	}
-	const ownerRuns = 0o100
-	if info.Mode().Perm()&ownerRuns != ownerRuns {
-		return errors.Newf("the agent does not run under ground: %s is not executable", ground)
+	for _, built := range []string{AgentGround(home), AgentHook(home), AgentSky(home)} {
+		info, err := os.Stat(built)
+		if err != nil {
+			return errors.Wrapf(err, "the agent does not run under ground: %s", why)
+		}
+		const ownerRuns = 0o100
+		if info.Mode().Perm()&ownerRuns != ownerRuns {
+			return errors.Newf("the agent does not run under ground: %s is not executable", built)
+		}
 	}
 	settings, err := os.ReadFile(filepath.Join(home, "claude", "settings.json"))
 	if err != nil {
 		return errors.Wrapf(err, "the agent does not run under ground: its settings are not written, and %s", why)
 	}
-	if !bytes.Contains(settings, []byte(ground)) {
-		return errors.Newf("the agent does not run under ground: its settings run no %s", ground)
+	hook := AgentHook(home)
+	if !bytes.Contains(settings, []byte(hook)) {
+		return errors.Newf("the agent does not run under ground: its settings run no %s", hook)
 	}
 	return nil
 }
@@ -116,7 +129,7 @@ var agentHooks = []string{"PreToolUse", "PostToolUse", "PreCompact", "Stop", "Se
 var skyHooks = map[string]bool{"PostToolUse": true, "Stop": true, "SessionStart": true}
 
 // AgentSettings writes the hooks of the agent's Claude Code, under CLAUDE_CONFIG_DIR, each running its
-// ground. What else the settings hold is kept.
+// ground_hook, and its courier ground_sky. What else the settings hold is kept.
 func AgentSettings(home string) error {
 	path := filepath.Join(home, "claude", "settings.json")
 	settings := map[string]any{}
@@ -129,12 +142,11 @@ func AgentSettings(home string) error {
 			return errors.Wrapf(err, "the agent's settings at %s are not JSON", path)
 		}
 	}
-	ground := AgentGround(home)
 	hooks := map[string]any{}
 	for _, event := range agentHooks {
-		run := []any{map[string]any{"type": "command", "command": ground}}
+		run := []any{map[string]any{"type": "command", "command": AgentHook(home)}}
 		if skyHooks[event] {
-			run = append(run, map[string]any{"type": "command", "command": ground + " sky \"$PWD\" </dev/null >/dev/null 2>&1 &"})
+			run = append(run, map[string]any{"type": "command", "command": AgentSky(home) + " \"$PWD\" </dev/null >/dev/null 2>&1 &"})
 		}
 		hooks[event] = []any{map[string]any{"matcher": "", "hooks": run}}
 	}
