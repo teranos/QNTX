@@ -14,6 +14,6 @@ Feature: USER connects Anthropic
 
     Examples:
       | part              | story                                                     |
-      | add QNTX MCP to Claude | 20-user-connects-claude.feature                      |
+      | add QNTX MCP to Claude | 20-user-adds-qntx-mcp-to-claude.feature              |
       | Claude Code       | 22-user-signs-claude-code-in.feature                      |
       | Anthropic API key | 21-user-sets-the-anthropic-key.feature                    |
