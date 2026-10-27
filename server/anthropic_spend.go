@@ -141,7 +141,12 @@ func (s *QNTXServer) spend(agent *rootAgent, said claudecode.Said, each func(cla
 			on.Resumes = claudecode.Holds(agent.home, said.Session)
 		}
 		s.anthropicInUse.Store(source)
-		answer, err = on.Run(s.ctx, each)
+		// An element's agent on the Console runs at Anthropic, not on the node.
+		if source == anthropicConsole && agent.element != "" {
+			answer, err = s.runManaged(agent, said, kept, each)
+		} else {
+			answer, err = on.Run(s.ctx, each)
+		}
 		if err != nil {
 			s.logger.Errorw("a ROOT agent's turn did not run", "on", source, "session", said.Session, "error", err)
 			return answer, err
