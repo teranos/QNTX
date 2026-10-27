@@ -142,7 +142,12 @@ func (s *QNTXServer) spend(agent *rootAgent, said claudecode.Said, each func(cla
 		}
 		s.anthropicInUse.Store(source)
 		answer, err = on.Run(s.ctx, each)
-		if err != nil || !exhausted(source, answer) {
+		if err != nil {
+			s.logger.Errorw("a ROOT agent's turn did not run", "on", source, "session", said.Session, "error", err)
+			return answer, err
+		}
+		s.logger.Infow("a ROOT agent's turn ran", "on", source, "is_error", answer.IsError, "said", answer.Text, "cost_usd", answer.CostUSD, "session", said.Session)
+		if !exhausted(source, answer) {
 			return answer, err
 		}
 		s.logger.Infow("what ROOT's agents spend was exhausted", "source", source, "said", answer.Text, "session", said.Session)
