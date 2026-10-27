@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
@@ -35,6 +36,8 @@ type managedOf struct {
 	Vault   string `json:"vault"`
 	Memory  string `json:"memory"`
 	Session string `json:"session"`
+	// Spent is what Session had cost by the end of the last turn, in USD: a turn's cost is what it adds.
+	Spent float64 `json:"spent"`
 }
 
 // anthropicClient is the node at Anthropic on its own identity, at the rule ROOT gave.
@@ -103,6 +106,17 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 	for stream.Next() {
 		event := stream.Current()
 		switch event.Type {
+		// What it reaches for is shown as it happens, as a Claude Code turn shows it (claude_turns.go).
+		case "agent.tool_use", "agent.mcp_tool_use":
+			name, input := event.Name, event.Input
+			if event.Type == "agent.mcp_tool_use" {
+				name = "mcp__" + event.MCPServerName + "__" + event.Name
+			}
+			if reached, err := reachedFor(event.ID, name, input); err == nil {
+				each(reached)
+			} else {
+				s.logger.Errorw("what an agent at Anthropic reached for was not shown", "element", agent.element, "tool", name, "error", err)
+			}
 		case "agent.message":
 			for _, block := range event.AsAgentMessage().Content {
 				if block.Type == "text" {
@@ -117,6 +131,11 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 			if len(text) == 0 && len(failed) > 0 {
 				answer.Text, answer.IsError = strings.Join(failed, "\n"), true
 			}
+			if spent, err := s.spentBy(ctx, client, agent, &held); err != nil {
+				s.logger.Errorw("what the turn cost at Anthropic was not read", "element", agent.element, "session", held.Session, "error", err)
+			} else {
+				answer.CostUSD = spent
+			}
 			each(claudecode.Message{Type: "result", Subtype: "success", IsError: answer.IsError, Result: answer.Text})
 			return answer, nil
 		}
@@ -125,6 +144,47 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 		return claudecode.Answer{}, errors.Wrapf(err, "the events of session %s at Anthropic stopped before it was idle", held.Session)
 	}
 	return claudecode.Answer{}, errors.Newf("the events of session %s at Anthropic ended before it was idle", held.Session)
+}
+
+// reachedFor is a tool an agent at Anthropic reached for, as a Claude Code stream says one.
+func reachedFor(id, name string, input any) (claudecode.Message, error) {
+	blocks, err := json.Marshal([]map[string]any{{"type": "tool_use", "id": id, "name": name, "input": input}})
+	if err != nil {
+		return claudecode.Message{}, errors.Wrapf(err, "the call to %s did not write", name)
+	}
+	m := claudecode.Message{Type: "assistant"}
+	m.Message = &struct {
+		Content json.RawMessage `json:"content"`
+	}{Content: blocks}
+	return m, nil
+}
+
+// spentBy is what the turn just ended cost: what its Session has cost now, less what it had before.
+func (s *QNTXServer) spentBy(ctx context.Context, client anthropic.Client, agent *rootAgent, held *managedOf) (float64, error) {
+	session, err := client.Beta.Sessions.Get(ctx, held.Session, anthropic.BetaSessionGetParams{})
+	if err != nil {
+		return 0, errors.Wrapf(err, "session %s at Anthropic did not answer", held.Session)
+	}
+	total, err := strconv.ParseFloat(session.Usage.ListCost.Amount, 64)
+	if err != nil {
+		return 0, errors.Wrapf(err, "session %s at Anthropic said it cost %q", held.Session, session.Usage.ListCost.Amount)
+	}
+	spent := total - held.Spent
+	held.Spent = total
+	return spent, keepManaged(agent, *held)
+}
+
+// keepManaged writes down what the element has at Anthropic, beside its session.
+func keepManaged(agent *rootAgent, held managedOf) error {
+	file := filepath.Join(agent.home, agent.sessionDir, managedElementFile)
+	raw, err := json.Marshal(held)
+	if err != nil {
+		return errors.Wrapf(err, "what the element %s has at Anthropic did not write", agent.element)
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
+		return errors.Wrapf(err, "could not create %s", filepath.Dir(file))
+	}
+	return errors.Wrapf(os.WriteFile(file, raw, 0o600), "what the element %s has at Anthropic was not kept in %s", agent.element, file)
 }
 
 // shaken is what ROOT said, the element it was said in, and where its screenshot was put on the node.
@@ -185,16 +245,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 	} else if !os.IsNotExist(err) {
 		return managedOf{}, errors.Wrapf(err, "what the element %s keeps of Anthropic in %s did not read", agent.element, file)
 	}
-	keep := func() error {
-		raw, err := json.Marshal(held)
-		if err != nil {
-			return errors.Wrapf(err, "what the element %s has at Anthropic did not write", agent.element)
-		}
-		if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
-			return errors.Wrapf(err, "could not create %s", filepath.Dir(file))
-		}
-		return errors.Wrapf(os.WriteFile(file, raw, 0o600), "what the element %s has at Anthropic was not kept in %s", agent.element, file)
-	}
+	keep := func() error { return keepManaged(agent, held) }
 	// Anthropic reaches the node from outside: at its public origin, not the address it serves on.
 	mcp := s.authHandler.PublicOrigin() + "/mcp"
 	if held.Agent == "" {
@@ -273,7 +324,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		if err != nil {
 			return managedOf{}, errors.Wrapf(err, "no Session was made at Anthropic for the element %s", agent.element)
 		}
-		held.Session = session.ID
+		held.Session, held.Spent = session.ID, 0
 		if err := keep(); err != nil {
 			return managedOf{}, err
 		}

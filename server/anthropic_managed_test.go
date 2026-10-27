@@ -31,6 +31,8 @@ type consoleStandIn struct {
 	answers string
 	// ended is each Session Anthropic has terminated.
 	ended map[string]bool
+	// spent is what the Session has cost, by each time it is read.
+	spent float64
 }
 
 func standInConsole(t *testing.T) (*consoleStandIn, string) {
@@ -76,7 +78,8 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 			if c.ended[id] {
 				status = "terminated"
 			}
-			_, _ = io.WriteString(w, `{"id":"`+id+`","status":"`+status+`"}`)
+			c.spent += 0.25
+			_, _ = io.WriteString(w, fmt.Sprintf(`{"id":"%s","status":"%s","usage":{"list_cost":{"amount":"%.2f","currency":"USD"}}}`, id, status, c.spent))
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/events"):
 			events, _ := sent["events"].([]any)
 			first, _ := events[0].(map[string]any)
@@ -94,6 +97,7 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 			<-c.said
 			c.mu.Lock()
 			for _, event := range [][2]string{
+				{"agent.mcp_tool_use", `{"id":"ev_0","type":"agent.mcp_tool_use","processed_at":"2026-10-27T18:00:00Z","mcp_server_name":"qntx","name":"am_version","input":{}}`},
 				{"agent.message", `{"id":"ev_1","type":"agent.message","processed_at":"2026-10-27T18:00:00Z","content":[{"type":"text","text":"` + c.answers + `"}]}`},
 				{"session.status_idle", `{"id":"ev_2","type":"session.status_idle","processed_at":"2026-10-27T18:00:01Z","stop_reason":{"type":"end_turn"},"stop_details":{}}`},
 			} {
@@ -131,8 +135,12 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	assert.Equal(t, "the element answered at Anthropic", answer.Text)
 	assert.False(t, answer.IsError)
 	assert.Equal(t, "sesn_1", answer.Session)
-	require.Len(t, seen, 1)
-	assert.Equal(t, "the element answered at Anthropic", seen[0].Result)
+	assert.InDelta(t, 0.25, answer.CostUSD, 0.001, "what the Session cost, read when the turn ended")
+	// What it reached for is shown as it happens, then the answer.
+	require.Len(t, seen, 2)
+	assert.Equal(t, "assistant", seen[0].Type)
+	assert.Equal(t, "mcp__qntx__am_version", seen[0].Blocks()[0].Name)
+	assert.Equal(t, "the element answered at Anthropic", seen[1].Result)
 
 	console.mu.Lock()
 	agentMade := console.bodies["agent"][0]
