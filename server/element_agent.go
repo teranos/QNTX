@@ -33,6 +33,30 @@ var elementLinks = map[string][]string{
 	"a2a-card":   {"am-element"},
 }
 
+// "should the User story itself, be it's own Agent ? or should the Element Agent be made aware of the user stories?"
+// "i guess both, because having one agent be always in tune with one story, it would make it so you never have to make it shift frame, the contract is always clear."
+
+// storyPrefix is what a user story's agent is named by: story-, then its file's name in QNTX-Web's stories/, without .feature.
+const storyPrefix = "story-"
+
+// storyOf is the story file an agent is, or "" when it is an element's.
+func storyOf(element string) string {
+	if !strings.HasPrefix(element, storyPrefix) {
+		return ""
+	}
+	return "stories/" + strings.TrimPrefix(element, storyPrefix) + ".feature"
+}
+
+// storiesAware is what an agent is told of the user stories: a story's agent, that its one story is its contract;
+// an element's agent, that the stories naming it are.
+func storiesAware(element string) string {
+	if story := storyOf(element); story != "" {
+		return "You are the user story " + story + " of github.com/teranos/QNTX-Web, and nothing else: that file is your contract, every time you are spoken to. " +
+			"What it says ROOT or a user does and sees is what has to hold. The elements it names are agents you can reach."
+	}
+	return "The user stories in stories/ of github.com/teranos/QNTX-Web that name you are your contract: what they say a person does and sees with you is what has to hold."
+}
+
 // elementsAware is what an element's agent is told of the others: each is an agent of its own,
 // reached through the elements say tool, and the ones it is linked to directly.
 func elementsAware(element string) string {
@@ -41,7 +65,7 @@ func elementsAware(element string) string {
 	if linked := elementLinks[element]; len(linked) > 0 {
 		told += " You work directly with " + strings.Join(linked, " and ") + "."
 	}
-	return told
+	return told + " " + storiesAware(element)
 }
 
 // elementAgentPath is where an element's agent answers.

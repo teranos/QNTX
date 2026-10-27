@@ -62,6 +62,10 @@ func (s *QNTXServer) anthropicClient(kept anthropicKept) (anthropic.Client, erro
 
 // managedIsSaidToBe is what an element's agent at Anthropic is told it is.
 func managedIsSaidToBe(a *rootAgent) string {
+	if story := storyOf(a.element); story != "" {
+		return "You run at Anthropic, in a container of your own, not on the machine the node runs on. Your DID is " + a.did + ". " +
+			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " + elementsAware(a.element)
+	}
 	return "You are the element " + a.element + " of a QNTX node's page, as ROOT speaks to it: one element, one conversation, continued every time ROOT shakes the phone with you on screen. " +
 		"ROOT says what they see; what you do about it is the prompt. " +
 		"You run at Anthropic, in a container of your own, not on the machine the node runs on. " +

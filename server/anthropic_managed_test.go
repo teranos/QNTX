@@ -227,3 +227,12 @@ func TestAnElementsAgentKnowsTheOthersAndWhichItWorksWithDirectly(t *testing.T) 
 	assert.Contains(t, managedIsSaidToBe(&rootAgent{element: "a2a-card", did: "did:key:a2a"}), "You work directly with am-element.")
 	assert.NotContains(t, managedIsSaidToBe(&rootAgent{element: "ax-1", did: "did:key:ax"}), "You work directly with")
 }
+
+// "having one agent be always in tune with one story, it would make it so you never have to make it shift frame, the contract is always clear."
+func TestAStorysAgentHasItsOneStoryAsItsContract(t *testing.T) {
+	story := managedIsSaidToBe(&rootAgent{element: "story-27-root-registers-the-node-with-anthropic", did: "did:key:story"})
+	assert.Contains(t, story, "You are the user story stories/27-root-registers-the-node-with-anthropic.feature of github.com/teranos/QNTX-Web, and nothing else")
+	assert.NotContains(t, story, "You are the element")
+	element := managedIsSaidToBe(&rootAgent{element: "approvals-element", did: "did:key:approvals"})
+	assert.Contains(t, element, "The user stories in stories/ of github.com/teranos/QNTX-Web that name you are your contract")
+}
