@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
@@ -20,6 +21,28 @@ import (
 // "ROOT SHAKE ANOTHER"
 
 // "AGENT PER ELEMENT, EACH ELEMENT IS ITS OWN CONVERSATION"
+
+// "i really want"
+// "Agent Awareness about each other"
+// "Am Agent should have a direct link to A2A Agent and reverse"
+// "so the constellation becomes more of a thing"
+
+// elementLinks is each element's agent and the ones it works with directly, both ways.
+var elementLinks = map[string][]string{
+	"am-element": {"a2a-card"},
+	"a2a-card":   {"am-element"},
+}
+
+// elementsAware is what an element's agent is told of the others: each is an agent of its own,
+// reached through the elements say tool, and the ones it is linked to directly.
+func elementsAware(element string) string {
+	told := "Every element on the page is an agent of its own, as you are. You reach one with the say tool of the elements signum on the " + nodeAgentMCP +
+		" MCP server, naming its element id and the claude harness. Never say anything to an element that is waiting on your answer: it cannot answer you until you answer it."
+	if linked := elementLinks[element]; len(linked) > 0 {
+		told += " You work directly with " + strings.Join(linked, " and ") + "."
+	}
+	return told
+}
 
 // elementAgentPath is where an element's agent answers.
 const elementAgentPath = "/api/elements/{element}"

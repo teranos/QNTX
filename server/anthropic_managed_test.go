@@ -218,3 +218,12 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	assert.NotEqual(t, "sesn_1", moved.Session)
 
 }
+
+// "Am Agent should have a direct link to A2A Agent and reverse"
+func TestAnElementsAgentKnowsTheOthersAndWhichItWorksWithDirectly(t *testing.T) {
+	am := managedIsSaidToBe(&rootAgent{element: "am-element", did: "did:key:am"})
+	assert.Contains(t, am, "Every element on the page is an agent of its own")
+	assert.Contains(t, am, "You work directly with a2a-card.")
+	assert.Contains(t, managedIsSaidToBe(&rootAgent{element: "a2a-card", did: "did:key:a2a"}), "You work directly with am-element.")
+	assert.NotContains(t, managedIsSaidToBe(&rootAgent{element: "ax-1", did: "did:key:ax"}), "You work directly with")
+}

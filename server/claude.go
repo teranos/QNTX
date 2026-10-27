@@ -181,7 +181,8 @@ func (a *rootAgent) isSaidToBe() string {
 			"Your DID is " + a.did + ". " +
 			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
 			"Your git is your own: commits are authored as you, and when you push to GitHub your git asks the node for what carries the push. " +
-			"Never ask for, read, print or store a GitHub credential yourself."
+			"Never ask for, read, print or store a GitHub credential yourself. " +
+			elementsAware(a.element)
 	}
 	if a.namespace != auth.NamespaceSystem {
 		return "You are the agent of the namespace " + a.namespace + " on a QNTX node, shared by everyone who has reach on that namespace. " +
