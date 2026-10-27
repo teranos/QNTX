@@ -107,7 +107,8 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, kept ant
 		case "session.error":
 			failed = append(failed, event.RawJSON())
 		case "session.status_idle", "session.status_terminated":
-			answer := claudecode.Answer{Text: strings.Join(text, "\n"), Session: held.Session, Model: said.Model}
+			// One message comes as blocks cut wherever a citation sits: they are read back to back.
+			answer := claudecode.Answer{Text: strings.Join(text, ""), Session: held.Session, Model: said.Model}
 			if len(text) == 0 && len(failed) > 0 {
 				answer.Text, answer.IsError = strings.Join(failed, "\n"), true
 			}
