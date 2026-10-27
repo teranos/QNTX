@@ -206,4 +206,4 @@ to Pi by itself: what Claude Code answers then has not been seen.
   namespace and model, its own home, session and token, signed in through claude login (ADR-051), a sandbox around the turn, and one test of the whole
   claim: it fails to reach the node's environment, its config, another
   namespace, the box's AWS role and its own credential file, and its model
-  call succeeds on its own sign-in. Its story is docs/stories.
+  call succeeds on its own sign-in. [15-user-goes-on-to-the-namespace-agent.feature](https://github.com/teranos/QNTX-Web/blob/main/stories/15-user-goes-on-to-the-namespace-agent.feature)

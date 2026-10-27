@@ -38,6 +38,7 @@ const (
 // who sent. What it was wired with is kept, so the window says what sends.
 func (s *QNTXServer) mailWiring() services.MailWiring {
 	s.mailConfig = s.deps.cfg.Mail
+	s.nodeName = s.deps.cfg.Auth.RPID
 	w := services.MailWiring{
 		From:       services.MailFrom(s.mailConfig.From),
 		Transport:  services.HavingNot[services.MailTransport](errors.New("no mail transport is enabled: set mail.ses.enabled = true in am.toml")),

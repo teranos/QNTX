@@ -77,6 +77,12 @@ type NewToken struct {
 	Namespaces []string
 	// ReturnAddress is a client's, and only a client's.
 	ReturnAddress string
+	// Instructions is a client's, and only a client's: what its connector's
+	// MCP server tells the agent on initialize (ADR-038).
+	Instructions string
+	// Root is a client's, and only a client's: ROOT's client for the node's
+	// MCP server (ADR-038).
+	Root bool
 }
 
 // IssuedToken is a token the flow minted (token_strategy.go), written down.
@@ -103,6 +109,10 @@ type IssuedToken struct {
 	// revocation arrive naming it rather than a hash, so the record carries
 	// it or the two cannot be joined after a restart.
 	RequestID string
+	// Instructions is a client's (ADR-038). Empty on a token the flow issued.
+	Instructions string
+	// Root is a client's (ADR-038). False on a token the flow issued.
+	Root bool
 }
 
 // TokenRecord is a token whole, hash included — what the operational db holds
@@ -124,12 +134,18 @@ type TokenRecord struct {
 	ReturnAddress       string   `json:"return_address"`
 	ClientDID           string   `json:"client_did"`
 	RequestID           string   `json:"request_id"`
-	ScopeRead           []string `json:"scope_read"`
-	ScopeWrite          []string `json:"scope_write"`
-	CreatedAt           int64    `json:"created_at"`
-	ExpiresAt           *int64   `json:"expires_at,omitempty"`
-	LastUsedAt          *int64   `json:"last_used_at,omitempty"`
-	RevokedAt           *int64   `json:"revoked_at,omitempty"`
+	// Instructions is what a client's connector is told on initialize
+	// (ADR-038). Empty on every kind but OAUTH.
+	Instructions string `json:"instructions,omitempty"`
+	// Root is ROOT's client for the node's MCP server (ADR-038). False on
+	// every kind but OAUTH.
+	Root       bool     `json:"root,omitempty"`
+	ScopeRead  []string `json:"scope_read"`
+	ScopeWrite []string `json:"scope_write"`
+	CreatedAt  int64    `json:"created_at"`
+	ExpiresAt  *int64   `json:"expires_at,omitempty"`
+	LastUsedAt *int64   `json:"last_used_at,omitempty"`
+	RevokedAt  *int64   `json:"revoked_at,omitempty"`
 	// GitHub is what a GITHUB token holds and no other kind does: the
 	// credential itself, which the node spends at GitHub (ADR-043).
 	GitHub *GitHubSecret `json:"github,omitempty"`
@@ -181,6 +197,8 @@ func (t TokenRecord) Info() TokenInfo {
 		ReturnAddress:       t.ReturnAddress,
 		ClientDID:           t.ClientDID,
 		RequestID:           t.RequestID,
+		Instructions:        t.Instructions,
+		Root:                t.Root,
 		CreatedAt:           whenMS(&t.CreatedAt),
 		ExpiresAt:           whenMSOrNil(t.ExpiresAt),
 		LastUsedAt:          whenMSOrNil(t.LastUsedAt),
@@ -220,6 +238,8 @@ type TokenInfo struct {
 	ReturnAddress       string   `json:"return_address,omitempty"`
 	ClientDID           string   `json:"client_did,omitempty"`
 	RequestID           string   `json:"request_id,omitempty"`
+	Instructions        string   `json:"instructions,omitempty"`
+	Root                bool     `json:"root,omitempty"`
 	CreatedAt           string   `json:"created_at"`
 	ExpiresAt           *string  `json:"expires_at,omitempty"`
 	LastUsedAt          *string  `json:"last_used_at,omitempty"`

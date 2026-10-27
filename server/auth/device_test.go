@@ -44,7 +44,7 @@ func pollForToken(t *testing.T, h *Handler, deviceCode string) (int, map[string]
 // token is that person: ROOT here, since the passkey is a root identity's.
 func TestAnAgentIsSignedInByThePersonsPasskey(t *testing.T) {
 	h, store, _ := authorizingHandler(t)
-	asked := askForSignIn(t, h, "Claude Code on l")
+	asked := askForSignIn(t, h, "Coding Agent on l")
 	deviceCode, _ := asked["device_code"].(string)
 	userCode, _ := asked["user_code"].(string)
 	require.NotEmpty(t, deviceCode)
@@ -68,7 +68,7 @@ func TestAnAgentIsSignedInByThePersonsPasskey(t *testing.T) {
 	face.AddCookie(&http.Cookie{Name: homewardCookieName, Value: ticket.Value})
 	named := httptest.NewRecorder()
 	h.handleJourney(named, face)
-	assert.JSONEq(t, `{"kind":"client","label":"Claude Code on l `+userCode+`"}`, named.Body.String())
+	assert.JSONEq(t, `{"kind":"client","label":"Coding Agent on l `+userCode+`"}`, named.Body.String())
 
 	finish := httptest.NewRequest(http.MethodPost, "/auth/login/finish", nil)
 	finish.AddCookie(&http.Cookie{Name: homewardCookieName, Value: ticket.Value})

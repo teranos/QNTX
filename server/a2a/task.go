@@ -25,12 +25,13 @@ const (
 	Working   = "TASK_STATE_WORKING"
 	Completed = "TASK_STATE_COMPLETED"
 	Failed    = "TASK_STATE_FAILED"
+	Canceled  = "TASK_STATE_CANCELED"
 )
 
 // Terminal is whether a Task in state has ended, and takes no further message
 // (§3.1.1).
 func Terminal(state string) bool {
-	return state == Completed || state == Failed || state == "TASK_STATE_CANCELED" || state == "TASK_STATE_REJECTED"
+	return state == Completed || state == Failed || state == Canceled || state == "TASK_STATE_REJECTED"
 }
 
 // Text is the media type of what a text part carries.
@@ -158,6 +159,11 @@ func limitOf(length *int32) HistoryLimit {
 // Response is the task as lf.a2a.v1.Task, with as much of its history as limit
 // gives.
 func (t Task) Response(limit HistoryLimit) (protoreflect.Message, error) {
+	return t.response(limit, true)
+}
+
+// response is Response, with its artifacts when artifacts.
+func (t Task) response(limit HistoryLimit, artifacts bool) (protoreflect.Message, error) {
 	descriptor, err := message("lf.a2a.v1.Task")
 	if err != nil {
 		return nil, err
@@ -175,7 +181,7 @@ func (t Task) Response(limit HistoryLimit) (protoreflect.Message, error) {
 		}
 	}
 	task := map[string]any{"id": t.ID, "contextId": t.ContextID, "status": status, "history": history}
-	if t.State == Completed {
+	if t.State == Completed && artifacts {
 		// "Results SHOULD BE returned using Artifacts associated with a Task" (§3.7).
 		task["artifacts"] = []map[string]any{{
 			"artifactId": "answer", "name": "answer",
@@ -216,16 +222,128 @@ func (t Task) Sending(limit HistoryLimit) (proto.Message, error) {
 // of its history.
 func Asked(request proto.Message) (id string, limit HistoryLimit, err error) {
 	held := request.ProtoReflect()
-	named, found := fieldNamed(held.Descriptor(), "id")
-	if !found || named.Kind() != protoreflect.StringKind {
-		return "", HistoryLimit{}, errors.Newf("%s has no id", held.Descriptor().FullName())
+	if id, err = Named(request); err != nil {
+		return "", HistoryLimit{}, err
 	}
 	length, found := fieldNamed(held.Descriptor(), "history_length")
 	if !found || length.Kind() != protoreflect.Int32Kind {
 		return "", HistoryLimit{}, errors.Newf("%s has no history_length", held.Descriptor().FullName())
 	}
 	limit = HistoryLimit{Limited: held.Has(length), Length: int32(held.Get(length).Int())}
-	return held.Get(named).String(), limit, nil
+	return id, limit, nil
+}
+
+// Named is the id of the task a request names: a GetTaskRequest's, or a
+// CancelTaskRequest's.
+func Named(request proto.Message) (string, error) {
+	held := request.ProtoReflect()
+	named, found := fieldNamed(held.Descriptor(), "id")
+	if !found || named.Kind() != protoreflect.StringKind {
+		return "", errors.Newf("%s has no id", held.Descriptor().FullName())
+	}
+	return held.Get(named).String(), nil
+}
+
+// Listing is a ListTasksRequest as the node reads it (§3.1.4).
+type Listing struct {
+	// ContextID and State are what the tasks are filtered by, each when set.
+	ContextID, State string
+	// After is the status timestamp the tasks were updated at or after, when
+	// Since.
+	After time.Time
+	Since bool
+	// Size is how many tasks a page holds, and Token the page it continues
+	// from, empty for the first.
+	Size  int32
+	Token string
+	// History is how much of each task's history, and Artifacts whether each
+	// task's artifacts are given.
+	History   HistoryLimit
+	Artifacts bool
+}
+
+// listedSize is how many tasks a page holds when the request names none: "If
+// unspecified, at most 50 tasks will be returned. The minimum value is 1. The
+// maximum value is 100." (a2a.proto ListTasksRequest)
+const (
+	listedSize    = 50
+	listedSizeMax = 100
+)
+
+// ReadListing is the ListTasksRequest request is, or why it is not one the
+// node takes.
+func ReadListing(request proto.Message) (Listing, *Error) {
+	raw, err := protojson.Marshal(request)
+	if err != nil {
+		return Listing{}, invalid("the ListTasksRequest did not marshal to be read: " + err.Error())
+	}
+	var read struct {
+		ContextID string     `json:"contextId"`
+		Status    string     `json:"status"`
+		PageSize  *int32     `json:"pageSize"`
+		PageToken string     `json:"pageToken"`
+		History   *int32     `json:"historyLength"`
+		After     *time.Time `json:"statusTimestampAfter"`
+		Artifacts bool       `json:"includeArtifacts"`
+	}
+	if err := json.Unmarshal(raw, &read); err != nil {
+		return Listing{}, invalid("the ListTasksRequest did not read: " + err.Error())
+	}
+	listing := Listing{ContextID: read.ContextID, State: read.Status, Size: listedSize, Token: read.PageToken,
+		History: limitOf(read.History), Artifacts: read.Artifacts}
+	if read.PageSize != nil {
+		if *read.PageSize < 1 || *read.PageSize > listedSizeMax {
+			return Listing{}, invalid("pageSize must be between 1 and 100 inclusive, got " + strconv.Itoa(int(*read.PageSize)))
+		}
+		listing.Size = *read.PageSize
+	}
+	if read.History != nil && *read.History < 0 {
+		return Listing{}, invalid("historyLength must be a non-negative integer, got " + strconv.Itoa(int(*read.History)))
+	}
+	if read.After != nil {
+		listing.After, listing.Since = *read.After, true
+	}
+	return listing, nil
+}
+
+// Listed is a page of tasks as ListTasksResponse carries it: next is the token
+// of the page after it, empty on the last, and total how many tasks the
+// listing holds before it is paged.
+func (l Listing) Listed(tasks []Task, next string, total int) (proto.Message, error) {
+	descriptor, err := message("lf.a2a.v1.ListTasksResponse")
+	if err != nil {
+		return nil, err
+	}
+	response := dynamicpb.NewMessage(descriptor)
+	field, found := fieldNamed(descriptor, "tasks")
+	if !found {
+		return nil, errors.New("lf.a2a.v1.ListTasksResponse has no tasks")
+	}
+	listed := response.Mutable(field).List()
+	for _, task := range tasks {
+		built, err := task.response(l.History, l.Artifacts)
+		if err != nil {
+			return nil, err
+		}
+		listed.Append(protoreflect.ValueOfMessage(built))
+	}
+	for name, value := range map[protoreflect.Name]protoreflect.Value{
+		"next_page_token": protoreflect.ValueOfString(next),
+		"page_size":       protoreflect.ValueOfInt32(l.Size),
+		"total_size":      protoreflect.ValueOfInt32(int32(total)),
+	} {
+		field, found := fieldNamed(descriptor, name)
+		if !found {
+			return nil, errors.Newf("lf.a2a.v1.ListTasksResponse has no %s", name)
+		}
+		response.Set(field, value)
+	}
+	return response, nil
+}
+
+// TaskNotCancelable is a task in a state it is not canceled from (§3.1.5).
+func TaskNotCancelable(id, state string) *Error {
+	return &Error{Name: "TaskNotCancelableError", Message: "task " + id + " is " + state + ", and is not canceled from it"}
 }
 
 // TaskNotFound is a task id that does not correspond to a task the caller may

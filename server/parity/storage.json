@@ -46,8 +46,7 @@
     "rebuilt": true,
     "sites": [
       "ats/storage/query_builder.go",
-      "internal/testing/database.go",
-      "server/db_stats_cache.go"
+      "internal/testing/database.go"
     ]
   },
   {
@@ -58,8 +57,7 @@
     "rebuilt": true,
     "sites": [
       "ats/storage/query_builder.go",
-      "internal/testing/database.go",
-      "server/db_stats_cache.go"
+      "internal/testing/database.go"
     ]
   },
   {
@@ -82,8 +80,7 @@
     "rebuilt": true,
     "sites": [
       "ats/storage/query_builder.go",
-      "internal/testing/database.go",
-      "server/db_stats_cache.go"
+      "internal/testing/database.go"
     ]
   },
   {

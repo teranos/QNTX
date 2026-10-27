@@ -5,7 +5,6 @@
 package reach
 
 import (
-	_ "embed"
 	"maps"
 	"slices"
 	"strings"
@@ -15,12 +14,6 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 )
-
-// The Tablet of Reach is the deployment's, compiled in: QNTX's own is for its
-// tests and development, and a deployment builds with its own at this path.
-//
-//go:embed tablet-of-reach
-var tablet string
 
 // reachSubject is what every line here is about. A line about anything else is
 // in the wrong file.

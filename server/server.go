@@ -50,12 +50,16 @@ type QNTXServer struct {
 	nodeDID             *nodedid.Handler              // node's decentralized identity
 	harnessBinaries     harnessesHeld                 // Each harness the Node Agent runs in, as this node holds its binary, by the harness's name (ADR-048)
 	nodeAgent           *rootAgent                    // The Node Agent this node runs; nil when am.toml names none (ADR-048)
+	taskEnds            sync.Mutex                    // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
+	taskStops           sync.Map                      // Each Task of the Node Agent this process runs, by id, to the context.CancelFunc that keeps its turn from starting
 	noNodeAgent         error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents     agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
 	elementAgents       agentsHeld                    // Each element's agent this node has held, by its purpose (ADR-054)
+	providersAt         map[string]string             // Where each provider a key is asked of answers; nil is providersAt (provider_keys.go)
 	agentsDir           string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL              string                        // Where this node answers on its own machine; empty until it listens
 	underGround         groundHomes                   // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)
+	scrubWith           scrubber                      // A test's scanner in place of ground's (fixtures.go); nil is ground's
 	daemon              *async.WorkerPool             // Background job processor (daemon)
 	scheduleStore       *schedule.Store               // Schedule persistence (shared with ticker)
 	tickerCfg           schedule.TickerConfig         // Ticker configuration (resolved at init)
@@ -83,6 +87,8 @@ type QNTXServer struct {
 	// What the mail service was wired with (ADR-041), read back by the mail
 	// signum so ROOT sees what sends and not what am.toml says since.
 	mailConfig config.MailConfig
+	// auth.rp_id, the node's name: what a mail about this node names as the node.
+	nodeName string
 	// Sentry as am.toml names it, read back for the weekly report (ADR-042).
 	// The token is resolved when a report is written, so one created after the
 	// node started is read by the next report.
@@ -198,6 +204,8 @@ type QNTXServer struct {
 	// How ci.watch asks GitHub and with what: this node's own token, or its primary's way (sub_auth.go).
 	ciGitHubGet   func(ctx context.Context, token, url string) ([]byte, error)
 	ciGitHubToken func(ctx context.Context) (string, error)
+	// Where GitHub points an artifact's archive, asked the same way.
+	ciGitHubLocate func(ctx context.Context, token, url string) (string, error)
 	// How a comet's build asks GitHub on a peer: through its primary (sub_auth.go, comet.go).
 	primaryGitHub      primaryGitHub
 	watcherDB          *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)

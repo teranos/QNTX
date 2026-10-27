@@ -51,6 +51,10 @@ every device through Sync.
 
 ## The Obsidian element
 
+"you need to do some separate shit first before you can use your synced obsidian vault"
+
+- `vault list` says per vault, as `setup`, that its copy is not on the box at its path, and nothing when it is. Setting it up there is by hand until #1091.
+
 "you would think there would be a Obsidian Element to make it a bit easier"
 
 "and i guess i want to do the docs tracking in that Element as well"
@@ -93,5 +97,5 @@ folder itself carries nothing.
 ## Per namespace
 
 "and as a USER, have the possibility to also set Obsidian per namespace"
-- One vault today, synced by a systemd unit on the box as root. Every vault  sigil is `of ROOT` (server/reach/tablet-of-reach), and a VAULT line is a node  record (server/vault.go). 
+- One vault today, synced by a systemd unit on the box as root. Every vault  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node  record (server/vault.go). 
 - A vault per namespace is that line in the  namespace, its reach lines there, and one sync process per vault.

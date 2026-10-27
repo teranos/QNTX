@@ -9,8 +9,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -147,15 +150,13 @@ func TestADarwinCometLinksTheStubsTheNodeHolds(t *testing.T) {
 	assert.ErrorContains(t, err, "x86_64-darwin")
 }
 
-func TestGroundsSourcesAreItsModulesAndNoneOfItsTests(t *testing.T) {
-	src := t.TempDir()
-	for _, f := range []string{"source/main.d", "source/ritual/run.d", "source/comet_test.d", "source/README.md", "tools/wind.d"} {
-		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(src, f)), 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(src, f), []byte("module x;"), 0o644))
-	}
-	sources, err := Sources(src)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"source/main.d", "source/ritual/run.d"}, sources)
+// A binary of ground's is built from its entry point and what it imports (ldc2 -i): ground from
+// source/main.d, each other from bin/<name>.d, by the make goal that builds it.
+func TestEachOfGroundsBinariesIsBuiltFromItsEntryPoint(t *testing.T) {
+	assert.Equal(t, "source/main.d", entryOf("ground"))
+	assert.Equal(t, "bin/ground_hook.d", entryOf("ground_hook"))
+	assert.Equal(t, "build", goalOf("ground"))
+	assert.Equal(t, "ground_hook", goalOf("ground_hook"))
 }
 
 // "A person configures controls; the model is on the enforced side of them"
@@ -214,6 +215,12 @@ func TestAnAgentRunsUnderGroundOnceItsGroundAndSettingsStand(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(AgentGround(home)), 0o755))
 	require.NoError(t, os.WriteFile(AgentGround(home), []byte("a ground"), 0o755))
+	// "ground_hook as the hooks binary"
+	// The hooks are answered by ground_hook, sky and rituals by ground: an agent needs both.
+	assert.ErrorContains(t, Under(home), "its ground is not built")
+	require.NoError(t, os.WriteFile(AgentHook(home), []byte("a ground_hook"), 0o755))
+	assert.ErrorContains(t, Under(home), "its ground is not built")
+	require.NoError(t, os.WriteFile(AgentSky(home), []byte("a ground_sky"), 0o755))
 	assert.ErrorContains(t, Under(home), "its settings are not written")
 
 	// Settings held already keep what they hold; the hooks are ground's.
@@ -237,13 +244,26 @@ func TestAnAgentRunsUnderGroundOnceItsGroundAndSettingsStand(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(written, &settings))
 	assert.Equal(t, "opus", settings.Model)
-	assert.Equal(t, AgentGround(home), settings.Hooks["PreToolUse"][0].Hooks[0].Command)
+	assert.Equal(t, AgentHook(home), settings.Hooks["PreToolUse"][0].Hooks[0].Command)
 	// Under -p a hook that does not end holds the turn, so the agent's sky is spawned apart.
 	stop := settings.Hooks["Stop"][0].Hooks
 	require.Len(t, stop, 2)
-	assert.Equal(t, AgentGround(home)+` sky "$PWD" </dev/null >/dev/null 2>&1 &`, stop[1].Command)
+	assert.Equal(t, `exec 3<&0; `+AgentSky(home)+` "$PWD" <&3 >/dev/null 2>&1 &`, stop[1].Command)
 	assert.Zero(t, stop[1].Timeout)
 	assert.False(t, stop[1].AsyncRewake)
+
+	// Spawned apart, sky still hears the event it was spawned on: with no session on its stdin it
+	// took whichever session's claim was listed first, another session's on k (2026-10-26).
+	heard := filepath.Join(home, "heard")
+	require.NoError(t, os.WriteFile(AgentSky(home), []byte("#!/bin/sh\ncat > "+heard+".part && mv "+heard+".part "+heard+"\n"), 0o755))
+	run := exec.Command("sh", "-c", stop[1].Command)
+	run.Dir = home
+	run.Stdin = strings.NewReader(`{"session_id":"sess-sky","hook_event_name":"Stop"}`)
+	require.NoError(t, run.Run())
+	require.Eventually(t, func() bool { _, err := os.Stat(heard); return err == nil }, 5*time.Second, 20*time.Millisecond)
+	got, err := os.ReadFile(heard)
+	require.NoError(t, err)
+	assert.Contains(t, string(got), `"session_id":"sess-sky"`)
 }
 
 // A ritual starts its own agent with claude --bg in a tree under the agent's work, which Claude Code

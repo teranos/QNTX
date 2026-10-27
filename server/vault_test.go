@@ -312,3 +312,23 @@ func TestEachBoundFolderSaysWhetherItIsActive(t *testing.T) {
 	assert.Equal(t, vaultInvalid, states[3].State)
 	assert.Contains(t, states[3].Why, "Gone is no folder of abcd")
 }
+
+// A vault whose copy is not on the box says so in the list, before any folder
+// is asked about: set up by hand until #1091.
+//
+// "you need to do some separate shit first before you can use your synced obsidian vault"
+func TestAVaultSaysItsCopyIsNotOnTheBox(t *testing.T) {
+	s, there := vaultBindingServer(t)
+	gone := filepath.Join(t.TempDir(), "nowhere")
+	require.NoError(t, s.nodeRecords().SetVault(rootAccount, Vault{Name: "ghost", Path: gone, Folders: []string{}}))
+
+	got, refused := askVault(t, s, "list", sigil.Sent{})
+	require.Nil(t, refused)
+	setup := map[string]string{}
+	for _, vault := range got.(*protocol.Vaults).GetVaults() {
+		setup[vault.GetName()] = vault.GetSetup()
+	}
+	assert.Equal(t, "", setup[there.Name], "a vault whose copy is on the box was told it needs something")
+	assert.Contains(t, setup["ghost"], gone)
+	assert.Contains(t, setup["ghost"], "#1091")
+}

@@ -376,6 +376,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if through, locate, hasPrimary := authHandler.GitHubThroughThePrimary(); hasPrimary {
 		s.ciGitHubGet = githubThroughThePrimary(through)
 		s.ciGitHubToken = noGitHubToken
+		s.ciGitHubLocate = locatesThroughThePrimary(locate)
 		// A comet's build asks through it too.
 		s.primaryGitHub = primaryGitHub{get: through, locate: locate, held: true}
 	}
