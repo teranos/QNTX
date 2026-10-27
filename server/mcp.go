@@ -67,8 +67,9 @@ func declaredBy(signa []sigil.Signum, path string, pluginRoute func(string) bool
 
 // namespaced is a path that says or moves where its caller acts. To a
 // connector the namespace does not exist (ADR-038), so none is offered to one.
+// ROOT's client is ROOT, and reaches every namespace by its level.
 func namespaced(admitted auth.Admission, path string) bool {
-	if admitted.ClientDID == "" {
+	if admitted.ClientDID == "" || admitted.IsRoot() {
 		return false
 	}
 	return path == "/i/" || path == "/i/standing" || strings.HasPrefix(path, "/api/namespaces")
@@ -140,7 +141,9 @@ func mcpNamespaceOf(path string) (string, bool) {
 func mcpServerRefuses(r *http.Request) (int, string) {
 	named, namesOne := mcpNamespaceOf(r.URL.Path)
 	admitted, known := auth.AdmissionFrom(r.Context())
-	if known && admitted.ClientDID != "" {
+	// A connector stands at CONNECTOR. ROOT through a client is ROOT's client,
+	// and is the node's like anyone but a connector (ADR-038).
+	if known && admitted.ClientDID != "" && !admitted.IsRoot() {
 		if len(admitted.Namespaces) != 1 {
 			return http.StatusForbidden, fmt.Sprintf("a connector acts in one namespace, and this one names %d", len(admitted.Namespaces))
 		}
@@ -192,6 +195,12 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			c.CacheScope = "private"
 		}
 	}}
+	// A connector's server tells the agent what its client says to: the
+	// instructions on the client it was minted through, read now, so a change
+	// holds from the connector's next initialize. Nobody else is told anything.
+	if known && admitted.ClientDID != "" && s.authHandler != nil {
+		options.Instructions = s.authHandler.ConnectorInstructions(admitted.ClientDID)
+	}
 	server := mcp.NewServer(&mcp.Implementation{Name: "qntx", Version: version.VersionTag}, options)
 	// A sigil is one tool, read from the sigil itself (ADR-039). Its path gates
 	// itself and is no route tool below, so one thing is offered once.
@@ -249,7 +258,7 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				}
 				// Who reaches it is asked again on the call, so a line written
 				// since the list was drawn holds, and a listed tool is still gated.
-				return overMCP(ctx, s.gate, s.reachingOver, r, held, args, given), nil
+				return s.fixtured(ctx, admitted, overMCP(ctx, s.gate, s.reachingOver, r, held, args, given)), nil
 			})
 		}
 	}
@@ -293,7 +302,7 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				return refusal, nil
 			}
 			op := operation{Path: path, Method: strings.ToUpper(in.Method), Prefix: prefix}
-			return callThrough(ctx, s.served, r, op, in), nil
+			return s.fixtured(ctx, admitted, callThrough(ctx, s.served, r, op, in)), nil
 		})
 	}
 	return server

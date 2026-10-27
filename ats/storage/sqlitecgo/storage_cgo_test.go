@@ -4,6 +4,9 @@
 package sqlitecgo
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -281,5 +284,56 @@ func TestRustStore_Update(t *testing.T) {
 	}
 	if len(retrieved.Subjects) != 1 || retrieved.Subjects[0] != "EEG_Beta_Wave" {
 		t.Errorf("Subjects after update = %v, want [EEG_Beta_Wave]", retrieved.Subjects)
+	}
+}
+
+// PASSIVE copies the WAL and leaves the file its size; TRUNCATE gives the file
+// back, and is asked for only once the WAL has reached truncateAt.
+func TestRustStore_WALCheckpoint_PassiveUntilTheLimit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "landing.db")
+	store, err := NewFileStore(path)
+	if err != nil {
+		t.Fatalf("NewFileStore() error: %v", err)
+	}
+	defer store.Close()
+
+	for i := 0; i < 20; i++ {
+		if err := store.CreateAttestation(&types.As{
+			ID: fmt.Sprintf("AS-wal-%d", i), Subjects: []string{"s"}, Predicates: []string{"p"},
+			Contexts: []string{"c"}, Actors: []string{"a"}, Timestamp: time.Now(), Source: "test",
+			Attributes: map[string]any{},
+		}); err != nil {
+			t.Fatalf("CreateAttestation() error: %v", err)
+		}
+	}
+	wal := func() int64 {
+		t.Helper()
+		info, err := os.Stat(path + "-wal")
+		if err != nil {
+			t.Fatalf("the WAL could not be measured: %v", err)
+		}
+		return info.Size()
+	}
+	before := wal()
+	if before == 0 {
+		t.Fatal("twenty writes left an empty WAL")
+	}
+
+	busy, walPages, checkpointed, err := store.WALCheckpoint(before + 1)
+	if err != nil {
+		t.Fatalf("PASSIVE: %v", err)
+	}
+	if busy != 0 || walPages == 0 || checkpointed != walPages {
+		t.Errorf("PASSIVE answered busy %d, wal pages %d, checkpointed %d", busy, walPages, checkpointed)
+	}
+	if got := wal(); got != before {
+		t.Errorf("PASSIVE left the WAL at %d bytes, want it kept at %d", got, before)
+	}
+
+	if _, _, _, err := store.WALCheckpoint(before); err != nil {
+		t.Fatalf("TRUNCATE: %v", err)
+	}
+	if got := wal(); got != 0 {
+		t.Errorf("TRUNCATE left the WAL at %d bytes, want 0", got)
 	}
 }

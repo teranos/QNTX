@@ -14,6 +14,7 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/server/a2a"
+	"github.com/teranos/QNTX/server/auth"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
@@ -85,6 +86,37 @@ func TestTheAgentCardIsServedToAnyone(t *testing.T) {
 		assert.NotEmpty(t, skill.Requires, skill.ID+" does not say it takes the bearer token")
 	}
 	assert.Equal(t, agentCardSigna, ids)
+	// The node admits a person's passkey session as it admits the bearer token,
+	// so both are schemes it declares, and either one is enough (§13.3).
+	var security struct {
+		Schemes map[string]struct {
+			APIKey *struct {
+				Location string `json:"location"`
+				Name     string `json:"name"`
+			} `json:"apiKeySecurityScheme"`
+			HTTP *struct {
+				Scheme string `json:"scheme"`
+			} `json:"httpAuthSecurityScheme"`
+		} `json:"securitySchemes"`
+		Required []struct {
+			Schemes map[string]any `json:"schemes"`
+		} `json:"securityRequirements"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &security))
+	require.NotNil(t, security.Schemes["bearer"].HTTP)
+	assert.Equal(t, "Bearer", security.Schemes["bearer"].HTTP.Scheme)
+	require.NotNil(t, security.Schemes["session"].APIKey)
+	assert.Equal(t, "cookie", security.Schemes["session"].APIKey.Location)
+	assert.Equal(t, auth.SessionCookie, security.Schemes["session"].APIKey.Name)
+	var alternatives []string
+	for _, required := range security.Required {
+		require.Len(t, required.Schemes, 1, "a requirement naming two schemes asks for both at once")
+		for scheme := range required.Schemes {
+			alternatives = append(alternatives, scheme)
+		}
+	}
+	assert.ElementsMatch(t, []string{"bearer", "session"}, alternatives)
+
 	require.Len(t, card.Capabilities.Extensions, 1)
 	assert.Equal(t, nodeExtensionURI, card.Capabilities.Extensions[0].URI)
 	assert.Contains(t, card.Capabilities.Extensions[0].Params, "syscap")

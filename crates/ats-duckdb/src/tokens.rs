@@ -74,6 +74,14 @@ pub struct TokenRecord {
     /// the hash.
     #[serde(default)]
     pub request_id: String,
+    /// What a client's connector is told on initialize (ADR-038). A client's,
+    /// and only a client's; empty on every other kind.
+    #[serde(default)]
+    pub instructions: String,
+    /// ROOT's client for the node's MCP server (ADR-038). A client's, and only
+    /// a client's; false on every other kind.
+    #[serde(default)]
+    pub root: bool,
     /// Predicates this token may read. Empty is none, not all.
     #[serde(default)]
     pub scope_read: Vec<String>,
@@ -166,6 +174,12 @@ pub struct TokenSummary {
     pub client_did: String,
     #[serde(default)]
     pub request_id: String,
+    /// What a client's connector is told on initialize. Public the way a
+    /// door's origin is.
+    #[serde(default)]
+    pub instructions: String,
+    #[serde(default)]
+    pub root: bool,
     pub scope_read: Vec<String>,
     pub scope_write: Vec<String>,
     pub created_at: i64,
@@ -201,6 +215,8 @@ impl From<&TokenRecord> for TokenSummary {
             return_address: record.return_address.clone(),
             client_did: record.client_did.clone(),
             request_id: record.request_id.clone(),
+            instructions: record.instructions.clone(),
+            root: record.root,
             scope_read: record.scope_read.clone(),
             scope_write: record.scope_write.clone(),
             created_at: record.created_at,
@@ -266,6 +282,10 @@ struct TokenObject {
     client_did: Option<String>,
     #[serde(default)]
     request_id: Option<String>,
+    #[serde(default)]
+    instructions: Option<String>,
+    #[serde(default)]
+    root: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     github: Option<GitHubSecret>,
 }
@@ -291,6 +311,8 @@ impl From<&TokenRecord> for TokenObject {
             return_address: Some(r.return_address.clone()),
             client_did: Some(r.client_did.clone()),
             request_id: Some(r.request_id.clone()),
+            instructions: Some(r.instructions.clone()),
+            root: Some(r.root),
             github: r.github.clone(),
         }
     }
@@ -320,6 +342,10 @@ impl From<TokenObject> for TokenRecord {
             // one a refresh can be spent against.
             client_did: o.client_did.unwrap_or_default(),
             request_id: o.request_id.unwrap_or_default(),
+            // Written before a client could guide its agent: no instructions.
+            instructions: o.instructions.unwrap_or_default(),
+            // Written before ROOT had a client of its own: not one.
+            root: o.root.unwrap_or_default(),
             scope_read: o.scope_read,
             scope_write: o.scope_write,
             created_at: o.created_at,
@@ -580,6 +606,8 @@ mod tests {
             return_address: String::new(),
             client_did: String::new(),
             request_id: String::new(),
+            instructions: String::new(),
+            root: false,
             scope_read: vec!["reads".to_string()],
             scope_write: vec!["writes".to_string()],
             created_at: 1_700_000_000_000,

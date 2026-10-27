@@ -45,6 +45,12 @@ func Unsupported(op Operation) *Error {
 	return &Error{Name: "UnsupportedOperationError", Message: op.Name + " is not one this node does yet"}
 }
 
+// PushNotificationNotSupported is a request for what push notifications would
+// do: the card says capabilities.pushNotifications is false (§3.3.4).
+func PushNotificationNotSupported() *Error {
+	return &Error{Name: "PushNotificationNotSupportedError", Message: "the node sends no push notifications (capabilities.pushNotifications is false)"}
+}
+
 // Unauthenticated is a request that came with no credential the node took:
 // the extended card "MUST require authentication" (§13.3).
 func Unauthenticated(message string) *Error {

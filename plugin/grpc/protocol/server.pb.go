@@ -2401,7 +2401,10 @@ type Vault struct {
 	Disabled []string `protobuf:"bytes,4,rep,name=disabled,proto3" json:"disabled,omitempty"`
 	// By place, the branch the vault's changes there are committed to. A place
 	// not in it sends nothing: it is opted into, never assumed.
-	Sends         map[string]string `protobuf:"bytes,5,rep,name=sends,proto3" json:"sends,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Sends map[string]string `protobuf:"bytes,5,rep,name=sends,proto3" json:"sends,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// What still stands between this vault and its folders working: its copy
+	// not being on the box at path (#1091). Empty is nothing.
+	Setup         string `protobuf:"bytes,6,opt,name=setup,proto3" json:"setup,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2469,6 +2472,13 @@ func (x *Vault) GetSends() map[string]string {
 		return x.Sends
 	}
 	return nil
+}
+
+func (x *Vault) GetSetup() string {
+	if x != nil {
+		return x.Setup
+	}
+	return ""
 }
 
 // Vaults is what vault list answers, and what every vault sigil that changes
@@ -3931,13 +3941,14 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x05repos\x18\x01 \x03(\tR\x05repos\":\n" +
 	"\fVaultSubdirs\x12\x12\n" +
 	"\x04dirs\x18\x01 \x03(\tR\x04dirs\x12\x16\n" +
-	"\x06branch\x18\x02 \x01(\tR\x06branch\"\xd1\x01\n" +
+	"\x06branch\x18\x02 \x01(\tR\x06branch\"\xe7\x01\n" +
 	"\x05Vault\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x18\n" +
 	"\afolders\x18\x03 \x03(\tR\afolders\x12\x1a\n" +
 	"\bdisabled\x18\x04 \x03(\tR\bdisabled\x120\n" +
-	"\x05sends\x18\x05 \x03(\v2\x1a.protocol.Vault.SendsEntryR\x05sends\x1a8\n" +
+	"\x05sends\x18\x05 \x03(\v2\x1a.protocol.Vault.SendsEntryR\x05sends\x12\x14\n" +
+	"\x05setup\x18\x06 \x01(\tR\x05setup\x1a8\n" +
 	"\n" +
 	"SendsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +

@@ -94,10 +94,45 @@ func TestAFollowIsNamedByItsForgeAndTheOldLineIsRetired(t *testing.T) {
 	assert.Equal(t, "github.com/sbvh-nl/q.sbvh.nl", follows[0].Dispatches)
 	assert.Equal(t, "deploy.yml", follows[0].Workflow)
 	assert.True(t, follows[0].Enabled)
-	assert.Equal(t, "follow:github.com/teranos/QNTX@main", follows[0].line())
+	assert.Equal(t, "follow:github.com/teranos/QNTX@main>github.com/sbvh-nl/q.sbvh.nl/deploy.yml", follows[0].line())
 
 	require.NoError(t, s.nameForges())
 	again, err := s.nodeRecords().Follows()
 	require.NoError(t, err)
 	assert.Equal(t, follows, again)
+}
+
+// "k should follow QNTX main through webhooks"
+// One push dispatches every workflow that follows its repo and branch.
+func TestARepoAndBranchIsFollowedByEachWorkflowItDispatches(t *testing.T) {
+	s, _ := vaultBindingServer(t)
+	for _, f := range []GitHubFollow{
+		{Repo: "github.com/teranos/QNTX", Branch: "main", Dispatches: "github.com/sbvh-nl/q.sbvh.nl", Workflow: "deploy.yml", Ref: "master", Enabled: true},
+		{Repo: "github.com/teranos/QNTX", Branch: "main", Dispatches: "github.com/sbvh-nl/k.sbvh.nl", Workflow: "kapteyn-switch.yml", Ref: "main", Enabled: true},
+	} {
+		require.NoError(t, s.nodeRecords().SetFollow(rootAccount, f))
+	}
+	follows, err := s.nodeRecords().Follows()
+	require.NoError(t, err)
+	require.Len(t, follows, 2)
+	assert.Equal(t, "github.com/sbvh-nl/k.sbvh.nl", follows[0].Dispatches)
+	assert.Equal(t, "github.com/sbvh-nl/q.sbvh.nl", follows[1].Dispatches)
+}
+
+// A follow kept under the line it had before it named what it dispatches is
+// kept under its new line, and the old one retired, so it dispatches once.
+func TestAFollowIsNamedByWhatItDispatchesAndTheOldLineIsRetired(t *testing.T) {
+	s, _ := vaultBindingServer(t)
+	require.NoError(t, s.nodeRecords().nodeRecord(rootAccount, githubSubject, "follow:github.com/teranos/QNTX@main", "_", map[string]any{
+		"repo": "github.com/teranos/QNTX", "branch": "main", "dispatches": "github.com/sbvh-nl/q.sbvh.nl",
+		"workflow": "deploy.yml", "ref": "master", "inputs": map[string]any{}, "enabled": true,
+	}))
+
+	require.NoError(t, s.nameForges())
+
+	follows, err := s.nodeRecords().Follows()
+	require.NoError(t, err)
+	require.Len(t, follows, 1, "the old line is retired, not read beside the new one")
+	assert.Equal(t, "follow:github.com/teranos/QNTX@main>github.com/sbvh-nl/q.sbvh.nl/deploy.yml", follows[0].line())
+	assert.True(t, follows[0].Enabled)
 }

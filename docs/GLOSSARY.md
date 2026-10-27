@@ -25,6 +25,10 @@ Sigmas are normal attestations — they participate in enforcement and can be re
 
 Identified by `_distill: true` in attributes, `source: "distill"`, and predicates prefixed with `distill:`. Rendered in the UI as the sigma element (Σ) with histogram bar charts, numeric range bars, and pie charts for string frequency distributions. See [ADR-020](adr/ADR-020-attestation-distillation.md) and [Bounded Storage](architecture/bounded-storage.md).
 
+### Codex runtime
+
+“making an early start on the Codex Agent runtime”: the [initial runtime package](https://github.com/teranos/QNTX/blob/main/internal/codex/README.md), beside Claude Code and Pi. It is not yet a registered Node Agent or namespace harness.
+
 ## Symbols
 
 See [SYMBOLS.md](SYMBOLS.md) for the complete symbol reference — segments, attestation building blocks, derived types, and system symbols.

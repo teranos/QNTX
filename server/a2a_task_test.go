@@ -382,3 +382,124 @@ func TestATurnThatAnsweredAsTheNodeStoppedCompletesItsTask(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_COMPLETED", at(sent, "task.status.state"))
 	assert.Equal(t, "Up 3 days.", at(sent, "task.artifacts.0.parts.0.text"))
 }
+
+// ListTasks gives the Node Agent's Tasks the most recently updated first, a
+// page at a time, each without its artifacts unless they are asked for, and
+// says how many there are and where the next page starts (§3.1.4).
+func TestTheNodeAgentsTasksAreListedTheMostRecentlyUpdatedFirst(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	_, first := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("remember 7", ""), tokens[auth.LevelRoot])
+	_, second := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("what did I ask you to remember?", ""), tokens[auth.LevelRoot])
+
+	code, page := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks?pageSize=1", "", tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, page)
+	assert.Equal(t, at(second, "task.id"), at(page, "tasks.0.id"))
+	assert.Nil(t, at(page, "tasks.1"))
+	assert.Equal(t, float64(2), at(page, "totalSize"))
+	assert.Equal(t, float64(1), at(page, "pageSize"))
+	// "the artifacts field MUST be omitted entirely from each Task object"
+	_, artifacts := at(page, "tasks.0").(map[string]any)["artifacts"]
+	assert.False(t, artifacts)
+	token, _ := at(page, "nextPageToken").(string)
+	require.NotEmpty(t, token)
+
+	code, page = a2aAsked(t, srv, http.MethodGet, "/a2a/tasks?pageSize=1&pageToken="+token, "", tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, page)
+	assert.Equal(t, at(first, "task.id"), at(page, "tasks.0.id"))
+	// "When there are no more results to retrieve (i.e., this is the final
+	// page), the field MUST be set to an empty string"
+	next, present := page["nextPageToken"]
+	assert.True(t, present, "nextPageToken MUST always be present")
+	assert.Equal(t, "", next)
+
+	_, page = a2aAsked(t, srv, http.MethodGet, "/a2a/tasks?includeArtifacts=true&historyLength=0", "", tokens[auth.LevelRoot])
+	assert.Equal(t, "Up 3 days.", at(page, "tasks.0.artifacts.0.parts.0.text"))
+	assert.Nil(t, at(page, "tasks.0.history"))
+
+	_, page = a2aAsked(t, srv, http.MethodGet, "/a2a/tasks?contextId="+at(first, "task.contextId").(string)+"&status=TASK_STATE_COMPLETED", "", tokens[auth.LevelRoot])
+	assert.Equal(t, float64(2), at(page, "totalSize"))
+	_, page = a2aAsked(t, srv, http.MethodGet, "/a2a/tasks?status=TASK_STATE_WORKING", "", tokens[auth.LevelRoot])
+	assert.Equal(t, []any{}, at(page, "tasks"))
+	assert.Equal(t, float64(0), at(page, "totalSize"))
+	_, page = a2aAsked(t, srv, http.MethodGet, "/a2a/tasks?statusTimestampAfter="+time.Now().Add(time.Hour).UTC().Format(time.RFC3339), "", tokens[auth.LevelRoot])
+	assert.Equal(t, float64(0), at(page, "totalSize"))
+}
+
+// A listing the spec does not allow is refused, as its validation error
+// example refuses it (§6.5), and so is a page token this node did not give.
+func TestAListingOfTasksTheSpecDoesNotAllowIsRefused(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	for _, query := range []string{"pageSize=150", "pageSize=0", "historyLength=-5", "status=TASK_STATE_RUNNING", "pageToken=nothing"} {
+		code, answered := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks?"+query, "", tokens[auth.LevelRoot])
+		assert.Equal(t, http.StatusBadRequest, code, query+": %v", answered)
+	}
+}
+
+// "ROOT can do anything": canceling a Task stops its turn, and it ends
+// canceled however its turn ends after (§3.1.5).
+func TestCancelingAWorkingTaskStopsItsTurn(t *testing.T) {
+	held := filepath.Join(t.TempDir(), "held")
+	require.NoError(t, os.WriteFile(held, nil, 0o600))
+	srv, tokens, _ := nodeAgentOverA2A(t, held)
+
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to a million", `{"returnImmediately": true}`), tokens[auth.LevelRoot])
+	id := at(sent, "task.id").(string)
+	require.Eventually(t, func() bool {
+		_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+		return at(got, "status.state") == "TASK_STATE_WORKING"
+	}, 10*time.Second, 20*time.Millisecond)
+
+	code, canceled := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/"+id+":cancel", `{}`, tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, canceled)
+	assert.Equal(t, "TASK_STATE_CANCELED", at(canceled, "status.state"))
+
+	// The turn stopped while the stand-in was still held: nothing let it answer.
+	require.Eventually(t, func() bool { return srv.nodeAgent.in(srv.claudeHarness()).answering.Load() == nil }, 10*time.Second, 20*time.Millisecond)
+	assert.FileExists(t, held)
+	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	assert.Equal(t, "TASK_STATE_CANCELED", at(got, "status.state"), "the turn ending wrote over its cancel")
+}
+
+// A Task canceled while its turn waits on another never starts its turn.
+func TestATaskCanceledBeforeItsTurnStartsNeverStartsIt(t *testing.T) {
+	srv, tokens, ran := nodeAgentOverA2A(t, "")
+	in := srv.nodeAgent.in(srv.claudeHarness())
+	in.turn <- struct{}{}
+
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("how long has the box been up?", `{"returnImmediately": true}`), tokens[auth.LevelRoot])
+	id := at(sent, "task.id").(string)
+	assert.Equal(t, "TASK_STATE_SUBMITTED", at(sent, "task.status.state"))
+	code, canceled := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/"+id+":cancel", `{}`, tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, canceled)
+	assert.Equal(t, "TASK_STATE_CANCELED", at(canceled, "status.state"))
+
+	<-in.turn
+	_, stops := srv.taskStops.Load(id)
+	require.Eventually(t, func() bool { _, stops = srv.taskStops.Load(id); return !stops }, 10*time.Second, 20*time.Millisecond)
+	entries, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "the turn of a canceled task was run")
+	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	assert.Equal(t, "TASK_STATE_CANCELED", at(got, "status.state"))
+}
+
+// A Task that ended is not canceled, a second cancel among them, and one no id
+// names is not found (§3.1.5).
+func TestATaskThatEndedIsNotCanceled(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	_, done := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("remember 7", ""), tokens[auth.LevelRoot])
+	require.NoError(t, srv.writeTaskLine("waiting", "TASK_STATE_SUBMITTED", "someone", time.Now(), map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
+	code, _ := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/waiting:cancel", `{}`, tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code)
+
+	for id, says := range map[string]string{
+		at(done, "task.id").(string): "TASK_NOT_CANCELABLE",
+		"waiting":                    "TASK_NOT_CANCELABLE",
+		"nothing":                    "TASK_NOT_FOUND",
+	} {
+		code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/"+id+":cancel", `{}`, tokens[auth.LevelRoot])
+		said, _ := json.Marshal(answered)
+		assert.Contains(t, string(said), says, id)
+		assert.NotEqual(t, http.StatusOK, code, id)
+	}
+}

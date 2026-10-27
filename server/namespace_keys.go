@@ -109,8 +109,18 @@ func (s *QNTXServer) keysAsking(ctx context.Context, sent sigil.Sent) (anAsking,
 func (s *QNTXServer) keysList(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	asked, refused := s.keysAsking(ctx, sent)
 	return then(asked, refused, func(asked anAsking) (any, *protocol.Refusal) {
-		return s.keysOf(asked.namespace)
+		return s.keysAskedOf(ctx, asked.namespace)
 	})
+}
+
+// keysAskedOf is the keys the namespace holds, each named after a provider
+// asked of that provider.
+func (s *QNTXServer) keysAskedOf(ctx context.Context, namespace string) (*protocol.NamespaceKeys, *protocol.Refusal) {
+	kept, refused := s.keysOf(namespace)
+	if refused == nil {
+		s.askProviders(ctx, kept)
+	}
+	return kept, refused
 }
 
 func (s *QNTXServer) keysSet(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -132,7 +142,7 @@ func (s *QNTXServer) keysSet(ctx context.Context, sent sigil.Sent) (any, *protoc
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 		s.logger.Infow("a namespace's key was set", "namespace", asked.namespace, "key", name.String(), "by", asked.admitted.Identity)
-		return s.keysOf(asked.namespace)
+		return s.keysAskedOf(ctx, asked.namespace)
 	})
 }
 

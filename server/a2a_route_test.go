@@ -41,6 +41,7 @@ func TestA2AIsServedToRootAlone(t *testing.T) {
 		{http.MethodGet, "/a2a/tasks", "", http.StatusBadRequest, unsupported},
 		{http.MethodPost, "/a2a/tasks/abc:cancel", "", http.StatusBadRequest, unsupported},
 		{http.MethodPost, "/a2a/garden/tasks/abc:cancel", "", http.StatusNotFound, noOperation},
+		{http.MethodPost, "/a2a/tasks/abc/pushNotificationConfigs", "{}", http.StatusBadRequest, "PUSH_NOTIFICATION_NOT_SUPPORTED"},
 		{http.MethodGet, "/a2a/garden/extendedAgentCard", "", http.StatusNotFound, noOperation},
 	} {
 		r := asked(route.method, route.path, route.body, tokens[auth.LevelRoot])

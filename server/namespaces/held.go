@@ -307,6 +307,20 @@ func (h *Held) OfPlugin(namespace string) (ats.AttestationStore, error) {
 	return u.Store(), nil
 }
 
+// OfStandingRow hands back the store of the namespace a standing row landed
+// in, for what its built-in writes beside the row. system is refused: what a
+// built-in takes in from outside is never a record the node keeps of itself.
+func (h *Held) OfStandingRow(namespace string) (ats.AttestationStore, error) {
+	if namespace == auth.NamespaceSystem {
+		return nil, NotServed{Asked: namespace}
+	}
+	u, err := h.universeIn(namespace)
+	if err != nil {
+		return nil, err
+	}
+	return u.Store(), nil
+}
+
 // WriteWhatTheNodeKnowsOfItself hands back the system store for a line about
 // the node rather than about the world: a role grant, a reach line, a word
 // line, a stand's definition. These land in system whatever namespace their

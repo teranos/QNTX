@@ -133,16 +133,18 @@ func watchedNodeWithTokens(t *testing.T) (*QNTXServer, *inbox, *auth.TokenTable)
 	s.nodeMailer = mail
 
 	s.nodeDB.SetMaxOpenConns(1)
+	s.nodeName = "garden.test"
 	return s, box, tokens
 }
 
 // The whole of a minute, shrunk.
 var shortPatience = operationalPatience{
-	every:     20 * time.Millisecond,
-	sentry:    30 * time.Millisecond,
-	mailEvery: 100 * time.Millisecond,
-	die:       500 * time.Millisecond,
-	lastWords: time.Second,
+	every:      20 * time.Millisecond,
+	sentry:     30 * time.Millisecond,
+	mailEvery:  100 * time.Millisecond,
+	mailAtMost: 2 * time.Second,
+	die:        500 * time.Millisecond,
+	lastWords:  time.Second,
 }
 
 // stepClock is time that moves only when the test moves it, so the watch acts
@@ -247,16 +249,17 @@ func TestASlowOperationalStoreIsWaitedOnAndROOTIsTold(t *testing.T) {
 		var waits int
 		var answered bool
 		for _, subject := range box.subjects() {
-			if strings.HasPrefix(subject, "The operational store has not answered for") {
+			// "its not indicated to me, which node its talking about"
+			if strings.HasPrefix(subject, "garden.test: The operational store has not answered for") {
 				waits++
 			}
-			if strings.HasPrefix(subject, "The operational store answers again, after") {
+			if strings.HasPrefix(subject, "garden.test: The operational store answers again, after") {
 				answered = true
 			}
 		}
-		return waits == 2 && answered
+		return waits == 1 && answered
 	}, 10*time.Second, time.Millisecond) {
-		t.Fatalf("ROOT was not mailed as the wait grew and when it ended: %v", box.subjects())
+		t.Fatalf("ROOT was not mailed once about the wait and once when it ended: %v", box.subjects())
 	}
 	box.mu.Lock()
 	for _, m := range box.mails {
@@ -292,8 +295,57 @@ func TestAStoreThatDoesNotAnswerInAMinuteStopsTheNodeAndROOTIsTold(t *testing.T)
 
 	subjects := box.subjects()
 	require.NotEmpty(t, subjects)
-	assert.True(t, strings.HasPrefix(subjects[len(subjects)-1], "QNTX stops: the operational store has not answered for"),
-		"the last mail does not say the node stops: %v", subjects)
+	assert.True(t, strings.HasPrefix(subjects[len(subjects)-1], "garden.test: QNTX stops: the operational store has not answered for"),
+		"the last mail does not say which node stops: %v", subjects)
+}
+
+// "i dont think i need to receive it more often than once per 20 min"
+// A second wait inside that window is not mailed, however long it grows; the
+// recovery mail answers only a wait that was mailed about.
+func TestAStalledMailComesAtMostOncePerWindow(t *testing.T) {
+	s, box := watchedNode(t)
+	clock, stopped := watching(t, s)
+
+	// The same steps as the wait above, twice: the second wait begins well
+	// within mailAtMost of the first mail.
+	stall := func() {
+		// The one connection is taken while the watch is parked on its next
+		// ask, not while an ask is in flight: taken then, the ask would block
+		// and the watch would be waiting on Sentry, not on every.
+		clock.handled(t, shortPatience.every)
+		held, err := s.nodeDB.Conn(context.Background())
+		require.NoError(t, err)
+		clock.step(t, shortPatience.every)
+		clock.step(t, shortPatience.mailEvery)
+		clock.step(t, shortPatience.mailEvery)
+		clock.handled(t, shortPatience.mailEvery)
+		require.NoError(t, held.Close())
+		clock.step(t, shortPatience.every)
+	}
+	stall()
+	clock.step(t, shortPatience.every) // the store answers in time: the first wait is over
+	stall()
+
+	if !assert.Eventually(t, func() bool {
+		var stalled, recovered int
+		for _, subject := range box.subjects() {
+			if strings.Contains(subject, "has not answered for") {
+				stalled++
+			}
+			if strings.Contains(subject, "answers again, after") {
+				recovered++
+			}
+		}
+		return stalled == 1 && recovered == 1
+	}, 10*time.Second, time.Millisecond) {
+		t.Fatalf("two waits inside the window should mail once each way: %v", box.subjects())
+	}
+
+	select {
+	case reason := <-stopped:
+		t.Fatalf("a slow store stopped the node: %v", reason)
+	default:
+	}
 }
 
 // The recovery mail answers a mail about the wait: a wait that ended before

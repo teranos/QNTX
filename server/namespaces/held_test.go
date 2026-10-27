@@ -164,6 +164,22 @@ func TestAPluginStandsWhereItsRecordSaysAndNeverInSystem(t *testing.T) {
 	assert.Contains(t, err.Error(), auth.NamespaceSystem)
 }
 
+// A standing row's built-in writes beside the row, in the namespace it landed
+// in, by slug, and never in system.
+func TestAStandingRowsBuiltInWritesWhereTheRowLandedAndNeverInSystem(t *testing.T) {
+	opener := &openedNamespaces{}
+	held := serving([]string{"Ground"}, opener)
+	held.SetSystem(mustMake("system", nothing{}, nil))
+
+	_, err := held.OfStandingRow("ground")
+	require.NoError(t, err, "a row that landed in ground was refused its namespace")
+	assert.Equal(t, []string{"Ground"}, opener.asked)
+
+	_, err = held.OfStandingRow(auth.NamespaceSystem)
+	require.Error(t, err, "a built-in wrote where the node keeps its own records")
+	assert.Contains(t, err.Error(), auth.NamespaceSystem)
+}
+
 // A write no admission stands behind never lands in the two namespaces that
 // hold the node's own records, whatever the handler asks for (ADR-035).
 func TestPublicWritesNeverReachSystemOrDefault(t *testing.T) {

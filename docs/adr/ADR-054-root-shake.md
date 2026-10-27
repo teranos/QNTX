@@ -16,10 +16,11 @@ Status: Proposed
 "its work is the prompt"
 
 - Each element is its own agent: its own key derived from the node's for
-  `agent:element:<element>`, its own home under `elements/<element>/` beside
-  the Node Agent's, its own token of ROOT's kind, its own session, its own
-  turn. It runs as `[agent.root]` says, in Claude Code, so it answers from the
-  first shake with nothing set.
+  `agent:element:<element>` ([[ADR-048-Node-Agent]]: an agent has its own DID
+  and attests as itself), its own token of ROOT's kind, its own session under
+  `elements/<element>/`, its own turn. It stands where the Node Agent stands:
+  the Node Agent's home, its ground, its credential, its git, as `[agent.root]`
+  says. Nothing is built, set or waited for: it answers from the first shake.
 - What it does is what ROOT said: no repo is chosen for it, no task is given
   beyond the prompt.
 
@@ -73,9 +74,8 @@ attach an imagine whne in a mobile chat"
 
 ## Not done
 
-- The first shake at an element whose ground is not built yet is refused
-  until it is: the ground is built in the agent's home when the agent is first
-  held, the same as a namespace agent's ([[ADR-050-comet]]).
+- The element's repo, which the host sets: nothing on the node says which
+  repo an element is yet, so the agent is not told one.
 - One `turn` per element agent: two shakes at one element wait on each other,
   two at two elements run at once.
 - The Sentry User Feedback shake, deferred: this is not the feedback form.
