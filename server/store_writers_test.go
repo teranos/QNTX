@@ -75,6 +75,9 @@ var storeWriters = map[string]string{
 	"setAgentLine": "the AGENT line a namespace opts into its agent by (ADR-048), in the namespace's own " +
 		"store through Write as the setter is admitted, after maySetAgent says they own the namespace, " +
 		"or are ROOT or SUPER",
+	"anthropicSet": "the node's ANTHROPIC line, the ids of the rule its identity token is traded at, " +
+		"in system through WriteWhatTheNodeKnowsOfItself: a line about the node, and the reach table " +
+		"names /api/anthropic of ROOT alone",
 	"setKeyLine": "a KEY line of a namespace (ADR-051), in the namespace's own store through Write as " +
 		"the setter is admitted, after keysAsking refuses a token or a connector and mayHandleKeys says " +
 		"they own the namespace, or are ROOT or SUPER",

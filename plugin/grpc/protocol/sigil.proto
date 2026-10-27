@@ -235,6 +235,36 @@ message CodexAm {
   string not_ready = 9;
 }
 
+// NodeAnthropic is what anthropic am and anthropic set answer: the node's
+// issuer and subject that ROOT registers at Anthropic, the ids of the rule its
+// identity token is traded at, and whether Anthropic accepted it.
+message NodeAnthropic {
+  // The node's OIDC issuer, the iss of every identity token it signs.
+  string issuer = 1;
+  // The node's DID, the sub of the node's own identity token.
+  string subject = 2;
+  // The Anthropic organization the rule is in.
+  string organization_id = 3;
+  // The federation rule the node's identity token is traded at.
+  string federation_rule_id = 4;
+  // The service account the traded token acts as.
+  string service_account_id = 5;
+  // Who gave the ids; empty before anybody did.
+  string set_by = 6;
+  // When the ids were given, as RFC 3339.
+  string at = 7;
+  // Whether Anthropic was asked: false before any ids were given.
+  bool asked = 8;
+  // Whether Anthropic accepted the node's identity at the rule.
+  bool accepted = 9;
+  // What Anthropic answered when it did not accept it, or why it was not reached.
+  string why = 10;
+  // The node's issuer as Anthropic registered it (fdis_).
+  string issuer_id = 11;
+  // The workspace the traded token is scoped to (wrkspc_), as the wizard's snippet names it.
+  string workspace_id = 12;
+}
+
 // NamespaceKeys is what keys list, set and drop answer: the names of a
 // namespace's keys, never their values (ADR-051).
 message NamespaceKeys {

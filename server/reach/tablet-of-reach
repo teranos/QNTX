@@ -64,6 +64,11 @@ REACH is '/github/'                                                       of ANY
 # sends anybody anywhere, so by a stranger.
 REACH is '/.well-known/oauth-authorization-server'                        of ANYONE
 REACH is '/.well-known/oauth-protected-resource'                          of ANYONE
+# The node as an OIDC issuer (OpenID Connect Discovery 1.0): where Anthropic
+# reads the key the node's identity tokens are signed with.
+REACH is '/.well-known/openid-configuration' '/.well-known/jwks.json'     of ANYONE
+# The node at Anthropic: the ids of the rule its identity token is traded at, ROOT's.
+REACH is '/api/anthropic'                                                 of ROOT
 # The A2A agent card (ADR-039): how an agent that has never seen this node
 # finds what it is and what it serves.
 REACH is '/.well-known/agent-card.json'                                   of ANYONE
