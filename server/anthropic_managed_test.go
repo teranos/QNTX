@@ -62,6 +62,9 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 			c.made["credential"]++
 			c.bodies["credential"] = append(c.bodies["credential"], sent)
 			answer("vcrd_1")
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/memory_stores":
+			c.made["memory"]++
+			answer("memstore_1")
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/sessions":
 			c.made["session"]++
 			c.bodies["session"] = append(c.bodies["session"], sent)
@@ -139,13 +142,14 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	credential := console.bodies["credential"][0]["auth"].(map[string]any)
 	assert.Equal(t, map[string]any{"type": "static_bearer", "token": "the-element-token", "mcp_server_url": "https://node.example/mcp"}, credential, "with its own token")
 	assert.Equal(t, []any{"vlt_1"}, console.bodies["session"][0]["vault_ids"])
+	assert.Equal(t, []any{map[string]any{"type": "memory_store", "memory_store_id": "memstore_1"}}, console.bodies["session"][0]["resources"], "its Memory, in every Session")
 	console.mu.Unlock()
 
 	again, err := s.spend(agent, said, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_1", again.Session, "shaken again: the same Session")
 	console.mu.Lock()
-	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "session": 1}, console.made, "each made once")
+	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "memory": 1, "session": 1}, console.made, "each made once")
 	console.mu.Unlock()
 
 	kept, err := os.ReadFile(filepath.Join(home, elementsDir, "canvas-1", managedElementFile))
@@ -160,6 +164,7 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_2", anew.Session)
 	console.mu.Lock()
-	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "session": 2}, console.made)
+	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "memory": 1, "session": 2}, console.made)
+	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "the new Session has the Memory the ended one had")
 	console.mu.Unlock()
 }

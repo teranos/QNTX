@@ -27,10 +27,11 @@ const (
 )
 
 // managedOf is an element's own at the Console: its Agent, the Vault that
-// carries its token to the node's MCP, and its one Session.
+// carries its token to the node's MCP, the Memory it keeps across Sessions, and its Session.
 type managedOf struct {
 	Agent   string `json:"agent"`
 	Vault   string `json:"vault"`
+	Memory  string `json:"memory"`
 	Session string `json:"session"`
 }
 
@@ -208,6 +209,20 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 			return managedOf{}, err
 		}
 	}
+	// A Session that ends takes what the agent learned with it; its Memory does not.
+	if held.Memory == "" {
+		memory, err := client.Beta.MemoryStores.New(ctx, anthropic.BetaMemoryStoreNewParams{
+			Name:        "qntx-element-" + agent.element,
+			Description: anthropic.String("What you, the element " + agent.element + ", learned in your conversations with ROOT, kept for every conversation after."),
+		})
+		if err != nil {
+			return managedOf{}, errors.Wrapf(err, "no Memory was made at Anthropic for the element %s", agent.element)
+		}
+		held.Memory = memory.ID
+		if err := keep(); err != nil {
+			return managedOf{}, err
+		}
+	}
 	// How long Anthropic keeps a Session is not said: one that has ended is said, and a new one is made.
 	if held.Session != "" {
 		session, err := client.Beta.Sessions.Get(ctx, held.Session, anthropic.BetaSessionGetParams{})
@@ -225,6 +240,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 			EnvironmentID: environment,
 			Title:         anthropic.String("the element " + agent.element),
 			VaultIDs:      []string{held.Vault},
+			Resources:     []anthropic.BetaSessionNewParamsResourceUnion{{OfMemoryStore: &anthropic.BetaManagedAgentsMemoryStoreResourceParam{MemoryStoreID: held.Memory}}},
 		})
 		if err != nil {
 			return managedOf{}, errors.Wrapf(err, "no Session was made at Anthropic for the element %s", agent.element)
@@ -233,7 +249,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		if err := keep(); err != nil {
 			return managedOf{}, err
 		}
-		s.logger.Infow("the element's agent runs at Anthropic", "element", agent.element, "agent", held.Agent, "vault", held.Vault, "session", held.Session)
+		s.logger.Infow("the element's agent runs at Anthropic", "element", agent.element, "agent", held.Agent, "vault", held.Vault, "memory", held.Memory, "session", held.Session)
 	}
 	return held, nil
 }
