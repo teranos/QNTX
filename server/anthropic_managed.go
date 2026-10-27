@@ -67,8 +67,8 @@ func managedIsSaidToBe(a *rootAgent) string {
 // runManaged says said to the element's agent at Anthropic, and reads its answer
 // from the Session's events until the Session is idle again.
 func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, kept anthropicKept, each func(claudecode.Message)) (claudecode.Answer, error) {
-	if s.ownURL == "" {
-		return claudecode.Answer{}, errors.New("the node knows no URL of its own, so an agent at Anthropic has no MCP to reach it by")
+	if s.authHandler == nil {
+		return claudecode.Answer{}, errors.New("this node runs without auth, so it has no public origin an agent at Anthropic could reach its MCP by")
 	}
 	client, err := s.anthropicClient(kept)
 	if err != nil {
@@ -168,7 +168,8 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		}
 		return errors.Wrapf(os.WriteFile(file, raw, 0o600), "what the element %s has at Anthropic was not kept in %s", agent.element, file)
 	}
-	mcp := s.ownURL + "/mcp"
+	// Anthropic reaches the node from outside: at its public origin, not the address it serves on.
+	mcp := s.authHandler.PublicOrigin() + "/mcp"
 	if held.Agent == "" {
 		made, err := client.Beta.Agents.New(ctx, anthropic.BetaAgentNewParams{
 			Name:       "qntx-element-" + agent.element,

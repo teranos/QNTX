@@ -112,7 +112,6 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	s, _, _ := runningNamespaceAgents(t)
 	console, base := standInConsole(t)
 	s.anthropicBaseURL = base
-	s.ownURL = "https://node.example"
 	if s.nodeAgent == nil {
 		s.nodeAgent = &rootAgent{home: t.TempDir()}
 	}
@@ -138,9 +137,9 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	assert.Equal(t, "claude-opus-5-5", agentMade["model"].(map[string]any)["id"])
 	assert.Contains(t, agentMade["system"], "You run at Anthropic")
 	servers := agentMade["mcp_servers"].([]any)
-	assert.Equal(t, "https://node.example/mcp", servers[0].(map[string]any)["url"], "it reaches the node through the node's MCP")
+	assert.Equal(t, s.authHandler.PublicOrigin()+"/mcp", servers[0].(map[string]any)["url"], "it reaches the node's MCP at its public origin")
 	credential := console.bodies["credential"][0]["auth"].(map[string]any)
-	assert.Equal(t, map[string]any{"type": "static_bearer", "token": "the-element-token", "mcp_server_url": "https://node.example/mcp"}, credential, "with its own token")
+	assert.Equal(t, map[string]any{"type": "static_bearer", "token": "the-element-token", "mcp_server_url": s.authHandler.PublicOrigin() + "/mcp"}, credential, "with its own token")
 	assert.Equal(t, []any{"vlt_1"}, console.bodies["session"][0]["vault_ids"])
 	assert.Equal(t, []any{map[string]any{"type": "memory_store", "memory_store_id": "memstore_1"}}, console.bodies["session"][0]["resources"], "its Memory, in every Session")
 	console.mu.Unlock()
