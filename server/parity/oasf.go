@@ -9,30 +9,33 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
-// OASFSkills is every skill of OASF's taxonomy as pinned, by its path there,
-// with the id a Record names it by.
+// OASFSkills is every skill of OASF's taxonomy as pinned that a Record can
+// name, by its path there, with the id it names it by.
 func OASFSkills() (map[string]uint32, *protocol.Refusal) {
 	return oasfClasses("schema/skills", "base_skill")
 }
 
-// OASFModules is every module of OASF's taxonomy as pinned, by its path
-// there, with the id a Record names it by: integration/a2a is 203.
+// OASFModules is every module of OASF's taxonomy as pinned that a Record can
+// name, by its path there, with the id it names it by: integration/a2a is 203.
 func OASFModules() (map[string]uint32, *protocol.Refusal) {
 	return oasfClasses("schema/modules", "base_module")
 }
 
 // oasfClasses is every class of one of OASF's taxonomies, by its path there,
 // with its id: its parent's id * 100 + its own uid, up to a class that extends
-// the base (oasf server/lib/schema/types.ex, class_uid).
+// the base (oasf server/lib/schema/types.ex, class_uid). A category, such as
+// software_engineering, numbers the classes under it and is not one a Record
+// names: the pinned record.schema.json holds none.
 func oasfClasses(at, base string) (map[string]uint32, *protocol.Refusal) {
 	dir, files, refused := pinnedAt("oasf")
 	if refused != nil {
 		return nil, refused
 	}
 	type class struct {
-		UID     uint32 `json:"uid"`
-		Name    string `json:"name"`
-		Extends string `json:"extends"`
+		UID      uint32 `json:"uid"`
+		Name     string `json:"name"`
+		Extends  string `json:"extends"`
+		Category bool   `json:"category"`
 	}
 	classes := map[string]class{}
 	for _, file := range files {
@@ -57,7 +60,10 @@ func oasfClasses(at, base string) (map[string]uint32, *protocol.Refusal) {
 		classes[c.Name] = c
 	}
 	ids := make(map[string]uint32, len(classes))
-	for name := range classes {
+	for name, held := range classes {
+		if held.Category {
+			continue
+		}
 		var segments []string
 		var id, scale uint32 = 0, 1
 		for up := name; up != base; {
@@ -138,4 +144,19 @@ func OASFRequired(object string) ([]string, *protocol.Refusal) {
 		}
 	}
 	return required, nil
+}
+
+// OASFRecordSchema is the JSON Schema OASF's schema server gives a Record of
+// the pinned schema version, as pinned.
+func OASFRecordSchema() ([]byte, *protocol.Refusal) {
+	dir, _, refused := pinnedAt("oasf")
+	if refused != nil {
+		return nil, refused
+	}
+	read := path.Join(dir, "record.schema.json")
+	raw, err := fs.ReadFile(pinned, read)
+	if err != nil {
+		return nil, failed("%s did not read: %v", read, err)
+	}
+	return raw, nil
 }

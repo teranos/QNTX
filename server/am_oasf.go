@@ -58,7 +58,9 @@ func (s *QNTXServer) amOASF(ctx context.Context, _ sigil.Sent) (any, *protocol.R
 	if refused != nil {
 		return nil, refused
 	}
-	body, err := protojson.Marshal(record.Interface())
+	// OASF names a Record's fields as its .proto does, schema_version and not
+	// schemaVersion, and its schema allows no other.
+	body, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(record.Interface())
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrap(err, "the record did not marshal").Error()}
 	}
