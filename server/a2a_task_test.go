@@ -170,6 +170,10 @@ func TestATaskReturnedImmediatelyIsAnsweredByItsIdWhenItEnds(t *testing.T) {
 	assert.Contains(t, []any{"TASK_STATE_SUBMITTED", "TASK_STATE_WORKING"}, at(sent, "task.status.state"))
 	assert.Nil(t, at(sent, "task.artifacts"))
 	id := at(sent, "task.id").(string)
+	// The first message: the session it generates is in the answer, before its
+	// turn has run (§3.4.1).
+	context, _ := at(sent, "task.contextId").(string)
+	require.NotEmpty(t, context, "a generated contextId MUST be included in the response")
 
 	// "Indicates that a task is actively being processed by the agent."
 	var working map[string]any
@@ -188,6 +192,7 @@ func TestATaskReturnedImmediatelyIsAnsweredByItsIdWhenItEnds(t *testing.T) {
 	assert.Equal(t, "Up 3 days.", at(got, "artifacts.0.parts.0.text"))
 	// Working, it was in the session its turn ran in.
 	assert.Equal(t, after(ranWith(t, ran, "0", "args"), "--session-id"), at(working, "contextId"))
+	assert.Equal(t, context, after(ranWith(t, ran, "0", "args"), "--session-id"), "the turn ran in another session than the one answered")
 }
 
 // What the Node Agent does not take is refused before anything is said to it.

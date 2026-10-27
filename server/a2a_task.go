@@ -206,20 +206,9 @@ func (s *QNTXServer) sendTask(r *http.Request, ta taskAgent, request proto.Messa
 		return nil, &a2a.Error{Name: "UnsupportedOperationError", Message: "task " + task.ID + " is " + task.State + ": a task of " + ta.called + " is one turn, which takes nothing more once it is said"}
 	}
 
-	in := ta.agent.in(s.claudeHarness())
-	session, kept, err := ta.agent.sessionIn(in.file)
-	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	// "If an agent cannot accept a client-provided contextId, it MUST reject
-	// the request with an error and MUST NOT generate a new contextId" (§3.4.1).
-	if sent.ContextID != "" && (!kept || sent.ContextID != session) {
-		return nil, a2a.Invalid(ta.called + " is one session, and context " + sent.ContextID + " is not it")
-	}
-	// A session not yet kept is named by the turn that keeps it.
-	contextID := ""
-	if kept {
-		contextID = session
+	contextID, refused := s.contextOf(ta, sent.ContextID)
+	if refused != nil {
+		return nil, refused
 	}
 
 	id := uuid.NewString()
@@ -265,6 +254,32 @@ func (s *QNTXServer) sendTask(r *http.Request, ta taskAgent, request proto.Messa
 		}
 	}
 	return s.taskAnswered(ta.taskLines, id, func(task a2a.Task) (proto.Message, error) { return task.Sending(sent.History) })
+}
+
+// contextOf is the context a Task of ta is in: the agent's one session. One not
+// kept yet is kept now, before the Task is answered: "If an agent generates a
+// new contextId, it MUST be included in the response" (§3.4.1). Its first turn
+// then starts the session under that id.
+func (s *QNTXServer) contextOf(ta taskAgent, asked string) (string, *a2a.Error) {
+	// Two first messages at once are one session.
+	s.taskEnds.Lock()
+	defer s.taskEnds.Unlock()
+	in := ta.agent.in(s.claudeHarness())
+	session, kept, err := ta.agent.sessionIn(in.file)
+	if err != nil {
+		return "", &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+	}
+	// "If an agent cannot accept a client-provided contextId, it MUST reject
+	// the request with an error and MUST NOT generate a new contextId" (§3.4.1).
+	if asked != "" && (!kept || asked != session) {
+		return "", a2a.Invalid(ta.called + " is one session, and context " + asked + " is not it")
+	}
+	if !kept {
+		if err := ta.agent.keepIn(in.file, session); err != nil {
+			return "", &a2a.Error{Name: "InvalidAgentResponseError", Message: "the session of " + ta.called + " was not kept: " + err.Error()}
+		}
+	}
+	return session, nil
 }
 
 // saidInClaude is an agent's answer as Claude Code gave it: the Node Agent's
