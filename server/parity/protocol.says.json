@@ -70,6 +70,7 @@
   "protocol.ClaudeAm.did": "Its own DID, which signs what it writes down.",
   "protocol.ClaudeAm.effort": "The effort am.toml names.",
   "protocol.ClaudeAm.model": "The model am.toml names.",
+  "protocol.ClaudeAm.models": "Every model a turn can be said to answer with.",
   "protocol.ClaudeAm.not_ready": "Why it cannot be spoken to, when it cannot.",
   "protocol.ClaudeAm.permission_mode": "The permission mode it runs in when whoever speaks names none.",
   "protocol.ClaudeAm.permission_modes": "Every permission mode Claude Code has.",

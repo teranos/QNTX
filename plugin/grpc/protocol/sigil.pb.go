@@ -736,7 +736,9 @@ type ClaudeAm struct {
 	// Whether Claude Code says it is signed in, by claude login.
 	SignedIn bool `protobuf:"varint,11,opt,name=signed_in,json=signedIn,proto3" json:"signed_in,omitempty"`
 	// How it is signed in, as Claude Code names it, or empty when it is not.
-	AuthMethod    string `protobuf:"bytes,12,opt,name=auth_method,json=authMethod,proto3" json:"auth_method,omitempty"`
+	AuthMethod string `protobuf:"bytes,12,opt,name=auth_method,json=authMethod,proto3" json:"auth_method,omitempty"`
+	// Every model a turn can be said to answer with.
+	Models        []string `protobuf:"bytes,13,rep,name=models,proto3" json:"models,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -853,6 +855,13 @@ func (x *ClaudeAm) GetAuthMethod() string {
 		return x.AuthMethod
 	}
 	return ""
+}
+
+func (x *ClaudeAm) GetModels() []string {
+	if x != nil {
+		return x.Models
+	}
+	return nil
 }
 
 // NamespaceAgentSaid is what agents say answers: what the namespace's agent
@@ -2475,7 +2484,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"pi_version\x18\x06 \x01(\tR\tpiVersion\x12\x19\n" +
 	"\bcost_usd\x18\a \x01(\x01R\acostUsd\x12\x17\n" +
 	"\atook_ms\x18\b \x01(\x01R\x06tookMs\x12\x1c\n" +
-	"\tunwritten\x18\t \x01(\tR\tunwritten\"\xe8\x02\n" +
+	"\tunwritten\x18\t \x01(\tR\tunwritten\"\x80\x03\n" +
 	"\bClaudeAm\x12\x10\n" +
 	"\x03did\x18\x01 \x01(\tR\x03did\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x16\n" +
@@ -2491,7 +2500,8 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	" \x01(\tR\bnotReady\x12\x1b\n" +
 	"\tsigned_in\x18\v \x01(\bR\bsignedIn\x12\x1f\n" +
 	"\vauth_method\x18\f \x01(\tR\n" +
-	"authMethod\"d\n" +
+	"authMethod\x12\x16\n" +
+	"\x06models\x18\r \x03(\tR\x06models\"d\n" +
 	"\x12NamespaceAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\"\x8a\x01\n" +

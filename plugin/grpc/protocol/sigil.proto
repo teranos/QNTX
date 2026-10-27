@@ -161,6 +161,8 @@ message ClaudeAm {
   bool signed_in = 11;
   // How it is signed in, as Claude Code names it, or empty when it is not.
   string auth_method = 12;
+  // Every model a turn can be said to answer with.
+  repeated string models = 13;
 }
 
 // NamespaceAgentSaid is what agents say answers: what the namespace's agent
