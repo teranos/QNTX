@@ -75,7 +75,13 @@ func rootAsksAnthropic(t *testing.T, s *QNTXServer, name string, sent sigil.Sent
 	return am
 }
 
-var theRule = sigil.Sent{"organization_id": "00000000-0000-0000-0000-000000000000", "federation_rule_id": "fdrl_node", "service_account_id": "svac_node"}
+// Each id as the Console shows it, given at the step that made it.
+var (
+	anOrganization = sigil.Sent{"given": "Organization ID: 377885f2-bf73-4758-9338-dcfe26b37568"}
+	anIssuer       = sigil.Sent{"given": " fdis_014ooUtLKoVwFC8XnFZtMdfp "}
+	aServiceAcct   = sigil.Sent{"given": "svac_node"}
+	aRule          = sigil.Sent{"given": "\"fdrl_node\""}
+)
 
 // "oidc for the node"
 func TestRootGivesTheNodesRuleAndAnthropicAcceptsTheNodesIdentity(t *testing.T) {
@@ -88,7 +94,14 @@ func TestRootGivesTheNodesRuleAndAnthropicAcceptsTheNodesIdentity(t *testing.T) 
 	assert.Equal(t, s.nodeDID.DID, before.GetSubject())
 	assert.False(t, before.GetAsked(), "no ids given, nothing asked: the light is not on")
 
-	set := rootAsksAnthropic(t, s, "set", theRule)
+	org := rootAsksAnthropic(t, s, "set", anOrganization)
+	assert.Equal(t, "377885f2-bf73-4758-9338-dcfe26b37568", org.GetOrganizationId(), "the label the Console shows it with is not the id")
+	assert.False(t, org.GetAsked(), "Anthropic is not asked before the rule and the service account are known")
+	issuer := rootAsksAnthropic(t, s, "set", anIssuer)
+	assert.Equal(t, "fdis_014ooUtLKoVwFC8XnFZtMdfp", issuer.GetIssuerId())
+	assert.Equal(t, "377885f2-bf73-4758-9338-dcfe26b37568", issuer.GetOrganizationId(), "kept: each id is given once")
+	rootAsksAnthropic(t, s, "set", aServiceAcct)
+	set := rootAsksAnthropic(t, s, "set", aRule)
 	assert.True(t, set.GetAsked())
 	assert.True(t, set.GetAccepted(), set.GetWhy())
 	assert.Equal(t, "fdrl_node", set.GetFederationRuleId())
@@ -106,9 +119,45 @@ func TestARuleThatDoesNotMatchTheNodeIsKeptWithWhyAnthropicRefused(t *testing.T)
 	base, _ := anthropicAccepting(t, s, "did:key:somebody-else")
 	s.anthropicBaseURL = base
 
-	set := rootAsksAnthropic(t, s, "set", theRule)
+	for _, given := range []sigil.Sent{anOrganization, aServiceAcct, aRule} {
+		rootAsksAnthropic(t, s, "set", given)
+	}
+	set := rootAsksAnthropic(t, s, "am", sigil.Sent{})
 	assert.True(t, set.GetAsked())
 	assert.False(t, set.GetAccepted())
 	assert.Contains(t, set.GetWhy(), "fdrl_node")
 	assert.Equal(t, "svac_node", set.GetServiceAccountId(), "kept all the same")
+}
+
+// "THE UI SHOULD BE OKAY WITH A SMALL MISTAKE THAT IS AUTOMATICALLY RESOLVABLE"
+func TestAnIdIsPlacedByWhatItIsNotWhereItWasPasted(t *testing.T) {
+	assert.Equal(t, map[string]string{"issuer_id": "fdis_014ooUtLKoVwFC8XnFZtMdfp"}, anthropicIDsIn("fdis_014ooUtLKoVwFC8XnFZtMdfp"))
+	assert.Equal(t, map[string]string{"organization_id": "377885f2-bf73-4758-9338-dcfe26b37568"}, anthropicIDsIn("Organization ID: 377885f2-bf73-4758-9338-dcfe26b37568"))
+	assert.Equal(t, map[string]string{"federation_rule_id": "fdrl_01DQdKZw6ZNBSii36GU5z6Gv", "service_account_id": "svac_01WZQhV4qnKBk7baz5smh5vw"},
+		anthropicIDsIn("fdrl_01DQdKZw6ZNBSii36GU5z6Gv main-rule node-story svac_01WZQhV4qnKBk7baz5smh5vw"))
+	// The Connect workload wizard's snippet, pasted whole from its copy button.
+	assert.Equal(t, map[string]string{
+		"federation_rule_id": "fdrl_01Kp4mjUuvKYj3yGjMwYfi81", "organization_id": "377885f2-bf73-4758-9338-dcfe26b37568",
+		"service_account_id": "svac_01KNepFSKtHDxy3GuBdRbcEB", "workspace_id": "wrkspc_01YbvLt3KhHVJZ3hK6kA7bGA",
+	}, anthropicIDsIn(`{
+  "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+  "assertion": "$JWT",
+  "federation_rule_id": "fdrl_01Kp4mjUuvKYj3yGjMwYfi81",
+  "organization_id": "377885f2-bf73-4758-9338-dcfe26b37568",
+  "service_account_id": "svac_01KNepFSKtHDxy3GuBdRbcEB",
+  "workspace_id": "wrkspc_01YbvLt3KhHVJZ3hK6kA7bGA"
+}`))
+	assert.Empty(t, anthropicIDsIn("main-rule"))
+	assert.Empty(t, anthropicIDsIn("fdrl_"))
+}
+
+func TestWhatHoldsNoIdOfAnthropicsIsRefusedSayingWhatAnIdLooksLike(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	admitted := auth.Admitted(auth.LevelRoot)
+	admitted.Identity = "https://example.org/root"
+	asked := httptest.NewRequest(http.MethodPost, "/api/anthropic", nil)
+	asked = asked.WithContext(auth.WithAdmission(asked.Context(), admitted))
+	_, refused := s.anthropicSignum().Answers["set"](sigil.WithCaller(asked.Context(), asked), sigil.Sent{"given": "main-rule"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.Says, "fdrl_")
 }

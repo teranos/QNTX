@@ -31,16 +31,66 @@ const (
 	anthropicAsking = 15 * time.Second
 )
 
-// anthropicIDs are the three ids ROOT gives, by the name each is given under.
-var anthropicIDs = []string{"organization_id", "federation_rule_id", "service_account_id"}
+// anthropicIDs are the ids ROOT makes at Anthropic, by the name each is kept under.
+var anthropicIDs = []string{"organization_id", "issuer_id", "service_account_id", "federation_rule_id", "workspace_id"}
+
+// anthropicKindOf is the id a word Anthropic shows is, by its prefix or, for
+// the organization, by being a UUID: "" is no id of Anthropic's.
+func anthropicKindOf(word string) string {
+	switch {
+	case strings.HasPrefix(word, "fdis_") && len(word) > len("fdis_"):
+		return "issuer_id"
+	case strings.HasPrefix(word, "svac_") && len(word) > len("svac_"):
+		return "service_account_id"
+	case strings.HasPrefix(word, "fdrl_") && len(word) > len("fdrl_"):
+		return "federation_rule_id"
+	case strings.HasPrefix(word, "wrkspc_") && len(word) > len("wrkspc_"):
+		return "workspace_id"
+	case isUUID(word):
+		return "organization_id"
+	}
+	return ""
+}
+
+// isUUID is whether word is a UUID as Anthropic shows an organization's id.
+func isUUID(word string) bool {
+	if len(word) != 36 {
+		return false
+	}
+	for at, c := range word {
+		switch at {
+		case 8, 13, 18, 23:
+			if c != '-' {
+				return false
+			}
+		default:
+			if !strings.ContainsRune("0123456789abcdefABCDEF", c) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// anthropicIDsIn is every id of Anthropic's in what was pasted, placed by its
+// kind: a label, quotes or spaces around it are what the Console put there.
+func anthropicIDsIn(pasted string) map[string]string {
+	found := map[string]string{}
+	for _, word := range strings.FieldsFunc(pasted, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == '\n' || r == '"' || r == '\'' || r == '`' || r == ',' || r == ':' || r == ';'
+	}) {
+		if kind := anthropicKindOf(word); kind != "" {
+			found[kind] = word
+		}
+	}
+	return found
+}
 
 // anthropicSignum is the node's own connection to Anthropic, ROOT's.
 func (s *QNTXServer) anthropicSignum() sigil.Signum {
 	at := "/api/anthropic"
 	takes := []*protocol.Param{
-		{Name: "organization_id", Required: true, Says: "The Anthropic organization the rule is in, from its Organization page."},
-		{Name: "federation_rule_id", Required: true, Says: "The federation rule (fdrl_) the node's identity token is traded at."},
-		{Name: "service_account_id", Required: true, Says: "The service account (svac_) the traded token acts as."},
+		{Name: "given", Required: true, Says: "Whatever was copied from the Console: the node places each id in it by its kind, an fdis_ issuer, an svac_ service account, an fdrl_ rule, a UUID organization."},
 	}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
@@ -56,7 +106,7 @@ func (s *QNTXServer) anthropicSignum() sigil.Signum {
 				},
 				{
 					Name:   "set",
-					Does:   "Keeps the ids of the rule the node's identity token is traded at, then asks Anthropic whether it accepts it.",
+					Does:   "Keeps each id of Anthropic's in what was given, placed by its kind, and asks Anthropic whether it accepts the node once the organization, the service account and the rule are known.",
 					Takes:  takes,
 					Answer: "protocol.NodeAnthropic",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at},
@@ -83,8 +133,12 @@ func (s *QNTXServer) anthropicAm(ctx context.Context, _ sigil.Sent) (any, *proto
 	if !held {
 		return am, nil
 	}
-	am.OrganizationId, am.FederationRuleId, am.ServiceAccountId = kept.ids["organization_id"], kept.ids["federation_rule_id"], kept.ids["service_account_id"]
+	am.OrganizationId, am.IssuerId, am.FederationRuleId, am.ServiceAccountId, am.WorkspaceId = kept.ids["organization_id"], kept.ids["issuer_id"], kept.ids["federation_rule_id"], kept.ids["service_account_id"], kept.ids["workspace_id"]
 	am.SetBy, am.At = kept.setBy, kept.at.Format(time.RFC3339)
+	// Anthropic is asked once it can be: the organization, the service account and the rule known.
+	if am.OrganizationId == "" || am.ServiceAccountId == "" || am.FederationRuleId == "" {
+		return am, nil
+	}
 	am.Asked = true
 	if err := s.askAnthropic(ctx, i, am); err != nil {
 		am.Why = err.Error()
@@ -99,13 +153,23 @@ func (s *QNTXServer) anthropicSet(ctx context.Context, sent sigil.Sent) (any, *p
 	if !gated {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the node's ids at Anthropic are given through the gate, and this came through none"}
 	}
+	found := anthropicIDsIn(sent["given"])
+	if len(found) == 0 {
+		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "given", Says: "no id of Anthropic's in " + strings.TrimSpace(sent["given"]) + ": an organization's is a UUID, an issuer's starts fdis_, a service account's svac_, a rule's fdrl_"}
+	}
+	// What was given joins what the node kept: each id is given once, at its own step.
 	attributes := map[string]any{}
-	for _, name := range anthropicIDs {
-		given, err := named.TextOf(name, strings.TrimSpace(sent[name]))
-		if err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Missing, Param: name, Says: err.Error()}
+	if kept, held, err := s.anthropicLine(); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	} else if held {
+		for name, id := range kept.ids {
+			if id != "" {
+				attributes[name] = id
+			}
 		}
-		attributes[name] = given.String()
+	}
+	for name, id := range found {
+		attributes[name] = id
 	}
 	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
@@ -122,7 +186,7 @@ func (s *QNTXServer) anthropicSet(ctx context.Context, sent sigil.Sent) (any, *p
 	}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "the node's %s line %s was not kept", anthropicLineSubject, id).Error()}
 	}
-	s.logger.Infow("the node's ids at Anthropic were given", "organization_id", attributes["organization_id"], "federation_rule_id", attributes["federation_rule_id"], "service_account_id", attributes["service_account_id"], "by", admitted.Identity)
+	s.logger.Infow("the node's ids at Anthropic were given", "given", found, "by", admitted.Identity)
 	return s.anthropicAm(ctx, sent)
 }
 
@@ -154,6 +218,10 @@ func (s *QNTXServer) anthropicLine() (anthropicKept, bool, error) {
 	}
 	kept := anthropicKept{ids: map[string]string{}, at: newest.Timestamp}
 	for _, name := range anthropicIDs {
+		// An id not given yet is absent from the line.
+		if _, given := newest.Attributes[name]; !given {
+			continue
+		}
 		if kept.ids[name], err = oneText(newest.Attributes, name, anthropicLineSubject, newest.ID, auth.NamespaceSystem); err != nil {
 			return anthropicKept{}, false, err
 		}
@@ -177,7 +245,7 @@ func (s *QNTXServer) askAnthropic(ctx context.Context, i *issuer, am *protocol.N
 		option.WithoutEnvironmentDefaults(),
 		option.WithBaseURL(base),
 		option.WithFederationTokenProvider(i.identityTokenOf(am.Subject, auth.NamespaceSystem), option.FederationOptions{
-			FederationRuleID: am.FederationRuleId, OrganizationID: am.OrganizationId, ServiceAccountID: am.ServiceAccountId,
+			FederationRuleID: am.FederationRuleId, OrganizationID: am.OrganizationId, ServiceAccountID: am.ServiceAccountId, WorkspaceID: am.WorkspaceId,
 		}),
 	)
 	asking, cancel := context.WithTimeout(ctx, anthropicAsking)

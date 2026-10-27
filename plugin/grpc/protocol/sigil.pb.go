@@ -1291,7 +1291,11 @@ type NodeAnthropic struct {
 	// Whether Anthropic accepted the node's identity at the rule.
 	Accepted bool `protobuf:"varint,9,opt,name=accepted,proto3" json:"accepted,omitempty"`
 	// What Anthropic answered when it did not accept it, or why it was not reached.
-	Why           string `protobuf:"bytes,10,opt,name=why,proto3" json:"why,omitempty"`
+	Why string `protobuf:"bytes,10,opt,name=why,proto3" json:"why,omitempty"`
+	// The node's issuer as Anthropic registered it (fdis_).
+	IssuerId string `protobuf:"bytes,11,opt,name=issuer_id,json=issuerId,proto3" json:"issuer_id,omitempty"`
+	// The workspace the traded token is scoped to (wrkspc_), as the wizard's snippet names it.
+	WorkspaceId   string `protobuf:"bytes,12,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1392,6 +1396,20 @@ func (x *NodeAnthropic) GetAccepted() bool {
 func (x *NodeAnthropic) GetWhy() string {
 	if x != nil {
 		return x.Why
+	}
+	return ""
+}
+
+func (x *NodeAnthropic) GetIssuerId() string {
+	if x != nil {
+		return x.IssuerId
+	}
+	return ""
+}
+
+func (x *NodeAnthropic) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
 	}
 	return ""
 }
@@ -2395,7 +2413,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tanswering\x18\x06 \x01(\bR\tanswering\x12\x14\n" +
 	"\x05codex\x18\a \x01(\tR\x05codex\x12#\n" +
 	"\rcodex_version\x18\b \x01(\tR\fcodexVersion\x12\x1b\n" +
-	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\xb1\x02\n" +
+	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\xf1\x02\n" +
 	"\rNodeAnthropic\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
 	"\asubject\x18\x02 \x01(\tR\asubject\x12'\n" +
@@ -2407,7 +2425,9 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x05asked\x18\b \x01(\bR\x05asked\x12\x1a\n" +
 	"\baccepted\x18\t \x01(\bR\baccepted\x12\x10\n" +
 	"\x03why\x18\n" +
-	" \x01(\tR\x03why\"Y\n" +
+	" \x01(\tR\x03why\x12\x1b\n" +
+	"\tissuer_id\x18\v \x01(\tR\bissuerId\x12!\n" +
+	"\fworkspace_id\x18\f \x01(\tR\vworkspaceId\"Y\n" +
 	"\rNamespaceKeys\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12*\n" +
 	"\x04keys\x18\x02 \x03(\v2\x16.protocol.NamespaceKeyR\x04keys\"\x8d\x01\n" +
