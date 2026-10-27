@@ -250,17 +250,11 @@ func registerLoaded(loadedPlugins []plugin.DomainPlugin, registry *plugin.Regist
 	for i, p := range loadedPlugins {
 		meta := p.Metadata()
 		pluginLogger.Debugf("[%d/%d] Attempting to register '%s' plugin", i+1, len(loadedPlugins), meta.Name)
-		if acc != nil {
-			acc.SetLoading(meta.Name, meta.Version)
-		}
+		acc.SetLoading(meta.Name, meta.Version)
 		if err := registry.Register(p); err != nil {
 			pluginLogger.Errorf("Failed to register '%s' plugin v%s: %s (skipping)",
 				meta.Name, meta.Version, err.Error())
-			registry.MarkFailed(meta.Name, err.Error())
-			if acc != nil {
-				acc.SetFailed(meta.Name, err.Error())
-				acc.Emit(meta.Name, grpc.BannerBoot)
-			}
+			failPlugin(registry, acc, meta.Name, err.Error())
 			continue
 		}
 		// Mark plugin as running since gRPC connection is already established
@@ -287,6 +281,13 @@ func markNeverLoaded(manager *grpc.PluginManager, registry *plugin.Registry, ena
 			registry.MarkFailed(name, reason)
 		}
 	}
+}
+
+// failPlugin marks a plugin failed in the registry and says so on its banner.
+func failPlugin(registry *plugin.Registry, acc *grpc.PluginAccumulator, name, why string) {
+	registry.MarkFailed(name, why)
+	acc.SetFailed(name, why)
+	acc.Emit(name, grpc.BannerBoot)
 }
 
 // pluginInit is what initializing one plugin reaches for.
@@ -435,10 +436,8 @@ func (e pluginInit) initializeOne(p plugin.DomainPlugin) {
 		e.srv.RegisterPluginMux(meta.Name)
 
 		// Emit partial banner so the UI shows something
-		if e.acc != nil {
-			e.acc.SetHealth(meta.Name, false, "initializing (waiting for gRPC response)", nil)
-			e.acc.Emit(meta.Name, grpc.BannerBoot)
-		}
+		e.acc.SetHealth(meta.Name, false, "initializing (waiting for gRPC response)", nil)
+		e.acc.Emit(meta.Name, grpc.BannerBoot)
 
 		// Continue waiting in background — complete setup when Initialize returns
 		sacred.Go("plugin.initializeSlowly "+meta.Name, func() {
@@ -451,20 +450,14 @@ func (e pluginInit) initializeOne(p plugin.DomainPlugin) {
 	if initErr != nil {
 		e.logger.Errorw("Failed to initialize plugin",
 			"plugin", meta.Name, "version", meta.Version, "error", initErr)
-		e.registry.MarkFailed(meta.Name, initErr.Error())
-		if e.acc != nil {
-			e.acc.SetFailed(meta.Name, initErr.Error())
-			e.acc.Emit(meta.Name, grpc.BannerBoot)
-		}
+		failPlugin(e.registry, e.acc, meta.Name, initErr.Error())
 		return
 	}
 
 	e.registry.MarkReady(meta.Name)
 	e.logger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
 	if err := registerPluginProviders(p, meta, e.sm, e.srv, e.logger, e.acc); err != nil {
-		e.registry.MarkFailed(meta.Name, err.Error())
-		e.acc.SetFailed(meta.Name, err.Error())
-		e.acc.Emit(meta.Name, grpc.BannerBoot)
+		failPlugin(e.registry, e.acc, meta.Name, err.Error())
 		return
 	}
 	registerPluginHandlers(p, meta, e.handlerRegistry, e.db, e.sm, e.logger, e.acc)
@@ -475,11 +468,7 @@ func (e pluginInit) finishSlowInit(p plugin.DomainPlugin, meta plugin.Metadata, 
 	if bgErr != nil {
 		e.logger.Errorw("Background Initialize failed",
 			"plugin", meta.Name, "version", meta.Version, "error", bgErr)
-		e.registry.MarkFailed(meta.Name, bgErr.Error())
-		if e.acc != nil {
-			e.acc.SetFailed(meta.Name, bgErr.Error())
-			e.acc.Emit(meta.Name, grpc.BannerBoot)
-		}
+		failPlugin(e.registry, e.acc, meta.Name, bgErr.Error())
 		if pm := grpc.GetDefaultPluginManager(); pm != nil {
 			pm.EmitLifecycle(meta.Name, meta.Version, "failed", nil)
 		}
@@ -489,9 +478,7 @@ func (e pluginInit) finishSlowInit(p plugin.DomainPlugin, meta plugin.Metadata, 
 		"plugin", meta.Name, "version", meta.Version)
 	e.registry.MarkReady(meta.Name)
 	if err := registerPluginProviders(p, meta, e.sm, e.srv, e.logger, e.acc); err != nil {
-		e.registry.MarkFailed(meta.Name, err.Error())
-		e.acc.SetFailed(meta.Name, err.Error())
-		e.acc.Emit(meta.Name, grpc.BannerBoot)
+		failPlugin(e.registry, e.acc, meta.Name, err.Error())
 		return
 	}
 	registerPluginHandlers(p, meta, e.handlerRegistry, e.db, e.sm, e.logger, e.acc)
@@ -546,9 +533,7 @@ func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *gr
 			logger.Debugw("Registered Python provider", "plugin", meta.Name)
 		}
 	}
-	if acc != nil {
-		acc.SetRoles(meta.Name, roles)
-	}
+	acc.SetRoles(meta.Name, roles)
 
 	// Its sigils arrived with Initialize, after the node opened.
 	srv.ServePluginSigils()
@@ -580,23 +565,21 @@ func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handler
 
 	routeStrs := externalPlugin.SigilRoutes()
 
-	if acc != nil {
-		acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), grpc.ScheduleNames(externalPlugin.GetSchedules()), grpc.WatcherNames(externalPlugin.GetWatchers()), grpc.UnfilteredWatcherNames(externalPlugin.GetWatchers()))
-		if len(routeStrs) > 0 {
-			acc.SetHTTPRoutes(meta.Name, routeStrs)
-		}
-		healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		health := externalPlugin.Health(healthCtx)
-		hCancel()
-		details := make(map[string]string)
-		for k, v := range health.Details {
-			if s, ok := v.(string); ok {
-				details[k] = s
-			}
-		}
-		acc.SetHealth(meta.Name, health.Healthy, health.Message, details)
-		acc.Emit(meta.Name, grpc.BannerBoot)
+	acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), grpc.ScheduleNames(externalPlugin.GetSchedules()), grpc.WatcherNames(externalPlugin.GetWatchers()), grpc.UnfilteredWatcherNames(externalPlugin.GetWatchers()))
+	if len(routeStrs) > 0 {
+		acc.SetHTTPRoutes(meta.Name, routeStrs)
 	}
+	healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	health := externalPlugin.Health(healthCtx)
+	hCancel()
+	details := make(map[string]string)
+	for k, v := range health.Details {
+		if s, ok := v.(string); ok {
+			details[k] = s
+		}
+	}
+	acc.SetHealth(meta.Name, health.Healthy, health.Message, details)
+	acc.Emit(meta.Name, grpc.BannerBoot)
 
 	if pm := grpc.GetDefaultPluginManager(); pm != nil {
 		pm.EmitLifecycle(meta.Name, meta.Version, "started", routeStrs)
@@ -637,27 +620,19 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 		for _, p := range plugins {
 			sacred.GoTracked(&retryWg, "plugin.retryInitialize "+p.Metadata().Name, func() {
 				meta := p.Metadata()
-				if acc != nil {
-					acc.SetLoading(meta.Name, meta.Version)
-				}
+				acc.SetLoading(meta.Name, meta.Version)
 				initCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 				defer cancel()
 				if err := p.Initialize(initCtx, services); err != nil {
 					logger.Errorw("Failed to initialize plugin",
 						"plugin", meta.Name, "version", meta.Version, "error", err)
-					pluginRegistry.MarkFailed(meta.Name, err.Error())
-					if acc != nil {
-						acc.SetFailed(meta.Name, err.Error())
-						acc.Emit(meta.Name, grpc.BannerBoot)
-					}
+					failPlugin(pluginRegistry, acc, meta.Name, err.Error())
 					return
 				}
 				pluginRegistry.MarkReady(meta.Name)
 				logger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
 				if err := registerPluginProviders(p, meta, sm, defaultServer, logger, acc); err != nil {
-					pluginRegistry.MarkFailed(meta.Name, err.Error())
-					acc.SetFailed(meta.Name, err.Error())
-					acc.Emit(meta.Name, grpc.BannerBoot)
+					failPlugin(pluginRegistry, acc, meta.Name, err.Error())
 					return
 				}
 				registerPluginHandlers(p, meta, handlerRegistry, db, sm, logger, acc)
