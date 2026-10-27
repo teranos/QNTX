@@ -66,7 +66,9 @@ func managedIsSaidToBe(a *rootAgent) string {
 		"ROOT says what they see; what you do about it is the prompt. " +
 		"You run at Anthropic, in a container of your own, not on the machine the node runs on. " +
 		"Your DID is " + a.did + ". " +
-		"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token."
+		"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
+		"What ROOT has said about you is quoted in your source's comments, and in the commit messages of github.com/teranos/QNTX-Web and github.com/teranos/QNTX that touch your files: " +
+		"ROOT's words are the quoted lines, and a commit's session: line names the conversation they were said in."
 }
 
 // runManaged says said to the element's agent at Anthropic, and reads its answer
