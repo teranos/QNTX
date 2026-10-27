@@ -58,6 +58,14 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 			c.made["agent"]++
 			c.bodies["agent"] = append(c.bodies["agent"], sent)
 			answer("agent_1")
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/agent_1":
+			last := c.bodies["agent"][len(c.bodies["agent"])-1]
+			agent, _ := json.Marshal(map[string]any{"id": "agent_1", "version": len(c.bodies["agent"]), "system": last["system"], "model": last["model"]})
+			_, _ = w.Write(agent)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/agents/agent_1":
+			c.made["agent version"]++
+			c.bodies["agent"] = append(c.bodies["agent"], sent)
+			answer("agent_1")
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/vaults":
 			c.made["vault"]++
 			answer("vlt_1")
@@ -192,4 +200,21 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "memory": 1, "session": 2}, console.made)
 	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "the new Session has the Memory the ended one had")
 	console.mu.Unlock()
+
+	// Another model: its Agent becomes a new version, and it goes on in a new Session with the same Memory.
+	console.mu.Lock()
+	sessionsBefore := console.made["session"]
+	console.mu.Unlock()
+	onSonnet := said
+	onSonnet.Model = "claude-sonnet-5-5"
+	moved, err := s.spend(agent, onSonnet, shaken{}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	console.mu.Lock()
+	assert.Equal(t, 1, console.made["agent version"])
+	updated := console.bodies["agent"][len(console.bodies["agent"])-1]
+	assert.Equal(t, "claude-sonnet-5-5", updated["model"].(map[string]any)["id"])
+	assert.Equal(t, sessionsBefore+1, console.made["session"])
+	console.mu.Unlock()
+	assert.NotEqual(t, "sesn_1", moved.Session)
+
 }

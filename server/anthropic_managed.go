@@ -250,8 +250,9 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 	keep := func() error { return keepManaged(agent, held) }
 	// Anthropic reaches the node from outside: at its public origin, not the address it serves on.
 	mcp := s.authHandler.PublicOrigin() + "/mcp"
-	if held.Agent == "" {
-		made, err := client.Beta.Agents.New(ctx, anthropic.BetaAgentNewParams{
+	made := held.Agent == ""
+	if made {
+		created, err := client.Beta.Agents.New(ctx, anthropic.BetaAgentNewParams{
 			Name:       "qntx-element-" + agent.element,
 			Model:      anthropic.BetaManagedAgentsModelConfigParams{ID: anthropic.BetaManagedAgentsModel(model)},
 			System:     anthropic.String(managedIsSaidToBe(agent)),
@@ -270,7 +271,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		if err != nil {
 			return managedOf{}, errors.Wrapf(err, "no Agent was made at Anthropic for the element %s", agent.element)
 		}
-		held.Agent = made.ID
+		held.Agent = created.ID
 		if err := keep(); err != nil {
 			return managedOf{}, err
 		}
@@ -288,6 +289,24 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		held.Vault = vault.ID
 		if err := keep(); err != nil {
 			return managedOf{}, err
+		}
+	}
+	// Told something new, or on another model: its Agent becomes a new version, and a Session
+	// stays on the version it started with, so it goes on in a new one; its Memory carries over.
+	if !made {
+		was, err := client.Beta.Agents.Get(ctx, held.Agent, anthropic.BetaAgentGetParams{})
+		if err != nil {
+			return managedOf{}, errors.Wrapf(err, "the element %s's Agent %s at Anthropic did not answer", agent.element, held.Agent)
+		}
+		if was.System != managedIsSaidToBe(agent) || string(was.Model.ID) != model {
+			if _, err := client.Beta.Agents.Update(ctx, held.Agent, anthropic.BetaAgentUpdateParams{
+				Version: anthropic.Int(was.Version), System: anthropic.String(managedIsSaidToBe(agent)),
+				Model: anthropic.BetaManagedAgentsModelConfigParams{ID: anthropic.BetaManagedAgentsModel(model)},
+			}); err != nil {
+				return managedOf{}, errors.Wrapf(err, "the element %s's Agent %s at Anthropic was not brought up to date", agent.element, held.Agent)
+			}
+			s.logger.Infow("the element's Agent at Anthropic is a new version, and goes on in a new Session", "element", agent.element, "agent", held.Agent, "was", was.Version, "model", model, "ended", held.Session)
+			held.Session = ""
 		}
 	}
 	// A Session that ends takes what the agent learned with it; its Memory does not.
