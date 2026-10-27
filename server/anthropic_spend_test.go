@@ -50,14 +50,14 @@ func TestTheSessionExhaustedRootsAgentGoesOnOnTheConsoleWhenRootTickedIt(t *test
 	agent := &rootAgent{home: t.TempDir(), namespace: auth.NamespaceSystem}
 
 	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicSession})
-	stopped, err := s.spend(agent, rootSaid(binary, agent.home), func(claudecode.Message) {})
+	stopped, err := s.spend(agent, rootSaid(binary, agent.home), shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.True(t, stopped.IsError, "nothing follows: the turn ends exhausted")
 	assert.Contains(t, stopped.Text, "session limit")
 	assert.Equal(t, anthropicSession, s.anthropicInUse.Load())
 
 	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicSession, "then": "true"})
-	went, err := s.spend(agent, rootSaid(binary, agent.home), func(claudecode.Message) {})
+	went, err := s.spend(agent, rootSaid(binary, agent.home), shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.False(t, went.IsError, went.Text)
 	assert.Equal(t, "answered on the Console", went.Text)
@@ -113,7 +113,7 @@ func TestAnotherAgentsTurnRunsAsSaid(t *testing.T) {
 	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole, "then": "true"})
 	binary, _ := spending(t)
 	agent := &rootAgent{home: t.TempDir(), namespace: "pond"}
-	answer, err := s.spend(agent, rootSaid(binary, agent.home), func(claudecode.Message) {})
+	answer, err := s.spend(agent, rootSaid(binary, agent.home), shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.Contains(t, answer.Text, "session limit", "a namespace's agent is not ROOT's: it spends as it was signed in")
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -80,6 +81,7 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 			events, _ := sent["events"].([]any)
 			first, _ := events[0].(map[string]any)
 			content, _ := first["content"].([]any)
+			c.bodies["said"] = append(c.bodies["said"], map[string]any{"content": content})
 			text, _ := content[0].(map[string]any)
 			said, _ := text["text"].(string)
 			c.said <- said
@@ -124,7 +126,7 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	said := rootSaid(filepath.Join(t.TempDir(), "no-claude-code-is-run"), home)
 
 	var seen []claudecode.Message
-	answer, err := s.spend(agent, said, func(m claudecode.Message) { seen = append(seen, m) })
+	answer, err := s.spend(agent, said, shaken{}, func(m claudecode.Message) { seen = append(seen, m) })
 	require.NoError(t, err)
 	assert.Equal(t, "the element answered at Anthropic", answer.Text)
 	assert.False(t, answer.IsError)
@@ -144,12 +146,28 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	assert.Equal(t, []any{map[string]any{"type": "memory_store", "memory_store_id": "memstore_1"}}, console.bodies["session"][0]["resources"], "its Memory, in every Session")
 	console.mu.Unlock()
 
-	again, err := s.spend(agent, said, func(claudecode.Message) {})
+	again, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_1", again.Session, "shaken again: the same Session")
 	console.mu.Lock()
 	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "memory": 1, "session": 1}, console.made, "each made once")
 	console.mu.Unlock()
+
+	// A screenshot reaches it as a picture, not as a path on the node it cannot open.
+	picture := filepath.Join(t.TempDir(), "shot.png")
+	png := []byte("\x89PNG\r\n\x1a\n" + "the rest of a picture")
+	require.NoError(t, os.WriteFile(picture, png, 0o600))
+	_, err = s.spend(agent, said, shaken{says: "weird resize happens", element: "canvas-1", screenshot: picture}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	console.mu.Lock()
+	sent := console.bodies["said"][len(console.bodies["said"])-1]["content"].([]any)
+	console.mu.Unlock()
+	require.Len(t, sent, 2)
+	assert.Equal(t, "weird resize happens\n\nThe screenshot of element canvas-1 is with this message.", sent[0].(map[string]any)["text"])
+	source := sent[1].(map[string]any)["source"].(map[string]any)
+	assert.Equal(t, "image/png", source["media_type"])
+	assert.Equal(t, base64.StdEncoding.EncodeToString(png), source["data"])
+	assert.NotContains(t, sent[0].(map[string]any)["text"], picture, "no path on the node")
 
 	kept, err := os.ReadFile(filepath.Join(home, elementsDir, "canvas-1", managedElementFile))
 	require.NoError(t, err)
@@ -159,7 +177,7 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	console.mu.Lock()
 	console.ended["sesn_1"] = true
 	console.mu.Unlock()
-	anew, err := s.spend(agent, said, func(claudecode.Message) {})
+	anew, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_2", anew.Session)
 	console.mu.Lock()

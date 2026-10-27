@@ -116,7 +116,7 @@ func (s *QNTXServer) sessionWindows(ctx context.Context) ([]*protocol.AnthropicW
 
 // spend runs a ROOT agent's turn on what ROOT ordered: the first until it is
 // exhausted, then the other when ROOT ticked it. Any other agent's turn runs as said.
-func (s *QNTXServer) spend(agent *rootAgent, said claudecode.Said, each func(claudecode.Message)) (claudecode.Answer, error) {
+func (s *QNTXServer) spend(agent *rootAgent, said claudecode.Said, shot shaken, each func(claudecode.Message)) (claudecode.Answer, error) {
 	if agent.namespace != auth.NamespaceSystem {
 		return said.Run(s.ctx, each)
 	}
@@ -143,7 +143,7 @@ func (s *QNTXServer) spend(agent *rootAgent, said claudecode.Said, each func(cla
 		s.anthropicInUse.Store(source)
 		// An element's agent on the Console runs at Anthropic, not on the node.
 		if source == anthropicConsole && agent.element != "" {
-			answer, err = s.runManaged(agent, said, kept, each)
+			answer, err = s.runManaged(agent, said, shot, kept, each)
 		} else {
 			answer, err = on.Run(s.ctx, each)
 		}

@@ -7,7 +7,9 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,7 +68,7 @@ func managedIsSaidToBe(a *rootAgent) string {
 
 // runManaged says said to the element's agent at Anthropic, and reads its answer
 // from the Session's events until the Session is idle again.
-func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, kept anthropicKept, each func(claudecode.Message)) (claudecode.Answer, error) {
+func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot shaken, kept anthropicKept, each func(claudecode.Message)) (claudecode.Answer, error) {
 	if s.authHandler == nil {
 		return claudecode.Answer{}, errors.New("this node runs without auth, so it has no public origin an agent at Anthropic could reach its MCP by")
 	}
@@ -87,10 +89,12 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, kept ant
 	// The stream is opened before the message is sent: it has no replay.
 	stream := client.Beta.Sessions.Events.StreamEvents(ctx, held.Session, anthropic.BetaSessionEventStreamParams{})
 	defer stream.Close()
+	content, err := shot.content(said.Says)
+	if err != nil {
+		return claudecode.Answer{}, err
+	}
 	if _, err := client.Beta.Sessions.Events.Send(ctx, held.Session, anthropic.BetaSessionEventSendParams{
-		Events: []anthropic.BetaManagedAgentsEventParamsUnion{{OfUserMessage: &anthropic.BetaManagedAgentsUserMessageEventParams{
-			Content: []anthropic.BetaManagedAgentsUserMessageEventParamsContentUnion{{OfText: &anthropic.BetaManagedAgentsTextBlockParam{Text: said.Says}}},
-		}}},
+		Events: []anthropic.BetaManagedAgentsEventParamsUnion{{OfUserMessage: &anthropic.BetaManagedAgentsUserMessageEventParams{Content: content}}},
 	}); err != nil {
 		return claudecode.Answer{}, errors.Wrapf(err, "what was said did not reach session %s at Anthropic", held.Session)
 	}
@@ -121,6 +125,29 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, kept ant
 		return claudecode.Answer{}, errors.Wrapf(err, "the events of session %s at Anthropic stopped before it was idle", held.Session)
 	}
 	return claudecode.Answer{}, errors.Newf("the events of session %s at Anthropic ended before it was idle", held.Session)
+}
+
+// shaken is what ROOT said, the element it was said in, and where its screenshot was put on the node.
+type shaken struct {
+	says, element, screenshot string
+}
+
+// content is what is said to an agent at Anthropic: the words, and the screenshot itself, since a path
+// on the node is nothing it can open. With no screenshot, it is what the harness was told.
+func (s shaken) content(told string) ([]anthropic.BetaManagedAgentsUserMessageEventParamsContentUnion, error) {
+	if s.screenshot == "" {
+		return []anthropic.BetaManagedAgentsUserMessageEventParamsContentUnion{{OfText: &anthropic.BetaManagedAgentsTextBlockParam{Text: told}}}, nil
+	}
+	picture, err := os.ReadFile(s.screenshot)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the screenshot of element %s at %s did not read", s.element, s.screenshot)
+	}
+	return []anthropic.BetaManagedAgentsUserMessageEventParamsContentUnion{
+		{OfText: &anthropic.BetaManagedAgentsTextBlockParam{Text: s.says + "\n\nThe screenshot of element " + s.element + " is with this message."}},
+		{OfImage: &anthropic.BetaManagedAgentsImageBlockParam{Source: anthropic.BetaManagedAgentsImageBlockSourceUnionParam{
+			OfBase64: &anthropic.BetaManagedAgentsBase64ImageSourceParam{Data: base64.StdEncoding.EncodeToString(picture), MediaType: http.DetectContentType(picture)},
+		}}},
+	}, nil
 }
 
 // managedEnvironment is the cloud Environment every element's agent runs in, made once.
