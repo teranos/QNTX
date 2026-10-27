@@ -161,6 +161,8 @@ message ClaudeAm {
   bool signed_in = 11;
   // How it is signed in, as Claude Code names it, or empty when it is not.
   string auth_method = 12;
+  // Every model a turn can be said to answer with.
+  repeated string models = 13;
 }
 
 // NamespaceAgentSaid is what agents say answers: what the namespace's agent
@@ -263,6 +265,25 @@ message NodeAnthropic {
   string issuer_id = 11;
   // The workspace the traded token is scoped to (wrkspc_), as the wizard's snippet names it.
   string workspace_id = 12;
+  // What ROOT's agents spend first: "session", the Claude subscription, or "console", the node's OIDC.
+  string first = 13;
+  // Whether the other follows once the first is exhausted.
+  bool then = 14;
+  // The session's windows, as ug last read each.
+  repeated AnthropicWindow session = 15;
+  // What ROOT's agents last ran on: "session" or "console"; empty before any turn.
+  string in_use = 16;
+}
+
+// AnthropicWindow is one window of the Claude subscription, as ug's status line read it.
+message AnthropicWindow {
+  // five_hour or seven_day.
+  string window = 1;
+  double used_percentage = 2;
+  // When the window resets, in Unix seconds.
+  int64 resets_at = 3;
+  // When ug read it, as RFC 3339.
+  string at = 4;
 }
 
 // NamespaceKeys is what keys list, set and drop answer: the names of a

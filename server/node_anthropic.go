@@ -105,6 +105,16 @@ func (s *QNTXServer) anthropicSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: at},
 				},
 				{
+					Name: "order",
+					Does: "What ROOT's agents spend first, the session or the Console, and whether the other follows once the first is exhausted.",
+					Takes: []*protocol.Param{
+						{Name: "first", Required: true, OneOf: anthropicSources, Says: "session, the Claude subscription, or console, the node's OIDC at the Console."},
+						{Name: "then", OneOf: []string{"true", "false"}, Says: "Whether the other follows once the first is exhausted. Not sent, it does not."},
+					},
+					Answer: "protocol.NodeAnthropic",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/order"},
+				},
+				{
 					Name:   "set",
 					Does:   "Keeps each id of Anthropic's in what was given, placed by its kind, and asks Anthropic whether it accepts the node once the organization, the service account and the rule are known.",
 					Takes:  takes,
@@ -114,8 +124,9 @@ func (s *QNTXServer) anthropicSignum() sigil.Signum {
 			},
 		},
 		Answers: map[string]sigil.Answer{
-			"am":  s.anthropicAm,
-			"set": s.anthropicSet,
+			"am":    s.anthropicAm,
+			"set":   s.anthropicSet,
+			"order": s.anthropicOrder,
 		},
 	}
 }
@@ -125,7 +136,10 @@ func (s *QNTXServer) anthropicAm(ctx context.Context, _ sigil.Sent) (any, *proto
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	am := &protocol.NodeAnthropic{Issuer: i.url, Subject: s.nodeDID.DID}
+	am := &protocol.NodeAnthropic{Issuer: i.url, Subject: s.nodeDID.DID, First: anthropicSession, InUse: s.anthropicInUse.Load()}
+	if am.Session, err = s.sessionWindows(ctx); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
 	kept, held, err := s.anthropicLine()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
@@ -133,6 +147,7 @@ func (s *QNTXServer) anthropicAm(ctx context.Context, _ sigil.Sent) (any, *proto
 	if !held {
 		return am, nil
 	}
+	am.First, am.Then = kept.first, kept.then
 	am.OrganizationId, am.IssuerId, am.FederationRuleId, am.ServiceAccountId, am.WorkspaceId = kept.ids["organization_id"], kept.ids["issuer_id"], kept.ids["federation_rule_id"], kept.ids["service_account_id"], kept.ids["workspace_id"]
 	am.SetBy, am.At = kept.setBy, kept.at.Format(time.RFC3339)
 	// Anthropic is asked once it can be: the organization, the service account and the rule known.
@@ -158,41 +173,52 @@ func (s *QNTXServer) anthropicSet(ctx context.Context, sent sigil.Sent) (any, *p
 		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "given", Says: "no id of Anthropic's in " + strings.TrimSpace(sent["given"]) + ": an organization's is a UUID, an issuer's starts fdis_, a service account's svac_, a rule's fdrl_"}
 	}
 	// What was given joins what the node kept: each id is given once, at its own step.
-	attributes := map[string]any{}
-	if kept, held, err := s.anthropicLine(); err != nil {
+	kept, _, err := s.anthropicLine()
+	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	} else if held {
-		for name, id := range kept.ids {
-			if id != "" {
-				attributes[name] = id
-			}
-		}
 	}
 	for name, id := range found {
-		attributes[name] = id
+		kept.ids[name] = id
 	}
-	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "no store to keep the node's %s line in", anthropicLineSubject).Error()}
-	}
-	id, err := identity.GenerateASUIDWithRetry("AS", anthropicLineSubject, anthropicLinePredicate, auth.NamespaceSystem, store.AttestationExists)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "failed to name the node's %s line", anthropicLineSubject).Error()}
-	}
-	now := time.Now()
-	if err := store.CreateAttestation(&types.As{
-		ID: id, Subjects: []string{anthropicLineSubject}, Predicates: []string{anthropicLinePredicate}, Contexts: []string{auth.NamespaceSystem},
-		Actors: []string{admitted.Identity}, Timestamp: now, CreatedAt: now, Source: "anthropic", Attributes: attributes,
-	}); err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "the node's %s line %s was not kept", anthropicLineSubject, id).Error()}
+	if refused := s.keepAnthropicLine(admitted.Identity, kept); refused != nil {
+		return nil, refused
 	}
 	s.logger.Infow("the node's ids at Anthropic were given", "given", found, "by", admitted.Identity)
 	return s.anthropicAm(ctx, sent)
 }
 
+// keepAnthropicLine writes the node's ANTHROPIC line anew: every id kept, and the order.
+func (s *QNTXServer) keepAnthropicLine(by string, kept anthropicKept) *protocol.Refusal {
+	attributes := map[string]any{"first": kept.first, "then": kept.then}
+	for name, id := range kept.ids {
+		if id != "" {
+			attributes[name] = id
+		}
+	}
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	if err != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "no store to keep the node's %s line in", anthropicLineSubject).Error()}
+	}
+	id, err := identity.GenerateASUIDWithRetry("AS", anthropicLineSubject, anthropicLinePredicate, auth.NamespaceSystem, store.AttestationExists)
+	if err != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "failed to name the node's %s line", anthropicLineSubject).Error()}
+	}
+	now := time.Now()
+	if err := store.CreateAttestation(&types.As{
+		ID: id, Subjects: []string{anthropicLineSubject}, Predicates: []string{anthropicLinePredicate}, Contexts: []string{auth.NamespaceSystem},
+		Actors: []string{by}, Timestamp: now, CreatedAt: now, Source: "anthropic", Attributes: attributes,
+	}); err != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "the node's %s line %s was not kept", anthropicLineSubject, id).Error()}
+	}
+	return nil
+}
+
 // anthropicKept is the node's newest ANTHROPIC line.
 type anthropicKept struct {
-	ids   map[string]string
+	ids map[string]string
+	// What ROOT's agents spend first, and whether the other follows.
+	first string
+	then  bool
 	setBy string
 	at    time.Time
 }
@@ -214,9 +240,20 @@ func (s *QNTXServer) anthropicLine() (anthropicKept, bool, error) {
 		}
 	}
 	if newest == nil {
-		return anthropicKept{}, false, nil
+		return anthropicKept{ids: map[string]string{}, first: anthropicSession}, false, nil
 	}
-	kept := anthropicKept{ids: map[string]string{}, at: newest.Timestamp}
+	kept := anthropicKept{ids: map[string]string{}, first: anthropicSession, at: newest.Timestamp}
+	// A line kept before ROOT ordered anything spends the session first, and nothing follows.
+	if _, ordered := newest.Attributes["first"]; ordered {
+		if kept.first, err = oneText(newest.Attributes, "first", anthropicLineSubject, newest.ID, auth.NamespaceSystem); err != nil {
+			return anthropicKept{}, false, err
+		}
+		then, isBool := newest.Attributes["then"].(bool)
+		if !isBool {
+			return anthropicKept{}, false, errors.Newf("the node's %s line %s keeps then as %T, not a bool", anthropicLineSubject, newest.ID, newest.Attributes["then"])
+		}
+		kept.then = then
+	}
 	for _, name := range anthropicIDs {
 		// An id not given yet is absent from the line.
 		if _, given := newest.Attributes[name]; !given {

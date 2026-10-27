@@ -44,7 +44,9 @@ type aTurn struct {
 // turnRun is what a harness runs a turn with.
 type turnRun struct {
 	says, session string
-	resumes       bool
+	// shot is what was said with its screenshot, for a harness that carries the picture itself.
+	shot    shaken
+	resumes bool
 	// env is the agent's git, as the harness hands it on.
 	env    []string
 	writes sessionWriter
@@ -115,7 +117,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	if starts, forATask := taskStartsIn(ctx); forATask {
 		started = func(stream string) { starts(session, stream) }
 	}
-	answer, err := t.run(turnRun{says: shakePrompt(says, t.element, t.screenshot), session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
+	answer, err := t.run(turnRun{says: shakePrompt(says, t.element, t.screenshot), shot: shaken{says: says, element: t.element, screenshot: t.screenshot}, session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
 		unwritten: unwritten, started: started})
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: t.called + " did not answer: " + err.Error()}
