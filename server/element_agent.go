@@ -52,7 +52,8 @@ func storyOf(element string) string {
 func storiesAware(element string) string {
 	if story := storyOf(element); story != "" {
 		return "You are the user story " + story + " of github.com/teranos/QNTX-Web, and nothing else: that file is your contract, every time you are spoken to. " +
-			"What it says ROOT or a user does and sees is what has to hold. The elements it names are agents you can reach."
+			"What it says ROOT or a user does and sees is what has to hold. The elements it names are agents you can reach. " +
+			"So is every other story, named " + storyPrefix + " and its file's name: a story that leads into yours, or that yours leads into, is one to talk to."
 	}
 	return "The user stories in stories/ of github.com/teranos/QNTX-Web that name you are your contract: what they say a person does and sees with you is what has to hold."
 }

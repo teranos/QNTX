@@ -233,6 +233,8 @@ func TestAStorysAgentHasItsOneStoryAsItsContract(t *testing.T) {
 	story := managedIsSaidToBe(&rootAgent{element: "story-27-root-registers-the-node-with-anthropic", did: "did:key:story"})
 	assert.Contains(t, story, "You are the user story stories/27-root-registers-the-node-with-anthropic.feature of github.com/teranos/QNTX-Web, and nothing else")
 	assert.NotContains(t, story, "You are the element")
+	// "and because some stories may lead into each other, the stories could talk to the stories as well"
+	assert.Contains(t, story, "So is every other story, named story- and its file's name")
 	element := managedIsSaidToBe(&rootAgent{element: "approvals-element", did: "did:key:approvals"})
 	assert.Contains(t, element, "The user stories in stories/ of github.com/teranos/QNTX-Web that name you are your contract")
 }
