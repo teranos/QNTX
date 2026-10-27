@@ -195,17 +195,7 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		return
 	}
 
-	// Pre-register enabled plugins and answer their routes, so a request that
-	// arrives while they load is told so.
-	var enabledNames []string
-	for _, record := range known {
-		if record.Enabled {
-			enabledNames = append(enabledNames, record.Name)
-			registry.PreRegister(record.Name)
-			defaultServer.RegisterPluginRoutes(record.Name)
-		}
-	}
-	pluginLogger.Debugf("Pre-registered %d plugins, loading in background", len(enabledNames))
+	enabledNames := preRegisterEnabled(known, registry, defaultServer, pluginLogger)
 
 	manager := grpc.GetDefaultPluginManager()
 	grpc.ConfigureWebSocketFromConfig(manager, cfg)
@@ -219,9 +209,42 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		return
 	}
 
-	// Register loaded plugins with registry
 	loadedPlugins := manager.GetAllPlugins()
 	acc := manager.Accumulator()
+	registeredNames := registerLoaded(loadedPlugins, registry, acc, pluginLogger)
+	markNeverLoaded(manager, registry, enabledNames, registeredNames)
+
+	pluginLogger.Debug("Plugin loading complete")
+
+	initializeLoaded(defaultServer, manager, registry, loadedPlugins, acc, pluginLogger)
+
+	// Start health polling — detect plugin crashes and restart automatically
+	if defaultServer != nil && defaultServer.GetServices() != nil {
+		manager.StartHealthPolling(registry, defaultServer.GetServices())
+	}
+
+	// A plugin's new build is taken from the runner the moment it lands (ADR-043).
+	defaultServer.StartRunner()
+}
+
+// preRegisterEnabled pre-registers enabled plugins and answers their routes, so
+// a request that arrives while they load is told so. It returns their names.
+func preRegisterEnabled(known []grpc.PluginRecord, registry *plugin.Registry, defaultServer *server.QNTXServer, pluginLogger *zap.SugaredLogger) []string {
+	var enabledNames []string
+	for _, record := range known {
+		if record.Enabled {
+			enabledNames = append(enabledNames, record.Name)
+			registry.PreRegister(record.Name)
+			defaultServer.RegisterPluginRoutes(record.Name)
+		}
+	}
+	pluginLogger.Debugf("Pre-registered %d plugins, loading in background", len(enabledNames))
+	return enabledNames
+}
+
+// registerLoaded registers loaded plugins with the registry and returns the
+// names that registered.
+func registerLoaded(loadedPlugins []plugin.DomainPlugin, registry *plugin.Registry, acc *grpc.PluginAccumulator, pluginLogger *zap.SugaredLogger) map[string]bool {
 	pluginLogger.Debugf("Registering %d loaded plugins with registry", len(loadedPlugins))
 	registeredNames := make(map[string]bool)
 	for i, p := range loadedPlugins {
@@ -246,8 +269,11 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 		pluginLogger.Debugf("Registered '%s' plugin v%s - %s",
 			meta.Name, meta.Version, meta.Description)
 	}
+	return registeredNames
+}
 
-	// Mark any pre-registered plugins that never loaded as failed, with the real error
+// markNeverLoaded marks any pre-registered plugins that never loaded as failed, with the real error
+func markNeverLoaded(manager *grpc.PluginManager, registry *plugin.Registry, enabledNames []string, registeredNames map[string]bool) {
 	failedErrors := manager.GetFailedPlugins()
 	for _, name := range enabledNames {
 		if registeredNames[name] {
@@ -261,187 +287,218 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 			registry.MarkFailed(name, reason)
 		}
 	}
+}
 
-	pluginLogger.Debug("Plugin loading complete")
+// pluginInit is what initializing one plugin reaches for.
+type pluginInit struct {
+	srv             *server.QNTXServer
+	registry        *plugin.Registry
+	acc             *grpc.PluginAccumulator
+	sm              *grpc.ServicesManager
+	services        plugin.ServiceRegistry
+	handlerRegistry *async.HandlerRegistry
+	db              *sql.DB
+	logger          *zap.SugaredLogger
+}
 
-	// CRITICAL: Initialize all loaded plugins now that they're registered
-	// This must happen HERE (not in server/init.go) because plugins load asynchronously
-	// and the server starts before plugin loading completes.
-	if defaultServer.GetServices() != nil {
-		services := defaultServer.GetServices()
-		sm := defaultServer.GetServicesManager()
-
-		// Wire watcher reload so plugin-declared watchers are loaded into the engine
-		if pm := grpc.GetDefaultPluginManager(); pm != nil {
-			pm.SetOnWatchersSetup(func() {
-				if err := defaultServer.ReloadWatchers(); err != nil {
-					pluginLogger.Errorw("Plugin watchers are not live; they will not fire until QNTX restarts", "error", err)
-				}
-			})
-			pm.SetOnPluginRestarted(func(name string) {
-				defaultServer.InvalidatePluginMux(name)
-				defaultServer.RegisterPluginMux(name)
-				// "i want runtime restarts to register new ones though"
-				defaultServer.ServePluginSigils()
-			})
-			pm.SetOnEmbeddingProviderReady(func(name string, client protocol.EmbeddingServiceClient) {
-				defaultServer.SetupPluginEmbeddingService(client)
-				pluginLogger.Debugw("Re-wired embedding provider after restart", "plugin", name)
-			})
-			pm.SetOnPythonProviderReady(func(name string, client protocol.PythonServiceClient) {
-				defaultServer.AddPythonProvider(client)
-				pluginLogger.Debugw("Registered Python provider after restart", "plugin", name)
-			})
-		}
-
-		// Capture Pulse resources before init loop so goroutines can register handlers.
-		daemon := defaultServer.GetDaemon()
-		var handlerRegistry *async.HandlerRegistry
-		var db *sql.DB
-		if daemon != nil {
-			handlerRegistry = daemon.Registry()
-			db = defaultServer.GetDB()
-			manager.SetPulseResources(db, handlerRegistry)
-		}
-
-		// Initialize all plugins concurrently — each plugin gets its own goroutine.
-		// Each goroutine handles its own post-init work (providers, handlers, banner).
-		// If Initialize doesn't respond within 30s, HTTP routes are pre-registered and
-		// a partial banner is emitted; Initialize continues in the background.
-		const initTimeout = 30 * time.Second
-		pluginLogger.Debugw("Initializing plugins concurrently", "count", len(loadedPlugins))
-		var initWg sync.WaitGroup
-		for _, p := range loadedPlugins {
-			// Every goroutine here reaches a plugin's own Initialize. A panic
-			// in one used to end the node before it had finished starting.
-			sacred.GoTracked(&initWg, "plugin.initialize "+p.Metadata().Name, func() {
-				meta := p.Metadata()
-
-				initCtx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-				initDone := make(chan error, 1)
-				// Recovered, not just logged: a panic that only logged would
-				// leave initDone unsent and everything waiting on it waiting
-				// forever. As an error it takes the failure path that already
-				// exists below.
-				sacred.Go("plugin.Initialize "+meta.Name, func() {
-					initDone <- func() (err error) {
-						defer sacred.Recovered("plugin.Initialize "+meta.Name, &err)
-						return p.Initialize(initCtx, services)
-					}()
-				})
-
-				// Each branch owns initCtx: the fast path cancels here, the slow
-				// path hands ownership to the background goroutine below.
-				var initErr error
-				select {
-				case initErr = <-initDone:
-					cancel()
-
-				case <-time.After(initTimeout):
-					pluginLogger.Warnw("Initialize not responding, continuing startup",
-						"plugin", meta.Name, "timeout", initTimeout)
-
-					// Pre-register HTTP proxy routes so the plugin is reachable now
-					defaultServer.RegisterPluginMux(meta.Name)
-
-					// Emit partial banner so the UI shows something
-					if acc != nil {
-						acc.SetHealth(meta.Name, false, "initializing (waiting for gRPC response)", nil)
-						acc.Emit(meta.Name, grpc.BannerBoot)
-					}
-
-					// Continue waiting in background — complete setup when Initialize returns
-					sacred.Go("plugin.initializeSlowly "+meta.Name, func() {
-						defer cancel()
-						bgErr := <-initDone
-						if bgErr != nil {
-							pluginLogger.Errorw("Background Initialize failed",
-								"plugin", meta.Name, "version", meta.Version, "error", bgErr)
-							registry.MarkFailed(meta.Name, bgErr.Error())
-							if acc != nil {
-								acc.SetFailed(meta.Name, bgErr.Error())
-								acc.Emit(meta.Name, grpc.BannerBoot)
-							}
-							if pm := grpc.GetDefaultPluginManager(); pm != nil {
-								pm.EmitLifecycle(meta.Name, meta.Version, "failed", nil)
-							}
-							return
-						}
-						pluginLogger.Infow("Background Initialize completed",
-							"plugin", meta.Name, "version", meta.Version)
-						registry.MarkReady(meta.Name)
-						if err := registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc); err != nil {
-							registry.MarkFailed(meta.Name, err.Error())
-							acc.SetFailed(meta.Name, err.Error())
-							acc.Emit(meta.Name, grpc.BannerBoot)
-							return
-						}
-						registerPluginHandlers(p, meta, handlerRegistry, db, sm, pluginLogger, acc)
-						if err := defaultServer.ReloadWatchers(); err != nil {
-							pluginLogger.Warnw("Failed to reload watchers after background init",
-								"plugin", meta.Name, "error", err)
-						}
-					})
-					return
-				}
-
-				if initErr != nil {
-					pluginLogger.Errorw("Failed to initialize plugin",
-						"plugin", meta.Name, "version", meta.Version, "error", initErr)
-					registry.MarkFailed(meta.Name, initErr.Error())
-					if acc != nil {
-						acc.SetFailed(meta.Name, initErr.Error())
-						acc.Emit(meta.Name, grpc.BannerBoot)
-					}
-					return
-				}
-
-				registry.MarkReady(meta.Name)
-				pluginLogger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
-				if err := registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc); err != nil {
-					registry.MarkFailed(meta.Name, err.Error())
-					acc.SetFailed(meta.Name, err.Error())
-					acc.Emit(meta.Name, grpc.BannerBoot)
-					return
-				}
-				registerPluginHandlers(p, meta, handlerRegistry, db, sm, pluginLogger, acc)
-			})
-		}
-		initWg.Wait()
-
-		// Reload watcher engine — plugins may have registered watchers during Initialize
-		if err := defaultServer.ReloadWatchers(); err != nil {
-			pluginLogger.Errorw("Failed to reload watchers after plugin init", "error", err)
-		}
-
-		// A restart stops the build the node was running; this starts it again.
-		defaultServer.BuildMoved()
-		// A push while the node was down reached no vault either.
-		defaultServer.FillVaults()
-		defaultServer.SendVaults()
-
-		if daemon == nil {
-			pluginLogger.Warnw("Cannot register handlers - the node's Pulse pool is not up yet, will retry")
-			sacred.Go("plugin.retrySetup.noDaemon", func() {
-				retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
-			})
-		} else {
-			pluginLogger.Debugw("Plugin init complete")
-		}
-	} else {
+// initializeLoaded initializes all loaded plugins now that they're registered.
+// CRITICAL: This must happen HERE (not in server/init.go) because plugins load
+// asynchronously and the server starts before plugin loading completes.
+func initializeLoaded(defaultServer *server.QNTXServer, manager *grpc.PluginManager, registry *plugin.Registry, loadedPlugins []plugin.DomainPlugin, acc *grpc.PluginAccumulator, pluginLogger *zap.SugaredLogger) {
+	if defaultServer.GetServices() == nil {
 		pluginLogger.Debugw("Cannot initialize plugins - server or services not available yet, will retry")
 		sacred.Go("plugin.retrySetup.noServer", func() {
 			retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
 		})
+		return
+	}
+	services := defaultServer.GetServices()
+	sm := defaultServer.GetServicesManager()
+
+	wireRestartHooks(defaultServer, pluginLogger)
+
+	// Capture Pulse resources before init loop so goroutines can register handlers.
+	daemon := defaultServer.GetDaemon()
+	var handlerRegistry *async.HandlerRegistry
+	var db *sql.DB
+	if daemon != nil {
+		handlerRegistry = daemon.Registry()
+		db = defaultServer.GetDB()
+		manager.SetPulseResources(db, handlerRegistry)
 	}
 
-	// Start health polling — detect plugin crashes and restart automatically
-	if defaultServer != nil && defaultServer.GetServices() != nil {
-		manager.StartHealthPolling(registry, defaultServer.GetServices())
+	env := pluginInit{
+		srv:             defaultServer,
+		registry:        registry,
+		acc:             acc,
+		sm:              sm,
+		services:        services,
+		handlerRegistry: handlerRegistry,
+		db:              db,
+		logger:          pluginLogger,
 	}
 
-	// A plugin's new build is taken from the runner the moment it lands (ADR-043).
-	defaultServer.StartRunner()
+	// Initialize all plugins concurrently — each plugin gets its own goroutine.
+	// Each goroutine handles its own post-init work (providers, handlers, banner).
+	pluginLogger.Debugw("Initializing plugins concurrently", "count", len(loadedPlugins))
+	var initWg sync.WaitGroup
+	for _, p := range loadedPlugins {
+		// Every goroutine here reaches a plugin's own Initialize. A panic
+		// in one used to end the node before it had finished starting.
+		sacred.GoTracked(&initWg, "plugin.initialize "+p.Metadata().Name, func() {
+			env.initializeOne(p)
+		})
+	}
+	initWg.Wait()
+
+	// Reload watcher engine — plugins may have registered watchers during Initialize
+	if err := defaultServer.ReloadWatchers(); err != nil {
+		pluginLogger.Errorw("Failed to reload watchers after plugin init", "error", err)
+	}
+
+	// A restart stops the build the node was running; this starts it again.
+	defaultServer.BuildMoved()
+	// A push while the node was down reached no vault either.
+	defaultServer.FillVaults()
+	defaultServer.SendVaults()
+
+	if daemon == nil {
+		pluginLogger.Warnw("Cannot register handlers - the node's Pulse pool is not up yet, will retry")
+		sacred.Go("plugin.retrySetup.noDaemon", func() {
+			retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
+		})
+	} else {
+		pluginLogger.Debugw("Plugin init complete")
+	}
+}
+
+// wireRestartHooks wires watcher reload so plugin-declared watchers are loaded
+// into the engine, and the re-wiring a restarted plugin needs.
+func wireRestartHooks(defaultServer *server.QNTXServer, pluginLogger *zap.SugaredLogger) {
+	pm := grpc.GetDefaultPluginManager()
+	if pm == nil {
+		return
+	}
+	pm.SetOnWatchersSetup(func() {
+		if err := defaultServer.ReloadWatchers(); err != nil {
+			pluginLogger.Errorw("Plugin watchers are not live; they will not fire until QNTX restarts", "error", err)
+		}
+	})
+	pm.SetOnPluginRestarted(func(name string) {
+		defaultServer.InvalidatePluginMux(name)
+		defaultServer.RegisterPluginMux(name)
+		// "i want runtime restarts to register new ones though"
+		defaultServer.ServePluginSigils()
+	})
+	pm.SetOnEmbeddingProviderReady(func(name string, client protocol.EmbeddingServiceClient) {
+		defaultServer.SetupPluginEmbeddingService(client)
+		pluginLogger.Debugw("Re-wired embedding provider after restart", "plugin", name)
+	})
+	pm.SetOnPythonProviderReady(func(name string, client protocol.PythonServiceClient) {
+		defaultServer.AddPythonProvider(client)
+		pluginLogger.Debugw("Registered Python provider after restart", "plugin", name)
+	})
+}
+
+// initializeOne runs one plugin's Initialize and the post-init work (providers, handlers, banner).
+// If Initialize doesn't respond within 30s, HTTP routes are pre-registered and
+// a partial banner is emitted; Initialize continues in the background.
+func (e pluginInit) initializeOne(p plugin.DomainPlugin) {
+	const initTimeout = 30 * time.Second
+	meta := p.Metadata()
+
+	initCtx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	initDone := make(chan error, 1)
+	// Recovered, not just logged: a panic that only logged would
+	// leave initDone unsent and everything waiting on it waiting
+	// forever. As an error it takes the failure path that already
+	// exists below.
+	sacred.Go("plugin.Initialize "+meta.Name, func() {
+		initDone <- func() (err error) {
+			defer sacred.Recovered("plugin.Initialize "+meta.Name, &err)
+			return p.Initialize(initCtx, e.services)
+		}()
+	})
+
+	// Each branch owns initCtx: the fast path cancels here, the slow
+	// path hands ownership to the background goroutine.
+	var initErr error
+	select {
+	case initErr = <-initDone:
+		cancel()
+
+	case <-time.After(initTimeout):
+		e.logger.Warnw("Initialize not responding, continuing startup",
+			"plugin", meta.Name, "timeout", initTimeout)
+
+		// Pre-register HTTP proxy routes so the plugin is reachable now
+		e.srv.RegisterPluginMux(meta.Name)
+
+		// Emit partial banner so the UI shows something
+		if e.acc != nil {
+			e.acc.SetHealth(meta.Name, false, "initializing (waiting for gRPC response)", nil)
+			e.acc.Emit(meta.Name, grpc.BannerBoot)
+		}
+
+		// Continue waiting in background — complete setup when Initialize returns
+		sacred.Go("plugin.initializeSlowly "+meta.Name, func() {
+			defer cancel()
+			e.finishSlowInit(p, meta, <-initDone)
+		})
+		return
+	}
+
+	if initErr != nil {
+		e.logger.Errorw("Failed to initialize plugin",
+			"plugin", meta.Name, "version", meta.Version, "error", initErr)
+		e.registry.MarkFailed(meta.Name, initErr.Error())
+		if e.acc != nil {
+			e.acc.SetFailed(meta.Name, initErr.Error())
+			e.acc.Emit(meta.Name, grpc.BannerBoot)
+		}
+		return
+	}
+
+	e.registry.MarkReady(meta.Name)
+	e.logger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+	if err := registerPluginProviders(p, meta, e.sm, e.srv, e.logger, e.acc); err != nil {
+		e.registry.MarkFailed(meta.Name, err.Error())
+		e.acc.SetFailed(meta.Name, err.Error())
+		e.acc.Emit(meta.Name, grpc.BannerBoot)
+		return
+	}
+	registerPluginHandlers(p, meta, e.handlerRegistry, e.db, e.sm, e.logger, e.acc)
+}
+
+// finishSlowInit completes setup for a plugin whose Initialize returned after the timeout.
+func (e pluginInit) finishSlowInit(p plugin.DomainPlugin, meta plugin.Metadata, bgErr error) {
+	if bgErr != nil {
+		e.logger.Errorw("Background Initialize failed",
+			"plugin", meta.Name, "version", meta.Version, "error", bgErr)
+		e.registry.MarkFailed(meta.Name, bgErr.Error())
+		if e.acc != nil {
+			e.acc.SetFailed(meta.Name, bgErr.Error())
+			e.acc.Emit(meta.Name, grpc.BannerBoot)
+		}
+		if pm := grpc.GetDefaultPluginManager(); pm != nil {
+			pm.EmitLifecycle(meta.Name, meta.Version, "failed", nil)
+		}
+		return
+	}
+	e.logger.Infow("Background Initialize completed",
+		"plugin", meta.Name, "version", meta.Version)
+	e.registry.MarkReady(meta.Name)
+	if err := registerPluginProviders(p, meta, e.sm, e.srv, e.logger, e.acc); err != nil {
+		e.registry.MarkFailed(meta.Name, err.Error())
+		e.acc.SetFailed(meta.Name, err.Error())
+		e.acc.Emit(meta.Name, grpc.BannerBoot)
+		return
+	}
+	registerPluginHandlers(p, meta, e.handlerRegistry, e.db, e.sm, e.logger, e.acc)
+	if err := e.srv.ReloadWatchers(); err != nil {
+		e.logger.Warnw("Failed to reload watchers after background init",
+			"plugin", meta.Name, "error", err)
+	}
 }
 
 // pluginLoadTimeout bounds launching every enabled plugin from its build on disk.
