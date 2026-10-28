@@ -67,6 +67,7 @@ Even faster when the builds are done by QNTX as Comet
 
 ## The ROOT agent
 
+
 "to get ground setup for the ROOT agent"
 
 - The node runs Claude Code with CLAUDE_CONFIG_DIR under the agent's home
