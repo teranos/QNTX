@@ -68,9 +68,8 @@ Status: Implemented, mostly
 - One `turn` per element agent: two shakes at one element wait on each other,
   two at two elements run at once.
 
-### PR's submitted via ROOT SHAKE
+### Review PR's submitted via ROOT SHAKE
 
 - https://github.com/teranos/QNTX-Web/pull/13
 - https://github.com/teranos/QNTX-Web/pull/26
 - https://github.com/teranos/QNTX-Web/pull/29 (Via Claude Console Managed Agents go SDK)
-- 
