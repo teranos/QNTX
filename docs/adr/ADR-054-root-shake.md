@@ -9,7 +9,7 @@ Status: Implemented, mostly
 
 -  `/api/elements/{element}`, its `say` and its `session` are of ROOT in the tablet of reach, as `/api/files` is.
 
-"each element is an agent as well, we default t"
+"each element and each is an agent as well."
 
 "its work is the prompt"
 
