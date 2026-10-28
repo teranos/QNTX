@@ -1,5 +1,5 @@
 
-> [spec.c2pa.org](https://spec.c2pa.)
+> [spec.c2pa.org](https://spec.c2pa.org)
 > With the increasing velocity of digital content and the increasing availability of powerful creation and editing techniques, establishing the provenance of media is critical to ensure transparency, understanding, and ultimately, trust. 
 
 
