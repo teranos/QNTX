@@ -100,7 +100,7 @@ TODO: talk about comet ui needs to be owned by Web
   serves no tenant.
 
 ## The node holds the private controls
-
+TODO: UI CONCERN
 "How the node holds private controls, It should be somewhat doable in the UI"
 
 - Not a text box of pbt, and never a record a model can write: the first
