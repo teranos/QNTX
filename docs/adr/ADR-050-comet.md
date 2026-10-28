@@ -121,7 +121,7 @@ TODO: UI CONCERN
 
 ## Landing
 
-"Yes, custoner uses ground, but they dont think about it because it just lands via comet"
+"Yes, USER uses ground, but they dont think about it because it just lands via comet"
 
 - The node reaches no machine. sky polls every five seconds, ug polls the
   status line, SessionStart checks once a day. A comet is pulled.
