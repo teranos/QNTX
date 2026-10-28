@@ -200,4 +200,4 @@ Even faster when the builds are done by QNTX as Comet
   standing in it says rituals on.
 - Managed Agents SDK, Environments, ground and comets there
 - Comet is a core feature, README isn’t reflecting the relationship to ground yet 
-- Fur
+- Further UI integration through the ground 
