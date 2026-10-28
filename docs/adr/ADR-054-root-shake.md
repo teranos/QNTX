@@ -1,4 +1,4 @@
-![[Screenshot 2026-10-28 at 14.49.20.png]]# ADR-054: ROOT SHAKE
+# ADR-054: ROOT SHAKE
 
 Date: 2026-10-23
 Status: Implemented, mostly
@@ -68,11 +68,13 @@ Status: Implemented, mostly
 - One `turn` per element agent: two shakes at one element wait on each other,
   two at two elements run at once.
 
+
+
+
+![[Screenshot 2026-10-28 at 14.49.20.png]]
+
 ### Review PR's submitted via ROOT SHAKE
 
 - https://github.com/teranos/QNTX-Web/pull/13
 - https://github.com/teranos/QNTX-Web/pull/26
 - https://github.com/teranos/QNTX-Web/pull/29 (Via Claude Console Managed Agents go SDK)
-
-
-![[Screenshot 2026-10-28 at 14.49.20.png]]
