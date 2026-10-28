@@ -1,7 +1,7 @@
 # ADR-054: ROOT SHAKE
 
 Date: 2026-10-23
-Status: Impl
+Status: Implemented, mostly
 
 "think ROOT SHAKE"
 
