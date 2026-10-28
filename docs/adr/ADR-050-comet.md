@@ -201,4 +201,4 @@ Even faster when the builds are done by QNTX as Comet
 - Managed Agents SDK, Environments, ground and comets there
 - Comet is a core feature, README isn’t reflecting the relationship to ground yet 
 - Further UI integration through the ground element 
-- Comet Chapter in 
+- Comet Chapter in Book of 
