@@ -26,3 +26,5 @@ make sure this is a thing for
 - [ ] 
 
 
+An agent should be free to interpret human speech, but it should never inherit the human's authority merely by interpreting it.
+
