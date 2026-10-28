@@ -7,7 +7,7 @@ Status: Implemented, mostly
 
 "this mechanism is special, its just for root."
 
-- The shake is ROOT's and nobody else's: `/api/elements/{element}`, its
+-  `/api/elements/{element}`, its
   `say` and its `session` are of ROOT in the tablet of reach, as `/api/files`
   is.
 
