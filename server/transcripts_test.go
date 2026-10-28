@@ -83,6 +83,51 @@ func TestATranscriptIsTheSessionInOrder(t *testing.T) {
 	assert.Equal(t, "ground:payload:UserPromptSubmit:1", tr.Turns[0].Of)
 }
 
+// "I don't see the cost of an utterance"
+// Claude Code says what the session cost so far; each answer says what its own turn added.
+func TestEachAnswerSaysWhatItsOwnTurnCost(t *testing.T) {
+	at := time.Date(2026, 10, 28, 18, 0, 0, 0, time.UTC)
+	stop := func(id string, after time.Duration, attrs map[string]any) *types.As {
+		attrs["last_assistant_message"] = id
+		return streamed("ground:payload:Stop:"+id, "Stop", "s-1", at.Add(after), attrs)
+	}
+	rows := []*types.As{
+		// Read out of order, as a store may give them.
+		stop("third", 30*time.Second, map[string]any{"session_cost_usd": 137.25}),
+		stop("first", 10*time.Second, map[string]any{"session_cost_usd": 136.0}),
+		stop("unsaid", 15*time.Second, map[string]any{}),
+		stop("second", 20*time.Second, map[string]any{"session_cost_usd": 136.5}),
+		// Counted again from nothing: its whole is its own.
+		stop("again", 40*time.Second, map[string]any{"session_cost_usd": 0.75}),
+	}
+	got := transcriptsOf(rows, transcriptSessionLimit)
+	require.Len(t, got, 1)
+	costs := map[string]float64{}
+	for _, turn := range got[0].message().GetTurns() {
+		if turn.GetSpeaker() == "assistant" {
+			costs[turn.GetText()] = turn.GetCostUsd()
+		}
+	}
+	assert.InDelta(t, 136.0, costs["first"], 1e-9)
+	assert.Zero(t, costs["unsaid"])
+	assert.InDelta(t, 0.5, costs["second"], 1e-9)
+	assert.InDelta(t, 0.75, costs["third"], 1e-9)
+	assert.InDelta(t, 0.75, costs["again"], 1e-9)
+
+	// A session whose answers said no cost before: the first that says one holds theirs too, and says nothing.
+	older := append(aSession(at),
+		stop("before", 5*time.Second, map[string]any{}),
+		stop("then", 10*time.Second, map[string]any{"session_cost_usd": 136.0}),
+		stop("now", 20*time.Second, map[string]any{"session_cost_usd": 136.5}),
+	)
+	costs = map[string]float64{}
+	for _, turn := range transcriptsOf(older, transcriptSessionLimit)[0].message().GetTurns() {
+		costs[turn.GetText()] = turn.GetCostUsd()
+	}
+	assert.Zero(t, costs["then"])
+	assert.InDelta(t, 0.5, costs["now"], 1e-9)
+}
+
 // Tim: a session says the model it started on and the effort its last Stop ran at.
 func TestATranscriptSaysItsModelAndEffort(t *testing.T) {
 	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)

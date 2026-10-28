@@ -300,7 +300,7 @@ type Turn struct {
 	Text string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
 	// The attestation it was read from.
 	Of string `protobuf:"bytes,4,opt,name=of,proto3" json:"of,omitempty"`
-	// What the turn an assistant's answer ends cost, in USD, as Claude Code says; 0 when it says none.
+	// What the turn an assistant's answer ends cost, in USD: what Claude Code says the session cost when it ended, less what it said at the answer before; 0 when it says none.
 	CostUsd       float64 `protobuf:"fixed64,5,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

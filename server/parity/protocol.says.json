@@ -887,7 +887,7 @@
   "protocol.Transcripts.transcripts": "Each session: its id, the subjects it was about, when it started and ended, and its turns, each naming the attestation it was read from.",
   "protocol.Turn": "Turn is one thing said or done in a session, naming the attestation it was read from.",
   "protocol.Turn.at": "When it was said or done.",
-  "protocol.Turn.cost_usd": "What the turn an assistant's answer ends cost, in USD, as Claude Code says; 0 when it says none.",
+  "protocol.Turn.cost_usd": "What the turn an assistant's answer ends cost, in USD: what Claude Code says the session cost when it ended, less what it said at the answer before; 0 when it says none.",
   "protocol.Turn.of": "The attestation it was read from.",
   "protocol.Turn.speaker": "Who said or did it.",
   "protocol.Turn.text": "What was said or done.",

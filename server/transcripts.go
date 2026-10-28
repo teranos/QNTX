@@ -51,10 +51,13 @@ type transcriptTurn struct {
 	Speaker string
 	Text    string
 	Of      string
-	// CostUSD is what the turn an assistant's answer ends cost, as its Stop says; 0 when it says none.
+	// CostUSD is what the turn an assistant's answer ends cost: what its Stop says the session
+	// cost so far, less what the Stop before it said; 0 when it says none.
 	CostUSD float64
 
 	when time.Time
+	// sessionCost is what its Stop says the session cost so far.
+	sessionCost float64
 }
 
 // transcript is one session, every turn in the order it happened, as it is
@@ -249,6 +252,7 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 			}
 			return t.Turns[i].Of < t.Turns[j].Of
 		})
+		costEach(t.Turns)
 		t.Started = earlier(t.Started, t.Turns[0].At)
 		t.Ended = later(t.Ended, t.Turns[len(t.Turns)-1].At)
 		out = append(out, *t)
@@ -263,6 +267,34 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 		out = out[:limit]
 	}
 	return out
+}
+
+// costEach says what each answer's turn cost, from what the session cost so far
+// as each Stop says it, in order: what a Stop adds to the one before it. A
+// session cost said lower than the one before started counting again, and is
+// that turn's whole. The first said after answers that said none (written
+// before Stops kept it) is theirs as well as its own, so it says nothing.
+func costEach(turns []transcriptTurn) {
+	var before float64
+	unsaid := false
+	for i := range turns {
+		if turns[i].Speaker != "assistant" {
+			continue
+		}
+		so := turns[i].sessionCost
+		if so <= 0 {
+			unsaid = unsaid || before == 0
+			continue
+		}
+		switch {
+		case before == 0 && unsaid:
+		case so >= before:
+			turns[i].CostUSD = so - before
+		default:
+			turns[i].CostUSD = so
+		}
+		before = so
+	}
 }
 
 // ranOn takes the model off a SessionStart and the effort off the latest Stop.
@@ -300,8 +332,8 @@ func turnOf(as *types.As) (transcriptTurn, bool) {
 		turn.Speaker, turn.Text = "human", attr("prompt")
 	case "Stop":
 		turn.Speaker, turn.Text = "assistant", attr("last_assistant_message")
-		if cost, ok := as.Attributes["cost_usd"].(float64); ok {
-			turn.CostUSD = cost
+		if cost, ok := as.Attributes["session_cost_usd"].(float64); ok {
+			turn.sessionCost = cost
 		}
 	case "PreToolUse":
 		turn.Speaker, turn.Text = toolTurn(attr("tool_name"), attr("file_path"), attr("command"))

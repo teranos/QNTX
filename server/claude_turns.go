@@ -176,9 +176,11 @@ func (w sessionWriter) rowsOf(m claudecode.Message, at time.Time) ([]*types.As, 
 		if w.effort != "" {
 			attrs["effort"] = map[string]any{"level": w.effort}
 		}
-		// "I don't see the cost of an utterance": what Claude Code says the turn cost, kept on how it ended.
+		// "I don't see the cost of an utterance": Claude Code's total_cost_usd, kept on how the turn
+		// ended. Resumed, it is what the session cost so far, not this turn: a transcript reads the
+		// turn's own cost as what it adds to the Stop before it.
 		if m.CostUSD > 0 {
-			attrs["cost_usd"] = m.CostUSD
+			attrs["session_cost_usd"] = m.CostUSD
 		}
 		if err := add("Stop", attrs); err != nil {
 			return nil, err

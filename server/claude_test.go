@@ -329,10 +329,13 @@ func TestTheEffortIsNamedByWhoeverSpeaks(t *testing.T) {
 }
 
 // "I don't see the cost of an utterance"
-// What Claude Code says a turn cost is read with the answer that ends it.
+// What a turn cost is read with the answer that ends it: what it added to what the session cost.
 func TestAnAnswerSaysWhatItsTurnCost(t *testing.T) {
 	s, _ := runningTheNodeAgent(t, opusLow)
 	_, refused := saying(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.Nil(t, refused)
+	// Resumed, Claude Code says what the session cost so far: the stand-in says 0.05 again, so nothing was added.
+	_, refused = saying(s, sigil.Sent{"says": "and now?"})
 	require.Nil(t, refused)
 
 	answer, refused := s.harnessSession(s.claudeHarness())
@@ -343,7 +346,7 @@ func TestAnAnswerSaysWhatItsTurnCost(t *testing.T) {
 			costs = append(costs, turn.GetCostUsd())
 		}
 	}
-	assert.Equal(t, []float64{0.05}, costs)
+	assert.Equal(t, []float64{0.05, 0}, costs)
 }
 
 // Who said it is written down with what was said.
