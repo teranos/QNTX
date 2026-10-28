@@ -1,4 +1,4 @@
-# ADR-054: ROOT SHAKE
+![[Screenshot 2026-10-28 at 14.49.20.png]]# ADR-054: ROOT SHAKE
 
 Date: 2026-10-23
 Status: Implemented, mostly
@@ -75,3 +75,4 @@ Status: Implemented, mostly
 - https://github.com/teranos/QNTX-Web/pull/29 (Via Claude Console Managed Agents go SDK)
 
 
+![[Screenshot 2026-10-28 at 14.49.20.png]]
