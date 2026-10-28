@@ -17,6 +17,8 @@ import (
 // A plugin the node builds loads from the Nix store: its program loader and
 // libraries are store paths nothing else roots. The box collects its store at
 // every deploy, and on 2026-10-05 that took datapunt's glibc from under it.
+// A build installed from a workflow run's artifact loads from the store the
+// same way, and on 2026-10-26 that took cleanAPI's (teranos/QNTX#1440).
 
 // storePrefix is where every store path starts.
 const storePrefix = "/nix/store/"
