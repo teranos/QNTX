@@ -67,6 +67,7 @@ Even faster when the builds are done by QNTX as Comet
 
 ## The ROOT agent
 
+TODO: move section to the root agent AD
 
 "to get ground setup for the ROOT agent"
 
