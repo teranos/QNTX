@@ -119,10 +119,14 @@ func (x *Signum) GetOasf() []string {
 // signa it holds. It is what fills A2A's AgentCard, which am node answers, and
 // the parity sigil holds it to that card.
 type Node struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Signa         []*Signum              `protobuf:"bytes,3,rep,name=signa,proto3" json:"signa,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Name        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Signa       []*Signum              `protobuf:"bytes,3,rep,name=signa,proto3" json:"signa,omitempty"`
+	// The media types the node gives, across every signum: JSON, everywhere.
+	// To A2A these are the card's default output modes, which a skill's own
+	// output modes override.
+	OutputModes   []string `protobuf:"bytes,4,rep,name=output_modes,json=outputModes,proto3" json:"output_modes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -174,6 +178,13 @@ func (x *Node) GetDescription() string {
 func (x *Node) GetSigna() []*Signum {
 	if x != nil {
 		return x.Signa
+	}
+	return nil
+}
+
+func (x *Node) GetOutputModes() []string {
+	if x != nil {
+		return x.OutputModes
 	}
 	return nil
 }
@@ -2433,11 +2444,12 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\afollows\x18\x03 \x03(\v2\x11.protocol.FollowsR\afollows\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x12\n" +
 	"\x04tags\x18\x05 \x03(\tR\x04tags\x12\x12\n" +
-	"\x04oasf\x18\x06 \x03(\tR\x04oasf\"d\n" +
+	"\x04oasf\x18\x06 \x03(\tR\x04oasf\"\x87\x01\n" +
 	"\x04Node\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12&\n" +
-	"\x05signa\x18\x03 \x03(\v2\x10.protocol.SignumR\x05signa\"\xde\x01\n" +
+	"\x05signa\x18\x03 \x03(\v2\x10.protocol.SignumR\x05signa\x12!\n" +
+	"\foutput_modes\x18\x04 \x03(\tR\voutputModes\"\xde\x01\n" +
 	"\n" +
 	"Transcript\x12\x18\n" +
 	"\asession\x18\x01 \x01(\tR\asession\x12\x1a\n" +

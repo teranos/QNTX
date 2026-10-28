@@ -37,6 +37,10 @@ message Node {
   string name = 1;
   string description = 2;
   repeated Signum signa = 3;
+  // The media types the node gives, across every signum: JSON, everywhere.
+  // To A2A these are the card's default output modes, which a skill's own
+  // output modes override.
+  repeated string output_modes = 4;
 }
 
 // Transcript is one agent session Ground recorded, derived from its hook
