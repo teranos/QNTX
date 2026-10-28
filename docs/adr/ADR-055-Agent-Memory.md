@@ -10,7 +10,8 @@ Allow all Agent Harnesses to leverage memories created in Managed Agents.
 
 
 
-- [ ] View Memory store's in 
+- [ ] View Memory store's in Agents Element
+- [ ] 
 
 make sure this is a thing for
 - [ ] [[ADR-053-Namespace-Agents]]
