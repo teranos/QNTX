@@ -71,7 +71,7 @@ Status: Implemented, mostly
 ![[Screenshot 2026-10-28 at 14.49.20.png]]
 
 - Needs repo attached, namely QNTX, QNTX-App, QNTX-Web
-- And Memory store needs to be a thing,, 
+- And Memory store needs to be a thing,,  
 
 ### Review PR's submitted via ROOT SHAKE
 
