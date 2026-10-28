@@ -2,6 +2,8 @@
 > [spec.c2pa.org](https://spec.c2pa.org)
 > With the increasing velocity of digital content and the increasing availability of powerful creation and editing techniques, establishing the provenance of media is critical to ensure transparency, understanding, and ultimately, trust. 
 
+https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/ref-q.html
+
 
 
 
