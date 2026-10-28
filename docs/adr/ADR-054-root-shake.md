@@ -68,10 +68,9 @@ Status: Implemented, mostly
 - One `turn` per element agent: two shakes at one element wait on each other,
   two at two elements run at once.
 
-
-
-
 ![[Screenshot 2026-10-28 at 14.49.20.png]]
+
+- Needs repo a
 
 ### Review PR's submitted via ROOT SHAKE
 
