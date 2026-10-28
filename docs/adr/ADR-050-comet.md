@@ -80,7 +80,7 @@ TODO: move section to the root agent ADR
   DID the hook events are attested under.
 
 ## The Element
-TODO
+TODO: talk about comet ui needs to be owned by We
 "which is for all of this to be visible in the existing Element in the ui, remvoing the coment crosshatches"
 
 - The Comet stratum is `gr-unreal`, with a limit saying the comet does not
