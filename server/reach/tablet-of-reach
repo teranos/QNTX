@@ -175,7 +175,7 @@ REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROO
 
 # The Node Agent (the agent signum, ADR-048), in a Coding Agent Harness. Who may
 # talk to it is the whole of what guards it, and that is ROOT.
-REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' of ROOT
+REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' '/api/agent/live' of ROOT
 
 # The element agent (the elements signum, ADR-054): each element is its own
 # agent and its own conversation, and ROOT SHAKE is ROOT's.

@@ -111,8 +111,10 @@ const (
 	piSessionFile     = "pi-session"
 )
 
-// turnInSession is a turn going on, by the session it is in.
-type turnInSession struct{ session string }
+// turnInSession is a turn going on, by the session it is in, and the stream it
+// prints to once it runs: empty until then, and in a harness that prints to no
+// file (Pi).
+type turnInSession struct{ session, stream string }
 
 // theNodeAgent is the Node Agent of the node holding this key, working in home.
 func theNodeAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {

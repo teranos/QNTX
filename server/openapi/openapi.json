@@ -91,6 +91,11 @@
         "ROOT"
       ]
     },
+    "/api/agent/live": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/agent/login": {
       "x-qntx-reach": [
         "ROOT"
