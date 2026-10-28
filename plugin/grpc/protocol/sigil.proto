@@ -161,6 +161,8 @@ message ClaudeAm {
   bool signed_in = 11;
   // How it is signed in, as Claude Code names it, or empty when it is not.
   string auth_method = 12;
+  // Every model a turn can be said to answer with.
+  repeated string models = 13;
 }
 
 // NamespaceAgentSaid is what agents say answers: what the namespace's agent
@@ -179,6 +181,8 @@ message NodeAgentSaid {
   ClaudeSaid claude = 1;
   // What it answered in Pi.
   PiSaid pi = 2;
+  // What it answered in codex.
+  CodexSaid codex = 3;
 }
 
 // NodeAgentAm is what agent am answers: who the Node Agent is and how the node
@@ -188,6 +192,98 @@ message NodeAgentAm {
   ClaudeAm claude = 1;
   // In Pi.
   PiAm pi = 2;
+  // In codex.
+  CodexAm codex = 3;
+}
+
+// CodexSaid is what the Node Agent answered in codex.
+message CodexSaid {
+  // What it answered.
+  string answer = 1;
+  // The session it was said in: the node's, apart from codex's own thread.
+  string session = 2;
+  // The model that answered.
+  string model = 3;
+  // The codex that ran.
+  string codex_version = 4;
+  // What codex says the turn used, in tokens.
+  int64 input_tokens = 5;
+  int64 output_tokens = 6;
+  // How long the turn took.
+  double took_ms = 7;
+  // Why a row of the session was not written down, when one was not.
+  string unwritten = 8;
+}
+
+// CodexAm is who the Node Agent is in codex and how the node runs it.
+message CodexAm {
+  // Its own DID, which signs what it writes down.
+  string did = 1;
+  // The model am.toml names.
+  string model = 2;
+  // The plugin every model call it makes in codex goes through.
+  string gateway = 3;
+  // The sandbox codex runs it in.
+  string sandbox = 4;
+  // The session it continues in codex, or empty before anything was said to it there.
+  string session = 5;
+  // Whether it is in a turn in codex now.
+  bool answering = 6;
+  // Where the codex it runs is, or empty when the node has none yet.
+  string codex = 7;
+  // The codex this build pins.
+  string codex_version = 8;
+  // Why it cannot be spoken to in codex, when it cannot.
+  string not_ready = 9;
+}
+
+// NodeAnthropic is what anthropic am and anthropic set answer: the node's
+// issuer and subject that ROOT registers at Anthropic, the ids of the rule its
+// identity token is traded at, and whether Anthropic accepted it.
+message NodeAnthropic {
+  // The node's OIDC issuer, the iss of every identity token it signs.
+  string issuer = 1;
+  // The node's DID, the sub of the node's own identity token.
+  string subject = 2;
+  // The Anthropic organization the rule is in.
+  string organization_id = 3;
+  // The federation rule the node's identity token is traded at.
+  string federation_rule_id = 4;
+  // The service account the traded token acts as.
+  string service_account_id = 5;
+  // Who gave the ids; empty before anybody did.
+  string set_by = 6;
+  // When the ids were given, as RFC 3339.
+  string at = 7;
+  // Whether Anthropic was asked: false before any ids were given.
+  bool asked = 8;
+  // Whether Anthropic accepted the node's identity at the rule.
+  bool accepted = 9;
+  // What Anthropic answered when it did not accept it, or why it was not reached.
+  string why = 10;
+  // The node's issuer as Anthropic registered it (fdis_).
+  string issuer_id = 11;
+  // The workspace the traded token is scoped to (wrkspc_), as the wizard's snippet names it.
+  string workspace_id = 12;
+  // What ROOT's agents spend first: "session", the Claude subscription, or "console", the node's OIDC.
+  string first = 13;
+  // Whether the other follows once the first is exhausted.
+  bool then = 14;
+  // The session's windows, as ug last read each.
+  repeated AnthropicWindow session = 15;
+  // What ROOT's agents last ran on: "session" or "console"; empty before any turn.
+  string in_use = 16;
+}
+
+// AnthropicWindow is one window of the Claude subscription, as ug's status line read it.
+message AnthropicWindow {
+  // five_hour or seven_day.
+  string window = 1;
+  double used_percentage = 2;
+  // When the window resets, in Unix seconds.
+  int64 resets_at = 3;
+  // When ug read it, as RFC 3339.
+  string at = 4;
 }
 
 // NamespaceKeys is what keys list, set and drop answer: the names of a
@@ -207,6 +303,14 @@ message NamespaceKey {
   string set_by = 2;
   // When it was set, RFC 3339.
   string at = 3;
+  // Whether the provider it is named after was asked about it as this was
+  // answered.
+  bool asked = 4;
+  // Whether that provider accepts it: the light in Connectors.
+  bool accepted = 5;
+  // What the provider answered when it did not accept it, or why it was not
+  // reached.
+  string why = 6;
 }
 
 // PiAm is what pi am answers.

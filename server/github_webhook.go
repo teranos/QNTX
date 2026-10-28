@@ -5,6 +5,7 @@ package server
 // installs and restarts the plugin.
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -165,7 +166,8 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		respond(w, g.host.log(), http.StatusOK, map[string][]string{"approvals": touched})
+		fixed := g.fixturesOf(r.Context(), event, body)
+		respond(w, g.host.log(), http.StatusOK, map[string][]string{"approvals": touched, "fixtures": fixed})
 		return
 	}
 	var push gitHubPush
@@ -181,5 +183,18 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	filling := g.host.vaultsMovedBy(landed)
 	dispatching := g.followsMovedBy(landed)
 	rebuilding := g.host.cometsMovedBy(landed)
-	respond(w, g.host.log(), http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding})
+	fixed := g.fixturesOf(r.Context(), event, body)
+	respond(w, g.host.log(), http.StatusOK, map[string][]string{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding, "fixtures": fixed})
+}
+
+// fixturesOf is what the node put fixtures in for one delivery, asked after the
+// rest of the delivery was taken. A scanner that did not run is said in the log
+// and in the answer, not as a failed delivery GitHub would hand in again.
+func (g *gitHub) fixturesOf(ctx context.Context, event string, body []byte) []string {
+	fixed, err := g.host.fixturesFromGitHub(ctx, event, body)
+	if err != nil {
+		g.host.log().Errorw("A delivery's words were not checked for what names a person", "event", event, "error", err)
+		return []string{"error: " + err.Error()}
+	}
+	return fixed
 }

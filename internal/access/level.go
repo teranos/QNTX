@@ -30,6 +30,9 @@ const (
 	// LevelUser is the normal user. It reaches no store and sees no system on
 	// its own, and belongs to no door.
 	LevelUser Level = "USER"
+	// LevelConnector is a token issued through a minted client (ADR-038). No
+	// line names it: it reaches by a role its client's label holds, and nothing on its own.
+	LevelConnector Level = "CONNECTOR"
 	// LevelOAuth is a kind and not a rung. A client is a door (ADR-025): an
 	// app the node lets in on a person's say-so. Its DID is the client id and
 	// its raw value the client secret. It authenticates at the token endpoint

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	errors "github.com/teranos/sacred-error"
 )
@@ -81,6 +82,12 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		Namespaces []string `json:"namespaces,omitempty"`
 		// Where a client's codes go. A client's, and only a client's.
 		ReturnAddress string `json:"return_address,omitempty"`
+		// What a client's connector is told on initialize (ADR-038). A
+		// client's, and only a client's.
+		Instructions string `json:"instructions,omitempty"`
+		// ROOT's client for the node's MCP server (ADR-038). A client's, and
+		// only ROOT's to mint.
+		Root bool `json:"root,omitempty"`
 	}
 	// Bounded like every other body in this package. A session holder is not a
 	// stranger, but a label is a string and nothing capped how long.
@@ -129,12 +136,35 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 
 	returnAddress := strings.TrimSpace(req.ReturnAddress)
+	instructions := strings.TrimSpace(req.Instructions)
+	if instructions != "" && level != LevelOAuth {
+		h.writeError(w, http.StatusBadRequest, "only a client has instructions")
+		return
+	}
+	if why := guidable(instructions); why != "" {
+		h.writeError(w, http.StatusBadRequest, why)
+		return
+	}
 	namespaces := req.Namespaces
+	if req.Root && level != LevelOAuth {
+		h.writeError(w, http.StatusBadRequest, "only a client is ROOT's client")
+		return
+	}
+	// "but i want a MCP specifically for the Node, only for ROOT"
+	if req.Root && h.levelOf(mintedBy) != LevelRoot {
+		h.writeError(w, http.StatusForbidden, "ROOT's client is ROOT's to mint")
+		return
+	}
+	if req.Root && len(namespaces) != 0 {
+		h.writeError(w, http.StatusBadRequest,
+			"ROOT's client answers at /mcp, the node's, and this named "+strconv.Itoa(len(namespaces))+" namespaces")
+		return
+	}
 	if level == LevelOAuth {
 		// A client is a door (ADR-025): ROOT writes its return address here the
 		// way it writes a door's origin in am.toml. Its connector acts in the one
 		// namespace picked here (ADR-038).
-		if len(namespaces) != 1 {
+		if len(namespaces) != 1 && !req.Root {
 			h.writeError(w, http.StatusBadRequest,
 				"a client acts in one namespace, picked at minting, and this named "+strconv.Itoa(len(namespaces)))
 			return
@@ -184,6 +214,8 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		Level:               level,
 		Namespaces:          namespaces,
 		ReturnAddress:       returnAddress,
+		Instructions:        instructions,
+		Root:                req.Root,
 	})
 	if err != nil {
 		h.attest(PredicateUnanswered, mintedBy, map[string]any{
@@ -202,6 +234,12 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		// Where this client's codes will go is a fact about who gets in.
 		minted["return_address"] = returnAddress
 	}
+	if instructions != "" {
+		minted["instructions"] = instructions
+	}
+	if req.Root {
+		minted["root"] = true
+	}
 	h.attest(PredicateMinted, mintedBy, minted)
 	resp := map[string]any{
 		"id":         id,
@@ -214,6 +252,19 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 	}
 	if returnAddress != "" {
 		resp["return_address"] = returnAddress
+	}
+	if instructions != "" {
+		resp["instructions"] = instructions
+	}
+	if req.Root {
+		resp["root"] = true
+	}
+	// A client's id is its DID, which an app is set up with beside the secret,
+	// so it is said here rather than looked up elsewhere.
+	//
+	// "AND I SHOULD NOT NEED TO OPEN UP THE TOKEN ELEMENT SEPARATELY TO CREATE THE TOKEN"
+	if minted, ok := h.tokens.Lookup(sha256Hex(raw)); ok {
+		resp["did"] = minted.DID
 	}
 	resp["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
 	h.writeJSON(w, http.StatusOK, resp)
@@ -298,6 +349,14 @@ func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Pres
 			return
 		}
 		h.handleClientNamespaces(w, r, p, id, strings.TrimSpace(namespace), takenOut, "taken out")
+		return
+	}
+	if id, ok := strings.CutSuffix(rest, "/instructions"); ok {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		h.handleClientInstructions(w, r, p, id)
 		return
 	}
 	if r.Method == http.MethodGet {
@@ -545,6 +604,72 @@ func (h *Handler) handleClientNamespaces(w http.ResponseWriter, r *http.Request,
 	}
 	h.attest(PredicateMoved, by, map[string]any{"token": id, "did": did, "namespace": namespace, "from": from, "to": to})
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": did, "id": id, "namespaces": to})
+}
+
+// maxInstructionsRunes is how long a client's instructions may be.
+const maxInstructionsRunes = 5000
+
+// guidable is why these instructions cannot be a client's, or empty.
+func guidable(instructions string) string {
+	if n := utf8.RuneCountInString(instructions); n > maxInstructionsRunes {
+		return "instructions are at most " + strconv.Itoa(maxInstructionsRunes) + " characters, and these are " + strconv.Itoa(n)
+	}
+	return ""
+}
+
+// handleClientInstructions changes what a client's connector is told on
+// initialize (ADR-038). POST /auth/tokens/{id}/instructions {"instructions": "<text>"}
+//
+// "guide your agent is easy to add"
+func (h *Handler) handleClientInstructions(w http.ResponseWriter, r *http.Request, p Presented, id string) {
+	setter, sets := h.tokens.(InstructionsSetter)
+	if !sets {
+		h.writeError(w, http.StatusServiceUnavailable, "this node's token store cannot change a token's instructions")
+		return
+	}
+	var req struct {
+		Instructions string `json:"instructions"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCeremonyBodyBytes)).Decode(&req); err != nil {
+		h.writeError(w, http.StatusBadRequest, "the body did not parse as JSON: "+err.Error())
+		return
+	}
+	// Empty clears them: a connector is told nothing from its next initialize.
+	instructions := strings.TrimSpace(req.Instructions)
+	if why := guidable(instructions); why != "" {
+		h.writeError(w, http.StatusBadRequest, why)
+		return
+	}
+	by, _ := p.Admitted()
+	infos, err := h.tokens.List()
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "the token store did not answer: "+err.Error())
+		return
+	}
+	found := false
+	for _, info := range infos {
+		if info.ID != id {
+			continue
+		}
+		if info.Level != LevelOAuth {
+			h.writeError(w, http.StatusBadRequest, "only a client has instructions, and "+id+" is a "+string(info.Level)+" token")
+			return
+		}
+		found = true
+	}
+	if !found {
+		h.writeError(w, http.StatusNotFound, "the node does not list token "+id)
+		return
+	}
+	if err := setter.SetInstructions(id, instructions); err != nil {
+		h.attest(PredicateUnanswered, by, map[string]any{
+			"asked": "token store", "doing": "guide", "token": id, "error": err.Error(),
+		})
+		h.writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
+		return
+	}
+	h.attest(PredicateGuided, by, map[string]any{"token": id, "instructions": instructions})
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "guided", "id": id, "instructions": instructions})
 }
 
 // handleEnableToken lifts a revocation. POST /auth/tokens/{id}/enable

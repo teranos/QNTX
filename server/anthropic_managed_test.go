@@ -1,0 +1,240 @@
+package server
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/internal/claudecode"
+	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/sigil"
+)
+
+// consoleStandIn answers as Anthropic's Managed Agents do, on a token traded for
+// the node's identity: each object made is counted, and a session's stream
+// answers what was sent to it, then goes idle.
+type consoleStandIn struct {
+	mu      sync.Mutex
+	made    map[string]int
+	bodies  map[string][]map[string]any
+	said    chan string
+	answers string
+	// ended is each Session Anthropic has terminated.
+	ended map[string]bool
+	// spent is what the Session has cost, by each time it is read.
+	spent float64
+}
+
+func standInConsole(t *testing.T) (*consoleStandIn, string) {
+	t.Helper()
+	c := &consoleStandIn{made: map[string]int{}, bodies: map[string][]map[string]any{}, said: make(chan string, 4), answers: "the element answered at Anthropic", ended: map[string]bool{}}
+	served := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var sent map[string]any
+		_ = json.Unmarshal(body, &sent)
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		answer := func(id string) { _, _ = io.WriteString(w, `{"id":"`+id+`"}`) }
+		switch {
+		case r.URL.Path == "/v1/oauth/token":
+			_, _ = io.WriteString(w, `{"access_token":"sk-ant-oat01-traded","token_type":"Bearer","expires_in":3600}`)
+		case r.Header.Get("Authorization") != "Bearer sk-ant-oat01-traded":
+			w.WriteHeader(http.StatusUnauthorized)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/environments":
+			c.made["environment"]++
+			answer("env_1")
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/agents":
+			c.made["agent"]++
+			c.bodies["agent"] = append(c.bodies["agent"], sent)
+			answer("agent_1")
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/agent_1":
+			last := c.bodies["agent"][len(c.bodies["agent"])-1]
+			agent, _ := json.Marshal(map[string]any{"id": "agent_1", "version": len(c.bodies["agent"]), "system": last["system"], "model": last["model"]})
+			_, _ = w.Write(agent)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/agents/agent_1":
+			c.made["agent version"]++
+			c.bodies["agent"] = append(c.bodies["agent"], sent)
+			answer("agent_1")
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/vaults":
+			c.made["vault"]++
+			answer("vlt_1")
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/vaults/vlt_1/credentials":
+			c.made["credential"]++
+			c.bodies["credential"] = append(c.bodies["credential"], sent)
+			answer("vcrd_1")
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/memory_stores":
+			c.made["memory"]++
+			answer("memstore_1")
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/sessions":
+			c.made["session"]++
+			c.bodies["session"] = append(c.bodies["session"], sent)
+			answer(fmt.Sprintf("sesn_%d", c.made["session"]))
+		case r.Method == http.MethodGet && strings.Count(r.URL.Path, "/") == 3 && strings.HasPrefix(r.URL.Path, "/v1/sessions/"):
+			id := strings.TrimPrefix(r.URL.Path, "/v1/sessions/")
+			status := "idle"
+			if c.ended[id] {
+				status = "terminated"
+			}
+			c.spent += 0.25
+			_, _ = io.WriteString(w, fmt.Sprintf(`{"id":"%s","status":"%s","usage":{"list_cost":{"amount":"%.2f","currency":"USD"}}}`, id, status, c.spent))
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/events"):
+			events, _ := sent["events"].([]any)
+			first, _ := events[0].(map[string]any)
+			content, _ := first["content"].([]any)
+			c.bodies["said"] = append(c.bodies["said"], map[string]any{"content": content})
+			text, _ := content[0].(map[string]any)
+			said, _ := text["text"].(string)
+			c.said <- said
+			_, _ = io.WriteString(w, `{"data":[]}`)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/events/stream"):
+			w.Header().Set("Content-Type", "text/event-stream")
+			flusher, _ := w.(http.Flusher)
+			flusher.Flush()
+			c.mu.Unlock()
+			<-c.said
+			c.mu.Lock()
+			for _, event := range [][2]string{
+				{"agent.mcp_tool_use", `{"id":"ev_0","type":"agent.mcp_tool_use","processed_at":"2026-10-27T18:00:00Z","mcp_server_name":"qntx","name":"am_version","input":{}}`},
+				{"agent.message", `{"id":"ev_1","type":"agent.message","processed_at":"2026-10-27T18:00:00Z","content":[{"type":"text","text":"` + c.answers + `"}]}`},
+				{"session.status_idle", `{"id":"ev_2","type":"session.status_idle","processed_at":"2026-10-27T18:00:01Z","stop_reason":{"type":"end_turn"},"stop_details":{}}`},
+			} {
+				_, _ = io.WriteString(w, "event: "+event[0]+"\ndata: "+event[1]+"\n\n")
+				flusher.Flush()
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(served.Close)
+	return c, served.URL
+}
+
+// "so we can have an agent, that isnt hosted on the same box as QNTX"
+// "if we use their infra, we use their infra"
+func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	console, base := standInConsole(t)
+	s.anthropicBaseURL = base
+	if s.nodeAgent == nil {
+		s.nodeAgent = &rootAgent{home: t.TempDir()}
+	}
+	for _, given := range []sigil.Sent{anOrganization, aServiceAcct, aRule} {
+		rootAsksAnthropic(t, s, "set", given)
+	}
+	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole})
+	home := t.TempDir()
+	agent := &rootAgent{home: home, namespace: auth.NamespaceSystem, element: "canvas-1", sessionDir: filepath.Join(elementsDir, "canvas-1"), did: "did:key:element", token: "the-element-token"}
+	said := rootSaid(filepath.Join(t.TempDir(), "no-claude-code-is-run"), home)
+
+	var seen []claudecode.Message
+	answer, err := s.spend(agent, said, shaken{}, func(m claudecode.Message) { seen = append(seen, m) })
+	require.NoError(t, err)
+	assert.Equal(t, "the element answered at Anthropic", answer.Text)
+	assert.False(t, answer.IsError)
+	assert.Equal(t, "sesn_1", answer.Session)
+	assert.InDelta(t, 0.25, answer.CostUSD, 0.001, "what the Session cost, read when the turn ended")
+	// What it reached for is shown as it happens, then the answer.
+	require.Len(t, seen, 2)
+	assert.Equal(t, "assistant", seen[0].Type)
+	assert.Equal(t, "mcp__qntx__am_version", seen[0].Blocks()[0].Name)
+	assert.Equal(t, "the element answered at Anthropic", seen[1].Result)
+
+	console.mu.Lock()
+	agentMade := console.bodies["agent"][0]
+	assert.Equal(t, "claude-opus-5-5", agentMade["model"].(map[string]any)["id"])
+	assert.Contains(t, agentMade["system"], "You run at Anthropic")
+	servers := agentMade["mcp_servers"].([]any)
+	assert.Equal(t, s.authHandler.PublicOrigin()+"/mcp", servers[0].(map[string]any)["url"], "it reaches the node's MCP at its public origin")
+	credential := console.bodies["credential"][0]["auth"].(map[string]any)
+	assert.Equal(t, map[string]any{"type": "static_bearer", "token": "the-element-token", "mcp_server_url": s.authHandler.PublicOrigin() + "/mcp"}, credential, "with its own token")
+	assert.Equal(t, []any{"vlt_1"}, console.bodies["session"][0]["vault_ids"])
+	assert.Equal(t, []any{map[string]any{"type": "memory_store", "memory_store_id": "memstore_1"}}, console.bodies["session"][0]["resources"], "its Memory, in every Session")
+	console.mu.Unlock()
+
+	again, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	assert.Equal(t, "sesn_1", again.Session, "shaken again: the same Session")
+	console.mu.Lock()
+	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "memory": 1, "session": 1}, console.made, "each made once")
+	console.mu.Unlock()
+
+	// A screenshot reaches it as a picture, not as a path on the node it cannot open.
+	picture := filepath.Join(t.TempDir(), "shot.png")
+	png := []byte("\x89PNG\r\n\x1a\n" + "the rest of a picture")
+	require.NoError(t, os.WriteFile(picture, png, 0o600))
+	_, err = s.spend(agent, said, shaken{says: "weird resize happens", element: "canvas-1", screenshot: picture}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	console.mu.Lock()
+	sent := console.bodies["said"][len(console.bodies["said"])-1]["content"].([]any)
+	console.mu.Unlock()
+	require.Len(t, sent, 2)
+	assert.Equal(t, "weird resize happens\n\nThe screenshot of element canvas-1 is with this message.", sent[0].(map[string]any)["text"])
+	source := sent[1].(map[string]any)["source"].(map[string]any)
+	assert.Equal(t, "image/png", source["media_type"])
+	assert.Equal(t, base64.StdEncoding.EncodeToString(png), source["data"])
+	assert.NotContains(t, sent[0].(map[string]any)["text"], picture, "no path on the node")
+
+	kept, err := os.ReadFile(filepath.Join(home, elementsDir, "canvas-1", managedElementFile))
+	require.NoError(t, err)
+	assert.True(t, strings.Contains(string(kept), `"session":"sesn_1"`), string(kept))
+
+	// A Session Anthropic ended is said, and the element goes on in a new one, on the same Agent and Vault.
+	console.mu.Lock()
+	console.ended["sesn_1"] = true
+	console.mu.Unlock()
+	anew, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	assert.Equal(t, "sesn_2", anew.Session)
+	console.mu.Lock()
+	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "memory": 1, "session": 2}, console.made)
+	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "the new Session has the Memory the ended one had")
+	console.mu.Unlock()
+
+	// Another model: its Agent becomes a new version, and it goes on in a new Session with the same Memory.
+	console.mu.Lock()
+	sessionsBefore := console.made["session"]
+	console.mu.Unlock()
+	onSonnet := said
+	onSonnet.Model = "claude-sonnet-5-5"
+	moved, err := s.spend(agent, onSonnet, shaken{}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	console.mu.Lock()
+	assert.Equal(t, 1, console.made["agent version"])
+	updated := console.bodies["agent"][len(console.bodies["agent"])-1]
+	assert.Equal(t, "claude-sonnet-5-5", updated["model"].(map[string]any)["id"])
+	assert.Equal(t, sessionsBefore+1, console.made["session"])
+	console.mu.Unlock()
+	assert.NotEqual(t, "sesn_1", moved.Session)
+
+}
+
+// "Am Agent should have a direct link to A2A Agent and reverse"
+func TestAnElementsAgentKnowsTheOthersAndWhichItWorksWithDirectly(t *testing.T) {
+	am := managedIsSaidToBe(&rootAgent{element: "am-element", did: "did:key:am"})
+	assert.Contains(t, am, "Every element on the page is an agent of its own")
+	assert.Contains(t, am, "You work directly with a2a-card.")
+	assert.Contains(t, managedIsSaidToBe(&rootAgent{element: "a2a-card", did: "did:key:a2a"}), "You work directly with am-element.")
+	assert.NotContains(t, managedIsSaidToBe(&rootAgent{element: "ax-1", did: "did:key:ax"}), "You work directly with")
+}
+
+// "having one agent be always in tune with one story, it would make it so you never have to make it shift frame, the contract is always clear."
+func TestAStorysAgentHasItsOneStoryAsItsContract(t *testing.T) {
+	story := managedIsSaidToBe(&rootAgent{element: "story-27-root-registers-the-node-with-anthropic", did: "did:key:story"})
+	assert.Contains(t, story, "You are the user story stories/27-root-registers-the-node-with-anthropic.feature of github.com/teranos/QNTX-Web, and nothing else")
+	assert.NotContains(t, story, "You are the element")
+	// "and because some stories may lead into each other, the stories could talk to the stories as well"
+	assert.Contains(t, story, "So is every other story, named story- and its file's name")
+	element := managedIsSaidToBe(&rootAgent{element: "approvals-element", did: "did:key:approvals"})
+	assert.Contains(t, element, "The user stories in stories/ of github.com/teranos/QNTX-Web that name you are your contract")
+}

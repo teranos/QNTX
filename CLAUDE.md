@@ -22,6 +22,10 @@ A sigil handles a server capability, the reach table governs it with attestation
 
 **Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, literally, don't describe implementation details, User Vision outlives derived code. Ask questions to preserve the user's mental model _verbatim_ rather than descriptive interpreted summaries. **Maximize signal-to-noise: essential context only, no filler.**
 
+## Stories
+
+[QNTX-Web/stories](https://github.com/teranos/QNTX-Web/tree/main/stories)
+
 ## Identity
 
 Who may log in, the provider ceremony, and what a passkey carries: [ADR-030](docs/adr/ADR-030-identity-providers.md). Access tokens: [ADR-025](docs/adr/ADR-025-access-tokens.md).

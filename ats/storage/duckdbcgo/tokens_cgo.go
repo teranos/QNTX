@@ -63,6 +63,8 @@ type tokenSummary struct {
 	ReturnAddress       string   `json:"return_address"`
 	ClientDID           string   `json:"client_did"`
 	RequestID           string   `json:"request_id"`
+	Instructions        string   `json:"instructions"`
+	Root                bool     `json:"root"`
 	ScopeRead           []string `json:"scope_read"`
 	ScopeWrite          []string `json:"scope_write"`
 	CreatedAt           int64    `json:"created_at"`
@@ -192,6 +194,8 @@ func (s *TokenStore) Create(spec access.NewToken) (string, string, error) {
 		Level:               spec.Level,
 		Namespaces:          spec.Namespaces,
 		ExpiresAt:           spec.ExpiresAt,
+		Instructions:        spec.Instructions,
+		Root:                spec.Root,
 	}, spec.ReturnAddress)
 	if err != nil {
 		return "", "", err
@@ -223,6 +227,8 @@ func (s *TokenStore) put(spec access.IssuedToken, returnAddress string) (string,
 		ReturnAddress:       returnAddress,
 		ClientDID:           spec.ClientDID,
 		RequestID:           spec.RequestID,
+		Instructions:        spec.Instructions,
+		Root:                spec.Root,
 		// The lines say what a token may touch (ADR-034). The two lists stay
 		// on the object so what was written before still reads, and carry
 		// nothing.
@@ -358,6 +364,8 @@ func (s *TokenStore) List() ([]access.TokenInfo, error) {
 			ReturnAddress:       s.ReturnAddress,
 			ClientDID:           s.ClientDID,
 			RequestID:           s.RequestID,
+			Instructions:        s.Instructions,
+			Root:                s.Root,
 			CreatedAt:           millisToRFC3339(&s.CreatedAt),
 			ExpiresAt:           optionalRFC3339(s.ExpiresAt),
 			LastUsedAt:          optionalRFC3339(s.LastUsedAt),

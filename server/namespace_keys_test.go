@@ -99,6 +99,55 @@ func TestANamespacesKeysAreAPersonsToHandle(t *testing.T) {
 	assert.Nil(t, refused, "SUPER handles a namespace's keys")
 }
 
+// providerIssuing answers as a provider does for the one key it issued, and
+// 401 for any other, on every path a key is asked at.
+func providerIssuing(t *testing.T, issued string) string {
+	t.Helper()
+	at := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("x-api-key") == issued || r.Header.Get("Authorization") == "Bearer "+issued {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"invalid x-api-key"}`))
+	}))
+	t.Cleanup(at.Close)
+	return at.URL
+}
+
+// "kept with red light"
+func TestAProvidersKeyIsKeptAndSaysWhetherItsProviderAcceptsIt(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	s.providersAt = map[string]string{"anthropic": providerIssuing(t, "sk-ant-issued")}
+	owner := person(gardener, auth.LevelUser, "garden")
+
+	set, refused := keysAs(s, owner, "set", sigil.Sent{"namespace": "garden", "name": "anthropic", "value": "sk-ant-mistyped"})
+	require.Nil(t, refused, "a key its provider refuses is kept")
+	red := set.(*protocol.NamespaceKeys).GetKeys()[0]
+	assert.True(t, red.GetAsked())
+	assert.False(t, red.GetAccepted())
+	assert.Contains(t, red.GetWhy(), "401")
+
+	_, refused = keysAs(s, owner, "set", sigil.Sent{"namespace": "garden", "name": "anthropic", "value": "sk-ant-issued"})
+	require.Nil(t, refused)
+	listed, refused := keysAs(s, owner, "list", sigil.Sent{"namespace": "garden"})
+	require.Nil(t, refused)
+	green := listed.(*protocol.NamespaceKeys).GetKeys()[0]
+	assert.True(t, green.GetAsked())
+	assert.True(t, green.GetAccepted())
+	assert.Empty(t, green.GetWhy())
+
+	_, refused = keysAs(s, owner, "set", sigil.Sent{"namespace": "garden", "name": "sentry", "value": "a-dsn"})
+	require.Nil(t, refused)
+	listed, refused = keysAs(s, owner, "list", sigil.Sent{"namespace": "garden"})
+	require.Nil(t, refused)
+	for _, key := range listed.(*protocol.NamespaceKeys).GetKeys() {
+		if key.GetName() == "sentry" {
+			assert.False(t, key.GetAsked())
+		}
+	}
+}
+
 // The keys paths let in whoever acts in a namespace and no token: who handles
 // them is the handler's to ask.
 func TestTheTableGivesAnamespacesKeysToNoToken(t *testing.T) {

@@ -24,6 +24,15 @@ type Pin struct {
 	Artifacts     map[string]Artifact
 }
 
+// PinnedVersion is the codex Parity pins, as what is said of a turn names it.
+var PinnedVersion = func() string {
+	version, _, err := parity.Codex()
+	if err != nil {
+		return ""
+	}
+	return version
+}()
+
 func Pinned() (Pin, error) {
 	version, artifacts, err := parity.Codex()
 	if err != nil {

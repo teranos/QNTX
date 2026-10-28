@@ -21,12 +21,22 @@
         "ANYONE"
       ]
     },
+    "/.well-known/jwks.json": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/.well-known/oauth-authorization-server": {
       "x-qntx-reach": [
         "ANYONE"
       ]
     },
     "/.well-known/oauth-protected-resource": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/.well-known/openid-configuration": {
       "x-qntx-reach": [
         "ANYONE"
       ]
@@ -122,6 +132,16 @@
         "ROOT",
         "SUPER",
         "USER"
+      ]
+    },
+    "/api/anthropic": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/anthropic/order": {
+      "x-qntx-reach": [
+        "ROOT"
       ]
     },
     "/api/approvals": {

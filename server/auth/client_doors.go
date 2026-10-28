@@ -25,6 +25,15 @@ type Client struct {
 	// was minted at, or the namespaces a peer serves.
 	Namespaces    []string
 	ReturnAddress string
+	// Instructions is what the connector's MCP server tells the agent on
+	// initialize (ADR-038).
+	//
+	// "guide your agent is easy to add"
+	Instructions string
+	// Root is ROOT's client for the node's MCP server (ADR-038).
+	//
+	// "but i want a MCP specifically for the Node, only for ROOT"
+	Root bool
 	// Origin is where a peer answers, which requests for it are carried to.
 	Origin *url.URL
 	// Node is a peer nodes.peers declares by its did:key.
@@ -56,19 +65,34 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 		if t.RevokedAt != nil || expiredAt(t.ExpiresAt) {
 			return Client{}, false
 		}
-		namespace := NamespaceDefault
+		// Where it acts is the first the record names, and nowhere when it
+		// names none.
+		var namespaces []string
 		if len(t.Namespaces) > 0 {
-			namespace = t.Namespaces[0]
+			namespaces = []string{t.Namespaces[0]}
 		}
 		return Client{
 			DID:           t.DID,
 			Label:         t.Label,
 			MintedBy:      t.MintedBy,
-			Namespaces:    []string{namespace},
+			Namespaces:    namespaces,
 			ReturnAddress: t.ReturnAddress,
+			Instructions:  t.Instructions,
+			Root:          t.Root,
 		}, true
 	}
 	return Client{}, false
+}
+
+// ConnectorInstructions is what a connector's MCP server tells the agent on
+// initialize: the instructions on the client it was minted through, and none
+// for a DID no live client answers to.
+func (h *Handler) ConnectorInstructions(clientDID string) string {
+	client, ok := h.clientByDID(clientDID)
+	if !ok {
+		return ""
+	}
+	return client.Instructions
 }
 
 // expiredAt is whether an RFC3339 expiry has passed. An expiry that does not

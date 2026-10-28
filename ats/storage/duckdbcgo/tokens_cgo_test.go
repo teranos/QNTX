@@ -78,6 +78,38 @@ func TestAClientKeepsItsReturnAddress(t *testing.T) {
 	}
 }
 
+// A client's instructions are what its connector is told (ADR-038). They ride
+// the record through the FFI and back, and survive reopen.
+func TestAClientKeepsItsInstructions(t *testing.T) {
+	dir := "file://" + t.TempDir()
+	first, err := NewTokenStore(dir)
+	if err != nil {
+		t.Fatalf("NewTokenStore: %v", err)
+	}
+	_, _, err = first.Create(access.NewToken{
+		Label: "app", MintedBy: "https://mastodon.example/@tim", Level: access.LevelOAuth,
+		Namespaces: []string{NamespaceDefault}, ReturnAddress: "https://app.example/callback",
+		Instructions: "Always show drafts before sending.", ExpiresAt: &neverEnds,
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	first.Close()
+
+	second, err := NewTokenStore(dir)
+	if err != nil {
+		t.Fatalf("NewTokenStore (reopen): %v", err)
+	}
+	defer second.Close()
+	listed, err := second.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(listed) != 1 || listed[0].Instructions != "Always show drafts before sending." {
+		t.Fatalf("after reopen the list says %+v", listed)
+	}
+}
+
 // A token whose hash the open is handed is left unread; the rest load.
 func TestATokenTheOpenSkipsIsNotRead(t *testing.T) {
 	dir := "file://" + t.TempDir()

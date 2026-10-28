@@ -1,8 +1,12 @@
 package parity
 
 import (
+	"encoding/json"
+	"maps"
 	"slices"
 	"testing"
+
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
 // A skill is named by its path in the taxonomy, and its id is derived from
@@ -12,11 +16,14 @@ func TestOASFSkills(t *testing.T) {
 	if refused != nil {
 		t.Fatal(refused)
 	}
-	if len(skills) != 513 {
-		t.Errorf("the pinned taxonomy holds %d skills", len(skills))
+	if len(skills) != 495 {
+		t.Errorf("the pinned taxonomy holds %d skills a Record can name", len(skills))
+	}
+	if _, held := skills["software_engineering"]; held {
+		t.Error("software_engineering is a category, and a Record names none")
 	}
 	for name, id := range map[string]uint32{
-		"software_engineering": 6,
+		"software_engineering/version_control":                                  610,
 		"software_engineering/version_control/pull_request_management":          61003,
 		"cybersecurity/identity_access_management/authorization_access_control": 100502,
 		"tool_use_automation/workflow_automation":                               1704,
@@ -61,5 +68,44 @@ func TestOASFRecordRequirements(t *testing.T) {
 	version, refused := OASFSchemaVersion()
 	if refused != nil || version != "1.1.0" {
 		t.Errorf("the schema version is %q: %v", version, refused)
+	}
+}
+
+// The skills and modules a Record can name, with their ids, are exactly the
+// ones the Record schema OASF's server gives holds, each a name and an id it
+// fixes.
+func TestOASFClassesAreTheRecordSchemas(t *testing.T) {
+	raw, refused := OASFRecordSchema()
+	if refused != nil {
+		t.Fatal(refused)
+	}
+	var schema struct {
+		Defs map[string]map[string]struct {
+			Properties struct {
+				Name struct{ Const string } `json:"name"`
+				ID   struct{ Const uint32 } `json:"id"`
+			} `json:"properties"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatal(err)
+	}
+	for family, derive := range map[string]func() (map[string]uint32, *protocol.Refusal){"skills": OASFSkills, "modules": OASFModules} {
+		derived, refused := derive()
+		if refused != nil {
+			t.Fatal(refused)
+		}
+		fixed := map[string]uint32{}
+		for _, def := range schema.Defs[family] {
+			fixed[def.Properties.Name.Const] = def.Properties.ID.Const
+		}
+		if len(fixed) == 0 || !maps.Equal(fixed, derived) {
+			t.Errorf("%s: the schema fixes %d, and %d are derived from the taxonomy", family, len(fixed), len(derived))
+			for name, id := range fixed {
+				if derived[name] != id {
+					t.Errorf("%s: %s is %d in the schema and %d derived", family, name, id, derived[name])
+				}
+			}
+		}
 	}
 }
