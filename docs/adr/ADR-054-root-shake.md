@@ -34,7 +34,7 @@ Status: Implemented, mostly
 - The row of what was said (`UserPromptSubmit`) carries the element and the
   screenshot's path, in the node's own record.
 
-"say being able to carry an image sounds usefull to me, and being able to attach an imagine whne in a mobile chat"
+"say being able to carry an image sounds useful to me, and being able to attach an imagine when in a mobile chat"
 
 - The Node Agent's `say` and the namespace agent's `say` take `file_id` too: a
   picture attached in chat, put where that agent works the same way, and the
