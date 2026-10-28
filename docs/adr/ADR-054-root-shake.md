@@ -60,8 +60,7 @@ Status: Implemented, mostly
 "YES, WHERE WE LEFT OFF, SEPARATE FROM THE NODE AGENT THAT IS RESPONSIBLE FOR THE NODE, NOT A SINGLE ELEMENT"
 
 - Day 1: ROOT shakes with an element on screen, and that element answers. 
-- Day
-  3, the same element: the same session, resumed, from where it left off.
+- Day 3, the same element: the same session, resumed, from where it left off.
 
 ## Not done
 
