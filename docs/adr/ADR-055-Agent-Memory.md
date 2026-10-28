@@ -19,4 +19,7 @@ make sure this is a thing for
 - [ ] [[ADR-053-Namespace-Agents]]
 - [ ] [[ADR-048-Node-Agent]]
 - [ ] [[Elements]] Agents
-- [ ] 
+
+
+
+- [ ] Ability to merge Memory Stores
