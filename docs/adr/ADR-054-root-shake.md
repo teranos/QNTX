@@ -68,8 +68,7 @@ Status: Implemented, mostly
 
 ## Not done
 
-- The element's repo, which the host sets: nothing on the node says which
-  repo an element is yet, so the agent is not told one.
+
 - One `turn` per element agent: two shakes at one element wait on each other,
   two at two elements run at once.
-- The Sentry User Feedback shake, deferred: this is not the feedback form.
+
