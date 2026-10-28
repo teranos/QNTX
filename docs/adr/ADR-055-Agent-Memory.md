@@ -1,5 +1,8 @@
 
-> With the increasing velocity of digital content and the increasing availability of powerful creation and editing techniques, establishing the provenance of media is critical to ensure transparency, understanding, and ultimately, trust.
+> c2PA
+> With the increasing velocity of digital content and the increasing availability of powerful creation and editing techniques, establishing the provenance of media is critical to ensure transparency, understanding, and ultimately, trust. 
+
+
 
 
 https://platform.claude.com/dashboard
