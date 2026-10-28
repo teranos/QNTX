@@ -115,6 +115,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/pulse/jobs", s.HandlePulseJobs)                                     // List async jobs (GET)
 	s.answer("/api/prompt/", s.HandlePrompt)                                           // Prompt operations (preview/execute/list/save/get/versions)
 	s.answer("/api/plugins/{name}/logs", s.HandlePluginLogs)                           // Plugin log stream (SSE)
+	s.answer("/api/agent/live", s.HandleNodeAgentLive)                                 // The Node Agent's turn as it prints it (SSE)
 	s.answer("/api/plugins/{name}/config", s.HandlePluginConfig)                       // Plugin configuration (GET/PUT)
 	s.answer("/am/statusline", s.statusLine)                                           // What a status line draws (GET)
 	s.answer("/api/types/", s.HandleTypes)                                             // Get specific type (GET /api/types/{typename})

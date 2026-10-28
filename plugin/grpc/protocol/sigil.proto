@@ -87,6 +87,50 @@ message SessionTranscript {
   Transcript transcript = 1;
 }
 
+// SessionEvent is one thing a harness's session emitted, as it emitted it:
+// live, in the order it happened, and no attestation. The transcript is the
+// session after the fact (Transcript); this is the session while it runs.
+message SessionEvent {
+  // "I want to see the most honest and least data-lossy representation of what
+  // there is to show."
+
+  // The session it happened in.
+  string session = 1;
+  // Whose line this is: claude, pi, anthropic.
+  string harness = 2;
+  // When, as the harness stamped it, or when the node read it when it did not.
+  string at = 3;
+  // What it is, in the words every harness has one of: started, text, delta,
+  // tool_use, tool_result, thinking, ended, failed. A line that is none of
+  // these is "other", and raw still carries it whole.
+  string kind = 4;
+  // What was said: the text, the delta, a tool's result, the answer on ended,
+  // the error on failed.
+  string text = 5;
+  // On tool_use and tool_result: the tool and the id the harness gave the call.
+  string tool = 6;
+  string tool_use_id = 7;
+  // On tool_use: the input, as JSON, whole.
+  string input = 8;
+  // The harness's own line, whole, as it printed it. Nothing above says more
+  // than this; what the fields do not carry is still here.
+  string raw = 9;
+  // Where in the session's stream this line ends, so a reader asks for what
+  // follows it and nothing is read twice or skipped.
+  int64 mark = 10;
+}
+
+// SessionEvents is the events of a turn from a mark on, and whether the turn
+// is still printing. Over SSE each event travels alone, as one data line.
+message SessionEvents {
+  repeated SessionEvent events = 1;
+  // Whether the harness is still printing: false is the turn over, and its
+  // last event ended or failed.
+  bool live = 2;
+  // The mark to ask from next.
+  int64 mark = 3;
+}
+
 // ClaudeSaid is what claude say answers.
 message ClaudeSaid {
   // What it answered.
