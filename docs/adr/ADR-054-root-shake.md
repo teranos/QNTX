@@ -1,7 +1,7 @@
 # ADR-054: ROOT SHAKE
 
 Date: 2026-10-23
-Status: Proposed
+Status: Impl
 
 "think ROOT SHAKE"
 
