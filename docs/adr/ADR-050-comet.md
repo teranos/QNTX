@@ -1,7 +1,7 @@
 # ADR-050: Comet
 
 Date: 2026-10-08
-Status: Proposed
+Status: Accepted 
 
 "the feature i am imagining is called comet"
 
@@ -67,6 +67,8 @@ Even faster when the builds are done by QNTX as Comet
 
 ## The ROOT agent
 
+TODO: move section to the root agent ADR
+
 "to get ground setup for the ROOT agent"
 
 - The node runs Claude Code with CLAUDE_CONFIG_DIR under the agent's home
@@ -78,7 +80,7 @@ Even faster when the builds are done by QNTX as Comet
   DID the hook events are attested under.
 
 ## The Element
-
+TODO: talk about comet ui needs to be owned by Web
 "which is for all of this to be visible in the existing Element in the ui, remvoing the coment crosshatches"
 
 - The Comet stratum is `gr-unreal`, with a limit saying the comet does not
@@ -98,7 +100,7 @@ Even faster when the builds are done by QNTX as Comet
   serves no tenant.
 
 ## The node holds the private controls
-
+TODO: UI CONCERN
 "How the node holds private controls, It should be somewhat doable in the UI"
 
 - Not a text box of pbt, and never a record a model can write: the first
@@ -119,7 +121,7 @@ Even faster when the builds are done by QNTX as Comet
 
 ## Landing
 
-"Yes, custoner uses ground, but they dont think about it because it just lands via comet"
+"Yes, USER uses ground, but they dont think about it because it just lands via comet"
 
 - The node reaches no machine. sky polls every five seconds, ug polls the
   status line, SessionStart checks once a day. A comet is pulled.
@@ -198,3 +200,8 @@ Even faster when the builds are done by QNTX as Comet
 - Rituals on the box: everything a ritual needs stands in the Node Agent's
   grove checkout, and grove's rituals are off there until a person's session
   standing in it says rituals on.
+- Managed Agents SDK, Environments, ground and comets there
+- Comet is a core feature, README isn’t reflecting the relationship to ground yet 
+- Further UI integration through the ground element 
+- Comet Chapter in Book of ground 
+- Make Quotation Enforcement Understandable and more ready for future development 
