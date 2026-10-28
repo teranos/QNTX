@@ -3,4 +3,7 @@
 - And later 'dreams' as well
 
 
-bidirectional sync between our abstraction of the memory St
+bidirectional sync between our abstraction of the memory store.
+
+
+Allow all A
