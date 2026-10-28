@@ -204,4 +204,4 @@ TODO: UI CONCERN
 - Comet is a core feature, README isn’t reflecting the relationship to ground yet 
 - Further UI integration through the ground element 
 - Comet Chapter in Book of ground 
-- 
+- Quotation Enforcement 
