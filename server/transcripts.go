@@ -51,6 +51,8 @@ type transcriptTurn struct {
 	Speaker string
 	Text    string
 	Of      string
+	// CostUSD is what the turn an assistant's answer ends cost, as its Stop says; 0 when it says none.
+	CostUSD float64
 
 	when time.Time
 }
@@ -77,7 +79,7 @@ type transcript struct {
 func (t transcript) message() *protocol.Transcript {
 	turns := make([]*protocol.Turn, 0, len(t.Turns))
 	for _, turn := range t.Turns {
-		turns = append(turns, &protocol.Turn{At: turn.At, Speaker: turn.Speaker, Text: turn.Text, Of: turn.Of})
+		turns = append(turns, &protocol.Turn{At: turn.At, Speaker: turn.Speaker, Text: turn.Text, Of: turn.Of, CostUsd: turn.CostUSD})
 	}
 	return &protocol.Transcript{Session: t.Session, Subjects: t.Subjects, Started: t.Started, Ended: t.Ended,
 		Turns: turns, Folded: uint32(t.Folded), Model: t.Model, Effort: t.Effort}
@@ -298,6 +300,9 @@ func turnOf(as *types.As) (transcriptTurn, bool) {
 		turn.Speaker, turn.Text = "human", attr("prompt")
 	case "Stop":
 		turn.Speaker, turn.Text = "assistant", attr("last_assistant_message")
+		if cost, ok := as.Attributes["cost_usd"].(float64); ok {
+			turn.CostUSD = cost
+		}
 	case "PreToolUse":
 		turn.Speaker, turn.Text = toolTurn(attr("tool_name"), attr("file_path"), attr("command"))
 	case "SessionStart", "SessionEnd":

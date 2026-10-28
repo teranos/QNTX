@@ -71,6 +71,8 @@ message Turn {
   string text = 3;
   // The attestation it was read from.
   string of = 4;
+  // What the turn an assistant's answer ends cost, in USD, as Claude Code says; 0 when it says none.
+  double cost_usd = 5;
 }
 
 // Transcripts is what transcripts read answers.
@@ -163,6 +165,8 @@ message ClaudeAm {
   string auth_method = 12;
   // Every model a turn can be said to answer with.
   repeated string models = 13;
+  // Every effort a turn can be said to run at.
+  repeated string efforts = 14;
 }
 
 // NamespaceAgentSaid is what agents say answers: what the namespace's agent

@@ -299,7 +299,9 @@ type Turn struct {
 	// What was said or done.
 	Text string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
 	// The attestation it was read from.
-	Of            string `protobuf:"bytes,4,opt,name=of,proto3" json:"of,omitempty"`
+	Of string `protobuf:"bytes,4,opt,name=of,proto3" json:"of,omitempty"`
+	// What the turn an assistant's answer ends cost, in USD, as Claude Code says; 0 when it says none.
+	CostUsd       float64 `protobuf:"fixed64,5,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -360,6 +362,13 @@ func (x *Turn) GetOf() string {
 		return x.Of
 	}
 	return ""
+}
+
+func (x *Turn) GetCostUsd() float64 {
+	if x != nil {
+		return x.CostUsd
+	}
+	return 0
 }
 
 // Transcripts is what transcripts read answers.
@@ -738,7 +747,9 @@ type ClaudeAm struct {
 	// How it is signed in, as Claude Code names it, or empty when it is not.
 	AuthMethod string `protobuf:"bytes,12,opt,name=auth_method,json=authMethod,proto3" json:"auth_method,omitempty"`
 	// Every model a turn can be said to answer with.
-	Models        []string `protobuf:"bytes,13,rep,name=models,proto3" json:"models,omitempty"`
+	Models []string `protobuf:"bytes,13,rep,name=models,proto3" json:"models,omitempty"`
+	// Every effort a turn can be said to run at.
+	Efforts       []string `protobuf:"bytes,14,rep,name=efforts,proto3" json:"efforts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -860,6 +871,13 @@ func (x *ClaudeAm) GetAuthMethod() string {
 func (x *ClaudeAm) GetModels() []string {
 	if x != nil {
 		return x.Models
+	}
+	return nil
+}
+
+func (x *ClaudeAm) GetEfforts() []string {
+	if x != nil {
+		return x.Efforts
 	}
 	return nil
 }
@@ -2447,12 +2465,13 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x05turns\x18\x05 \x03(\v2\x0e.protocol.TurnR\x05turns\x12\x16\n" +
 	"\x06folded\x18\x06 \x01(\rR\x06folded\x12\x14\n" +
 	"\x05model\x18\a \x01(\tR\x05model\x12\x16\n" +
-	"\x06effort\x18\b \x01(\tR\x06effort\"T\n" +
+	"\x06effort\x18\b \x01(\tR\x06effort\"o\n" +
 	"\x04Turn\x12\x0e\n" +
 	"\x02at\x18\x01 \x01(\tR\x02at\x12\x18\n" +
 	"\aspeaker\x18\x02 \x01(\tR\aspeaker\x12\x12\n" +
 	"\x04text\x18\x03 \x01(\tR\x04text\x12\x0e\n" +
-	"\x02of\x18\x04 \x01(\tR\x02of\"E\n" +
+	"\x02of\x18\x04 \x01(\tR\x02of\x12\x19\n" +
+	"\bcost_usd\x18\x05 \x01(\x01R\acostUsd\"E\n" +
 	"\vTranscripts\x126\n" +
 	"\vtranscripts\x18\x01 \x03(\v2\x14.protocol.TranscriptR\vtranscripts\"I\n" +
 	"\x11SessionTranscript\x124\n" +
@@ -2484,7 +2503,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"pi_version\x18\x06 \x01(\tR\tpiVersion\x12\x19\n" +
 	"\bcost_usd\x18\a \x01(\x01R\acostUsd\x12\x17\n" +
 	"\atook_ms\x18\b \x01(\x01R\x06tookMs\x12\x1c\n" +
-	"\tunwritten\x18\t \x01(\tR\tunwritten\"\x80\x03\n" +
+	"\tunwritten\x18\t \x01(\tR\tunwritten\"\x9a\x03\n" +
 	"\bClaudeAm\x12\x10\n" +
 	"\x03did\x18\x01 \x01(\tR\x03did\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x16\n" +
@@ -2501,7 +2520,8 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tsigned_in\x18\v \x01(\bR\bsignedIn\x12\x1f\n" +
 	"\vauth_method\x18\f \x01(\tR\n" +
 	"authMethod\x12\x16\n" +
-	"\x06models\x18\r \x03(\tR\x06models\"d\n" +
+	"\x06models\x18\r \x03(\tR\x06models\x12\x18\n" +
+	"\aefforts\x18\x0e \x03(\tR\aefforts\"d\n" +
 	"\x12NamespaceAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\"\x8a\x01\n" +

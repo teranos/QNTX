@@ -207,6 +207,7 @@ func (s *QNTXServer) claudeHarness() *harness {
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs this in. Not sent, it is the one am.toml gives."},
 			{Name: "model", OneOf: claudeModels, Says: "The model it answers with. Not sent, it is the one am.toml gives."},
+			{Name: "effort", OneOf: claudeEfforts, Says: "In Claude Code, the effort it runs this at. Not sent, it is the one am.toml gives."},
 		},
 		// am.toml naming the Node Agent names it in Claude Code.
 		named:    func() bool { return true },
@@ -219,7 +220,7 @@ func (s *QNTXServer) claudeHarness() *harness {
 		am: func(is agentIn, agent *rootAgent, spec agentSpec) proto.Message {
 			am := &protocol.ClaudeAm{
 				Did: is.did, Model: spec.Model, Effort: spec.Effort, PermissionMode: spec.Mode,
-				PermissionModes: appcfg.PermissionModes, Models: claudeModels, Allow: spec.Allow,
+				PermissionModes: appcfg.PermissionModes, Models: claudeModels, Efforts: claudeEfforts, Allow: spec.Allow,
 				Session: is.session, Answering: is.answering, ClaudeCode: is.path, NotReady: is.notReady,
 			}
 			// Asked of Claude Code itself, when the node holds one.
@@ -261,6 +262,9 @@ func (s *QNTXServer) thereIsNoNodeAgent() *protocol.Refusal {
 // claudeModels is every model a turn can be said to answer with.
 var claudeModels = []string{"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"}
 
+// claudeEfforts is every effort a turn can be said to run at, as Claude Code's --effort takes it.
+var claudeEfforts = []string{"low", "medium", "high", "xhigh", "max"}
+
 // claudePart is Claude Code's part of one turn: run in the permission mode
 // whoever speaks names, or the one am.toml gives.
 func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal) {
@@ -273,6 +277,11 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 	if model == "" {
 		model = named.Model
 	}
+	// "The effort chooser should be top of the screen."
+	effort := sent["effort"]
+	if effort == "" {
+		effort = named.Effort
+	}
 	if mode == "" {
 		return aTurn{}, &protocol.Refusal{Why: sigil.Missing, Param: "permission_mode",
 			Says: "no permission mode was named, and none is set for " + agent.called + " (am.toml gives it under [agent.root])"}
@@ -280,7 +289,7 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 
 	var binary, plan string
 	return aTurn{
-		effort: named.Effort,
+		effort: effort,
 		ready: func(ctx context.Context, session string, kept bool) (bool, *protocol.Refusal) {
 			var err error
 			if binary, err = s.harnessHeldBy("claude").Path(ctx); err != nil {
@@ -315,7 +324,7 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 		run: func(t turnRun) (proto.Message, error) {
 			said := claudecode.Said{
 				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
-				Says: t.says, Model: model, Effort: named.Effort, Token: plan,
+				Says: t.says, Model: model, Effort: effort, Token: plan,
 				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
 				// "on a redeploy NODE agent would still be alive, which is the
 				// intended state, rather than being killed mid-turn" (#1256).

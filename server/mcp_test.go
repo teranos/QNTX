@@ -148,7 +148,7 @@ func TestAnAnswerIsItsMessageWhole(t *testing.T) {
 
 	written, err := answerJSON(&protocol.Transcripts{Transcripts: []*protocol.Transcript{{Session: "s", Turns: []*protocol.Turn{{Text: "hey"}}}}})
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"transcripts":[{"session":"s","subjects":[],"started":"","ended":"","turns":[{"at":"","speaker":"","text":"hey","of":""}],"folded":0,"model":"","effort":""}]}`, string(written))
+	assert.JSONEq(t, `{"transcripts":[{"session":"s","subjects":[],"started":"","ended":"","turns":[{"at":"","speaker":"","text":"hey","of":"","cost_usd":0}],"folded":0,"model":"","effort":""}]}`, string(written))
 	assert.NoError(t, heldTo(promised.schema, written))
 
 	assert.Error(t, heldTo(promised.schema, []byte(`{"transcripts":[{"session":"s"}]}`)), "a session leaving out what it holds")

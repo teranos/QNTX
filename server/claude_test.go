@@ -310,6 +310,42 @@ func TestThePermissionModeIsNamedByWhoeverSpeaks(t *testing.T) {
 	assert.Equal(t, "permission_mode", refused.GetParam())
 }
 
+// "The effort chooser should be top of the screen."
+// Whoever speaks names the effort the turn runs at; its answer ends at it.
+func TestTheEffortIsNamedByWhoeverSpeaks(t *testing.T) {
+	s, ran := runningTheNodeAgent(t, opusLow)
+
+	_, refused := saying(s, sigil.Sent{"says": "think hard", "effort": "xhigh"})
+	require.Nil(t, refused)
+	assert.Equal(t, "xhigh", after(ranWith(t, ran, "0", "args"), "--effort"))
+	answer, refused := s.harnessSession(s.claudeHarness())
+	require.Nil(t, refused)
+	assert.Equal(t, "xhigh", answer.(*protocol.SessionTranscript).GetTranscript().GetEffort())
+
+	// Named none, it is am.toml's.
+	_, refused = saying(s, sigil.Sent{"says": "and again"})
+	require.Nil(t, refused)
+	assert.Equal(t, "low", after(ranWith(t, ran, "1", "args"), "--effort"))
+}
+
+// "I don't see the cost of an utterance"
+// What Claude Code says a turn cost is read with the answer that ends it.
+func TestAnAnswerSaysWhatItsTurnCost(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	_, refused := saying(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.Nil(t, refused)
+
+	answer, refused := s.harnessSession(s.claudeHarness())
+	require.Nil(t, refused)
+	var costs []float64
+	for _, turn := range answer.(*protocol.SessionTranscript).GetTranscript().GetTurns() {
+		if turn.GetSpeaker() == "assistant" {
+			costs = append(costs, turn.GetCostUsd())
+		}
+	}
+	assert.Equal(t, []float64{0.05}, costs)
+}
+
 // Who said it is written down with what was said.
 func TestWhoSpokeToTheNodeAgentIsWrittenDown(t *testing.T) {
 	s, _ := runningTheNodeAgent(t, opusLow)

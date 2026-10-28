@@ -176,6 +176,10 @@ func (w sessionWriter) rowsOf(m claudecode.Message, at time.Time) ([]*types.As, 
 		if w.effort != "" {
 			attrs["effort"] = map[string]any{"level": w.effort}
 		}
+		// "I don't see the cost of an utterance": what Claude Code says the turn cost, kept on how it ended.
+		if m.CostUSD > 0 {
+			attrs["cost_usd"] = m.CostUSD
+		}
 		if err := add("Stop", attrs); err != nil {
 			return nil, err
 		}
