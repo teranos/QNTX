@@ -199,4 +199,4 @@ Even faster when the builds are done by QNTX as Comet
   grove checkout, and grove's rituals are off there until a person's session
   standing in it says rituals on.
 - Managed Agents SDK, Environments, ground and comets there
-- Comet is a co
+- Comet is a core feature, README isn’t refl
