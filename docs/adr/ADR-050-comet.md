@@ -67,7 +67,7 @@ Even faster when the builds are done by QNTX as Comet
 
 ## The ROOT agent
 
-TODO: move section to the root agent AD
+TODO: move section to the root agent ADR
 
 "to get ground setup for the ROOT agent"
 
@@ -80,7 +80,7 @@ TODO: move section to the root agent AD
   DID the hook events are attested under.
 
 ## The Element
-
+TODO
 "which is for all of this to be visible in the existing Element in the ui, remvoing the coment crosshatches"
 
 - The Comet stratum is `gr-unreal`, with a limit saying the comet does not
