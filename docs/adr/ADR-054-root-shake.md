@@ -7,8 +7,7 @@ Status: Implemented, mostly
 
 "this mechanism is special, its just for root."
 
--  `/api/elements/{element}`, its
-  `say` and its `session` are of ROOT in the tablet of reach, as `/api/files`
+-  `/api/elements/{element}`, its `say` and its `session` are of ROOT in the tablet of reach, as `/api/files`
   is.
 
 "each element is an agent as well, we default to claude"
