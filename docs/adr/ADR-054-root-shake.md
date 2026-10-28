@@ -22,8 +22,7 @@ Status: Implemented, mostly
 
 "i want to shake my phone and talk to an element"
 
-"and its not the user Feedback form but literally an agent El, with the
-screenshot pasted right there."
+"and its not the user Feedback form but literally an agent Element, with the screenshot pasted right there."
 
 - The shake opens the element's chat from below, with the screenshot of the
   page in the composer. What is sent is said to that element by
