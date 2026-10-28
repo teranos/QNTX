@@ -26,5 +26,8 @@ make sure this is a thing for
 - [ ] 
 
 
+
+Preserving the words is only the beginning. Preserving the discipline of interpretation is the harder achievement.
+
 An agent should be free to interpret human speech, but it should never inherit the human's authority merely by interpreting it.
 
