@@ -58,10 +58,7 @@ no deeper.
 
 "yes"
 
-A plugin built by a runner on another machine reaches the node as a GitHub
-Actions artifact of a successful workflow run in the plugin record's
-repository. The artifact is named as the archive is, and holds the archive and
-its `.sha256`. The App's `workflow_run` delivery is what has the node download
+A plugin built by a runner on another machine reaches the node as a GitHub Actions artifact of a successful workflow run in the plugin record's repository. The artifact is named as the archive is, and holds the archive and its `.sha256`. The App's `workflow_run` delivery is what has the node download
 it, as the App's installation where the repository is; QNTX checks it against
 the `.sha256` as it checks a build under the runner, and a run older than the
 one whose build is installed is not installed over it. A repository no enabled
