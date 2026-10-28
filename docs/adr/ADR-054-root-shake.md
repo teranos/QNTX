@@ -41,7 +41,6 @@ Status: Implemented, mostly
   prompt says a picture is there and to read it.
 
 "ROOT AGENT IS ONE THING"
-
 "ROOT SHAKE ANOTHER"
 
 "AGENT PER ELEMENT, EACH ELEMENT IS ITS OWN CONVERSATION"
