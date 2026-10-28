@@ -9,9 +9,7 @@ Status: Implemented, mostly
 
 -  `/api/elements/{element}`, its `say` and its `session` are of ROOT in the tablet of reach, as `/api/files` is.
 
-"each element and each is an agent as well."
-
-"its work is the prompt"
+"each element and each user story is an agent as well."
 
 - Each element is its own agent: its own key derived from the node's for
   `agent:element:<element>` ([[ADR-048-Node-Agent]]: an agent has its own DID
