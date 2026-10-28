@@ -6,4 +6,5 @@
 bidirectional sync between our abstraction of the memory store.
 
 
-Allow all Agent Harnesses to leverage memories created in Managed Ag
+Allow all Agent Harnesses to leverage memories created in Managed Agents.
+
