@@ -74,7 +74,11 @@ func (s SignIn) Begin(ctx context.Context) (*SigningIn, error) {
 	default:
 		return nil, errors.Newf("billing is one of %s, not %q", strings.Join(Billings, ", "), s.Billing)
 	}
-	cmd := exec.CommandContext(ctx, s.Binary, args...)
+	binary, argv, err := Invocation(s.Binary, args)
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.CommandContext(ctx, binary, argv...)
 	cmd.Dir, cmd.Env = s.Home, environment(s.Home)
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
@@ -182,7 +186,11 @@ type Status struct {
 // out, Claude Code says so and exits 1: that exit with its answer is the
 // answer, and an exit 1 with no answer is still a failure.
 func StatusOf(ctx context.Context, binary, home string) (Status, error) {
-	cmd := exec.CommandContext(ctx, binary, "auth", "status", "--json")
+	run, argv, err := Invocation(binary, []string{"auth", "status", "--json"})
+	if err != nil {
+		return Status{}, err
+	}
+	cmd := exec.CommandContext(ctx, run, argv...)
 	cmd.Dir, cmd.Env = home, environment(home)
 	out, exitErr := cmd.Output()
 	if exitErr != nil {

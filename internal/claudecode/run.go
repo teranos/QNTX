@@ -225,14 +225,17 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		return errors.Wrapf(said.Close(), "%s.err did not close", stream)
 	}
 
-	binary, argv := s.Binary, args
+	binary, argv, err := Invocation(s.Binary, args)
+	if err != nil {
+		return Answer{}, errors.WithSecondaryError(err, handedOver())
+	}
 	if s.Apart {
 		scope, bus, systemd, err := systemdScope("qntx-turn-" + strings.TrimSuffix(filepath.Base(stream), streamExt))
 		if err != nil {
 			return Answer{}, err
 		}
 		if systemd {
-			binary, argv = "systemd-run", append(append(scope, s.Binary), args...)
+			binary, argv = "systemd-run", append(append(scope, binary), argv...)
 			env = append(env, bus...)
 		}
 	}
