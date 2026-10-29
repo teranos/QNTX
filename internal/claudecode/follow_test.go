@@ -114,3 +114,79 @@ func TestATurnIsInterruptedTheWayAPersonStopsIt(t *testing.T) {
 		t.Fatalf("a turn already gone was an error: %v", err)
 	}
 }
+
+// A second reader tails the stream while the turn prints to it: each line is
+// handed over as it lands, before the result exists, and the .read mark the
+// turn's own follow keeps is not moved.
+func TestTailHandsEachLineAsItLandsAndMovesNoMark(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(turnsDir(home), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stream := filepath.Join(turnsDir(home), "s-2.1791900000000000000"+streamExt)
+	init := `{"type":"system","subtype":"init","session_id":"s-2","model":"m"}` + "\n"
+	if err := os.WriteFile(stream, []byte(init), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stream+".read", []byte("0"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	appended, err := os.OpenFile(stream, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer appended.Close()
+
+	landed := make(chan string, 8)
+	tailed := make(chan struct{})
+	var end int64
+	var live bool
+	go func() {
+		defer close(tailed)
+		end, live, err = Tail(context.Background(), stream, 0, func(line []byte, _ int64) { landed <- string(line) })
+	}()
+	if got := <-landed; got != init {
+		t.Fatalf("the first line handed over is %q", got)
+	}
+	delta := `{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Up"}}}` + "\n"
+	if _, err := appended.WriteString(delta); err != nil {
+		t.Fatal(err)
+	}
+	// The delta lands while no result exists in the file: that is the turn
+	// still printing, and the reader already holding its words.
+	select {
+	case got := <-landed:
+		if got != delta {
+			t.Fatalf("the line handed over is %q", got)
+		}
+	case <-time.After(20 * followEvery):
+		t.Fatal("the delta was not handed over while the turn printed")
+	}
+	result := `{"type":"result","subtype":"success","session_id":"s-2","is_error":false,"result":"Up 3 days."}` + "\n"
+	if _, err := appended.WriteString(result); err != nil {
+		t.Fatal(err)
+	}
+	if got := <-landed; got != result {
+		t.Fatalf("the last line handed over is %q", got)
+	}
+	<-tailed
+	if err != nil {
+		t.Fatalf("Tail: %v", err)
+	}
+	if live {
+		t.Error("the turn is said to print on after its result")
+	}
+	if want := int64(len(init) + len(delta) + len(result)); end != want {
+		t.Errorf("the end is %d, and the stream holds %d bytes", end, want)
+	}
+	mark, err := os.ReadFile(stream + ".read")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(mark) != "0" {
+		t.Errorf("the tail moved the turn's own mark to %s", mark)
+	}
+}

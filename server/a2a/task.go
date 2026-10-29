@@ -81,6 +81,9 @@ func ReadSent(request proto.Message) (Sent, error) {
 	if err := json.Unmarshal(raw, &read); err != nil {
 		return Sent{}, errors.Wrap(err, "the SendMessageRequest did not read")
 	}
+	if refused := historyRefused(read.Configuration.HistoryLength); refused != nil {
+		return Sent{}, refused
+	}
 	held := request.ProtoReflect()
 	field, found := fieldNamed(held.Descriptor(), "message")
 	if !found {
@@ -147,6 +150,16 @@ type Task struct {
 type HistoryLimit struct {
 	Limited bool
 	Length  int32
+}
+
+// historyRefused is why a history_length is not one the node takes, nil when it
+// is: "Agents MUST validate all input parameters before processing" (§13),
+// and a negative one is refused, as §6.5's validation error example refuses it.
+func historyRefused(length *int32) error {
+	if length == nil || *length >= 0 {
+		return nil
+	}
+	return errors.Newf("historyLength must be a non-negative integer, got %d", *length)
 }
 
 func limitOf(length *int32) HistoryLimit {
@@ -230,6 +243,11 @@ func Asked(request proto.Message) (id string, limit HistoryLimit, err error) {
 		return "", HistoryLimit{}, errors.Newf("%s has no history_length", held.Descriptor().FullName())
 	}
 	limit = HistoryLimit{Limited: held.Has(length), Length: int32(held.Get(length).Int())}
+	if limit.Limited {
+		if refused := historyRefused(&limit.Length); refused != nil {
+			return "", HistoryLimit{}, refused
+		}
+	}
 	return id, limit, nil
 }
 
@@ -297,8 +315,8 @@ func ReadListing(request proto.Message) (Listing, *Error) {
 		}
 		listing.Size = *read.PageSize
 	}
-	if read.History != nil && *read.History < 0 {
-		return Listing{}, invalid("historyLength must be a non-negative integer, got " + strconv.Itoa(int(*read.History)))
+	if refused := historyRefused(read.History); refused != nil {
+		return Listing{}, invalid(refused.Error())
 	}
 	if read.After != nil {
 		listing.After, listing.Since = *read.After, true
