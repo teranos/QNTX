@@ -2,7 +2,9 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"crypto/ed25519"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -124,6 +127,32 @@ func TestTheLiveSessionHandsTheWordsBeforeTheTurnEnds(t *testing.T) {
 	assert.Equal(t, "end", name)
 	assert.False(t, end.Live)
 	assert.Equal(t, int64(len(init)+len(delta)+len(result)), end.Mark)
+}
+
+// An element's agent is tailed at its own path, its session its own (ADR-054).
+func TestAnElementAgentsLiveSessionIsItsOwn(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, ed25519.SeedSize))}
+	agent, refused := s.holdElementAgent("agent-element")
+	require.Nil(t, refused)
+	stream := filepath.Join(agent.home, "turns", "s-el.1791900000000000000.stream")
+	require.NoError(t, os.MkdirAll(filepath.Dir(stream), 0o700))
+	require.NoError(t, os.WriteFile(stream, []byte(`{"type":"result","subtype":"success","session_id":"s-el","is_error":false,"result":"Shaken."}`+"\n"), 0o600))
+	agent.in(s.claudeHarness()).answering.Store(&turnInSession{session: "s-el", stream: stream})
+
+	asked := httptest.NewRequest(http.MethodGet, "/api/elements/agent-element/live?harness=claude", nil)
+	asked.SetPathValue("element", "agent-element")
+	recorded := httptest.NewRecorder()
+	s.HandleElementLive(recorded, asked)
+	assert.Equal(t, http.StatusOK, recorded.Code, recorded.Body.String())
+	assert.Contains(t, recorded.Body.String(), `"kind":"ended"`)
+	assert.Contains(t, recorded.Body.String(), `"session":"s-el"`)
+
+	// The Node Agent is in no turn: its own live says so, by its own name.
+	recorded = httptest.NewRecorder()
+	s.HandleNodeAgentLive(recorded, httptest.NewRequest(http.MethodGet, "/api/agent/live?harness=claude", nil))
+	assert.Equal(t, http.StatusNotFound, recorded.Code)
+	assert.Contains(t, recorded.Body.String(), "the Node Agent is not in a turn")
 }
 
 // Between turns there is no stream to tail, and a harness that prints to no
