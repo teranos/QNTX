@@ -67,7 +67,7 @@ The MCP element in [QNTX-Web](https://github.com/teranos/QNTX-Web) is where a pe
 
 A client carries instructions, set at minting and changed at `POST /auth/tokens/{id}/instructions`; its connector's server says them to the agent on initialize, and nobody else is told anything.
 
-A connector stands at CONNECTOR, a rung no line names, and is offered what REACH lines grant the roles its client's label holds ([[ADR-034-roles-as-attestations]]): a client whose label holds nothing is a connector offered nothing, however the person who said yes stands. Picking what a connector reaches is two lines, `REACH is 'staands' of APP` and `app is APP of <namespace>`.
+A connector stands at CONNECTOR, a rung no line names, and is offered what REACH lines grant the roles its client's label holds ([ADR-034](./ADR-034-roles-as-attestations.md)): a client whose label holds nothing is a connector offered nothing, however the person who said yes stands. Picking what a connector reaches is two lines, `REACH is 'staands' of APP` and `app is APP of <namespace>`.
 
 "but i want a MCP specifically for the Node, only for ROOT"
 

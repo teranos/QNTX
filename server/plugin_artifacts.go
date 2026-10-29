@@ -130,7 +130,12 @@ func (s *QNTXServer) takeRun(ctx context.Context, name string, source gitHubSour
 		if err != nil {
 			return err
 		}
-		if taken.Changed {
+		if taken.Older {
+			continue
+		}
+		// What the build loads from is rooted before it runs; a build whose
+		// store paths had been collected is started by keepStoreAlive.
+		if !s.keepStoreAlive(ctx, name, logger) && taken.Changed {
 			s.buildLanded(name)
 		}
 	}
@@ -174,6 +179,30 @@ func (s *QNTXServer) installRun(name, artifact string, archive []byte, digest st
 	taken.Changed, taken.Digest = changed, installed
 	s.artifacts.record(taken)
 	return taken, nil
+}
+
+// KeepRunsAlive roots what each enabled plugin's build installed from a
+// workflow run's artifact loads from. A build QNTX builds itself is rooted by
+// BuildMoved; one installed before its roots were kept is rooted here.
+func (s *QNTXServer) KeepRunsAlive() {
+	logger := s.logger.Named("artifact")
+	records, err := s.pluginRecords().Plugins()
+	if err != nil {
+		logger.Errorw("The plugin records were not read, so no artifact's build is rooted", "error", err)
+		return
+	}
+	for _, record := range records {
+		if !record.Enabled {
+			continue
+		}
+		if _, built, _ := buildOf(record); built {
+			continue
+		}
+		if _, fromRun := installedRun(record.Name); !fromRun {
+			continue
+		}
+		s.keepStoreAlive(s.lifetime(), record.Name, logger)
+	}
 }
 
 // builtRunFile is beside a build installed from a workflow run's artifact:

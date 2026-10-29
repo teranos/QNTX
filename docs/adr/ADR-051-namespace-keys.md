@@ -1,7 +1,7 @@
 # ADR-051: A namespace's keys
 
 Date: 2026-10-08
-Status: Proposed
+Status: Unclear, in debate 
 
 BRING YOUR OWN KEY
 BYOK
