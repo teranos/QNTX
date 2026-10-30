@@ -1,0 +1,16 @@
+DeepSeek Harness (dsh)
+
+Package: https://www.npmjs.com/package/@deepseek-ai/dsh/v/0.2.1-rc.5
+Git tag: dsh-v0.2.1-rc.5 (https://github.com/deepseek-ai/deepseek-harness)
+Commit: b830ec950faba0a46dda564be3e2d854afed94f1
+Published: 2026-10-29
+
+dsh has no stable release: every tag is an alpha or a release candidate, and
+this is the version npm's latest dist-tag names. Its README: "DeepSeek
+Harness is in _developer preview_ and iterating rapidly. THERE WILL BE
+COMPATIBILITY-BREAKING CHANGES."
+
+dsh is one npm package for every platform. manifest.json records its tarball:
+the SHA-256 of the bytes the registry serves, and the registry's own sha512
+integrity. The tarball is the CLI; its 86 dependencies are not pinned here.
+No package is bundled and this pin alone does not install or run dsh.
