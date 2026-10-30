@@ -131,6 +131,23 @@ message SessionEvents {
   int64 mark = 3;
 }
 
+// ElementAgent is one element whose agent this node holds (ADR-054): named,
+// and in a session when one was kept.
+message ElementAgent {
+  // The element, as it is said to.
+  string element = 1;
+  // Its session in Claude Code, or empty before anything was said to it.
+  string session = 2;
+  // Whether it is answering now.
+  bool answering = 3;
+}
+
+// ElementAgents is what elements list answers: every element agent this node
+// holds, the stories' included, each by the element's name.
+message ElementAgents {
+  repeated ElementAgent agents = 1;
+}
+
 // ClaudeSaid is what claude say answers.
 message ClaudeSaid {
   // What it answered.

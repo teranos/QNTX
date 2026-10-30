@@ -19,6 +19,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/sigil"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -169,4 +170,27 @@ func TestTheLiveSessionRefusesWhatItCannotTail(t *testing.T) {
 		assert.NotEqual(t, http.StatusOK, recorded.Code, ask.query)
 		assert.Contains(t, recorded.Body.String(), ask.says, ask.query)
 	}
+}
+
+// Every element agent the node holds is listed by the element's name, kept
+// beside its sessions: "the Agents Element as the main entry-point into all
+// Agents that User has access to."
+func TestEveryElementAgentHeldIsListed(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, ed25519.SeedSize))}
+	for _, element := range []string{"agent-element", "story-1-root-invites-a-user"} {
+		_, refused := s.holdElementAgent(element)
+		require.Nil(t, refused)
+	}
+	shaken, _ := s.holdElementAgent("agent-element")
+	require.NoError(t, shaken.keepIn(filepath.Join(shaken.sessionDir, claudeSessionFile), "s-shaken"))
+
+	answer, refused := s.elementsList(context.Background(), sigil.Sent{})
+	require.Nil(t, refused)
+	listed := answer.(*protocol.ElementAgents).Agents
+	names := map[string]string{}
+	for _, one := range listed {
+		names[one.Element] = one.Session
+	}
+	assert.Equal(t, map[string]string{"agent-element": "s-shaken", "story-1-root-invites-a-user": ""}, names)
 }
