@@ -195,6 +195,39 @@ func TestATaskReturnedImmediatelyIsAnsweredByItsIdWhenItEnds(t *testing.T) {
 	assert.Equal(t, context, after(ranWith(t, ran, "0", "args"), "--session-id"), "the turn ran in another session than the one answered")
 }
 
+// A first message in a context that is not the agent's is refused, and keeps no session (§3.4.1).
+func TestAFirstMessageInAnotherContextKeepsNoSession(t *testing.T) {
+	srv, tokens, ran := nodeAgentOverA2A(t, "")
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send",
+		`{"message": {"messageId": "m", "role": "ROLE_USER", "contextId": "another", "parts": [{"text": "hi"}]}}`, tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusBadRequest, code, answered)
+	_, kept, err := srv.nodeAgent.sessionIn(srv.nodeAgent.in(srv.claudeHarness()).file)
+	require.NoError(t, err)
+	assert.False(t, kept, "a refused context generated a session")
+	entries, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "something refused was said to the Node Agent")
+}
+
+// Two first messages at once are one session: each Task answers the same context.
+func TestTwoFirstMessagesAtOnceAreOneContext(t *testing.T) {
+	held := filepath.Join(t.TempDir(), "held")
+	require.NoError(t, os.WriteFile(held, nil, 0o600))
+	srv, tokens, _ := nodeAgentOverA2A(t, held)
+
+	contexts := make(chan any, 2)
+	for range 2 {
+		go func() {
+			_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("hi", `{"returnImmediately": true}`), tokens[auth.LevelRoot])
+			contexts <- at(sent, "task.contextId")
+		}()
+	}
+	first, second := <-contexts, <-contexts
+	require.NotEmpty(t, first)
+	assert.Equal(t, first, second)
+	require.NoError(t, os.Remove(held))
+}
+
 // What the Node Agent does not take is refused before anything is said to it.
 func TestWhatTheNodeAgentDoesNotTakeIsRefused(t *testing.T) {
 	srv, tokens, ran := nodeAgentOverA2A(t, "")
