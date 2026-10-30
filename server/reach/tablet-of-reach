@@ -179,7 +179,7 @@ REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' '
 
 # The element agent (the elements signum, ADR-054): each element is its own
 # agent and its own conversation, and ROOT SHAKE is ROOT's.
-REACH is '/api/elements' '/api/elements/{element}' '/api/elements/{element}/say' '/api/elements/{element}/session' '/api/elements/{element}/live' of ROOT
+REACH is '/api/elements' '/api/elements/{element}' '/api/elements/{element}/say' '/api/elements/{element}/session' '/api/elements/{element}/sessions' '/api/elements/{element}/live' of ROOT
 
 # The namespace agent (the agents signum, ADR-048): "shared amongst anyone who
 # has REACH on it". Who acts in the namespace reaches it, which the handler

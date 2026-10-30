@@ -3,11 +3,13 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"github.com/anthropics/anthropic-sdk-go/v2"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -172,7 +174,53 @@ func (s *QNTXServer) elementsList(_ context.Context, _ sigil.Sent) (any, *protoc
 	return answer, nil
 }
 
-// elementsSignum is an element's agent: list, say, am and session, each at the element's path.
+// elementSessions is every Session the element's agent has at Anthropic's
+// Console, listed back from it: "so it means we need the SDK to list back sessions".
+func (s *QNTXServer) elementSessions(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	element, refused := elementOf(sent)
+	if refused != nil {
+		return nil, refused
+	}
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
+	}
+	answer := &protocol.ElementSessions{Sessions: []*protocol.ElementSession{}}
+	kept, err := os.ReadFile(filepath.Join(s.nodeAgent.home, elementsDir, slug.Of(element), managedElementFile))
+	if os.IsNotExist(err) {
+		return answer, nil
+	}
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what " + element + " is at Anthropic did not read: " + err.Error()}
+	}
+	var held managedOf
+	if err := json.Unmarshal(kept, &held); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what " + element + " is at Anthropic did not parse: " + err.Error()}
+	}
+	answer.Agent = held.Agent
+	line, _, err := s.anthropicLine()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	client, err := s.anthropicClient(line)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	pages := client.Beta.Sessions.ListAutoPaging(ctx, anthropic.BetaSessionListParams{AgentID: anthropic.String(held.Agent), IncludeArchived: anthropic.Bool(true)})
+	for pages.Next() {
+		one := pages.Current()
+		answer.Sessions = append(answer.Sessions, &protocol.ElementSession{
+			Id: one.ID, Title: one.Title, Status: string(one.Status), CreatedAt: one.CreatedAt.UTC().Format(time.RFC3339),
+			Archived: !one.ArchivedAt.IsZero(), Current: one.ID == held.Session,
+		})
+	}
+	if err := pages.Err(); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Sessions of " + element + " at Anthropic did not list: " + err.Error()}
+	}
+	sort.SliceStable(answer.Sessions, func(i, j int) bool { return answer.Sessions[i].CreatedAt > answer.Sessions[j].CreatedAt })
+	return answer, nil
+}
+
+// elementsSignum is an element's agent: list, say, am, session and sessions, each at the element's path.
 func (s *QNTXServer) elementsSignum() sigil.Signum {
 	claude := s.claudeHarness()
 	element := &protocol.Param{Name: "element", Required: true, Says: "The id of the element on screen: a canvas element id, or a tray element id such as agent-element."}
@@ -204,6 +252,13 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: elementAgentPath},
 				},
 				{
+					Name:   "sessions",
+					Does:   "Every Session the element's agent has at Anthropic's Console, newest first, the current one marked; none when it runs on the box.",
+					Takes:  []*protocol.Param{element},
+					Answer: "protocol.ElementSessions",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: elementAgentPath + "/sessions"},
+				},
+				{
 					Name:   "session",
 					Does:   "The element's one conversation in the harness named, whole, as a transcript.",
 					Takes:  []*protocol.Param{element, harness},
@@ -213,10 +268,11 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 			},
 		},
 		Answers: map[string]sigil.Answer{
-			"list":    s.elementsList,
-			"say":     s.elementSay,
-			"am":      s.elementAm,
-			"session": s.elementSession,
+			"list":     s.elementsList,
+			"sessions": s.elementSessions,
+			"say":      s.elementSay,
+			"am":       s.elementAm,
+			"session":  s.elementSession,
 		},
 	}
 }
