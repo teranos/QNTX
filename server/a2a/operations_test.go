@@ -84,12 +84,52 @@ func TestOperationsAreTheMethodMapping(t *testing.T) {
 			t.Errorf("§5.3 does not map %s", got.Name)
 			continue
 		}
-		if got.JSONRPC != want.jsonrpc || got.HTTP != want.http {
+		if got.JSONRPC != want.jsonrpc || got.HTTP.Method != want.http.Method || unnamed(got.HTTP.Path) != unnamed(want.http.Path) {
 			t.Errorf("%s reads %s %+v, and §5.3 says %s %+v", got.Name, got.JSONRPC, got.HTTP, want.jsonrpc, want.http)
 		}
 		tenant := Route{Method: want.http.Method, Path: "/{tenant}" + want.http.Path}
-		if got.Tenant != tenant {
+		if got.Tenant.Method != tenant.Method || unnamed(got.Tenant.Path) != unnamed(tenant.Path) {
 			t.Errorf("%s under a tenant is %+v, not %+v", got.Name, got.Tenant, tenant)
+		}
+	}
+}
+
+// unnamed is a path with each parameter's name left out: {id} and {task_id}
+// are one segment.
+func unnamed(path string) string {
+	var b strings.Builder
+	for {
+		open := strings.Index(path, "{")
+		closing := strings.Index(path, "}")
+		if open < 0 || closing < open {
+			b.WriteString(path)
+			return b.String()
+		}
+		b.WriteString(path[:open] + "{}")
+		path = path[closing+1:]
+	}
+}
+
+// §5.3 names a push notification config's segments {id} and {configId}, and
+// a2a.proto {task_id} and {id}: the same task, then the same config. "spec/a2a.proto
+// is the single authoritative normative definition of all protocol data objects
+// and request/response messages" (specification.md:107), so a segment fills the
+// field a2a.proto names.
+func TestAPushConfigSegmentIsNamedAsA2AProtoNamesIt(t *testing.T) {
+	mapping := methodMapping(t)
+	operations, err := Operations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, op := range operations {
+		if !strings.Contains(op.HTTP.Path, "pushNotificationConfigs") {
+			continue
+		}
+		if !strings.HasPrefix(op.HTTP.Path, "/tasks/{task_id}/pushNotificationConfigs") {
+			t.Errorf("%s is routed %s, not under its task_id", op.Name, op.HTTP.Path)
+		}
+		if !strings.HasPrefix(mapping[op.Name].http.Path, "/tasks/{id}/pushNotificationConfigs") {
+			t.Errorf("§5.3 routes %s %s: the names no longer differ", op.Name, mapping[op.Name].http.Path)
 		}
 	}
 }
@@ -125,12 +165,16 @@ func TestOperationsCarryTheirMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string][3]string{
-		"SendMessage":          {"lf.a2a.v1.SendMessageRequest", "lf.a2a.v1.SendMessageResponse", ""},
-		"SendStreamingMessage": {"lf.a2a.v1.SendMessageRequest", "lf.a2a.v1.StreamResponse", "streams"},
-		"GetTask":              {"lf.a2a.v1.GetTaskRequest", "lf.a2a.v1.Task", ""},
-		"ListTasks":            {"lf.a2a.v1.ListTasksRequest", "lf.a2a.v1.ListTasksResponse", ""},
-		"CancelTask":           {"lf.a2a.v1.CancelTaskRequest", "lf.a2a.v1.Task", ""},
-		"GetExtendedAgentCard": {"lf.a2a.v1.GetExtendedAgentCardRequest", "lf.a2a.v1.AgentCard", ""},
+		"SendMessage":                      {"lf.a2a.v1.SendMessageRequest", "lf.a2a.v1.SendMessageResponse", ""},
+		"SendStreamingMessage":             {"lf.a2a.v1.SendMessageRequest", "lf.a2a.v1.StreamResponse", "streams"},
+		"GetTask":                          {"lf.a2a.v1.GetTaskRequest", "lf.a2a.v1.Task", ""},
+		"ListTasks":                        {"lf.a2a.v1.ListTasksRequest", "lf.a2a.v1.ListTasksResponse", ""},
+		"CancelTask":                       {"lf.a2a.v1.CancelTaskRequest", "lf.a2a.v1.Task", ""},
+		"GetExtendedAgentCard":             {"lf.a2a.v1.GetExtendedAgentCardRequest", "lf.a2a.v1.AgentCard", ""},
+		"CreateTaskPushNotificationConfig": {"lf.a2a.v1.TaskPushNotificationConfig", "lf.a2a.v1.TaskPushNotificationConfig", ""},
+		"GetTaskPushNotificationConfig":    {"lf.a2a.v1.GetTaskPushNotificationConfigRequest", "lf.a2a.v1.TaskPushNotificationConfig", ""},
+		"ListTaskPushNotificationConfigs":  {"lf.a2a.v1.ListTaskPushNotificationConfigsRequest", "lf.a2a.v1.ListTaskPushNotificationConfigsResponse", ""},
+		"DeleteTaskPushNotificationConfig": {"lf.a2a.v1.DeleteTaskPushNotificationConfigRequest", "google.protobuf.Empty", ""},
 	}
 	for _, op := range operations {
 		w := want[op.Name]
