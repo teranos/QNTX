@@ -508,3 +508,23 @@ func TestATaskThatEndedIsNotCanceled(t *testing.T) {
 		assert.NotEqual(t, http.StatusOK, code, id)
 	}
 }
+
+// "Agents MUST validate all input parameters before processing" (§13): a
+// negative historyLength is refused wherever it is asked, as ListTasks refuses
+// it, and nothing is said to the Node Agent.
+func TestANegativeHistoryLengthIsRefused(t *testing.T) {
+	srv, tokens, ran := nodeAgentOverA2A(t, "")
+	_, done := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("remember 7", ""), tokens[auth.LevelRoot])
+	id := at(done, "task.id").(string)
+
+	code, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id+"?historyLength=-5", "", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusBadRequest, code, got)
+	assert.Contains(t, at(got, "error.message"), "historyLength must be a non-negative integer, got -5")
+
+	code, got = a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("again", `{"historyLength": -5}`), tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusBadRequest, code, got)
+	assert.Contains(t, at(got, "error.message"), "historyLength must be a non-negative integer, got -5")
+	entries, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "a refused message was said to the Node Agent")
+}

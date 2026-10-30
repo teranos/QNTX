@@ -64,6 +64,12 @@ REACH is '/github/'                                                       of ANY
 # sends anybody anywhere, so by a stranger.
 REACH is '/.well-known/oauth-authorization-server'                        of ANYONE
 REACH is '/.well-known/oauth-protected-resource'                          of ANYONE
+# The node as an OIDC issuer (OpenID Connect Discovery 1.0): where Anthropic
+# reads the key the node's identity tokens are signed with.
+REACH is '/.well-known/openid-configuration' '/.well-known/jwks.json'     of ANYONE
+# The node at Anthropic: the ids of the rule its identity token is traded at, ROOT's.
+REACH is '/api/anthropic'                                                 of ROOT
+REACH is '/api/anthropic/order'                                           of ROOT
 # The A2A agent card (ADR-039): how an agent that has never seen this node
 # finds what it is and what it serves.
 REACH is '/.well-known/agent-card.json'                                   of ANYONE
@@ -169,11 +175,11 @@ REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROO
 
 # The Node Agent (the agent signum, ADR-048), in a Coding Agent Harness. Who may
 # talk to it is the whole of what guards it, and that is ROOT.
-REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' of ROOT
+REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' '/api/agent/live' of ROOT
 
 # The element agent (the elements signum, ADR-054): each element is its own
 # agent and its own conversation, and ROOT SHAKE is ROOT's.
-REACH is '/api/elements/{element}' '/api/elements/{element}/say' '/api/elements/{element}/session' of ROOT
+REACH is '/api/elements' '/api/elements/{element}' '/api/elements/{element}/say' '/api/elements/{element}/session' '/api/elements/{element}/sessions' '/api/elements/{element}/live' of ROOT
 
 # The namespace agent (the agents signum, ADR-048): "shared amongst anyone who
 # has REACH on it". Who acts in the namespace reaches it, which the handler

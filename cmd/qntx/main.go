@@ -416,6 +416,8 @@ func loadPluginsAsync(cfg *config.Config, pluginLogger *zap.SugaredLogger, regis
 
 		// A restart stops the build the node was running; this starts it again.
 		defaultServer.BuildMoved()
+		// A build installed from a run's artifact before its roots were kept loads from what the deploy collects.
+		sacred.Go("plugin.artifact.roots", defaultServer.KeepRunsAlive)
 		// A push while the node was down reached no vault either.
 		defaultServer.FillVaults()
 		defaultServer.SendVaults()

@@ -178,6 +178,59 @@ func follow(ctx context.Context, stream string, runs func() bool, each func(Mess
 	return answer, ended(stream)
 }
 
+// Tail reads stream from mark on as a second reader: the turn's own follow
+// keeps the .read mark, and this moves nothing. Each whole line is handed to
+// each with where it ends.
+func Tail(ctx context.Context, stream string, mark int64, each func(line []byte, end int64)) (end int64, live bool, err error) {
+	// It returns at the result, when the process is gone and nothing more is
+	// in the file, or when ctx is done; live is whether the process still
+	// printed when it returned.
+	file, err := os.Open(stream)
+	if err != nil {
+		return mark, false, errors.Wrapf(err, "the stream %s did not open", stream)
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			err = errors.WithSecondaryError(errors.Wrapf(closeErr, "the stream %s did not close", stream), err)
+		}
+	}()
+	if at, err := file.Seek(mark, io.SeekStart); err != nil {
+		return mark, false, errors.Wrapf(err, "the stream %s did not seek to %d, and is at %d", stream, mark, at)
+	}
+	end = mark
+	lines := bufio.NewReader(file)
+	var partial []byte
+	gone := false
+	for {
+		line, readErr := lines.ReadBytes('\n')
+		partial = append(partial, line...)
+		if readErr == nil {
+			end += int64(len(partial))
+			var m Message
+			if json.Unmarshal(partial, &m) == nil {
+				each(partial, end)
+				if m.Type == "result" {
+					return end, false, nil
+				}
+			}
+			partial = []byte{}
+			continue
+		}
+		if !errors.Is(readErr, io.EOF) {
+			return end, pidRuns(stream), errors.Wrapf(readErr, "the stream %s did not read", stream)
+		}
+		if gone {
+			return end, false, nil
+		}
+		gone = !pidRuns(stream)
+		select {
+		case <-ctx.Done():
+			return end, !gone, nil
+		case <-time.After(followEvery):
+		}
+	}
+}
+
 // answerFrom takes into answer what m says of how the run went, and whether m
 // is its result.
 func answerFrom(answer *Answer, m Message) bool {
