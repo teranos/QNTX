@@ -66,7 +66,7 @@ func toSentry(t *testing.T) *sentrySent {
 	return sent
 }
 
-func attr(l *sentry.Log, key string) (string, bool) {
+func logAttr(l *sentry.Log, key string) (string, bool) {
 	v, held := l.Attributes[key]
 	if !held {
 		return "", false
@@ -102,11 +102,11 @@ func TestARefusedA2ARequestIsASentryLog(t *testing.T) {
 		"a2a.method": "POST", "a2a.path": "/a2a/", "user_agent.untrusted": "a-client/1", "request_id": id,
 		"sentry.release": "test-release",
 	} {
-		got, held := attr(l, key)
+		got, held := logAttr(l, key)
 		assert.True(t, held, key)
 		assert.Equal(t, want, got, key)
 	}
-	caller, _ := attr(l, "a2a.caller")
+	caller, _ := logAttr(l, "a2a.caller")
 	assert.NotEmpty(t, caller, "who asked, as the gate admitted them, is not said")
 	for key, value := range l.Attributes {
 		assert.NotContains(t, value.AsString(), tokens[auth.LevelRoot], "the bearer token is in %s", key)
@@ -126,7 +126,7 @@ func TestAUserAgentIsWrittenBounded(t *testing.T) {
 
 	logs, _ := sent.said()
 	require.Len(t, logs, 1)
-	agent, _ := attr(logs[0], "user_agent.untrusted")
+	agent, _ := logAttr(logs[0], "user_agent.untrusted")
 	assert.NotContains(t, agent, "\n")
 	assert.LessOrEqual(t, len([]rune(agent)), saidUserAgentMost+1)
 }
