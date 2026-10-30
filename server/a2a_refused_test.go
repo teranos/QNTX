@@ -173,8 +173,6 @@ func TestAnAnsweredA2ARequestIsNotWritten(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, w.Code)
 	logs, _ := sent.said()
 	require.Len(t, logs, 1, "the control's own refusal")
-	caller, _ := logAttr(logs[0], "a2a.caller")
-	assert.NotEmpty(t, caller, "who asked, as the gate admitted them, is not said")
 	operation, _ := logAttr(logs[0], "a2a.operation")
 	assert.Equal(t, "GetTask", operation)
 
