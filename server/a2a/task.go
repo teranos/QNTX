@@ -2,6 +2,7 @@ package a2a
 
 import (
 	"encoding/json"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -52,6 +53,10 @@ type Sent struct {
 	// carries one: "Task id should be empty when sending this configuration in
 	// a SendMessage request" (a2a.proto).
 	Push *Push
+	// Accepted is what the client is prepared to take back: "A list of media
+	// types the client is prepared to accept for response parts" (a2a.proto).
+	// Empty, it takes anything.
+	Accepted []string
 
 	parts []sentPart
 }
@@ -76,6 +81,7 @@ func ReadSent(request proto.Message) (Sent, error) {
 		} `json:"message"`
 		Configuration struct {
 			ReturnImmediately bool            `json:"returnImmediately"`
+			Accepted          []string        `json:"acceptedOutputModes"`
 			HistoryLength     *int32          `json:"historyLength"`
 			Push              json.RawMessage `json:"taskPushNotificationConfig"`
 		} `json:"configuration"`
@@ -103,14 +109,19 @@ func ReadSent(request proto.Message) (Sent, error) {
 	return Sent{
 		Message: held.Get(field).Message(), TaskID: m.TaskID, ContextID: m.ContextID, Role: m.Role,
 		ReturnImmediately: read.Configuration.ReturnImmediately, History: limitOf(read.Configuration.HistoryLength),
-		Push: push, parts: m.Parts,
+		Push: push, Accepted: read.Configuration.Accepted, parts: m.Parts,
 	}, nil
 }
 
 // Said is what the message's text parts say, one after another. A part that is
 // not text, or text in another media type than Text, is refused: the agent
-// takes text and nothing else (ContentTypeNotSupportedError).
+// takes text and nothing else (ContentTypeNotSupportedError). So is a client
+// that takes back no Text, which is all the agent gives: "A Media Type ...
+// implied for an artifact is not supported by the agent" (§3.3.2).
 func (s Sent) Said() (string, *Error) {
+	if len(s.Accepted) > 0 && !slices.ContainsFunc(s.Accepted, isText) {
+		return "", &Error{Name: "ContentTypeNotSupportedError", Message: "the client accepts " + strings.Join(s.Accepted, ", ") + ", and the agent gives " + Text + " alone"}
+	}
 	texts := make([]string, 0, len(s.parts))
 	for i, part := range s.parts {
 		if part.Text == nil {
@@ -122,6 +133,13 @@ func (s Sent) Said() (string, *Error) {
 		texts = append(texts, *part.Text)
 	}
 	return strings.Join(texts, "\n"), nil
+}
+
+// isText is whether a media type is Text, whatever parameters it carries:
+// text/plain; charset=utf-8 is text/plain.
+func isText(mediaType string) bool {
+	base, _, _ := strings.Cut(mediaType, ";")
+	return strings.EqualFold(strings.TrimSpace(base), Text)
 }
 
 // InTask is the message sent as the history of task holds it: naming the task
