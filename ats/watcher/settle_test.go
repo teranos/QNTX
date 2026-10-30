@@ -139,3 +139,76 @@ func TestDrainCompletesWhatATellQueued(t *testing.T) {
 		t.Errorf("draining a tell recorded an error: %q", got.LastError)
 	}
 }
+
+// Migration 066 left the ids a node minted as they were, so an AX placed
+// before the rename kept a watcher under ax-glyph-, which the canvas no
+// longer names: it could not find it, show it, or switch it off, and opening
+// the AX wrote a second watcher beside it. Started, the engine moves each to
+// the id the canvas names, and drops it where the canvas already wrote one.
+func TestStartMovesAGlyphWatcherToTheIDTheCanvasNames(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	ctx := context.Background()
+	store := storage.NewWatcherStore(db)
+
+	held := []*storage.Watcher{
+		// Only under the old id: moved, and a tell like every AX.
+		{ID: "ax-glyph-ax-9", Name: "AX Glyph: is", ActionType: storage.ActionTypePython,
+			MaxFiresPerSecond: 1, Enabled: true, Filter: unbounded()},
+		// Under both: the one the canvas wrote stays, the old one goes.
+		{ID: "ax-glyph-ax-8", Name: "old", ActionType: storage.ActionTypePython,
+			MaxFiresPerSecond: 1, Enabled: true, Filter: unbounded()},
+		{ID: "ax-element-ax-8", Name: "new", ActionType: storage.ActionTypeTell,
+			MaxFiresPerSecond: 1, Enabled: true, Filter: unbounded()},
+		{ID: "se-glyph-se-7", Name: "SE", SemanticQuery: "science", SemanticThreshold: 0.4,
+			ActionType: storage.ActionTypeSemanticMatch, MaxFiresPerSecond: 1, Enabled: true, Filter: unbounded()},
+	}
+	for _, w := range held {
+		if err := store.Create(ctx, w); err != nil {
+			t.Fatalf("Create %s failed: %v", w.ID, err)
+		}
+	}
+
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://unused", zap.NewNop().Sugar())
+	q := engine.GetQueueStore()
+	if err := q.Enqueue(&watcher.QueueEntry{WatcherID: "ax-glyph-ax-8", AttestationJSON: `{"id":"AS-G"}`,
+		Reason: "paused", Attempt: 1, NotBefore: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatalf("Enqueue failed: %v", err)
+	}
+	if err := engine.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+	defer engine.Stop()
+
+	for _, gone := range []string{"ax-glyph-ax-9", "ax-glyph-ax-8", "se-glyph-se-7"} {
+		if _, err := store.Get(ctx, gone); err == nil {
+			t.Errorf("%s is still held", gone)
+		}
+		if n := queuedFor(t, q, gone); n != 0 {
+			t.Errorf("%s still has %d queued", gone, n)
+		}
+	}
+
+	moved, err := store.Get(ctx, "ax-element-ax-9")
+	if err != nil {
+		t.Fatalf("ax-element-ax-9 was not written: %v", err)
+	}
+	if moved.ActionType != storage.ActionTypeTell {
+		t.Errorf("the moved AX watcher is %q, want tell", moved.ActionType)
+	}
+
+	kept, err := store.Get(ctx, "ax-element-ax-8")
+	if err != nil {
+		t.Fatalf("ax-element-ax-8 is gone: %v", err)
+	}
+	if kept.Name != "new" {
+		t.Errorf("the watcher the canvas wrote was replaced by the old one: %q", kept.Name)
+	}
+
+	se, err := store.Get(ctx, "se-element-se-7")
+	if err != nil {
+		t.Fatalf("se-element-se-7 was not written: %v", err)
+	}
+	if se.SemanticQuery != "science" || se.ActionType != storage.ActionTypeSemanticMatch {
+		t.Errorf("the moved SE watcher lost what it was: %q %q", se.SemanticQuery, se.ActionType)
+	}
+}
