@@ -17,6 +17,8 @@ import (
 // A plugin the node builds loads from the Nix store: its program loader and
 // libraries are store paths nothing else roots. The box collects its store at
 // every deploy, and on 2026-10-05 that took datapunt's glibc from under it.
+// A build installed from a workflow run's artifact loads from the store the
+// same way, and on 2026-10-26 that took cleanAPI's (teranos/QNTX#1440).
 
 // storePrefix is where every store path starts.
 const storePrefix = "/nix/store/"
@@ -107,30 +109,32 @@ func rootStorePaths(ctx context.Context, nixStore, binary string, data []byte, r
 const storeRootsDir = "store-roots"
 
 // keepStoreAlive roots what name's installed build loads from, and starts it
-// again when something it loads from had been collected.
-func (s *QNTXServer) keepStoreAlive(ctx context.Context, name string, logger *zap.SugaredLogger) {
+// again when something it loads from had been collected. True is a build it
+// started.
+func (s *QNTXServer) keepStoreAlive(ctx context.Context, name string, logger *zap.SugaredLogger) bool {
 	dir, err := grpcplugin.PluginInstallPath(name)
 	if err != nil {
 		logger.Warnw("A plugin's install path was not resolved, so what it loads from is not rooted", "plugin", name, "error", err)
-		return
+		return false
 	}
 	binary := filepath.Join(dir, grpcplugin.PluginBinaryName(name))
 	data, err := os.ReadFile(binary)
 	if errors.Is(err, fs.ErrNotExist) {
 		// No build is installed, so nothing it loads from is there to root.
-		return
+		return false
 	}
 	if err != nil {
 		logger.Errorw("A plugin's binary did not read, so what it loads from is not rooted", "plugin", name, "binary", binary, "error", err)
-		return
+		return false
 	}
 	fetched, collected, err := rootStorePaths(ctx, filepath.Join(nixBin, "nix-store"), binary, data, filepath.Join(dir, storeRootsDir))
 	if err != nil {
 		logger.Errorw("What a plugin loads from was not kept, so a collection of the store can stop it", "plugin", name, "error", err)
-		return
+		return false
 	}
 	if collected {
 		logger.Infow("What a plugin loads from had been collected, and is fetched and kept again", "plugin", name, "fetched", fetched)
 		s.buildLanded(name)
 	}
+	return collected
 }

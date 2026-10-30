@@ -2,13 +2,19 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/anthropics/anthropic-sdk-go/v2"
 	"net/http"
+	"os"
 	"path/filepath"
+	"sort"
+	"strings"
+	"time"
 
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
-	"github.com/teranos/QNTX/internal/slug"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -20,6 +26,53 @@ import (
 // "ROOT SHAKE ANOTHER"
 
 // "AGENT PER ELEMENT, EACH ELEMENT IS ITS OWN CONVERSATION"
+
+// "i really want"
+// "Agent Awareness about each other"
+// "Am Agent should have a direct link to A2A Agent and reverse"
+// "so the constellation becomes more of a thing"
+
+// elementLinks is each element's agent and the ones it works with directly, both ways.
+var elementLinks = map[string][]string{
+	"am-element": {"a2a-card"},
+	"a2a-card":   {"am-element"},
+}
+
+// "should the User story itself, be it's own Agent ? or should the Element Agent be made aware of the user stories?"
+// "i guess both, because having one agent be always in tune with one story, it would make it so you never have to make it shift frame, the contract is always clear."
+
+// storyPrefix is what a user story's agent is named by: story-, then its file's name in QNTX-Web's stories/, without .feature.
+const storyPrefix = "story-"
+
+// storyOf is the story file an agent is, or "" when it is an element's.
+func storyOf(element string) string {
+	if !strings.HasPrefix(element, storyPrefix) {
+		return ""
+	}
+	return "stories/" + strings.TrimPrefix(element, storyPrefix) + ".feature"
+}
+
+// storiesAware is what an agent is told of the user stories: a story's agent, that its one story is its contract;
+// an element's agent, that the stories naming it are.
+func storiesAware(element string) string {
+	if story := storyOf(element); story != "" {
+		return "You are the user story " + story + " of github.com/teranos/QNTX-Web, and nothing else: that file is your contract, every time you are spoken to. " +
+			"What it says ROOT or a user does and sees is what has to hold. The elements it names are agents you can reach. " +
+			"So is every other story, named " + storyPrefix + " and its file's name: a story that leads into yours, or that yours leads into, is one to talk to."
+	}
+	return "The user stories in stories/ of github.com/teranos/QNTX-Web that name you are your contract: what they say a person does and sees with you is what has to hold."
+}
+
+// elementsAware is what an element's agent is told of the others: each is an agent of its own,
+// reached through the elements say tool, and the ones it is linked to directly.
+func elementsAware(element string) string {
+	told := "Every element on the page is an agent of its own, as you are. You reach one with the say tool of the elements signum on the " + nodeAgentMCP +
+		" MCP server, naming its element id and the claude harness. Never say anything to an element that is waiting on your answer: it cannot answer you until you answer it."
+	if linked := elementLinks[element]; len(linked) > 0 {
+		told += " You work directly with " + strings.Join(linked, " and ") + "."
+	}
+	return told + " " + storiesAware(element)
+}
 
 // elementAgentPath is where an element's agent answers.
 const elementAgentPath = "/api/elements/{element}"
@@ -67,6 +120,10 @@ func (s *QNTXServer) holdElementAgent(element string) (*rootAgent, *protocol.Ref
 	}
 	agent.namespace, agent.called, agent.element = auth.NamespaceSystem, "the element "+element, element
 	agent.sessionDir = filepath.Join(elementsDir, slug.Of(element))
+	// The element's name is kept beside its sessions, so the node lists it after a restart (elements list).
+	if err := agent.keepIn(filepath.Join(agent.sessionDir, elementNameFile), element); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + element + " was not written down: " + err.Error()}
+	}
 	// Its token is ROOT's kind, as the Node Agent's is: the element is ROOT's to shake.
 	if s.authHandler != nil {
 		if err := s.authHandler.HoldElementAgent(agent.token, agent.did, element); err != nil {
@@ -76,7 +133,150 @@ func (s *QNTXServer) holdElementAgent(element string) (*rootAgent, *protocol.Ref
 	return s.elementAgents.hold(purpose, agent), nil
 }
 
-// elementsSignum is an element's agent: say, am and session, each at the element's path.
+// elementNameFile is where an element agent's name is kept, beside its sessions.
+const elementNameFile = "element"
+
+// elementsList is every element agent this node holds, by the names kept under
+// its home.
+func (s *QNTXServer) elementsList(_ context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	// "the Agents Element as the main entry-point into all Agents that User has access to."
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
+	}
+	names, err := filepath.Glob(filepath.Join(s.nodeAgent.home, elementsDir, "*", elementNameFile))
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the element agents under " + s.nodeAgent.home + " did not list: " + err.Error()}
+	}
+	sort.Strings(names)
+	answer := &protocol.ElementAgents{Agents: []*protocol.ElementAgent{}}
+	for _, name := range names {
+		held, err := os.ReadFile(name)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: name + " did not read: " + err.Error()}
+		}
+		element := strings.TrimSpace(string(held))
+		one := &protocol.ElementAgent{Element: element}
+		if kept, err := os.ReadFile(filepath.Join(filepath.Dir(name), claudeSessionFile)); err == nil {
+			one.Session = strings.TrimSpace(string(kept))
+		}
+		if agent, ok := s.elementAgents.of(elementPurpose(element)); ok {
+			one.Answering = agent.in(s.claudeHarness()).answering.Load() != nil
+		}
+		// "so it means we need the SDK to list back sessions": its Session at the Console, when it runs there.
+		if kept, err := os.ReadFile(filepath.Join(filepath.Dir(name), managedElementFile)); err == nil {
+			var held managedOf
+			if json.Unmarshal(kept, &held) == nil {
+				one.AnthropicSession = held.Session
+			}
+		}
+		answer.Agents = append(answer.Agents, one)
+	}
+	return answer, nil
+}
+
+// elementSessions is every Session the element's agent has at Anthropic's
+// Console, listed back from it: "so it means we need the SDK to list back sessions".
+func (s *QNTXServer) elementSessions(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	element, refused := elementOf(sent)
+	if refused != nil {
+		return nil, refused
+	}
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
+	}
+	answer := &protocol.ElementSessions{Sessions: []*protocol.ElementSession{}}
+	kept, err := os.ReadFile(filepath.Join(s.nodeAgent.home, elementsDir, slug.Of(element), managedElementFile))
+	if os.IsNotExist(err) {
+		return answer, nil
+	}
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what " + element + " is at Anthropic did not read: " + err.Error()}
+	}
+	var held managedOf
+	if err := json.Unmarshal(kept, &held); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what " + element + " is at Anthropic did not parse: " + err.Error()}
+	}
+	answer.Agent = held.Agent
+	line, _, err := s.anthropicLine()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	client, err := s.anthropicClient(line)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	pages := client.Beta.Sessions.ListAutoPaging(ctx, anthropic.BetaSessionListParams{AgentID: anthropic.String(held.Agent), IncludeArchived: anthropic.Bool(true)})
+	for pages.Next() {
+		one := pages.Current()
+		answer.Sessions = append(answer.Sessions, &protocol.ElementSession{
+			Id: one.ID, Title: one.Title, Status: string(one.Status), CreatedAt: one.CreatedAt.UTC().Format(time.RFC3339),
+			Archived: !one.ArchivedAt.IsZero(), Current: one.ID == held.Session,
+		})
+	}
+	if err := pages.Err(); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Sessions of " + element + " at Anthropic did not list: " + err.Error()}
+	}
+	sort.SliceStable(answer.Sessions, func(i, j int) bool { return answer.Sessions[i].CreatedAt > answer.Sessions[j].CreatedAt })
+	return answer, nil
+}
+
+// elementPickSession makes the Session named the one the element's chat goes
+// on in at the Console: an earlier conversation, picked up where it left off.
+func (s *QNTXServer) elementPickSession(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	element, refused := elementOf(sent)
+	if refused != nil {
+		return nil, refused
+	}
+	picked := strings.TrimSpace(sent["session"])
+	if picked == "" {
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "session", Says: "no Session is named"}
+	}
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
+	}
+	file := filepath.Join(s.nodeAgent.home, elementsDir, slug.Of(element), managedElementFile)
+	kept, err := os.ReadFile(file)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: element + " runs at no Console, so it has no Session to pick: " + err.Error()}
+	}
+	var held managedOf
+	if err := json.Unmarshal(kept, &held); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what " + element + " is at Anthropic did not parse: " + err.Error()}
+	}
+	line, _, err := s.anthropicLine()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	client, err := s.anthropicClient(line)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	// The Session is the agent's, as the Console says, or it is not picked.
+	found, err := client.Beta.Sessions.Get(ctx, picked, anthropic.BetaSessionGetParams{})
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "the Console holds no Session " + picked + ": " + err.Error()}
+	}
+	if found.Agent.ID != held.Agent {
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: "Session " + picked + " is not " + element + "'s: it is agent " + found.Agent.ID + "'s"}
+	}
+	if agent, ok := s.elementAgents.of(elementPurpose(element)); ok && agent.in(s.claudeHarness()).answering.Load() != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: element + " is answering; its Session is picked between turns"}
+	}
+	held.Session = picked
+	if err := os.WriteFile(file, must(json.Marshal(held)), 0o600); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Session picked for " + element + " was not kept: " + err.Error()}
+	}
+	return s.elementSessions(ctx, sent)
+}
+
+func must(b []byte, err error) []byte {
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+// elementsSignum is an element's agent: list, say, am, session and sessions, each at the element's path.
 func (s *QNTXServer) elementsSignum() sigil.Signum {
 	claude := s.claudeHarness()
 	element := &protocol.Param{Name: "element", Required: true, Says: "The id of the element on screen: a canvas element id, or a tray element id such as agent-element."}
@@ -87,6 +287,12 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 			Description: "The element agent: each element is its own agent, and its own conversation, as ROOT speaks to it (ADR-054).",
 			Tags:        []string{"agent", "root"},
 			Sigils: []*protocol.Sigil{
+				{
+					Name:   "list",
+					Does:   "Every element agent this node holds, the stories' included, each by the element's name, with its session and whether it is answering.",
+					Answer: "protocol.ElementAgents",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/elements"},
+				},
 				{
 					Name:   "say",
 					Does:   "Says something to the element's agent and gives what it answered. One conversation that continues: shaken on day 3, it goes on from day 1. Runs as [agent.root] says.",
@@ -102,6 +308,20 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: elementAgentPath},
 				},
 				{
+					Name:   "sessions",
+					Does:   "Every Session the element's agent has at Anthropic's Console, newest first, the current one marked; none when it runs on the box.",
+					Takes:  []*protocol.Param{element},
+					Answer: "protocol.ElementSessions",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: elementAgentPath + "/sessions"},
+				},
+				{
+					Name:   "pick",
+					Does:   "Makes the Session named the one the element's chat goes on in at the Console: an earlier conversation, picked up where it left off. Answers as sessions does.",
+					Takes:  []*protocol.Param{element, {Name: "session", Required: true, Says: "The Session's id at the Console, one of the element's."}},
+					Answer: "protocol.ElementSessions",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: elementAgentPath + "/sessions"},
+				},
+				{
 					Name:   "session",
 					Does:   "The element's one conversation in the harness named, whole, as a transcript.",
 					Takes:  []*protocol.Param{element, harness},
@@ -111,9 +331,12 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 			},
 		},
 		Answers: map[string]sigil.Answer{
-			"say":     s.elementSay,
-			"am":      s.elementAm,
-			"session": s.elementSession,
+			"list":     s.elementsList,
+			"sessions": s.elementSessions,
+			"pick":     s.elementPickSession,
+			"say":      s.elementSay,
+			"am":       s.elementAm,
+			"session":  s.elementSession,
 		},
 	}
 }

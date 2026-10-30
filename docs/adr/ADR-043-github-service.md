@@ -32,7 +32,6 @@ brandon: "So, this concept, it will be called Forge in the future, 1356, 1352, 1
 
 "that means no am.toml"
 
-The plugin element is the only place a plugin is added, configured and enabled.
 
 The App's own credentials are the operator's, and they are in am.toml under
 `[auth.provider.github]`, each secret an `ssm://` or `env:` reference, as
@@ -40,8 +39,6 @@ Google's and Apple's are. `client_id` and `client_secret` are what the OAuth
 ceremony spends. `private_key` is the App's private key, PEM, which signs the
 JWT GitHub requires of a call made as the App itself, such as listing and
 redelivering the webhook's deliveries.
-
-"qntx has the concept of tokens"
 
 "it would not be an attestation"
 
@@ -61,14 +58,9 @@ no deeper.
 
 "yes"
 
-A plugin built by a runner on another machine reaches the node as a GitHub
-Actions artifact of a successful workflow run in the plugin record's
-repository. The artifact is named as the archive is, and holds the archive and
-its `.sha256`. The App's `workflow_run` delivery is what has the node download
-it, as the App's installation where the repository is; QNTX checks it against
-the `.sha256` as it checks a build under the runner, and a run older than the
-one whose build is installed is not installed over it. A repository no enabled
-plugin record names has nothing downloaded from it.
+A plugin built by a runner on another machine reaches the node as a GitHub Actions artifact of a successful workflow run in the plugin record's repository. The artifact is named as the archive is, and holds the archive and its `.sha256`. The App's `workflow_run` delivery is what has the node download
+it, as the App's installation where the repository is; QNTX checks it against the `.sha256` as it checks a build under the runner, and a run older than the
+one whose build is installed is not installed over it. A repository no enabled plugin record names has nothing downloaded from it.
 
 A plugin record's URL names the repository and the branch the plugin is built
 from: a tree URL's branch, or the repository's default branch when it names
@@ -80,4 +72,4 @@ none. A run counts for the plugin only on that repository and that branch.
 
 "depending on who does it, the namespace will take it from that user"
 
-"that isolates crazy users or agents"
+

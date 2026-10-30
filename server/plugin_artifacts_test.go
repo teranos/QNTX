@@ -306,3 +306,57 @@ func TestTheWebhookReadsAWorkflowRunForBuilds(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.JSONEq(t, `{"taking": []}`, w.Body.String())
 }
+
+// nixStoreAt makes nix the stand-in for nix-store while t runs.
+func nixStoreAt(t *testing.T, nixStore string) {
+	t.Helper()
+	was := nixBin
+	nixBin = filepath.Dir(nixStore)
+	t.Cleanup(func() { nixBin = was })
+}
+
+// pyreRoots is where what pyre loads from is rooted.
+func pyreRoots(t *testing.T) string {
+	t.Helper()
+	dir, err := grpcplugin.PluginInstallPath("pyre")
+	require.NoError(t, err)
+	return filepath.Join(dir, storeRootsDir)
+}
+
+// A build installed from a run's artifact loads from the store as one the
+// node built does, and what it loads from is rooted as it is installed.
+func TestARunsBuildKeepsWhatItLoadsFrom(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	nixStore, ran := nixStoreStandIn(t)
+	nixStoreAt(t, nixStore)
+	s, _ := artifactServingServer(t, map[int64][]map[string]any{9: {
+		{"id": 3, "name": pyreBuild("1.0.0"), "expired": false},
+	}}, map[int64][]byte{3: pyreArtifact(t, "1.0.0", []byte("\x7fELF"+glibcPath+"/lib/ld-linux-x86-64.so.2\x00"))})
+
+	run := workflowRun(t, "teranos/pyre", 9, "completed", "success", "2026-10-12T10:00:00Z")
+	require.NoError(t, s.takeRun(context.Background(), "pyre", gitHubSource{Owner: "teranos", Repo: "pyre"}, run))
+
+	raw, err := os.ReadFile(ran)
+	require.NoError(t, err, "nix-store did not run, so the glibc pyre loads from is not rooted")
+	assert.Equal(t, "--realise "+glibcPath+" --add-root "+filepath.Join(pyreRoots(t), filepath.Base(glibcPath)), strings.TrimSpace(string(raw)))
+}
+
+// A build installed from a run's artifact before its roots were kept is
+// rooted when the node starts, and what a collection took is fetched again.
+func TestARunsBuildIsRootedWhenTheNodeStarts(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _ := artifactServingServer(t, nil, nil)
+	dir, err := grpcplugin.PluginInstallPath("pyre")
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, grpcplugin.PluginBinaryName("pyre")), []byte("\x7fELF"+glibcPath+"/lib/ld-linux-x86-64.so.2\x00"), 0o755))
+	require.NoError(t, keepBuiltRun("pyre", time.Date(2026, 10, 17, 12, 19, 40, 0, time.UTC)))
+	nixStore, ran := nixStoreStandIn(t)
+	nixStoreAt(t, nixStore)
+
+	s.KeepRunsAlive()
+
+	raw, err := os.ReadFile(ran)
+	require.NoError(t, err, "nix-store did not run, so the glibc pyre loads from is not rooted")
+	assert.Equal(t, "--realise "+glibcPath+" --add-root "+filepath.Join(pyreRoots(t), filepath.Base(glibcPath)), strings.TrimSpace(string(raw)))
+}
