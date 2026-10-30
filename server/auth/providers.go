@@ -240,6 +240,10 @@ func isPublicIP(ip net.IP) bool {
 	return true
 }
 
+// IsPublicIP is isPublicIP, for whatever else the node reaches at a URL a
+// caller hands it: an A2A push notification's webhook (§13.2).
+func IsPublicIP(ip net.IP) bool { return isPublicIP(ip) }
+
 // guardDial refuses the address a connection actually landed on. The hostname
 // check in normalizeHost is advisory — DNS answers again at dial time and can
 // answer differently, so this is where an internal address is refused.

@@ -5,7 +5,7 @@ Status: Accepted
 
 "mail, per user, in the system"
 
-"everyone get's their own mail address, and they get it via ROOT approval"
+"everyone get's their own mail address, via ROOT approval"
 
 "a normal mail client, boring, fast, reliable, send and receive mail, spambox, etc."
 

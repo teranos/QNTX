@@ -52,6 +52,7 @@ type QNTXServer struct {
 	nodeAgent             *rootAgent                    // The Node Agent this node runs; nil when am.toml names none (ADR-048)
 	taskEnds              sync.Mutex                    // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
 	taskStops             sync.Map                      // Each Task of the Node Agent this process runs, by id, to the context.CancelFunc that keeps its turn from starting
+	pushing               sync.Map                      // Each Task with push notifications, by id, to the *sync.Mutex its notifications go out under one after another
 	noNodeAgent           error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents       agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
 	elementAgents         agentsHeld                    // Each element's agent this node has held, by its purpose (ADR-054)

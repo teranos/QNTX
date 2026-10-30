@@ -45,12 +45,6 @@ func Unsupported(op Operation) *Error {
 	return &Error{Name: "UnsupportedOperationError", Message: op.Name + " is not one this node does yet"}
 }
 
-// PushNotificationNotSupported is a request for what push notifications would
-// do: the card says capabilities.pushNotifications is false (§3.3.4).
-func PushNotificationNotSupported() *Error {
-	return &Error{Name: "PushNotificationNotSupportedError", Message: "the node sends no push notifications (capabilities.pushNotifications is false)"}
-}
-
 // Unauthenticated is a request that came with no credential the node took:
 // the extended card "MUST require authentication" (§13.3).
 func Unauthenticated(message string) *Error {
@@ -67,6 +61,18 @@ func NotFound(message string) *Error { return notFound(message) }
 
 func notFound(message string) *Error {
 	return &Error{Message: message, status: http.StatusNotFound, grpc: "NOT_FOUND"}
+}
+
+// Said is how the error is answered: its HTTP status, and in a word the A2A
+// error's reason or the google.rpc code, a closed set either way.
+func (e *Error) Said() (int, string) {
+	if m, ok := mapped[e.Name]; ok {
+		return m.status, m.reason
+	}
+	if e.status == 0 {
+		return http.StatusInternalServerError, "INTERNAL"
+	}
+	return e.status, e.grpc
 }
 
 // write is §11.6: the google.rpc.Status JSON representation, the HTTP status

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -100,7 +101,10 @@ func TestNoAgentIsServedWhereNoneWasOptedInto(t *testing.T) {
 func TestAnAgentsTenantAnswersWhatTheNodeDoesNotDoYet(t *testing.T) {
 	srv, tokens := servingGardens(t)
 
-	r := asBearer(http.MethodGet, "/a2a/garden/tasks", tokens[auth.LevelRoot])
+	sent := `{"message": {"messageId": "m1", "role": "ROLE_USER", "parts": [{"text": "hi"}]}}`
+	r := asBearer(http.MethodPost, "/a2a/garden/message:stream", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(sent))
+	r.ContentLength = int64(len(sent))
 	r.Header.Set("A2A-Version", "1.0")
 	w := httptest.NewRecorder()
 	srv.served.ServeHTTP(w, r)

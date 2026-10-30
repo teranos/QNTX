@@ -87,6 +87,96 @@ message SessionTranscript {
   Transcript transcript = 1;
 }
 
+// SessionEvent is one thing a harness's session emitted, as it emitted it:
+// live, in the order it happened, and no attestation. The transcript is the
+// session after the fact (Transcript); this is the session while it runs.
+message SessionEvent {
+  // "I want to see the most honest and least data-lossy representation of what
+  // there is to show."
+
+  // The session it happened in.
+  string session = 1;
+  // Whose line this is: claude, pi, anthropic.
+  string harness = 2;
+  // When, as the harness stamped it, or when the node read it when it did not.
+  string at = 3;
+  // What it is, in the words every harness has one of: started, text, delta,
+  // tool_use, tool_result, thinking, ended, failed. A line that is none of
+  // these is "other", and raw still carries it whole.
+  string kind = 4;
+  // What was said: the text, the delta, a tool's result, the answer on ended,
+  // the error on failed.
+  string text = 5;
+  // On tool_use and tool_result: the tool and the id the harness gave the call.
+  string tool = 6;
+  string tool_use_id = 7;
+  // On tool_use: the input, as JSON, whole.
+  string input = 8;
+  // The harness's own line, whole, as it printed it. Nothing above says more
+  // than this; what the fields do not carry is still here.
+  string raw = 9;
+  // Where in the session's stream this line ends, so a reader asks for what
+  // follows it and nothing is read twice or skipped.
+  int64 mark = 10;
+}
+
+// SessionEvents is the events of a turn from a mark on, and whether the turn
+// is still printing. Over SSE each event travels alone, as one data line.
+message SessionEvents {
+  repeated SessionEvent events = 1;
+  // Whether the harness is still printing: false is the turn over, and its
+  // last event ended or failed.
+  bool live = 2;
+  // The mark to ask from next.
+  int64 mark = 3;
+}
+
+// ElementAgent is one element whose agent this node holds (ADR-054): named,
+// and in a session when one was kept.
+message ElementAgent {
+  // The element, as it is said to.
+  string element = 1;
+  // Its session in Claude Code, or empty before anything was said to it.
+  string session = 2;
+  // Whether it is answering now.
+  bool answering = 3;
+  // Its Session at Anthropic's Console, when it runs there (ADR-054), or empty.
+  string anthropic_session = 4;
+}
+
+// ElementAgents is what elements list answers: every element agent this node
+// holds, the stories' included, each by the element's name.
+message ElementAgents {
+  // Each element agent held, by the element's name.
+  repeated ElementAgent agents = 1;
+}
+
+// ElementSession is one Session an element's agent has at Anthropic's Console.
+message ElementSession {
+  // The Session's id at the Console.
+  string id = 1;
+  // Its title there, when it has one.
+  string title = 2;
+  // Its status there: idle, running, terminated, as the Console says it.
+  string status = 3;
+  // When it was made, RFC 3339.
+  string created_at = 4;
+  // Whether the Console archived it.
+  bool archived = 5;
+  // Whether it is the one the element's chat goes on in.
+  bool current = 6;
+}
+
+// ElementSessions is what elements sessions and elements pick answer: every
+// Session the element's agent has at the Console, newest first; none when it
+// runs on the box.
+message ElementSessions {
+  // The agent's id at the Console, or empty when it runs on the box.
+  string agent = 1;
+  // Each Session, newest first.
+  repeated ElementSession sessions = 2;
+}
+
 // ClaudeSaid is what claude say answers.
 message ClaudeSaid {
   // What it answered.
