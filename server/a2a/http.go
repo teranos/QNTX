@@ -68,10 +68,6 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			found = at
 		}
 		if !found {
-			if refused := pushConfigured(r, served); refused != nil {
-				refuse(refused)
-				return
-			}
 			refuse(notFound(r.Method + " " + r.URL.Path + " is no A2A operation" + jsonRPCAsked(r)))
 			return
 		}
@@ -125,40 +121,6 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			undelivered(op.Name, err)
 		}
 	})
-}
-
-// pushConfigured is how a push notification config operation is answered,
-// nil for a request that is none: PushNotificationNotSupportedError, as the
-// card says capabilities.pushNotifications is false, and not found at a tenant
-// no agent is served at (§3.3.2).
-func pushConfigured(r *http.Request, served Served) *Error {
-	routes, err := pushConfigRoutes()
-	if err != nil {
-		return &Error{Message: "the push notification config routes did not read from the pinned spec: " + err.Error()}
-	}
-	for _, route := range routes {
-		if route.Method != r.Method {
-			continue
-		}
-		params, ok := matchPath(route.Path, r.URL.Path)
-		if !ok {
-			continue
-		}
-		if tenant, named := params["tenant"]; named {
-			at, err := served(tenant)
-			if err != nil {
-				return &Error{Message: "whether an agent is served at tenant " + tenant + " was not answered: " + err.Error()}
-			}
-			if !at {
-				return notFound("no agent is served at tenant " + tenant)
-			}
-		}
-		if refused := version(r); refused != nil {
-			return refused
-		}
-		return PushNotificationNotSupported()
-	}
-	return nil
 }
 
 // getExtendedAgentCard is the operation whose card is the caller's own.

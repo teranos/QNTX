@@ -273,9 +273,9 @@ func TestWhatTheNodeAgentDoesNotTakeIsRefused(t *testing.T) {
 		{"a task that ended",
 			`{"message": {"messageId": "m", "role": "ROLE_USER", "taskId": "` + finished + `", "parts": [{"text": "hi"}]}}`,
 			http.StatusBadRequest, "UNSUPPORTED_OPERATION"},
-		{"a push notification",
-			saidToTheNode("hi", `{"taskPushNotificationConfig": {"url": "https://example.org/hook"}}`),
-			http.StatusBadRequest, "PUSH_NOTIFICATION_NOT_SUPPORTED"},
+		{"a push notification to a private address",
+			saidToTheNode("hi", `{"taskPushNotificationConfig": {"url": "http://10.0.0.1/hook"}}`),
+			http.StatusBadRequest, "no public address"},
 	} {
 		code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", refused.body, tokens[auth.LevelRoot])
 		assert.Equal(t, refused.code, code, refused.what)

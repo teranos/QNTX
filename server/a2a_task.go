@@ -186,8 +186,10 @@ func (s *QNTXServer) sendTask(r *http.Request, ta taskAgent, request proto.Messa
 	if sent.Role != "ROLE_USER" {
 		return nil, a2a.Invalid("a message sent to " + ta.called + " is the user's, and this one's role is " + sent.Role)
 	}
-	if sent.Push {
-		return nil, a2a.PushNotificationNotSupported()
+	if sent.Push != nil {
+		if refused := webhookRefused(*sent.Push); refused != nil {
+			return nil, refused
+		}
 	}
 	says, refused := sent.Said()
 	if refused != nil {
@@ -215,6 +217,18 @@ func (s *QNTXServer) sendTask(r *http.Request, ta taskAgent, request proto.Messa
 	message, err := sent.InTask(id, contextID)
 	if err != nil {
 		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+	}
+	// A config sent with the message is the new Task's, set before the Task is
+	// written down, so its webhook is told of it from the first state on.
+	if sent.Push != nil {
+		push := *sent.Push
+		push.TaskID = id
+		if push.ID == "" {
+			push.ID = uuid.NewString()
+		}
+		if err := s.setPush(ta.taskLines, push, spokenBy(r)); err != nil {
+			return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+		}
 	}
 	// The turn is the node's, not the caller's: a caller that leaves does not
 	// stop it, and its Task is answered by its id after (§3.2.2). Canceling
@@ -567,11 +581,17 @@ func (s *QNTXServer) writeTaskLine(lines taskLines, id, state, by string, at tim
 	if err != nil {
 		return errors.Wrapf(err, "failed to name the %s line of task %s", state, id)
 	}
-	return errors.Wrapf(store.CreateAttestation(&types.As{
+	if err := store.CreateAttestation(&types.As{
 		ID: line, Subjects: []string{taskLineSubject}, Predicates: []string{state},
 		Contexts: append([]string{taskContext(id), agentContext(lines.did)}, also...),
 		Actors:   []string{by}, Timestamp: at, CreatedAt: at, Source: "a2a", Attributes: attributes,
-	}), "the %s line of task %s was not written", state, id)
+	}); err != nil {
+		return errors.Wrapf(err, "the %s line of task %s was not written", state, id)
+	}
+	// "When a task update occurs, the agent sends an HTTP POST request to the
+	// configured webhook URL" (§4.3.3).
+	s.notify(lines, id)
+	return nil
 }
 
 // taskContext is what a task's lines are in.

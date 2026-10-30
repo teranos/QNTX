@@ -25,6 +25,12 @@ var asked = map[string]struct{ method, path, body string }{
 	"ListTasks":            {"GET", "/tasks", ""},
 	"CancelTask":           {"POST", "/tasks/abc:cancel", ""},
 	"GetExtendedAgentCard": {"GET", "/extendedAgentCard", ""},
+	// The config's id is abc, the id the path's last segment fills, and its
+	// task t1.
+	"CreateTaskPushNotificationConfig": {"POST", "/tasks/t1/pushNotificationConfigs", `{"url": "https://example.org/hook"}`},
+	"GetTaskPushNotificationConfig":    {"GET", "/tasks/t1/pushNotificationConfigs/abc", ""},
+	"ListTaskPushNotificationConfigs":  {"GET", "/tasks/t1/pushNotificationConfigs", ""},
+	"DeleteTaskPushNotificationConfig": {"DELETE", "/tasks/t1/pushNotificationConfigs/abc", ""},
 }
 
 // status is a google.rpc.Status as §11.6 writes it.
@@ -219,31 +225,25 @@ func TestWhatIsNoOperationIsNotFound(t *testing.T) {
 	}
 }
 
-// §3.3.4: the card says capabilities.pushNotifications is false, so every
-// push notification config operation answers PushNotificationNotSupportedError,
-// at no tenant and at one an agent is served at, with nothing asked of what
-// answers.
-func TestPushNotificationConfigIsNotSupported(t *testing.T) {
-	reached := false
-	answer := func(_ context.Context, op Operation, _ proto.Message) (proto.Message, *Error) {
-		reached = true
-		return nil, Unsupported(op)
-	}
-	for _, r := range []struct{ method, path string }{
-		{"POST", "/tasks/abc/pushNotificationConfigs"},
-		{"GET", "/tasks/abc/pushNotificationConfigs/c1"},
-		{"GET", "/tasks/abc/pushNotificationConfigs"},
-		{"DELETE", "/tasks/abc/pushNotificationConfigs/c1"},
-		{"POST", "/garden/tasks/abc/pushNotificationConfigs"},
-		{"DELETE", "/garden/tasks/abc/pushNotificationConfigs/c1"},
-	} {
-		w, said := serve(t, answer, r.method, r.path, `{}`, v1)
-		if w.Code != http.StatusBadRequest || said.Error.Status != "FAILED_PRECONDITION" || !strings.Contains(w.Body.String(), "PUSH_NOTIFICATION_NOT_SUPPORTED") {
-			t.Errorf("%s %s answered %d %s", r.method, r.path, w.Code, w.Body.String())
+// A push notification config's path fills the task the config is of, and the
+// config itself last: task_id and id, as a2a.proto names them.
+func TestAPushConfigPathFillsItsTaskAndItsConfig(t *testing.T) {
+	for _, name := range []string{"CreateTaskPushNotificationConfig", "GetTaskPushNotificationConfig", "ListTaskPushNotificationConfigs", "DeleteTaskPushNotificationConfig"} {
+		var request proto.Message
+		answer := func(_ context.Context, op Operation, r proto.Message) (proto.Message, *Error) {
+			request = r
+			return nil, Unsupported(op)
 		}
-	}
-	if reached {
-		t.Error("a push notification config operation was asked of what answers")
+		route := asked[name]
+		serve(t, answer, route.method, route.path, route.body, v1)
+		if request == nil {
+			t.Errorf("%s was not reached", name)
+			continue
+		}
+		fields := request.ProtoReflect().Descriptor().Fields()
+		if got := request.ProtoReflect().Get(fields.ByName("task_id")).String(); got != "t1" {
+			t.Errorf("%s took task %q from %s", name, got, route.path)
+		}
 	}
 }
 
