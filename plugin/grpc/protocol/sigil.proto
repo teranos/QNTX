@@ -151,6 +151,31 @@ message ElementAgents {
   repeated ElementAgent agents = 1;
 }
 
+// ElementSession is one Session an element's agent has at Anthropic's Console.
+message ElementSession {
+  // The Session's id at the Console.
+  string id = 1;
+  // Its title there, when it has one.
+  string title = 2;
+  // Its status there: idle, running, terminated, as the Console says it.
+  string status = 3;
+  // When it was made, RFC 3339.
+  string created_at = 4;
+  // Whether the Console archived it.
+  bool archived = 5;
+  // Whether it is the one the element's chat goes on in.
+  bool current = 6;
+}
+
+// ElementSessions is what elements sessions answers: every Session the element's
+// agent has at the Console, newest first; none when it runs on the box.
+message ElementSessions {
+  // The agent's id at the Console, or empty when it runs on the box.
+  string agent = 1;
+  // Each Session, newest first.
+  repeated ElementSession sessions = 2;
+}
+
 // ClaudeSaid is what claude say answers.
 message ClaudeSaid {
   // What it answered.

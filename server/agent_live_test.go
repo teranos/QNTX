@@ -194,3 +194,16 @@ func TestEveryElementAgentHeldIsListed(t *testing.T) {
 	}
 	assert.Equal(t, map[string]string{"agent-element": "s-shaken", "story-1-root-invites-a-user": ""}, names)
 }
+
+// An element whose agent runs on the box has no Session at the Console: sessions says none, and names no agent.
+func TestAnElementOnTheBoxHasNoConsoleSessions(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, ed25519.SeedSize))}
+	_, refused := s.holdElementAgent("agent-element")
+	require.Nil(t, refused)
+	answer, refused := s.elementSessions(context.Background(), sigil.Sent{"element": "agent-element"})
+	require.Nil(t, refused)
+	listed := answer.(*protocol.ElementSessions)
+	assert.Equal(t, "", listed.Agent)
+	assert.Empty(t, listed.Sessions)
+}
