@@ -130,6 +130,11 @@ StringArrayResultC read_conn_ids(const ReadConn *rc);
 CountResultC read_conn_count(const ReadConn *rc);
 
 /**
+ * Whether any attestation is held through the read connection: count 1 or 0.
+ */
+CountResultC read_conn_holds_any(const ReadConn *rc);
+
+/**
  * Get distinct predicates through the read connection.
  */
 StringArrayResultC read_conn_predicates(const ReadConn *rc);
@@ -228,6 +233,11 @@ StringArrayResultC storage_ids(const SqliteStore *store);
  * @return Result with count
  */
 CountResultC storage_count(const SqliteStore *store);
+
+/**
+ * Whether any attestation is held through the store's connection: count 1 or 0.
+ */
+CountResultC storage_holds_any(const SqliteStore *store);
 
 /**
  * Clear all attestations from the store.
