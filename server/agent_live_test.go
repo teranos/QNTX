@@ -2,7 +2,9 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"crypto/ed25519"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,7 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/sigil"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -126,6 +130,32 @@ func TestTheLiveSessionHandsTheWordsBeforeTheTurnEnds(t *testing.T) {
 	assert.Equal(t, int64(len(init)+len(delta)+len(result)), end.Mark)
 }
 
+// An element's agent is tailed at its own path, its session its own (ADR-054).
+func TestAnElementAgentsLiveSessionIsItsOwn(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, ed25519.SeedSize))}
+	agent, refused := s.holdElementAgent("agent-element")
+	require.Nil(t, refused)
+	stream := filepath.Join(agent.home, "turns", "s-el.1791900000000000000.stream")
+	require.NoError(t, os.MkdirAll(filepath.Dir(stream), 0o700))
+	require.NoError(t, os.WriteFile(stream, []byte(`{"type":"result","subtype":"success","session_id":"s-el","is_error":false,"result":"Shaken."}`+"\n"), 0o600))
+	agent.in(s.claudeHarness()).answering.Store(&turnInSession{session: "s-el", stream: stream})
+
+	asked := httptest.NewRequest(http.MethodGet, "/api/elements/agent-element/live?harness=claude", nil)
+	asked.SetPathValue("element", "agent-element")
+	recorded := httptest.NewRecorder()
+	s.HandleElementLive(recorded, asked)
+	assert.Equal(t, http.StatusOK, recorded.Code, recorded.Body.String())
+	assert.Contains(t, recorded.Body.String(), `"kind":"ended"`)
+	assert.Contains(t, recorded.Body.String(), `"session":"s-el"`)
+
+	// The Node Agent is in no turn: its own live says so, by its own name.
+	recorded = httptest.NewRecorder()
+	s.HandleNodeAgentLive(recorded, httptest.NewRequest(http.MethodGet, "/api/agent/live?harness=claude", nil))
+	assert.Equal(t, http.StatusNotFound, recorded.Code)
+	assert.Contains(t, recorded.Body.String(), "the Node Agent is not in a turn")
+}
+
 // Between turns there is no stream to tail, and a harness that prints to no
 // file is refused by name.
 func TestTheLiveSessionRefusesWhatItCannotTail(t *testing.T) {
@@ -140,4 +170,54 @@ func TestTheLiveSessionRefusesWhatItCannotTail(t *testing.T) {
 		assert.NotEqual(t, http.StatusOK, recorded.Code, ask.query)
 		assert.Contains(t, recorded.Body.String(), ask.says, ask.query)
 	}
+}
+
+// Every element agent the node holds is listed by the element's name, kept
+// beside its sessions: "the Agents Element as the main entry-point into all
+// Agents that User has access to."
+func TestEveryElementAgentHeldIsListed(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, ed25519.SeedSize))}
+	for _, element := range []string{"agent-element", "story-1-root-invites-a-user"} {
+		_, refused := s.holdElementAgent(element)
+		require.Nil(t, refused)
+	}
+	shaken, _ := s.holdElementAgent("agent-element")
+	require.NoError(t, shaken.keepIn(filepath.Join(shaken.sessionDir, claudeSessionFile), "s-shaken"))
+
+	answer, refused := s.elementsList(context.Background(), sigil.Sent{})
+	require.Nil(t, refused)
+	listed := answer.(*protocol.ElementAgents).Agents
+	names := map[string]string{}
+	for _, one := range listed {
+		names[one.Element] = one.Session
+	}
+	assert.Equal(t, map[string]string{"agent-element": "s-shaken", "story-1-root-invites-a-user": ""}, names)
+}
+
+// An element whose agent runs on the box has no Session at the Console: sessions says none, and names no agent.
+func TestAnElementOnTheBoxHasNoConsoleSessions(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, ed25519.SeedSize))}
+	_, refused := s.holdElementAgent("agent-element")
+	require.Nil(t, refused)
+	answer, refused := s.elementSessions(context.Background(), sigil.Sent{"element": "agent-element"})
+	require.Nil(t, refused)
+	listed := answer.(*protocol.ElementSessions)
+	assert.Equal(t, "", listed.Agent)
+	assert.Empty(t, listed.Sessions)
+}
+
+// An element whose agent runs on the box has no Session at the Console to pick.
+func TestAnElementOnTheBoxPicksNoConsoleSession(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, ed25519.SeedSize))}
+	_, refused := s.holdElementAgent("agent-element")
+	require.Nil(t, refused)
+	_, refused = s.elementPickSession(context.Background(), sigil.Sent{"element": "agent-element", "session": "sesn_x"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.Says, "runs at no Console")
+	_, refused = s.elementPickSession(context.Background(), sigil.Sent{"element": "agent-element"})
+	require.NotNil(t, refused)
+	assert.Equal(t, "session", refused.Param)
 }
