@@ -219,6 +219,11 @@ func (e *Engine) Dilation() float64 {
 
 // Start loads watchers from DB and starts the drain loop
 func (e *Engine) Start() error {
+	// Not settling leaves the watchers as they were before this build, which
+	// is no reason to load none of them.
+	if err := e.settleStored(); err != nil {
+		e.logger.Errorw("Stored watchers were not settled; they load as they were", "error", err)
+	}
 	if err := e.loadWatchers(); err != nil {
 		return errors.Wrap(err, "failed to load watchers")
 	}
@@ -923,7 +928,8 @@ func (e *Engine) drainOnce() {
 			execErr = e.executePlugin(watcher, &as)
 		case storage.ActionTypeBuiltinExecute:
 			execErr = e.executeBuiltin(watcher, &as)
-		case storage.ActionTypeSemanticMatch:
+		case storage.ActionTypeSemanticMatch, storage.ActionTypeTell:
+			// Telling happened at match time; there is nothing left to run.
 			e.queueWriteFailed(entry.WatcherID, "complete", entry.ID, e.queueStore.Complete(entry.ID))
 			continue
 		default:
