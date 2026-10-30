@@ -137,6 +137,9 @@ const (
 	purgeRetention     = 1 * time.Hour
 	purgeEveryNthTick  = 100 // purge completed entries every 100th drain tick
 	maxQueuePerWatcher = 1000
+	// How long a row waits on a plugin that is not loaded before it is given
+	// up, and the giving up is the watcher's error.
+	maxPluginWait = 24 * time.Hour
 )
 
 // NewEngine creates a new watcher engine
@@ -877,9 +880,17 @@ func (e *Engine) drainOnce() {
 			continue
 		}
 
-		// If the action depends on a plugin that isn't loaded, defer execution
+		// If the action depends on a plugin that isn't loaded, defer execution,
+		// for as long as maxPluginWait. Put back every minute with nothing
+		// counting, a row waited forever on a plugin the node never loads.
 		if required := actionRequiresPlugin(watcher); required != "" && e.pluginExecutor != nil {
 			if !e.pluginExecutor.IsPluginLoaded(required) {
+				if waited := time.Since(entry.CreatedAt); waited > maxPluginWait {
+					why := errors.Newf("gave up after waiting %s for plugin %s, which was not loaded", maxPluginWait, required)
+					e.recordError(watcher.ID, why.Error(), queuedAttestationID(entry))
+					e.queueWriteFailed(entry.WatcherID, "fail", entry.ID, e.queueStore.Fail(entry.ID, why.Error()))
+					continue
+				}
 				e.queueWriteFailed(entry.WatcherID, "requeue", entry.ID,
 					e.queueStore.Requeue(entry.ID, time.Now().Add(60*time.Second)))
 				continue
@@ -957,6 +968,18 @@ func (e *Engine) drainOnce() {
 			}
 		}
 	}
+}
+
+// queuedAttestationID names the attestation a queued row carries, for an
+// error about the row; empty when the row cannot be read.
+func queuedAttestationID(entry *QueueEntry) string {
+	var as struct {
+		ID string `json:"id"`
+	}
+	if json.Unmarshal([]byte(entry.AttestationJSON), &as) != nil {
+		return ""
+	}
+	return as.ID
 }
 
 // deepCopyAttestation creates a deep copy of an attestation to prevent race conditions.
