@@ -220,6 +220,62 @@ func (s *QNTXServer) elementSessions(ctx context.Context, sent sigil.Sent) (any,
 	return answer, nil
 }
 
+// elementPickSession makes the Session named the one the element's chat goes
+// on in at the Console: an earlier conversation, picked up where it left off.
+func (s *QNTXServer) elementPickSession(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	element, refused := elementOf(sent)
+	if refused != nil {
+		return nil, refused
+	}
+	picked := strings.TrimSpace(sent["session"])
+	if picked == "" {
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "session", Says: "no Session is named"}
+	}
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
+	}
+	file := filepath.Join(s.nodeAgent.home, elementsDir, slug.Of(element), managedElementFile)
+	kept, err := os.ReadFile(file)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: element + " runs at no Console, so it has no Session to pick: " + err.Error()}
+	}
+	var held managedOf
+	if err := json.Unmarshal(kept, &held); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what " + element + " is at Anthropic did not parse: " + err.Error()}
+	}
+	line, _, err := s.anthropicLine()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	client, err := s.anthropicClient(line)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	// The Session is the agent's, as the Console says, or it is not picked.
+	found, err := client.Beta.Sessions.Get(ctx, picked, anthropic.BetaSessionGetParams{})
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "the Console holds no Session " + picked + ": " + err.Error()}
+	}
+	if found.Agent.ID != held.Agent {
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: "Session " + picked + " is not " + element + "'s: it is agent " + found.Agent.ID + "'s"}
+	}
+	if agent, ok := s.elementAgents.of(elementPurpose(element)); ok && agent.in(s.claudeHarness()).answering.Load() != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: element + " is answering; its Session is picked between turns"}
+	}
+	held.Session = picked
+	if err := os.WriteFile(file, must(json.Marshal(held)), 0o600); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Session picked for " + element + " was not kept: " + err.Error()}
+	}
+	return s.elementSessions(ctx, sent)
+}
+
+func must(b []byte, err error) []byte {
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 // elementsSignum is an element's agent: list, say, am, session and sessions, each at the element's path.
 func (s *QNTXServer) elementsSignum() sigil.Signum {
 	claude := s.claudeHarness()
@@ -259,6 +315,13 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: elementAgentPath + "/sessions"},
 				},
 				{
+					Name:   "pick",
+					Does:   "Makes the Session named the one the element's chat goes on in at the Console: an earlier conversation, picked up where it left off. Answers as sessions does.",
+					Takes:  []*protocol.Param{element, {Name: "session", Required: true, Says: "The Session's id at the Console, one of the element's."}},
+					Answer: "protocol.ElementSessions",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: elementAgentPath + "/sessions"},
+				},
+				{
 					Name:   "session",
 					Does:   "The element's one conversation in the harness named, whole, as a transcript.",
 					Takes:  []*protocol.Param{element, harness},
@@ -270,6 +333,7 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 		Answers: map[string]sigil.Answer{
 			"list":     s.elementsList,
 			"sessions": s.elementSessions,
+			"pick":     s.elementPickSession,
 			"say":      s.elementSay,
 			"am":       s.elementAm,
 			"session":  s.elementSession,

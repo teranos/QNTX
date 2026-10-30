@@ -145,7 +145,7 @@
   "protocol.ElementSession.id": "The Session's id at the Console.",
   "protocol.ElementSession.status": "Its status there: idle, running, terminated, as the Console says it.",
   "protocol.ElementSession.title": "Its title there, when it has one.",
-  "protocol.ElementSessions": "ElementSessions is what elements sessions answers: every Session the element's agent has at the Console, newest first; none when it runs on the box.",
+  "protocol.ElementSessions": "ElementSessions is what elements sessions and elements pick answer: every Session the element's agent has at the Console, newest first; none when it runs on the box.",
   "protocol.ElementSessions.agent": "The agent's id at the Console, or empty when it runs on the box.",
   "protocol.ElementSessions.sessions": "Each Session, newest first.",
   "protocol.Endpoint": "An Endpoint is a sigil's form in the HTTP API: the method and the whole path.",

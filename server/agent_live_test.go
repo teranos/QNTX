@@ -207,3 +207,17 @@ func TestAnElementOnTheBoxHasNoConsoleSessions(t *testing.T) {
 	assert.Equal(t, "", listed.Agent)
 	assert.Empty(t, listed.Sessions)
 }
+
+// An element whose agent runs on the box has no Session at the Console to pick.
+func TestAnElementOnTheBoxPicksNoConsoleSession(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	s.nodeDID = &nodedid.Handler{PrivateKey: ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, ed25519.SeedSize))}
+	_, refused := s.holdElementAgent("agent-element")
+	require.Nil(t, refused)
+	_, refused = s.elementPickSession(context.Background(), sigil.Sent{"element": "agent-element", "session": "sesn_x"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.Says, "runs at no Console")
+	_, refused = s.elementPickSession(context.Background(), sigil.Sent{"element": "agent-element"})
+	require.NotNil(t, refused)
+	assert.Equal(t, "session", refused.Param)
+}
