@@ -215,16 +215,32 @@ func TestTwoFirstMessagesAtOnceAreOneContext(t *testing.T) {
 	require.NoError(t, os.WriteFile(held, nil, 0o600))
 	srv, tokens, _ := nodeAgentOverA2A(t, held)
 
-	contexts := make(chan any, 2)
+	// Each message is sent from its own goroutine and read here: require stops
+	// the test from its own goroutine alone, and a goroutine it stopped would
+	// leave this one waiting on its answer until the suite times out.
+	answers := make(chan *httptest.ResponseRecorder, 2)
 	for range 2 {
 		go func() {
-			_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("hi", `{"returnImmediately": true}`), tokens[auth.LevelRoot])
-			contexts <- at(sent, "task.contextId")
+			body := saidToTheNode("hi", `{"returnImmediately": true}`)
+			r := asBearer(http.MethodPost, "/a2a/message:send", tokens[auth.LevelRoot])
+			r.Body = io.NopCloser(strings.NewReader(body))
+			r.ContentLength = int64(len(body))
+			r.Header.Set("A2A-Version", "1.0")
+			w := httptest.NewRecorder()
+			srv.served.ServeHTTP(w, r)
+			answers <- w
 		}()
 	}
-	first, second := <-contexts, <-contexts
-	require.NotEmpty(t, first)
-	assert.Equal(t, first, second)
+	var contexts []any
+	for range 2 {
+		w := <-answers
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var sent map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &sent), w.Body.String())
+		contexts = append(contexts, at(sent, "task.contextId"))
+	}
+	require.NotEmpty(t, contexts[0])
+	assert.Equal(t, contexts[0], contexts[1])
 	require.NoError(t, os.Remove(held))
 }
 
