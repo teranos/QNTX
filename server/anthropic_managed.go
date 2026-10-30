@@ -96,6 +96,26 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 		return claudecode.Answer{}, err
 	}
 
+	// What the Console says of the turn is printed to a stream of the node's own, so
+	// live tails an agent at Anthropic as it tails one in Claude Code (agent_live.go).
+	mirror, err := claudecode.OpenMirror(agent.home, held.Session)
+	if err != nil {
+		return claudecode.Answer{}, err
+	}
+	defer func() {
+		if err := mirror.End(); err != nil {
+			s.logger.Errorw("the mirrored stream of a turn at Anthropic was not ended", "element", agent.element, "stream", mirror.Stream, "error", err)
+		}
+	}()
+	if said.Started != nil {
+		said.Started(mirror.Stream)
+	}
+	print := func(m claudecode.Message) {
+		if err := mirror.Print(m); err != nil {
+			s.logger.Errorw("a line of a turn at Anthropic was not mirrored", "element", agent.element, "stream", mirror.Stream, "error", err)
+		}
+	}
+
 	// The stream is opened before the message is sent: it has no replay.
 	stream := client.Beta.Sessions.Events.StreamEvents(ctx, held.Session, anthropic.BetaSessionEventStreamParams{})
 	defer stream.Close()
@@ -120,6 +140,7 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 				name = "mcp__" + event.MCPServerName + "__" + event.Name
 			}
 			if reached, err := reachedFor(event.ID, name, input); err == nil {
+				print(reached)
 				each(reached)
 			} else {
 				s.logger.Errorw("what an agent at Anthropic reached for was not shown", "element", agent.element, "tool", name, "error", err)
@@ -128,6 +149,7 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 			for _, block := range event.AsAgentMessage().Content {
 				if block.Type == "text" {
 					text = append(text, block.Text)
+					print(claudecode.TextMessage(block.Text))
 				}
 			}
 		case "session.error":
@@ -143,7 +165,9 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 			} else {
 				answer.CostUSD = spent
 			}
-			each(claudecode.Message{Type: "result", Subtype: "success", IsError: answer.IsError, Result: answer.Text})
+			result := claudecode.Message{Type: "result", Subtype: "success", IsError: answer.IsError, Result: answer.Text}
+			print(result)
+			each(result)
 			return answer, nil
 		}
 	}

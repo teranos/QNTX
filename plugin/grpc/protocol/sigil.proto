@@ -140,6 +140,8 @@ message ElementAgent {
   string session = 2;
   // Whether it is answering now.
   bool answering = 3;
+  // Its Session at Anthropic's Console, when it runs there (ADR-054), or empty.
+  string anthropic_session = 4;
 }
 
 // ElementAgents is what elements list answers: every element agent this node
