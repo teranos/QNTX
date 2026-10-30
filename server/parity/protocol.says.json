@@ -124,6 +124,7 @@
   "protocol.DaemonStatusMessage": "DaemonStatusMessage represents daemon status update sent to clients. Mirrors server.DaemonStatusMessage.",
   "protocol.ElementAgent": "ElementAgent is one element whose agent this node holds (ADR-054): named, and in a session when one was kept.",
   "protocol.ElementAgent.answering": "Whether it is answering now.",
+  "protocol.ElementAgent.anthropic_session": "Its Session at Anthropic's Console, when it runs there (ADR-054), or empty.",
   "protocol.ElementAgent.element": "The element, as it is said to.",
   "protocol.ElementAgent.session": "Its session in Claude Code, or empty before anything was said to it.",
   "protocol.ElementAgents": "ElementAgents is what elements list answers: every element agent this node holds, the stories' included, each by the element's name.",

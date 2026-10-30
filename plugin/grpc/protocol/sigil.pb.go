@@ -663,9 +663,11 @@ type ElementAgent struct {
 	// Its session in Claude Code, or empty before anything was said to it.
 	Session string `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
 	// Whether it is answering now.
-	Answering     bool `protobuf:"varint,3,opt,name=answering,proto3" json:"answering,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Answering bool `protobuf:"varint,3,opt,name=answering,proto3" json:"answering,omitempty"`
+	// Its Session at Anthropic's Console, when it runs there (ADR-054), or empty.
+	AnthropicSession string `protobuf:"bytes,4,opt,name=anthropic_session,json=anthropicSession,proto3" json:"anthropic_session,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ElementAgent) Reset() {
@@ -717,6 +719,13 @@ func (x *ElementAgent) GetAnswering() bool {
 		return x.Answering
 	}
 	return false
+}
+
+func (x *ElementAgent) GetAnthropicSession() string {
+	if x != nil {
+		return x.AnthropicSession
+	}
+	return ""
 }
 
 // ElementAgents is what elements list answers: every element agent this node
@@ -2784,11 +2793,12 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\rSessionEvents\x12.\n" +
 	"\x06events\x18\x01 \x03(\v2\x16.protocol.SessionEventR\x06events\x12\x12\n" +
 	"\x04live\x18\x02 \x01(\bR\x04live\x12\x12\n" +
-	"\x04mark\x18\x03 \x01(\x03R\x04mark\"`\n" +
+	"\x04mark\x18\x03 \x01(\x03R\x04mark\"\x8d\x01\n" +
 	"\fElementAgent\x12\x18\n" +
 	"\aelement\x18\x01 \x01(\tR\aelement\x12\x18\n" +
 	"\asession\x18\x02 \x01(\tR\asession\x12\x1c\n" +
-	"\tanswering\x18\x03 \x01(\bR\tanswering\"?\n" +
+	"\tanswering\x18\x03 \x01(\bR\tanswering\x12+\n" +
+	"\x11anthropic_session\x18\x04 \x01(\tR\x10anthropicSession\"?\n" +
 	"\rElementAgents\x12.\n" +
 	"\x06agents\x18\x01 \x03(\v2\x16.protocol.ElementAgentR\x06agents\"\xbd\x02\n" +
 	"\n" +

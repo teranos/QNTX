@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -188,5 +189,47 @@ func TestTailHandsEachLineAsItLandsAndMovesNoMark(t *testing.T) {
 	}
 	if string(mark) != "0" {
 		t.Errorf("the tail moved the turn's own mark to %s", mark)
+	}
+}
+
+// A turn that runs where no process prints a stream, an agent at Anthropic,
+// is mirrored by the node into one, and a tail reads it as any turn's.
+func TestAMirroredTurnIsTailedAsAnyTurnIs(t *testing.T) {
+	home := t.TempDir()
+	mirror, err := OpenMirror(home, "s-3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	landed := make(chan string, 8)
+	tailed := make(chan struct{})
+	var live bool
+	go func() {
+		defer close(tailed)
+		_, live, err = Tail(context.Background(), mirror.Stream, 0, func(line []byte, _ int64) { landed <- string(line) })
+	}()
+	if err := mirror.Print(TextMessage("Shaken.")); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-landed:
+		if !strings.Contains(got, `"text":"Shaken."`) {
+			t.Fatalf("the line handed over is %q", got)
+		}
+	case <-time.After(20 * followEvery):
+		t.Fatal("the mirrored line was not handed over while the turn ran")
+	}
+	if err := mirror.Print(Message{Type: "result", Subtype: "success", Result: "Shaken."}); err != nil {
+		t.Fatal(err)
+	}
+	<-landed
+	<-tailed
+	if err != nil || live {
+		t.Fatalf("Tail: err %v live %v", err, live)
+	}
+	if err := mirror.End(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(mirror.Stream); !os.IsNotExist(err) {
+		t.Errorf("the mirrored stream was not removed when the turn ended")
 	}
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -158,6 +159,13 @@ func (s *QNTXServer) elementsList(_ context.Context, _ sigil.Sent) (any, *protoc
 		}
 		if agent, ok := s.elementAgents.of(elementPurpose(element)); ok {
 			one.Answering = agent.in(s.claudeHarness()).answering.Load() != nil
+		}
+		// "so it means we need the SDK to list back sessions": its Session at the Console, when it runs there.
+		if kept, err := os.ReadFile(filepath.Join(filepath.Dir(name), managedElementFile)); err == nil {
+			var held managedOf
+			if json.Unmarshal(kept, &held) == nil {
+				one.AnthropicSession = held.Session
+			}
 		}
 		answer.Agents = append(answer.Agents, one)
 	}
