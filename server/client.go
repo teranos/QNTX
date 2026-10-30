@@ -749,8 +749,11 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		watcher.SemanticThreshold = msg.SemanticThreshold
 		watcher.SemanticClusterID = msg.SemanticClusterID
 	} else {
+		// An AX element shows what matches. It runs no code, so it tells: a
+		// Python action with none queued every match, and on a node without
+		// the python plugin the queue never let go of them.
 		watcher.AxQuery = msg.WatcherQuery
-		watcher.ActionType = storage.ActionTypePython // Default to Python action
+		watcher.ActionType = storage.ActionTypeTell
 	}
 
 	// Try to get existing watcher first
