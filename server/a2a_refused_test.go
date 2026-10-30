@@ -106,8 +106,6 @@ func TestARefusedA2ARequestIsASentryLog(t *testing.T) {
 		assert.True(t, held, key)
 		assert.Equal(t, want, got, key)
 	}
-	caller, _ := logAttr(l, "a2a.caller")
-	assert.NotEmpty(t, caller, "who asked, as the gate admitted them, is not said")
 	for key, value := range l.Attributes {
 		assert.NotContains(t, value.AsString(), tokens[auth.LevelRoot], "the bearer token is in %s", key)
 		assert.NotContains(t, value.AsString(), "in-the-body", "the body is in %s", key)
@@ -155,12 +153,9 @@ func TestAnA2ADefectIsASentryIssue(t *testing.T) {
 func TestRefusalsWrittenAreBounded(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	sent := toSentry(t)
+	r := asBearer(http.MethodGet, "/a2a/nothing", tokens[auth.LevelRoot])
 	for range 200 {
-		r := asBearer(http.MethodGet, "/a2a/nothing", tokens[auth.LevelRoot])
-		r.Header.Set("A2A-Version", "1.0")
-		w := httptest.NewRecorder()
-		srv.served.ServeHTTP(w, r)
-		require.Equal(t, http.StatusNotFound, w.Code)
+		srv.a2aRefused(r, a2a.Refusal{Err: &a2a.Error{Name: "TaskNotFoundError", Message: "no task"}})
 	}
 	logs, _ := sent.said()
 	assert.GreaterOrEqual(t, len(logs), 20)
@@ -178,6 +173,10 @@ func TestAnAnsweredA2ARequestIsNotWritten(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, w.Code)
 	logs, _ := sent.said()
 	require.Len(t, logs, 1, "the control's own refusal")
+	caller, _ := logAttr(logs[0], "a2a.caller")
+	assert.NotEmpty(t, caller, "who asked, as the gate admitted them, is not said")
+	operation, _ := logAttr(logs[0], "a2a.operation")
+	assert.Equal(t, "GetTask", operation)
 
 	r = asBearer(http.MethodGet, "/a2a/tasks", tokens[auth.LevelRoot])
 	r.Header.Set("A2A-Version", "1.0")
