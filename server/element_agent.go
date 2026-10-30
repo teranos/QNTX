@@ -3,13 +3,15 @@ package server
 import (
 	"context"
 	"net/http"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
-	"github.com/teranos/QNTX/internal/slug"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -115,6 +117,10 @@ func (s *QNTXServer) holdElementAgent(element string) (*rootAgent, *protocol.Ref
 	}
 	agent.namespace, agent.called, agent.element = auth.NamespaceSystem, "the element "+element, element
 	agent.sessionDir = filepath.Join(elementsDir, slug.Of(element))
+	// The element's name is kept beside its sessions, so the node lists it after a restart (elements list).
+	if err := agent.keepIn(filepath.Join(agent.sessionDir, elementNameFile), element); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + element + " was not written down: " + err.Error()}
+	}
 	// Its token is ROOT's kind, as the Node Agent's is: the element is ROOT's to shake.
 	if s.authHandler != nil {
 		if err := s.authHandler.HoldElementAgent(agent.token, agent.did, element); err != nil {
@@ -124,7 +130,41 @@ func (s *QNTXServer) holdElementAgent(element string) (*rootAgent, *protocol.Ref
 	return s.elementAgents.hold(purpose, agent), nil
 }
 
-// elementsSignum is an element's agent: say, am and session, each at the element's path.
+// elementNameFile is where an element agent's name is kept, beside its sessions.
+const elementNameFile = "element"
+
+// elementsList is every element agent this node holds, by the names kept under
+// its home.
+func (s *QNTXServer) elementsList(_ context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	// "the Agents Element as the main entry-point into all Agents that User has access to."
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
+	}
+	names, err := filepath.Glob(filepath.Join(s.nodeAgent.home, elementsDir, "*", elementNameFile))
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the element agents under " + s.nodeAgent.home + " did not list: " + err.Error()}
+	}
+	sort.Strings(names)
+	answer := &protocol.ElementAgents{Agents: []*protocol.ElementAgent{}}
+	for _, name := range names {
+		held, err := os.ReadFile(name)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: name + " did not read: " + err.Error()}
+		}
+		element := strings.TrimSpace(string(held))
+		one := &protocol.ElementAgent{Element: element}
+		if kept, err := os.ReadFile(filepath.Join(filepath.Dir(name), claudeSessionFile)); err == nil {
+			one.Session = strings.TrimSpace(string(kept))
+		}
+		if agent, ok := s.elementAgents.of(elementPurpose(element)); ok {
+			one.Answering = agent.in(s.claudeHarness()).answering.Load() != nil
+		}
+		answer.Agents = append(answer.Agents, one)
+	}
+	return answer, nil
+}
+
+// elementsSignum is an element's agent: list, say, am and session, each at the element's path.
 func (s *QNTXServer) elementsSignum() sigil.Signum {
 	claude := s.claudeHarness()
 	element := &protocol.Param{Name: "element", Required: true, Says: "The id of the element on screen: a canvas element id, or a tray element id such as agent-element."}
@@ -135,6 +175,12 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 			Description: "The element agent: each element is its own agent, and its own conversation, as ROOT speaks to it (ADR-054).",
 			Tags:        []string{"agent", "root"},
 			Sigils: []*protocol.Sigil{
+				{
+					Name:   "list",
+					Does:   "Every element agent this node holds, the stories' included, each by the element's name, with its session and whether it is answering.",
+					Answer: "protocol.ElementAgents",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/elements"},
+				},
 				{
 					Name:   "say",
 					Does:   "Says something to the element's agent and gives what it answered. One conversation that continues: shaken on day 3, it goes on from day 1. Runs as [agent.root] says.",
@@ -159,6 +205,7 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 			},
 		},
 		Answers: map[string]sigil.Answer{
+			"list":    s.elementsList,
 			"say":     s.elementSay,
 			"am":      s.elementAm,
 			"session": s.elementSession,

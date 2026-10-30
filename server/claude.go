@@ -261,7 +261,10 @@ func (s *QNTXServer) thereIsNoNodeAgent() *protocol.Refusal {
 }
 
 // claudeModels is every model a turn can be said to answer with.
-var claudeModels = []string{"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"}
+// After a tool result, Opus 5.5, Sonnet 5.5 and Fable 5.1 hold their text and
+// print it whole (anthropics/claude-code#96439); Sonnet 5 and Haiku 4.5 stream
+// it, so a turn watched live through tool calls is said with one of those.
+var claudeModels = []string{"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-sonnet-5", "claude-haiku-4-5"}
 
 // claudePart is Claude Code's part of one turn: run in the permission mode
 // whoever speaks names, or the one am.toml gives.

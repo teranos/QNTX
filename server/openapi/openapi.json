@@ -282,7 +282,17 @@
         "ROOT"
       ]
     },
+    "/api/elements": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/elements/{element}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/elements/{element}/live": {
       "x-qntx-reach": [
         "ROOT"
       ]
