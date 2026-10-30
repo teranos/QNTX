@@ -36,15 +36,38 @@ type Answer func(ctx context.Context, op Operation, request proto.Message) (prot
 // no trace anywhere else.
 type Undelivered func(what string, err error)
 
+// Refused is told of each request the binding answers with an error: what a
+// client asked that the node does not answer, which leaves no trace anywhere
+// else. "how would we know what things like chatGPT are trying to do and
+// call? Things it might expect"
+type Refused func(r *http.Request, refusal Refusal)
+
+// Refusal is one request the binding answered with an error: the operation it
+// matched, empty when none did, and the JSON-RPC method (§9) it called when it
+// was JSON-RPC, as the client wrote it.
+type Refusal struct {
+	Operation, JSONRPC string
+	Err                *Error
+}
+
 // Served is whether an agent is served at tenant (AgentInterface.tenant), or
 // why that was not answered.
 type Served func(tenant string) (bool, error)
 
 // HTTP serves the operations on their routes, relative to wherever it is
 // mounted. Every request is read the same way before any operation answers.
-func HTTP(operations []Operation, served Served, answer Answer, undelivered Undelivered) http.Handler {
+func HTTP(operations []Operation, served Served, answer Answer, undelivered Undelivered, told Refused) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		op, params, found := match(operations, r.Method, r.URL.Path)
+		jsonRPC := ""
+		refuse := func(refused *Error) {
+			operation := ""
+			if found {
+				operation = op.Name
+			}
+			told(r, Refusal{Operation: operation, JSONRPC: jsonRPC, Err: refused})
+			refused.write(w, undelivered)
+		}
 		// A tenant no agent is served at is a resource that does not exist, and
 		// answers as no operation does: "MUST return a not found error when a
 		// requested resource does not exist", and "SHOULD NOT distinguish
@@ -52,26 +75,27 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 		if tenant, named := params["tenant"]; found && named {
 			at, err := served(tenant)
 			if err != nil {
-				(&Error{Message: "whether an agent is served at tenant " + tenant + " was not answered: " + err.Error()}).write(w, undelivered)
+				refuse(&Error{Message: "whether an agent is served at tenant " + tenant + " was not answered: " + err.Error()})
 				return
 			}
 			found = at
 		}
 		if !found {
-			if refused := pushConfigured(r, served); refused != nil {
-				refused.write(w, undelivered)
-				return
+			jsonRPC = jsonRPCAsked(r)
+			said := ""
+			if jsonRPC != "" {
+				said = ": it is JSON-RPC " + strconv.Quote(jsonRPC) + ", and this node serves HTTP+JSON (§11)"
 			}
-			notFound(r.Method+" "+r.URL.Path+" is no A2A operation").write(w, undelivered)
+			refuse(notFound(r.Method + " " + r.URL.Path + " is no A2A operation" + said))
 			return
 		}
 		if refused := version(r); refused != nil {
-			refused.write(w, undelivered)
+			refuse(refused)
 			return
 		}
 		request, refused := read(op, r, params)
 		if refused != nil {
-			refused.write(w, undelivered)
+			refuse(refused)
 			return
 		}
 		// A tenant can arrive in the query or the body as well as the path, and
@@ -79,32 +103,32 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 		if tenant, named := TenantOf(request); named {
 			at, err := served(tenant)
 			if err != nil {
-				(&Error{Message: "whether an agent is served at tenant " + tenant + " was not answered: " + err.Error()}).write(w, undelivered)
+				refuse(&Error{Message: "whether an agent is served at tenant " + tenant + " was not answered: " + err.Error()})
 				return
 			}
 			if !at {
-				notFound("no agent is served at tenant "+tenant).write(w, undelivered)
+				refuse(notFound("no agent is served at tenant " + tenant))
 				return
 			}
 		}
 		if refused := lacking(op, request); refused != nil {
-			refused.write(w, undelivered)
+			refuse(refused)
 			return
 		}
 		response, refused := answer(r.Context(), op, request)
 		if refused != nil {
-			refused.write(w, undelivered)
+			refuse(refused)
 			return
 		}
 		if op.Streams {
 			// A stream is Server-Sent Events (§11.7), and no operation here
 			// streams yet.
-			(&Error{Name: "InvalidAgentResponseError", Message: op.Name + " answered without a stream"}).write(w, undelivered)
+			refuse(&Error{Name: "InvalidAgentResponseError", Message: op.Name + " answered without a stream"})
 			return
 		}
 		body, err := marshalled(response)
 		if err != nil {
-			(&Error{Name: "InvalidAgentResponseError", Message: err.Error()}).write(w, undelivered)
+			refuse(&Error{Name: "InvalidAgentResponseError", Message: err.Error()})
 			return
 		}
 		if op.Name == getExtendedAgentCard && cached(w, r, body) {
@@ -115,40 +139,6 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			undelivered(op.Name, err)
 		}
 	})
-}
-
-// pushConfigured is how a push notification config operation is answered,
-// nil for a request that is none: PushNotificationNotSupportedError, as the
-// card says capabilities.pushNotifications is false, and not found at a tenant
-// no agent is served at (§3.3.2).
-func pushConfigured(r *http.Request, served Served) *Error {
-	routes, err := pushConfigRoutes()
-	if err != nil {
-		return &Error{Message: "the push notification config routes did not read from the pinned spec: " + err.Error()}
-	}
-	for _, route := range routes {
-		if route.Method != r.Method {
-			continue
-		}
-		params, ok := matchPath(route.Path, r.URL.Path)
-		if !ok {
-			continue
-		}
-		if tenant, named := params["tenant"]; named {
-			at, err := served(tenant)
-			if err != nil {
-				return &Error{Message: "whether an agent is served at tenant " + tenant + " was not answered: " + err.Error()}
-			}
-			if !at {
-				return notFound("no agent is served at tenant " + tenant)
-			}
-		}
-		if refused := version(r); refused != nil {
-			return refused
-		}
-		return PushNotificationNotSupported()
-	}
-	return nil
 }
 
 // getExtendedAgentCard is the operation whose card is the caller's own.
@@ -406,4 +396,40 @@ func queried(message protoreflect.MessageDescriptor, r *http.Request) (map[strin
 		}
 	}
 	return values, nil
+}
+
+// jsonRPCAsked is the method a JSON-RPC request (§9) called, empty for anything
+// else: the node serves the HTTP+JSON binding (§11) alone, so a JSON-RPC client
+// is told which method it called. A method is a name: anything longer than one,
+// or holding what no name holds, is not taken as one.
+func jsonRPCAsked(r *http.Request) string {
+	if r.Body == nil || r.Method != http.MethodPost {
+		return ""
+	}
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<16))
+	if err != nil {
+		return ""
+	}
+	var asked struct {
+		JSONRPC string `json:"jsonrpc"`
+		Method  string `json:"method"`
+	}
+	if json.Unmarshal(raw, &asked) != nil || asked.JSONRPC == "" || !aMethodName(asked.Method) {
+		return ""
+	}
+	return asked.Method
+}
+
+// aMethodName is whether s is a name a JSON-RPC method is called by: at most 64
+// letters, digits and . _ / -.
+func aMethodName(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '_' || c == '/' || c == '-') {
+			return false
+		}
+	}
+	return true
 }

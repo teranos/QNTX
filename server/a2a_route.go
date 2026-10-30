@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/a2a"
@@ -25,9 +27,9 @@ import (
 // over A2A is a2a:<signum> lines (ADR-039), asked when a message reaches one.
 const a2aPrefix = "/a2a/"
 
-// The operations the node does: the card its caller reaches (§3.1.11), and at
-// no tenant a message sent to the Node Agent and the Tasks it is (§3.1.1,
-// §3.1.3, §3.1.4, §3.1.5).
+// The operations the node does: the card its caller reaches (§3.1.11), and a
+// message sent to an agent and the Tasks it is (§3.1.1, §3.1.3, §3.1.4,
+// §3.1.5), and their push notification configs (a2a_push.go).
 const (
 	getExtendedAgentCard = "GetExtendedAgentCard"
 	sendMessage          = "SendMessage"
@@ -53,7 +55,11 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	// the agents served at a tenant are the caller's too, so the binding is
 	// made for each request.
 	return func(w http.ResponseWriter, r *http.Request) {
-		binding := a2a.HTTP(operations, s.a2aServed(r), s.a2aAnswer(r), undelivered)
+		// One id per request, answered to the client, so what it reports names what the node wrote down.
+		id := uuid.NewString()
+		w.Header().Set("X-Request-Id", id)
+		r = r.WithContext(logger.WithRequestID(r.Context(), id))
+		binding := a2a.HTTP(operations, s.a2aServed(r), s.a2aAnswer(r), undelivered, s.a2aRefused)
 		http.StripPrefix(a2aPrefix[:len(a2aPrefix)-1], binding).ServeHTTP(w, r)
 	}
 }
@@ -116,7 +122,7 @@ func (s *QNTXServer) a2aAnswer(r *http.Request) a2a.Answer {
 				return s.namespaceAgentCard(r, tenant)
 			}
 			return s.extendedCard(r)
-		case sendMessage, getTask, listTasks, cancelTask:
+		case sendMessage, getTask, listTasks, cancelTask, createPush, getPush, listPushes, deletePush:
 		default:
 			return nil, a2a.Unsupported(op)
 		}
@@ -131,6 +137,14 @@ func (s *QNTXServer) a2aAnswer(r *http.Request) a2a.Answer {
 			return s.getTask(ta, request)
 		case listTasks:
 			return s.listTasks(ta, request)
+		case createPush:
+			return s.createTaskPush(r, ta, request)
+		case getPush:
+			return s.getTaskPush(ta, request)
+		case listPushes:
+			return s.listTaskPushes(ta, request)
+		case deletePush:
+			return s.deleteTaskPush(r, ta, request)
 		}
 		return s.cancelTask(r, ta, request)
 	}
