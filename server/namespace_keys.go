@@ -240,57 +240,68 @@ func (s *QNTXServer) keyValue(namespace, name string) (string, error) {
 	return s.unsealKey(namespace, sealed)
 }
 
-// keySealer is the AEAD a namespace's keys are sealed with: AES-256-GCM under
-// a key derived from the node's own for that namespace.
-func (s *QNTXServer) keySealer(namespace string) (cipher.AEAD, error) {
-	node, err := named.Pointed("this node's key, which the keys of "+namespace+" are sealed under,", s.nodeDID)
+// sealerOf is the AEAD what is sealed for the purpose in a namespace is sealed
+// with: AES-256-GCM under a key derived from the node's own for both.
+func (s *QNTXServer) sealerOf(purpose, namespace string) (cipher.AEAD, error) {
+	node, err := named.Pointed("this node's key, which the "+purpose+" of "+namespace+" are sealed under,", s.nodeDID)
 	if err != nil {
 		return nil, err
 	}
-	derived, err := access.DeriveKey(node.PrivateKey, "keys:"+slug.Of(namespace))
+	derived, err := access.DeriveKey(node.PrivateKey, purpose+":"+slug.Of(namespace))
 	if err != nil {
-		return nil, errors.Wrapf(err, "no key to seal the keys of %s under", namespace)
+		return nil, errors.Wrapf(err, "no key to seal the %s of %s under", purpose, namespace)
 	}
 	block, err := aes.NewCipher(derived.Seed())
 	if err != nil {
-		return nil, errors.Wrapf(err, "the keys of %s have no cipher", namespace)
+		return nil, errors.Wrapf(err, "the %s of %s have no cipher", purpose, namespace)
 	}
 	return cipher.NewGCM(block)
 }
 
 // sealKey is value sealed for the namespace: the nonce, then what was sealed.
 func (s *QNTXServer) sealKey(namespace, value string) (string, error) {
-	aead, err := s.keySealer(namespace)
+	return s.sealFor("keys", namespace, value)
+}
+
+// unsealKey is what sealKey sealed for the namespace.
+func (s *QNTXServer) unsealKey(namespace, sealed string) (string, error) {
+	return s.unsealFor("keys", namespace, sealed)
+}
+
+// sealFor is value sealed for the purpose in the namespace: the nonce, then
+// what was sealed.
+func (s *QNTXServer) sealFor(purpose, namespace, value string) (string, error) {
+	aead, err := s.sealerOf(purpose, namespace)
 	if err != nil {
 		return "", err
 	}
 	nonce := make([]byte, aead.NonceSize())
 	read, err := rand.Read(nonce)
 	if err != nil {
-		return "", errors.Wrapf(err, "no nonce to seal a key of %s with", namespace)
+		return "", errors.Wrapf(err, "no nonce to seal the %s of %s with", purpose, namespace)
 	}
 	if read != len(nonce) {
-		return "", errors.Newf("the nonce to seal a key of %s with is %d bytes of %d", namespace, read, len(nonce))
+		return "", errors.Newf("the nonce to seal the %s of %s with is %d bytes of %d", purpose, namespace, read, len(nonce))
 	}
 	return base64.StdEncoding.EncodeToString(aead.Seal(nonce, nonce, []byte(value), []byte(namespace))), nil
 }
 
-// unsealKey is what sealKey sealed for the namespace.
-func (s *QNTXServer) unsealKey(namespace, sealed string) (string, error) {
-	aead, err := s.keySealer(namespace)
+// unsealFor is what sealFor sealed for the purpose in the namespace.
+func (s *QNTXServer) unsealFor(purpose, namespace, sealed string) (string, error) {
+	aead, err := s.sealerOf(purpose, namespace)
 	if err != nil {
 		return "", err
 	}
 	raw, err := base64.StdEncoding.DecodeString(sealed)
 	if err != nil {
-		return "", errors.Wrapf(err, "a key of %s is not sealed as the node seals one", namespace)
+		return "", errors.Wrapf(err, "the %s of %s are not sealed as the node seals them", purpose, namespace)
 	}
 	if len(raw) < aead.NonceSize() {
-		return "", errors.Newf("a key of %s is %d bytes, shorter than its nonce", namespace, len(raw))
+		return "", errors.Newf("what was sealed of the %s of %s is %d bytes, shorter than its nonce", purpose, namespace, len(raw))
 	}
 	opened, err := aead.Open(nil, raw[:aead.NonceSize()], raw[aead.NonceSize():], []byte(namespace))
 	if err != nil {
-		return "", errors.Wrapf(err, "a key of %s does not open under the node's key for it", namespace)
+		return "", errors.Wrapf(err, "what was sealed of the %s of %s does not open under the node's key for them", purpose, namespace)
 	}
 	return string(opened), nil
 }

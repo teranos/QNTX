@@ -170,6 +170,10 @@ func TestATaskReturnedImmediatelyIsAnsweredByItsIdWhenItEnds(t *testing.T) {
 	assert.Contains(t, []any{"TASK_STATE_SUBMITTED", "TASK_STATE_WORKING"}, at(sent, "task.status.state"))
 	assert.Nil(t, at(sent, "task.artifacts"))
 	id := at(sent, "task.id").(string)
+	// The first message: the session it generates is in the answer, before its
+	// turn has run (§3.4.1).
+	context, _ := at(sent, "task.contextId").(string)
+	require.NotEmpty(t, context, "a generated contextId MUST be included in the response")
 
 	// "Indicates that a task is actively being processed by the agent."
 	var working map[string]any
@@ -188,6 +192,56 @@ func TestATaskReturnedImmediatelyIsAnsweredByItsIdWhenItEnds(t *testing.T) {
 	assert.Equal(t, "Up 3 days.", at(got, "artifacts.0.parts.0.text"))
 	// Working, it was in the session its turn ran in.
 	assert.Equal(t, after(ranWith(t, ran, "0", "args"), "--session-id"), at(working, "contextId"))
+	assert.Equal(t, context, after(ranWith(t, ran, "0", "args"), "--session-id"), "the turn ran in another session than the one answered")
+}
+
+// A first message in a context that is not the agent's is refused, and keeps no session (§3.4.1).
+func TestAFirstMessageInAnotherContextKeepsNoSession(t *testing.T) {
+	srv, tokens, ran := nodeAgentOverA2A(t, "")
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send",
+		`{"message": {"messageId": "m", "role": "ROLE_USER", "contextId": "another", "parts": [{"text": "hi"}]}}`, tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusBadRequest, code, answered)
+	_, kept, err := srv.nodeAgent.sessionIn(srv.nodeAgent.in(srv.claudeHarness()).file)
+	require.NoError(t, err)
+	assert.False(t, kept, "a refused context generated a session")
+	entries, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "something refused was said to the Node Agent")
+}
+
+// Two first messages at once are one session: each Task answers the same context.
+func TestTwoFirstMessagesAtOnceAreOneContext(t *testing.T) {
+	held := filepath.Join(t.TempDir(), "held")
+	require.NoError(t, os.WriteFile(held, nil, 0o600))
+	srv, tokens, _ := nodeAgentOverA2A(t, held)
+
+	// Each message is sent from its own goroutine and read here: require stops
+	// the test from its own goroutine alone, and a goroutine it stopped would
+	// leave this one waiting on its answer until the suite times out.
+	answers := make(chan *httptest.ResponseRecorder, 2)
+	for range 2 {
+		go func() {
+			body := saidToTheNode("hi", `{"returnImmediately": true}`)
+			r := asBearer(http.MethodPost, "/a2a/message:send", tokens[auth.LevelRoot])
+			r.Body = io.NopCloser(strings.NewReader(body))
+			r.ContentLength = int64(len(body))
+			r.Header.Set("A2A-Version", "1.0")
+			w := httptest.NewRecorder()
+			srv.served.ServeHTTP(w, r)
+			answers <- w
+		}()
+	}
+	var contexts []any
+	for range 2 {
+		w := <-answers
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var sent map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &sent), w.Body.String())
+		contexts = append(contexts, at(sent, "task.contextId"))
+	}
+	require.NotEmpty(t, contexts[0])
+	assert.Equal(t, contexts[0], contexts[1])
+	require.NoError(t, os.Remove(held))
 }
 
 // What the Node Agent does not take is refused before anything is said to it.
@@ -219,9 +273,9 @@ func TestWhatTheNodeAgentDoesNotTakeIsRefused(t *testing.T) {
 		{"a task that ended",
 			`{"message": {"messageId": "m", "role": "ROLE_USER", "taskId": "` + finished + `", "parts": [{"text": "hi"}]}}`,
 			http.StatusBadRequest, "UNSUPPORTED_OPERATION"},
-		{"a push notification",
-			saidToTheNode("hi", `{"taskPushNotificationConfig": {"url": "https://example.org/hook"}}`),
-			http.StatusBadRequest, "PUSH_NOTIFICATION_NOT_SUPPORTED"},
+		{"a push notification to a private address",
+			saidToTheNode("hi", `{"taskPushNotificationConfig": {"url": "http://10.0.0.1/hook"}}`),
+			http.StatusBadRequest, "no public address"},
 	} {
 		code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", refused.body, tokens[auth.LevelRoot])
 		assert.Equal(t, refused.code, code, refused.what)
@@ -286,8 +340,8 @@ func TestATaskWhoseTurnTheLastNodeLeftIsSettledFromItsStream(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	before := time.Now().Add(-time.Minute)
 	stream := leftTurn(t, srv.nodeAgent, "s-left", claudeAnswered)
-	require.NoError(t, srv.writeTaskLine("left", "TASK_STATE_SUBMITTED", "someone", before, map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
-	require.NoError(t, srv.writeTaskLine("left", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-left", "stream": filepath.Base(stream)}, streamContext(stream)))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "left", "TASK_STATE_SUBMITTED", "someone", before, map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "left", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-left", "stream": filepath.Base(stream)}, streamContext(stream)))
 
 	readingOn(srv, time.Now())
 
@@ -305,10 +359,10 @@ func TestATaskNoTurnIsLeftToEndIsFailed(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	before, since := time.Now().Add(-time.Minute), time.Now()
 	message := map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}
-	require.NoError(t, srv.writeTaskLine("waiting", "TASK_STATE_SUBMITTED", "someone", before, message))
-	require.NoError(t, srv.writeTaskLine("running", "TASK_STATE_SUBMITTED", "someone", before, message))
-	require.NoError(t, srv.writeTaskLine("running", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-gone", "stream": "s-gone.1.stream"}, streamContext("s-gone.1.stream")))
-	require.NoError(t, srv.writeTaskLine("mine", "TASK_STATE_SUBMITTED", "someone", since.Add(time.Second), message))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "waiting", "TASK_STATE_SUBMITTED", "someone", before, message))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "running", "TASK_STATE_SUBMITTED", "someone", before, message))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "running", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-gone", "stream": "s-gone.1.stream"}, streamContext("s-gone.1.stream")))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "mine", "TASK_STATE_SUBMITTED", "someone", since.Add(time.Second), message))
 
 	readingOn(srv, since)
 
@@ -488,7 +542,7 @@ func TestATaskCanceledBeforeItsTurnStartsNeverStartsIt(t *testing.T) {
 func TestATaskThatEndedIsNotCanceled(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	_, done := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("remember 7", ""), tokens[auth.LevelRoot])
-	require.NoError(t, srv.writeTaskLine("waiting", "TASK_STATE_SUBMITTED", "someone", time.Now(), map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "waiting", "TASK_STATE_SUBMITTED", "someone", time.Now(), map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
 	code, _ := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/waiting:cancel", `{}`, tokens[auth.LevelRoot])
 	require.Equal(t, http.StatusOK, code)
 
@@ -502,4 +556,24 @@ func TestATaskThatEndedIsNotCanceled(t *testing.T) {
 		assert.Contains(t, string(said), says, id)
 		assert.NotEqual(t, http.StatusOK, code, id)
 	}
+}
+
+// "Agents MUST validate all input parameters before processing" (§13): a
+// negative historyLength is refused wherever it is asked, as ListTasks refuses
+// it, and nothing is said to the Node Agent.
+func TestANegativeHistoryLengthIsRefused(t *testing.T) {
+	srv, tokens, ran := nodeAgentOverA2A(t, "")
+	_, done := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("remember 7", ""), tokens[auth.LevelRoot])
+	id := at(done, "task.id").(string)
+
+	code, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id+"?historyLength=-5", "", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusBadRequest, code, got)
+	assert.Contains(t, at(got, "error.message"), "historyLength must be a non-negative integer, got -5")
+
+	code, got = a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("again", `{"historyLength": -5}`), tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusBadRequest, code, got)
+	assert.Contains(t, at(got, "error.message"), "historyLength must be a non-negative integer, got -5")
+	entries, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "a refused message was said to the Node Agent")
 }
