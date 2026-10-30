@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/a2a"
@@ -53,9 +54,34 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	// the agents served at a tenant are the caller's too, so the binding is
 	// made for each request.
 	return func(w http.ResponseWriter, r *http.Request) {
-		binding := a2a.HTTP(operations, s.a2aServed(r), s.a2aAnswer(r), undelivered)
+		binding := a2a.HTTP(operations, s.a2aServed(r), s.a2aAnswer(r), undelivered, s.a2aRefused)
 		http.StripPrefix(a2aPrefix[:len(a2aPrefix)-1], binding).ServeHTTP(w, r)
 	}
+}
+
+// a2aRefused writes down an A2A request the node answered with an error, as
+// the client sent it: "how would we know what things like chatGPT are trying
+// to do and call? Things it might expect". The gate's own refusals are
+// written where it refuses (rejectOutOfReach).
+func (s *QNTXServer) a2aRefused(r *http.Request, refused *a2a.Error) {
+	status, reason := refused.Said()
+	version := r.Header.Get("A2A-Version")
+	if version == "" {
+		version = r.URL.Query().Get("A2A-Version")
+	}
+	s.logger.Infow("An A2A request was refused",
+		"method", r.Method,
+		"path", a2aPrefix[:len(a2aPrefix)-1]+r.URL.Path,
+		"a2a_version", version,
+		"user_agent", r.UserAgent(),
+		"content_type", r.Header.Get("Content-Type"),
+		"caller", spokenBy(r),
+		"status", status,
+		"reason", reason,
+		"says", refused.Message)
+	measure.Count(measure.A2ARefused, 1,
+		measure.String(measure.AttrOutcome, reason),
+		measure.String(measure.AttrMethod, r.Method))
 }
 
 // a2aServed is whether an agent is served at tenant for the caller of r. The

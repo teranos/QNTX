@@ -55,7 +55,7 @@ func serve(t *testing.T, answer Answer, method, path, body string, header map[st
 		r.Header.Set(k, v)
 	}
 	w := httptest.NewRecorder()
-	HTTP(operations, garden, answer, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }).ServeHTTP(w, r)
+	HTTP(operations, garden, answer, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }, func(*http.Request, *Error) {}).ServeHTTP(w, r)
 	var said status
 	_ = json.Unmarshal(w.Body.Bytes(), &said)
 	return w, said
@@ -305,8 +305,53 @@ func TestATenantThatCouldNotBeAskedIsAnError(t *testing.T) {
 	r := httptest.NewRequest("GET", "/garden/extendedAgentCard", nil)
 	r.Header.Set("A2A-Version", "1.0")
 	w := httptest.NewRecorder()
-	HTTP(operations, broken, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }).ServeHTTP(w, r)
+	HTTP(operations, broken, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }, func(*http.Request, *Error) {}).ServeHTTP(w, r)
 	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "the store did not answer") {
 		t.Errorf("a tenant that could not be asked answered %d %s", w.Code, w.Body.String())
+	}
+}
+
+// Every request the binding answers with an error is told, as the client sent
+// it and with the reason it was answered: "how would we know what things like
+// chatGPT are trying to do and call?"
+func TestEveryRefusalIsTold(t *testing.T) {
+	operations, err := Operations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		method, path, body, version, reason string
+	}{
+		{"GET", "/nothing", "", "1.0", "NOT_FOUND"},
+		{"POST", "/message:send", sent, "", "VERSION_NOT_SUPPORTED"},
+		{"POST", "/message:send", `{"message": {}}`, "1.0", "INVALID_ARGUMENT"},
+		{"GET", "/tasks/abc", "", "1.0", "UNSUPPORTED_OPERATION"},
+	} {
+		var told *Error
+		var asked *http.Request
+		r := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
+		if c.version != "" {
+			r.Header.Set("A2A-Version", c.version)
+		}
+		w := httptest.NewRecorder()
+		HTTP(operations, garden, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) },
+			func(r *http.Request, refused *Error) { asked, told = r, refused }).ServeHTTP(w, r)
+		if told == nil {
+			t.Errorf("%s %s answered %d and was not told", c.method, c.path, w.Code)
+			continue
+		}
+		status, reason := told.Said()
+		if status != w.Code || reason != c.reason || asked.URL.Path != c.path {
+			t.Errorf("%s %s was told as %d %s at %s, and answered %d", c.method, c.path, status, reason, asked.URL.Path, w.Code)
+		}
+	}
+}
+
+// A JSON-RPC request (§9) is told the method it called and that the node
+// serves HTTP+JSON (§11).
+func TestAJSONRPCRequestIsToldWhatItCalled(t *testing.T) {
+	w, said := serve(t, unsupported, "POST", "/", `{"jsonrpc": "2.0", "id": 1, "method": "SendMessage", "params": {}}`, v1)
+	if w.Code != http.StatusNotFound || !strings.Contains(said.Error.Message, `JSON-RPC "SendMessage"`) {
+		t.Errorf("a JSON-RPC request answered %d %s", w.Code, w.Body.String())
 	}
 }

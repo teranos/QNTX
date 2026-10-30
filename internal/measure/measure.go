@@ -57,6 +57,11 @@ const (
 	// caller turned away from somewhere real.
 	RouteUnmatched = "qntx.route.unmatched"
 
+	// A2ARefused is one per A2A request the node answered with an error past
+	// the gate, sliced by its reason: what clients ask of A2A that the node
+	// does not answer, which no other count sees.
+	A2ARefused = "qntx.a2a.refused"
+
 	// QueueDepth is what Pulse is holding right now, and WorkersActive is how
 	// many are working it off. Either one alone says less than the pair: deep
 	// and busy is a node under load, deep and idle is a node that is stuck.

@@ -69,6 +69,18 @@ func notFound(message string) *Error {
 	return &Error{Message: message, status: http.StatusNotFound, grpc: "NOT_FOUND"}
 }
 
+// Said is how the error is answered: its HTTP status, and in a word the A2A
+// error's reason or the google.rpc code, a closed set either way.
+func (e *Error) Said() (int, string) {
+	if m, ok := mapped[e.Name]; ok {
+		return m.status, m.reason
+	}
+	if e.status == 0 {
+		return http.StatusInternalServerError, "INTERNAL"
+	}
+	return e.status, e.grpc
+}
+
 // write is §11.6: the google.rpc.Status JSON representation, the HTTP status
 // of §5.4, and for an A2A error an ErrorInfo naming it.
 func (e *Error) write(w http.ResponseWriter, undelivered Undelivered) {
