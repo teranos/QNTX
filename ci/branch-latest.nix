@@ -94,8 +94,11 @@
       }
 
       {
-        name = "Cache binary to Cachix";
-        run = "nix build .#qntx --print-out-paths --no-link | cachix push qntx";
+        name = "Cache binary and its Rust to Cachix";
+        # The Rust libraries and their compiled dependencies are build-time
+        # inputs of qntx, so pushing qntx alone never carried them: every node
+        # building qntx compiled every crate again.
+        run = "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --print-out-paths --no-link | cachix push qntx";
       }
 
       {

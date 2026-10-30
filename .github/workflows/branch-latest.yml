@@ -40,8 +40,8 @@
           "run": "echo \"Building QNTX for Linux ${{ matrix.arch }}...\"\nnix build .#qntx --print-build-logs\n"
         },
         {
-          "name": "Cache binary to Cachix",
-          "run": "nix build .#qntx --print-out-paths --no-link | cachix push qntx"
+          "name": "Cache binary and its Rust to Cachix",
+          "run": "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --print-out-paths --no-link | cachix push qntx"
         },
         {
           "name": "Package binary with bundled libduckdb",

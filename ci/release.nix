@@ -203,9 +203,11 @@ in
         }
 
         {
-          name = "Cache binary to Cachix";
+          name = "Cache binary and its Rust to Cachix";
           env.VERSION_TAG = "v\${{ steps.version.outputs.version }}";
-          run = "nix build .#qntx --impure --print-out-paths --no-link | cachix push qntx";
+          # The Rust is a build-time input of qntx, not in its closure; see
+          # branch-latest.nix.
+          run = "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --impure --print-out-paths --no-link | cachix push qntx";
         }
 
         {
