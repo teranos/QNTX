@@ -722,8 +722,9 @@ func (x *ElementAgent) GetAnswering() bool {
 // ElementAgents is what elements list answers: every element agent this node
 // holds, the stories' included, each by the element's name.
 type ElementAgents struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Agents        []*ElementAgent        `protobuf:"bytes,1,rep,name=agents,proto3" json:"agents,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Each element agent held, by the element's name.
+	Agents        []*ElementAgent `protobuf:"bytes,1,rep,name=agents,proto3" json:"agents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

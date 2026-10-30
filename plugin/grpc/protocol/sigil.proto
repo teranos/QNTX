@@ -145,6 +145,7 @@ message ElementAgent {
 // ElementAgents is what elements list answers: every element agent this node
 // holds, the stories' included, each by the element's name.
 message ElementAgents {
+  // Each element agent held, by the element's name.
   repeated ElementAgent agents = 1;
 }
 
