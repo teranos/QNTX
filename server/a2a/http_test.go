@@ -61,7 +61,7 @@ func serve(t *testing.T, answer Answer, method, path, body string, header map[st
 		r.Header.Set(k, v)
 	}
 	w := httptest.NewRecorder()
-	HTTP(operations, garden, answer, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }, func(*http.Request, *Error) {}).ServeHTTP(w, r)
+	HTTP(operations, garden, answer, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }, func(*http.Request, Refusal) {}).ServeHTTP(w, r)
 	var said status
 	_ = json.Unmarshal(w.Body.Bytes(), &said)
 	return w, said
@@ -305,7 +305,7 @@ func TestATenantThatCouldNotBeAskedIsAnError(t *testing.T) {
 	r := httptest.NewRequest("GET", "/garden/extendedAgentCard", nil)
 	r.Header.Set("A2A-Version", "1.0")
 	w := httptest.NewRecorder()
-	HTTP(operations, broken, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }, func(*http.Request, *Error) {}).ServeHTTP(w, r)
+	HTTP(operations, broken, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }, func(*http.Request, Refusal) {}).ServeHTTP(w, r)
 	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "the store did not answer") {
 		t.Errorf("a tenant that could not be asked answered %d %s", w.Code, w.Body.String())
 	}
@@ -320,14 +320,15 @@ func TestEveryRefusalIsTold(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range []struct {
-		method, path, body, version, reason string
+		method, path, body, version, reason, operation string
 	}{
-		{"GET", "/nothing", "", "1.0", "NOT_FOUND"},
-		{"POST", "/message:send", sent, "", "VERSION_NOT_SUPPORTED"},
-		{"POST", "/message:send", `{"message": {}}`, "1.0", "INVALID_ARGUMENT"},
-		{"GET", "/tasks/abc", "", "1.0", "UNSUPPORTED_OPERATION"},
+		{"GET", "/nothing", "", "1.0", "NOT_FOUND", ""},
+		{"POST", "/message:send", sent, "", "VERSION_NOT_SUPPORTED", "SendMessage"},
+		{"POST", "/message:send", `{"message": {}}`, "1.0", "INVALID_ARGUMENT", "SendMessage"},
+		{"GET", "/tasks/abc", "", "1.0", "UNSUPPORTED_OPERATION", "GetTask"},
 	} {
 		var told *Error
+		var operation string
 		var asked *http.Request
 		r := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
 		if c.version != "" {
@@ -335,13 +336,13 @@ func TestEveryRefusalIsTold(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 		HTTP(operations, garden, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) },
-			func(r *http.Request, refused *Error) { asked, told = r, refused }).ServeHTTP(w, r)
+			func(r *http.Request, refusal Refusal) { asked, told, operation = r, refusal.Err, refusal.Operation }).ServeHTTP(w, r)
 		if told == nil {
 			t.Errorf("%s %s answered %d and was not told", c.method, c.path, w.Code)
 			continue
 		}
 		status, reason := told.Said()
-		if status != w.Code || reason != c.reason || asked.URL.Path != c.path {
+		if status != w.Code || reason != c.reason || asked.URL.Path != c.path || operation != c.operation {
 			t.Errorf("%s %s was told as %d %s at %s, and answered %d", c.method, c.path, status, reason, asked.URL.Path, w.Code)
 		}
 	}
@@ -353,5 +354,17 @@ func TestAJSONRPCRequestIsToldWhatItCalled(t *testing.T) {
 	w, said := serve(t, unsupported, "POST", "/", `{"jsonrpc": "2.0", "id": 1, "method": "SendMessage", "params": {}}`, v1)
 	if w.Code != http.StatusNotFound || !strings.Contains(said.Error.Message, `JSON-RPC "SendMessage"`) {
 		t.Errorf("a JSON-RPC request answered %d %s", w.Code, w.Body.String())
+	}
+}
+
+// A JSON-RPC method is a name: one too long, or holding what no name holds, is
+// not said back.
+func TestAJSONRPCMethodThatIsNoNameIsNotSaidBack(t *testing.T) {
+	for _, method := range []string{strings.Repeat("a", 65), "Send\nMessage", "<script>"} {
+		body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method})
+		w, said := serve(t, unsupported, "POST", "/", string(body), v1)
+		if w.Code != http.StatusNotFound || strings.Contains(said.Error.Message, "JSON-RPC") {
+			t.Errorf("a JSON-RPC method %q answered %d %s", method, w.Code, w.Body.String())
+		}
 	}
 }

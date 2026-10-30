@@ -58,9 +58,15 @@ const (
 	RouteUnmatched = "qntx.route.unmatched"
 
 	// A2ARefused is one per A2A request the node answered with an error past
-	// the gate, sliced by its reason: what clients ask of A2A that the node
-	// does not answer, which no other count sees.
+	// the gate, sliced by its reason, its kind, the binding and version the
+	// client spoke: what clients ask of A2A that the node does not answer, which
+	// no other count sees. Every one is counted, written down or not.
 	A2ARefused = "qntx.a2a.refused"
+
+	// A2ARefusedUnwritten is one per refusal counted and not written down as a
+	// log or an issue, because the refusals of its kind already written this
+	// minute were as many as are written.
+	A2ARefusedUnwritten = "qntx.a2a.refused.unwritten"
 
 	// QueueDepth is what Pulse is holding right now, and WorkersActive is how
 	// many are working it off. Either one alone says less than the pair: deep
@@ -217,6 +223,15 @@ const (
 	// AttrMethod is the request's HTTP verb. Bounded: a handful of methods,
 	// never a caller-chosen string.
 	AttrMethod = "method"
+
+	// AttrKind is what a refusal was: expected, a client asking what the node
+	// does not answer, or a defect, the node failing what it should answer.
+	AttrKind = "kind"
+
+	// AttrBinding and AttrVersion are the A2A binding and version a client
+	// spoke, each one of a few words.
+	AttrBinding = "binding"
+	AttrVersion = "version"
 
 	// AttrWhole is whether a take-in read the whole record or from its mark
 	// on: "true" or "false".

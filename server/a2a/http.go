@@ -40,7 +40,15 @@ type Undelivered func(what string, err error)
 // client asked that the node does not answer, which leaves no trace anywhere
 // else. "how would we know what things like chatGPT are trying to do and
 // call? Things it might expect"
-type Refused func(r *http.Request, refused *Error)
+type Refused func(r *http.Request, refusal Refusal)
+
+// Refusal is one request the binding answered with an error: the operation it
+// matched, empty when none did, and the JSON-RPC method (§9) it called when it
+// was JSON-RPC, as the client wrote it.
+type Refusal struct {
+	Operation, JSONRPC string
+	Err                *Error
+}
 
 // Served is whether an agent is served at tenant (AgentInterface.tenant), or
 // why that was not answered.
@@ -50,11 +58,16 @@ type Served func(tenant string) (bool, error)
 // mounted. Every request is read the same way before any operation answers.
 func HTTP(operations []Operation, served Served, answer Answer, undelivered Undelivered, told Refused) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		op, params, found := match(operations, r.Method, r.URL.Path)
+		jsonRPC := ""
 		refuse := func(refused *Error) {
-			told(r, refused)
+			operation := ""
+			if found {
+				operation = op.Name
+			}
+			told(r, Refusal{Operation: operation, JSONRPC: jsonRPC, Err: refused})
 			refused.write(w, undelivered)
 		}
-		op, params, found := match(operations, r.Method, r.URL.Path)
 		// A tenant no agent is served at is a resource that does not exist, and
 		// answers as no operation does: "MUST return a not found error when a
 		// requested resource does not exist", and "SHOULD NOT distinguish
@@ -68,7 +81,12 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			found = at
 		}
 		if !found {
-			refuse(notFound(r.Method + " " + r.URL.Path + " is no A2A operation" + jsonRPCAsked(r)))
+			jsonRPC = jsonRPCAsked(r)
+			said := ""
+			if jsonRPC != "" {
+				said = ": it is JSON-RPC " + strconv.Quote(jsonRPC) + ", and this node serves HTTP+JSON (§11)"
+			}
+			refuse(notFound(r.Method + " " + r.URL.Path + " is no A2A operation" + said))
 			return
 		}
 		if refused := version(r); refused != nil {
@@ -380,10 +398,10 @@ func queried(message protoreflect.MessageDescriptor, r *http.Request) (map[strin
 	return values, nil
 }
 
-// jsonRPCAsked is what a JSON-RPC request (§9) asked, said after a path no
-// operation answers: the node serves the HTTP+JSON binding (§11) alone, so a
-// JSON-RPC client is told which method it called, and the node learns it.
-// Empty for anything else.
+// jsonRPCAsked is the method a JSON-RPC request (§9) called, empty for anything
+// else: the node serves the HTTP+JSON binding (§11) alone, so a JSON-RPC client
+// is told which method it called. A method is a name: anything longer than one,
+// or holding what no name holds, is not taken as one.
 func jsonRPCAsked(r *http.Request) string {
 	if r.Body == nil || r.Method != http.MethodPost {
 		return ""
@@ -396,8 +414,22 @@ func jsonRPCAsked(r *http.Request) string {
 		JSONRPC string `json:"jsonrpc"`
 		Method  string `json:"method"`
 	}
-	if json.Unmarshal(raw, &asked) != nil || asked.JSONRPC == "" || asked.Method == "" {
+	if json.Unmarshal(raw, &asked) != nil || asked.JSONRPC == "" || !aMethodName(asked.Method) {
 		return ""
 	}
-	return ": it is JSON-RPC " + strconv.Quote(asked.Method) + ", and this node serves HTTP+JSON (§11)"
+	return asked.Method
+}
+
+// aMethodName is whether s is a name a JSON-RPC method is called by: at most 64
+// letters, digits and . _ / -.
+func aMethodName(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '_' || c == '/' || c == '-') {
+			return false
+		}
+	}
+	return true
 }
