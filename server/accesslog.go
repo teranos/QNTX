@@ -120,12 +120,18 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		// Middleware passes the admission down on a copy of the request, so the
 		// one this layer holds never learns it. The sink is where it is written.
 		ctx, seen := auth.WithAdmissionSink(r.Context())
+		ctx, said := withRefusalSaid(ctx)
 		next(recorder, r.WithContext(withStarted(ctx, start)))
 
 		took := time.Since(start)
 		// Counted before the heartbeat check, or the row would report only the
 		// refusals that were also worth a log line.
 		s.answers.note(recorder.status)
+
+		// A refusal Sentry is told of is said there, bounded, and not again here.
+		if said.Load() {
+			return
+		}
 
 		// A polled path says something when its answer turns, and nothing while
 		// it stays the same.

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/a2a"
@@ -53,7 +55,11 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	// the agents served at a tenant are the caller's too, so the binding is
 	// made for each request.
 	return func(w http.ResponseWriter, r *http.Request) {
-		binding := a2a.HTTP(operations, s.a2aServed(r), s.a2aAnswer(r), undelivered)
+		// One id per request, answered to the client, so what it reports names what the node wrote down.
+		id := uuid.NewString()
+		w.Header().Set("X-Request-Id", id)
+		r = r.WithContext(logger.WithRequestID(r.Context(), id))
+		binding := a2a.HTTP(operations, s.a2aServed(r), s.a2aAnswer(r), undelivered, s.a2aRefused)
 		http.StripPrefix(a2aPrefix[:len(a2aPrefix)-1], binding).ServeHTTP(w, r)
 	}
 }
