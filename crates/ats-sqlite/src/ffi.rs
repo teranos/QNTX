@@ -659,6 +659,41 @@ pub extern "C" fn read_conn_count(rc: *const ReadConn) -> CountResultC {
     })
 }
 
+/// Whether any attestation is held, as a count of 0 or 1: one row read, where
+/// COUNT(*) reads them all.
+const HOLDS_ANY: &str = "SELECT EXISTS(SELECT 1 FROM attestations)";
+
+fn holds_any(conn: &rusqlite::Connection) -> CountResultC {
+    match conn.query_row(HOLDS_ANY, [], |row| row.get::<_, bool>(0)) {
+        Ok(held) => CountResultC::ok(usize::from(held)),
+        Err(e) => CountResultC::error(e.to_string()),
+    }
+}
+
+/// Whether any attestation is held, through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_holds_any(rc: *const ReadConn) -> CountResultC {
+    qntx_ffi_common::guarded_result("read_conn_holds_any", || {
+        if rc.is_null() {
+            return CountResultC::error("null read connection");
+        }
+        holds_any(&unsafe { &*rc }.conn)
+    })
+}
+
+/// Whether any attestation is held, through the store's own connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_holds_any(store: *const SqliteStore) -> CountResultC {
+    qntx_ffi_common::guarded_result("storage_holds_any", || {
+        if store.is_null() {
+            return CountResultC::error("null store pointer");
+        }
+        holds_any(unsafe { &*store }.connection())
+    })
+}
+
 /// Get distinct predicates through the read connection.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]

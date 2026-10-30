@@ -556,6 +556,30 @@ func (rs *RustStore) CountAttestations() (int, error) {
 	return int(result.count), nil
 }
 
+// HoldsAny says whether any attestation is held, reading one row where a count reads them all.
+func (rs *RustStore) HoldsAny() (bool, error) {
+	var result C.CountResultC
+	entry := rs.acquireReadConn()
+	if entry != nil {
+		result = C.read_conn_holds_any(entry.conn)
+		rs.releaseReadConn(entry)
+	} else {
+		rs.muWrite.Lock()
+		if rs.closed {
+			rs.muWrite.Unlock()
+			return false, errors.New("store is closed")
+		}
+		result = C.storage_holds_any(rs.store)
+		rs.muWrite.Unlock()
+	}
+	defer C.count_result_free(result)
+
+	if !result.success {
+		return false, errors.New(C.GoString(result.error_msg))
+	}
+	return result.count > 0, nil
+}
+
 // putLocked stores an attestation without acquiring the lock (caller must hold muWrite).
 func (rs *RustStore) putLocked(jsonBytes []byte) error {
 	cJSON := C.CString(string(jsonBytes))

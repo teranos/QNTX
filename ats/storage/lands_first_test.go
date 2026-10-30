@@ -344,6 +344,36 @@ func TestAMarkOnAnEmptyFileIsNotBelieved(t *testing.T) {
 	assert.Equal(t, 1, done.TakenIn)
 }
 
+// uncountable answers whether it holds anything and refuses to count: k sat
+// in COUNT(*) over a 1.9 GB namespace for nine minutes and never listened.
+type uncountable struct{ *rawInOrder }
+
+func (u uncountable) CountAttestations() (int, error) {
+	return 0, errors.New("counting reads every row")
+}
+func (u uncountable) HoldsAny() (bool, error) { return len(u.held) > 0, nil }
+
+// "OH ON K THE SQLITE IS BUSY APPAREANTLY CAN YOU CHECK WHY"
+func TestATakeInAsksWhetherTheFileHoldsAnythingNotHowMuch(t *testing.T) {
+	var order []string
+	first := uncountable{newRawInOrder("operational db", &order)}
+	record := newRawInOrder("S3", &order)
+	first.held["AS-a"] = at("AS-a", 1)
+	record.held["AS-a"] = at("AS-a", 1)
+	record.held["AS-b"] = at("AS-b", 2)
+	mark := &memMark{at: at("AS-a", 1).Timestamp, marked: true}
+
+	done, err := TakeIn(first, record, mark)
+	require.NoError(t, err)
+	assert.False(t, done.Whole, "a file holding rows is behind its mark")
+	assert.Equal(t, 1, done.TakenIn)
+
+	empty := uncountable{newRawInOrder("empty operational db", &order)}
+	done, err = TakeIn(empty, record, &memMark{at: at("AS-b", 2).Timestamp, marked: true})
+	require.NoError(t, err)
+	assert.True(t, done.Whole, "a file holding nothing was trusted to be behind its mark")
+}
+
 func TestARecordThatDoesNotAnswerTakesNothingInAndMarksNothing(t *testing.T) {
 	var order []string
 	first := newRawInOrder("operational db", &order)
