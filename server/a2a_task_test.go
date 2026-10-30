@@ -286,8 +286,8 @@ func TestATaskWhoseTurnTheLastNodeLeftIsSettledFromItsStream(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	before := time.Now().Add(-time.Minute)
 	stream := leftTurn(t, srv.nodeAgent, "s-left", claudeAnswered)
-	require.NoError(t, srv.writeTaskLine("left", "TASK_STATE_SUBMITTED", "someone", before, map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
-	require.NoError(t, srv.writeTaskLine("left", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-left", "stream": filepath.Base(stream)}, streamContext(stream)))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "left", "TASK_STATE_SUBMITTED", "someone", before, map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "left", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-left", "stream": filepath.Base(stream)}, streamContext(stream)))
 
 	readingOn(srv, time.Now())
 
@@ -305,10 +305,10 @@ func TestATaskNoTurnIsLeftToEndIsFailed(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	before, since := time.Now().Add(-time.Minute), time.Now()
 	message := map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}
-	require.NoError(t, srv.writeTaskLine("waiting", "TASK_STATE_SUBMITTED", "someone", before, message))
-	require.NoError(t, srv.writeTaskLine("running", "TASK_STATE_SUBMITTED", "someone", before, message))
-	require.NoError(t, srv.writeTaskLine("running", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-gone", "stream": "s-gone.1.stream"}, streamContext("s-gone.1.stream")))
-	require.NoError(t, srv.writeTaskLine("mine", "TASK_STATE_SUBMITTED", "someone", since.Add(time.Second), message))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "waiting", "TASK_STATE_SUBMITTED", "someone", before, message))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "running", "TASK_STATE_SUBMITTED", "someone", before, message))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "running", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-gone", "stream": "s-gone.1.stream"}, streamContext("s-gone.1.stream")))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "mine", "TASK_STATE_SUBMITTED", "someone", since.Add(time.Second), message))
 
 	readingOn(srv, since)
 
@@ -488,7 +488,7 @@ func TestATaskCanceledBeforeItsTurnStartsNeverStartsIt(t *testing.T) {
 func TestATaskThatEndedIsNotCanceled(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	_, done := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("remember 7", ""), tokens[auth.LevelRoot])
-	require.NoError(t, srv.writeTaskLine("waiting", "TASK_STATE_SUBMITTED", "someone", time.Now(), map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "waiting", "TASK_STATE_SUBMITTED", "someone", time.Now(), map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
 	code, _ := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/waiting:cancel", `{}`, tokens[auth.LevelRoot])
 	require.Equal(t, http.StatusOK, code)
 
