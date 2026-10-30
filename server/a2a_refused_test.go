@@ -111,6 +111,25 @@ func TestARefusedA2ARequestIsASentryLog(t *testing.T) {
 		assert.NotContains(t, value.AsString(), "in-the-body", "the body is in %s", key)
 	}
 	assert.Empty(t, written.FilterMessageSnippet("refused").All(), "an expected refusal was written in the node's own log")
+	assert.Empty(t, written.FilterMessageSnippet("http POST /a2a/").All(), "the refusal was also an access log line")
+}
+
+// A request the gate turns away never reached the binding, and is the access log's to say.
+func TestAGateRefusalIsStillAnAccessLogLine(t *testing.T) {
+	srv, _, _ := nodeAgentOverA2A(t, "")
+	core, written := observer.New(zapcore.DebugLevel)
+	srv.logger = zap.New(core).Sugar()
+	sent := toSentry(t)
+	r := httptest.NewRequest(http.MethodGet, "/a2a/tasks", nil)
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
+	assert.Len(t, written.FilterMessage("http GET /a2a/tasks 401").All(), 1)
+	logs, _ := sent.said()
+	for _, l := range logs {
+		assert.NotEqual(t, "An A2A request was refused", l.Body, "the gate's refusal was said as the binding's")
+	}
 }
 
 // What the client says it is is cut short, and says nothing on more than one line.

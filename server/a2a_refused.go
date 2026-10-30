@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -48,8 +49,19 @@ func kindOf(refused *a2a.Error, status int) refusalKind {
 	return refusedExpected
 }
 
+// refusalSaidKey holds whether a refusal of the request was said to Sentry, so the access log says it no more.
+type refusalSaidKey struct{}
+
+func withRefusalSaid(ctx context.Context) (context.Context, *atomic.Bool) {
+	said := &atomic.Bool{}
+	return context.WithValue(ctx, refusalSaidKey{}, said), said
+}
+
 // a2aRefused counts every refused A2A request, and writes down as many as the limits let through.
 func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2a.Refusal) {
+	if said, held := r.Context().Value(refusalSaidKey{}).(*atomic.Bool); held {
+		said.Store(true)
+	}
 	status, reason := refusal.Err.Said()
 	kind := kindOf(refusal.Err, status)
 	binding := "http+json"
