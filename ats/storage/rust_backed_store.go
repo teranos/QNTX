@@ -29,13 +29,8 @@ type RustBackedStore struct {
 
 // CreateAttestation signs the attestation then delegates to Rust for INSERT.
 func (s *RustBackedStore) CreateAttestation(as *types.As) error {
-	warnIDLikeSubjects(s.log, as.ID, as.Subjects)
-
-	// Sign if we have a signer and the attestation isn't already signed
-	if signer := getDefaultSigner(); signer != nil {
-		if err := signer.Sign(as); err != nil {
-			return errors.Wrapf(err, "failed to sign attestation %s", as.ID)
-		}
+	if err := signBeforeStore(s.log, as); err != nil {
+		return err
 	}
 
 	if err := s.rust.CreateAttestation(as); err != nil {
@@ -213,12 +208,8 @@ func (s *RustBackedStore) BatchGenerateAndCreateAttestations(ctx context.Context
 // CreateAttestationHighPriority signs and stores with high priority.
 // POST handler uses this to jump ahead of queued plugin writes.
 func (s *RustBackedStore) CreateAttestationHighPriority(as *types.As) error {
-	warnIDLikeSubjects(s.log, as.ID, as.Subjects)
-
-	if signer := getDefaultSigner(); signer != nil {
-		if err := signer.Sign(as); err != nil {
-			return errors.Wrapf(err, "failed to sign attestation %s", as.ID)
-		}
+	if err := signBeforeStore(s.log, as); err != nil {
+		return err
 	}
 
 	if err := s.rust.CreateAttestationHighPriority(as); err != nil {
