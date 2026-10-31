@@ -13,6 +13,17 @@ import (
 // LandedHandlerName is the built-in a merged pull request reaches.
 const LandedHandlerName = "quote.landed"
 
+// The numbers the loop reads GitHub with, so none is read out of the code below.
+const (
+	// pageSize is how many a GitHub list is asked for at once: the most it gives.
+	pageSize = 100
+
+	// pageCeiling is how many pages of one list are read before the loop stops
+	// and says so, so an answer that ignores the page it was asked for cannot
+	// keep it reading.
+	pageCeiling = 50
+)
+
 // A Landing is a pull request that landed on its repository's default branch:
 // what the loop reads, measures, and answers with a pull request of its own.
 type Landing struct {
@@ -88,6 +99,13 @@ func (l *Landed) Correct(landing Landing) (Correction, error) {
 		if err != nil {
 			return done, err
 		}
+		// A project the node holds no namespace for has no prompts to read: its
+		// spans are unmeasured, not unsourced, and none is the agent's to claim.
+		if len(arrived.Spans) > 0 && !arrived.Known {
+			done.Spans, done.Files = nil, nil
+			done.Skipped = "the node holds no namespace for " + landing.Owner + "/" + landing.Repo + ", so none of its quotes is known to be a person's or an agent's"
+			return done, nil
+		}
 		for _, s := range arrived.Spans {
 			if s.Kind != "unsourced" {
 				continue
@@ -122,24 +140,30 @@ func (l *Landed) Correct(landing Landing) (Correction, error) {
 // checksGreen is whether every check run on the landing's head completed and
 // passed, and when not, why the landing is left alone.
 func (l *Landed) checksGreen(landing Landing) (bool, string, error) {
-	raw, err := l.ask("ListCheckRunsForAGitReference", map[string]any{"owner": landing.Owner, "repo": landing.Repo, "ref": landing.HeadSha})
+	type checkRun struct {
+		Name       string `json:"name"`
+		Status     string `json:"status"`
+		Conclusion string `json:"conclusion"`
+	}
+	var runs []checkRun
+	err := l.pages("ListCheckRunsForAGitReference", map[string]any{"owner": landing.Owner, "repo": landing.Repo, "ref": landing.HeadSha},
+		func(raw []byte) (int, error) {
+			var answered struct {
+				CheckRuns []checkRun `json:"check_runs"`
+			}
+			if err := json.Unmarshal(raw, &answered); err != nil {
+				return 0, errors.Wrap(err, "the check runs did not read")
+			}
+			runs = append(runs, answered.CheckRuns...)
+			return len(answered.CheckRuns), nil
+		})
 	if err != nil {
 		return false, "", err
 	}
-	var answered struct {
-		CheckRuns []struct {
-			Name       string `json:"name"`
-			Status     string `json:"status"`
-			Conclusion string `json:"conclusion"`
-		} `json:"check_runs"`
-	}
-	if err := json.Unmarshal(raw, &answered); err != nil {
-		return false, "", errors.Wrap(err, "the check runs did not read")
-	}
-	if len(answered.CheckRuns) == 0 {
+	if len(runs) == 0 {
 		return false, "no check ran on it", nil
 	}
-	for _, run := range answered.CheckRuns {
+	for _, run := range runs {
 		if run.Status != "completed" || (run.Conclusion != "success" && run.Conclusion != "neutral" && run.Conclusion != "skipped") {
 			return false, "check " + run.Name + " is " + run.Status + " " + run.Conclusion, nil
 		}
@@ -147,25 +171,48 @@ func (l *Landed) checksGreen(landing Landing) (bool, string, error) {
 	return true, "", nil
 }
 
+// pages reads a list GitHub answers a page at a time, handing each page to
+// read, which says how many it held, until a page comes back short.
+func (l *Landed) pages(operation string, request map[string]any, read func(raw []byte) (int, error)) error {
+	for page := 1; page <= pageCeiling; page++ {
+		request["per_page"], request["page"] = pageSize, page
+		raw, err := l.ask(operation, request)
+		if err != nil {
+			return errors.Wrapf(err, "%s, page %d", operation, page)
+		}
+		held, err := read(raw)
+		if err != nil {
+			return err
+		}
+		if held < pageSize {
+			return nil
+		}
+	}
+	return errors.Newf("%s held more than %d pages of %d, so what it holds past them was not read", operation, pageCeiling, pageSize)
+}
+
 // agentsOf is the agents the pull request's commits name as co-authors.
 func (l *Landed) agentsOf(landing Landing) ([]string, error) {
-	raw, err := l.ask("ListCommitsOnAPullRequest", map[string]any{"owner": landing.Owner, "repo": landing.Repo, "pull_number": landing.Number})
+	var messages []string
+	err := l.pages("ListCommitsOnAPullRequest", map[string]any{"owner": landing.Owner, "repo": landing.Repo, "pull_number": landing.Number},
+		func(raw []byte) (int, error) {
+			var answered struct {
+				Items []struct {
+					Commit struct {
+						Message string `json:"message"`
+					} `json:"commit"`
+				} `json:"items"`
+			}
+			if err := json.Unmarshal(raw, &answered); err != nil {
+				return 0, errors.Wrap(err, "the commits did not read")
+			}
+			for _, item := range answered.Items {
+				messages = append(messages, item.Commit.Message)
+			}
+			return len(answered.Items), nil
+		})
 	if err != nil {
 		return nil, err
-	}
-	var answered struct {
-		Items []struct {
-			Commit struct {
-				Message string `json:"message"`
-			} `json:"commit"`
-		} `json:"items"`
-	}
-	if err := json.Unmarshal(raw, &answered); err != nil {
-		return nil, errors.Wrap(err, "the commits did not read")
-	}
-	var messages []string
-	for _, item := range answered.Items {
-		messages = append(messages, item.Commit.Message)
 	}
 	return AgentsOf(messages), nil
 }
@@ -178,21 +225,24 @@ type changedFile struct {
 
 // files is every file the pull request changed, with its patch.
 func (l *Landed) files(landing Landing) ([]changedFile, error) {
-	raw, err := l.ask("ListPullRequestsFiles", map[string]any{"owner": landing.Owner, "repo": landing.Repo, "pull_number": landing.Number})
+	var kept []changedFile
+	err := l.pages("ListPullRequestsFiles", map[string]any{"owner": landing.Owner, "repo": landing.Repo, "pull_number": landing.Number},
+		func(raw []byte) (int, error) {
+			var answered struct {
+				Items []changedFile `json:"items"`
+			}
+			if err := json.Unmarshal(raw, &answered); err != nil {
+				return 0, errors.Wrap(err, "the files did not read")
+			}
+			for _, f := range answered.Items {
+				if f.Status != "removed" && Prose(f.Filename) {
+					kept = append(kept, f)
+				}
+			}
+			return len(answered.Items), nil
+		})
 	if err != nil {
 		return nil, err
-	}
-	var answered struct {
-		Items []changedFile `json:"items"`
-	}
-	if err := json.Unmarshal(raw, &answered); err != nil {
-		return nil, errors.Wrap(err, "the files did not read")
-	}
-	var kept []changedFile
-	for _, f := range answered.Items {
-		if f.Status != "removed" && Prose(f.Filename) {
-			kept = append(kept, f)
-		}
 	}
 	return kept, nil
 }
