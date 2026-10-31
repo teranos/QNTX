@@ -88,7 +88,7 @@ func (s *QNTXServer) quoteLanded(e gitHubPullRequestEvent) error {
 	}
 	now := time.Now()
 	job := &async.Job{ID: quote.LandedHandlerName + ":" + e.Repository.FullName + "#" + strconv.FormatInt(e.Number, 10) + "@" + e.PullRequest.Head.Sha,
-		HandlerName: quote.LandedHandlerName, Payload: payload, Source: "webhook", MadeBy: async.MadeByNoCaller,
+		HandlerName: quote.LandedHandlerName, Payload: payload, Source: "webhook", Status: async.JobStatusQueued, MadeBy: async.MadeByNoCaller,
 		CreatedAt: now, UpdatedAt: now, Pulse: async.NoPulse(), Started: async.NotYet(), Completed: async.NotYet()}
 	return errors.Wrapf(s.daemon.GetQueue().Enqueue(job), "quote.landed: enqueueing %s", job.ID)
 }

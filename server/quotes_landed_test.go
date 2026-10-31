@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/quote"
 )
 
 // A merged pull request's landing is a job the queue takes: it says its pulse
@@ -22,4 +24,10 @@ func TestAMergedPullRequestIsEnqueuedForQuotes(t *testing.T) {
 	e.PullRequest.Base.Ref = "main"
 	e.Repository.FullName, e.Repository.DefaultBranch = "teranos/QNTX-Web", "main"
 	require.NoError(t, srv.quoteLanded(e))
+
+	// Enqueued is not taken: the queue hands out only the jobs it holds as queued.
+	job, err := srv.daemon.GetQueue().Dequeue()
+	require.NoError(t, err, "a landing's job was enqueued and the queue has none to hand out")
+	require.Equal(t, quote.LandedHandlerName, job.HandlerName)
+	require.Equal(t, async.JobStatusRunning, job.Status)
 }
