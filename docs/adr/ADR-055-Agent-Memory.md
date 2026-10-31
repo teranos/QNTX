@@ -41,3 +41,21 @@ Preserving the words is only the beginning. Preserving the discipline of interpr
 
 An agent should be free to interpret human speech, but it should never inherit the human's authority merely by interpreting it.
 
+## Quotes from an agent
+
+"ah, right, it was more about quote provenance than memory per se"
+
+A memory is an agent's record of what someone said, carried into every later turn. The quote inside it needs its speaker.
+
+"i want [Fable] inside of quotes originating from Fable for example"
+
+A quote from an agent carries the agent's name inside it, so the words never pass as the human's wherever they are copied: a memory, a commit message, a PR body, another agent's context.
+
+"and another thought was to give LLM or Agent's their own quotation notation"
+
+The notation says an agent is speaking, before a name is read. The name says which one. A human's words keep the quotation marks they have always had.
+
+An agent sentence inside human quotation marks is the violation, wherever it appears.
+
+- [ ] The notation's glyphs.
+
