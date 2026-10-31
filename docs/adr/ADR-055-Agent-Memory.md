@@ -87,3 +87,13 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 - [ ] The signum that keeps a Quote, so the node holds it to tei.
 - [ ] C2PA, for the material a quote arrives in, pinned as TEI is.
 
+## The process
+
+"there needs to be a process"
+
+"it doesnt run one today"
+
+"dealing with the ground namespace"
+
+「[Fable] Every row of ground's own attestations table carries qntx_at, qntx_status and qntx_reason: what ground sees is written to a node. What the namespace holds there I have not read.」
+
