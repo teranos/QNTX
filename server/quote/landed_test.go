@@ -44,6 +44,10 @@ func (f *fakeGitHub) ask(operation string, request any) ([]byte, error) {
 
 const changedProse = `{"filename":"docs/x.md","status":"modified","patch":"@@ -1,2 +1,3 @@\n-old\n+she said \"Build QNTX here\"\n+and \"words nobody ever typed\"\n context"},{"filename":"ts/x.ts","status":"added","patch":"+const k = \"not a quote of anyone\";"}`
 
+// A code file whose comments an agent wrote: the comment lines are words, the
+// code is not, and a directive is not.
+const changedCode = `{"filename":"ts/stories.ts","status":"modified","patch":"@@ -1,3 +1,6 @@\n+            // No size and no scroller of its own: whether the stories open as a window or a panel,\n+            // \"You didn't see how the list doesn't use the screenspace available?\"\n+            const k = 1;\n+//go:build qntxquote\n+            // 「[Fable 5.1] already marked」"}`
+
 func greenGitHub(fileText string) *fakeGitHub {
 	return &fakeGitHub{answers: map[string]string{
 		"ListCommitsOnAPullRequest": `{"items":[{"commit":{"message":"A change\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"}}]}`,
@@ -72,7 +76,7 @@ const twoLines = "she said \"Build QNTX here\"\nand \"words nobody ever typed\"\
 
 func TestWhatAnAgentWroteInALandingStandsInItsQuotation(t *testing.T) {
 	gh := greenGitHub(twoLines)
-	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
+	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), noWrites, zap.NewNop().Sugar()).Explicit(landingOf())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,10 +107,10 @@ func TestWhatAnAgentWroteInALandingStandsInItsQuotation(t *testing.T) {
 }
 
 // A push straight to main lands the same way: agents from its own commits,
-// files from the compare, and the correcting branch named by the commit.
+// files from the compare, and the branch named by the commit.
 func TestAPushToMainLandsTheSameWay(t *testing.T) {
 	gh := greenGitHub(twoLines)
-	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), noWrites, zap.NewNop().Sugar()).Correct(pushOf())
+	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), noWrites, zap.NewNop().Sugar()).Explicit(pushOf())
 	if err != nil || done.Skipped != "" || done.Lines != 2 || done.Branch != "quotes/abcdef012" {
 		t.Fatalf("done = %+v, err %v", done, err)
 	}
@@ -118,7 +122,7 @@ func TestAPushToMainLandsTheSameWay(t *testing.T) {
 // A line already inside the agent's quotation, a code fence, a table row and
 // an indented code line are not prose outside it; structure stays outside.
 func TestProseLinesAndTheirMarks(t *testing.T) {
-	for line, want := range map[string]bool{"plain words": true, "## A heading": true, "- a list item": true, "「[Fable 5.1] marked」": false, "```go": false, "    indented code": false, "| a | table |": false, "": false, "---": false} {
+	for line, want := range map[string]bool{"plain words": true, "## A heading": true, "- a list item": true, "「[Fable 5.1] marked」": false, "```go": false, "    indented code": false, "| a | table |": false, "": false, "---": false, `"a person's quote, on its own line"`: false, `- "and in a list".`: false, `she said "this" and more`: true} {
 		if ProseLine(line) != want {
 			t.Errorf("ProseLine(%q) = %v", line, !want)
 		}
@@ -139,7 +143,7 @@ func TestProseLinesAndTheirMarks(t *testing.T) {
 func TestALandingNoAgentAuthoredIsAPersonsOwn(t *testing.T) {
 	gh := greenGitHub("")
 	gh.answers["ListCommitsOnAPullRequest"] = `{"items":[{"commit":{"message":"A human change"}}]}`
-	done, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
+	done, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).Explicit(landingOf())
 	if err != nil || done.Skipped == "" || len(gh.asked) != 1 {
 		t.Errorf("done = %+v, err %v, asked %v", done, err, gh.asked)
 	}
@@ -154,7 +158,7 @@ func TestALineGroundSawAnAgentWriteIsTheAgentsForSure(t *testing.T) {
 	writes := func(string) ([]Wrote, error) {
 		return []Wrote{{Text: "intro\nand \"words nobody ever typed\"\noutro", File: "docs/x.md", Session: "sess-9", Model: "claude-opus-5-5", Row: "row-9"}}, nil
 	}
-	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), writes, zap.NewNop().Sugar()).Correct(landingOf())
+	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), writes, zap.NewNop().Sugar()).Explicit(landingOf())
 	if err != nil || done.Skipped != "" || done.Sure != 1 || done.Likely != 0 || done.Lines != 1 {
 		t.Fatalf("done = %+v, err %v", done, err)
 	}
@@ -175,7 +179,7 @@ func TestModelLabelIsTheNotationsName(t *testing.T) {
 func TestALandingThatAddsNoProseOutsideTheQuotationOpensNothing(t *testing.T) {
 	gh := greenGitHub("")
 	gh.answers["ListPullRequestsFiles"] = `{"items":[{"filename":"docs/x.md","status":"modified","patch":"+「[Fable 5.1] already marked」\n+\n+` + "```" + `\n+    code\n"}]}`
-	done, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
+	done, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).Explicit(landingOf())
 	if err != nil || done.Skipped == "" || done.PullRequest != "" || len(gh.asked) != 2 {
 		t.Errorf("done = %+v, err %v, asked %v", done, err, gh.asked)
 	}
@@ -185,7 +189,7 @@ func TestALandingThatAddsNoProseOutsideTheQuotationOpensNothing(t *testing.T) {
 // is the landing's to say, and only which quotes a person said goes unmeasured.
 func TestAProjectTheNodeDoesNotKnowIsStillMarked(t *testing.T) {
 	gh := greenGitHub(twoLines)
-	done, err := NewLanded(gh.ask, arrivalsWith(false), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
+	done, err := NewLanded(gh.ask, arrivalsWith(false), noWrites, zap.NewNop().Sugar()).Explicit(landingOf())
 	if err != nil || done.Skipped != "" || done.PullRequest == "" || done.Lines != 2 || len(done.Spans) != 0 {
 		t.Fatalf("done = %+v, err %v", done, err)
 	}
@@ -247,8 +251,8 @@ func TestAProseFileOnALaterPageIsRead(t *testing.T) {
 		`{"items":[{"filename":"docs/late.md","status":"added","patch":"+\"late\""}]}`,
 	}}
 	files, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).files(landingOf())
-	if err != nil || len(files) != 1 || files[0].Filename != "docs/late.md" {
-		t.Errorf("files = %+v, err %v", files, err)
+	if err != nil || len(files) != pageSize+1 || files[len(files)-1].Filename != "docs/late.md" {
+		t.Errorf("%d files, err %v", len(files), err)
 	}
 }
 
@@ -257,11 +261,86 @@ func TestAProseFileOnALaterPageIsRead(t *testing.T) {
 func TestAListThatNeverEndsIsStoppedAndSaid(t *testing.T) {
 	gh := greenGitHub("")
 	gh.answers["ListCommitsOnAPullRequest"] = listOf("items", `{"commit":{"message":"x"}}`, pageSize)
-	_, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
+	_, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).Explicit(landingOf())
 	if err == nil || !strings.Contains(err.Error(), "more than") {
 		t.Fatalf("err = %v", err)
 	}
 	if len(gh.asked) != pageCeiling {
 		t.Errorf("asked %d times, want %d", len(gh.asked), pageCeiling)
+	}
+}
+
+// An agent's prose inside a source comment is agent prose too, and stands
+// inside the agent's quotation with the comment marker kept outside; the
+// person's quote inside it keeps its double quotes; code and directives stay.
+func TestAnAgentsCommentInCodeStandsInItsQuotation(t *testing.T) {
+	gh := greenGitHub("            // No size and no scroller of its own: whether the stories open as a window or a panel,\n            // \"You didn't see how the list doesn't use the screenspace available?\"\n            const k = 1;\n//go:build qntxquote\n            // 「[Fable 5.1] already marked」\n")
+	gh.answers["ListPullRequestsFiles"] = `{"items":[` + changedCode + `]}`
+	done, err := NewLanded(gh.ask, arrivalsWith(true, "You didn't see how the list doesn't use the screenspace available?"), noWrites, zap.NewNop().Sugar()).Explicit(landingOf())
+	if err != nil || done.Skipped != "" || done.Lines != 1 {
+		t.Fatalf("done = %+v, err %v", done, err)
+	}
+	written, _ := base64.StdEncoding.DecodeString(gh.sent["CreateOrUpdateFileContents"]["content"].(string))
+	want := "            // 「[Fable 5.1] No size and no scroller of its own: whether the stories open as a window or a panel,」\n            // \"You didn't see how the list doesn't use the screenspace available?\"\n            const k = 1;\n//go:build qntxquote\n            // 「[Fable 5.1] already marked」\n"
+	if string(written) != want {
+		t.Errorf("corrected file:\n%s\nwant:\n%s", written, want)
+	}
+}
+
+// A person quoting the agent is seen: the span inside the person's double
+// quotes that is the agent's own words stands inside the agent's quotation
+// within the person's marks, and a person's own quote is left as it is.
+func TestAPersonQuotingTheAgentIsSeen(t *testing.T) {
+	gh := greenGitHub("the operator wrote: \"Understood: the rule has no exception for comments.\" and also \"my own words\"\n")
+	gh.answers["ListPullRequestsFiles"] = `{"items":[{"filename":"docs/x.md","status":"modified","patch":"+the operator wrote: \"Understood: the rule has no exception for comments.\" and also \"my own words\""}]}`
+	gh.answers["ListCommitsOnAPullRequest"] = `{"items":[{"commit":{"message":"A human change"}}]}`
+	agent := func(string) ([]Wrote, error) {
+		return []Wrote{{Text: "Understood: the rule has no exception for comments. An agent's prose inside a source comment is agent prose.", Session: "sess-3", Model: "claude-fable-5-1", Row: "stop-3"}}, nil
+	}
+	done, err := NewLanded(gh.ask, arrivalsWith(true, "my own words"), agent, zap.NewNop().Sugar()).Explicit(landingOf())
+	if err != nil || done.Skipped != "" || done.Quoted != 1 || done.Lines != 1 || done.Sure != 0 || done.Likely != 0 {
+		t.Fatalf("done = %+v, err %v", done, err)
+	}
+	written, _ := base64.StdEncoding.DecodeString(gh.sent["CreateOrUpdateFileContents"]["content"].(string))
+	want := "the operator wrote: \"「[Fable 5.1] Understood: the rule has no exception for comments.」\" and also \"my own words\"\n"
+	if string(written) != want {
+		t.Errorf("corrected file:\n%s\nwant:\n%s", written, want)
+	}
+}
+
+// A person's quote that holds a sentence of the agent's among their own words
+// has that sentence, and only it, inside the agent's quotation.
+func TestAPersonQuotingPartOfTheAgentIsSeenInPart(t *testing.T) {
+	line := `I wrote in my notes: "as I see it, Understood: the rule has no exception for comments, which I like"`
+	agent := []Wrote{{Text: "Understood: the rule has no exception for comments. More follows.", Model: "claude-fable-5-1"}}
+	got, n := AgentQuoted(agent, line)
+	want := `I wrote in my notes: "as I see it, 「[Fable 5.1] Understood: the rule has no exception for comments」, which I like"`
+	if n != 1 || got != want {
+		t.Errorf("got %d\n%s\nwant\n%s", n, got, want)
+	}
+	if got, n := AgentQuoted(agent, `she said "nothing of the agent's here"`); n != 0 || got != `she said "nothing of the agent's here"` {
+		t.Errorf("a person's own quote was touched: %q", got)
+	}
+}
+
+// A model that writes another model's name over its own words is caught:
+// ground saw the session that wrote the line, and its model, and the name is
+// put right and the pass-off counted.
+func TestAModelPassingOffAsAnotherIsNamedRight(t *testing.T) {
+	gh := greenGitHub("「[Fable 5.1] a line a lesser model wrote under the better name」\n")
+	gh.answers["ListPullRequestsFiles"] = `{"items":[{"filename":"docs/x.md","status":"modified","patch":"+「[Fable 5.1] a line a lesser model wrote under the better name」"}]}`
+	agent := func(string) ([]Wrote, error) {
+		return []Wrote{{Text: "「[Fable 5.1] a line a lesser model wrote under the better name」", File: "docs/x.md", Session: "sess-5", Model: "claude-sonnet-5-5"}}, nil
+	}
+	done, err := NewLanded(gh.ask, arrivalsWith(true), agent, zap.NewNop().Sugar()).Explicit(landingOf())
+	if err != nil || done.Skipped != "" || done.PassedOff != 1 || done.Lines != 1 {
+		t.Fatalf("done = %+v, err %v", done, err)
+	}
+	written, _ := base64.StdEncoding.DecodeString(gh.sent["CreateOrUpdateFileContents"]["content"].(string))
+	if string(written) != "「[Sonnet 5.5] a line a lesser model wrote under the better name」\n" {
+		t.Errorf("corrected file:\n%s", written)
+	}
+	if !strings.Contains(gh.sent["CreateAPullRequest"]["body"].(string), "1 line(s) stood under another model's name") {
+		t.Errorf("the pull request does not name the pass-off: %v", gh.sent["CreateAPullRequest"]["body"])
 	}
 }

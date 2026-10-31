@@ -32,7 +32,7 @@ func (h *quoteLandedHandler) Execute(ctx context.Context, job *async.Job) error 
 	ask := func(operation string, request any) ([]byte, error) { return s.askGitHub(ctx, operation, request) }
 	arrivals := quote.NewArrivals(s.namespaceHolding, s.namespaceSaid, quotes.Measure, s.logger.Named("quote.arrival"))
 	began := time.Now()
-	done, err := quote.NewLanded(ask, arrivals, s.agentWritesFor, s.logger.Named(quote.LandedHandlerName)).Correct(landing)
+	done, err := quote.NewLanded(ask, arrivals, s.agentWritesFor, s.logger.Named(quote.LandedHandlerName)).Explicit(landing)
 	if err != nil {
 		return errors.Wrapf(err, "quote.landed: %s/%s#%d", landing.Owner, landing.Repo, landing.Number)
 	}

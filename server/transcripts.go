@@ -528,6 +528,22 @@ func agentWritesIn(store namespaces.Reading) ([]quote.Wrote, error) {
 		}
 	}
 	var writes []quote.Wrote
+	// What the agent said, as the Stop row holds its last message: a person
+	// quoting it is seen the same way as an agent's write.
+	for _, predicate := range []string{"Stop", "GroundedStop"} {
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: maxHumanRead})
+		if err != nil {
+			return nil, errors.Wrapf(err, "reading %s", predicate)
+		}
+		for _, as := range found {
+			said, _ := as.Attributes["last_assistant_message"].(string)
+			if said == "" {
+				continue
+			}
+			session := statusline.SessionOf(as.Contexts)
+			writes = append(writes, quote.Wrote{Text: said, Session: session, Model: models[session], Row: as.ID, At: as.Timestamp.UTC().Format(time.RFC3339)})
+		}
+	}
 	for _, predicate := range writePredicates {
 		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: maxHumanRead})
 		if err != nil {
