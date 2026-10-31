@@ -2,21 +2,19 @@
 //!
 //! "quote control needs to move to QNTX"
 //!
-//! The rules are ground's, unchanged: verbatim first, then four corrections
-//! per forty characters, five or six warned, past six not at all. A span is
-//! measured against the stretch of a prompt it matches best, free to start and
-//! end anywhere in it, so a long prompt does not count against a short quote.
+//! "To a QNTX subsystem"
 //!
-//! Everything here is bytes, as it was in Go: a correction is a byte added,
-//! dropped or changed. `testdata/quote.json` is what Go checks it reads the
-//! same way.
+//! "Rules are QNTX now"
+//!
+//! Verbatim first, then four corrections per forty characters, five or six
+//! warned, past six not at all. A correction is a byte added, dropped or
+//! changed. A span is measured against the stretch of a prompt it matches
+//! best, free to start and end anywhere in it, so a long prompt does not count
+//! against a short quote.
 
 use serde::{Deserialize, Serialize};
 
-// The numbers the rules are made of, all of them, so none is read out of a
-// formula below.
-
-/// The longest span measured, as in ground.
+/// The longest span measured.
 pub const SPAN_MAX: usize = 8192;
 
 /// The rules are rates per this many characters of the span.
