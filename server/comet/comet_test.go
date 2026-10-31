@@ -157,13 +157,15 @@ func TestACometIsServedWithItsDigestAndAskedForByIt(t *testing.T) {
 	assert.JSONEq(t, `{"digest":"`+hex.EncodeToString(sum[:])+`"}`, digest.Body.String())
 }
 
-// A build makes the sand of ground's main, whatever ABI it is: a POST that names one is refused.
+// A build makes the sand of ground's branch, whatever ABI it is: a POST that names one is refused,
+// naming the branch it is built from.
 func TestABuildIsAskedWithoutAnABI(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	got := httptest.NewRecorder()
 	handler().ServeHTTP(got, httptest.NewRequest(http.MethodPost, "/comet/abcd-nl/grove/x86_64-linux/7?machine=abcd-nl/l", nil))
 	assert.Equal(t, http.StatusUnprocessableEntity, got.Code)
 	assert.Contains(t, got.Body.String(), "POST /comet/abcd-nl/grove/x86_64-linux")
+	assert.Contains(t, got.Body.String(), "ground's "+Ground.Branch)
 }
 
 // A binary of ground's is built by the make goal that builds it.

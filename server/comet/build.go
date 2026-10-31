@@ -133,7 +133,7 @@ func machineSand(machine, named string) (map[string]string, error) {
 // short is a rev as git describe names one.
 func short(rev string) string { return rev[:min(len(rev), 7)] }
 
-// Version is what a comet's rows carry after ground in their source column: which ground's main
+// Version is what a comet's rows carry after ground in their source column: which ground's branch
 // and which project rev it was built from, so the node knows which comet landed (ADR-050, Landing).
 func Version(groundRev, of string) string { return "comet " + short(groundRev) + " " + of + "\n" }
 
@@ -154,7 +154,7 @@ func (b Builder) unpack(ctx context.Context, source Source, work, dir string) (s
 		"failed to unpack %s at %s", source.String(), rev)
 }
 
-// prepare unpacks ground's main in work with sand beside its own controls, and answers where, and
+// prepare unpacks ground's branch in work with sand beside its own controls, and answers where, and
 // the environment its steps run in. of names what the sand was built from, for its version.
 func (b Builder) prepare(ctx context.Context, work string, sand map[string]string, of string) (string, []string, error) {
 	src := filepath.Join(work, "ground")
@@ -180,7 +180,7 @@ func (b Builder) prepare(ctx context.Context, work string, sand map[string]strin
 	return src, []string{"PATH=" + b.NixBin + ":" + os.Getenv("PATH"), "TMPDIR=" + filepath.Join(work, "tmp")}, nil
 }
 
-// ground builds ground's main in work with sand beside its own controls, natively, and keeps
+// ground builds ground's branch in work with sand beside its own controls, natively, and keeps
 // each binary kept names at its path, with its digest beside it.
 func (b Builder) ground(ctx context.Context, work string, sand map[string]string, of string, kept map[string]string) error {
 	src, env, err := b.prepare(ctx, work, sand, of)

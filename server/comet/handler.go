@@ -50,7 +50,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, os.ErrNotExist) {
 			said := "no comet of " + key + " is kept: POST /comet/" + n.Base() + " builds it"
 			if abis := keptABIs(n); len(abis) > 0 {
-				said = "no comet of " + key + " is kept: " + n.Base() + " is kept for engine ABI " + strings.Join(abis, ", ") + ", built from ground's main"
+				said = "no comet of " + key + " is kept: " + n.Base() + " is kept for engine ABI " + strings.Join(abis, ", ") + ", built from ground's "+Ground.Branch
 			}
 			if last, building := builds.Load(n.Base()); building {
 				said = "no comet of " + key + " is kept: " + last.(string)
@@ -72,7 +72,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == http.MethodPost {
 		if n.ABI != "" {
-			h.Refuse(w, http.StatusUnprocessableEntity, "POST /comet/"+key+" names an ABI: a build makes the sand of ground's main, whatever ABI it is, at POST /comet/"+n.Base())
+			h.Refuse(w, http.StatusUnprocessableEntity, "POST /comet/"+key+" names an ABI: a build makes the sand of ground's "+Ground.Branch+", whatever ABI it is, at POST /comet/"+n.Base())
 			return
 		}
 		// "A person configures controls; the model is on the enforced side of them"

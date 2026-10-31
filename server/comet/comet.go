@@ -52,7 +52,7 @@ func (n Name) Key() string {
 	return n.Base() + "/" + n.ABI
 }
 
-// Base is what a build is for: owner/repo/platform, of whichever ABI ground's main builds.
+// Base is what a build is for: owner/repo/platform, of whichever ABI ground's branch builds.
 func (n Name) Base() string { return n.Owner + "/" + n.Repo + "/" + n.Platform }
 
 // SandFile is the file a sand is for platform, as ground's make sand names it.
@@ -247,10 +247,10 @@ func Names(dir string) ([]Name, error) {
 }
 
 // MovedBy is each kept comet a push to repo's branch moves: the project's own default branch,
-// or ground's main, which every comet is built from.
+// or ground's branch, which every comet is built from.
 func MovedBy(kept []Name, repo, branch, defaultBranch string) []Name {
 	moved := []Name{}
-	// One build per repository and platform: it builds whichever ABI ground's main is, so the
+	// One build per repository and platform: it builds whichever ABI ground's branch is, so the
 	// sands kept for older ABIs are not each built again.
 	building := map[string]bool{}
 	groundMoved := strings.EqualFold(repo, Ground.Owner+"/"+Ground.Repo) && branch == Ground.Branch
