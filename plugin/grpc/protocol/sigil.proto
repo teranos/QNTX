@@ -447,8 +447,9 @@ message NamespaceAgentAm {
 // tei, so parity holds it and an agent asks it over MCP for the context a thing
 // was said in and for each agent's reading of it (ADR-055).
 
-// IMPLEMENTME: an agent's quotation notation, rendered from who and rend, with
-// the agent's name inside the quote as [Fable]. The glyphs are open in ADR-055.
+// IMPLEMENTME: an agent's quotation notation, rendered from who and rend: an
+// agent's words inside 「 」 with the agent's name first in square brackets,
+// 「[Fable] …」, and a human's inside double quotes (ADR-055).
 
 // IMPLEMENTME: C2PA for the material a quote arrives in, pinned in server/parity
 // as TEI is, so source can name a manifest and not only a session or a commit.

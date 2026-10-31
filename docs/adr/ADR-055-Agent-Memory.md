@@ -59,7 +59,31 @@ The notation says an agent is speaking, before a name is read. The name says whi
 
 An agent sentence inside human quotation marks is the violation, wherever it appears.
 
-- [ ] The notation's glyphs.
+- [x] The notation's glyphs, settled:
+
+"My text is inside of double quotes, its settled"
+
+「[Fable] an agent free to interpret, inheriting no authority by doing so.」
+
+"the model has zero authority on anything"
+
+A human's words stand inside double quotes. An agent's stand inside 「 」, U+300C and U+300D, with the agent's name in square brackets as the first thing inside, as an editor's mark stands inside a quotation. What stands inside 「 」 carries its content and no authority.
+
+"So Agent Memory is also in its own quotation"
+
+A memory is an agent's utterance: it stands inside 「 」 with the agent's name first, and a human's words inside it keep their double quotes.
+
+"anything agent anywhere does into its own quotation"
+
+"source code comments get cleaned up by QNTX at some point, putting it inside of those quotes"
+
+- [ ] QNTX rewrites the source code comments an agent wrote into 「 」, with the agent's name first.
+
+"old text get's traced and we see exactly what parts are mosltly hallucinated and what parts are not and come directly from a human"
+
+"the backfill will happen at some point, that feature will exist, but is not in scope now."
+
+- [ ] Old text is traced: each span to the human words it came from, exact or by how many corrections, or marked as the agent's. Not in scope now.
 - [ ] The signum that keeps a Quote, so the node holds it to tei.
 - [ ] C2PA, for the material a quote arrives in, pinned as TEI is.
 
