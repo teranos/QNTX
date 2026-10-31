@@ -1,7 +1,7 @@
 package server
 
 import (
-	quoted "github.com/teranos/QNTX/ats/quote"
+	quotes "github.com/teranos/QNTX/ats/quote"
 	"github.com/teranos/QNTX/server/quote"
 	errors "github.com/teranos/sacred-error"
 )
@@ -25,11 +25,11 @@ func (s *QNTXServer) namespacePrompts(namespace string) ([]string, error) {
 // quote.removal out, and says so, rather than register built-ins that could
 // only fail.
 func (s *QNTXServer) quoteCarried() bool {
-	if !quoted.Carried {
+	if !quotes.Carried {
 		s.logger.Infow("quote subsystem not carried: quotes are judged in Rust, which this build leaves out",
 			"handlers", []string{"quote.provenance", "quote.removal"})
 	}
-	return quoted.Carried
+	return quotes.Carried
 }
 
 // setupQuoteProvenance registers the built-in. No schedule: the standing row
@@ -38,7 +38,7 @@ func (s *QNTXServer) setupQuoteProvenance() {
 	if !s.quoteCarried() {
 		return
 	}
-	s.daemon.Registry().Register(quote.NewWatch(s.namespacePrompts, quoted.Judge, s.news,
+	s.daemon.Registry().Register(quote.NewWatch(s.namespacePrompts, quotes.Judge, s.news,
 		s.authHandler.MintedBy, s.logger.Named("quote.provenance")))
 }
 
@@ -48,6 +48,6 @@ func (s *QNTXServer) setupQuoteRemoval() {
 	if !s.quoteCarried() {
 		return
 	}
-	s.daemon.Registry().Register(quote.NewRemoval(s.namespacePrompts, quoted.Judge, s.news,
+	s.daemon.Registry().Register(quote.NewRemoval(s.namespacePrompts, quotes.Judge, s.news,
 		s.authHandler.MintedBy, s.logger.Named("quote.removal")))
 }
