@@ -29,6 +29,10 @@ Identified by `_distill: true` in attributes, `source: "distill"`, and predicate
 
 “making an early start on the Codex Agent runtime”: the [initial runtime package](https://github.com/teranos/QNTX/blob/main/internal/codex/README.md), beside Claude Code and Pi. It runs as a Node Agent and as a selectable namespace harness, with a persisted thread and signed transcript. Namespace authentication setup remains separate work.
 
+### agy runtime
+
+“making a start on agy as another harness”: the [initial runtime package](https://github.com/teranos/QNTX/blob/main/internal/agy/README.md), beside Claude Code, Pi and Codex. It is not yet a registered Node Agent or namespace harness.
+
 ## Symbols
 
 See [SYMBOLS.md](SYMBOLS.md) for the complete symbol reference — segments, attestation building blocks, derived types, and system symbols.
