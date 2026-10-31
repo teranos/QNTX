@@ -96,6 +96,80 @@ fn older_rows_cost_a_read_nothing() {
     }
 }
 
+// On k ramen asked the ground namespace for what came since a time nothing
+// had come since, every few seconds, and each read walked all 543,573 rows.
+#[test]
+fn a_window_with_less_than_a_page_costs_only_its_rows() {
+    let mut small = SqliteStore::in_memory().unwrap();
+    fill(&mut small, NEW, NEW + 2_000);
+    let mut big = SqliteStore::in_memory().unwrap();
+    fill(&mut big, 0, 20_000);
+    fill(&mut big, NEW, NEW + 2_000);
+
+    let window = |from: i64, f: &dyn Fn(&mut AxFilter)| {
+        let mut x = AxFilter {
+            limit: LIMIT,
+            time_start: Some(from * 1000),
+            ..AxFilter::default()
+        };
+        f(&mut x);
+        x
+    };
+    let empty = NEW + 2_000;
+    let short = NEW + 2_000 - 10;
+    let shapes: Vec<(&str, AxFilter, usize)> = vec![
+        ("since nothing came", window(empty, &|_| {}), 0),
+        ("since ten came", window(short, &|_| {}), 10),
+        ("a predicate since nothing came", window(empty, &|f| f.predicates = vec!["p1".into()]), 0),
+        ("a predicate since ten came", window(short, &|f| f.predicates = vec!["p1".into()]), 2),
+    ];
+    for (name, f, rows) in shapes {
+        let (few, answer) = read(&small, &f);
+        let (many, same) = read(&big, &f);
+        assert_eq!(answer.len(), rows, "{}", name);
+        assert_eq!(answer, same, "{}: ten times the older rows changed the answer", name);
+        assert!(
+            many <= few + few / 10,
+            "{}: {} steps with 2,000 rows, {} with 22,000 — the read pays for rows outside its window",
+            name,
+            few,
+            many
+        );
+    }
+}
+
+// On k's disk every row read for its timestamp was a seek: a window of 3,889
+// rows took 27s to answer 301 of them.
+#[test]
+fn a_window_reads_only_the_rows_it_answers_with() {
+    let mut store = SqliteStore::in_memory().unwrap();
+    fill(&mut store, NEW, NEW + 2_000);
+    for (name, f) in shapes() {
+        if f.time_start.is_none() {
+            continue;
+        }
+        let (sql, params) = build_query_sql(&f);
+        let mut stmt = store
+            .connection()
+            .prepare(&format!("EXPLAIN QUERY PLAN {}", sql))
+            .unwrap();
+        let plan: Vec<String> = stmt
+            .query_map(rusqlite::params_from_iter(params.iter()), |row| {
+                row.get::<_, String>(3)
+            })
+            .unwrap()
+            .map(|step| step.unwrap())
+            .collect();
+        assert!(
+            plan.iter()
+                .any(|step| step.contains("COVERING INDEX idx_attestations_window")),
+            "{}: the window is not chosen inside its index: {:?}",
+            name,
+            plan
+        );
+    }
+}
+
 #[test]
 fn a_row_named_twice_is_answered_once() {
     let mut store = SqliteStore::in_memory().unwrap();

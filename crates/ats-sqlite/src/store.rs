@@ -819,6 +819,10 @@ pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
         ("attestation_actors", "actor", "idx_junc_actor_id", &filter.actors),
     ];
 
+    // A window walks its own rows. Newest first, a window with less than a
+    // page in it is only told apart by walking every row older than it.
+    let windowed = filter.time_start.is_some() || filter.time_end.is_some();
+
     let mut conditions = Vec::new();
     let mut params: Vec<String> = Vec::new();
     let mut walk = None;
@@ -826,7 +830,7 @@ pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
         if values.is_empty() {
             continue;
         }
-        if walk.is_none() {
+        if walk.is_none() && !windowed {
             walk = Some((table, column, values));
             continue;
         }
@@ -855,6 +859,15 @@ pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
     );
 
     let Some((table, column, values)) = walk else {
+        if windowed {
+            // The page is chosen inside idx_attestations_window (084); the
+            // rows themselves are read only for the page.
+            let sql = format!(
+                "SELECT {ATT_COLUMNS} FROM attestations att WHERE att.rowid IN (SELECT att.rowid FROM attestations att INDEXED BY idx_attestations_window WHERE {} {newest}) {newest}",
+                conditions.join(" AND ")
+            );
+            return (sql, params);
+        }
         let mut sql = format!("SELECT {ATT_COLUMNS} FROM attestations att");
         if !conditions.is_empty() {
             sql.push_str(" WHERE ");
