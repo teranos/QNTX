@@ -33,7 +33,6 @@ Even faster when the builds are done by QNTX as Comet
 "
 
 - ground compiles one file, .ctfe/sand. wind folds it from three places on the operator's disk: ground's own controls/, controls/local/, and each declared project's controls/ with that project's `git ls-files` (ground tools/wind.d).
-- controls/local on the operator's machine holds 31 pbt files today: the qntx block with the node's URL and the token's path, seven projects by absolute path, permissions, org and sentry.
 
 ## The builder
 
@@ -68,9 +67,7 @@ TODO: move section to the root agent ADR
 "to get ground setup for the ROOT agent"
 
 - The node runs Claude Code with CLAUDE_CONFIG_DIR under the agent's home
-  (internal/claudecode/run.go). On the box that directory holds no
-  settings.json, and `which ground` finds nothing: the ROOT agent runs with no
-  hooks.
+  (internal/claudecode/run.go).
 - Its comet is the box's own: x86_64-linux, a sand whose qntx block names the
   node's own URL and the agent's token. ADR-048, The host agent, says whose
   DID the hook events are attested under.
@@ -79,9 +76,6 @@ TODO: move section to the root agent ADR
 TODO: talk about comet ui needs to be owned by Web
 "which is for all of this to be visible in the existing Element in the ui, remvoing the coment crosshatches"
 
-- The Comet stratum is `gr-unreal`, with a limit saying the comet does not
-  exist yet (web/ts/ground-element.ts). web/ts/ground-element.test.ts holds
-  Scry, Comet and Underground as the unreal three.
 - am ground answers started, left, watches, news, failed and ug
   (server/am_ground.go). Comet is answered beside ug: the builds, for whom,
   and the version each session's rows carry.
@@ -92,8 +86,6 @@ TODO: talk about comet ui needs to be owned by Web
 
 - Every turn passes `ready` in server/claude.go, which checks the Claude Code
   binary and the plan token. A comet held for the harness is checked there.
-- server/a2a_route.go answers UnsupportedOperationError to every operation and
-  serves no tenant.
 
 ## The node holds the private controls
 TODO: UI CONCERN
