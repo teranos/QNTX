@@ -38,7 +38,7 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 	@# binary carries the static library, as a plugin's does.
 	@rm -f target/release/libats_sqlite.dylib target/release/deps/libats_sqlite.dylib target/release/libats_sqlite.so target/release/deps/libats_sqlite.so
 	@go build -tags "$(BUILD_TAGS)" $(GO_LDFLAGS) -o bin/qntx ./cmd/qntx || { \
-		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
+		if [ -f "$(GROUND_DB)" ] && [ -n "$$CLAUDE_CODE_SESSION_ID" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"session:$$CLAUDE_CODE_SESSION_ID\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
 
 # QuickDev: "One of the distributions of QNTX, purpose is to build FAST, help
@@ -167,7 +167,7 @@ rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO inte
 	@echo "Building Rust SQLite storage library..."
 	$(call ground-notify,rust-build,Rust: building ats-sqlite)
 	@cargo build --release --package ats-sqlite --features ffi --lib || { \
-		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-rust-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:rust-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Rust: ats-sqlite build FAILED\",\"after\":0}')"; fi; \
+		if [ -f "$(GROUND_DB)" ] && [ -n "$$CLAUDE_CODE_SESSION_ID" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-rust-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:rust-build-failed\"]', '[\"session:$$CLAUDE_CODE_SESSION_ID\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Rust: ats-sqlite build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
 	@echo "✓ libats_sqlite built in target/release/"
 	@echo "  Static:  libats_sqlite.a"

@@ -50,9 +50,14 @@ type NodeAgentConfig struct {
 // model runs it without codex.
 type CodexConfig struct {
 	Model string `mapstructure:"model"` // The model, by the id the gateway knows it as.
-	// Gateway is the plugin whose /v1 answers OpenAI's Responses API, the only
-	// wire codex speaks, and which every model call codex makes goes through.
+	// Gateway is where every model call codex makes goes, over OpenAI's
+	// Responses API, the only wire codex speaks: a plugin on this node by its
+	// name, or another node's gateway by its /v1 URL.
 	Gateway string `mapstructure:"gateway"`
+	// TokenRef is what another node's gateway is reached with, ssm:// or env:,
+	// as the plan token is: that node knows nothing of this node's agent token.
+	// Empty is the agent's own token, for a gateway on this node.
+	TokenRef string `mapstructure:"token"`
 	// Sandbox is codex's own: read-only or workspace-write.
 	Sandbox string `mapstructure:"sandbox"`
 }

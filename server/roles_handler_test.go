@@ -2,12 +2,15 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 )
@@ -69,4 +72,29 @@ func TestOnlyTheLinesTheGateReadsAreAnswered(t *testing.T) {
 	for _, line := range answer.Lines {
 		assert.NotEqual(t, []string{"visit-1"}, line.Subjects, "a visit is not a line about a role")
 	}
+}
+
+// "explain how roles work to me": the element showed six lines, from the
+// newest days, while the gate held forty back to the first. System takes in
+// more than the lines, and the newest rows under the store's ceiling were all
+// the list read. Every line the gate reads is answered however much else
+// system holds after it.
+func TestTheLinesOutlastWhatElseSystemTakesIn(t *testing.T) {
+	s := workersNode(t)
+	system, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	after := time.Now().Add(time.Hour)
+	for i := 0; i <= storage.MaxAttestationLimit; i++ {
+		require.NoError(t, system.CreateAttestation(&types.As{
+			ID:         fmt.Sprintf("ground-%d", i),
+			Subjects:   []string{"ground"},
+			Predicates: []string{"ground:payload"},
+			Contexts:   []string{"system"},
+			Actors:     []string{rootAccount},
+			Timestamp:  after.Add(time.Duration(i) * time.Millisecond),
+		}))
+	}
+
+	answer := readLines(t, s)
+	require.Equal(t, uint32(6), answer.GetCount(), "a line the gate reads fell off the list")
 }

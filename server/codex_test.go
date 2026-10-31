@@ -129,6 +129,45 @@ func TestCodexSessionReadsAsTheOthers(t *testing.T) {
 	}, said)
 }
 
+// "Why would you not be able to use q's gateway?"
+// A gateway named as a URL is reached there, so a node without the plugin
+// makes its model calls through another node's.
+func TestCodexReachesAGatewayNamedByItsURL(t *testing.T) {
+	named := opusLow
+	named.Codex = appcfg.CodexConfig{Model: "anthropic/claude-sonnet-4.5", Gateway: "https://api.q.sbvh.nl/api/openrouter-qntx/v1", Sandbox: "workspace-write"}
+	s, _ := runningTheNodeAgent(t, named)
+	binary, _ := claudeStandIn(t, codexAnswered)
+	fetched := make(chan struct{})
+	close(fetched)
+	s.holdHarness("codex", &harnessHeld{name: "Codex", fetched: fetched, path: binary})
+
+	_, refused := sayingToCodex(s, sigil.Sent{"says": "hello"})
+	require.Nil(t, refused)
+	config, err := os.ReadFile(filepath.Join(s.nodeAgent.home, "codex", "config.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(config), `base_url = "https://api.q.sbvh.nl/api/openrouter-qntx/v1"`)
+}
+
+// Another node's gateway knows nothing of this node's agent token: the
+// credential it is reached with is named by reference, as a plan token is.
+func TestCodexReachesAnotherGatewayWithTheTokenNamedForIt(t *testing.T) {
+	t.Setenv("QNTX_TEST_GATEWAY_TOKEN", "q-knows-this-one")
+	named := opusLow
+	named.Codex = appcfg.CodexConfig{Model: "anthropic/claude-sonnet-4.5", Gateway: "https://api.q.sbvh.nl/api/openrouter-qntx/v1",
+		Sandbox: "workspace-write", TokenRef: "env:QNTX_TEST_GATEWAY_TOKEN"}
+	s, _ := runningTheNodeAgent(t, named)
+	binary, ran := claudeStandIn(t, codexAnswered)
+	fetched := make(chan struct{})
+	close(fetched)
+	s.holdHarness("codex", &harnessHeld{name: "Codex", fetched: fetched, path: binary})
+
+	_, refused := sayingToCodex(s, sigil.Sent{"says": "hello"})
+	require.Nil(t, refused)
+	env := ranWith(t, ran, "0", "env")
+	assert.Contains(t, env, "CODEX_API_KEY=q-knows-this-one")
+	assert.NotContains(t, env, "CODEX_API_KEY="+s.nodeAgent.token)
+}
+
 // A node whose am.toml names no codex has none to speak to, and says where.
 func TestANodeThatNamesNoCodexHasNoneToSpeakTo(t *testing.T) {
 	s, _ := runningTheNodeAgent(t, opusLow)

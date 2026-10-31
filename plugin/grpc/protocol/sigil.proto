@@ -37,6 +37,10 @@ message Node {
   string name = 1;
   string description = 2;
   repeated Signum signa = 3;
+  // The media types the node gives, across every signum: JSON, everywhere.
+  // To A2A these are the card's default output modes, which a skill's own
+  // output modes override.
+  repeated string output_modes = 4;
 }
 
 // Transcript is one agent session Ground recorded, derived from its hook
@@ -262,6 +266,8 @@ message NamespaceAgentSaid {
   ClaudeSaid claude = 1;
   // What it answered in Pi.
   PiSaid pi = 2;
+  // What the namespace agent answered in Codex.
+  CodexSaid codex = 3;
 }
 
 // NodeAgentSaid is what agent say answers: what the Node Agent answered, in the
@@ -286,7 +292,7 @@ message NodeAgentAm {
   CodexAm codex = 3;
 }
 
-// CodexSaid is what the Node Agent answered in codex.
+// CodexSaid is what an agent answered in codex.
 message CodexSaid {
   // What it answered.
   string answer = 1;
@@ -303,9 +309,11 @@ message CodexSaid {
   double took_ms = 7;
   // Why a row of the session was not written down, when one was not.
   string unwritten = 8;
+  // The CLI thread used to resume, distinct from the transcript session.
+  string thread = 9;
 }
 
-// CodexAm is who the Node Agent is in codex and how the node runs it.
+// CodexAm is who an agent is in codex and how the node runs it.
 message CodexAm {
   // Its own DID, which signs what it writes down.
   string did = 1;
@@ -441,6 +449,8 @@ message NamespaceAgentAm {
   ClaudeAm agent = 3;
   // Who the agent is and how it runs, in Pi.
   PiAm pi = 4;
+  // Who the namespace agent is in Codex.
+  CodexAm codex = 5;
 }
 
 // IMPLEMENTME: the signum that keeps a Quote and its Interps, declared to follow
