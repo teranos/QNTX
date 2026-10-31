@@ -21,7 +21,7 @@ func (s *QNTXServer) namespacePrompts(namespace string) ([]string, error) {
 }
 
 // The quote subsystem is optional: quotes are judged in Rust (ats/quote), so a
-// build without it (quickdev, or no qntxwasm) leaves quote.provenance and
+// build without it (quickdev, or no qntxquote) leaves quote.provenance and
 // quote.removal out, and says so, rather than register built-ins that could
 // only fail.
 func (s *QNTXServer) quoteCarried() bool {

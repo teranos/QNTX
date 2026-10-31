@@ -7,7 +7,7 @@
 // "quote control needs to move to QNTX"
 //
 // The check is Rust's (crates/ats/src/quote.rs). This build either carries it
-// (qntxwasm, quote_qntx.go) or does not (quote_default.go) and says which in
+// (qntxquote, quote_qntx.go) or does not (quote_default.go) and says which in
 // Carried; there is no second implementation here to drift from the one the
 // node runs.
 package quote
