@@ -190,11 +190,23 @@ func (l *Landed) files(landing Landing) ([]changedFile, error) {
 	}
 	var kept []changedFile
 	for _, f := range answered.Items {
-		if f.Status != "removed" {
+		if f.Status != "removed" && Prose(f.Filename) {
 			kept = append(kept, f)
 		}
 	}
 	return kept, nil
+}
+
+// Prose is whether a file is words and not code: only there is a span in
+// double quotes a claim about what a person said. Source code comments are
+// cleaned up by QNTX at some point, and not yet.
+func Prose(path string) bool {
+	for _, ext := range []string{".md", ".markdown", ".txt", ".adoc", ".rst"} {
+		if strings.HasSuffix(strings.ToLower(path), ext) {
+			return true
+		}
+	}
+	return false
 }
 
 // branch makes the correcting branch at the default branch's head.

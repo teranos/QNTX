@@ -37,7 +37,7 @@ func greenGitHub(fileText string) *fakeGitHub {
 	return &fakeGitHub{answers: map[string]string{
 		"ListCheckRunsForAGitReference": `{"check_runs":[{"name":"Go Tests","status":"completed","conclusion":"success"}]}`,
 		"ListCommitsOnAPullRequest":     `{"items":[{"commit":{"message":"A change\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"}}]}`,
-		"ListPullRequestsFiles":         `{"items":[{"filename":"docs/x.md","status":"modified","patch":"@@ -1,2 +1,3 @@\n-old\n+she said \"Build QNTX here\"\n+and \"words nobody ever typed\"\n context"}]}`,
+		"ListPullRequestsFiles":         `{"items":[{"filename":"docs/x.md","status":"modified","patch":"@@ -1,2 +1,3 @@\n-old\n+she said \"Build QNTX here\"\n+and \"words nobody ever typed\"\n context"},{"filename":"ts/x.ts","status":"added","patch":"+const k = \"not a quote of anyone\";"}]}`,
 		"GetABranch":                    `{"name":"main","commit":{"sha":"abc123"}}`,
 		"GetRepositoryContent":          `{"content":"` + base64.StdEncoding.EncodeToString([]byte(fileText)) + `","sha":"blob1"}`,
 		"CreateAPullRequest":            `{"html_url":"https://github.com/o/r/pull/9"}`,
@@ -119,5 +119,14 @@ func TestAddedLinesAreThePlusLines(t *testing.T) {
 	got := AddedLines("--- a\n+++ b\n@@ -1 +1,2 @@\n-gone\n+kept\n+also\n same")
 	if strings.Join(got, "|") != "kept|also" {
 		t.Errorf("added = %v", got)
+	}
+}
+
+// A string literal in source code is nobody's words: only prose is read.
+func TestOnlyProseIsReadForQuotes(t *testing.T) {
+	for path, want := range map[string]bool{"docs/adr/ADR-055.md": true, "README.txt": true, "ts/x.ts": false, "server/quote/landed.go": false, "crates/ats/src/quote.rs": false} {
+		if Prose(path) != want {
+			t.Errorf("Prose(%q) = %v", path, !want)
+		}
 	}
 }
