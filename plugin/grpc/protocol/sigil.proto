@@ -443,6 +443,16 @@ message NamespaceAgentAm {
   PiAm pi = 4;
 }
 
+// IMPLEMENTME: the signum that keeps a Quote and its Interps, declared to follow
+// tei, so parity holds it and an agent asks it over MCP for the context a thing
+// was said in and for each agent's reading of it (ADR-055).
+
+// IMPLEMENTME: an agent's quotation notation, rendered from who and rend, with
+// the agent's name inside the quote as [Fable]. The glyphs are open in ADR-055.
+
+// IMPLEMENTME: C2PA for the material a quote arrives in, pinned in server/parity
+// as TEI is, so source can name a manifest and not only a session or a commit.
+
 // A Quote is TEI's q: words distinguished from the text around them, and whose
 // they are. The words are the one who said them's; everything else here is
 // about the words and never inside them (ADR-055).
@@ -472,6 +482,10 @@ message Quote {
   // The quote's own id, for an Interp to point to: TEI's xml:id.
   string id = 9;
 }
+
+// IMPLEMENTME: several Interps of one quote by different agents, each with its
+// cert, so a weak reading stays on record and a decisive one is chosen over it,
+// and neither is ever inside the quote.
 
 // An Interp is TEI's interp: what someone made of a quote, kept apart from
 // the words and carrying none of their speaker's authority (ADR-055).

@@ -27,6 +27,9 @@ type judgeOutput struct {
 
 // Judge is what the prompts say of each span, in order. The prompts cross to
 // Rust once however many spans there are.
+// IMPLEMENTME: fuzzy and semantic matching beside edit distance, inside qntxquote
+// with the types that suit them; crates/ats/src/similarity.rs already holds cosine
+// similarity. Whatever matches inside, the boundary speaks protocol.Quote.
 func Judge(spans, said []string) ([]Judgement, error) {
 	engine, err := wasm.GetEngine()
 	if err != nil {

@@ -44,6 +44,10 @@ func NamespaceOf(ctx context.Context) string {
 	return ns
 }
 
+// IMPLEMENTME: speak spec at the boundary. A span judged here is a protocol.Quote:
+// content the span, who the person whose prompt it matched, source that prompt's
+// row, resp the actor that relayed it, cert the verdict. degree stays inside.
+
 // degree is one span that did not comply, and by how much.
 type degree struct {
 	Span        string `json:"span"`
