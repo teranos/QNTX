@@ -680,6 +680,7 @@
   "protocol.NamespacesList.count": "How many there are, so none and a backend that keeps none are different answers.",
   "protocol.NamespacesList.namespaces": "One row per namespace.",
   "protocol.Node": "Node is the node about itself: what it is called, what it is for, and the signa it holds. It is what fills A2A's AgentCard, which am node answers, and the parity sigil holds it to that card.",
+  "protocol.Node.output_modes": "The media types the node gives, across every signum: JSON, everywhere. To A2A these are the card's default output modes, which a skill's own output modes override.",
   "protocol.NodeAgentAm": "NodeAgentAm is what agent am answers: who the Node Agent is and how the node runs it, in the harness named.",
   "protocol.NodeAgentAm.claude": "In Claude Code.",
   "protocol.NodeAgentAm.codex": "In codex.",
