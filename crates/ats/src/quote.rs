@@ -28,6 +28,9 @@ pub struct Measurement {
     pub corrections: usize,
     /// The span's length in bytes.
     pub length: usize,
+    /// The prompt the span is nearest to, by its place in the list: the one
+    /// holding it when exact, else the one with the fewest corrections.
+    pub prompt: Option<usize>,
 }
 
 /// One pass of the table over `text`, handing the best distance of each
@@ -75,24 +78,38 @@ pub fn measure(span: &str, said: &[String]) -> Measurement {
             exact: false,
             corrections: 0,
             length,
+            prompt: None,
         };
     }
-    if said.iter().any(|prompt| prompt.contains(span)) {
+    if let Some(at) = said.iter().position(|prompt| prompt.contains(span)) {
         return Measurement {
             exact: true,
             corrections: 0,
             length,
+            prompt: Some(at),
         };
     }
-    let corrections = said
-        .iter()
-        .map(|prompt| nearest_corrections(prompt, span))
-        .fold(length, usize::min);
+    let (prompt, corrections) = nearest_of(span, said);
     Measurement {
         exact: false,
         corrections,
         length,
+        prompt,
     }
+}
+
+/// The prompt with the nearest stretch to the span, and how many corrections
+/// away it is. With nothing to compare against, every byte of the span is one
+/// and no prompt is named.
+pub fn nearest_of(span: &str, said: &[String]) -> (Option<usize>, usize) {
+    let mut best = (None, span.len());
+    for (at, prompt) in said.iter().enumerate() {
+        let corrections = nearest_corrections(prompt, span);
+        if corrections < best.1 {
+            best = (Some(at), corrections);
+        }
+    }
+    best
 }
 
 /// Spans to measure against what the namespace's prompts hold, in one call: the
@@ -180,6 +197,8 @@ mod tests {
                 case["length"].as_u64().unwrap() as usize,
                 "{case}"
             );
+            let prompt = case["prompt"].as_u64().map(|at| at as usize);
+            assert_eq!(got.prompt, prompt, "{case}");
         }
     }
 
@@ -199,7 +218,8 @@ mod tests {
             Measurement {
                 exact: true,
                 corrections: 0,
-                length: 5
+                length: 5,
+                prompt: Some(0)
             }
         );
     }
@@ -210,7 +230,7 @@ mod tests {
         let out = measure_json(r#"{"spans":["typed"],"said":["the user typed this"]}"#);
         assert_eq!(
             out,
-            r#"{"measurements":[{"exact":true,"corrections":0,"length":5}]}"#
+            r#"{"measurements":[{"exact":true,"corrections":0,"length":5,"prompt":0}]}"#
         );
     }
 }

@@ -24,6 +24,7 @@ func TestMeasureReadsTheVectors(t *testing.T) {
 			Exact       bool     `json:"exact"`
 			Corrections int      `json:"corrections"`
 			Length      int      `json:"length"`
+			Prompt      *int     `json:"prompt"`
 		} `json:"measurements"`
 	}
 	if err := json.Unmarshal(raw, &vectors); err != nil {
@@ -35,7 +36,7 @@ func TestMeasureReadsTheVectors(t *testing.T) {
 			t.Errorf("Measure(%q): %v", v.Span, err)
 			continue
 		}
-		want := Measurement{Exact: v.Exact, Corrections: v.Corrections, Length: v.Length}
+		want := Measurement{Exact: v.Exact, Corrections: v.Corrections, Length: v.Length, Prompt: promptAt(v.Prompt)}
 		if len(got) != 1 || got[0] != want {
 			t.Errorf("Measure(%q) = %v, want %v", v.Span, got, want)
 		}

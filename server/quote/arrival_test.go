@@ -3,7 +3,6 @@ package quote
 import (
 	"testing"
 
-	quoted "github.com/teranos/QNTX/ats/quote"
 	"go.uber.org/zap"
 )
 
@@ -26,8 +25,8 @@ func TestSpansAreTheDoubleQuotedOnes(t *testing.T) {
 func arrivalsWith(known bool, prompts ...string) *Arrivals {
 	return NewArrivals(
 		func(project string) (string, bool) { return "ground", known },
-		func(string) ([]string, error) { return prompts, nil },
-		substringJudge, zap.NewNop().Sugar())
+		func(string) ([]Said, error) { return saidOf(prompts...), nil },
+		substringMeasure, zap.NewNop().Sugar())
 }
 
 // A project no held namespace has a row of ground for is not known, and every
@@ -37,7 +36,7 @@ func TestArrivalOfAnUnknownProjectIsUnprovenanced(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if arrived.Known || len(arrived.Spans) != 1 || arrived.Spans[0].Verdict != quoted.Unsourced.String() {
+	if arrived.Known || len(arrived.Spans) != 1 || arrived.Spans[0].Kind != "unsourced" {
 		t.Errorf("arrived = %+v", arrived)
 	}
 }
@@ -51,8 +50,15 @@ func TestArrivalOfAKnownProjectIsMeasured(t *testing.T) {
 	if !arrived.Known || arrived.Namespace != "ground" || len(arrived.Spans) != 2 {
 		t.Fatalf("arrived = %+v", arrived)
 	}
-	if arrived.Spans[0].Verdict != quoted.Sourced.String() || arrived.Spans[1].Verdict != quoted.Unsourced.String() {
+	if arrived.Spans[0].Kind != "sourced" || arrived.Spans[1].Kind != "unsourced" {
 		t.Errorf("spans = %+v", arrived.Spans)
+	}
+	// The exact span says whose words it is, in which row, when, in which session.
+	if s := arrived.Spans[0]; s.Who != "did:key:person" || s.Row != "row-1" || s.Session != "sess-0" || s.At == "" {
+		t.Errorf("the matched span does not name its row: %+v", s)
+	}
+	if s := arrived.Spans[1]; s.Who != "" || s.Row != "" {
+		t.Errorf("an unsourced span named a row: %+v", s)
 	}
 }
 

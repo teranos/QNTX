@@ -6,6 +6,7 @@ package server
 
 import (
 	"context"
+	"github.com/teranos/QNTX/server/quote"
 	"net/http"
 	"slices"
 	"strconv"
@@ -59,6 +60,7 @@ type gitHubHost interface {
 	buildsOfRun(gitHubWorkflowRun) ([]string, error)
 	approvalsFromGitHub(ctx context.Context, event string, body []byte) ([]string, error)
 	fixturesFromGitHub(ctx context.Context, event string, body []byte) ([]string, error)
+	quotesFromGitHub(ctx context.Context, event string, body []byte) (*quote.Arrived, error)
 	buildsMovedBy(forge.Push) []string
 	vaultsMovedBy(forge.Push) []string
 	cometsMovedBy(forge.Push) []string

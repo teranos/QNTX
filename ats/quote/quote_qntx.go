@@ -22,6 +22,7 @@ type measureOutput struct {
 		Exact       bool `json:"exact"`
 		Corrections int  `json:"corrections"`
 		Length      int  `json:"length"`
+		Prompt      *int `json:"prompt"`
 	} `json:"measurements"`
 	Error string `json:"error"`
 }
@@ -60,7 +61,15 @@ func Measure(spans, said []string) ([]Measurement, error) {
 	}
 	measured := make([]Measurement, 0, len(spans))
 	for _, m := range out.Measurements {
-		measured = append(measured, Measurement{Exact: m.Exact, Corrections: m.Corrections, Length: m.Length})
+		measured = append(measured, Measurement{Exact: m.Exact, Corrections: m.Corrections, Length: m.Length, Prompt: promptAt(m.Prompt)})
 	}
 	return measured, nil
+}
+
+// promptAt is the prompt's place as Go keeps it: -1 when Rust named none.
+func promptAt(at *int) int {
+	if at == nil {
+		return -1
+	}
+	return *at
 }

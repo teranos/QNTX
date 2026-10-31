@@ -54,12 +54,17 @@ type degree struct {
 	Kind        string `json:"verdict"`
 	Corrections int    `json:"corrections"`
 	Length      int    `json:"length"`
+	// The prompt the span is nearest to: its row, who said it, when, in which session.
+	Row     string `json:"row,omitempty"`
+	Who     string `json:"who,omitempty"`
+	At      string `json:"at,omitempty"`
+	Session string `json:"session,omitempty"`
 }
 
 // Watch is quote.provenance: the claims a write carried, asked of the prompts.
 type Watch struct {
 	// prompts is every prompt the namespace holds, as typed.
-	prompts func(namespace string) ([]string, error)
+	prompts func(namespace string) ([]Said, error)
 	// measure is what was measured of each span against the prompts
 	// (ats/quote), which is Rust's.
 	measure func(spans, said []string) ([]quoted.Measurement, error)
@@ -92,7 +97,7 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrapf(err, "quote.provenance: reading the prompts of %s for %s", namespace, as.ID)
 	}
 
-	measurements, err := h.measure(spans, said)
+	measurements, err := h.measure(spans, Texts(said))
 	if err != nil {
 		return errors.Wrapf(err, "quote.provenance: measuring the spans of %s against the prompts of %s", as.ID, namespace)
 	}
@@ -109,8 +114,11 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 		default:
 			unsourced = append(unsourced, span)
 		}
-		degrees = append(degrees, degree{Span: span, Kind: kind(m),
-			Corrections: m.Corrections, Length: m.Length})
+		d := degree{Span: span, Kind: kind(m), Corrections: m.Corrections, Length: m.Length}
+		if near, ok := saidAt(said, m); ok {
+			d.Row, d.Who, d.At, d.Session = near.Row, near.Who, near.At, near.Session
+		}
+		degrees = append(degrees, d)
 	}
 	if len(degrees) == 0 {
 		return nil
@@ -186,7 +194,7 @@ func attrString(attrs map[string]any, key string) string {
 }
 
 // NewWatch is quote.provenance, asking prompts for what a namespace was told.
-func NewWatch(prompts func(namespace string) ([]string, error),
+func NewWatch(prompts func(namespace string) ([]Said, error),
 	measure func(spans, said []string) ([]quoted.Measurement, error), news *statusline.NewsLog,
 	mintedBy func(did string) (string, bool), logger *zap.SugaredLogger) *Watch {
 	return &Watch{prompts: prompts, measure: measure, news: news, mintedBy: mintedBy, logger: logger}

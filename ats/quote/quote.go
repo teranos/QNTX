@@ -25,4 +25,7 @@ type Measurement struct {
 	Corrections int
 	// Length is the span's length in bytes.
 	Length int
+	// Prompt is the place in the list of the prompt the span is nearest to, the
+	// one holding it when Exact; -1 when none was given or none is near.
+	Prompt int
 }

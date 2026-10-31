@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/server/quote"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -253,9 +254,15 @@ func TestQuoteReadsTheTranscriptsHumanTurns(t *testing.T) {
 	}
 	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
 
-	said, err := s.namespacePrompts(auth.NamespaceDefault)
+	said, err := s.namespaceSaid(auth.NamespaceDefault)
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"Build QNTX here", "and also, check open pr's"}, said)
+	assert.ElementsMatch(t, []string{"Build QNTX here", "and also, check open pr's"}, quote.Texts(said))
+	// Each prompt comes with its row: who typed it, when, in which session.
+	for _, one := range said {
+		if one.Row == "" || one.Session == "" || one.At == "" {
+			t.Errorf("a prompt without its row: %+v", one)
+		}
+	}
 }
 
 // "if SUPER cant access transcripts, make it so SUPER can access it"

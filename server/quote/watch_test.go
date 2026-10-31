@@ -38,9 +38,9 @@ func watchWith(prompts ...string) (*Watch, *statusline.NewsLog, *string) {
 	asked := new(string)
 	news := statusline.NewNewsLog()
 	return &Watch{
-		prompts: func(ns string) ([]string, error) {
+		prompts: func(ns string) ([]Said, error) {
 			*asked = ns
-			return prompts, nil
+			return saidOf(prompts...), nil
 		},
 		measure:  substringMeasure,
 		news:     news,

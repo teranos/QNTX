@@ -21,9 +21,14 @@ type Arrival struct {
 // A Span is one quoted span of an Arrival, measured.
 type Span struct {
 	Span        string `json:"span"`
-	Verdict     string `json:"verdict"`
+	Kind        string `json:"kind"`
 	Corrections int    `json:"corrections"`
 	Length      int    `json:"length"`
+	// The prompt the span is nearest to: its row, who said it, when, in which session.
+	Row     string `json:"row,omitempty"`
+	Who     string `json:"who,omitempty"`
+	At      string `json:"at,omitempty"`
+	Session string `json:"session,omitempty"`
 }
 
 // Arrived is an Arrival measured. Known is whether some held namespace has a
@@ -41,16 +46,16 @@ type Arrived struct {
 // namespace that holds the project's rows.
 type Arrivals struct {
 	namespaceOf func(project string) (string, bool)
-	prompts     func(namespace string) ([]string, error)
-	judge       func(spans, said []string) ([]quoted.Judgement, error)
+	prompts     func(namespace string) ([]Said, error)
+	measure     func(spans, said []string) ([]quoted.Measurement, error)
 	logger      *zap.SugaredLogger
 }
 
 // NewArrivals is the trigger on the webhook side of the quote subsystem.
 func NewArrivals(namespaceOf func(project string) (string, bool),
-	prompts func(namespace string) ([]string, error),
-	judge func(spans, said []string) ([]quoted.Judgement, error), logger *zap.SugaredLogger) *Arrivals {
-	return &Arrivals{namespaceOf: namespaceOf, prompts: prompts, judge: judge, logger: logger}
+	prompts func(namespace string) ([]Said, error),
+	measure func(spans, said []string) ([]quoted.Measurement, error), logger *zap.SugaredLogger) *Arrivals {
+	return &Arrivals{namespaceOf: namespaceOf, prompts: prompts, measure: measure, logger: logger}
 }
 
 // Spans is every span inside double quotes in text, in order. A span inside
@@ -101,7 +106,7 @@ func (a *Arrivals) Measure(arrival Arrival) (Arrived, error) {
 	arrived.Namespace, arrived.Known = namespace, known
 	if !known {
 		for _, span := range spans {
-			arrived.Spans = append(arrived.Spans, Span{Span: span, Verdict: quoted.Unsourced.String(), Corrections: len(span), Length: len(span)})
+			arrived.Spans = append(arrived.Spans, Span{Span: span, Kind: "unsourced", Corrections: len(span), Length: len(span)})
 		}
 		return arrived, nil
 	}
@@ -109,14 +114,17 @@ func (a *Arrivals) Measure(arrival Arrival) (Arrived, error) {
 	if err != nil {
 		return arrived, errors.Wrapf(err, "quote arrival: reading the prompts of %s for %s", namespace, arrival.Project)
 	}
-	judgements, err := a.judge(spans, said)
+	measurements, err := a.measure(spans, Texts(said))
 	if err != nil {
-		return arrived, errors.Wrapf(err, "quote arrival: judging %d spans of %s against the prompts of %s", len(spans), arrival.Ref, namespace)
+		return arrived, errors.Wrapf(err, "quote arrival: measuring %d spans of %s against the prompts of %s", len(spans), arrival.Ref, namespace)
 	}
 	for i, span := range spans {
-		j := judgements[i]
-		corrections, _ := j.Corrections()
-		arrived.Spans = append(arrived.Spans, Span{Span: span, Verdict: j.Verdict.String(), Corrections: corrections, Length: len(span)})
+		m := measurements[i]
+		s := Span{Span: span, Kind: kind(m), Corrections: m.Corrections, Length: m.Length}
+		if near, ok := saidAt(said, m); ok {
+			s.Row, s.Who, s.At, s.Session = near.Row, near.Who, near.At, near.Session
+		}
+		arrived.Spans = append(arrived.Spans, s)
 	}
 	return arrived, nil
 }

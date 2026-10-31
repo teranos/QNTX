@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
@@ -158,6 +159,35 @@ const maxHumanRead = 1_000_000
 // humanTurnsIn is everything the person said in the store: the human turns of
 // its transcripts, as typed. A store that will not answer is an error, not no
 // turns: the two read the same, and one of them calls every quote invented.
+// humanSaidIn is every prompt a namespace holds with the row it is in: who
+// typed it, when, in which session. What quote measures spans against.
+func humanSaidIn(store namespaces.Reading) ([]quote.Said, error) {
+	var said []quote.Said
+	for _, predicate := range humanPredicates {
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: maxHumanRead})
+		if err != nil {
+			return nil, errors.Wrapf(err, "reading %s", predicate)
+		}
+		for _, as := range found {
+			text, _ := as.Attributes["prompt"].(string)
+			if text == "" {
+				continue
+			}
+			// A prompt outside any session is no one's turn, as transcriptsOf reads them.
+			session := statusline.SessionOf(as.Contexts)
+			if session == "" {
+				continue
+			}
+			s := quote.Said{Text: text, Row: as.ID, At: as.Timestamp.UTC().Format(time.RFC3339), Session: session}
+			if len(as.Actors) > 0 {
+				s.Who = as.Actors[0]
+			}
+			said = append(said, s)
+		}
+	}
+	return said, nil
+}
+
 func humanTurnsIn(store namespaces.Reading) ([]string, error) {
 	var events []*types.As
 	for _, predicate := range humanPredicates {
