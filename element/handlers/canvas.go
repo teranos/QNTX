@@ -276,21 +276,27 @@ func (h *CanvasHandler) HandleCompositions(w http.ResponseWriter, r *http.Reques
 
 // === Element handlers ===
 
-func (h *CanvasHandler) handleListElements(w http.ResponseWriter, r *http.Request) {
+// listAll answers with every row list gives from the canvas the request is
+// scoped to; none is an empty array, not null.
+func listAll[T any](h *CanvasHandler, w http.ResponseWriter, r *http.Request, list func(*elementstorage.CanvasStore, context.Context) ([]*T, error)) {
 	store, ok := h.storeOf(w, r)
 	if !ok {
 		return
 	}
-	items, err := store.ListElements(r.Context())
+	items, err := list(store, r.Context())
 	if err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
 	}
 	if items == nil {
-		items = []*elementstorage.CanvasElement{}
+		items = []*T{}
 	}
 
 	h.writeJSON(w, items)
+}
+
+func (h *CanvasHandler) handleListElements(w http.ResponseWriter, r *http.Request) {
+	listAll(h, w, r, (*elementstorage.CanvasStore).ListElements)
 }
 
 func (h *CanvasHandler) handleGetElement(w http.ResponseWriter, r *http.Request, id string) {
@@ -350,20 +356,7 @@ func (h *CanvasHandler) handleDeleteElement(w http.ResponseWriter, r *http.Reque
 // === Composition handlers ===
 
 func (h *CanvasHandler) handleListCompositions(w http.ResponseWriter, r *http.Request) {
-	store, ok := h.storeOf(w, r)
-	if !ok {
-		return
-	}
-	comps, err := store.ListCompositions(r.Context())
-	if err != nil {
-		h.writeError(w, err, http.StatusInternalServerError)
-		return
-	}
-	if comps == nil {
-		comps = []*elementstorage.CanvasComposition{}
-	}
-
-	h.writeJSON(w, comps)
+	listAll(h, w, r, (*elementstorage.CanvasStore).ListCompositions)
 }
 
 func (h *CanvasHandler) handleGetComposition(w http.ResponseWriter, r *http.Request, id string) {
@@ -482,20 +475,7 @@ func (h *CanvasHandler) HandleMinimizedWindows(w http.ResponseWriter, r *http.Re
 }
 
 func (h *CanvasHandler) handleListMinimizedWindows(w http.ResponseWriter, r *http.Request) {
-	store, ok := h.storeOf(w, r)
-	if !ok {
-		return
-	}
-	windows, err := store.ListMinimizedWindows(r.Context())
-	if err != nil {
-		h.writeError(w, err, http.StatusInternalServerError)
-		return
-	}
-	if windows == nil {
-		windows = []*elementstorage.MinimizedWindow{}
-	}
-
-	h.writeJSON(w, windows)
+	listAll(h, w, r, (*elementstorage.CanvasStore).ListMinimizedWindows)
 }
 
 func (h *CanvasHandler) handleAddMinimizedWindow(w http.ResponseWriter, r *http.Request) {
