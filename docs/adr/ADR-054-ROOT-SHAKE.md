@@ -78,3 +78,5 @@ Status: Implemented, mostly
 - https://github.com/teranos/QNTX-Web/pull/13
 - https://github.com/teranos/QNTX-Web/pull/26
 - https://github.com/teranos/QNTX-Web/pull/29 (Via Claude Console Managed Agents go SDK)
+- https://github.com/teranos/QNTX/pull/1436 (roles-element)
+- https://github.com/teranos/QNTX/pull/1437 (parity-element)
