@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +36,11 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := n.Key()
 	// HEAD is ground asking whether its comet moved: the digest, and none of the bytes.
 	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		// "A comet held for the harness is checked there."
+		if n.ABI == "" {
+			h.Refuse(w, http.StatusNotFound, "/comet/"+key+" names no engine ABI: a sand is read as /comet/"+key+"/{abi}, the ABI of the ground that loads it")
+			return
+		}
 		path, err := Path(n)
 		if err != nil {
 			h.Refuse(w, http.StatusInternalServerError, err.Error())
@@ -42,8 +48,11 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		digest, err := Digest(path)
 		if errors.Is(err, os.ErrNotExist) {
-			said := "no comet of " + key + " is kept: POST /comet/" + key + " builds it"
-			if last, building := builds.Load(key); building {
+			said := "no comet of " + key + " is kept: POST /comet/" + n.Base() + " builds it"
+			if abis := keptABIs(n); len(abis) > 0 {
+				said = "no comet of " + key + " is kept: " + n.Base() + " is kept for engine ABI " + strings.Join(abis, ", ") + ", built from ground's "+Ground.Branch
+			}
+			if last, building := builds.Load(n.Base()); building {
 				said = "no comet of " + key + " is kept: " + last.(string)
 			}
 			h.Refuse(w, http.StatusNotFound, said)
@@ -62,6 +71,10 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodPost {
+		if n.ABI != "" {
+			h.Refuse(w, http.StatusUnprocessableEntity, "POST /comet/"+key+" names an ABI: a build makes the sand of ground's "+Ground.Branch+", whatever ABI it is, at POST /comet/"+n.Base())
+			return
+		}
 		// "A person configures controls; the model is on the enforced side of them"
 		machine, err := MachineOf(r.URL.Query().Get("machine"))
 		if err != nil {
@@ -79,27 +92,30 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Refuse(w, http.StatusMethodNotAllowed, r.Method+" /comet/"+key+": a comet is read with GET, its digest with HEAD or ?digest, and built with POST")
 }
 
-// Start builds n apart from whoever asked, and keeps what the build came to for GET to say.
-// A platform this node neither builds natively nor holds the stubs to link is refused, and why.
-func (h Handler) Start(n Name) error {
-	native, err := Native()
+// keptABIs is each engine ABI a sand of n's repository and platform is kept for.
+func keptABIs(n Name) []string {
+	dir, err := Dir()
 	if err != nil {
+		return nil
+	}
+	found, err := filepath.Glob(filepath.Join(dir, n.Owner, n.Repo, n.Platform, "*", SandFile(n.Platform)))
+	if err != nil {
+		return nil
+	}
+	abis := []string{}
+	for _, path := range found {
+		abis = append(abis, filepath.Base(filepath.Dir(path)))
+	}
+	return abis
+}
+
+// Start builds n apart from whoever asked, and keeps what the build came to for GET to say.
+// A sand imports no symbol, so any node builds it for every platform ground's flake names.
+func (h Handler) Start(n Name) error {
+	if _, err := Native(); err != nil {
 		return err
 	}
-	// A Darwin comet built on the box links Apple's stubs (ADR-050, The stubs); another Linux
-	// links what the binary cache holds for it, on a Linux node.
-	_, linux := linuxTargets[n.Platform]
-	if linux && n.Platform != native && !strings.HasSuffix(native, "-linux") {
-		return errors.Newf("this node builds %s natively, and links another Linux only from a Linux", native)
-	}
-	if _, darwin := darwinTargets[n.Platform]; darwin && n.Platform != native {
-		stubs, err := Stubs(n.Platform)
-		if err != nil {
-			return errors.Wrapf(err, "this node builds %s natively, and a comet for %s links Apple's stubs", native, n.Platform)
-		}
-		h.Log("A Darwin comet links the stubs the node holds", "comet", n.Key(), "sdk", stubs.SDK, "libgit2", stubs.Git2)
-	}
-	key := n.Key()
+	key := n.Base()
 	builds.Store(key, "building since "+time.Now().UTC().Format(time.RFC3339))
 	sacred.Go("comet.build."+key, func() {
 		if err := h.Builder.Build(h.Ctx, n); err != nil {

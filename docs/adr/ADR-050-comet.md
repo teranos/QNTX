@@ -131,7 +131,8 @@ TODO: UI CONCERN
 - The stubs are `sdk/MacOSX26.1.sdk` and `sdk/aarch64-darwin/libgit2.dylib` in
   the bootstrap bucket (the deploy repository's infra/macos-link-stubs.tf). The reconciler
   syncs them to the node's `~/.qntx/darwin-stubs` (infra/bootstrap/apply.sh),
-  where server/comet links against them.
+  where server/comet linked a whole ground against them. A sand imports no
+  symbol and links against nothing (server/comet sandLinked).
 
 ## Rituals
 
@@ -158,6 +159,10 @@ TODO: UI CONCERN
 - A push to a project's default branch, or to ground's main, rebuilds the
   comets it moves.
 - Comet on am ground, and the Comet stratum real.
+- A comet is the sand alone: POST `/comet/{owner}/{repo}/{platform}` builds
+  ground main's `make sand`, kept by the engine ABI it wrote; GET
+  `/comet/{owner}/{repo}/{platform}/{abi}` serves it to the ground of that ABI,
+  which loads it (ground source/sandload.d).
 - ground for the Node Agent: its settings.json runs it, and no turn is said to
   the agent until it stands. On q its rows name `ground comet a1ac2c0
   agent:root` and reached the node.
