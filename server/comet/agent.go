@@ -40,8 +40,8 @@ func AgentDrive(home string) string { return filepath.Join(home, "bin", "ground_
 func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	building.Lock()
 	defer building.Unlock()
-	platform, err := Native()
-	if err != nil {
+	// An agent's ground runs on the node that builds it: natively.
+	if _, err := Native(); err != nil {
 		return err
 	}
 	builds, err := b.Node.BuildsDir()
@@ -58,7 +58,7 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	sand := map[string]string{"comet.pbt": AgentDeclaration(filepath.Join(home, "work"), url)}
 	kept := map[string]string{"ground": AgentGround(home), "ground_hook": AgentHook(home),
 		"ground_sky": AgentSky(home), "ground_drive": AgentDrive(home)}
-	return b.ground(ctx, work, platform, sand, "agent:"+filepath.Base(home), kept)
+	return b.ground(ctx, work, sand, "agent:"+filepath.Base(home), kept)
 }
 
 // AgentPath is the PATH an agent's turn runs with: its own ground first, which its hooks and a

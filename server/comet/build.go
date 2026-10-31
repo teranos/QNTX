@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	errors "github.com/teranos/sacred-error"
 )
@@ -58,7 +57,7 @@ func (b Builder) Build(ctx context.Context, n Name) error {
 	return b.buildIn(ctx, n, work)
 }
 
-// buildIn builds the comet in work and keeps it.
+// buildIn builds the comet in work and keeps it, under the engine ABI the sand was built for.
 func (b Builder) buildIn(ctx context.Context, n Name, work string) error {
 	checkout := filepath.Join(work, "project")
 	rev, err := b.unpack(ctx, Source{Owner: n.Owner, Repo: n.Repo}, work, checkout)
@@ -80,14 +79,24 @@ func (b Builder) buildIn(ctx context.Context, n Name, work string) error {
 		return err
 	}
 	sand["comet.pbt"] = Declaration(checkout, n.Owner, n.Repo)
+	of := n.Owner + "/" + n.Repo + "@" + short(rev) + " " + n.Machine + "@" + short(machineRev)
+	// "only the compiled controls being their own thing shipped to the user"
+	// A comet is the sand alone, loaded by the ground that lands it (ground source/sandload.d).
+	src, env, err := b.prepare(ctx, work, sand, of)
+	if err != nil {
+		return errors.Wrapf(err, "the comet of %s did not build", n.Base())
+	}
+	abi, err := b.sandIn(ctx, src, env, n.Platform)
+	if err != nil {
+		return errors.Wrapf(err, "the comet of %s did not build", n.Base())
+	}
+	n.ABI = abi
 	kept, err := Path(n)
 	if err != nil {
 		return err
 	}
-	of := n.Owner + "/" + n.Repo + "@" + short(rev) + " " + n.Machine + "@" + short(machineRev)
-	// A comet answers its project's hooks (ground source/comet.d handOff): it is ground_hook.
-	if err := b.ground(ctx, work, n.Platform, sand, of, map[string]string{"ground_hook": kept}); err != nil {
-		return errors.Wrapf(err, "the comet of %s did not build", n.Key())
+	if err := keepBuilt(src, filepath.Join("build", SandFile(n.Platform)), kept); err != nil {
+		return err
 	}
 	return errors.Wrapf(os.WriteFile(kept+".machine", []byte(n.Machine), 0o644), "the comet of %s was kept, and the machine it carries was not written beside it", n.Key())
 }
@@ -143,57 +152,77 @@ func (b Builder) unpack(ctx context.Context, source Source, work, dir string) (s
 		"failed to unpack %s at %s", source.String(), rev)
 }
 
-// ground builds ground's main in work with sand beside its own controls, for platform, and keeps
-// each binary kept names at its path, with its digest beside it. of names what the sand was built
-// from, for its version.
-func (b Builder) ground(ctx context.Context, work, platform string, sand map[string]string, of string, kept map[string]string) error {
+// prepare unpacks ground's main in work with sand beside its own controls, and answers where, and
+// the environment its steps run in. of names what the sand was built from, for its version.
+func (b Builder) prepare(ctx context.Context, work string, sand map[string]string, of string) (string, []string, error) {
 	src := filepath.Join(work, "ground")
 	groundRev, err := b.unpack(ctx, Ground, work, src)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	if err := os.WriteFile(filepath.Join(src, ".version"), []byte(Version(groundRev, of)), 0o644); err != nil {
-		return errors.Wrapf(err, "failed to write the comet's version in %s", src)
+		return "", nil, errors.Wrapf(err, "failed to write the comet's version in %s", src)
 	}
 	local := filepath.Join(src, "controls", "local")
 	if err := os.MkdirAll(local, 0o755); err != nil {
-		return errors.Wrapf(err, "failed to make %s", local)
+		return "", nil, errors.Wrapf(err, "failed to make %s", local)
 	}
 	for name, pbt := range sand {
 		if err := os.WriteFile(filepath.Join(local, name), []byte(pbt), 0o644); err != nil {
-			return errors.Wrapf(err, "failed to write the comet's %s in %s", name, local)
+			return "", nil, errors.Wrapf(err, "failed to write the comet's %s in %s", name, local)
 		}
 	}
 	if err := os.Mkdir(filepath.Join(work, "tmp"), 0o755); err != nil {
-		return errors.Wrapf(err, "failed to make the comet's temp directory in %s", work)
+		return "", nil, errors.Wrapf(err, "failed to make the comet's temp directory in %s", work)
 	}
+	return src, []string{"PATH=" + b.NixBin + ":" + os.Getenv("PATH"), "TMPDIR=" + filepath.Join(work, "tmp")}, nil
+}
 
-	env := []string{"PATH=" + b.NixBin + ":" + os.Getenv("PATH"), "TMPDIR=" + filepath.Join(work, "tmp")}
-	native, err := Native()
+// ground builds ground's main in work with sand beside its own controls, natively, and keeps
+// each binary kept names at its path, with its digest beside it.
+func (b Builder) ground(ctx context.Context, work string, sand map[string]string, of string, kept map[string]string) error {
+	src, env, err := b.prepare(ctx, work, sand, of)
 	if err != nil {
 		return err
 	}
 	for name, path := range kept {
-		if platform == native {
-			if err := b.step(ctx, src, env, b.inGround(src, "make", goalOf(name))); err != nil {
-				return err
-			}
-		}
-		if _, linux := linuxTargets[platform]; linux && platform != native {
-			if err := b.buildLinux(ctx, src, env, platform, name); err != nil {
-				return err
-			}
-		}
-		if _, darwin := darwinTargets[platform]; darwin {
-			if err := b.buildDarwin(ctx, src, env, platform, name); err != nil {
-				return err
-			}
+		if err := b.step(ctx, src, env, b.inGround(src, "make", goalOf(name))); err != nil {
+			return err
 		}
 		if err := keepBuilt(src, name, path); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// sandIn builds the sand in src for platform at build/<SandFile>, and answers the engine ABI it is for.
+// make sand builds it natively and says its ABI; the ABI is one layout hash whichever 64-bit platform
+// ground's flake names, so a sand for another is compiled for its triple and linked with nothing.
+func (b Builder) sandIn(ctx context.Context, src string, env []string, platform string) (string, error) {
+	native, err := Native()
+	if err != nil {
+		return "", err
+	}
+	if err := b.step(ctx, src, env, b.inGround(src, "make", "sand")); err != nil {
+		return "", err
+	}
+	abi, err := BuiltABI(src)
+	if err != nil {
+		return "", err
+	}
+	if platform != native {
+		steps := [][]string{
+			b.inGround(src, sandCompiled(platform)...),
+			append([]string{"shell", "--inputs-from", src, "nixpkgs#lld_21", "-c"}, sandLinked(platform)...),
+		}
+		for _, args := range steps {
+			if err := b.step(ctx, src, env, args); err != nil {
+				return "", err
+			}
+		}
+	}
+	return abi, nil
 }
 
 // keepBuilt puts the binary built in src as name at kept, with its digest beside it.
@@ -216,15 +245,6 @@ func keepBuilt(src, name, kept string) error {
 	return KeepDigest(kept)
 }
 
-// entryOf is the module a binary of ground's is built from: ground from source/main.d, each
-// other from bin/<name>.d (ground's Makefile).
-func entryOf(name string) string {
-	if name == "ground" {
-		return "source/main.d"
-	}
-	return "bin/" + name + ".d"
-}
-
 // goalOf is the make goal that builds a binary of ground's natively.
 func goalOf(name string) string {
 	if name == "ground" {
@@ -244,138 +264,38 @@ func (b Builder) step(ctx context.Context, src string, env []string, args []stri
 	return b.Node.Run(ctx, src, env, "nice", append([]string{"-n", "19", filepath.Join(b.NixBin, "nix")}, args...)...)
 }
 
-// "A Darwin build on the box takes clang as cc, ld64.lld as linker, and Apple's link stubs"
-
-// darwinTargets are the Darwin platforms a comet is linked for: LDC's triple and ld64's arch.
+// darwinTargets are the Darwin platforms a sand is linked for: LDC's triple and ld64's arch.
 var darwinTargets = map[string]struct{ triple, arch string }{
 	"aarch64-darwin": {"arm64-apple-macos14.0", "arm64"},
 	"x86_64-darwin":  {"x86_64-apple-macos14.0", "x86_64"},
 }
 
-// DarwinStubs is what a Darwin comet links against: Apple's SDK stubs, and the libgit2 the
-// machine it lands on loads, which no SDK carries.
-type DarwinStubs struct{ SDK, Git2 string }
-
-// Stubs are the stubs the node holds for platform, under ~/.qntx/darwin-stubs: the box's
-// reconciler unpacks them there from the bootstrap bucket (ADR-050, The stubs).
-func Stubs(platform string) (DarwinStubs, error) {
-	if _, darwin := darwinTargets[platform]; !darwin {
-		return DarwinStubs{}, errors.Newf("%s is not a platform this node links: it links Darwin alone", platform)
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return DarwinStubs{}, errors.Wrap(err, "the node's home was not found, so its stubs were not looked for")
-	}
-	dir := filepath.Join(home, ".qntx", "darwin-stubs")
-	stubs := DarwinStubs{SDK: filepath.Join(dir, "MacOSX.sdk"), Git2: filepath.Join(dir, platform, "libgit2.dylib")}
-	for _, held := range []string{filepath.Join(stubs.SDK, "SDKSettings.json"), stubs.Git2} {
-		info, err := os.Stat(held)
-		if err != nil {
-			return DarwinStubs{}, errors.Wrapf(err, "this node does not hold %s", held)
-		}
-		if info.IsDir() {
-			return DarwinStubs{}, errors.Newf("%s is a directory, where a stub is a file", held)
-		}
-	}
-	return stubs, nil
+// linuxTargets are the Linux platforms a sand is linked for: LDC's triple.
+var linuxTargets = map[string]string{
+	"aarch64-linux": "aarch64-linux-gnu",
+	"x86_64-linux":  "x86_64-linux-gnu",
 }
 
-// buildDarwin builds name in src for a Darwin platform: wind folds the sand, LDC compiles
-// for the target's triple, and ld64.lld links against Apple's stubs. With -betterC ground
-// links no druntime and no Phobos, so the stubs are the whole of what it links.
-func (b Builder) buildDarwin(ctx context.Context, src string, env []string, platform, name string) error {
-	target := darwinTargets[platform]
-	stubs, err := Stubs(platform)
-	if err != nil {
-		return err
+// sandCompiled is the LDC invocation that compiles the sand for platform into build/sand.o, as
+// ground's make sand compiles it: bin/sand.d with builtin_sand and sandview alone.
+func sandCompiled(platform string) []string {
+	triple := linuxTargets[platform]
+	pic := []string{"-relocation-model=pic"}
+	if target, darwin := darwinTargets[platform]; darwin {
+		triple, pic = target.triple, nil
 	}
-	stamp := []byte(time.Now().UTC().Format("2006-01-02T15:04:05Z") + "\n")
-	if err := os.WriteFile(filepath.Join(src, ".builddate"), stamp, 0o644); err != nil {
-		return errors.Wrapf(err, "failed to write the build date in %s", src)
-	}
-	steps := [][]string{
-		b.inGround(src, "make", "wind"),
-		b.inGround(src, "tools/wind"),
-		b.inGround(src, compiled(target.triple, name)...),
-		{"shell", "--inputs-from", src, "nixpkgs#lld_21", "-c", "ld64.lld", "-arch", target.arch,
-			"-platform_version", "macos", "14.0", "14.0", "-syslibroot", stubs.SDK, "-o", name, name + ".o",
-			"-lSystem", "-lobjc", "-lsqlite3", "-lcurl", "-lpthread", "-lm", stubs.Git2},
-	}
-	for _, args := range steps {
-		if err := b.step(ctx, src, env, args); err != nil {
-			return err
-		}
-	}
-	return nil
+	args := []string{"ldc2", "-betterC", "--lowmem", "-mtriple=" + triple, "-O", "-release",
+		"-fvisibility=hidden", "--function-sections", "--data-sections"}
+	args = append(args, pic...)
+	return append(args, "-I=source", "-J=.", "-i=builtin_sand", "-i=sandview", "-c", "--singleobj", "-of=build/sand.o", "bin/sand.d")
 }
 
-// linuxTargets are the Linux platforms a comet is linked for on another Linux: LDC's triple and the
-// dynamic loader glibc names for it.
-var linuxTargets = map[string]struct{ triple, loader string }{
-	"aarch64-linux": {"aarch64-linux-gnu", "ld-linux-aarch64.so.1"},
-	"x86_64-linux":  {"x86_64-linux-gnu", "ld-linux-x86-64.so.2"},
-}
-
-// buildLinux builds name in src for a Linux platform the node does not run: LDC compiles for its
-// triple, and ld.lld links against that platform's glibc, sqlite, curl, libgit2 and libgcc, fetched
-// from the binary cache at ground's pin and built nowhere.
-func (b Builder) buildLinux(ctx context.Context, src string, env []string, platform, name string) error {
-	target := linuxTargets[platform]
-	stamp := []byte(time.Now().UTC().Format("2006-01-02T15:04:05Z") + "\n")
-	if err := os.WriteFile(filepath.Join(src, ".builddate"), stamp, 0o644); err != nil {
-		return errors.Wrapf(err, "failed to write the build date in %s", src)
+// sandLinked links build/sand.o into the library platform loads, against nothing.
+func sandLinked(platform string) []string {
+	out := filepath.Join("build", SandFile(platform))
+	if target, darwin := darwinTargets[platform]; darwin {
+		return []string{"ld64.lld", "-dylib", "-arch", target.arch, "-platform_version", "macos", "14.0", "14.0",
+			"-dead_strip", "-o", out, "build/sand.o"}
 	}
-	libs := filepath.Join(src, ".comet-libs")
-	if err := os.MkdirAll(libs, 0o755); err != nil {
-		return errors.Wrapf(err, "failed to make %s", libs)
-	}
-	held := map[string]string{}
-	// nix names an out-link for an output other than out after it: libgit2's lib lands at <link>-lib.
-	for lib, landed := range map[string]string{"glibc.out": "", "sqlite.out": "", "curl.out": "", "libgit2.lib": "-lib", "gcc.cc": ""} {
-		link := filepath.Join(libs, lib)
-		if err := b.step(ctx, src, env, []string{"build", "--out-link", link, "--max-jobs", "0", "--system", platform,
-			"--inputs-from", src, "nixpkgs#" + lib}); err != nil {
-			return errors.Wrapf(err, "%s for %s is not in the binary cache at ground's pin", lib, platform)
-		}
-		path, err := filepath.EvalSymlinks(link + landed)
-		if err != nil {
-			return errors.Wrapf(err, "the %s nix fetched was not read at %s", lib, link)
-		}
-		held[lib] = path
-	}
-	found, err := filepath.Glob(filepath.Join(held["gcc.cc"], "lib", "gcc", "*", "*", "libgcc.a"))
-	if err != nil || len(found) != 1 {
-		return errors.Newf("one libgcc.a is under %s/lib/gcc for %s, and %d were found", held["gcc.cc"], platform, len(found))
-	}
-	libgcc := filepath.Dir(found[0])
-	glibc := filepath.Join(held["glibc.out"], "lib")
-	paths := []string{glibc, filepath.Join(held["sqlite.out"], "lib"), filepath.Join(held["curl.out"], "lib"), filepath.Join(held["libgit2.lib"], "lib")}
-	link := []string{"shell", "--inputs-from", src, "nixpkgs#lld_21", "-c", "ld.lld", "-o", name,
-		"-dynamic-linker", filepath.Join(glibc, target.loader),
-		filepath.Join(glibc, "crt1.o"), filepath.Join(glibc, "crti.o"), filepath.Join(libgcc, "crtbegin.o"), name + ".o",
-		"-rpath", strings.Join(paths, ":")}
-	for _, p := range append(paths, libgcc) {
-		link = append(link, "-L"+p)
-	}
-	link = append(link, "-lsqlite3", "-lcurl", "-lgit2", "-lpthread", "-lm", "-ldl", "-lrt", "-lc", "-lgcc",
-		filepath.Join(libgcc, "crtend.o"), filepath.Join(glibc, "crtn.o"))
-	steps := [][]string{
-		b.inGround(src, "make", "wind"),
-		b.inGround(src, "tools/wind"),
-		b.inGround(src, compiled(target.triple, name)...),
-		link,
-	}
-	for _, args := range steps {
-		if err := b.step(ctx, src, env, args); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// compiled is the LDC invocation that compiles name for triple into name.o: its entry point and
-// the modules it imports (-i), as ground's Makefile builds it.
-func compiled(triple, name string) []string {
-	return []string{"ldc2", "-betterC", "--lowmem", "-mtriple=" + triple, "-O", "-release",
-		"-I=source", "-J=.", "-i", "-c", "--singleobj", "-of=" + name + ".o", entryOf(name)}
+	return []string{"ld.lld", "-shared", "--gc-sections", "-z", "defs", "-o", out, "build/sand.o"}
 }

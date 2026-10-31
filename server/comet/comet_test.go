@@ -19,23 +19,54 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestACometIsNamedByItsRepositoryAndPlatform(t *testing.T) {
-	n, err := Of("/comet/abcd-nl/grove/x86_64-linux")
+// "A comet is one sand for one user, one project and one platform."
+// ground asks for the sand of its own engine ABI (ground source/comet.d cometUrlInto); a build is asked for without one.
+func TestACometIsNamedByItsRepositoryPlatformAndEngineABI(t *testing.T) {
+	n, err := Of("/comet/abcd-nl/grove/x86_64-linux/13452661796216880070")
 	require.NoError(t, err)
-	assert.Equal(t, Name{Owner: "abcd-nl", Repo: "grove", Platform: "x86_64-linux"}, n)
-	assert.Equal(t, "abcd-nl/grove/x86_64-linux", n.Key())
+	assert.Equal(t, Name{Owner: "abcd-nl", Repo: "grove", Platform: "x86_64-linux", ABI: "13452661796216880070"}, n)
+	assert.Equal(t, "abcd-nl/grove/x86_64-linux/13452661796216880070", n.Key())
 
-	for _, path := range []string{"/comet/", "/comet/abcd-nl", "/comet/abcd-nl/grove", "/comet/abcd-nl/grove/", "/comet/abcd-nl/grove/x86_64-linux/more", "/comet//grove/x86_64-linux", "/comet/../grove/x86_64-linux", "/comet/abcd-nl/grove/windows"} {
+	built, err := Of("/comet/abcd-nl/grove/x86_64-linux")
+	require.NoError(t, err)
+	assert.Equal(t, Name{Owner: "abcd-nl", Repo: "grove", Platform: "x86_64-linux"}, built)
+	assert.Equal(t, "abcd-nl/grove/x86_64-linux", built.Key())
+
+	for _, path := range []string{"/comet/", "/comet/abcd-nl", "/comet/abcd-nl/grove", "/comet/abcd-nl/grove/", "/comet/abcd-nl/grove/x86_64-linux/", "/comet/abcd-nl/grove/x86_64-linux/abc", "/comet/abcd-nl/grove/x86_64-linux/1/more", "/comet//grove/x86_64-linux", "/comet/../grove/x86_64-linux", "/comet/abcd-nl/grove/windows"} {
 		_, err := Of(path)
 		assert.Error(t, err, path)
 	}
 }
 
+// A comet is make sand's library, kept by the engine ABI it was built for.
+func TestACometIsKeptAsTheSandOfItsABI(t *testing.T) {
+	t.Setenv("HOME", "/h")
+	linux, err := Path(Name{Owner: "abcd-nl", Repo: "grove", Platform: "x86_64-linux", ABI: "7"})
+	require.NoError(t, err)
+	assert.Equal(t, "/h/.qntx/comets/abcd-nl/grove/x86_64-linux/7/libground_sand.so", linux)
+	darwin, err := Path(Name{Owner: "abcd-nl", Repo: "grove", Platform: "aarch64-darwin", ABI: "7"})
+	require.NoError(t, err)
+	assert.Equal(t, "/h/.qntx/comets/abcd-nl/grove/aarch64-darwin/7/libground_sand.dylib", darwin)
+
+	// The ABI a build is kept under is the one make sand wrote beside the library.
+	src := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(src, "build"), 0o755))
+	_, err = BuiltABI(src)
+	assert.ErrorContains(t, err, "libground_sand.abi")
+	require.NoError(t, os.WriteFile(filepath.Join(src, "build", "libground_sand.abi"), []byte("13452661796216880070\n"), 0o644))
+	abi, err := BuiltABI(src)
+	require.NoError(t, err)
+	assert.Equal(t, "13452661796216880070", abi)
+	require.NoError(t, os.WriteFile(filepath.Join(src, "build", "libground_sand.abi"), []byte("not an abi\n"), 0o644))
+	_, err = BuiltABI(src)
+	assert.ErrorContains(t, err, "not an abi")
+}
+
 func TestAmGroundNamesEachCometTheNodeKeeps(t *testing.T) {
 	dir := t.TempDir()
-	kept := filepath.Join(dir, "abcd-nl", "grove", "aarch64-darwin", "ground")
+	kept := filepath.Join(dir, "abcd-nl", "grove", "aarch64-darwin", "7", "libground_sand.dylib")
 	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
-	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o644))
 	require.NoError(t, KeepDigest(kept))
 	require.NoError(t, os.WriteFile(kept+".machine", []byte("abcd-nl/l"), 0o644))
 	// A build still landing is not a comet yet.
@@ -57,6 +88,7 @@ func TestAmGroundNamesEachCometTheNodeKeeps(t *testing.T) {
 	assert.InDelta(t, 7.0/(1<<20), comets[0].Size, 1e-12)
 	require.Len(t, comets[0].Builds, 1)
 	assert.Equal(t, "aarch64-darwin", comets[0].Builds[0].Platform)
+	assert.Equal(t, "7", comets[0].Builds[0].ABI)
 	assert.Equal(t, hex.EncodeToString(sum[:]), comets[0].Builds[0].Digest)
 	assert.Equal(t, int64(7), comets[0].Builds[0].Bytes)
 
@@ -84,79 +116,79 @@ func handler() Handler {
 func TestACometIsServedWithItsDigestAndAskedForByIt(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	kept := filepath.Join(home, ".qntx", "comets", "abcd-nl", "grove", "x86_64-linux", "ground")
+	kept := filepath.Join(home, ".qntx", "comets", "abcd-nl", "grove", "x86_64-linux", "7", "libground_sand.so")
 	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
-	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o644))
 	require.NoError(t, KeepDigest(kept))
 	sum := sha256.Sum256([]byte("a comet"))
 	h := handler()
 
 	got := httptest.NewRecorder()
-	h.ServeHTTP(got, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux", nil))
+	h.ServeHTTP(got, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux/7", nil))
 	assert.Equal(t, http.StatusOK, got.Code)
 	assert.Equal(t, hex.EncodeToString(sum[:]), got.Header().Get("X-Comet-Digest"))
 	assert.Equal(t, "a comet", got.Body.String())
 
-	// Asking whether it moved costs a header, not the binary.
+	// Asking whether it moved costs a header, not the sand.
 	head := httptest.NewRecorder()
-	h.ServeHTTP(head, httptest.NewRequest(http.MethodHead, "/comet/abcd-nl/grove/x86_64-linux", nil))
+	h.ServeHTTP(head, httptest.NewRequest(http.MethodHead, "/comet/abcd-nl/grove/x86_64-linux/7", nil))
 	assert.Equal(t, http.StatusOK, head.Code)
 	assert.Equal(t, hex.EncodeToString(sum[:]), head.Header().Get("X-Comet-Digest"))
 	assert.Empty(t, head.Body.String())
 
 	none := httptest.NewRecorder()
-	h.ServeHTTP(none, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/other/x86_64-linux", nil))
+	h.ServeHTTP(none, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/other/x86_64-linux/7", nil))
 	assert.Equal(t, http.StatusNotFound, none.Code)
+
+	// An engine of another ABI is told which ABIs are kept, and a read that names none is refused.
+	other := httptest.NewRecorder()
+	h.ServeHTTP(other, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux/8?digest", nil))
+	assert.Equal(t, http.StatusNotFound, other.Code)
+	assert.Contains(t, other.Body.String(), "kept for engine ABI 7")
+	bare := httptest.NewRecorder()
+	h.ServeHTTP(bare, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux", nil))
+	assert.Equal(t, http.StatusNotFound, bare.Code)
+	assert.Contains(t, bare.Body.String(), "engine ABI")
 
 	// The digest alone: what ground's sky asks every five seconds.
 	digest := httptest.NewRecorder()
-	h.ServeHTTP(digest, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux?digest", nil))
+	h.ServeHTTP(digest, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux/7?digest", nil))
 	assert.Equal(t, http.StatusOK, digest.Code)
 	assert.JSONEq(t, `{"digest":"`+hex.EncodeToString(sum[:])+`"}`, digest.Body.String())
 }
 
-func TestACometForAPlatformWithoutItsStubsIsRefusedWithWhy(t *testing.T) {
+// A build makes the sand of ground's main, whatever ABI it is: a POST that names one is refused.
+func TestABuildIsAskedWithoutAnABI(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	native, err := Native()
-	require.NoError(t, err)
-	other := "aarch64-darwin"
-	if native == other {
-		other = "x86_64-linux"
-	}
 	got := httptest.NewRecorder()
-	handler().ServeHTTP(got, httptest.NewRequest(http.MethodPost, "/comet/abcd-nl/grove/"+other+"?machine=abcd-nl/l", nil))
+	handler().ServeHTTP(got, httptest.NewRequest(http.MethodPost, "/comet/abcd-nl/grove/x86_64-linux/7?machine=abcd-nl/l", nil))
 	assert.Equal(t, http.StatusUnprocessableEntity, got.Code)
-	assert.Contains(t, got.Body.String(), "this node builds "+native+" natively")
+	assert.Contains(t, got.Body.String(), "POST /comet/abcd-nl/grove/x86_64-linux")
 }
 
-func TestADarwinCometLinksTheStubsTheNodeHolds(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	_, err := Stubs("aarch64-darwin")
-	assert.ErrorContains(t, err, "this node does not hold")
-	_, err = Stubs("x86_64-linux")
-	assert.ErrorContains(t, err, "it links Darwin alone")
-
-	stubs := filepath.Join(home, ".qntx", "darwin-stubs")
-	require.NoError(t, os.MkdirAll(filepath.Join(stubs, "MacOSX.sdk"), 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(stubs, "aarch64-darwin"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(stubs, "MacOSX.sdk", "SDKSettings.json"), []byte("{}"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(stubs, "aarch64-darwin", "libgit2.dylib"), []byte("a dylib"), 0o644))
-	held, err := Stubs("aarch64-darwin")
-	require.NoError(t, err)
-	assert.Equal(t, DarwinStubs{SDK: filepath.Join(stubs, "MacOSX.sdk"), Git2: filepath.Join(stubs, "aarch64-darwin", "libgit2.dylib")}, held)
-	// Each Darwin platform carries the libgit2 of its own architecture.
-	_, err = Stubs("x86_64-darwin")
-	assert.ErrorContains(t, err, "x86_64-darwin")
-}
-
-// A binary of ground's is built from its entry point and what it imports (ldc2 -i): ground from
-// source/main.d, each other from bin/<name>.d, by the make goal that builds it.
-func TestEachOfGroundsBinariesIsBuiltFromItsEntryPoint(t *testing.T) {
-	assert.Equal(t, "source/main.d", entryOf("ground"))
-	assert.Equal(t, "bin/ground_hook.d", entryOf("ground_hook"))
+// A binary of ground's is built by the make goal that builds it.
+func TestEachOfGroundsBinariesIsBuiltByItsGoal(t *testing.T) {
 	assert.Equal(t, "build", goalOf("ground"))
 	assert.Equal(t, "ground_hook", goalOf("ground_hook"))
+}
+
+// "only the compiled controls being their own thing shipped to the user"
+// A sand for another platform is compiled as ground's `make sand` compiles it, and linked with
+// nothing: it imports no symbol, so no stubs and no libraries.
+func TestASandForAnotherPlatformIsCompiledAloneAndLinkedWithNothing(t *testing.T) {
+	assert.Equal(t, []string{"ldc2", "-betterC", "--lowmem", "-mtriple=arm64-apple-macos14.0", "-O", "-release",
+		"-fvisibility=hidden", "--function-sections", "--data-sections",
+		"-I=source", "-J=.", "-i=builtin_sand", "-i=sandview", "-c", "--singleobj", "-of=build/sand.o", "bin/sand.d"},
+		sandCompiled("aarch64-darwin"))
+	assert.Contains(t, sandCompiled("x86_64-linux"), "-relocation-model=pic")
+	assert.NotContains(t, sandCompiled("aarch64-darwin"), "-relocation-model=pic")
+
+	assert.Equal(t, []string{"ld64.lld", "-dylib", "-arch", "arm64", "-platform_version", "macos", "14.0", "14.0",
+		"-dead_strip", "-o", "build/libground_sand.dylib", "build/sand.o"}, sandLinked("aarch64-darwin"))
+	assert.Equal(t, []string{"ld.lld", "-shared", "--gc-sections", "-z", "defs", "-o", "build/libground_sand.so", "build/sand.o"},
+		sandLinked("aarch64-linux"))
+	assert.Equal(t, "libground_sand.dylib", SandFile("x86_64-darwin"))
+	assert.Equal(t, "libground_sand.so", SandFile("x86_64-linux"))
 }
 
 // "A person configures controls; the model is on the enforced side of them"
@@ -180,30 +212,33 @@ func TestACometCarriesTheControlsOfTheMachineAPersonNamed(t *testing.T) {
 
 	// A comet that does not say which machine it carries is not rebuilt as if it carried none.
 	dir := t.TempDir()
-	kept := filepath.Join(dir, "abcd-nl", "grove", "x86_64-linux", "ground")
+	kept := filepath.Join(dir, "abcd-nl", "grove", "x86_64-linux", "7", "libground_sand.so")
 	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
-	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o644))
 	_, err = Names(dir)
 	assert.ErrorContains(t, err, "does not say which machine")
 }
 
 func TestAPushRebuildsTheCometsItMoves(t *testing.T) {
 	dir := t.TempDir()
-	for _, key := range []string{"abcd-nl/grove/x86_64-linux", "abcd-nl/grove/aarch64-darwin", "abcd-nl/other/x86_64-linux"} {
-		kept := filepath.Join(dir, filepath.FromSlash(key), "ground")
+	for _, key := range []string{"abcd-nl/grove/x86_64-linux/7/libground_sand.so", "abcd-nl/grove/aarch64-darwin/7/libground_sand.dylib", "abcd-nl/other/x86_64-linux/7/libground_sand.so", "abcd-nl/other/x86_64-linux/6/libground_sand.so"} {
+		kept := filepath.Join(dir, filepath.FromSlash(key))
 		require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
-		require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+		require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o644))
 		require.NoError(t, os.WriteFile(kept+".machine", []byte("abcd-nl/l"), 0o644))
 	}
 	kept, err := Names(dir)
 	require.NoError(t, err)
-	require.Len(t, kept, 3)
+	require.Len(t, kept, 4)
 
 	grove := MovedBy(kept, "abcd-nl/grove", "master", "master")
-	assert.ElementsMatch(t, []Name{{"abcd-nl", "grove", "x86_64-linux", "abcd-nl/l"}, {"abcd-nl", "grove", "aarch64-darwin", "abcd-nl/l"}}, grove)
+	assert.ElementsMatch(t, []Name{
+		{Owner: "abcd-nl", Repo: "grove", Platform: "x86_64-linux", ABI: "7", Machine: "abcd-nl/l"},
+		{Owner: "abcd-nl", Repo: "grove", Platform: "aarch64-darwin", ABI: "7", Machine: "abcd-nl/l"},
+	}, grove)
 	// A branch that is not the project's default moves nothing.
 	assert.Empty(t, MovedBy(kept, "abcd-nl/grove", "a-branch", "master"))
-	// Ground's main moves every comet, since every comet is built from it.
+	// Ground's main moves every comet, once per repository and platform whatever ABIs it keeps.
 	assert.Len(t, MovedBy(kept, "teranos/ground", "main", "main"), 3)
 	assert.Empty(t, MovedBy(kept, "teranos/ground", "a-branch", "main"))
 }
