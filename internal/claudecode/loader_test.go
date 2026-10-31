@@ -68,6 +68,54 @@ func TestAnELFWhoseLoaderIsNotHereRunsThroughTheNodesOwn(t *testing.T) {
 	}
 }
 
+// "Could not start dynamically linked executable"
+// On k the loader an ELF names is there, NixOS's stub-ld, which only says it cannot run it.
+// A file there that names itself no shared object is no loader: the ELF runs through the node's own.
+func TestAnELFWhoseLoaderIsAStubRunsThroughTheNodesOwn(t *testing.T) {
+	self := ownELF(t)
+	own, _, err := interpreterOf(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The stub's path is as long as the loader's, so the ELF stays whole.
+	prefix := "/tmp/stub-ld-"
+	if len(prefix) >= len(own) {
+		t.Skipf("%s is too short a loader path to stand a stub in for", own)
+	}
+	stub := prefix + strings.Repeat("x", len(own)-len(prefix))
+	// An executable, as the stub is: no SONAME names it a shared object.
+	if err := os.WriteFile(stub, raw, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Remove(stub); err != nil {
+			t.Errorf("the stub %s was not removed: %v", stub, err)
+		}
+	})
+	at := bytes.Index(raw, []byte(own+"\x00"))
+	if at < 0 {
+		t.Fatalf("%s does not hold its own loader %s", self, own)
+	}
+	copy(raw[at:], stub)
+	claude := filepath.Join(t.TempDir(), "claude")
+	if err := os.WriteFile(claude, raw, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	run, argv, err := Invocation(claude, []string{"--version"})
+	if err != nil {
+		t.Fatalf("Invocation: %v", err)
+	}
+	want := []string{"--library-path", filepath.Dir(own), claude, "--version"}
+	if run != own || !slices.Equal(argv, want) {
+		t.Errorf("ran as %s %v, not %s %v", run, argv, own, want)
+	}
+}
+
 // ownELF is this test's own binary, when it is a Linux ELF that names a loader.
 func ownELF(t *testing.T) string {
 	t.Helper()

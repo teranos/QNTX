@@ -207,7 +207,7 @@ func StatusOf(ctx context.Context, binary, home string) (Status, error) {
 		return Status{}, errors.Wrapf(err, "claude auth status did not answer JSON: %s", strings.TrimSpace(string(out)))
 	}
 	if exitErr != nil && status.SignedIn {
-		return Status{}, errors.Wrapf(exitErr,"claude auth status exited 1 and said it is signed in: %s", strings.TrimSpace(string(out)))
+		return Status{}, errors.Wrapf(exitErr, "claude auth status exited 1 and said it is signed in: %s", strings.TrimSpace(string(out)))
 	}
 	return status, nil
 }
