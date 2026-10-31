@@ -177,6 +177,9 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	landed := push.push()
+	if err := g.host.quoteLanded(body); err != nil {
+		g.host.log().Errorw("A push to the default branch was not read for quotes", "repo", landed.Repo.Path, "error", err)
+	}
 	if tag := tagLanded(landed); tag != "" {
 		g.dispatchApp(tag)
 	}

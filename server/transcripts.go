@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -503,4 +504,69 @@ func (s *QNTXServer) transcriptsQuoted(ctx context.Context, sent sigil.Sent) (an
 		answer.Quotes = append(answer.Quotes, q)
 	}
 	return answer, nil
+}
+
+// writePredicates are the rows that hold what a tool did; a Write or an Edit
+// among them holds the words an agent put in a file, in its tool_input.
+var writePredicates = []string{"PostToolUse", "GroundedPostToolUse"}
+
+// writingTools are the tools whose input is words put in a file.
+var writingTools = []string{"Write", "Edit", "MultiEdit", "NotebookEdit"}
+
+// agentWritesIn is every write an agent made in a namespace, as ground attested
+// it: the text, the file, the session, and the model the session ran on, read
+// off its SessionStart. What quote holds a landed line to, to be sure of whose it is.
+func agentWritesIn(store namespaces.Reading) ([]quote.Wrote, error) {
+	models := map[string]string{}
+	starts, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"SessionStart"}, Limit: maxHumanRead})
+	if err != nil {
+		return nil, errors.Wrap(err, "reading SessionStart")
+	}
+	for _, as := range starts {
+		if model, _ := as.Attributes["model"].(string); model != "" {
+			models[statusline.SessionOf(as.Contexts)] = model
+		}
+	}
+	var writes []quote.Wrote
+	for _, predicate := range writePredicates {
+		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: maxHumanRead})
+		if err != nil {
+			return nil, errors.Wrapf(err, "reading %s", predicate)
+		}
+		for _, as := range found {
+			tool, _ := as.Attributes["tool_name"].(string)
+			if !slices.Contains(writingTools, tool) {
+				continue
+			}
+			input, _ := as.Attributes["tool_input"].(map[string]any)
+			file, _ := input["file_path"].(string)
+			session := statusline.SessionOf(as.Contexts)
+			for _, text := range writtenTexts(input) {
+				writes = append(writes, quote.Wrote{Text: text, File: file, Session: session, Model: models[session], Row: as.ID, At: as.Timestamp.UTC().Format(time.RFC3339)})
+			}
+		}
+	}
+	return writes, nil
+}
+
+// writtenTexts is the words a writing tool's input puts in a file: a Write's
+// content, an Edit's new_string, each of a MultiEdit's edits' new_string, a
+// NotebookEdit's new_source.
+func writtenTexts(input map[string]any) []string {
+	var texts []string
+	for _, key := range []string{"content", "new_string", "new_source"} {
+		if text, _ := input[key].(string); text != "" {
+			texts = append(texts, text)
+		}
+	}
+	if edits, _ := input["edits"].([]any); len(edits) > 0 {
+		for _, e := range edits {
+			if edit, _ := e.(map[string]any); edit != nil {
+				if text, _ := edit["new_string"].(string); text != "" {
+					texts = append(texts, text)
+				}
+			}
+		}
+	}
+	return texts
 }

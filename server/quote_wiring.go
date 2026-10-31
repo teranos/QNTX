@@ -26,6 +26,20 @@ func (s *QNTXServer) namespaceSaid(namespace string) ([]quote.Said, error) {
 	return humanSaidIn(store)
 }
 
+// agentWritesFor is every write an agent made in the namespace that holds
+// ground's rows for the project; none where no namespace does.
+func (s *QNTXServer) agentWritesFor(project string) ([]quote.Wrote, error) {
+	namespace, known := s.namespaceHolding(project)
+	if !known {
+		return nil, nil
+	}
+	store, err := s.held.Read(namespace)
+	if err != nil {
+		return nil, errors.Wrapf(err, "opening %s to read what agents wrote", namespace)
+	}
+	return agentWritesIn(store)
+}
+
 // namespaceHolding is the held namespace with a row of ground's for the
 // project, by the context ground writes, project:owner/repo. None means ground
 // does not know the project.
@@ -55,9 +69,13 @@ func (s *QNTXServer) namespaceHolding(project string) (string, bool) {
 // gitHubQuotedEvent is the part of a push or pull_request delivery that
 // carries words a person may be quoted in.
 type gitHubQuotedEvent struct {
+	Ref        string `json:"ref"`
+	Before     string `json:"before"`
 	After      string `json:"after"`
+	Deleted    bool   `json:"deleted"`
 	Repository struct {
-		FullName string `json:"full_name"`
+		FullName      string `json:"full_name"`
+		DefaultBranch string `json:"default_branch"`
 	} `json:"repository"`
 	Commits []struct {
 		Message string `json:"message"`

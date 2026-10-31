@@ -141,13 +141,6 @@ func (s *QNTXServer) pullRequestEvent(e gitHubPullRequestEvent) ([]string, error
 		if err := s.approvalLine(s.nodeActor(), subject, watcher.ApprovalClosed, e.Repository.FullName, attrs); err != nil {
 			return nil, err
 		}
-		// A pull request that landed on the default branch is read for quotes,
-		// off this request's time (quotes_landed.go).
-		if e.Action == "closed" && e.PullRequest.Merged && e.PullRequest.Base.Ref == e.Repository.DefaultBranch {
-			if err := s.quoteLanded(e); err != nil {
-				s.logger.Errorw("A merged pull request was not read for quotes", "subject", subject, "error", err)
-			}
-		}
 	case "assigned", "unassigned", "labeled", "unlabeled", "edited", "locked", "unlocked",
 		"review_requested", "review_request_removed", "milestoned", "demilestoned",
 		"auto_merge_enabled", "auto_merge_disabled", "enqueued", "dequeued", "typed", "untyped":

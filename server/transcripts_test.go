@@ -297,3 +297,33 @@ func TestTranscriptsFollowTEI(t *testing.T) {
 		"q.source: a list in the schema, and protocol.Turn.of is one value",
 	}, departed)
 }
+
+// What an agent wrote is read from ground's rows with the session's model: the
+// words a Write put in a file, and an Edit's new string, each as a Wrote.
+func TestAgentWritesAreReadWithTheirSessionsModel(t *testing.T) {
+	store, db := qntxtest.CreateTestStore(t)
+	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
+	rows := []*types.As{
+		streamed("start", "SessionStart", "s-7", at, map[string]any{"model": "claude-opus-5-5", "source": "startup"}),
+		streamed("w1", "PostToolUse", "s-7", at.Add(time.Minute), map[string]any{"tool_name": "Write", "tool_input": map[string]any{"file_path": "docs/x.md", "content": "intro\nthe agent wrote this line\n"}}),
+		streamed("e1", "PostToolUse", "s-7", at.Add(2*time.Minute), map[string]any{"tool_name": "Edit", "tool_input": map[string]any{"file_path": "docs/x.md", "old_string": "a", "new_string": "and this one"}}),
+		streamed("r1", "PostToolUse", "s-7", at.Add(3*time.Minute), map[string]any{"tool_name": "Read", "tool_input": map[string]any{"file_path": "docs/x.md"}}),
+	}
+	for _, as := range rows {
+		require.NoError(t, store.CreateAttestation(as))
+	}
+	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
+	reading, err := s.held.Read(auth.NamespaceDefault)
+	require.NoError(t, err)
+	wrote, err := agentWritesIn(reading)
+	require.NoError(t, err)
+	require.Len(t, wrote, 2)
+	for _, w := range wrote {
+		assert.Equal(t, "claude-opus-5-5", w.Model)
+		assert.Equal(t, "s-7", w.Session)
+		assert.Equal(t, "docs/x.md", w.File)
+	}
+	if w, sure := quote.WroteLine(wrote, "  the agent wrote this line"); !sure || w.Row != "w1" {
+		t.Errorf("the line was not found in the agent's write: %+v %v", w, sure)
+	}
+}

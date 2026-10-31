@@ -42,14 +42,16 @@ func (f *fakeGitHub) ask(operation string, request any) ([]byte, error) {
 	return []byte(answer), nil
 }
 
+const changedProse = `{"filename":"docs/x.md","status":"modified","patch":"@@ -1,2 +1,3 @@\n-old\n+she said \"Build QNTX here\"\n+and \"words nobody ever typed\"\n context"},{"filename":"ts/x.ts","status":"added","patch":"+const k = \"not a quote of anyone\";"}`
+
 func greenGitHub(fileText string) *fakeGitHub {
 	return &fakeGitHub{answers: map[string]string{
-		"ListCheckRunsForAGitReference": `{"check_runs":[{"name":"Go Tests","status":"completed","conclusion":"success"}]}`,
-		"ListCommitsOnAPullRequest":     `{"items":[{"commit":{"message":"A change\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"}}]}`,
-		"ListPullRequestsFiles":         `{"items":[{"filename":"docs/x.md","status":"modified","patch":"@@ -1,2 +1,3 @@\n-old\n+she said \"Build QNTX here\"\n+and \"words nobody ever typed\"\n context"},{"filename":"ts/x.ts","status":"added","patch":"+const k = \"not a quote of anyone\";"}]}`,
-		"GetABranch":                    `{"name":"main","commit":{"sha":"abc123"}}`,
-		"GetRepositoryContent":          `{"content":"` + base64.StdEncoding.EncodeToString([]byte(fileText)) + `","sha":"blob1"}`,
-		"CreateAPullRequest":            `{"html_url":"https://github.com/o/r/pull/9"}`,
+		"ListCommitsOnAPullRequest": `{"items":[{"commit":{"message":"A change\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"}}]}`,
+		"ListPullRequestsFiles":     `{"items":[` + changedProse + `]}`,
+		"CompareTwoCommits":         `{"files":[` + changedProse + `]}`,
+		"GetABranch":                `{"name":"main","commit":{"sha":"abc123"}}`,
+		"GetRepositoryContent":      `{"content":"` + base64.StdEncoding.EncodeToString([]byte(fileText)) + `","sha":"blob1"}`,
+		"CreateAPullRequest":        `{"html_url":"https://github.com/o/r/pull/9"}`,
 	}}
 }
 
@@ -57,60 +59,135 @@ func landingOf() Landing {
 	return Landing{Owner: "o", Repo: "r", DefaultBranch: "main", Number: 8, HeadSha: "head1"}
 }
 
-func TestALandingWithAnAgentsUnsourcedQuoteIsCorrectedInAPullRequest(t *testing.T) {
-	gh := greenGitHub("she said \"Build QNTX here\"\nand \"words nobody ever typed\"\n")
-	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), zap.NewNop().Sugar()).Correct(landingOf())
+// pushOf is a push to main with no pull request: its agents are read from its
+// own commits, its files from the compare.
+func pushOf() Landing {
+	return Landing{Owner: "o", Repo: "r", DefaultBranch: "main", HeadSha: "abcdef0123456789", BaseSha: "base0",
+		Messages: []string{"A change\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"}}
+}
+
+func noWrites(string) ([]Wrote, error) { return nil, nil }
+
+const twoLines = "she said \"Build QNTX here\"\nand \"words nobody ever typed\"\n"
+
+func TestWhatAnAgentWroteInALandingStandsInItsQuotation(t *testing.T) {
+	gh := greenGitHub(twoLines)
+	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if done.Skipped != "" || done.PullRequest != "https://github.com/o/r/pull/9" {
+	if done.Skipped != "" || done.PullRequest != "https://github.com/o/r/pull/9" || done.Lines != 2 {
 		t.Fatalf("done = %+v", done)
 	}
 	if len(done.Spans) != 1 || done.Spans[0].Span != "words nobody ever typed" {
-		t.Errorf("spans = %+v", done.Spans)
+		t.Errorf("spans no person said = %+v", done.Spans)
 	}
 	if done.Agents[0] != "Fable 5.1" || done.Branch != "quotes/pr-8" {
 		t.Errorf("agents %v branch %s", done.Agents, done.Branch)
 	}
-	want := []string{"ListCheckRunsForAGitReference", "ListCommitsOnAPullRequest", "ListPullRequestsFiles", "GetABranch", "CreateAReference", "GetRepositoryContent", "CreateOrUpdateFileContents", "CreateAPullRequest"}
+	want := []string{"ListCommitsOnAPullRequest", "ListPullRequestsFiles", "GetABranch", "CreateAReference", "GetRepositoryContent", "CreateOrUpdateFileContents", "CreateAPullRequest"}
 	if strings.Join(gh.asked, " ") != strings.Join(want, " ") {
 		t.Errorf("asked %v", gh.asked)
 	}
 	written, _ := base64.StdEncoding.DecodeString(gh.sent["CreateOrUpdateFileContents"]["content"].(string))
-	if string(written) != "she said \"Build QNTX here\"\nand 「[Fable 5.1] words nobody ever typed」\n" {
+	if string(written) != "「[Fable 5.1] she said \"Build QNTX here\"」\n「[Fable 5.1] and \"words nobody ever typed\"」\n" {
 		t.Errorf("corrected file:\n%s", written)
 	}
 	if gh.sent["CreateOrUpdateFileContents"]["branch"] != "quotes/pr-8" || gh.sent["CreateAReference"]["sha"] != "abc123" {
 		t.Errorf("sent %v", gh.sent)
 	}
-	if !strings.Contains(gh.sent["CreateAPullRequest"]["body"].(string), "words nobody ever typed") {
-		t.Errorf("the pull request does not name the span: %v", gh.sent["CreateAPullRequest"]["body"])
+	body := gh.sent["CreateAPullRequest"]["body"].(string)
+	if !strings.Contains(body, "docs/x.md") || !strings.Contains(body, "words nobody ever typed") || !strings.Contains(body, "#8") {
+		t.Errorf("the pull request does not say what moved: %v", body)
 	}
 }
 
-func TestALandingWithRedChecksIsLeftAlone(t *testing.T) {
-	gh := greenGitHub("")
-	gh.answers["ListCheckRunsForAGitReference"] = `{"check_runs":[{"name":"Go Tests","status":"completed","conclusion":"failure"}]}`
-	done, err := NewLanded(gh.ask, arrivalsWith(true), zap.NewNop().Sugar()).Correct(landingOf())
-	if err != nil || !strings.Contains(done.Skipped, "Go Tests") || len(gh.asked) != 1 {
-		t.Errorf("done = %+v, err %v, asked %v", done, err, gh.asked)
+// A push straight to main lands the same way: agents from its own commits,
+// files from the compare, and the correcting branch named by the commit.
+func TestAPushToMainLandsTheSameWay(t *testing.T) {
+	gh := greenGitHub(twoLines)
+	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), noWrites, zap.NewNop().Sugar()).Correct(pushOf())
+	if err != nil || done.Skipped != "" || done.Lines != 2 || done.Branch != "quotes/abcdef012" {
+		t.Fatalf("done = %+v, err %v", done, err)
+	}
+	if gh.asked[0] != "CompareTwoCommits" || gh.sent["CompareTwoCommits"]["basehead"] != "base0...abcdef0123456789" {
+		t.Errorf("asked %v with %v", gh.asked, gh.sent["CompareTwoCommits"])
+	}
+}
+
+// A line already inside the agent's quotation, a code fence, a table row and
+// an indented code line are not prose outside it; structure stays outside.
+func TestProseLinesAndTheirMarks(t *testing.T) {
+	for line, want := range map[string]bool{"plain words": true, "## A heading": true, "- a list item": true, "「[Fable 5.1] marked」": false, "```go": false, "    indented code": false, "| a | table |": false, "": false, "---": false} {
+		if ProseLine(line) != want {
+			t.Errorf("ProseLine(%q) = %v", line, !want)
+		}
+	}
+	for line, want := range map[string]string{
+		"## A heading":   "## 「[Fable 5.1] A heading」",
+		"- a list item":  "- 「[Fable 5.1] a list item」",
+		"  2. numbered":  "  2. 「[Fable 5.1] numbered」",
+		"> quoted block": "> 「[Fable 5.1] quoted block」",
+		"plain words  ":  "「[Fable 5.1] plain words」",
+	} {
+		if got := MarkLine(line, "Fable 5.1"); got != want {
+			t.Errorf("MarkLine(%q) = %q, want %q", line, got, want)
+		}
 	}
 }
 
 func TestALandingNoAgentAuthoredIsAPersonsOwn(t *testing.T) {
 	gh := greenGitHub("")
 	gh.answers["ListCommitsOnAPullRequest"] = `{"items":[{"commit":{"message":"A human change"}}]}`
-	done, err := NewLanded(gh.ask, arrivalsWith(true), zap.NewNop().Sugar()).Correct(landingOf())
-	if err != nil || done.Skipped == "" || len(gh.asked) != 2 {
+	done, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
+	if err != nil || done.Skipped == "" || len(gh.asked) != 1 {
 		t.Errorf("done = %+v, err %v, asked %v", done, err, gh.asked)
 	}
 }
 
-func TestALandingWhoseQuotesArePeoplesOpensNothing(t *testing.T) {
+// No commit names an agent, and ground saw one write the second line: that
+// line is the agent's for sure, named by the session's model, and the first
+// line, which no agent is known to have written, stays as it is.
+func TestALineGroundSawAnAgentWriteIsTheAgentsForSure(t *testing.T) {
+	gh := greenGitHub(twoLines)
+	gh.answers["ListCommitsOnAPullRequest"] = `{"items":[{"commit":{"message":"A human change"}}]}`
+	writes := func(string) ([]Wrote, error) {
+		return []Wrote{{Text: "intro\nand \"words nobody ever typed\"\noutro", File: "docs/x.md", Session: "sess-9", Model: "claude-opus-5-5", Row: "row-9"}}, nil
+	}
+	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here"), writes, zap.NewNop().Sugar()).Correct(landingOf())
+	if err != nil || done.Skipped != "" || done.Sure != 1 || done.Likely != 0 || done.Lines != 1 {
+		t.Fatalf("done = %+v, err %v", done, err)
+	}
+	written, _ := base64.StdEncoding.DecodeString(gh.sent["CreateOrUpdateFileContents"]["content"].(string))
+	if string(written) != "she said \"Build QNTX here\"\n「[Opus 5.5] and \"words nobody ever typed\"」\n" {
+		t.Errorf("corrected file:\n%s", written)
+	}
+}
+
+func TestModelLabelIsTheNotationsName(t *testing.T) {
+	for model, want := range map[string]string{"claude-fable-5-1": "Fable 5.1", "claude-opus-5-5": "Opus 5.5", "claude-sonnet-5": "Sonnet 5", "codex": "codex", "": ""} {
+		if got := ModelLabel(model); got != want {
+			t.Errorf("ModelLabel(%q) = %q, want %q", model, got, want)
+		}
+	}
+}
+
+func TestALandingThatAddsNoProseOutsideTheQuotationOpensNothing(t *testing.T) {
 	gh := greenGitHub("")
-	done, err := NewLanded(gh.ask, arrivalsWith(true, "Build QNTX here", "words nobody ever typed"), zap.NewNop().Sugar()).Correct(landingOf())
-	if err != nil || done.Skipped == "" || done.PullRequest != "" || len(gh.asked) != 3 {
+	gh.answers["ListPullRequestsFiles"] = `{"items":[{"filename":"docs/x.md","status":"modified","patch":"+「[Fable 5.1] already marked」\n+\n+` + "```" + `\n+    code\n"}]}`
+	done, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
+	if err != nil || done.Skipped == "" || done.PullRequest != "" || len(gh.asked) != 2 {
 		t.Errorf("done = %+v, err %v, asked %v", done, err, gh.asked)
+	}
+}
+
+// A project the node holds no namespace for still lands: who wrote the lines
+// is the landing's to say, and only which quotes a person said goes unmeasured.
+func TestAProjectTheNodeDoesNotKnowIsStillMarked(t *testing.T) {
+	gh := greenGitHub(twoLines)
+	done, err := NewLanded(gh.ask, arrivalsWith(false), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
+	if err != nil || done.Skipped != "" || done.PullRequest == "" || done.Lines != 2 || len(done.Spans) != 0 {
+		t.Fatalf("done = %+v, err %v", done, err)
 	}
 }
 
@@ -149,28 +226,6 @@ func listOf(key, item string, n int) string {
 	return `{"` + key + `":[` + strings.Join(items, ",") + `]}`
 }
 
-const greenRun = `{"name":"Go Tests","status":"completed","conclusion":"success"}`
-
-// A check past the first page of them still decides: a hundred green runs do
-// not make a landing green when the hundred-and-first failed.
-func TestAFailingCheckOnALaterPageIsNotMissed(t *testing.T) {
-	gh := greenGitHub("")
-	gh.paged = map[string][]string{"ListCheckRunsForAGitReference": {
-		listOf("check_runs", greenRun, pageSize),
-		`{"check_runs":[{"name":"Late Check","status":"completed","conclusion":"failure"}]}`,
-	}}
-	done, err := NewLanded(gh.ask, arrivalsWith(true), zap.NewNop().Sugar()).Correct(landingOf())
-	if err != nil || !strings.Contains(done.Skipped, "Late Check") {
-		t.Fatalf("done = %+v, err %v", done, err)
-	}
-	if strings.Join(gh.asked, " ") != "ListCheckRunsForAGitReference ListCheckRunsForAGitReference" {
-		t.Errorf("asked %v", gh.asked)
-	}
-	if gh.sent["ListCheckRunsForAGitReference"]["per_page"] != float64(pageSize) || gh.sent["ListCheckRunsForAGitReference"]["page"] != float64(2) {
-		t.Errorf("the last page was asked as %v", gh.sent["ListCheckRunsForAGitReference"])
-	}
-}
-
 // A co-author on a commit past the first page is still named.
 func TestAnAgentOnALaterPagesCommitIsNamed(t *testing.T) {
 	gh := greenGitHub("")
@@ -178,20 +233,20 @@ func TestAnAgentOnALaterPagesCommitIsNamed(t *testing.T) {
 		listOf("items", `{"commit":{"message":"A human change"}}`, pageSize),
 		`{"items":[{"commit":{"message":"Late\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"}}]}`,
 	}}
-	agents, err := NewLanded(gh.ask, arrivalsWith(true), zap.NewNop().Sugar()).agentsOf(landingOf())
+	agents, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).agentsOf(landingOf())
 	if err != nil || strings.Join(agents, "|") != "Fable 5.1" {
 		t.Errorf("agents = %v, err %v", agents, err)
 	}
 }
 
-// A prose file past the first page is still read.
+// A prose file past the first page of files is still read.
 func TestAProseFileOnALaterPageIsRead(t *testing.T) {
 	gh := greenGitHub("")
 	gh.paged = map[string][]string{"ListPullRequestsFiles": {
 		listOf("items", `{"filename":"ts/x.ts","status":"added","patch":"+x"}`, pageSize),
 		`{"items":[{"filename":"docs/late.md","status":"added","patch":"+\"late\""}]}`,
 	}}
-	files, err := NewLanded(gh.ask, arrivalsWith(true), zap.NewNop().Sugar()).files(landingOf())
+	files, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).files(landingOf())
 	if err != nil || len(files) != 1 || files[0].Filename != "docs/late.md" {
 		t.Errorf("files = %+v, err %v", files, err)
 	}
@@ -201,30 +256,12 @@ func TestAProseFileOnALaterPageIsRead(t *testing.T) {
 // reading: it stops at the ceiling and says so.
 func TestAListThatNeverEndsIsStoppedAndSaid(t *testing.T) {
 	gh := greenGitHub("")
-	gh.answers["ListCheckRunsForAGitReference"] = listOf("check_runs", greenRun, pageSize)
-	_, err := NewLanded(gh.ask, arrivalsWith(true), zap.NewNop().Sugar()).Correct(landingOf())
+	gh.answers["ListCommitsOnAPullRequest"] = listOf("items", `{"commit":{"message":"x"}}`, pageSize)
+	_, err := NewLanded(gh.ask, arrivalsWith(true), noWrites, zap.NewNop().Sugar()).Correct(landingOf())
 	if err == nil || !strings.Contains(err.Error(), "more than") {
 		t.Fatalf("err = %v", err)
 	}
 	if len(gh.asked) != pageCeiling {
 		t.Errorf("asked %d times, want %d", len(gh.asked), pageCeiling)
-	}
-}
-
-// A project the node holds no namespace for has no prompts to read: its quotes
-// are not the agent's to claim, so nothing is branched or written.
-func TestAProjectTheNodeDoesNotKnowIsLeftAlone(t *testing.T) {
-	gh := greenGitHub("")
-	done, err := NewLanded(gh.ask, arrivalsWith(false), zap.NewNop().Sugar()).Correct(landingOf())
-	if err != nil || !strings.Contains(done.Skipped, "holds no namespace") || done.PullRequest != "" || done.Branch != "" {
-		t.Fatalf("done = %+v, err %v", done, err)
-	}
-	for _, op := range gh.asked {
-		if op == "GetABranch" || op == "CreateAReference" || op == "CreateOrUpdateFileContents" || op == "CreateAPullRequest" {
-			t.Errorf("a project the node does not know was written to: %v", gh.asked)
-		}
-	}
-	if len(done.Spans) != 0 || len(done.Files) != 0 {
-		t.Errorf("spans %+v files %v were kept", done.Spans, done.Files)
 	}
 }
