@@ -650,7 +650,7 @@ pub extern "C" fn read_conn_count(rc: *const ReadConn) -> CountResultC {
         let rc = unsafe { &*rc };
         match rc
             .conn
-            .query_row("SELECT COUNT(*) FROM attestations", [], |row| {
+            .query_row(crate::store::COUNT_SQL, [], |row| {
                 row.get::<_, usize>(0)
             }) {
             Ok(count) => CountResultC::ok(count),
@@ -746,7 +746,7 @@ pub extern "C" fn read_conn_stats(rc: *const ReadConn) -> AttestationResultC {
                 .query_row(sql, [], |row| row.get::<_, usize>(0))
                 .map_err(|e| format!("{}", e))
         };
-        let total = match count("SELECT COUNT(*) FROM attestations") {
+        let total = match count(crate::store::COUNT_SQL) {
             Ok(v) => v,
             Err(e) => return AttestationResultC::error(&e),
         };

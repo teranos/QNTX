@@ -84,6 +84,14 @@
     ]
   },
   {
+    "name": "attestation_total",
+    "sqlite": true,
+    "duckdb": false,
+    "postgres": false,
+    "rebuilt": false,
+    "sites": []
+  },
+  {
     "name": "attestations",
     "sqlite": true,
     "duckdb": true,

@@ -578,32 +578,32 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
     crate::flight_recorder::record_fmt("put:junction_actors", &attestation.id);
     for actor in &attestation.actors {
         conn.execute(
-            "INSERT INTO attestation_actors (attestation_id, actor) VALUES (?, ?)",
-            rusqlite::params![attestation.id, actor],
+            "INSERT INTO attestation_actors (attestation_id, actor, created_at) VALUES (?, ?, ?)",
+            rusqlite::params![attestation.id, actor, created_at_sql],
         )
         .map_err(SqliteError::from)?;
     }
     crate::flight_recorder::record_fmt("put:junction_contexts", &attestation.id);
     for context in &attestation.contexts {
         conn.execute(
-            "INSERT INTO attestation_contexts (attestation_id, context) VALUES (?, ?)",
-            rusqlite::params![attestation.id, context],
+            "INSERT INTO attestation_contexts (attestation_id, context, created_at) VALUES (?, ?, ?)",
+            rusqlite::params![attestation.id, context, created_at_sql],
         )
         .map_err(SqliteError::from)?;
     }
     crate::flight_recorder::record_fmt("put:junction_subjects", &attestation.id);
     for subject in &attestation.subjects {
         conn.execute(
-            "INSERT INTO attestation_subjects (attestation_id, subject) VALUES (?, ?)",
-            rusqlite::params![attestation.id, subject],
+            "INSERT INTO attestation_subjects (attestation_id, subject, created_at) VALUES (?, ?, ?)",
+            rusqlite::params![attestation.id, subject, created_at_sql],
         )
         .map_err(SqliteError::from)?;
     }
     crate::flight_recorder::record_fmt("put:junction_predicates", &attestation.id);
     for predicate in &attestation.predicates {
         conn.execute(
-            "INSERT INTO attestation_predicates (attestation_id, predicate) VALUES (?, ?)",
-            rusqlite::params![attestation.id, predicate],
+            "INSERT INTO attestation_predicates (attestation_id, predicate, created_at) VALUES (?, ?, ?)",
+            rusqlite::params![attestation.id, predicate, created_at_sql],
         )
         .map_err(SqliteError::from)?;
     }
@@ -782,6 +782,12 @@ impl AttestationStore for SqliteStore {
         self.query_distinct_values("SELECT id FROM attestations ORDER BY created_at DESC")
     }
 
+    fn count(&self) -> StoreResult<usize> {
+        self.conn
+            .query_row(COUNT_SQL, [], |row| row.get::<_, usize>(0))
+            .map_err(|e| SqliteError::from(e).into())
+    }
+
     fn clear(&mut self) -> StoreResult<()> {
         self.conn
             .execute("DELETE FROM attestations", [])
@@ -791,77 +797,45 @@ impl AttestationStore for SqliteStore {
     }
 }
 
+/// How many attestations the store holds, as its writes kept it (083).
+pub const COUNT_SQL: &str = "SELECT n FROM attestation_total WHERE one = 1";
+
+const ATT_COLUMNS: &str = "att.id, att.subjects, att.predicates, att.contexts, att.actors, att.timestamp, att.source, att.attributes, att.created_at, att.signature, att.signer_did";
+
+fn placeholders(n: usize) -> String {
+    vec!["?"; n].join(", ")
+}
+
 /// Build SQL and params for an AxFilter query. Used by both SqliteStore and ReadConn.
+///
+/// A read walks an index newest first and stops at its LIMIT, so what it
+/// costs is the rows it answers with, not the rows the file holds (082).
 pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
-    // DISTINCT is only needed when JOINs are present (multi-value junction
-    // tables can produce duplicate attestation rows). Without JOINs,
-    // attestations.id is already unique and DISTINCT forces a full-table
-    // dedup scan that blocks LIMIT short-circuit (876K rows → ~14 min).
-    let has_joins = !filter.subjects.is_empty()
-        || !filter.predicates.is_empty()
-        || !filter.contexts.is_empty()
-        || !filter.actors.is_empty();
-    let distinct = if has_joins { "DISTINCT " } else { "" };
-    let mut sql = format!(
-        "SELECT {}att.id, att.subjects, att.predicates, att.contexts, att.actors, att.timestamp, att.source, att.attributes, att.created_at, att.signature, att.signer_did \
-         FROM attestations att",
-        distinct
-    );
-    let mut joins = Vec::new();
+    // Each table with the index that finds one attestation's names.
+    let names: [(&str, &str, &str, &Vec<String>); 4] = [
+        ("attestation_subjects", "subject", "idx_junc_subject_id", &filter.subjects),
+        ("attestation_predicates", "predicate", "idx_junc_predicate_id", &filter.predicates),
+        ("attestation_contexts", "context", "idx_junc_context_id", &filter.contexts),
+        ("attestation_actors", "actor", "idx_junc_actor_id", &filter.actors),
+    ];
+
     let mut conditions = Vec::new();
     let mut params: Vec<String> = Vec::new();
-
-    if !filter.subjects.is_empty() {
-        joins.push("JOIN attestation_subjects js ON att.id = js.attestation_id");
+    let mut walk = None;
+    for (table, column, by_id, values) in names {
+        if values.is_empty() {
+            continue;
+        }
+        if walk.is_none() {
+            walk = Some((table, column, values));
+            continue;
+        }
+        // Left to choose, sqlite reads every row of the name for each row walked.
         conditions.push(format!(
-            "js.subject IN ({})",
-            filter
-                .subjects
-                .iter()
-                .map(|_| "?")
-                .collect::<Vec<_>>()
-                .join(", ")
+            "EXISTS (SELECT 1 FROM {table} INDEXED BY {by_id} WHERE attestation_id = att.id AND {column} IN ({}))",
+            placeholders(values.len())
         ));
-        params.extend(filter.subjects.iter().cloned());
-    }
-    if !filter.predicates.is_empty() {
-        joins.push("JOIN attestation_predicates jp ON att.id = jp.attestation_id");
-        conditions.push(format!(
-            "jp.predicate IN ({})",
-            filter
-                .predicates
-                .iter()
-                .map(|_| "?")
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-        params.extend(filter.predicates.iter().cloned());
-    }
-    if !filter.contexts.is_empty() {
-        joins.push("JOIN attestation_contexts jc ON att.id = jc.attestation_id");
-        conditions.push(format!(
-            "jc.context IN ({})",
-            filter
-                .contexts
-                .iter()
-                .map(|_| "?")
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-        params.extend(filter.contexts.iter().cloned());
-    }
-    if !filter.actors.is_empty() {
-        joins.push("JOIN attestation_actors ja ON att.id = ja.attestation_id");
-        conditions.push(format!(
-            "ja.actor IN ({})",
-            filter
-                .actors
-                .iter()
-                .map(|_| "?")
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-        params.extend(filter.actors.iter().cloned());
+        params.extend(values.iter().cloned());
     }
     if let Some(ref source) = filter.source {
         conditions.push("att.source = ?".to_string());
@@ -875,19 +849,42 @@ pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
         conditions.push("att.timestamp <= ?".to_string());
         params.push(crate::json::timestamp_to_sql(end));
     }
+    let newest = format!(
+        "ORDER BY att.created_at DESC, att.rowid DESC LIMIT {}",
+        filter.limit
+    );
 
-    for join in &joins {
+    let Some((table, column, values)) = walk else {
+        let mut sql = format!("SELECT {ATT_COLUMNS} FROM attestations att");
+        if !conditions.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&conditions.join(" AND "));
+        }
         sql.push(' ');
-        sql.push_str(join);
-    }
-    if !conditions.is_empty() {
-        sql.push_str(" WHERE ");
-        sql.push_str(&conditions.join(" AND "));
-    }
-    sql.push_str(" ORDER BY att.created_at DESC, att.rowid DESC");
-    sql.push_str(&format!(" LIMIT {}", filter.limit));
+        sql.push_str(&newest);
+        return (sql, params);
+    };
 
-    (sql, params)
+    // One walk per name, each its own newest LIMIT; the union is at most
+    // LIMIT rows a name, and only those are sorted. IN answers a row named twice once.
+    let mut walks = Vec::new();
+    let mut walk_params = Vec::new();
+    for value in values {
+        let mut wheres = vec![format!("j.{column} = ?")];
+        wheres.extend(conditions.iter().cloned());
+        walks.push(format!(
+            "SELECT id FROM (SELECT j.attestation_id AS id FROM {table} j JOIN attestations att ON att.id = j.attestation_id WHERE {} ORDER BY j.created_at DESC, j.rowid DESC LIMIT {})",
+            wheres.join(" AND "),
+            filter.limit
+        ));
+        walk_params.push(value.clone());
+        walk_params.extend(params.iter().cloned());
+    }
+    let sql = format!(
+        "SELECT {ATT_COLUMNS} FROM attestations att WHERE att.id IN ({}) {newest}",
+        walks.join(" UNION ALL ")
+    );
+    (sql, walk_params)
 }
 
 impl QueryStore for SqliteStore {
