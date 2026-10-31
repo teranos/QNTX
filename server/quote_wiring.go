@@ -117,6 +117,7 @@ func (s *QNTXServer) setupQuote() {
 	}
 	s.setupQuoteProvenance()
 	s.setupQuoteRemoval()
+	s.setupQuoteLanded()
 }
 
 // setupQuoteProvenance registers the built-in. No schedule: the standing row
