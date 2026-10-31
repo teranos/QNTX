@@ -44,14 +44,14 @@ func NamespaceOf(ctx context.Context) string {
 	return ns
 }
 
-// IMPLEMENTME: speak spec at the boundary. A span judged here is a protocol.Quote:
+// IMPLEMENTME: speak spec at the boundary. A span measured here is a protocol.Quote:
 // content the span, who the person whose prompt it matched, source that prompt's
-// row, resp the actor that relayed it, cert the verdict. degree stays inside.
+// row, resp the actor that relayed it, cert the measurement. degree stays inside.
 
 // degree is one span that did not comply, and by how much.
 type degree struct {
 	Span        string `json:"span"`
-	Verdict     string `json:"verdict"`
+	Kind        string `json:"verdict"`
 	Corrections int    `json:"corrections"`
 	Length      int    `json:"length"`
 }
@@ -60,9 +60,10 @@ type degree struct {
 type Watch struct {
 	// prompts is every prompt the namespace holds, as typed.
 	prompts func(namespace string) ([]string, error)
-	// judge is what the prompts say of each span (ats/quote), which is Rust's.
-	judge func(spans, said []string) ([]quoted.Judgement, error)
-	news  *statusline.NewsLog
+	// measure is what was measured of each span against the prompts
+	// (ats/quote), which is Rust's.
+	measure func(spans, said []string) ([]quoted.Measurement, error)
+	news    *statusline.NewsLog
 	// Who the token that attested the claim speaks for, as ci.watch files it.
 	mintedBy func(did string) (string, bool)
 	logger   *zap.SugaredLogger
@@ -76,7 +77,7 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrap(err, "quote.provenance payload is not an attestation")
 	}
 	if len(as.Actors) == 0 || as.Actors[0] == "" {
-		return errors.Newf("quote.provenance: attestation %s has no actor to address the verdict to", as.ID)
+		return errors.Newf("quote.provenance: attestation %s has no actor to address the result to", as.ID)
 	}
 	namespace := NamespaceOf(ctx)
 	if namespace == "" {
@@ -91,29 +92,25 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrapf(err, "quote.provenance: reading the prompts of %s for %s", namespace, as.ID)
 	}
 
-	judgements, err := h.judge(spans, said)
+	measurements, err := h.measure(spans, said)
 	if err != nil {
-		return errors.Wrapf(err, "quote.provenance: judging the spans of %s against the prompts of %s", as.ID, namespace)
+		return errors.Wrapf(err, "quote.provenance: measuring the spans of %s against the prompts of %s", as.ID, namespace)
 	}
 
 	var unsourced, stretched []string
 	var degrees []degree
 	for i, span := range spans {
-		j := judgements[i]
-		switch j.Verdict {
-		case quoted.Unsourced:
-			unsourced = append(unsourced, span)
-		case quoted.Stretched:
+		m := measurements[i]
+		switch {
+		case accepts(m):
+			continue
+		case near(m):
 			stretched = append(stretched, span)
 		default:
-			continue
+			unsourced = append(unsourced, span)
 		}
-		corrections, measured := j.Corrections()
-		if !measured {
-			return errors.Newf("quote.provenance: %s span %d of %s was judged %s and not measured", as.ID, i+1, namespace, j.Verdict)
-		}
-		degrees = append(degrees, degree{Span: span, Verdict: j.Verdict.String(),
-			Corrections: corrections, Length: len(span)})
+		degrees = append(degrees, degree{Span: span, Kind: kind(m),
+			Corrections: m.Corrections, Length: m.Length})
 	}
 	if len(degrees) == 0 {
 		return nil
@@ -190,7 +187,7 @@ func attrString(attrs map[string]any, key string) string {
 
 // NewWatch is quote.provenance, asking prompts for what a namespace was told.
 func NewWatch(prompts func(namespace string) ([]string, error),
-	judge func(spans, said []string) ([]quoted.Judgement, error), news *statusline.NewsLog,
+	measure func(spans, said []string) ([]quoted.Measurement, error), news *statusline.NewsLog,
 	mintedBy func(did string) (string, bool), logger *zap.SugaredLogger) *Watch {
-	return &Watch{prompts: prompts, judge: judge, news: news, mintedBy: mintedBy, logger: logger}
+	return &Watch{prompts: prompts, measure: measure, news: news, mintedBy: mintedBy, logger: logger}
 }

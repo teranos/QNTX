@@ -14,16 +14,16 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 )
 
-// Within the warn band the claim side passes the span as the user's, so the
-// removal side reports it as theirs: through Rust, not a stand-in.
-func TestQuoteRemovalReportsAStretchedQuoteRustJudges(t *testing.T) {
+// A stretched span is reported by the removal side as the user's: measured by
+// Rust, not a stand-in.
+func TestQuoteRemovalReportsAStretchedQuoteMeasuredByRust(t *testing.T) {
 	said := "you replace something i said with something else, this is a different kind of violation"
 	span := "you replac somethin i sai wth somethng els, ths is a diferent knd of violaton"
-	if got, err := quoted.Judge([]string{span}, []string{said}); err != nil || got[0].Verdict != quoted.Stretched {
+	if got, err := quoted.Measure([]string{span}, []string{said}); err != nil || kind(got[0]) != "stretched" {
 		t.Fatalf("the fixture is %v (%v), not stretched", got, err)
 	}
 	h, news, _ := removalWith(said)
-	h.judge = quoted.Judge
+	h.measure = quoted.Measure
 	if err := h.Execute(WithNamespace(context.Background(), "ground"), removalJob(t, []string{"a.md"}, []string{span})); err != nil {
 		t.Fatal(err)
 	}

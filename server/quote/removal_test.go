@@ -49,7 +49,7 @@ func removalWith(prompts ...string) (*Removal, *statusline.NewsLog, *string) {
 			*asked = ns
 			return prompts, nil
 		},
-		judge:    substringJudge,
+		measure:  substringMeasure,
 		news:     news,
 		mintedBy: func(did string) (string, bool) { return "person-1", true },
 		logger:   zap.NewNop().Sugar(),
@@ -83,7 +83,7 @@ func TestQuoteRemovalReportsWhatTheUserSaid(t *testing.T) {
 		t.Errorf("the item is not for the session that committed: %v", held[0].Detail["session"])
 	}
 	removed, _ := held[0].Detail["removed"].([]removedQuote)
-	if len(removed) != 1 || removed[0].File != "source/a.d" || removed[0].Verdict != "sourced" {
+	if len(removed) != 1 || removed[0].File != "source/a.d" || removed[0].Kind != "sourced" {
 		t.Errorf("removed = %+v", removed)
 	}
 }
@@ -106,7 +106,7 @@ func TestQuoteRemovalReportsAStretchedQuote(t *testing.T) {
 	said := "you replace something i said with something else, this is a different kind of violation"
 	span := "you replac somethin i sai wth somethng els, ths is a diferent knd of violaton"
 	h, news, _ := removalWith(said)
-	h.judge = judgeAs(quoted.Stretched)
+	h.measure = measuredAs(quoted.Measurement{Corrections: 5, Length: 40})
 	ctx := WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, removalJob(t, []string{"a.md"}, []string{span})); err != nil {
 		t.Fatal(err)

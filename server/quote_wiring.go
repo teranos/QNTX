@@ -20,13 +20,13 @@ func (s *QNTXServer) namespacePrompts(namespace string) ([]string, error) {
 	return humanTurnsIn(store)
 }
 
-// The quote subsystem is optional: quotes are judged in Rust (ats/quote), so a
+// The quote subsystem is optional: quotes are measured in Rust (ats/quote), so a
 // build without it (quickdev, or no qntxquote) leaves quote.provenance and
 // quote.removal out, and says so, rather than register built-ins that could
 // only fail.
 func (s *QNTXServer) quoteCarried() bool {
 	if !quotes.Carried {
-		s.logger.Infow("quote subsystem not carried: quotes are judged in Rust, which this build leaves out",
+		s.logger.Infow("quote subsystem not carried: quotes are measured in Rust, which this build leaves out",
 			"handlers", []string{"quote.provenance", "quote.removal"})
 	}
 	return quotes.Carried
@@ -38,7 +38,7 @@ func (s *QNTXServer) setupQuoteProvenance() {
 	if !s.quoteCarried() {
 		return
 	}
-	s.daemon.Registry().Register(quote.NewWatch(s.namespacePrompts, quotes.Judge, s.news,
+	s.daemon.Registry().Register(quote.NewWatch(s.namespacePrompts, quotes.Measure, s.news,
 		s.authHandler.MintedBy, s.logger.Named("quote.provenance")))
 }
 
@@ -48,6 +48,6 @@ func (s *QNTXServer) setupQuoteRemoval() {
 	if !s.quoteCarried() {
 		return
 	}
-	s.daemon.Registry().Register(quote.NewRemoval(s.namespacePrompts, quotes.Judge, s.news,
+	s.daemon.Registry().Register(quote.NewRemoval(s.namespacePrompts, quotes.Measure, s.news,
 		s.authHandler.MintedBy, s.logger.Named("quote.removal")))
 }

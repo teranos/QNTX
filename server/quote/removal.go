@@ -21,18 +21,19 @@ import (
 
 // removedQuote is one of the person's quotes a commit took out.
 type removedQuote struct {
-	File    string `json:"file"`
-	Span    string `json:"span"`
-	Verdict string `json:"verdict"`
+	File string `json:"file"`
+	Span string `json:"span"`
+	Kind string `json:"verdict"`
 }
 
 // Removal is quote.removal: the quotes a commit took out, asked of the prompts.
 type Removal struct {
 	// prompts is every prompt the namespace holds, as typed.
 	prompts func(namespace string) ([]string, error)
-	// judge is what the prompts say of each span (ats/quote), which is Rust's.
-	judge func(spans, said []string) ([]quoted.Judgement, error)
-	news  *statusline.NewsLog
+	// measure is what was measured of each span against the prompts
+	// (ats/quote), which is Rust's.
+	measure func(spans, said []string) ([]quoted.Measurement, error)
+	news    *statusline.NewsLog
 	// Who the token that attested the removal speaks for, as ci.watch files it.
 	mintedBy func(did string) (string, bool)
 	logger   *zap.SugaredLogger
@@ -46,7 +47,7 @@ func (h *Removal) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrap(err, "quote.removal payload is not an attestation")
 	}
 	if len(as.Actors) == 0 || as.Actors[0] == "" {
-		return errors.Newf("quote.removal: attestation %s has no actor to address the verdict to", as.ID)
+		return errors.Newf("quote.removal: attestation %s has no actor to address the result to", as.ID)
 	}
 	namespace := NamespaceOf(ctx)
 	if namespace == "" {
@@ -66,18 +67,18 @@ func (h *Removal) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrapf(err, "quote.removal: reading the prompts of %s for %s", namespace, as.ID)
 	}
 
-	judgements, err := h.judge(spans, said)
+	measurements, err := h.measure(spans, said)
 	if err != nil {
-		return errors.Wrapf(err, "quote.removal: judging the spans of %s against the prompts of %s", as.ID, namespace)
+		return errors.Wrapf(err, "quote.removal: measuring the spans of %s against the prompts of %s", as.ID, namespace)
 	}
 
 	var removed []removedQuote
 	for i, span := range spans {
-		v := judgements[i].Verdict
-		if v == quoted.Unsourced {
+		m := measurements[i]
+		if !near(m) {
 			continue
 		}
-		removed = append(removed, removedQuote{File: files[i], Span: span, Verdict: v.String()})
+		removed = append(removed, removedQuote{File: files[i], Span: span, Kind: kind(m)})
 	}
 	if len(removed) == 0 {
 		return nil
@@ -121,7 +122,7 @@ func (h *Removal) leave(as types.As, namespace, commit string, removed []removed
 
 // NewRemoval is quote.removal, asking prompts for what a namespace was told.
 func NewRemoval(prompts func(namespace string) ([]string, error),
-	judge func(spans, said []string) ([]quoted.Judgement, error), news *statusline.NewsLog,
+	measure func(spans, said []string) ([]quoted.Measurement, error), news *statusline.NewsLog,
 	mintedBy func(did string) (string, bool), logger *zap.SugaredLogger) *Removal {
-	return &Removal{prompts: prompts, judge: judge, news: news, mintedBy: mintedBy, logger: logger}
+	return &Removal{prompts: prompts, measure: measure, news: news, mintedBy: mintedBy, logger: logger}
 }

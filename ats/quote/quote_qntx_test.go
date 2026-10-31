@@ -9,61 +9,52 @@ import (
 )
 
 // testdata/quote.json is what Rust writes and Go checks it reads the same way:
-// every verdict, and how far each unsourced or stretched span was measured.
-func TestJudgeReadsTheVectors(t *testing.T) {
+// whether each span is exact, the corrections to the nearest prompt, and its
+// length.
+func TestMeasureReadsTheVectors(t *testing.T) {
 	path := "../../crates/ats/testdata/quote.json"
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	var vectors struct {
-		Verdicts []struct {
-			Said    []string `json:"said"`
-			Span    string   `json:"span"`
-			Verdict string   `json:"verdict"`
-			Degree  *int     `json:"degree"`
-		} `json:"verdicts"`
+		Measurements []struct {
+			Said        []string `json:"said"`
+			Span        string   `json:"span"`
+			Exact       bool     `json:"exact"`
+			Corrections int      `json:"corrections"`
+			Length      int      `json:"length"`
+		} `json:"measurements"`
 	}
 	if err := json.Unmarshal(raw, &vectors); err != nil {
 		t.Fatalf("unmarshal %s: %v", path, err)
 	}
-	for _, v := range vectors.Verdicts {
-		got, err := Judge([]string{v.Span}, v.Said)
+	for _, v := range vectors.Measurements {
+		got, err := Measure([]string{v.Span}, v.Said)
 		if err != nil {
-			t.Errorf("Judge(%q): %v", v.Span, err)
+			t.Errorf("Measure(%q): %v", v.Span, err)
 			continue
 		}
-		if len(got) != 1 || got[0].Verdict.String() != v.Verdict {
-			t.Errorf("Judge(%q) = %v, want %s", v.Span, got, v.Verdict)
-			continue
-		}
-		degree, measured := got[0].Corrections()
-		if v.Verdict == "sourced" {
-			// Rust measures a sourced span in the vectors (degree_of); Judge does not.
-			if measured {
-				t.Errorf("Judge(%q) measured a sourced span at %d", v.Span, degree)
-			}
-			continue
-		}
-		if !measured || (v.Degree != nil && degree != *v.Degree) {
-			t.Errorf("Judge(%q) measured %d (%v), want %v", v.Span, degree, measured, v.Degree)
+		want := Measurement{Exact: v.Exact, Corrections: v.Corrections, Length: v.Length}
+		if len(got) != 1 || got[0] != want {
+			t.Errorf("Measure(%q) = %v, want %v", v.Span, got, want)
 		}
 	}
 }
 
-// Spans cross together: each one's verdict is its own, in order.
-func TestJudgeAnswersEachSpanInOrder(t *testing.T) {
-	got, err := Judge([]string{"typed", "never said at all", "typed"}, []string{"the user typed this"})
+// Spans cross together: each one's measurement is its own, in order.
+func TestMeasureAnswersEachSpanInOrder(t *testing.T) {
+	got, err := Measure([]string{"typed", "never said at all", "typed"}, []string{"the user typed this"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Verdict{Sourced, Unsourced, Sourced}
-	if len(got) != len(want) {
-		t.Fatalf("judged %d of %d", len(got), len(want))
+	if len(got) != 3 {
+		t.Fatalf("measured %d of 3", len(got))
 	}
-	for i := range want {
-		if got[i].Verdict != want[i] {
-			t.Errorf("span %d = %v, want %v", i, got[i].Verdict, want[i])
-		}
+	if !got[0].Exact || got[1].Exact || !got[2].Exact {
+		t.Errorf("exactness out of order: %v", got)
+	}
+	if got[1].Corrections == 0 || got[1].Length != len("never said at all") {
+		t.Errorf("the span that matched nothing was measured %v", got[1])
 	}
 }

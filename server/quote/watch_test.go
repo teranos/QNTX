@@ -42,7 +42,7 @@ func watchWith(prompts ...string) (*Watch, *statusline.NewsLog, *string) {
 			*asked = ns
 			return prompts, nil
 		},
-		judge:    substringJudge,
+		measure:  substringMeasure,
 		news:     news,
 		mintedBy: func(did string) (string, bool) { return "person-1", true },
 		logger:   zap.NewNop().Sugar(),
