@@ -28,9 +28,10 @@ import (
 // declares, an openapi.json as the operations and schemas of an OpenAPI
 // description. A .proto that imports by its path is pinned at that path:
 // oasf's are under agntcy/, its taxonomies under schema/, and the JSON Schema
-// its server gives a Record is record.schema.json.
+// its server gives a Record is record.schema.json. TEI's ODD is pinned under
+// Specs/ as the Guidelines keep it: tei is tei_4.12.0_113e933 (odd.go).
 //
-//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema */record.schema.json
+//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema */record.schema.json */Specs
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory
@@ -40,10 +41,12 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 	if refused != nil {
 		return Schema{}, refused
 	}
-	var protos, declarations []string
+	var protos, declarations, specs []string
 	prisma, jsonSchema, openAPI := false, false, false
 	for _, name := range files {
 		switch {
+		case strings.HasPrefix(name, "Specs/") && strings.HasSuffix(name, ".xml"):
+			specs = append(specs, name)
 		case name == "schema.prisma":
 			prisma = true
 		case name == "schema.json":
@@ -71,9 +74,11 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 		return openAPIAt(path.Join(dir, "openapi.json"))
 	case len(declarations) > 0:
 		return withDeclarations(Schema{fits: tsFits}, dir, declarations)
+	case len(specs) > 0:
+		return oddAt(dir, specs)
 	}
 	if len(protos) == 0 {
-		return Schema{}, failed("%s holds no schema.prisma, no .proto, no schema.json, no .d.ts and no openapi.json", dir)
+		return Schema{}, failed("%s holds no schema.prisma, no .proto, no schema.json, no .d.ts, no openapi.json and no Specs/", dir)
 	}
 	return protoAt(dir, protos)
 }
