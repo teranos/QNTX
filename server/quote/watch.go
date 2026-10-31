@@ -115,7 +115,7 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 			unsourced = append(unsourced, span)
 		}
 		d := degree{Span: span, Kind: kind(m), Corrections: m.Corrections, Length: m.Length}
-		if near, ok := saidAt(said, m); ok {
+		if near, ok := SaidAt(said, m); ok {
 			d.Row, d.Who, d.At, d.Session = near.Row, near.Who, near.At, near.Session
 		}
 		degrees = append(degrees, d)

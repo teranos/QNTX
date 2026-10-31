@@ -802,6 +802,8 @@
   "protocol.Quote.source": "Where the words were taken from: a session, a transcript, a commit, a PR description, a memory. TEI's source.",
   "protocol.Quote.type": "Whether the words were spoken, thought or written, or how else the quote is to be read: TEI's type, with its values.",
   "protocol.Quote.who": "Who said them, each a pointer to a person or an agent: TEI's who. An agent's name is rendered inside the quote, as [Fable].",
+  "protocol.Quotes": "Quotes is what transcripts quoted answers: each span in double quotes of the text it was given, as a Quote.",
+  "protocol.Quotes.quotes": "One per span, in the order the text has them.",
   "protocol.ReachCompiled": "ReachCompiled is one path the compiled-in table names, and the levels it opens it to.",
   "protocol.ReachLine": "ReachLine is one stored reach line, as it was written.",
   "protocol.ReachLine.at": "RFC 3339, to the nanosecond.",

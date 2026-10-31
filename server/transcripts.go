@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
+	quotes "github.com/teranos/QNTX/ats/quote"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/namespaces"
@@ -89,7 +90,8 @@ func (s *QNTXServer) transcriptsSignum() sigil.Signum {
 		Signum: &protocol.Signum{
 			Name:        "transcripts",
 			Description: "What was said and done in each agent session Ground recorded, read from the namespace the caller stands in.",
-			Tags:        []string{"transcripts", "agent", "session"},
+			Tags:        []string{"transcripts", "agent", "session", "quote"},
+			Follows:     []*protocol.Follows{transcriptsFollowTEI()},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "read",
@@ -101,9 +103,18 @@ func (s *QNTXServer) transcriptsSignum() sigil.Signum {
 					Answer: "protocol.Transcripts",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/transcripts"},
 				},
+				{
+					Name: "quoted",
+					Does: "The spans in double quotes of a text, each measured against what people said here, as TEI quotes: the words, whose they are, the turn they came from, and how many corrections away. A span inside an agent's quotation is the agent's and is not one.",
+					Takes: []*protocol.Param{
+						{Name: "text", Required: true, Says: "The words whose quoted spans are measured: a commit message, a PR description, a note."},
+					},
+					Answer: "protocol.Quotes",
+					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/transcripts/quoted"},
+				},
 			},
 		},
-		Answers: map[string]sigil.Answer{"read": s.transcriptsRead},
+		Answers: map[string]sigil.Answer{"read": s.transcriptsRead, "quoted": s.transcriptsQuoted},
 	}
 }
 
@@ -416,4 +427,80 @@ func riteSaid(attrs map[string]any) string {
 		said += " " + strconv.Itoa(int(code))
 	}
 	return said
+}
+
+// transcriptsFollowTEI is how a transcript's turns and a Quote are TEI's q, and
+// an Interp its interp: the words as the element's content, the speaker as who,
+// the row as source. Transcripts are quotes a person said.
+func transcriptsFollowTEI() *protocol.Follows {
+	pairs := [][2]string{
+		{"protocol.Turn.text", "q.content"},
+		{"protocol.Turn.speaker", "q.who"},
+		{"protocol.Turn.of", "q.source"},
+		{"protocol.Quote.content", "q.content"},
+		{"protocol.Quote.who", "q.who"},
+		{"protocol.Quote.type", "q.type"},
+		{"protocol.Quote.source", "q.source"},
+		{"protocol.Quote.resp", "q.resp"},
+		{"protocol.Quote.cert", "q.cert"},
+		{"protocol.Quote.rend", "q.rend"},
+		{"protocol.Quote.ana", "q.ana"},
+		{"protocol.Quote.id", "q.xml:id"},
+		{"protocol.Interp.content", "interp.content"},
+		{"protocol.Interp.resp", "interp.resp"},
+		{"protocol.Interp.cert", "interp.cert"},
+		{"protocol.Interp.type", "interp.type"},
+		{"protocol.Interp.inst", "interp.inst"},
+		{"protocol.Interp.id", "interp.xml:id"},
+	}
+	follows := &protocol.Follows{Reference: "tei"}
+	for _, pair := range pairs {
+		follows.Columns = append(follows.Columns, &protocol.Corresponds{Field: pair[0], Column: pair[1]})
+	}
+	return follows
+}
+
+// transcriptsQuoted is transcripts quoted: the spans in double quotes of a
+// text, each measured against what people said in the namespace the caller
+// stands in, and answered as Quotes naming the turn each came from.
+func (s *QNTXServer) transcriptsQuoted(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	caller := sigil.Caller(ctx)
+	if caller == nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "quotes are measured where their caller stands, and this asking carried no request"}
+	}
+	if !quotes.Carried {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "quotes are measured in Rust, which this build leaves out: it was built without qntxquote"}
+	}
+	if sent["text"] == "" {
+		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "text", Says: "text is the words whose quoted spans are measured"}
+	}
+	spans := quote.Spans(sent["text"])
+	answer := &protocol.Quotes{}
+	if len(spans) == 0 {
+		return answer, nil
+	}
+	store, err := s.storeFor(caller)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no namespace to measure quotes in: " + err.Error()}
+	}
+	said, err := humanSaidIn(store)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the prompts did not read: " + err.Error()}
+	}
+	measured, err := quotes.Measure(spans, quote.Texts(said))
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	for i, span := range spans {
+		m := measured[i]
+		q := &protocol.Quote{Content: span, Type: "written", Rend: []string{`"`}, Cert: strconv.Itoa(m.Corrections)}
+		// Only a span the policy takes as the person's words names whose and from
+		// which turn; the nearest prompt to an unsourced one is no source.
+		if near, ok := quote.SaidAt(said, m); ok && quote.Near(m) {
+			q.Who = []string{near.Who}
+			q.Source = []string{near.Row}
+		}
+		answer.Quotes = append(answer.Quotes, q)
+	}
+	return answer, nil
 }

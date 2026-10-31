@@ -58,3 +58,10 @@ func kind(m quoted.Measurement) string {
 		return "unsourced"
 	}
 }
+
+// Near is whether the policy reports the measurement as the person's words,
+// accepted or stretched: only then does a span name the turn it came from.
+func Near(m quoted.Measurement) bool { return near(m) }
+
+// Kind is how the policy names a measurement: sourced, stretched or unsourced.
+func Kind(m quoted.Measurement) string { return kind(m) }

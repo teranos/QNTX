@@ -22,8 +22,8 @@ func Texts(said []Said) []string {
 	return texts
 }
 
-// saidAt is the prompt a measurement names, when it names one.
-func saidAt(said []Said, m quoted.Measurement) (Said, bool) {
+// SaidAt is the prompt a measurement names, when it names one.
+func SaidAt(said []Said, m quoted.Measurement) (Said, bool) {
 	if m.Prompt < 0 || m.Prompt >= len(said) {
 		return Said{}, false
 	}

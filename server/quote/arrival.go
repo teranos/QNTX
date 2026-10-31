@@ -121,7 +121,7 @@ func (a *Arrivals) Measure(arrival Arrival) (Arrived, error) {
 	for i, span := range spans {
 		m := measurements[i]
 		s := Span{Span: span, Kind: kind(m), Corrections: m.Corrections, Length: m.Length}
-		if near, ok := saidAt(said, m); ok {
+		if near, ok := SaidAt(said, m); ok {
 			s.Row, s.Who, s.At, s.Session = near.Row, near.Who, near.At, near.Session
 		}
 		arrived.Spans = append(arrived.Spans, s)

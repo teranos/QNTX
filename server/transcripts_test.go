@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/QNTX/server/quote"
 	"net/http"
 	"net/http/httptest"
@@ -270,4 +271,29 @@ func TestTranscriptsAreRootsAndSupers(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ROOT", "SUPER"}, compiled["/api/transcripts"])
+}
+
+// transcripts follows tei: a turn and a Quote are q, an Interp is interp, and
+// parity finds nothing of theirs missing from the pin and no departure.
+func TestTranscriptsFollowTEI(t *testing.T) {
+	schema, refused := parity.Reference("tei")
+	require.Nil(t, refused)
+	s := &QNTXServer{}
+	p, refused := parity.Hold(s.transcriptsSignum().Signum, "", "tei", schema)
+	require.Nil(t, refused)
+	assert.Empty(t, p.Missing)
+	// A turn's speaker and row are one value where TEI's who and source are
+	// lists: the one departure, shown rather than hidden. A Quote departs nowhere.
+	var departed []string
+	for _, clade := range p.Clades {
+		for _, item := range clade.Items {
+			for _, d := range item.Departs {
+				departed = append(departed, clade.Model+"."+item.Column+": "+d)
+			}
+		}
+	}
+	assert.ElementsMatch(t, []string{
+		"q.who: a list in the schema, and protocol.Turn.speaker is one value",
+		"q.source: a list in the schema, and protocol.Turn.of is one value",
+	}, departed)
 }

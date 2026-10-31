@@ -83,7 +83,7 @@ func (h *Removal) Execute(ctx context.Context, job *async.Job) error {
 			continue
 		}
 		r := removedQuote{File: files[i], Span: span, Kind: kind(m)}
-		if near, ok := saidAt(said, m); ok {
+		if near, ok := SaidAt(said, m); ok {
 			r.Row, r.Who, r.At, r.Session = near.Row, near.Who, near.At, near.Session
 		}
 		removed = append(removed, r)
