@@ -109,7 +109,7 @@ func (c Card) Message() (protoreflect.Message, error) {
 		"supportedInterfaces": interfaces,
 		// What the node does not do is said as false (§3.3.4). The extended card
 		// is the card its caller reaches (§3.1.11), so it is always there to ask.
-		"capabilities": map[string]any{"streaming": false, "pushNotifications": false, "extendedAgentCard": true, "extensions": extensions},
+		"capabilities": map[string]any{"streaming": false, "pushNotifications": true, "extendedAgentCard": true, "extensions": extensions},
 		// The node's token is a bearer token (§3.1.11: the extended card is
 		// authenticated with a scheme the card declares).
 		"securitySchemes":      schemes,

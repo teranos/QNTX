@@ -87,6 +87,96 @@ message SessionTranscript {
   Transcript transcript = 1;
 }
 
+// SessionEvent is one thing a harness's session emitted, as it emitted it:
+// live, in the order it happened, and no attestation. The transcript is the
+// session after the fact (Transcript); this is the session while it runs.
+message SessionEvent {
+  // "I want to see the most honest and least data-lossy representation of what
+  // there is to show."
+
+  // The session it happened in.
+  string session = 1;
+  // Whose line this is: claude, pi, anthropic.
+  string harness = 2;
+  // When, as the harness stamped it, or when the node read it when it did not.
+  string at = 3;
+  // What it is, in the words every harness has one of: started, text, delta,
+  // tool_use, tool_result, thinking, ended, failed. A line that is none of
+  // these is "other", and raw still carries it whole.
+  string kind = 4;
+  // What was said: the text, the delta, a tool's result, the answer on ended,
+  // the error on failed.
+  string text = 5;
+  // On tool_use and tool_result: the tool and the id the harness gave the call.
+  string tool = 6;
+  string tool_use_id = 7;
+  // On tool_use: the input, as JSON, whole.
+  string input = 8;
+  // The harness's own line, whole, as it printed it. Nothing above says more
+  // than this; what the fields do not carry is still here.
+  string raw = 9;
+  // Where in the session's stream this line ends, so a reader asks for what
+  // follows it and nothing is read twice or skipped.
+  int64 mark = 10;
+}
+
+// SessionEvents is the events of a turn from a mark on, and whether the turn
+// is still printing. Over SSE each event travels alone, as one data line.
+message SessionEvents {
+  repeated SessionEvent events = 1;
+  // Whether the harness is still printing: false is the turn over, and its
+  // last event ended or failed.
+  bool live = 2;
+  // The mark to ask from next.
+  int64 mark = 3;
+}
+
+// ElementAgent is one element whose agent this node holds (ADR-054): named,
+// and in a session when one was kept.
+message ElementAgent {
+  // The element, as it is said to.
+  string element = 1;
+  // Its session in Claude Code, or empty before anything was said to it.
+  string session = 2;
+  // Whether it is answering now.
+  bool answering = 3;
+  // Its Session at Anthropic's Console, when it runs there (ADR-054), or empty.
+  string anthropic_session = 4;
+}
+
+// ElementAgents is what elements list answers: every element agent this node
+// holds, the stories' included, each by the element's name.
+message ElementAgents {
+  // Each element agent held, by the element's name.
+  repeated ElementAgent agents = 1;
+}
+
+// ElementSession is one Session an element's agent has at Anthropic's Console.
+message ElementSession {
+  // The Session's id at the Console.
+  string id = 1;
+  // Its title there, when it has one.
+  string title = 2;
+  // Its status there: idle, running, terminated, as the Console says it.
+  string status = 3;
+  // When it was made, RFC 3339.
+  string created_at = 4;
+  // Whether the Console archived it.
+  bool archived = 5;
+  // Whether it is the one the element's chat goes on in.
+  bool current = 6;
+}
+
+// ElementSessions is what elements sessions and elements pick answer: every
+// Session the element's agent has at the Console, newest first; none when it
+// runs on the box.
+message ElementSessions {
+  // The agent's id at the Console, or empty when it runs on the box.
+  string agent = 1;
+  // Each Session, newest first.
+  repeated ElementSession sessions = 2;
+}
+
 // ClaudeSaid is what claude say answers.
 message ClaudeSaid {
   // What it answered.
@@ -161,6 +251,8 @@ message ClaudeAm {
   bool signed_in = 11;
   // How it is signed in, as Claude Code names it, or empty when it is not.
   string auth_method = 12;
+  // Every model a turn can be said to answer with.
+  repeated string models = 13;
 }
 
 // NamespaceAgentSaid is what agents say answers: what the namespace's agent
@@ -239,6 +331,55 @@ message CodexAm {
   string not_ready = 9;
 }
 
+// NodeAnthropic is what anthropic am and anthropic set answer: the node's
+// issuer and subject that ROOT registers at Anthropic, the ids of the rule its
+// identity token is traded at, and whether Anthropic accepted it.
+message NodeAnthropic {
+  // The node's OIDC issuer, the iss of every identity token it signs.
+  string issuer = 1;
+  // The node's DID, the sub of the node's own identity token.
+  string subject = 2;
+  // The Anthropic organization the rule is in.
+  string organization_id = 3;
+  // The federation rule the node's identity token is traded at.
+  string federation_rule_id = 4;
+  // The service account the traded token acts as.
+  string service_account_id = 5;
+  // Who gave the ids; empty before anybody did.
+  string set_by = 6;
+  // When the ids were given, as RFC 3339.
+  string at = 7;
+  // Whether Anthropic was asked: false before any ids were given.
+  bool asked = 8;
+  // Whether Anthropic accepted the node's identity at the rule.
+  bool accepted = 9;
+  // What Anthropic answered when it did not accept it, or why it was not reached.
+  string why = 10;
+  // The node's issuer as Anthropic registered it (fdis_).
+  string issuer_id = 11;
+  // The workspace the traded token is scoped to (wrkspc_), as the wizard's snippet names it.
+  string workspace_id = 12;
+  // What ROOT's agents spend first: "session", the Claude subscription, or "console", the node's OIDC.
+  string first = 13;
+  // Whether the other follows once the first is exhausted.
+  bool then = 14;
+  // The session's windows, as ug last read each.
+  repeated AnthropicWindow session = 15;
+  // What ROOT's agents last ran on: "session" or "console"; empty before any turn.
+  string in_use = 16;
+}
+
+// AnthropicWindow is one window of the Claude subscription, as ug's status line read it.
+message AnthropicWindow {
+  // five_hour or seven_day.
+  string window = 1;
+  double used_percentage = 2;
+  // When the window resets, in Unix seconds.
+  int64 resets_at = 3;
+  // When ug read it, as RFC 3339.
+  string at = 4;
+}
+
 // NamespaceKeys is what keys list, set and drop answer: the names of a
 // namespace's keys, never their values (ADR-051).
 message NamespaceKeys {
@@ -256,6 +397,14 @@ message NamespaceKey {
   string set_by = 2;
   // When it was set, RFC 3339.
   string at = 3;
+  // Whether the provider it is named after was asked about it as this was
+  // answered.
+  bool asked = 4;
+  // Whether that provider accepts it: the light in Connectors.
+  bool accepted = 5;
+  // What the provider answered when it did not accept it, or why it was not
+  // reached.
+  string why = 6;
 }
 
 // PiAm is what pi am answers.

@@ -1,7 +1,7 @@
 # ADR-051: A namespace's keys
 
 Date: 2026-10-08
-Status: Proposed
+Status: Unclear, in debate 
 
 BRING YOUR OWN KEY
 BYOK
@@ -23,7 +23,7 @@ USE INDUSTRY STANDARD LANGUAGE FOR THIS PLEASE, THIS IS NOT AN INVENTION, AND SH
 
 - am.toml is the node's: written by the operator, read at start. A namespace's
   configuration is the namespace's own: its ns.toml, which holds its owner,
-  whether it is enabled and when it was made (ADR-026), and what its people set
+  whether it is enabled and when it was made ([ADR-026](ADR-026-Namespaces.md)), and what its people set
   at runtime. Its keys are part of that. Nothing of it touches am.toml, SSM, or
   the operator.
 
@@ -38,15 +38,17 @@ USE INDUSTRY STANDARD LANGUAGE FOR THIS PLEASE, THIS IS NOT AN INVENTION, AND SH
   drop a name. Their reach line names no TOKEN, and the handler refuses a token
   or a connector at any level: a model never lists, sets or reads a key.
 - Who sets them: ROOT, SUPER, and the namespace's owner as ns.toml names them.
-  Who holds REACH on a namespace is unbuilt (ADR-026), and the owner is the one
+  Who holds REACH on a namespace is unbuilt ([ADR-026](ADR-026-Namespaces.md)), and the owner is the one
   person a namespace names.
-- A value leaves the node once: into the environment of the harness process the
-  node starts for that namespace, the way the ROOT agent's plan token does
-  (internal/claudecode/run.go). ADR-048 lays the rule for git, and it holds
-  here: handed to the process, offered to no model.
+- A value leaves the node two ways: into the environment of the harness process
+  the node starts for that namespace, the way the ROOT agent's plan token does
+  (internal/claudecode/run.go), and to the provider a key is named after, which
+  keys set and keys list ask whether it accepts the key (server/provider_keys.go).
+  [ADR-048](ADR-048-Node-Agent.md) lays the rule for git, and it holds here: handed to the process,
+  offered to no model.
 - A namespace's agent in Pi is handed the key named for the provider its
   AGENT line names, as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or
-  `OPENROUTER_API_KEY` (ADR-053).
+  `OPENROUTER_API_KEY` ([ADR-053](ADR-053-Namespace-Agents.md)).
 
 ## Through the loss of the box
 
@@ -58,7 +60,7 @@ reading every key:
 "Yes"
 
 - A key is an attestation, so it rides the namespace's send to the bucket and
-  its take-in after a rebuild (ADR-037). The node's private key is kept at the
+  its take-in after a rebuild ([ADR-037](ADR-037-operational-db.md)). The node's private key is kept at the
   parquet location by the Rust identity store, so the bucket is the boundary.
 
 ## The element

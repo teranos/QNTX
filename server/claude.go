@@ -111,8 +111,10 @@ const (
 	piSessionFile     = "pi-session"
 )
 
-// turnInSession is a turn going on, by the session it is in.
-type turnInSession struct{ session string }
+// turnInSession is a turn going on, by the session it is in, and the stream it
+// prints to once it runs: empty until then, and in a harness that prints to no
+// file (Pi).
+type turnInSession struct{ session, stream string }
 
 // theNodeAgent is the Node Agent of the node holding this key, working in home.
 func theNodeAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
@@ -181,7 +183,8 @@ func (a *rootAgent) isSaidToBe() string {
 			"Your DID is " + a.did + ". " +
 			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
 			"Your git is your own: commits are authored as you, and when you push to GitHub your git asks the node for what carries the push. " +
-			"Never ask for, read, print or store a GitHub credential yourself."
+			"Never ask for, read, print or store a GitHub credential yourself. " +
+			elementsAware(a.element)
 	}
 	if a.namespace != auth.NamespaceSystem {
 		return "You are the agent of the namespace " + a.namespace + " on a QNTX node, shared by everyone who has reach on that namespace. " +
@@ -205,6 +208,7 @@ func (s *QNTXServer) claudeHarness() *harness {
 		name: "claude", called: "Claude Code", file: claudeSessionFile,
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs this in. Not sent, it is the one am.toml gives."},
+			{Name: "model", OneOf: claudeModels, Says: "The model it answers with. Not sent, it is the one am.toml gives."},
 		},
 		// am.toml naming the Node Agent names it in Claude Code.
 		named:    func() bool { return true },
@@ -217,7 +221,7 @@ func (s *QNTXServer) claudeHarness() *harness {
 		am: func(is agentIn, agent *rootAgent, spec agentSpec) proto.Message {
 			am := &protocol.ClaudeAm{
 				Did: is.did, Model: spec.Model, Effort: spec.Effort, PermissionMode: spec.Mode,
-				PermissionModes: appcfg.PermissionModes, Allow: spec.Allow,
+				PermissionModes: appcfg.PermissionModes, Models: claudeModels, Allow: spec.Allow,
 				Session: is.session, Answering: is.answering, ClaudeCode: is.path, NotReady: is.notReady,
 			}
 			// Asked of Claude Code itself, when the node holds one.
@@ -256,12 +260,23 @@ func (s *QNTXServer) thereIsNoNodeAgent() *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Node Agent ([agent.root]), so there is none to speak to"}
 }
 
+// claudeModels is every model a turn can be said to answer with.
+// After a tool result, Opus 5.5, Sonnet 5.5 and Fable 5.1 hold their text and
+// print it whole (anthropics/claude-code#96439); Sonnet 5 and Haiku 4.5 stream
+// it, so a turn watched live through tool calls is said with one of those.
+var claudeModels = []string{"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-sonnet-5", "claude-haiku-4-5"}
+
 // claudePart is Claude Code's part of one turn: run in the permission mode
 // whoever speaks names, or the one am.toml gives.
 func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAgent) (aTurn, *protocol.Refusal) {
 	mode := sent["permission_mode"]
 	if mode == "" {
 		mode = named.Mode
+	}
+	// "would like ability to pick model as well"
+	model := sent["model"]
+	if model == "" {
+		model = named.Model
 	}
 	if mode == "" {
 		return aTurn{}, &protocol.Refusal{Why: sigil.Missing, Param: "permission_mode",
@@ -305,7 +320,7 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 		run: func(t turnRun) (proto.Message, error) {
 			said := claudecode.Said{
 				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
-				Says: t.says, Model: named.Model, Effort: named.Effort, Token: plan,
+				Says: t.says, Model: model, Effort: named.Effort, Token: plan,
 				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
 				// "on a redeploy NODE agent would still be alive, which is the
 				// intended state, rather than being killed mid-turn" (#1256).
@@ -315,7 +330,7 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			if s.ownURL != "" {
 				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
 			}
-			answer, err := said.Run(s.ctx, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
+			answer, err := s.spend(agent, said, t.shot, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
 			if err != nil {
 				// The node stopping leaves the turn to the node that comes
 				// next, which reads it on from its stream to how it ends.

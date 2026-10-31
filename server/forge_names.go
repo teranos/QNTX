@@ -132,10 +132,10 @@ func (s *QNTXServer) nameFollowForges() error {
 	for _, f := range follows {
 		repo, repoLegacy := legacyRepo(f.Repo)
 		dispatches, dispatchesLegacy := legacyRepo(f.Dispatches)
-		if !repoLegacy && !dispatchesLegacy {
+		if !repoLegacy && !dispatchesLegacy && f.kept == f.line() {
 			continue
 		}
-		before := f.line()
+		before := f.kept
 		f.Repo, f.Dispatches = repo, dispatches
 		if err := s.nodeRecords().SetFollow(forgeNamer, f); err != nil {
 			return errors.Wrapf(err, "the follow %s was not given the forge of its repositories", before)
@@ -146,7 +146,7 @@ func (s *QNTXServer) nameFollowForges() error {
 		if err := s.nodeRecords().nodeRecord(forgeNamer, githubSubject, before, "_", map[string]any{retiredLine: true}); err != nil {
 			return errors.Wrapf(err, "the follow %s was named %s and not retired", before, f.line())
 		}
-		s.logger.Infow("A follow is named by its forge", "was", before, "now", f.line())
+		s.logger.Infow("A follow is kept under its own line, the old one retired", "was", before, "now", f.line())
 	}
 	return nil
 }

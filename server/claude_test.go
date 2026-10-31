@@ -112,11 +112,13 @@ func (h *handed) CreateAttestation(as *types.As) error {
 	return h.AttestationStore.CreateAttestation(as)
 }
 
-// underGround stands the agent in home under ground: a stand-in for its ground, and the settings that run it.
+// underGround stands the agent in home under ground: stand-ins for its ground binaries, and the settings that run them.
 func underGround(t *testing.T, home string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Dir(comet.AgentGround(home)), 0o755))
-	require.NoError(t, os.WriteFile(comet.AgentGround(home), []byte("#!/bin/sh\n"), 0o755))
+	for _, built := range []string{comet.AgentGround(home), comet.AgentHook(home), comet.AgentSky(home)} {
+		require.NoError(t, os.WriteFile(built, []byte("#!/bin/sh\n"), 0o755))
+	}
 	require.NoError(t, comet.AgentSettings(home))
 }
 

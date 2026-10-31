@@ -56,12 +56,12 @@ func TakeIn(first, record RawAttestationStore, mark Mark) (TakenIn, error) {
 	if err != nil {
 		return done, errors.Wrap(err, "the take-in mark could not be read")
 	}
-	held, err := first.CountAttestations()
+	holds, err := holdsAny(first)
 	if err != nil {
-		return done, errors.Wrap(err, "the operational db did not say how many attestations it holds")
+		return done, errors.Wrap(err, "the operational db did not say whether it holds any attestation")
 	}
 	filter := ats.AttestationFilter{Limit: ats.EveryRow, TimeStart: types.Unbounded(), TimeEnd: types.Unbounded()}
-	if marked && held > 0 {
+	if marked && holds {
 		done.Since = since
 		filter.TimeStart = types.BoundAt(since)
 	} else {
@@ -94,6 +94,15 @@ func TakeIn(first, record RawAttestationStore, mark Mark) (TakenIn, error) {
 		}
 	}
 	return done, nil
+}
+
+// holdsAny asks a store that can answer without counting, and counts the rest.
+func holdsAny(store RawAttestationStore) (bool, error) {
+	if h, ok := store.(HoldsAnyStore); ok {
+		return h.HoldsAny()
+	}
+	held, err := store.CountAttestations()
+	return held > 0, err
 }
 
 // Landed is a landing file read in the order its rows landed.

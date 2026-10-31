@@ -95,20 +95,21 @@ func (s *QNTXServer) groundAgent(home string) {
 	}
 }
 
-// keepAgentGround roots every store path the agent's ground loads from beside it, and fetches any a
-// collection took: on 2026-10-19 a deploy took its glibc, and the ground stood and ran nothing.
+// keepAgentGround roots every store path the agent's ground binaries load from beside them, and fetches
+// any a collection took: on 2026-10-19 a deploy took its glibc, and the ground stood and ran nothing.
 func (s *QNTXServer) keepAgentGround(home string) error {
-	ground := comet.AgentGround(home)
-	data, err := os.ReadFile(ground)
-	if err != nil {
-		return errors.Wrapf(err, "the agent's ground at %s did not read", ground)
-	}
-	fetched, collected, err := rootStorePaths(s.ctx, filepath.Join(nixBin, "nix-store"), ground, data, filepath.Join(filepath.Dir(ground), storeRootsDir))
-	if err != nil {
-		return err
-	}
-	if collected {
-		s.logger.Named("comet").Infow("What an agent's ground loads from had been collected, and is fetched and kept again", "home", home, "fetched", fetched)
+	for _, built := range []string{comet.AgentGround(home), comet.AgentHook(home), comet.AgentSky(home), comet.AgentDrive(home)} {
+		data, err := os.ReadFile(built)
+		if err != nil {
+			return errors.Wrapf(err, "the agent's %s did not read", built)
+		}
+		fetched, collected, err := rootStorePaths(s.ctx, filepath.Join(nixBin, "nix-store"), built, data, filepath.Join(filepath.Dir(built), storeRootsDir))
+		if err != nil {
+			return err
+		}
+		if collected {
+			s.logger.Named("comet").Infow("What an agent's ground loads from had been collected, and is fetched and kept again", "home", home, "binary", built, "fetched", fetched)
+		}
 	}
 	return nil
 }

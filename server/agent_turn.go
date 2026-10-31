@@ -48,7 +48,9 @@ type aTurn struct {
 // turnRun is what a harness runs a turn with.
 type turnRun struct {
 	says, session string
-	resumes       bool
+	// shot is what was said with its screenshot, for a harness that carries the picture itself.
+	shot    shaken
+	resumes bool
 	// env is the agent's git, as the harness hands it on.
 	env    []string
 	writes sessionWriter
@@ -122,13 +124,17 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	told, err := writes.told(says, spokenBy(caller), time.Now())
 	write([]*types.As{told}, err)
 
-	// A turn asked for a Task is told to it as it starts (A2A §3.1.1); a say
-	// that is no Task's tells nobody.
-	started := func(string) {}
-	if starts, forATask := taskStartsIn(ctx); forATask {
-		started = func(stream string) { starts(session, stream) }
+	// The stream a turn prints to is what live tails while it runs, so the turn
+	// going says it. A turn asked for a Task is told to it as it starts (A2A
+	// §3.1.1); a say that is no Task's tells nobody.
+	starts, forATask := taskStartsIn(ctx)
+	started := func(stream string) {
+		t.in.answering.Store(&turnInSession{session: session, stream: stream})
+		if forATask {
+			starts(session, stream)
+		}
 	}
-	answer, err := t.run(turnRun{says: shakePrompt(says, t.element, t.screenshot), session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
+	answer, err := t.run(turnRun{says: shakePrompt(says, t.element, t.screenshot), shot: shaken{says: says, element: t.element, screenshot: t.screenshot}, session: session, resumes: resumes, env: itsGit, writes: writes, write: write,
 		unwritten: unwritten, started: started})
 
 	if err != nil {

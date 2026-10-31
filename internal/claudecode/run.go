@@ -78,6 +78,8 @@ type Message struct {
 	Message *struct {
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
+	// On a stream_event: the API's own event, whole.
+	Event json.RawMessage `json:"event"`
 	// On the result.
 	Result  string  `json:"result"`
 	IsError bool    `json:"is_error"`
@@ -96,6 +98,32 @@ type Block struct {
 	ID    string          `json:"id"`
 	Name  string          `json:"name"`
 	Input json.RawMessage `json:"input"`
+	// On a thinking block.
+	Thinking string `json:"thinking"`
+	// On a tool_result: the call it answers, and what the tool said, a string
+	// or blocks of text.
+	ToolUseID string          `json:"tool_use_id"`
+	Content   json.RawMessage `json:"content"`
+}
+
+// Said is a tool_result's content as text: the string it is, or its text
+// blocks joined.
+func (b Block) Said() string {
+	var text string
+	if json.Unmarshal(b.Content, &text) == nil {
+		return text
+	}
+	var blocks []Block
+	if json.Unmarshal(b.Content, &blocks) != nil {
+		return string(b.Content)
+	}
+	parts := make([]string, 0, len(blocks))
+	for _, block := range blocks {
+		if block.Type == "text" {
+			parts = append(parts, block.Text)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 // Blocks is the parts of a message. One whose content is plain text has none.
@@ -146,7 +174,9 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		}
 	}
 
-	args := []string{"-p", s.Says, "--output-format", "stream-json", "--verbose",
+	// Partial messages are the stream_event lines: the words as the model says
+	// them, for whoever tails the stream while the turn runs (Tail).
+	args := []string{"-p", s.Says, "--output-format", "stream-json", "--verbose", "--include-partial-messages",
 		"--model", s.Model, "--effort", s.Effort, "--permission-mode", s.Mode}
 	if len(s.Allow) > 0 {
 		args = append(args, "--allowedTools", strings.Join(s.Allow, ","))
