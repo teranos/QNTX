@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,9 @@ import (
 // This foundation runs headlessly; it does not implement approval callbacks.
 type Said struct {
 	Binary, Home, Session, Says, Model, Sandbox, APIKey string
+	System                                              string
+	MCPURL, MCPBearer                                   string
+	Ground                                              string
 	// TrustHooks runs the hooks Home/codex/config.toml names without codex's
 	// /hooks trust: they are the node's, written there by the node.
 	TrustHooks bool
@@ -76,6 +80,28 @@ func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
 		}
 	}
 	args := []string{"exec", "--json", "--model", s.Model, "--sandbox", s.Sandbox, "--skip-git-repo-check"}
+	if s.System != "" {
+		value, err := json.Marshal(s.System)
+		if err != nil {
+			return Answer{}, errors.Wrap(err, "Codex instructions did not encode")
+		}
+		args = append(args, "-c", "developer_instructions="+string(value))
+	}
+	if s.MCPURL != "" {
+		value, err := json.Marshal(s.MCPURL)
+		if err != nil {
+			return Answer{}, errors.Wrap(err, "Codex MCP URL did not encode")
+		}
+		args = append(args, "-c", "mcp_servers.qntx.url="+string(value), "-c", `mcp_servers.qntx.bearer_token_env_var="QNTX_CODEX_MCP_BEARER"`)
+	}
+	if s.Ground != "" {
+		command := "'" + strings.ReplaceAll(s.Ground, "'", "'\"'\"'") + "'"
+		args = append(args, "-c", "features.hooks=true")
+		for _, event := range []string{"SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PreCompact", "PostCompact", "Stop", "SessionEnd", "SubagentStart", "SubagentStop"} {
+			args = append(args, "-c", "hooks."+event+"=[{hooks=[{type=\"command\",command="+strconv.Quote(command)+"}]}]")
+		}
+	}
+
 	if s.TrustHooks {
 		args = append(args, "--dangerously-bypass-hook-trust")
 	}
@@ -89,6 +115,12 @@ func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
 	cmd.Env = append(append(agentenv.Carried(), s.Env...), "HOME="+home, "CODEX_HOME="+config)
 	if s.APIKey != "" {
 		cmd.Env = append(cmd.Env, "CODEX_API_KEY="+s.APIKey)
+	}
+	if s.MCPURL != "" {
+		cmd.Env = append(cmd.Env, "QNTX_CODEX_MCP_BEARER="+s.MCPBearer)
+	}
+	if s.Ground != "" {
+		cmd.Env = append(cmd.Env, "QNTX_TOKEN="+s.MCPBearer, "PATH="+filepath.Dir(s.Ground)+":"+os.Getenv("PATH"))
 	}
 	cmd.Stdin = strings.NewReader(s.Says)
 	cmd.WaitDelay = time.Second

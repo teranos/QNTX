@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/codex"
+	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/comet"
 	"github.com/teranos/QNTX/server/sigil"
@@ -91,17 +92,27 @@ func (s *QNTXServer) codexPart(named appcfg.CodexConfig, agent *rootAgent) (aTur
 		return aTurn{}, &protocol.Refusal{Why: sigil.Failed, Says: "this node knows no URL of its own, where codex reaches its gateway"}
 	}
 	var binary string
+	key := agent.token
 	threads := filepath.Join(agent.home, codexThreadFile)
 	return aTurn{
 		ready: func(ctx context.Context, _ string, kept bool) (bool, *protocol.Refusal) {
 			var err error
+			if named.TokenRef != "" {
+				if key, err = secretref.Resolve(ctx, named.TokenRef); err != nil || key == "" {
+					why := "it resolved to nothing"
+					if err != nil {
+						why = err.Error()
+					}
+					return false, &protocol.Refusal{Why: sigil.Failed, Says: "the token am.toml names for codex's gateway did not resolve: " + why}
+				}
+			}
 			if binary, err = s.harnessHeldBy("codex").Path(ctx); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no codex to run: " + err.Error()}
 			}
 			if err := comet.Under(agent.home); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " is said nothing until it runs under ground: " + err.Error()}
 			}
-			if err := comet.AgentCodexConfig(agent.home, s.ownURL+"/api/"+named.Gateway+"/v1"); err != nil {
+			if err := comet.AgentCodexConfig(agent.home, codexGateway(s.ownURL, named.Gateway)); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 			}
 			return kept, nil
@@ -116,7 +127,7 @@ func (s *QNTXServer) codexPart(named appcfg.CodexConfig, agent *rootAgent) (aTur
 			last := ""
 			said := codex.Said{
 				Binary: binary, Home: agent.home, Session: thread, Says: t.says,
-				Model: named.Model, Sandbox: named.Sandbox, APIKey: agent.token, TrustHooks: true, Env: t.env,
+				Model: named.Model, Sandbox: named.Sandbox, APIKey: key, TrustHooks: true, Env: t.env,
 			}
 			answer, err := said.Run(s.ctx, func(e codex.Event) { t.write(t.writes.rowsOfCodex(e, &last, t.now())) })
 			if err != nil {
@@ -135,6 +146,15 @@ func (s *QNTXServer) codexPart(named appcfg.CodexConfig, agent *rootAgent) (aTur
 			}, nil
 		},
 	}, nil
+}
+
+// codexGateway is where codex makes its model calls: a gateway named by its
+// URL is that URL, and one named as a plugin is that plugin on this node.
+func codexGateway(own, gateway string) string {
+	if strings.Contains(gateway, "://") {
+		return gateway
+	}
+	return own + "/api/" + gateway + "/v1"
 }
 
 // rowsOfCodex is one record of codex's stream as the hook events Claude Code's

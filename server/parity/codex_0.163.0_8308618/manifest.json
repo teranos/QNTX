@@ -5,19 +5,57 @@
   "artifacts": {
     "linux-x64": {
       "file": "codex-x86_64-unknown-linux-musl.tar.gz",
-      "sha256": "beb339e8ecd9ba057a6bb2dc81ad8ca474812edfbf0fc5056ca818797648dde4"
+      "sha256": "beb339e8ecd9ba057a6bb2dc81ad8ca474812edfbf0fc5056ca818797648dde4",
+      "beside": [
+        {
+          "file": "bwrap-x86_64-unknown-linux-musl.tar.gz",
+          "sha256": "bcc196b1d25dc2c2b912dcedf780b562deb0552f3c50648761ced145c3466a23",
+          "path": "codex-resources/bwrap"
+        },
+        {
+          "file": "codex-code-mode-host-x86_64-unknown-linux-musl.tar.gz",
+          "sha256": "314263128ba6592e7e807c265deeaf928a692b72dcbfeb5e0b20c9423b703529",
+          "path": "codex-code-mode-host"
+        }
+      ]
     },
     "linux-arm64": {
       "file": "codex-aarch64-unknown-linux-musl.tar.gz",
-      "sha256": "a7261e65f4a96d8f4ca65a069c6cf2dc2c33defc341e48078acefda9461fffe4"
+      "sha256": "a7261e65f4a96d8f4ca65a069c6cf2dc2c33defc341e48078acefda9461fffe4",
+      "beside": [
+        {
+          "file": "bwrap-aarch64-unknown-linux-musl.tar.gz",
+          "sha256": "953647c6f8c8adc1b8fc6534ff283bf95e6ba0230274a70a9eda33bb2c8e6a82",
+          "path": "codex-resources/bwrap"
+        },
+        {
+          "file": "codex-code-mode-host-aarch64-unknown-linux-musl.tar.gz",
+          "sha256": "284356aefb197f00b76b912efdfdbae8ccf3ea1f89b976dde064b7ccb43214ef",
+          "path": "codex-code-mode-host"
+        }
+      ]
     },
     "darwin-x64": {
       "file": "codex-x86_64-apple-darwin.tar.gz",
-      "sha256": "562a1aea0e5686283a467687d268ae33705f02fd4d40f1bc4110a415c5c1c7b1"
+      "sha256": "562a1aea0e5686283a467687d268ae33705f02fd4d40f1bc4110a415c5c1c7b1",
+      "beside": [
+        {
+          "file": "codex-code-mode-host-x86_64-apple-darwin.tar.gz",
+          "sha256": "5211c6ed5062c84ba5796e555903c22a6e38fcccf6fe11ee11d7e1b5687ce1fd",
+          "path": "codex-code-mode-host"
+        }
+      ]
     },
     "darwin-arm64": {
       "file": "codex-aarch64-apple-darwin.tar.gz",
-      "sha256": "61c4d9a92521bdb42b0c1d9f87c673f6da628a06de5945cbdd9a0010632f6d10"
+      "sha256": "61c4d9a92521bdb42b0c1d9f87c673f6da628a06de5945cbdd9a0010632f6d10",
+      "beside": [
+        {
+          "file": "codex-code-mode-host-aarch64-apple-darwin.tar.gz",
+          "sha256": "2e28f49a4767a97586843c92692b96481be74d837199b49038f731cec88e9941",
+          "path": "codex-code-mode-host"
+        }
+      ]
     }
   }
 }
