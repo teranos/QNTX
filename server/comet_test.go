@@ -19,20 +19,20 @@ import (
 func TestTheCometRouteAnswersInTheNodesJSON(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	kept := filepath.Join(home, ".qntx", "comets", "abcd-nl", "grove", "x86_64-linux", "ground")
+	kept := filepath.Join(home, ".qntx", "comets", "abcd-nl", "grove", "x86_64-linux", "7", "libground_sand.so")
 	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
-	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o755))
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o644))
 	require.NoError(t, comet.KeepDigest(kept))
 	sum := sha256.Sum256([]byte("a comet"))
 	s := &QNTXServer{logger: zaptest.NewLogger(t).Sugar()}
 
 	digest := httptest.NewRecorder()
-	s.HandleComet(digest, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux?digest", nil))
+	s.HandleComet(digest, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux/7?digest", nil))
 	assert.Equal(t, http.StatusOK, digest.Code)
 	assert.JSONEq(t, `{"digest":"`+hex.EncodeToString(sum[:])+`"}`, digest.Body.String())
 
 	none := httptest.NewRecorder()
-	s.HandleComet(none, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/other/x86_64-linux", nil))
+	s.HandleComet(none, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/other/x86_64-linux/7", nil))
 	assert.Equal(t, http.StatusNotFound, none.Code)
-	assert.Contains(t, none.Body.String(), `"error":"no comet of abcd-nl/other/x86_64-linux is kept`)
+	assert.Contains(t, none.Body.String(), `"error":"no comet of abcd-nl/other/x86_64-linux/7 is kept`)
 }
