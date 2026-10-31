@@ -6,7 +6,7 @@ https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/ref-q.html
 
 https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/CO.html#COHQQ
 
-`protocol.Quote` and `protocol.Interp` ([sigil.proto](../../plugin/grpc/protocol/sigil.proto)) are TEI's `q` and `interp`, field by attribute, the words as the element's content. TEI P5 4.12.0 is pinned at [server/parity/tei_4.12.0_113e933](../../server/parity/tei_4.12.0_113e933/SOURCE) as every reference is, and parity holds a Quote to it.
+`protocol.Quote` and `protocol.Interp` ([sigil.proto](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/sigil.proto)) are TEI's `q` and `interp`, field by attribute, the words as the element's content. TEI P5 4.12.0 is pinned at [server/parity/tei_4.12.0_113e933](https://github.com/teranos/QNTX/blob/main/server/parity/tei_4.12.0_113e933/SOURCE) as every reference is, and parity holds a Quote to it.
 
 
 
