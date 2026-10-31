@@ -107,22 +107,21 @@ func (s *QNTXServer) quotesFromGitHub(_ context.Context, event string, body []by
 
 // The quote subsystem is optional: quotes are measured in Rust (ats/quote), so a
 // build without it (quickdev, or no qntxquote) leaves quote.provenance and
-// quote.removal out, and says so, rather than register built-ins that could
-// only fail.
-func (s *QNTXServer) quoteCarried() bool {
+// quote.removal out, and says so once, rather than register built-ins that
+// could only fail.
+func (s *QNTXServer) setupQuote() {
 	if !quotes.Carried {
 		s.logger.Infow("quote subsystem not carried: quotes are measured in Rust, which this build leaves out",
 			"handlers", []string{"quote.provenance", "quote.removal"})
+		return
 	}
-	return quotes.Carried
+	s.setupQuoteProvenance()
+	s.setupQuoteRemoval()
 }
 
 // setupQuoteProvenance registers the built-in. No schedule: the standing row
 // reaches it when a claim arrives.
 func (s *QNTXServer) setupQuoteProvenance() {
-	if !s.quoteCarried() {
-		return
-	}
 	s.daemon.Registry().Register(quote.NewWatch(s.namespaceSaid, quotes.Measure, s.news,
 		s.authHandler.MintedBy, s.logger.Named("quote.provenance")))
 }
@@ -130,9 +129,6 @@ func (s *QNTXServer) setupQuoteProvenance() {
 // setupQuoteRemoval registers the built-in. No schedule: the standing row
 // reaches it when a commit's removals arrive.
 func (s *QNTXServer) setupQuoteRemoval() {
-	if !s.quoteCarried() {
-		return
-	}
 	s.daemon.Registry().Register(quote.NewRemoval(s.namespaceSaid, quotes.Measure, s.news,
 		s.authHandler.MintedBy, s.logger.Named("quote.removal")))
 }
