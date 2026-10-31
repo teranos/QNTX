@@ -6,6 +6,8 @@ https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/ref-q.html
 
 https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/CO.html#COHQQ
 
+`protocol.Quote` and `protocol.Interp` ([sigil.proto](../../plugin/grpc/protocol/sigil.proto)) are TEI's `q` and `interp`, field by attribute, the words as the element's content. TEI P5 4.12.0 is pinned at [server/parity/tei_4.12.0_113e933](../../server/parity/tei_4.12.0_113e933/SOURCE) as every reference is, and parity holds a Quote to it.
+
 
 
 https://platform.claude.com/dashboard
@@ -58,4 +60,6 @@ The notation says an agent is speaking, before a name is read. The name says whi
 An agent sentence inside human quotation marks is the violation, wherever it appears.
 
 - [ ] The notation's glyphs.
+- [ ] The signum that keeps a Quote, so the node holds it to tei.
+- [ ] C2PA, for the material a quote arrives in, pinned as TEI is.
 
