@@ -73,6 +73,12 @@ Status: Implemented, mostly
 - Needs repo attached, namely QNTX, QNTX-App, QNTX-Web
 - And Memory store needs to be a thing,,  
 
+"it has happened that an element agent beleived it could not submit a pr and gave a patch to the Node Agent"
+
+- #1437 ends:
+
+"Made by parity-element, pushed by the Node Agent from the node."
+
 ### Review PR's submitted via ROOT SHAKE
 
 - https://github.com/teranos/QNTX-Web/pull/13
