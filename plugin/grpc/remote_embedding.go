@@ -8,7 +8,6 @@ import (
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // RemoteEmbedding is a gRPC client wrapper for the EmbeddingService.
@@ -23,11 +22,9 @@ type RemoteEmbedding struct {
 
 // NewRemoteEmbedding creates a gRPC client connection to the EmbeddingService.
 func NewRemoteEmbedding(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteEmbedding, error) {
-	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	conn, err := dialService(endpoint, "Embedding")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to Embedding gRPC endpoint")
+		return nil, err
 	}
 
 	client := protocol.NewEmbeddingServiceClient(conn)

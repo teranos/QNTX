@@ -8,7 +8,6 @@ import (
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // RemoteVectorSearch is a gRPC client wrapper for the VectorSearchService.
@@ -23,11 +22,9 @@ type RemoteVectorSearch struct {
 
 // NewRemoteVectorSearch creates a gRPC client connection to the VectorSearchService.
 func NewRemoteVectorSearch(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteVectorSearch, error) {
-	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	conn, err := dialService(endpoint, "VectorSearch")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to VectorSearch gRPC endpoint")
+		return nil, err
 	}
 
 	client := protocol.NewVectorSearchServiceClient(conn)
