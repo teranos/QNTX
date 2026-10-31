@@ -49,12 +49,8 @@ func (s *AtsStore) Raw() RawAttestationStore {
 
 // CreateAttestation signs then delegates.
 func (s *AtsStore) CreateAttestation(as *types.As) error {
-	warnIDLikeSubjects(s.log, as.ID, as.Subjects)
-
-	if signer := getDefaultSigner(); signer != nil {
-		if err := signer.Sign(as); err != nil {
-			return errors.Wrapf(err, "failed to sign attestation %s", as.ID)
-		}
+	if err := signBeforeStore(s.log, as); err != nil {
+		return err
 	}
 
 	if err := s.raw.CreateAttestation(as); err != nil {
@@ -152,4 +148,18 @@ func firstOr(v []string, fallback string) string {
 		return fallback
 	}
 	return v[0]
+}
+
+// signBeforeStore warns of subjects that look like ids and signs with the
+// default signer, when the node has one. Every write that is the node's own
+// goes through it before the backend sees the attestation.
+func signBeforeStore(log *zap.SugaredLogger, as *types.As) error {
+	warnIDLikeSubjects(log, as.ID, as.Subjects)
+
+	if signer := getDefaultSigner(); signer != nil {
+		if err := signer.Sign(as); err != nil {
+			return errors.Wrapf(err, "failed to sign attestation %s", as.ID)
+		}
+	}
+	return nil
 }
