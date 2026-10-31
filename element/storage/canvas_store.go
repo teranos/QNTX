@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"time"
 
@@ -217,30 +218,37 @@ func (s *CanvasStore) ListElements(ctx context.Context) (_ []*CanvasElement, err
 	return items, nil
 }
 
-// DeleteElement removes an element
-func (s *CanvasStore) DeleteElement(ctx context.Context, id string) error {
+// deleteScoped removes the row of table whose keyColumn is key, in the canvas
+// the context is scoped to, and says ErrNotFound when there was none. verb and
+// done are the same word before and after, for the errors.
+func (s *CanvasStore) deleteScoped(ctx context.Context, table, keyColumn, key, noun, verb, done string) error {
 	in, err := s.scope(ctx)
 	if err != nil {
 		return err
 	}
-	query := `DELETE FROM canvas_elements WHERE id = ? AND in_canvas = ?`
+	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = ? AND in_canvas = ?`, table, keyColumn)
 
-	result, err := s.db.ExecContext(ctx, query, id, in)
+	result, err := s.db.ExecContext(ctx, query, key, in)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete canvas element %s", id)
+		return errors.Wrapf(err, "failed to %s %s %s", verb, noun, key)
 	}
 
-	// A driver that cannot count the rows has not said the element was absent,
+	// A driver that cannot count the rows has not said the row was absent,
 	// and ErrNotFound here would be this function inventing that.
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrapf(err, "deleted canvas element %s but could not count the rows", id)
+		return errors.Wrapf(err, "%s %s %s but could not count the rows", done, noun, key)
 	}
 	if rows == 0 {
-		return errors.Wrapf(ErrNotFound, "canvas element %s", id)
+		return errors.Wrapf(ErrNotFound, "%s %s", noun, key)
 	}
 
 	return nil
+}
+
+// DeleteElement removes an element
+func (s *CanvasStore) DeleteElement(ctx context.Context, id string) error {
+	return s.deleteScoped(ctx, "canvas_elements", "id", id, "canvas element", "delete", "deleted")
 }
 
 // === Composition operations ===
@@ -461,26 +469,7 @@ func (s *CanvasStore) edgesForComposition(ctx context.Context, compID string) (_
 
 // DeleteComposition removes a composition
 func (s *CanvasStore) DeleteComposition(ctx context.Context, id string) error {
-	in, err := s.scope(ctx)
-	if err != nil {
-		return err
-	}
-	query := `DELETE FROM canvas_compositions WHERE id = ? AND in_canvas = ?`
-
-	result, err := s.db.ExecContext(ctx, query, id, in)
-	if err != nil {
-		return errors.Wrapf(err, "failed to delete canvas composition %s", id)
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return errors.Wrapf(err, "deleted canvas composition %s but could not count the rows", id)
-	}
-	if rows == 0 {
-		return errors.Wrapf(ErrNotFound, "canvas composition %s", id)
-	}
-
-	return nil
+	return s.deleteScoped(ctx, "canvas_compositions", "id", id, "canvas composition", "delete", "deleted")
 }
 
 // === Minimized window operations ===
@@ -546,23 +535,5 @@ func (s *CanvasStore) ListMinimizedWindows(ctx context.Context) (_ []*MinimizedW
 
 // RemoveMinimizedWindow removes a minimized window record
 func (s *CanvasStore) RemoveMinimizedWindow(ctx context.Context, elementID string) error {
-	in, err := s.scope(ctx)
-	if err != nil {
-		return err
-	}
-	query := `DELETE FROM minimized_windows WHERE element_id = ? AND in_canvas = ?`
-	result, err := s.db.ExecContext(ctx, query, elementID, in)
-	if err != nil {
-		return errors.Wrapf(err, "failed to remove minimized window %s", elementID)
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return errors.Wrapf(err, "removed minimized window %s but could not count the rows", elementID)
-	}
-	if rows == 0 {
-		return errors.Wrapf(ErrNotFound, "minimized window %s", elementID)
-	}
-
-	return nil
+	return s.deleteScoped(ctx, "minimized_windows", "element_id", elementID, "minimized window", "remove", "removed")
 }
