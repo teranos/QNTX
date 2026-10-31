@@ -26,6 +26,7 @@ func amFollowsAgentCard() *protocol.Follows {
 		{Field: "protocol.Node.description", Column: "AgentCard.description"},
 		{Field: "protocol.VersionInfo.version", Column: "AgentCard.version"},
 		{Field: "protocol.Node.signa", Column: "AgentCard.skills"},
+		{Field: "protocol.Node.output_modes", Column: "AgentCard.default_output_modes"},
 	}}
 }
 

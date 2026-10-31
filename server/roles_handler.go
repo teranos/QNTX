@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 )
@@ -56,9 +56,12 @@ func (s *QNTXServer) rolesList(_ context.Context, _ sigil.Sent) (any, *protocol.
 		s.logger.Errorw("the system store did not open for the lines", "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	// One scan. The store's ceiling, newest first, so a node past it loses
-	// the oldest lines rather than the ones that decide.
-	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: storage.MaxAttestationLimit})
+	// Found the way the gate finds them: by subject for the REACH, WRITE and
+	// READ lines, by predicate for the grants and revokes, every row of each.
+	// One scan of the newest rows under the store's ceiling lost every line
+	// older than whatever else system took in since, while the gate still
+	// read them: the audit trail said less than the gate held.
+	found, err := s.roleLinesIn(store)
 	if err != nil {
 		s.logger.Errorw("the lines were not read", "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
@@ -91,6 +94,36 @@ func (s *QNTXServer) rolesList(_ context.Context, _ sigil.Sent) (any, *protocol.
 		answer.Lines = append(answer.Lines, l.row)
 	}
 	return answer, nil
+}
+
+// roleLinesIn is every attestation in the store the gate reads about roles,
+// each once. One filter at a time: a filter naming two subjects or two
+// predicates is an `and` on some backends, and no line is both.
+func (s *QNTXServer) roleLinesIn(store namespaces.Reading) ([]*types.As, error) {
+	var filters []ats.AttestationFilter
+	for _, subject := range []string{reach.Subject, auth.SubjectWrite, auth.SubjectRead} {
+		filters = append(filters, ats.AttestationFilter{Subjects: []string{subject}})
+	}
+	for _, predicate := range []string{auth.PredicateRoleGranted, auth.PredicateRoleRevoked} {
+		filters = append(filters, ats.AttestationFilter{Predicates: []string{predicate}})
+	}
+	seen := map[string]bool{}
+	var lines []*types.As
+	for _, filter := range filters {
+		filter.TimeStart, filter.TimeEnd, filter.Limit = types.Unbounded(), types.Unbounded(), ats.EveryRow
+		found, err := store.GetAttestations(filter)
+		if err != nil {
+			return nil, err
+		}
+		for _, as := range found {
+			if seen[as.ID] || !aboutRoles(as) {
+				continue
+			}
+			seen[as.ID] = true
+			lines = append(lines, as)
+		}
+	}
+	return lines, nil
 }
 
 // aboutRoles is whether the gate reads this attestation: a REACH, WRITE or
