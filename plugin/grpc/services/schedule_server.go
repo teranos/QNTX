@@ -185,24 +185,31 @@ func (s *ScheduleServer) madeBy(req *protocol.CreateScheduleRequest) (Caller, as
 	return Caller{}, "", errors.Newf("schedule %s names who made it: the store_token of a sigil call, or by_plugin", req.HandlerName)
 }
 
+// moveTo puts a schedule in state on behalf of a plugin that holds the token,
+// and logs it. What went wrong is the failure it returns, empty when nothing
+// did: the failure travels in the response payload, a transport error would
+// discard it. verb and done are the same word before and after.
+func (s *ScheduleServer) moveTo(authToken, scheduleID, state, verb, done string) string {
+	if err := ValidateToken(authToken, s.authToken); err != nil {
+		return err.Error()
+	}
+
+	if err := s.store.UpdateJobState(scheduleID, state); err != nil {
+		return fmt.Sprintf("failed to %s schedule %s: %v", verb, scheduleID, err)
+	}
+
+	s.logger.Infow("Schedule "+done+" via gRPC", "schedule_id", scheduleID)
+	return ""
+}
+
 // PauseSchedule pauses an active schedule
 func (s *ScheduleServer) PauseSchedule(ctx context.Context, req *protocol.PauseScheduleRequest) (*protocol.PauseScheduleResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.PauseScheduleResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
-			Success: false,
-			Error:   err.Error(),
-		}, nil
-	}
-
-	if err := s.store.UpdateJobState(req.ScheduleId, schedule.StatePaused); err != nil {
+	if failure := s.moveTo(req.AuthToken, req.ScheduleId, schedule.StatePaused, "pause", "paused"); failure != "" {
 		return &protocol.PauseScheduleResponse{
 			Success: false,
-			Error:   fmt.Sprintf("failed to pause schedule %s: %v", req.ScheduleId, err),
+			Error:   failure,
 		}, nil
 	}
-
-	s.logger.Infow("Schedule paused via gRPC", "schedule_id", req.ScheduleId)
-
 	return &protocol.PauseScheduleResponse{
 		Success: true,
 	}, nil
@@ -210,22 +217,12 @@ func (s *ScheduleServer) PauseSchedule(ctx context.Context, req *protocol.PauseS
 
 // ResumeSchedule resumes a paused schedule
 func (s *ScheduleServer) ResumeSchedule(ctx context.Context, req *protocol.ResumeScheduleRequest) (*protocol.ResumeScheduleResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.ResumeScheduleResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
-			Success: false,
-			Error:   err.Error(),
-		}, nil
-	}
-
-	if err := s.store.UpdateJobState(req.ScheduleId, schedule.StateActive); err != nil {
+	if failure := s.moveTo(req.AuthToken, req.ScheduleId, schedule.StateActive, "resume", "resumed"); failure != "" {
 		return &protocol.ResumeScheduleResponse{
 			Success: false,
-			Error:   fmt.Sprintf("failed to resume schedule %s: %v", req.ScheduleId, err),
+			Error:   failure,
 		}, nil
 	}
-
-	s.logger.Infow("Schedule resumed via gRPC", "schedule_id", req.ScheduleId)
-
 	return &protocol.ResumeScheduleResponse{
 		Success: true,
 	}, nil
@@ -233,22 +230,12 @@ func (s *ScheduleServer) ResumeSchedule(ctx context.Context, req *protocol.Resum
 
 // DeleteSchedule soft-deletes a schedule
 func (s *ScheduleServer) DeleteSchedule(ctx context.Context, req *protocol.DeleteScheduleRequest) (*protocol.DeleteScheduleResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		return &protocol.DeleteScheduleResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
-			Success: false,
-			Error:   err.Error(),
-		}, nil
-	}
-
-	if err := s.store.UpdateJobState(req.ScheduleId, schedule.StateDeleted); err != nil {
+	if failure := s.moveTo(req.AuthToken, req.ScheduleId, schedule.StateDeleted, "delete", "deleted"); failure != "" {
 		return &protocol.DeleteScheduleResponse{
 			Success: false,
-			Error:   fmt.Sprintf("failed to delete schedule %s: %v", req.ScheduleId, err),
+			Error:   failure,
 		}, nil
 	}
-
-	s.logger.Infow("Schedule deleted via gRPC", "schedule_id", req.ScheduleId)
-
 	return &protocol.DeleteScheduleResponse{
 		Success: true,
 	}, nil
