@@ -491,6 +491,11 @@ func (s *QNTXServer) signerHoldsKey(w http.ResponseWriter, r *http.Request, req 
 			"%s is signed by %s, and this request is admitted as no person who could hold it", req.ID, req.SignerDID))
 		return false
 	}
+	// A token is an ed25519 seed, so its holder can sign as it (ADR-025): the
+	// key is the one that admitted the request.
+	if admitted.ActsAs() == req.SignerDID && admitted.Grant != nil {
+		return true
+	}
 	writer, found, err := s.authHandler.UserByID(admitted.UserID)
 	if err != nil {
 		writeWrappedError(w, s.logger, err,
