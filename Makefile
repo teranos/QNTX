@@ -9,13 +9,17 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-# Ground immediate delivery — notify active Claude sessions of build progress.
+# Ground immediate delivery — notify the Claude session that runs this make of build progress.
 # Usage: @$(call ground-notify,name,detail message)
+# The notice is addressed to the session make runs in (CLAUDE_CODE_SESSION_ID): ground
+# reads a session address before a project one, and a project address reaches every
+# session with that project as its cwd, which is not the one that built when make
+# runs in a checkout elsewhere. Without a session, the notice goes to nobody.
 GROUND_DB := $(HOME)/.local/share/ground/ground.db
 define ground-notify
-	@if [ -f "$(GROUND_DB)" ]; then \
+	@if [ -f "$(GROUND_DB)" ] && [ -n "$$CLAUDE_CODE_SESSION_ID" ]; then \
 		TS=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
-		sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-$(1)-' || strftime('%s','now'), '[\"qntx\"]', '[\"immediate:$(1)\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$TS', 'make', json_object('detail', '$(2) at ' || time('now','localtime'), 'after', 0))"; \
+		sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-$(1)-' || strftime('%s','now'), '[\"qntx\"]', '[\"immediate:$(1)\"]', '[\"session:$$CLAUDE_CODE_SESSION_ID\"]', '[\"make\"]', '$$TS', 'make', json_object('detail', '$(2) at ' || time('now','localtime'), 'after', 0))"; \
 	fi
 endef
 
