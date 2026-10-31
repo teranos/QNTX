@@ -344,3 +344,24 @@ func TestAModelPassingOffAsAnotherIsNamedRight(t *testing.T) {
 		t.Errorf("the pull request does not name the pass-off: %v", gh.sent["CreateAPullRequest"]["body"])
 	}
 }
+
+func TestCodeThatIsNotACommentIsLeftAlone(t *testing.T) {
+	for _, line := range []string{
+		"\t*p = 1;",
+		"*p;",
+		"// +build linux",
+		"//   +build linux",
+		"//go:build linux",
+	} {
+		path := "x.c"
+		if ProseLineIn(path, line) {
+			t.Errorf("%q is read as prose", line)
+		}
+		if got := MarkLineIn(path, line, "agent"); got != line {
+			t.Errorf("%q was rewritten to %q", line, got)
+		}
+	}
+	if got := MarkLineIn("x.c", " * says something", "agent"); !strings.Contains(got, "「[agent] says something」") {
+		t.Errorf("a block comment's line lost its quotation: %q", got)
+	}
+}

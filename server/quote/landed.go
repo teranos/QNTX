@@ -592,13 +592,14 @@ func commentPrefix(markers []string, line string) (string, string, bool) {
 			continue
 		}
 		after := rest[len(marker):]
-		if marker == "*" && (strings.HasPrefix(after, "/") || strings.HasPrefix(after, "*")) {
-			return "", "", false
-		}
-		if strings.HasPrefix(after, "go:") || strings.HasPrefix(after, "nolint") || strings.HasPrefix(after, "+build") {
+		// A block comment's line is "* words"; "*p" is code.
+		if marker == "*" && after != "" && after[0] != ' ' {
 			return "", "", false
 		}
 		text := strings.TrimLeft(after, " ")
+		if strings.HasPrefix(text, "go:") || strings.HasPrefix(text, "nolint") || strings.HasPrefix(text, "+build") {
+			return "", "", false
+		}
 		if quoteOnly(text) || !strings.ContainsFunc(text, func(r rune) bool { return r > ' ' && !strings.ContainsRune("-=*_#>|/", r) }) {
 			return "", "", false
 		}
