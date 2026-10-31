@@ -599,6 +599,12 @@
         "SUPER"
       ]
     },
+    "/api/transcripts/quoted": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
     "/api/types": {
       "x-qntx-reach": [
         "ROOT"

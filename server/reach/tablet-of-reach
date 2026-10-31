@@ -164,7 +164,7 @@ REACH is '/am/oasf'                                                       of ROO
 REACH is '/api/parity/hold' '/api/parity/storage' '/api/parity/follows'   of ROOT
 
 # What was said and done in each agent session Ground recorded (transcripts).
-REACH is '/api/transcripts'                                               of ROOT SUPER
+REACH is '/api/transcripts' '/api/transcripts/quoted'                     of ROOT SUPER
 
 # The Obsidian vaults the node keeps a copy of, and the folders each holds (ADR-049).
 REACH is '/api/vault'                                                     of ROOT

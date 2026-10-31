@@ -27,7 +27,7 @@ endef
 VERSION_TAG := $(shell git describe --tags --match 'v*' --dirty 2>/dev/null || echo dev)
 GO_LDFLAGS = -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(VERSION_TAG)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'"
 
-BUILD_TAGS := rustsqlite,qntxwasm
+BUILD_TAGS := rustsqlite,qntxwasm,qntxquote
 
 cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM parser)
 	@echo "Building QNTX CLI with Rust optimizations (sqlite) and WASM (parser, fuzzy)..."
