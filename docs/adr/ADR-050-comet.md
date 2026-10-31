@@ -57,10 +57,6 @@ Even faster when the builds are done by QNTX as Comet
   aarch64-darwin on x86_64-linux, ran on the operator's M1 on 2026-10-19,
   flags adhoc and linker-signed. `codesign -s -` runs on the machine that lands
   it (ground source/comet.d).
-- No SDK carries libgit2. An aarch64-darwin comet links the libgit2 the
-  operator's machine's ground loads, from its nix store.
-- Linked against Apple's stubs, the binary loads /usr/lib's sqlite3 and curl,
-  not the two Nix store dylibs the current binary names.
 - ground's ci/ci.nix builds aarch64-darwin on macos-latest for tags. The
   node's GitHubService has CreateAWorkflowDispatchEvent and
   DownloadAnArtifact.
@@ -115,7 +111,7 @@ TODO: UI CONCERN
 
 - A comet is one sand for one user, one project and one platform.
 - The hook is `exec ground` on PATH: one binary that path-matches every
-  project. Per project there is one binary per repository. Claude Code reads
+  project. Claude Code reads
   hooks from a repository's own .claude settings as well as the user's; how
   both combine when both name ground is not verified.
 
@@ -132,8 +128,6 @@ TODO: UI CONCERN
   hook answers a systemMessage that the plugin is installed and not yet
   functional (ground plugin/hooks/hooks.json). The customer installs the
   plugin and presents a token; the hook says the platform and pulls.
-- A landed binary is renamed over the one running, never copied onto it
-  (ground Makefile, 2026-09-14).
 
 ## The stubs
 
@@ -167,8 +161,6 @@ TODO: UI CONCERN
   `?digest` and HEAD answer the digest alone (server/comet).
 - The Darwin build on the box, end to end, with the stubs from S3: grove's
   aarch64-darwin comet, built on q, landed on the operator's machine.
-- A hook per repository: the universal ground hands a repository's hooks to
-  the comet landed for it (ground source/comet.d, main.d).
 - Landing: sky pulls the digest every five seconds and renames a checked
   comet over the one there (ground source/sky.d).
 - A push to a project's default branch, or to ground's main, rebuilds the
