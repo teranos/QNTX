@@ -14,7 +14,8 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The longest span measured.
+/// The longest span `within_corrections` compares against a prompt. A longer
+/// span is sourced only by a prompt that holds it verbatim.
 pub const SPAN_MAX: usize = 8192;
 
 /// The rules are rates per this many characters of the span.
