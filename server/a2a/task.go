@@ -48,8 +48,10 @@ type Sent struct {
 	// ReturnImmediately and History are SendMessageConfiguration's.
 	ReturnImmediately bool
 	History           HistoryLimit
-	// Push is whether the request configured a push notification.
-	Push bool
+	// Push is the push notification config the request carries, when it
+	// carries one: "Task id should be empty when sending this configuration in
+	// a SendMessage request" (a2a.proto).
+	Push *Push
 
 	parts []sentPart
 }
@@ -84,6 +86,14 @@ func ReadSent(request proto.Message) (Sent, error) {
 	if refused := historyRefused(read.Configuration.HistoryLength); refused != nil {
 		return Sent{}, refused
 	}
+	var push *Push
+	if len(read.Configuration.Push) > 0 {
+		config, refused := pushOf(read.Configuration.Push)
+		if refused != nil {
+			return Sent{}, errors.New(refused.Message)
+		}
+		push = &config
+	}
 	held := request.ProtoReflect()
 	field, found := fieldNamed(held.Descriptor(), "message")
 	if !found {
@@ -93,7 +103,7 @@ func ReadSent(request proto.Message) (Sent, error) {
 	return Sent{
 		Message: held.Get(field).Message(), TaskID: m.TaskID, ContextID: m.ContextID, Role: m.Role,
 		ReturnImmediately: read.Configuration.ReturnImmediately, History: limitOf(read.Configuration.HistoryLength),
-		Push: len(read.Configuration.Push) > 0, parts: m.Parts,
+		Push: push, parts: m.Parts,
 	}, nil
 }
 

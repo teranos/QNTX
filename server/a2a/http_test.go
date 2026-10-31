@@ -25,6 +25,12 @@ var asked = map[string]struct{ method, path, body string }{
 	"ListTasks":            {"GET", "/tasks", ""},
 	"CancelTask":           {"POST", "/tasks/abc:cancel", ""},
 	"GetExtendedAgentCard": {"GET", "/extendedAgentCard", ""},
+	// The config's id is abc, the id the path's last segment fills, and its
+	// task t1.
+	"CreateTaskPushNotificationConfig": {"POST", "/tasks/t1/pushNotificationConfigs", `{"url": "https://example.org/hook"}`},
+	"GetTaskPushNotificationConfig":    {"GET", "/tasks/t1/pushNotificationConfigs/abc", ""},
+	"ListTaskPushNotificationConfigs":  {"GET", "/tasks/t1/pushNotificationConfigs", ""},
+	"DeleteTaskPushNotificationConfig": {"DELETE", "/tasks/t1/pushNotificationConfigs/abc", ""},
 }
 
 // status is a google.rpc.Status as §11.6 writes it.
@@ -55,7 +61,7 @@ func serve(t *testing.T, answer Answer, method, path, body string, header map[st
 		r.Header.Set(k, v)
 	}
 	w := httptest.NewRecorder()
-	HTTP(operations, garden, answer, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }).ServeHTTP(w, r)
+	HTTP(operations, garden, answer, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }, func(*http.Request, Refusal) {}).ServeHTTP(w, r)
 	var said status
 	_ = json.Unmarshal(w.Body.Bytes(), &said)
 	return w, said
@@ -219,31 +225,25 @@ func TestWhatIsNoOperationIsNotFound(t *testing.T) {
 	}
 }
 
-// §3.3.4: the card says capabilities.pushNotifications is false, so every
-// push notification config operation answers PushNotificationNotSupportedError,
-// at no tenant and at one an agent is served at, with nothing asked of what
-// answers.
-func TestPushNotificationConfigIsNotSupported(t *testing.T) {
-	reached := false
-	answer := func(_ context.Context, op Operation, _ proto.Message) (proto.Message, *Error) {
-		reached = true
-		return nil, Unsupported(op)
-	}
-	for _, r := range []struct{ method, path string }{
-		{"POST", "/tasks/abc/pushNotificationConfigs"},
-		{"GET", "/tasks/abc/pushNotificationConfigs/c1"},
-		{"GET", "/tasks/abc/pushNotificationConfigs"},
-		{"DELETE", "/tasks/abc/pushNotificationConfigs/c1"},
-		{"POST", "/garden/tasks/abc/pushNotificationConfigs"},
-		{"DELETE", "/garden/tasks/abc/pushNotificationConfigs/c1"},
-	} {
-		w, said := serve(t, answer, r.method, r.path, `{}`, v1)
-		if w.Code != http.StatusBadRequest || said.Error.Status != "FAILED_PRECONDITION" || !strings.Contains(w.Body.String(), "PUSH_NOTIFICATION_NOT_SUPPORTED") {
-			t.Errorf("%s %s answered %d %s", r.method, r.path, w.Code, w.Body.String())
+// A push notification config's path fills the task the config is of, and the
+// config itself last: task_id and id, as a2a.proto names them.
+func TestAPushConfigPathFillsItsTaskAndItsConfig(t *testing.T) {
+	for _, name := range []string{"CreateTaskPushNotificationConfig", "GetTaskPushNotificationConfig", "ListTaskPushNotificationConfigs", "DeleteTaskPushNotificationConfig"} {
+		var request proto.Message
+		answer := func(_ context.Context, op Operation, r proto.Message) (proto.Message, *Error) {
+			request = r
+			return nil, Unsupported(op)
 		}
-	}
-	if reached {
-		t.Error("a push notification config operation was asked of what answers")
+		route := asked[name]
+		serve(t, answer, route.method, route.path, route.body, v1)
+		if request == nil {
+			t.Errorf("%s was not reached", name)
+			continue
+		}
+		fields := request.ProtoReflect().Descriptor().Fields()
+		if got := request.ProtoReflect().Get(fields.ByName("task_id")).String(); got != "t1" {
+			t.Errorf("%s took task %q from %s", name, got, route.path)
+		}
 	}
 }
 
@@ -305,8 +305,66 @@ func TestATenantThatCouldNotBeAskedIsAnError(t *testing.T) {
 	r := httptest.NewRequest("GET", "/garden/extendedAgentCard", nil)
 	r.Header.Set("A2A-Version", "1.0")
 	w := httptest.NewRecorder()
-	HTTP(operations, broken, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }).ServeHTTP(w, r)
+	HTTP(operations, broken, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) }, func(*http.Request, Refusal) {}).ServeHTTP(w, r)
 	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "the store did not answer") {
 		t.Errorf("a tenant that could not be asked answered %d %s", w.Code, w.Body.String())
+	}
+}
+
+// Every request the binding answers with an error is told, as the client sent
+// it and with the reason it was answered: "how would we know what things like
+// chatGPT are trying to do and call?"
+func TestEveryRefusalIsTold(t *testing.T) {
+	operations, err := Operations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		method, path, body, version, reason, operation string
+	}{
+		{"GET", "/nothing", "", "1.0", "NOT_FOUND", ""},
+		{"POST", "/message:send", sent, "", "VERSION_NOT_SUPPORTED", "SendMessage"},
+		{"POST", "/message:send", `{"message": {}}`, "1.0", "INVALID_ARGUMENT", "SendMessage"},
+		{"GET", "/tasks/abc", "", "1.0", "UNSUPPORTED_OPERATION", "GetTask"},
+	} {
+		var told *Error
+		var operation string
+		var asked *http.Request
+		r := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
+		if c.version != "" {
+			r.Header.Set("A2A-Version", c.version)
+		}
+		w := httptest.NewRecorder()
+		HTTP(operations, garden, unsupported, func(what string, err error) { t.Errorf("%s was not delivered: %v", what, err) },
+			func(r *http.Request, refusal Refusal) { asked, told, operation = r, refusal.Err, refusal.Operation }).ServeHTTP(w, r)
+		if told == nil {
+			t.Errorf("%s %s answered %d and was not told", c.method, c.path, w.Code)
+			continue
+		}
+		status, reason := told.Said()
+		if status != w.Code || reason != c.reason || asked.URL.Path != c.path || operation != c.operation {
+			t.Errorf("%s %s was told as %d %s at %s, and answered %d", c.method, c.path, status, reason, asked.URL.Path, w.Code)
+		}
+	}
+}
+
+// A JSON-RPC request (§9) is told the method it called and that the node
+// serves HTTP+JSON (§11).
+func TestAJSONRPCRequestIsToldWhatItCalled(t *testing.T) {
+	w, said := serve(t, unsupported, "POST", "/", `{"jsonrpc": "2.0", "id": 1, "method": "SendMessage", "params": {}}`, v1)
+	if w.Code != http.StatusNotFound || !strings.Contains(said.Error.Message, `JSON-RPC "SendMessage"`) {
+		t.Errorf("a JSON-RPC request answered %d %s", w.Code, w.Body.String())
+	}
+}
+
+// A JSON-RPC method is a name: one too long, or holding what no name holds, is
+// not said back.
+func TestAJSONRPCMethodThatIsNoNameIsNotSaidBack(t *testing.T) {
+	for _, method := range []string{strings.Repeat("a", 65), "Send\nMessage", "<script>"} {
+		body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method})
+		w, said := serve(t, unsupported, "POST", "/", string(body), v1)
+		if w.Code != http.StatusNotFound || strings.Contains(said.Error.Message, "JSON-RPC") {
+			t.Errorf("a JSON-RPC method %q answered %d %s", method, w.Code, w.Body.String())
+		}
 	}
 }

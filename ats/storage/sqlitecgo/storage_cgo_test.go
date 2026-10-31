@@ -123,6 +123,44 @@ func TestRustStore_Exists(t *testing.T) {
 	}
 }
 
+// A take-in asks whether a file holds anything; k counted a 1.9 GB namespace
+// for nine minutes to learn it. Asked of both ways a store reads.
+func TestRustStore_HoldsAny(t *testing.T) {
+	memory, err := NewMemoryStore()
+	if err != nil {
+		t.Fatalf("NewMemoryStore() error: %v", err)
+	}
+	defer memory.Close()
+	file, err := NewFileStore(filepath.Join(t.TempDir(), "holds.db"))
+	if err != nil {
+		t.Fatalf("NewFileStore() error: %v", err)
+	}
+	defer file.Close()
+
+	for name, store := range map[string]*RustStore{"memory": memory, "file": file} {
+		holds, err := store.HoldsAny()
+		if err != nil {
+			t.Fatalf("%s: HoldsAny() error: %v", name, err)
+		}
+		if holds {
+			t.Errorf("%s: an empty store says it holds something", name)
+		}
+		as := &types.As{ID: "AS-holds-" + name, Subjects: []string{"k"}, Predicates: []string{"held"},
+			Contexts: []string{"take-in"}, Actors: []string{"ground"}, Timestamp: time.Now(),
+			Source: "test", Attributes: map[string]any{}}
+		if err := store.CreateAttestation(as); err != nil {
+			t.Fatalf("%s: CreateAttestation() error: %v", name, err)
+		}
+		holds, err = store.HoldsAny()
+		if err != nil {
+			t.Fatalf("%s: HoldsAny() error: %v", name, err)
+		}
+		if !holds {
+			t.Errorf("%s: a store holding one says it holds nothing", name)
+		}
+	}
+}
+
 func TestRustStore_Count(t *testing.T) {
 	store, err := NewMemoryStore()
 	if err != nil {
