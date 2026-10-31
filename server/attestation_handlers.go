@@ -363,29 +363,46 @@ func (a *answerWriter) Write(p []byte) (int, error) {
 	return a.body.Write(p)
 }
 
+// attestationRequest is the JSON of one attestation to write.
+type attestationRequest struct {
+	ID         string         `json:"id"`
+	Subjects   []string       `json:"subjects"`
+	Predicates []string       `json:"predicates"`
+	Contexts   []string       `json:"contexts"`
+	Actors     []string       `json:"actors"`
+	Timestamp  *int64         `json:"timestamp"` // Unix seconds; left out is now, and 0 is 1970
+	Source     string         `json:"source"`
+	Attributes map[string]any `json:"attributes"`
+	Signature  []byte         `json:"signature"`
+	SignerDID  string         `json:"signer_did"`
+}
+
+// roleWrite says which write a request is among the ones that are not any
+// other: a role, a reach line or a word line.
+type roleWrite struct {
+	granting    string
+	writesRole  bool
+	writesReach bool
+	writesWords bool
+}
+
+// writeTimes are the phases of a write, each timed, said on the log line at the
+// end when the write was slow. A write is several reads of the store in a row,
+// and which one is slow is not a thing to guess at.
+type writeTimes struct {
+	beforeHandler time.Duration
+	store         time.Duration
+	exists        time.Duration
+	put           time.Duration
+	rebuild       time.Duration
+}
+
 // createAttestation writes one attestation from its JSON and answers on w.
 func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, raw []byte) {
-	// The phases of a write, each timed, said on the log line at the end when
-	// the write was slow. A
-	// write is several reads of the store in a row, and which one is slow is
-	// not a thing to guess at.
 	entered := time.Now()
-	beforeHandler := sinceStarted(r.Context())
-	var tookStore, tookExists, tookPut, tookRebuild time.Duration
+	times := writeTimes{beforeHandler: sinceStarted(r.Context())}
 
-	var req struct {
-		ID         string         `json:"id"`
-		Subjects   []string       `json:"subjects"`
-		Predicates []string       `json:"predicates"`
-		Contexts   []string       `json:"contexts"`
-		Actors     []string       `json:"actors"`
-		Timestamp  *int64         `json:"timestamp"` // Unix seconds; left out is now, and 0 is 1970
-		Source     string         `json:"source"`
-		Attributes map[string]any `json:"attributes"`
-		Signature  []byte         `json:"signature"`
-		SignerDID  string         `json:"signer_did"`
-	}
-
+	var req attestationRequest
 	if err := json.Unmarshal(raw, &req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return
@@ -399,40 +416,111 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("%s: %v", req.ID, err))
 		return
 	}
-	// "this person wrote it": the key it was signed with is one the person
-	// admitted holds. A request naming no person names nobody who wrote it.
-	if claim == signing.Signed {
-		admitted, ok := auth.AdmissionFrom(r.Context())
-		if !ok {
-			writeError(w, http.StatusForbidden, fmt.Sprintf(
-				"%s is signed by %s, and this request is admitted as no person who could hold it", req.ID, req.SignerDID))
-			return
-		}
-		writer, found, err := s.authHandler.UserByID(admitted.UserID)
-		if err != nil {
-			writeWrappedError(w, s.logger, err,
-				fmt.Sprintf("the User %q who signed %s was not read", admitted.UserID, req.ID),
-				http.StatusInternalServerError)
-			return
-		}
-		if !found {
-			writeError(w, http.StatusForbidden, fmt.Sprintf(
-				"%s is signed by %s, and %s is admitted as no User this node keeps", req.ID, req.SignerDID, admitted.Identity))
-			return
-		}
-		if !writer.HoldsKey(req.SignerDID) {
-			writeError(w, http.StatusForbidden, fmt.Sprintf(
-				"%s is signed by %s, a key User %s does not hold", req.ID, req.SignerDID, writer.ID))
-			return
-		}
+	if claim == signing.Signed && !s.signerHoldsKey(w, r, &req) {
+		return
 	}
 
-	// A role is an attestation, so granting one is a write like any other and
-	// there is no new endpoint. Who may make it is not like any other:
-	// MayGrantRoles decides, and nothing else here does.
-	//
-	// A reach line is the same kind of write: REACH as the subject, the paths,
-	// and the roles that reach them. Same writers, same store.
+	kind, ok := s.authorizeRoleWrite(w, r, &req)
+	if !ok {
+		return
+	}
+	if !mayWritePredicates(w, r, kind, req.Predicates) {
+		return
+	}
+
+	actors, ok := s.actorsFor(w, r, &req, claim, kind.writesRole)
+	if !ok {
+		return
+	}
+
+	storeAt := time.Now()
+	store, ok := s.storeForWrite(w, r, kind.writesRole)
+	times.store = time.Since(storeAt)
+	if !ok {
+		return
+	}
+
+	existsAt := time.Now()
+	if req.ID == "" && !s.nameAttestation(w, &req, claim, store) {
+		return
+	}
+
+	// Idempotent: if already exists, return success
+	if store.AttestationExists(req.ID) {
+		respond(w, s.logger, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
+		return
+	}
+	times.exists = time.Since(existsAt)
+
+	as, ok := s.buildAttestation(w, &req, actors, claim)
+	if !ok {
+		return
+	}
+
+	putAt := time.Now()
+	if !s.putAttestation(w, store, as, &req) {
+		return
+	}
+	times.put = time.Since(putAt)
+
+	times.rebuild = s.afterWrite(as, kind)
+
+	// One per attestation the node took in over the API. The node's own
+	// bookkeeping writes — clustering, refusals, plugin sync — are not this
+	// number, and the store's own count is the place to go for those.
+	measure.Count(measure.AttestationsWritten, 1)
+	tookHandler := time.Since(entered)
+	// The gate before the handler and the handler itself, as the access log
+	// sees the request: a long wait before a quick handler is a slow write.
+	took := times.beforeHandler + tookHandler
+	measure.Took(measure.AttestationWriteTook, took)
+
+	s.logSlowWrite(r, &req, times, tookHandler, took)
+
+	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
+}
+
+// signerHoldsKey says whether the key a request is signed with is one the
+// person it is admitted as holds; it answers on w when not.
+// "this person wrote it": the key it was signed with is one the person
+// admitted holds. A request naming no person names nobody who wrote it.
+func (s *QNTXServer) signerHoldsKey(w http.ResponseWriter, r *http.Request, req *attestationRequest) bool {
+	admitted, ok := auth.AdmissionFrom(r.Context())
+	if !ok {
+		writeError(w, http.StatusForbidden, fmt.Sprintf(
+			"%s is signed by %s, and this request is admitted as no person who could hold it", req.ID, req.SignerDID))
+		return false
+	}
+	writer, found, err := s.authHandler.UserByID(admitted.UserID)
+	if err != nil {
+		writeWrappedError(w, s.logger, err,
+			fmt.Sprintf("the User %q who signed %s was not read", admitted.UserID, req.ID),
+			http.StatusInternalServerError)
+		return false
+	}
+	if !found {
+		writeError(w, http.StatusForbidden, fmt.Sprintf(
+			"%s is signed by %s, and %s is admitted as no User this node keeps", req.ID, req.SignerDID, admitted.Identity))
+		return false
+	}
+	if !writer.HoldsKey(req.SignerDID) {
+		writeError(w, http.StatusForbidden, fmt.Sprintf(
+			"%s is signed by %s, a key User %s does not hold", req.ID, req.SignerDID, writer.ID))
+		return false
+	}
+	return true
+}
+
+// authorizeRoleWrite says which write a request is, and answers on w when it is
+// one its admission may not make.
+//
+// A role is an attestation, so granting one is a write like any other and
+// there is no new endpoint. Who may make it is not like any other:
+// MayGrantRoles decides, and nothing else here does.
+//
+// A reach line is the same kind of write: REACH as the subject, the paths,
+// and the roles that reach them. Same writers, same store.
+func (s *QNTXServer) authorizeRoleWrite(w http.ResponseWriter, r *http.Request, req *attestationRequest) (roleWrite, bool) {
 	granting, writesRole := auth.RoleWritten(req.Predicates)
 	subject := ""
 	if len(req.Subjects) == 1 {
@@ -444,14 +532,14 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		line, err := reach.ReadLine(req.Subjects, req.Predicates, req.Contexts, req.Actors, time.Now())
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
-			return
+			return roleWrite{}, false
 		}
 		// The compiled-in table is static and runtime never supersedes it: a
 		// level opens a plugin's route and nothing else.
 		if outside := line.Unopenable(s.pluginRoute); len(outside) > 0 {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf(
 				"%v: a runtime line opens only a plugin's route the compiled table does not name to a level", outside))
-			return
+			return roleWrite{}, false
 		}
 	}
 	// A WRITE or READ line says what a role may say. ROOT's to write, like a
@@ -463,7 +551,7 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		if words, _ := auth.WordsOn(req.Predicates); len(words) == 0 || len(req.Contexts) == 0 {
 			writeError(w, http.StatusBadRequest,
 				fmt.Sprintf("a %s line names the words as predicates and the roles as contexts", subject))
-			return
+			return roleWrite{}, false
 		}
 	}
 	if writesRole {
@@ -472,43 +560,55 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		case s.authHandler == nil:
 			writeError(w, http.StatusForbidden,
 				fmt.Sprintf("%s is ROOT's to write, and this node has no login", granting))
-			return
+			return roleWrite{}, false
 		case !ok:
 			writeError(w, http.StatusForbidden,
 				fmt.Sprintf("%s is ROOT's to write, and this request carries no admission", granting))
-			return
+			return roleWrite{}, false
 		case (writesReach || writesWords) && !s.authHandler.MayGrantRoles(admitted):
 			writeError(w, http.StatusForbidden,
 				fmt.Sprintf("%s is ROOT's to write, and this admission is %s",
 					granting, admitted.LevelName()))
-			return
+			return roleWrite{}, false
 		case !writesReach && !writesWords && !s.mayGrantEvery(admitted, req.Predicates, req.Contexts):
 			// `by` is read here: a coordinator grants what a reach line said a
 			// coordinator may, in the namespace they act in, and nothing else.
 			writeError(w, http.StatusForbidden,
 				fmt.Sprintf("%s of %v in %v is not this admission's to write: it is %s holding %v",
 					granting, rolesNamed(req.Predicates), req.Contexts, admitted.LevelName(), admitted.Roles()))
-			return
+			return roleWrite{}, false
 		}
 	}
+	return roleWrite{granting: granting, writesRole: writesRole, writesReach: writesReach, writesWords: writesWords}, true
+}
 
-	// Every other write is allowed a predicate at a time, so every predicate on
-	// the way in is checked rather than the first one. Refusing names the
-	// predicate. A grant, a reach line and a word line were decided above by
-	// who may write one, not by what a role may say.
-	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && !writesRole {
-		for _, predicate := range req.Predicates {
+// mayWritePredicates says whether the admission may write every predicate on
+// the way in, and answers on w naming the first it may not.
+//
+// Every other write is allowed a predicate at a time, so every predicate on
+// the way in is checked rather than the first one. Refusing names the
+// predicate. A grant, a reach line and a word line were decided above by
+// who may write one, not by what a role may say.
+func mayWritePredicates(w http.ResponseWriter, r *http.Request, kind roleWrite, predicates []string) bool {
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && !kind.writesRole {
+		for _, predicate := range predicates {
 			if !admitted.MayWrite(predicate) {
 				writeError(w, http.StatusForbidden,
 					fmt.Sprintf("%s holding %v may not write %q",
 						admitted.LevelName(), admitted.Roles(), predicate))
-				return
+				return false
 			}
 		}
 	}
+	return true
+}
 
-	// TOKATTEST: each token is its own actor. Its DID leads,
-	// because that is the one name here nobody had to be trusted about.
+// actorsFor is the actors an attestation is written with, and answers on w
+// when a signer named others than the node would write.
+//
+// TOKATTEST: each token is its own actor. Its DID leads,
+// because that is the one name here nobody had to be trusted about.
+func (s *QNTXServer) actorsFor(w http.ResponseWriter, r *http.Request, req *attestationRequest, claim signing.Claim, writesRole bool) ([]string, bool) {
 	actors := req.Actors
 	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
 		// Two actors can make contradictory claims about the same subject and
@@ -536,69 +636,71 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		writeError(w, http.StatusBadRequest, fmt.Sprintf(
 			"%s is signed by %s naming actors %v, and this node writes it as %v: the signer names them so",
 			req.ID, req.SignerDID, req.Actors, actors))
-		return
+		return nil, false
 	}
+	return actors, true
+}
 
-	// Roles are kept where the node keeps what it knows about itself, whatever
-	// namespace the writer is in. Writing there is not seeing there: this is
-	// the one place storeFor does not decide, and it decides nothing else. Who
-	// may write one was settled above, by mayGrantEvery and MayGrantRoles.
+// storeForWrite is the store a write goes to, and answers on w when there is none.
+//
+// Roles are kept where the node keeps what it knows about itself, whatever
+// namespace the writer is in. Writing there is not seeing there: this is
+// the one place storeFor does not decide, and it decides nothing else. Who
+// may write one was settled above, by mayGrantEvery and MayGrantRoles.
+func (s *QNTXServer) storeForWrite(w http.ResponseWriter, r *http.Request, writesRole bool) (ats.AttestationStore, bool) {
 	var store ats.AttestationStore
 	var storeErr error
-	storeAt := time.Now()
 	if writesRole {
 		store, storeErr = s.held.WriteWhatTheNodeKnowsOfItself()
 	} else {
 		store, storeErr = s.storeFor(r)
 	}
-	tookStore = time.Since(storeAt)
 	if storeErr != nil {
 		writeError(w, http.StatusForbidden, storeErr.Error())
-		return
+		return nil, false
 	}
+	return store, true
+}
 
-	// Auto-generate vanity ASID when client omits ID
-	existsAt := time.Now()
-	if req.ID == "" {
-		if claim == signing.Signed {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf(
-				"an attestation signed by %s names its id: the node generates none under a signature", req.SignerDID))
-			return
-		}
-		// The id is seeded from the first subject and predicate, so there
-		// must be one of each to seed it from.
-		if len(req.Subjects) == 0 || len(req.Predicates) == 0 {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf(
-				"an id is seeded from the first subject and predicate, and the attestation names subjects %v and predicates %v",
-				req.Subjects, req.Predicates))
-			return
-		}
-		subject := req.Subjects[0]
-		predicate := req.Predicates[0]
-		context := "_"
-		if len(req.Contexts) > 0 {
-			context = req.Contexts[0]
-		}
-		checkExists := func(asid string) bool {
-			return store.AttestationExists(asid)
-		}
-		generated, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, context, checkExists)
-		if err != nil {
-			writeWrappedError(w, s.logger, err,
-				fmt.Sprintf("failed to generate ASID for subjects %v", req.Subjects),
-				http.StatusInternalServerError)
-			return
-		}
-		req.ID = generated
+// nameAttestation gives an attestation that came without an id a vanity ASID,
+// and answers on w when it cannot be given one.
+func (s *QNTXServer) nameAttestation(w http.ResponseWriter, req *attestationRequest, claim signing.Claim, store ats.AttestationStore) bool {
+	if claim == signing.Signed {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf(
+			"an attestation signed by %s names its id: the node generates none under a signature", req.SignerDID))
+		return false
 	}
-
-	// Idempotent: if already exists, return success
-	if store.AttestationExists(req.ID) {
-		respond(w, s.logger, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
-		return
+	// The id is seeded from the first subject and predicate, so there
+	// must be one of each to seed it from.
+	if len(req.Subjects) == 0 || len(req.Predicates) == 0 {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf(
+			"an id is seeded from the first subject and predicate, and the attestation names subjects %v and predicates %v",
+			req.Subjects, req.Predicates))
+		return false
 	}
-	tookExists = time.Since(existsAt)
+	subject := req.Subjects[0]
+	predicate := req.Predicates[0]
+	context := "_"
+	if len(req.Contexts) > 0 {
+		context = req.Contexts[0]
+	}
+	checkExists := func(asid string) bool {
+		return store.AttestationExists(asid)
+	}
+	generated, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, context, checkExists)
+	if err != nil {
+		writeWrappedError(w, s.logger, err,
+			fmt.Sprintf("failed to generate ASID for subjects %v", req.Subjects),
+			http.StatusInternalServerError)
+		return false
+	}
+	req.ID = generated
+	return true
+}
 
+// buildAttestation is the attestation a request writes, signature verified when
+// it carries one; it answers on w when it cannot be built.
+func (s *QNTXServer) buildAttestation(w http.ResponseWriter, req *attestationRequest, actors []string, claim signing.Claim) (*types.As, bool) {
 	// A timestamp left out is the moment it arrived (omitting is how a caller
 	// asks for the default), and one said is the moment said, 0 included.
 	ts := time.Now()
@@ -607,7 +709,7 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	} else if claim == signing.Signed {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf(
 			"%s is signed by %s and names no timestamp: the node sets none under a signature", req.ID, req.SignerDID))
-		return
+		return nil, false
 	}
 
 	as := &types.As{
@@ -631,50 +733,59 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 			}
 			writeWrappedError(w, s.logger, err,
 				"signature not verified", status)
-			return
+			return nil, false
 		}
 	}
+	return as, true
+}
 
+// putAttestation stores as and answers on w for every outcome but the write
+// going well, which is the caller's to answer.
+func (s *QNTXServer) putAttestation(w http.ResponseWriter, store ats.AttestationStore, as *types.As, req *attestationRequest) bool {
 	// Use high priority so POST jumps ahead of queued plugin writes.
 	var createErr error
 	type highPriorityCreator interface {
 		CreateAttestationHighPriority(as *types.As) error
 	}
-	putAt := time.Now()
 	if hp, ok := store.(highPriorityCreator); ok {
 		createErr = hp.CreateAttestationHighPriority(as)
 	} else {
 		createErr = store.CreateAttestation(as)
 	}
-	tookPut = time.Since(putAt)
 	// What the store takes is the store's to say, for this door and every
 	// other: an attestation it refuses is the writer's to fix.
 	if ats.Unwritable(createErr) {
 		writeError(w, http.StatusBadRequest, createErr.Error())
-		return
+		return false
 	}
 	// The same answer the check above gives: the store held it before this write.
 	if ats.AlreadyExists(createErr) {
 		measure.Count(measure.AttestationsRepeated, 1)
 		respond(w, s.logger, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
-		return
+		return false
 	}
 	if err := createErr; err != nil {
 		writeWrappedError(w, s.logger, err,
 			fmt.Sprintf("failed to create attestation %s (subjects: %v, predicates: %v, source: %s)",
 				req.ID, req.Subjects, req.Predicates, req.Source),
 			http.StatusInternalServerError)
-		return
+		return false
 	}
+	return true
+}
 
+// afterWrite keeps the node up with a role or reach line it has just stored,
+// and says how long rebuilding what it serves took.
+func (s *QNTXServer) afterWrite(as *types.As, kind roleWrite) time.Duration {
 	// What the node holds about who is of what was true until this line. The
 	// node is the only writer of one, so this is the whole of keeping up.
-	if writesRole && s.authHandler != nil {
+	if kind.writesRole && s.authHandler != nil {
 		s.authHandler.ForgetRoles()
 	}
 	// A reach line changes what the node serves, so what it serves is built
 	// again from the table and the store, whole. Never patched.
-	if writesReach && s.served != nil {
+	var tookRebuild time.Duration
+	if kind.writesReach && s.served != nil {
 		rebuildAt := time.Now()
 		if unreachable, err := s.reopen(); err != nil {
 			s.logger.Errorw("the reach line is stored and not served; what the node serves is unchanged",
@@ -684,34 +795,27 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 		}
 		tookRebuild = time.Since(rebuildAt)
 	}
+	return tookRebuild
+}
 
-	// One per attestation the node took in over the API. The node's own
-	// bookkeeping writes — clustering, refusals, plugin sync — are not this
-	// number, and the store's own count is the place to go for those.
-	measure.Count(measure.AttestationsWritten, 1)
-	tookHandler := time.Since(entered)
-	// The gate before the handler and the handler itself, as the access log
-	// sees the request: a long wait before a quick handler is a slow write.
-	took := beforeHandler + tookHandler
-	measure.Took(measure.AttestationWriteTook, took)
-
-	// A write that went well is the attestation itself and the two numbers
-	// above. A slow one is said, with the phase it was slow in.
-	if took >= attestationWriteQuiet {
-		s.logger.Infow("Attestation created slowly",
-			"id", req.ID,
-			"subjects", req.Subjects,
-			"predicates", req.Predicates,
-			"source", req.Source,
-			"client", r.RemoteAddr,
-			"before_handler", beforeHandler,
-			"store", tookStore,
-			"exists", tookExists,
-			"put", tookPut,
-			"rebuild", tookRebuild,
-			"handler", tookHandler,
-			"took", took)
+// logSlowWrite says a write that was slow, with the phase it was slow in.
+// A write that went well is the attestation itself and the two numbers
+// measured above.
+func (s *QNTXServer) logSlowWrite(r *http.Request, req *attestationRequest, times writeTimes, tookHandler, took time.Duration) {
+	if took < attestationWriteQuiet {
+		return
 	}
-
-	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
+	s.logger.Infow("Attestation created slowly",
+		"id", req.ID,
+		"subjects", req.Subjects,
+		"predicates", req.Predicates,
+		"source", req.Source,
+		"client", r.RemoteAddr,
+		"before_handler", times.beforeHandler,
+		"store", times.store,
+		"exists", times.exists,
+		"put", times.put,
+		"rebuild", times.rebuild,
+		"handler", tookHandler,
+		"took", took)
 }
