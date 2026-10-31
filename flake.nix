@@ -144,11 +144,13 @@
         ats-ffi-deps = craneHost.buildDepsOnly ffiArgs;
         ats-ffi = craneHost.buildPackage (ffiArgs // {
           cargoArtifacts = ats-ffi-deps;
-          installPhaseCommand = ''
+          # The shared library is .so on Linux and .dylib on Darwin; the macOS
+          # build-go job failed on a .so that is never written there.
+          installPhaseCommand = let so = pkgs.stdenv.hostPlatform.extensions.sharedLibrary; in ''
             mkdir -p $out/lib $out/include
-            cp target/release/libats_sqlite.a target/release/libats_sqlite.so $out/lib/
-            cp target/release/libats_duckdb.a target/release/libats_duckdb.so $out/lib/
-            cp target/release/libats_postgres.a target/release/libats_postgres.so $out/lib/
+            cp target/release/libats_sqlite.a target/release/libats_sqlite${so} $out/lib/
+            cp target/release/libats_duckdb.a target/release/libats_duckdb${so} $out/lib/
+            cp target/release/libats_postgres.a target/release/libats_postgres${so} $out/lib/
             cp crates/ats-sqlite/include/storage_ffi.h $out/include/
             cp crates/ats-duckdb/include/duckdb_ffi.h $out/include/
             cp crates/ats-postgres/include/postgres_ffi.h $out/include/
