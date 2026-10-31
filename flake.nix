@@ -266,8 +266,10 @@
         # docs/release.md
         versionTag = let v = builtins.getEnv "VERSION_TAG"; in
           if v == "" then "dev" else v;
-        qntx = pkgs.buildGoModule {
-          pname = "qntx";
+        # "we separate it out from qntx like is demonstrated, it becomes an optional build, and k uses it, not q"
+        # qntx leaves the quote subsystem out; qntx-quotes is qntx with it.
+        mkQntx = { pname, quotes }: pkgs.buildGoModule {
+          inherit pname;
           version = versionTag;
           src = ./.;
 
@@ -285,9 +287,9 @@
           # rustpostgres (the postgres backend via ats-postgres + postgrescgo).
           # Without rustduckdb, backend = "parquet" in am.toml would validate
           # but the duckdbcgo wrapper wouldn't be compiled in.
-          # IMPLEMENTME: qntxquote per node. k, home to the ground namespace, carries
-          # the quote subsystem and q does not; one tag list serves both today.
-          tags = [ "rustsqlite" "qntxwasm" "qntxquote" "rustduckdb" "rustpostgres" ];
+          # qntxquote (the quote subsystem, ADR-055) only where quotes is asked.
+          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" ]
+            ++ pkgs.lib.optional quotes "qntxquote";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -297,6 +299,8 @@
 
           subPackages = [ "cmd/qntx" ];
         };
+        qntx = mkQntx { pname = "qntx"; quotes = false; };
+        qntx-quotes = mkQntx { pname = "qntx-quotes"; quotes = true; };
 
         # "It should be private, owned by the node's deployment repository"
         # A line naming a path this QNTX does not answer stops the node at start,
@@ -389,6 +393,8 @@
         packages = {
           # QNTX CLI binary
           qntx = qntx;
+          # The same with the quote subsystem: k, home to the ground namespace.
+          qntx-quotes = qntx-quotes;
 
           # WASM module (ats compiled to wasm32-unknown-unknown)
           ats-wasm = ats-wasm;
@@ -506,6 +512,7 @@
         checks = {
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
+          qntx-quotes-build = qntx-quotes;
           docs-site-builds = self.packages.${system}.docs-site; # Ensure docs site builds
           docs-site-links = pkgs.runCommand "docs-site-link-check"
             {
