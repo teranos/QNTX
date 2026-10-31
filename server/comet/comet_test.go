@@ -238,8 +238,11 @@ func TestAPushRebuildsTheCometsItMoves(t *testing.T) {
 	}, grove)
 	// A branch that is not the project's default moves nothing.
 	assert.Empty(t, MovedBy(kept, "abcd-nl/grove", "a-branch", "master"))
-	// Ground's main moves every comet, once per repository and platform whatever ABIs it keeps.
-	assert.Len(t, MovedBy(kept, "teranos/ground", "main", "main"), 3)
+	// Ground's libacp moves every comet, once per repository and platform whatever ABIs it keeps,
+	// while ground's main is held:
+	// "12 for now yes"
+	assert.Len(t, MovedBy(kept, "teranos/ground", "libacp", "main"), 3)
+	assert.Empty(t, MovedBy(kept, "teranos/ground", "main", "main"))
 	assert.Empty(t, MovedBy(kept, "teranos/ground", "a-branch", "main"))
 }
 

@@ -15,8 +15,10 @@ type Source struct{ Owner, Repo, Branch string }
 
 func (s Source) String() string { return s.Owner + "/" + s.Repo + "@" + s.Branch }
 
-// Ground is where ground's own sources and global controls come from.
-var Ground = Source{Owner: "teranos", Repo: "ground", Branch: "main"}
+// Ground is where ground's own sources and global controls come from: libacp
+// while ground's main is held, since `make sand` is there and not on main.
+// "12 for now yes"
+var Ground = Source{Owner: "teranos", Repo: "ground", Branch: "libacp"}
 
 // Node is what a build asks of the node it runs on: where a source is now, its tarball,
 // a directory to build in, and a step run.
