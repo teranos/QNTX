@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
 	quotes "github.com/teranos/QNTX/ats/quote"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -85,7 +86,9 @@ func (s *QNTXServer) quoteLanded(e gitHubPullRequestEvent) error {
 	if err != nil {
 		return errors.Wrap(err, "the landing did not encode")
 	}
+	now := time.Now()
 	job := &async.Job{ID: quote.LandedHandlerName + ":" + e.Repository.FullName + "#" + strconv.FormatInt(e.Number, 10) + "@" + e.PullRequest.Head.Sha,
-		HandlerName: quote.LandedHandlerName, Payload: payload}
+		HandlerName: quote.LandedHandlerName, Payload: payload, Source: "webhook", MadeBy: async.MadeByNoCaller,
+		CreatedAt: now, UpdatedAt: now, Pulse: async.NoPulse(), Started: async.NotYet(), Completed: async.NotYet()}
 	return errors.Wrapf(s.daemon.GetQueue().Enqueue(job), "quote.landed: enqueueing %s", job.ID)
 }
