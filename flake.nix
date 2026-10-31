@@ -285,7 +285,9 @@
           # rustpostgres (the postgres backend via ats-postgres + postgrescgo).
           # Without rustduckdb, backend = "parquet" in am.toml would validate
           # but the duckdbcgo wrapper wouldn't be compiled in.
-          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" ];
+          # IMPLEMENTME: qntxquote per node. k, home to the ground namespace, carries
+          # the quote subsystem and q does not; one tag list serves both today.
+          tags = [ "rustsqlite" "qntxwasm" "qntxquote" "rustduckdb" "rustpostgres" ];
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"

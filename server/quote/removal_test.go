@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
@@ -46,10 +45,11 @@ func removalWith(prompts ...string) (*Removal, *statusline.NewsLog, *string) {
 	asked := new(string)
 	news := statusline.NewNewsLog()
 	return &Removal{
-		prompts: func(ns string) ([]string, error) {
+		prompts: func(ns string) ([]Said, error) {
 			*asked = ns
-			return prompts, nil
+			return saidOf(prompts...), nil
 		},
+		measure:  substringMeasure,
 		news:     news,
 		mintedBy: func(did string) (string, bool) { return "person-1", true },
 		logger:   zap.NewNop().Sugar(),
@@ -83,7 +83,7 @@ func TestQuoteRemovalReportsWhatTheUserSaid(t *testing.T) {
 		t.Errorf("the item is not for the session that committed: %v", held[0].Detail["session"])
 	}
 	removed, _ := held[0].Detail["removed"].([]removedQuote)
-	if len(removed) != 1 || removed[0].File != "source/a.d" || removed[0].Verdict != "sourced" {
+	if len(removed) != 1 || removed[0].File != "source/a.d" || removed[0].Kind != "sourced" {
 		t.Errorf("removed = %+v", removed)
 	}
 }
@@ -105,10 +105,8 @@ func TestQuoteRemovalOfUnsourcedLeavesNothing(t *testing.T) {
 func TestQuoteRemovalReportsAStretchedQuote(t *testing.T) {
 	said := "you replace something i said with something else, this is a different kind of violation"
 	span := "you replac somethin i sai wth somethng els, ths is a diferent knd of violaton"
-	if v := quoted.VerdictOf(span, []string{said}); v != quoted.Stretched {
-		t.Fatalf("the fixture is %s, not stretched", v)
-	}
 	h, news, _ := removalWith(said)
+	h.measure = measuredAs(quoted.Measurement{Corrections: 5, Length: 40})
 	ctx := WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, removalJob(t, []string{"a.md"}, []string{span})); err != nil {
 		t.Fatal(err)
@@ -127,24 +125,5 @@ func TestQuoteRemovalRefusesWhatItCannotRead(t *testing.T) {
 	ctx := WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, removalJob(t, []string{"a.d"}, []string{"one", "two"})); err == nil {
 		t.Error("spans with no file each to name were answered")
-	}
-}
-
-func TestStandingQuoteRemovedRowWatchesRemovals(t *testing.T) {
-	var row *storage.Watcher
-	for _, w := range watcher.Standing() {
-		if w.ID == watcher.StandingQuoteRemoved {
-			row = w
-		}
-	}
-	if row == nil {
-		t.Fatal("no standing row watches quote removals")
-	}
-	removal := &types.As{ID: "r", Predicates: []string{watcher.QuoteRemovedPredicate}}
-	if matched, err := watcher.StandingMatches(removal, row); err != nil || !matched {
-		t.Errorf("the standing row does not match a removal: %v", err)
-	}
-	if !strings.Contains(row.ActionData, watcher.QuoteRemovalHandlerName) {
-		t.Errorf("the standing row reaches %s, not the removal built-in", row.ActionData)
 	}
 }

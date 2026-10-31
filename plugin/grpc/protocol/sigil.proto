@@ -453,6 +453,76 @@ message NamespaceAgentAm {
   CodexAm codex = 5;
 }
 
+// IMPLEMENTME: the signum that keeps a Quote and its Interps, declared to follow
+// tei, so parity holds it and an agent asks it over MCP for the context a thing
+// was said in and for each agent's reading of it (ADR-055).
+
+// IMPLEMENTME: an agent's quotation notation, rendered from who and rend: an
+// agent's words inside 「 」 with the agent's name first in square brackets,
+// 「[Fable] …」, and a human's inside double quotes (ADR-055).
+
+// IMPLEMENTME: C2PA for the material a quote arrives in, pinned in server/parity
+// as TEI is, so source can name a manifest and not only a session or a commit.
+
+// A Quote is TEI's q: words distinguished from the text around them, and whose
+// they are. The words are the one who said them's; everything else here is
+// about the words and never inside them (ADR-055).
+message Quote {
+  // The words, verbatim: the element's content in TEI.
+  string content = 1;
+  // Who said them, each a pointer to a person or an agent: TEI's who. An
+  // agent's name is rendered inside the quote, as [Fable].
+  repeated string who = 2;
+  // Whether the words were spoken, thought or written, or how else the quote
+  // is to be read: TEI's type, with its values.
+  string type = 3;
+  // Where the words were taken from: a session, a transcript, a commit, a PR
+  // description, a memory. TEI's source.
+  repeated string source = 4;
+  // Who ascribed the words to who said them: the human who reported it after
+  // the fact, or the model that relayed it. TEI's resp.
+  repeated string resp = 5;
+  // How certain the ascription is: TEI's cert.
+  string cert = 6;
+  // How the quote was rendered where it was read: a person's quotation marks,
+  // or an agent's notation. TEI's rend.
+  repeated string rend = 7;
+  // The interpretations made of the words, each an Interp by its id, apart
+  // from the words and none of them theirs: TEI's ana.
+  repeated string ana = 8;
+  // The quote's own id, for an Interp to point to: TEI's xml:id.
+  string id = 9;
+}
+
+// IMPLEMENTME: several Interps of one quote by different agents, each with its
+// cert, so a weak reading stays on record and a decisive one is chosen over it,
+// and neither is ever inside the quote.
+
+// An Interp is TEI's interp: what someone made of a quote, kept apart from
+// the words and carrying none of their speaker's authority (ADR-055).
+message Interp {
+  // The interpretation itself: the element's content.
+  string content = 1;
+  // Whose interpretation it is, each a pointer: TEI's resp. An agent's, when
+  // an agent made it.
+  repeated string resp = 2;
+  // How certain of it they are: TEI's cert.
+  string cert = 3;
+  // What kind of thing it notes: TEI's type.
+  string type = 4;
+  // The quotes it interprets, each by its id: TEI's inst.
+  repeated string inst = 5;
+  // Its own id, for a quote's ana to point to: TEI's xml:id.
+  string id = 6;
+}
+
+// Quotes is what transcripts quoted answers: each span in double quotes of the
+// text it was given, as a Quote.
+message Quotes {
+  // One per span, in the order the text has them.
+  repeated Quote quotes = 1;
+}
+
 // Follows says which column of a reference each of a signum's fields is. The
 // reference is named, not described: its own schema says what its columns are.
 message Follows {
