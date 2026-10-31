@@ -42,6 +42,9 @@ func (s *QNTXServer) cardBase(r *http.Request) a2a.Card {
 		Description: appcfg.GetString("node.description"),
 		Version:     version.VersionTag,
 		URL:         a2aURL(r),
+		// "Implement default output types": what the node gives is JSON,
+		// everywhere, and the Node Agent's text is its skill's own.
+		OutputModes: a2a.Modes,
 		Skills:      []a2a.Skill{},
 		Extensions:  []a2a.Extension{s.nodeExtension(r)},
 		Session:     auth.SessionCookie,

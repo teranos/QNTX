@@ -25,14 +25,35 @@ import (
 // HandleNodeAgentLive answers GET /api/agent/live?harness=claude&mark=N as
 // server-sent events: every line of the turn going from mark on, as it lands.
 func (s *QNTXServer) HandleNodeAgentLive(w http.ResponseWriter, r *http.Request) {
-	// Then an end event: whether the turn still prints, and the mark to ask
-	// from next.
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
 	if s.nodeAgent == nil {
 		writeError(w, http.StatusNotFound, s.thereIsNoNodeAgent().Says)
+		return
+	}
+	s.handleLive(w, r, s.nodeAgent, "the Node Agent")
+}
+
+// HandleElementLive is the same for the element's agent, at
+// GET /api/elements/{element}/live (ADR-054): "AGENT PER ELEMENT, EACH ELEMENT
+// IS ITS OWN CONVERSATION".
+func (s *QNTXServer) HandleElementLive(w http.ResponseWriter, r *http.Request) {
+	element := r.PathValue("element")
+	if element == "" {
+		writeError(w, http.StatusBadRequest, "no element is named")
+		return
+	}
+	agent, refused := s.holdElementAgent(element)
+	if refused != nil {
+		writeError(w, http.StatusNotFound, refused.Says)
+		return
+	}
+	s.handleLive(w, r, agent, agent.called)
+}
+
+// handleLive tails the turn agent is in, as the end event says: whether the
+// turn still prints, and the mark to ask from next.
+func (s *QNTXServer) handleLive(w http.ResponseWriter, r *http.Request, agent *rootAgent, called string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	harness := r.URL.Query().Get("harness")
@@ -50,9 +71,9 @@ func (s *QNTXServer) HandleNodeAgentLive(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
-	going := s.nodeAgent.in(s.claudeHarness()).answering.Load()
+	going := agent.in(s.claudeHarness()).answering.Load()
 	if going == nil || going.stream == "" {
-		writeError(w, http.StatusNotFound, "the Node Agent is not in a turn in Claude Code, so there is no stream to tail")
+		writeError(w, http.StatusNotFound, called+" is not in a turn in Claude Code, so there is no stream to tail")
 		return
 	}
 	flusher, ok := w.(http.Flusher)

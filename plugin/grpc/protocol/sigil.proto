@@ -37,6 +37,10 @@ message Node {
   string name = 1;
   string description = 2;
   repeated Signum signa = 3;
+  // The media types the node gives, across every signum: JSON, everywhere.
+  // To A2A these are the card's default output modes, which a skill's own
+  // output modes override.
+  repeated string output_modes = 4;
 }
 
 // Transcript is one agent session Ground recorded, derived from its hook
@@ -131,6 +135,52 @@ message SessionEvents {
   int64 mark = 3;
 }
 
+// ElementAgent is one element whose agent this node holds (ADR-054): named,
+// and in a session when one was kept.
+message ElementAgent {
+  // The element, as it is said to.
+  string element = 1;
+  // Its session in Claude Code, or empty before anything was said to it.
+  string session = 2;
+  // Whether it is answering now.
+  bool answering = 3;
+  // Its Session at Anthropic's Console, when it runs there (ADR-054), or empty.
+  string anthropic_session = 4;
+}
+
+// ElementAgents is what elements list answers: every element agent this node
+// holds, the stories' included, each by the element's name.
+message ElementAgents {
+  // Each element agent held, by the element's name.
+  repeated ElementAgent agents = 1;
+}
+
+// ElementSession is one Session an element's agent has at Anthropic's Console.
+message ElementSession {
+  // The Session's id at the Console.
+  string id = 1;
+  // Its title there, when it has one.
+  string title = 2;
+  // Its status there: idle, running, terminated, as the Console says it.
+  string status = 3;
+  // When it was made, RFC 3339.
+  string created_at = 4;
+  // Whether the Console archived it.
+  bool archived = 5;
+  // Whether it is the one the element's chat goes on in.
+  bool current = 6;
+}
+
+// ElementSessions is what elements sessions and elements pick answer: every
+// Session the element's agent has at the Console, newest first; none when it
+// runs on the box.
+message ElementSessions {
+  // The agent's id at the Console, or empty when it runs on the box.
+  string agent = 1;
+  // Each Session, newest first.
+  repeated ElementSession sessions = 2;
+}
+
 // ClaudeSaid is what claude say answers.
 message ClaudeSaid {
   // What it answered.
@@ -216,6 +266,8 @@ message NamespaceAgentSaid {
   ClaudeSaid claude = 1;
   // What it answered in Pi.
   PiSaid pi = 2;
+  // What the namespace agent answered in Codex.
+  CodexSaid codex = 3;
 }
 
 // NodeAgentSaid is what agent say answers: what the Node Agent answered, in the
@@ -240,7 +292,7 @@ message NodeAgentAm {
   CodexAm codex = 3;
 }
 
-// CodexSaid is what the Node Agent answered in codex.
+// CodexSaid is what an agent answered in codex.
 message CodexSaid {
   // What it answered.
   string answer = 1;
@@ -257,9 +309,11 @@ message CodexSaid {
   double took_ms = 7;
   // Why a row of the session was not written down, when one was not.
   string unwritten = 8;
+  // The CLI thread used to resume, distinct from the transcript session.
+  string thread = 9;
 }
 
-// CodexAm is who the Node Agent is in codex and how the node runs it.
+// CodexAm is who an agent is in codex and how the node runs it.
 message CodexAm {
   // Its own DID, which signs what it writes down.
   string did = 1;
@@ -395,6 +449,8 @@ message NamespaceAgentAm {
   ClaudeAm agent = 3;
   // Who the agent is and how it runs, in Pi.
   PiAm pi = 4;
+  // Who the namespace agent is in Codex.
+  CodexAm codex = 5;
 }
 
 // Follows says which column of a reference each of a signum's fields is. The

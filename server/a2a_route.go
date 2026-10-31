@@ -8,11 +8,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -24,9 +27,9 @@ import (
 // over A2A is a2a:<signum> lines (ADR-039), asked when a message reaches one.
 const a2aPrefix = "/a2a/"
 
-// The operations the node does: the card its caller reaches (§3.1.11), and at
-// no tenant a message sent to the Node Agent and the Tasks it is (§3.1.1,
-// §3.1.3, §3.1.4, §3.1.5).
+// The operations the node does: the card its caller reaches (§3.1.11), and a
+// message sent to an agent and the Tasks it is (§3.1.1, §3.1.3, §3.1.4,
+// §3.1.5), and their push notification configs (a2a_push.go).
 const (
 	getExtendedAgentCard = "GetExtendedAgentCard"
 	sendMessage          = "SendMessage"
@@ -52,18 +55,28 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	// the agents served at a tenant are the caller's too, so the binding is
 	// made for each request.
 	return func(w http.ResponseWriter, r *http.Request) {
-		binding := a2a.HTTP(operations, s.a2aServed(r), s.a2aAnswer(r), undelivered)
+		// One id per request, answered to the client, so what it reports names what the node wrote down.
+		id := uuid.NewString()
+		w.Header().Set("X-Request-Id", id)
+		r = r.WithContext(logger.WithRequestID(r.Context(), id))
+		binding := a2a.HTTP(operations, s.a2aServed(r), s.a2aAnswer(r), undelivered, s.a2aRefused)
 		http.StripPrefix(a2aPrefix[:len(a2aPrefix)-1], binding).ServeHTTP(w, r)
 	}
 }
 
 // a2aServed is whether an agent is served at tenant for the caller of r. The
 // tenant is a namespace (ADR-048), and an agent is served at one the caller
-// acts in that opted into an agent. Any other, system among them, is a
-// resource that does not exist to them (§3.3.2).
+// acts in that opted into an agent; or element:<element>, an element's agent
+// (ADR-054), served to ROOT alone: "this mechanism is special, its just for
+// root". Any other, system among them, is a resource that does not exist to
+// them (§3.3.2).
 func (s *QNTXServer) a2aServed(r *http.Request) a2a.Served {
 	return func(tenant string) (bool, error) {
 		admitted, gated := auth.AdmissionFrom(r.Context())
+		if element, isElement := strings.CutPrefix(tenant, elementTenantPrefix); isElement {
+			_, refused := elementOf(sigil.Sent{"element": element})
+			return gated && admitted.IsRoot() && s.nodeAgent != nil && refused == nil, nil
+		}
 		if !gated || tenant == auth.NamespaceSystem || !admitted.MayActIn(tenant) {
 			return false, nil
 		}
@@ -85,31 +98,74 @@ func (s *QNTXServer) a2aServed(r *http.Request) a2a.Served {
 	}
 }
 
-// a2aAnswer answers the operations for the caller of r.
+// a2aAnswer answers the operations for the caller of r: the card, and the
+// Tasks of the agent the tenant names, the Node Agent at none.
 func (s *QNTXServer) a2aAnswer(r *http.Request) a2a.Answer {
 	return func(_ context.Context, op a2a.Operation, request proto.Message) (proto.Message, *a2a.Error) {
 		tenant, named := a2a.TenantOf(request)
-		switch {
-		case op.Name == sendMessage && !named:
-			return s.sendToNodeAgent(r, request)
-		case op.Name == getTask && !named:
-			return s.getNodeAgentsTask(r, request)
-		case op.Name == listTasks && !named:
-			return s.listNodeAgentsTasks(r, request)
-		case op.Name == cancelTask && !named:
-			return s.cancelNodeAgentsTask(r, request)
-		case op.Name != getExtendedAgentCard:
+		// A peer's agent is the peer's: the node hands over its card, and the
+		// rest is asked of the peer.
+		peers := s.peers()
+		peer := slices.IndexFunc(peers, serving(tenant))
+		if named && peer >= 0 {
+			if op.Name != getExtendedAgentCard {
+				return nil, a2a.Unsupported(op)
+			}
+			return s.peersAgentCard(r, peers[peer], tenant)
+		}
+		switch op.Name {
+		case getExtendedAgentCard:
+			if element, isElement := strings.CutPrefix(tenant, elementTenantPrefix); named && isElement {
+				return s.elementAgentCard(r, element)
+			}
+			if named {
+				return s.namespaceAgentCard(r, tenant)
+			}
+			return s.extendedCard(r)
+		case sendMessage, getTask, listTasks, cancelTask, createPush, getPush, listPushes, deletePush:
+		default:
 			return nil, a2a.Unsupported(op)
 		}
-		if named {
-			peers := s.peers()
-			if at := slices.IndexFunc(peers, serving(tenant)); at >= 0 {
-				return s.peersAgentCard(r, peers[at], tenant)
-			}
-			return s.namespaceAgentCard(r, tenant)
+		ta, refused := s.taskAgentAt(r, tenant, named)
+		if refused != nil {
+			return nil, refused
 		}
-		return s.extendedCard(r)
+		switch op.Name {
+		case sendMessage:
+			return s.sendTask(r, ta, request)
+		case getTask:
+			return s.getTask(ta, request)
+		case listTasks:
+			return s.listTasks(ta, request)
+		case createPush:
+			return s.createTaskPush(r, ta, request)
+		case getPush:
+			return s.getTaskPush(ta, request)
+		case listPushes:
+			return s.listTaskPushes(ta, request)
+		case deletePush:
+			return s.deleteTaskPush(r, ta, request)
+		}
+		return s.cancelTask(r, ta, request)
 	}
+}
+
+// elementAgentCard is GetExtendedAgentCard at element:<element>: the card of
+// the element's agent (ADR-054), reached by its tenant and in no list. The
+// binding asked a2aServed first.
+func (s *QNTXServer) elementAgentCard(r *http.Request, element string) (proto.Message, *a2a.Error) {
+	elements := s.elementsSignum()
+	at := slices.IndexFunc(elements.GetSigils(), func(held *protocol.Sigil) bool { return held.GetName() == "say" })
+	if at < 0 {
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the elements signum has no say to describe the agent of " + element + " by"}
+	}
+	say := elements.GetSigils()[at]
+	card := s.cardBase(r)
+	card.Name = "the element " + element
+	card.Description = elements.GetDescription()
+	card.Tenant = elementTenantPrefix + element
+	card.Skills = []a2a.Skill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: elements.GetTags(), Modes: []string{a2a.Text}}}
+	return s.signedAgentCard(card, "the card of the element "+element)
 }
 
 // namespaceAgentCard is GetExtendedAgentCard at a tenant: the card of the
@@ -121,6 +177,20 @@ func (s *QNTXServer) namespaceAgentCard(r *http.Request, namespace string) (prot
 	if err != nil {
 		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the agent of " + namespace + " was not read: " + err.Error()}
 	}
+	if !set {
+		row, _, codexSet, codexErr := s.newestAgentLine(namespace, agentLineCodex)
+		if codexErr != nil {
+			return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: codexErr.Error()}
+		}
+		if codexSet {
+			model, err := oneText(row.Attributes, "model", agentLineSubject, row.ID, namespace)
+			if err != nil {
+				return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+			}
+			line.spec.Model, set = model, true
+		}
+	}
+
 	if !set {
 		return nil, &a2a.Error{Name: "ExtendedAgentCardNotConfiguredError", Message: namespace + " opted into no agent"}
 	}
@@ -134,21 +204,26 @@ func (s *QNTXServer) namespaceAgentCard(r *http.Request, namespace string) (prot
 	card.Name = "the agent of " + namespace + ", " + line.spec.Model
 	card.Description = agents.GetDescription()
 	card.Tenant = namespace
-	card.Skills = []a2a.Skill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: agents.GetTags()}}
+	card.Skills = []a2a.Skill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: agents.GetTags(), Modes: []string{a2a.Text}}}
+	return s.signedAgentCard(card, "the card of the agent of "+namespace)
+}
+
+// signedAgentCard is card as GetExtendedAgentCard gives it: built, signed with
+// the node's key (§8.4) so a primary handing it over can verify it came from
+// here, and lacking nothing the spec requires. which names it in an answer.
+func (s *QNTXServer) signedAgentCard(card a2a.Card, which string) (proto.Message, *a2a.Error) {
 	built, err := card.Message()
 	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the card of the agent of " + namespace + " was not built: " + err.Error()}
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: which + " was not built: " + err.Error()}
 	}
-	// Signed with the node's key (§8.4), so a primary handing it over can
-	// verify it came from here.
 	node, held := s.nodeKey()
 	if !held {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the card of the agent of " + namespace + " is signed with the node's key, and this node holds none"}
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: which + " is signed with the node's key, and this node holds none"}
 	}
 	if err := a2a.Sign(built, node.PrivateKey, node.KeyID()); err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the card of the agent of " + namespace + " was not signed: " + err.Error()}
+		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: which + " was not signed: " + err.Error()}
 	}
-	return given(built, "the card of the agent of "+namespace)
+	return given(built, which)
 }
 
 // peers is the nodes this one is the primary of (nodes.peers). A node running

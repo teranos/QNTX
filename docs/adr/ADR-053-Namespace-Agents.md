@@ -44,6 +44,18 @@ namespace agent"
 - It reaches the node's MCP with its own token, and its session is written in
   the namespace.
 
+## Codex
+
+“make Codex selectable and runnable as a namespace agent, including configuration, protocol responses, session persistence, and signed transcripts.”
+
+“Auth would be another PR, but hold off on it”
+
+An AGENT line with predicate `codex` names the model and explicit sandbox. The
+existing namespace operations select it with `harness=codex`. It uses its own
+MCP token and Ground, and keeps its QNTX transcript session separate from the
+Codex thread used for resumption. See the [runtime documentation](https://github.com/teranos/QNTX/blob/main/internal/codex/README.md)
+for prerequisites and limits. Authentication setup is deferred.
+
 ## Not done
 
 - The namespace agent: its own DID derived from the node's key for that

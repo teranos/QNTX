@@ -52,9 +52,13 @@ type Card struct {
 	URL string
 	// Tenant is the agent the interface routes to behind URL
 	// (AgentInterface.tenant); the node's own card names none.
-	Tenant     string
-	Skills     []Skill
-	Extensions []Extension
+	Tenant string
+	// OutputModes is the media types the node gives across every skill
+	// (protocol.Node.output_modes): the card's default output modes, which a
+	// skill's Modes override. Nil is none said, and Missing says so.
+	OutputModes []string
+	Skills      []Skill
+	Extensions  []Extension
 	// Session is the cookie a person's passkey session is carried in: the
 	// node admits it as it admits the bearer token, so the card declares both
 	// ("Agents MUST authenticate requests using one of the schemes declared",
@@ -102,6 +106,10 @@ func (c Card) Message() (protoreflect.Message, error) {
 		// Either one: each SecurityRequirement is an alternative.
 		required = append(required, sessionRequired...)
 	}
+	outputModes := c.OutputModes
+	if outputModes == nil {
+		outputModes = []string{}
+	}
 	body, err := json.Marshal(map[string]any{
 		"name":                c.Name,
 		"description":         c.Description,
@@ -109,13 +117,13 @@ func (c Card) Message() (protoreflect.Message, error) {
 		"supportedInterfaces": interfaces,
 		// What the node does not do is said as false (§3.3.4). The extended card
 		// is the card its caller reaches (§3.1.11), so it is always there to ask.
-		"capabilities": map[string]any{"streaming": false, "pushNotifications": false, "extendedAgentCard": true, "extensions": extensions},
+		"capabilities": map[string]any{"streaming": false, "pushNotifications": true, "extendedAgentCard": true, "extensions": extensions},
 		// The node's token is a bearer token (§3.1.11: the extended card is
 		// authenticated with a scheme the card declares).
 		"securitySchemes":      schemes,
 		"securityRequirements": required,
 		"defaultInputModes":    Modes,
-		"defaultOutputModes":   Modes,
+		"defaultOutputModes":   outputModes,
 		"skills":               skills,
 	})
 	if err != nil {

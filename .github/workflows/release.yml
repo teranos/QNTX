@@ -90,8 +90,8 @@
           "env": {
             "VERSION_TAG": "v${{ steps.version.outputs.version }}"
           },
-          "name": "Cache binary to Cachix",
-          "run": "nix build .#qntx --impure --print-out-paths --no-link | cachix push qntx"
+          "name": "Cache binary and its Rust to Cachix",
+          "run": "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --impure --print-out-paths --no-link | cachix push qntx"
         },
         {
           "name": "Package binary with bundled libduckdb",

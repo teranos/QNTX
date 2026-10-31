@@ -32,6 +32,13 @@ type QueryableStore interface {
 	GetAttestations(filter ats.AttestationFilter) ([]*types.As, error)
 }
 
+// HoldsAnyStore is an optional extension for backends that can say whether
+// they hold any attestation without counting them. COUNT(*) reads every row:
+// on k, nine minutes over a 1.9 GB namespace before the server listened.
+type HoldsAnyStore interface {
+	HoldsAny() (bool, error)
+}
+
 // BatchGetStore is an optional extension for backends that can resolve many
 // ids in one statement. AtsStore.GetAttestationsByIDs delegates when the raw
 // store satisfies this and reads them one at a time otherwise.
