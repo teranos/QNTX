@@ -21,12 +21,22 @@
         "ANYONE"
       ]
     },
+    "/.well-known/jwks.json": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/.well-known/oauth-authorization-server": {
       "x-qntx-reach": [
         "ANYONE"
       ]
     },
     "/.well-known/oauth-protected-resource": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/.well-known/openid-configuration": {
       "x-qntx-reach": [
         "ANYONE"
       ]
@@ -81,6 +91,11 @@
         "ROOT"
       ]
     },
+    "/api/agent/live": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/agent/login": {
       "x-qntx-reach": [
         "ROOT"
@@ -122,6 +137,16 @@
         "ROOT",
         "SUPER",
         "USER"
+      ]
+    },
+    "/api/anthropic": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/anthropic/order": {
+      "x-qntx-reach": [
+        "ROOT"
       ]
     },
     "/api/approvals": {
@@ -257,7 +282,17 @@
         "ROOT"
       ]
     },
+    "/api/elements": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/elements/{element}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/elements/{element}/live": {
       "x-qntx-reach": [
         "ROOT"
       ]
@@ -268,6 +303,11 @@
       ]
     },
     "/api/elements/{element}/session": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/elements/{element}/sessions": {
       "x-qntx-reach": [
         "ROOT"
       ]

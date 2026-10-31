@@ -35,6 +35,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	s.answer("/.well-known/did.json", s.nodeDID.HandleDIDDocument)
 
+	// The node as an OIDC issuer, where Anthropic reads the key its identity tokens are signed with.
+	s.answer(oidcDiscoveryPath, s.HandleOIDCDiscovery)
+	s.answer(oidcKeysPath, s.HandleOIDCKeys)
+
 	// The A2A agent card, where an agent that has never seen the node looks.
 	s.answer(agentCardPath, s.HandleAgentCard)
 
@@ -111,6 +115,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/pulse/jobs", s.HandlePulseJobs)                                     // List async jobs (GET)
 	s.answer("/api/prompt/", s.HandlePrompt)                                           // Prompt operations (preview/execute/list/save/get/versions)
 	s.answer("/api/plugins/{name}/logs", s.HandlePluginLogs)                           // Plugin log stream (SSE)
+	s.answer("/api/agent/live", s.HandleNodeAgentLive)                                 // The Node Agent's turn as it prints it (SSE)
+	s.answer("/api/elements/{element}/live", s.HandleElementLive)                     // An element agent's turn as it prints it (SSE)
 	s.answer("/api/plugins/{name}/config", s.HandlePluginConfig)                       // Plugin configuration (GET/PUT)
 	s.answer("/am/statusline", s.statusLine)                                           // What a status line draws (GET)
 	s.answer("/api/types/", s.HandleTypes)                                             // Get specific type (GET /api/types/{typename})
