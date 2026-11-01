@@ -183,7 +183,7 @@ func (s *QNTXServer) optedIntoAgent(namespace string) (bool, error) {
 		return false, err
 	}
 	return slices.ContainsFunc(found, func(as *types.As) bool {
-		return slices.Contains(as.Predicates, agentLineClaude) || slices.Contains(as.Predicates, agentLineCodex)
+		return slices.Contains(as.Predicates, agentLineClaude) || slices.Contains(as.Predicates, agentLineCodex) || slices.Contains(as.Predicates, agentLineAnthropic)
 	}), nil
 }
 

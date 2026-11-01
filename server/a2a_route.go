@@ -190,6 +190,19 @@ func (s *QNTXServer) namespaceAgentCard(r *http.Request, namespace string) (prot
 			line.spec.Model, set = model, true
 		}
 	}
+	if !set {
+		row, _, anthropicSet, anthropicErr := s.newestAgentLine(namespace, agentLineAnthropic)
+		if anthropicErr != nil {
+			return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: anthropicErr.Error()}
+		}
+		if anthropicSet {
+			model, err := oneText(row.Attributes, "model", agentLineSubject, row.ID, namespace)
+			if err != nil {
+				return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+			}
+			line.spec.Model, set = model, true
+		}
+	}
 
 	if !set {
 		return nil, &a2a.Error{Name: "ExtendedAgentCardNotConfiguredError", Message: namespace + " opted into no agent"}

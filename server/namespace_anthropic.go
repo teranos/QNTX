@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/access"
+	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/internal/claudecode"
 	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/internal/slug"
@@ -88,6 +89,7 @@ func (s *QNTXServer) namespaceAnthropicAmOf(ctx context.Context, namespace strin
 	}
 	am := &protocol.NodeAnthropic{Issuer: issuer.url, Subject: subject}
 	if !held {
+		am.Why = "the namespace has no complete Anthropic workload identity federation registration"
 		return am, nil
 	}
 	am.OrganizationId = kept.ids["organization_id"]
@@ -106,7 +108,9 @@ func (s *QNTXServer) namespaceAnthropicAmOf(ctx context.Context, namespace strin
 		am.Why = err.Error()
 		return am, nil
 	}
-	if _, err := client.Models.List(ctx, anthropic.ModelListParams{}); err != nil {
+	asking, cancel := context.WithTimeout(ctx, anthropicAsking)
+	defer cancel()
+	if _, err := client.Models.List(asking, anthropic.ModelListParams{}); err != nil {
 		am.Why = errors.Wrapf(err, "Anthropic did not accept namespace %s's identity at rule %s", namespace, am.FederationRuleId).Error()
 		return am, nil
 	}
@@ -140,6 +144,12 @@ func (s *QNTXServer) namespaceAnthropicSet(ctx context.Context, sent sigil.Sent)
 func namespaceAnthropicAsking(ctx context.Context, sent sigil.Sent, s *QNTXServer) (anAsking, *protocol.Refusal) {
 	asked, refused := agentNamespaceOf(ctx, sent)
 	return then(asked, refused, func(asked anAsking) (anAsking, *protocol.Refusal) {
+		if _, isToken := asked.admitted.Asker().(admission.TokenAsked); isToken {
+			return anAsking{}, &protocol.Refusal{Why: sigil.NotAllowed, Says: "Anthropic federation for " + asked.namespace + " is handled by a person, and a token asked"}
+		}
+		if client, err := named.TextOf("the connector's client", asked.admitted.ClientDID); err == nil {
+			return anAsking{}, &protocol.Refusal{Why: sigil.NotAllowed, Says: "Anthropic federation for " + asked.namespace + " is handled by a person, and the connector " + client.String() + " asked"}
+		}
 		return asked, s.mayHandle(asked.admitted, asked.namespace, "Anthropic federation for "+asked.namespace+" is handled")
 	})
 }

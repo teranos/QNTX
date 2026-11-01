@@ -32,7 +32,9 @@ type consoleStandIn struct {
 	// ended is each Session Anthropic has terminated.
 	ended map[string]bool
 	// spent is what the Session has cost, by each time it is read.
-	spent float64
+	spent      float64
+	assertions []string
+	sawAPIKey  bool
 }
 
 func standInConsole(t *testing.T) (*consoleStandIn, string) {
@@ -44,11 +46,20 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 		_ = json.Unmarshal(body, &sent)
 		c.mu.Lock()
 		defer c.mu.Unlock()
+		if r.Header.Get("x-api-key") != "" {
+			c.sawAPIKey = true
+		}
 		w.Header().Set("Content-Type", "application/json")
 		answer := func(id string) { _, _ = io.WriteString(w, `{"id":"`+id+`"}`) }
 		switch {
 		case r.URL.Path == "/v1/oauth/token":
+			if assertion, ok := sent["assertion"].(string); ok {
+				c.assertions = append(c.assertions, assertion)
+			}
+			c.bodies["oauth"] = append(c.bodies["oauth"], sent)
 			_, _ = io.WriteString(w, `{"access_token":"sk-ant-oat01-traded","token_type":"Bearer","expires_in":3600}`)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/models":
+			_, _ = io.WriteString(w, `{"data":[],"has_more":false}`)
 		case r.Header.Get("Authorization") != "Bearer sk-ant-oat01-traded":
 			w.WriteHeader(http.StatusUnauthorized)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/environments":
