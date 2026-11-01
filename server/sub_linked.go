@@ -144,6 +144,13 @@ func (h linkedHost) AskGitHub(ctx context.Context, operation string, request any
 	if err != nil {
 		return nil, errors.Wrapf(err, "what %s takes did not encode", operation)
 	}
+	relay, relayed, err := h.s.nodeRecords().Relay()
+	if err != nil {
+		return nil, errors.Wrapf(err, "whether %s goes through another node was not read", operation)
+	}
+	if relayed {
+		return relayAsk(ctx, relay, operation, raw)
+	}
 	answered, err := h.s.gitHubService().Ask(services.AsInstallation(ctx), operation, raw)
 	if err != nil {
 		return nil, err

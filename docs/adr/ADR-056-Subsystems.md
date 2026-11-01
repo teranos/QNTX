@@ -61,6 +61,10 @@ Status: Implemented
 - A node forwards the App's deliveries to the URLs ROOT names (`POST /api/github/forward`, `GITHUB forward:<url>`), the body and GitHub's signature untouched, so the node receiving them verifies it with the App's webhook secret it holds too.
 - A forward is a job, written before the delivery is handled, so a delivery the node takes too long over still leaves. A delivery the far node did not answer stays failed until a sweep queues it again; a status the far node gave itself is an answer, kept on the failed job and not sent again.
 
+"why cant we make q relay it"
+
+- A subsystem on a node that does not hold the App asks GitHub through the node that does: ROOT's `GITHUB relay` line (`POST /api/github/relay`) names that node and where the token for its `github ask` is kept, never the token.
+
 ## What the contract does not carry
 
 - Reach. The tablet is the deployment's, compiled in ([server/reach/tablet.go](https://github.com/teranos/QNTX/blob/main/server/reach/tablet.go)); a deployment builds with its own (`withTablet`, [flake.nix](https://github.com/teranos/QNTX/blob/main/flake.nix)). A subsystem's path no line names is served to ROOT alone, as any such path is.
