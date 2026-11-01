@@ -158,6 +158,19 @@ func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace strin
 	}
 	harness := agentLineClaude
 	if !set {
+		row, setBy, codexSet, codexErr := s.newestAgentLine(namespace, agentLineCodex)
+		if codexErr != nil {
+			return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: codexErr.Error()}
+		}
+		if codexSet {
+			model, err := oneText(row.Attributes, "model", agentLineSubject, row.ID, namespace)
+			if err != nil {
+				return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+			}
+			line, set, harness = agentLine{spec: agentSpec{Model: model}, setBy: setBy, at: row.Timestamp}, true, agentLineCodex
+		}
+	}
+	if !set {
 		row, setBy, anthropicSet, anthropicErr := s.newestAgentLine(namespace, agentLineAnthropic)
 		if anthropicErr != nil {
 			return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: anthropicErr.Error()}
@@ -171,7 +184,7 @@ func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace strin
 		}
 	}
 	if !set {
-		return taskAgent{}, &a2a.Error{Name: "UnsupportedOperationError", Message: namespace + " opted into no Claude Code or Anthropic agent"}
+		return taskAgent{}, &a2a.Error{Name: "UnsupportedOperationError", Message: namespace + " opted into no Claude Code, Codex or Anthropic agent"}
 	}
 	agent, refused := s.holdNamespaceAgent(namespace, line.spec.Model, line.setBy)
 	if refused != nil {
