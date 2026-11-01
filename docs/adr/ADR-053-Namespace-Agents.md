@@ -58,6 +58,25 @@ for prerequisites and limits. Authentication setup is deferred.
 
 ## Not done
 
+- “ok, for namespace, but we wont develop this out yet.”
+
+  Story 28: USER runs the namespace agent at Anthropic
+
+  ```gherkin
+  Feature: USER runs the namespace agent at Anthropic
+
+    "oidc for each namespace each with their own rpid"
+    "we will not be doing API key anymore"
+
+    Scenario: USER registers the namespace's issuer
+      Given I am standing in a namespace
+      When I register the namespace's issuer at https://platform.claude.com/settings/workload-identity-federation
+      And I give the namespace its rule and service account
+      Then the namespace's agent runs in Anthropic's environment, off the box
+      And my Anthropic organization pays for its model calls
+      And no Anthropic API key is kept
+  ```
+
 - The namespace agent: its own DID derived from the node's key for that
   namespace and model, its own home, session and token, signed in through
   claude login (ADR-051), a sandbox around the turn, and one test of the whole
