@@ -62,6 +62,8 @@ type gitHubHost interface {
 	fixturesFromGitHub(ctx context.Context, event string, body []byte) ([]string, error)
 	quotesFromGitHub(ctx context.Context, event string, body []byte) (*quote.Arrived, error)
 	quoteLanded(body []byte) error
+	// What each linked subsystem reading the event answered, by name (ADR-056).
+	deliveries(ctx context.Context, event string, body []byte) map[string]any
 	buildsMovedBy(forge.Push) []string
 	vaultsMovedBy(forge.Push) []string
 	cometsMovedBy(forge.Push) []string

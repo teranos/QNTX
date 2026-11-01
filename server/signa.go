@@ -28,9 +28,11 @@ import (
 // its paths to the mux, its sigils to MCP as tools and its operations to the
 // served document, all three read from the same values.
 
-// signa is every signum the node holds: its own, and every ready plugin's.
+// signa is every signum the node holds: its own, every linked subsystem's
+// (ADR-056), and every ready plugin's.
 func (s *QNTXServer) signa() []sigil.Signum {
 	own := []sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.openapiSignum(), s.paritySignum(), s.transcriptsSignum(), s.vaultSignum(), s.agentsSignum(), s.keysSignum(), s.anthropicSignum(), s.approvalsSignum(), s.nodeAgentSignum(), s.elementsSignum()}
+	own = append(own, s.linkedSigna()...)
 	return append(own, s.pluginSigna()...)
 }
 

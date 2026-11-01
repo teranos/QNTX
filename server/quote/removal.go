@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	quoted "github.com/teranos/QNTX/ats/quote"
+	"github.com/teranos/QNTX/server/namespaces"
 	"strconv"
 	"time"
 
@@ -53,7 +54,7 @@ func (h *Removal) Execute(ctx context.Context, job *async.Job) error {
 	if len(as.Actors) == 0 || as.Actors[0] == "" {
 		return errors.Newf("quote.removal: attestation %s has no actor to address the result to", as.ID)
 	}
-	namespace := NamespaceOf(ctx)
+	namespace := namespaces.NamespaceOf(ctx)
 	if namespace == "" {
 		return errors.Newf("quote.removal: attestation %s reached the built-in with no namespace to read prompts in", as.ID)
 	}

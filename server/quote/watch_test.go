@@ -3,6 +3,7 @@ package quote
 import (
 	"context"
 	"encoding/json"
+	"github.com/teranos/QNTX/server/namespaces"
 	"strings"
 	"testing"
 	"time"
@@ -51,7 +52,7 @@ func watchWith(prompts ...string) (*Watch, *statusline.NewsLog, *string) {
 
 func TestQuoteProvenanceSaysWhatHasNoSource(t *testing.T) {
 	h, news, asked := watchWith("i said this exactly once")
-	ctx := WithNamespace(context.Background(), "ground")
+	ctx := namespaces.WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, claimJob(t, "said this exactly", "nobody ever typed these words")); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +85,7 @@ func TestQuoteProvenanceSaysWhatHasNoSource(t *testing.T) {
 
 func TestQuoteProvenanceSourcedLeavesNothing(t *testing.T) {
 	h, news, _ := watchWith("i said this exactly once")
-	ctx := WithNamespace(context.Background(), "ground")
+	ctx := namespaces.WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, claimJob(t, "said this exactly")); err != nil {
 		t.Fatal(err)
 	}

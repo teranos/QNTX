@@ -197,7 +197,7 @@ const (
 	// before this is set (ADR-035), so an invented event cannot grow the series.
 	AttrEvent = "event"
 
-	// AttrSubsystem is which boot step: the names in server/subsystem.go, ten of them.
+	// AttrSubsystem is which boot step: the names in server/subsystem.go, eleven of them.
 	AttrSubsystem = "subsystem"
 
 	// AttrRoute is the path a request was gated on, as the reach table names

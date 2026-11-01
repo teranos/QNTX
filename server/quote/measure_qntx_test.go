@@ -4,6 +4,7 @@ package quote
 
 import (
 	"context"
+	"github.com/teranos/QNTX/server/namespaces"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +25,7 @@ func TestQuoteRemovalReportsAStretchedQuoteMeasuredByRust(t *testing.T) {
 	}
 	h, news, _ := removalWith(said)
 	h.measure = quoted.Measure
-	if err := h.Execute(WithNamespace(context.Background(), "ground"), removalJob(t, []string{"a.md"}, []string{span})); err != nil {
+	if err := h.Execute(namespaces.WithNamespace(context.Background(), "ground"), removalJob(t, []string{"a.md"}, []string{span})); err != nil {
 		t.Fatal(err)
 	}
 	if held := news.Since("person-1", time.Now().UnixMilli()); len(held) != 1 {

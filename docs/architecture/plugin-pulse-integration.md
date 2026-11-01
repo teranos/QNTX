@@ -58,7 +58,7 @@ Job with handler_name="python.script"
 
 **Implemented:**
 - Added `GetDaemon()` method to `QNTXServer` for accessing Pulse worker pool
-- Moved handler registration from `server/init.go` to `cmd/qntx/main.go` after `InitializeAll()`
+- Moved handler registration from `server/init.go` to `cmd/qntx/qntx/main.go` after `InitializeAll()`
 - Handlers now properly registered with Pulse after plugin initialization completes
 - Unit test `TestGetDaemon` verifies daemon/registry access
 

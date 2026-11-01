@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	quoted "github.com/teranos/QNTX/ats/quote"
+	"github.com/teranos/QNTX/server/namespaces"
 	"strings"
 	"testing"
 	"time"
@@ -58,7 +59,7 @@ func removalWith(prompts ...string) (*Removal, *statusline.NewsLog, *string) {
 
 func TestQuoteRemovalReportsWhatTheUserSaid(t *testing.T) {
 	h, news, asked := removalWith("the max time on phases is ideally lower than 5s always")
-	ctx := WithNamespace(context.Background(), "ground")
+	ctx := namespaces.WithNamespace(context.Background(), "ground")
 	job := removalJob(t,
 		[]string{"source/a.d", "source/b.d"},
 		[]string{"the max time on phases is ideally lower than 5s always", "words the agent wrote itself"})
@@ -91,7 +92,7 @@ func TestQuoteRemovalReportsWhatTheUserSaid(t *testing.T) {
 // A quote the user never said was not theirs to lose.
 func TestQuoteRemovalOfUnsourcedLeavesNothing(t *testing.T) {
 	h, news, _ := removalWith("something else entirely")
-	ctx := WithNamespace(context.Background(), "ground")
+	ctx := namespaces.WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, removalJob(t, []string{"a.d"}, []string{"words the agent wrote itself"})); err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +108,7 @@ func TestQuoteRemovalReportsAStretchedQuote(t *testing.T) {
 	span := "you replac somethin i sai wth somethng els, ths is a diferent knd of violaton"
 	h, news, _ := removalWith(said)
 	h.measure = measuredAs(quoted.Measurement{Corrections: 5, Length: 40})
-	ctx := WithNamespace(context.Background(), "ground")
+	ctx := namespaces.WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, removalJob(t, []string{"a.md"}, []string{span})); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +123,7 @@ func TestQuoteRemovalRefusesWhatItCannotRead(t *testing.T) {
 	if err := h.Execute(context.Background(), removalJob(t, []string{"a.d"}, []string{"anything at all"})); err == nil {
 		t.Error("a removal with no namespace was answered as if its prompts had been read")
 	}
-	ctx := WithNamespace(context.Background(), "ground")
+	ctx := namespaces.WithNamespace(context.Background(), "ground")
 	if err := h.Execute(ctx, removalJob(t, []string{"a.d"}, []string{"one", "two"})); err == nil {
 		t.Error("spans with no file each to name were answered")
 	}

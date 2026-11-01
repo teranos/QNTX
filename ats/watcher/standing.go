@@ -161,11 +161,18 @@ var standing = []storage.Watcher{
 	},
 }
 
-// Standing is what every namespace watches, as fresh values. The engine lays
-// what a store holds over these, and a stored row cannot take one away.
+// Standing is what every namespace watches, as fresh values: what this build
+// is born with, then what the subsystems linked in stood (Stand). The engine
+// lays what a store holds over these, and a stored row cannot take one away.
 func Standing() []*storage.Watcher {
-	held := make([]*storage.Watcher, 0, len(standing))
+	stoodMu.RLock()
+	defer stoodMu.RUnlock()
+	held := make([]*storage.Watcher, 0, len(standing)+len(stood))
 	for _, w := range standing {
+		row := w
+		held = append(held, &row)
+	}
+	for _, w := range stood {
 		row := w
 		held = append(held, &row)
 	}
@@ -201,10 +208,8 @@ func standingReadsNoType(names []string) ([]*types.As, error) {
 // IsStanding reports whether an id belongs to the table. The routes that write
 // watchers ask this: a standing row is not a person's to edit or delete.
 func IsStanding(id string) bool {
-	for _, w := range standing {
-		if w.ID == id {
-			return true
-		}
-	}
-	return false
+	stoodMu.RLock()
+	defer stoodMu.RUnlock()
+	_, standing := standingRow(id)
+	return standing
 }

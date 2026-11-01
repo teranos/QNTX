@@ -1,4 +1,4 @@
-package main
+package qntx
 
 import (
 	"os"
@@ -12,16 +12,14 @@ func tauriBinaryName() string {
 func tauriCandidates(dir string) []string {
 	return []string{
 		filepath.Join(dir, "QNTX"),
-		filepath.Join(dir, "QNTX.app", "Contents", "MacOS", "QNTX"),
 	}
 }
 
 func platformTauriPaths() []string {
-	paths := []string{
-		"/Applications/QNTX.app/Contents/MacOS/QNTX",
-	}
+	var paths []string
 	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, filepath.Join(home, "Applications", "QNTX.app", "Contents", "MacOS", "QNTX"))
+		paths = append(paths, filepath.Join(home, ".local", "bin", "QNTX"))
 	}
+	paths = append(paths, "/usr/local/bin/QNTX", "/usr/bin/QNTX")
 	return paths
 }

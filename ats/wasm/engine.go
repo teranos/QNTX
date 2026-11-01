@@ -56,20 +56,28 @@ func GetEngine() (*Engine, error) {
 }
 
 func newEngine() (*Engine, error) {
+	return NewEngine(wasmBytes, "ats")
+}
+
+// NewEngine is an engine over a module of the caller's, by name: its own
+// runtime, apart from the embedded one. A subsystem compiled in brings a
+// module of its own and speaks the same memory protocol through this
+// (ADR-056). The caller closes it.
+func NewEngine(module []byte, name string) (*Engine, error) {
 	ctx := context.Background()
 
 	r := wazero.NewRuntime(ctx)
 
-	compiled, err := r.CompileModule(ctx, wasmBytes)
+	compiled, err := r.CompileModule(ctx, module)
 	if err != nil {
-		err = errors.Wrap(err, "wasm compile")
+		err = errors.Wrapf(err, "wasm compile of the module %s", name)
 		return nil, sqlclose.With(err, r.Close(ctx), "the wasm runtime")
 	}
 
 	mod, err := r.InstantiateModule(ctx, compiled,
-		wazero.NewModuleConfig().WithName("ats"))
+		wazero.NewModuleConfig().WithName(name))
 	if err != nil {
-		err = errors.Wrap(err, "wasm instantiate")
+		err = errors.Wrapf(err, "wasm instantiate of the module %s", name)
 		return nil, sqlclose.With(err, r.Close(ctx), "the wasm runtime")
 	}
 
