@@ -150,19 +150,44 @@ func protocolSaid() (map[string]string, error) {
 	return protocolSays, nil
 }
 
+var (
+	alsoMu sync.RWMutex
+	// also is what the subsystems compiled in say of their own messages and
+	// fields, by full name (ADR-056): their says.json, as protocol.says.json
+	// is ours. Read after ours, so what ours say is never overridden.
+	also = map[string]string{}
+)
+
+// AlsoSays takes what a subsystem's messages and fields say of themselves,
+// by full name, to be read where ours are read. A name ours say something of
+// keeps our words.
+func AlsoSays(says map[string]string) {
+	alsoMu.Lock()
+	defer alsoMu.Unlock()
+	for name, said := range says {
+		also[name] = said
+	}
+}
+
 // OursSay is what one of our messages or fields says of itself, by full name,
-// in its .proto's words.
+// in its .proto's words; or a subsystem's, for a message of its own.
 func OursSay(name string) (string, error) {
 	return oursSay(name)
 }
 
-// oursSay is what one of our messages or fields says of itself, by full name.
+// oursSay is what one of our messages or fields says of itself, by full name:
+// ours first, then what a subsystem compiled in says of its own.
 func oursSay(name string) (string, error) {
 	says, err := protocolSaid()
 	if err != nil {
 		return "", err
 	}
-	return says[name], nil
+	if said := says[name]; said != "" {
+		return said, nil
+	}
+	alsoMu.RLock()
+	defer alsoMu.RUnlock()
+	return also[name], nil
 }
 
 // ours is what each message in scope and each of its fields says of itself.

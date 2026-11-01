@@ -9,6 +9,7 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
 	"github.com/teranos/QNTX/server/subsystem"
@@ -38,6 +39,9 @@ func (linkedSubsystem) Init(s *QNTXServer) error {
 		if err := watcher.Stand(rows...); err != nil {
 			return errors.Wrapf(err, "the subsystem %s stood a row that cannot stand", decl.GetName())
 		}
+		// What its messages say, for its sigils' fields to be described from
+		// when the signa are checked (signa.go, answeredOf).
+		parity.AlsoSays(decl.GetSays())
 		if err := sub.Start(linkedHost{s}); err != nil {
 			return errors.Wrapf(err, "the subsystem %s did not start", decl.GetName())
 		}

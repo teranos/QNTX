@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/subsystem"
 )
@@ -44,6 +45,10 @@ func (f *linkedForTest) Declare() *protocol.Subsystem {
 			Id: "fake-pinged", HandlerName: "fake.ping", Predicates: []string{"fake:pinged"}, MaxFiresPerSecond: 10,
 		}},
 		HandlerNames: []string{"fake.ping"},
+		// What its messages say, as its own says.json would hold it. Empty says
+		// nothing in QNTX's .proto, so what is read of it is the subsystem's; a
+		// field of QNTX's own, said again here, keeps QNTX's words.
+		Says:         map[string]string{"protocol.Empty": "nothing, for a test", "protocol.Sigil.does": "not what QNTX says"},
 		GithubEvents: []string{"push"},
 	}
 }
@@ -109,6 +114,19 @@ func TestALinkedSubsystemsSignumIsServed(t *testing.T) {
 	assert.Contains(t, names, linkedName)
 	answered := srv.answeredFromSigils()
 	assert.Contains(t, answered, "/api/fake/ping")
+}
+
+// What its messages say of themselves is read where QNTX's own are read, so a
+// sigil's fields are described and the signum is served; what QNTX's own say
+// is not overridden by a subsystem saying it again.
+func TestALinkedSubsystemsMessagesSayWhatTheyDeclare(t *testing.T) {
+	linkedServer(t)
+	said, err := parity.OursSay("protocol.Empty")
+	require.NoError(t, err)
+	assert.Equal(t, "nothing, for a test", said)
+	own, err := parity.OursSay("protocol.Sigil.does")
+	require.NoError(t, err)
+	assert.Equal(t, "What it is for, in words, for somebody who has never seen the code.", own)
 }
 
 // Its standing rows stand with QNTX's own: every namespace watches them.
