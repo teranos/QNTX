@@ -11,7 +11,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/teranos/QNTX/internal/forge"
-	"github.com/teranos/QNTX/server/quote"
 	"io"
 	"net/http"
 	"slices"
@@ -168,7 +167,7 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		fixed := g.fixturesOf(r.Context(), event, body)
-		answer := map[string]any{"approvals": touched, "fixtures": fixed, "quotes": g.quotesOf(r.Context(), event, body)}
+		answer := map[string]any{"approvals": touched, "fixtures": fixed}
 		g.deliveredInto(answer, r.Context(), event, body)
 		respond(w, g.host.log(), http.StatusOK, answer)
 		return
@@ -179,9 +178,6 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	landed := push.push()
-	if err := g.host.quoteLanded(body); err != nil {
-		g.host.log().Errorw("A push to the default branch was not read for quotes", "repo", landed.Repo.Path, "error", err)
-	}
 	if tag := tagLanded(landed); tag != "" {
 		g.dispatchApp(tag)
 	}
@@ -190,7 +186,7 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	dispatching := g.followsMovedBy(landed)
 	rebuilding := g.host.cometsMovedBy(landed)
 	fixed := g.fixturesOf(r.Context(), event, body)
-	answer := map[string]any{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding, "fixtures": fixed, "quotes": g.quotesOf(r.Context(), event, body)}
+	answer := map[string]any{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding, "fixtures": fixed}
 	g.deliveredInto(answer, r.Context(), event, body)
 	respond(w, g.host.log(), http.StatusOK, answer)
 }
@@ -209,16 +205,6 @@ func (g *gitHub) deliveredInto(answer map[string]any, ctx context.Context, event
 	}
 }
 
-// quotesOf is the quoted spans one delivery carried, measured against the
-// prompts of the namespace that knows the project. A measurement that did not
-// run is said in the log, not as a failed delivery GitHub would hand in again.
-func (g *gitHub) quotesOf(ctx context.Context, event string, body []byte) *quote.Arrived {
-	arrived, err := g.host.quotesFromGitHub(ctx, event, body)
-	if err != nil {
-		g.host.log().Errorw("A delivery's quoted spans were not measured", "event", event, "error", err)
-	}
-	return arrived
-}
 
 // fixturesOf is what the node put fixtures in for one delivery, asked after the
 // rest of the delivery was taken. A scanner that did not run is said in the log

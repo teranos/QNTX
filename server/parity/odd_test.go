@@ -3,8 +3,6 @@ package parity
 import (
 	"strings"
 	"testing"
-
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
 // What TEI P5 4.12.0 says of q, of interp and of their attributes is read
@@ -65,61 +63,6 @@ func TestParseODD_RefusesAnUnpinnedClass(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "q is a member of att.global, which is not pinned") {
 		t.Errorf("err is %v", err)
 	}
-}
-
-// Quote and Interp are TEI's q and interp: every field of ours follows one of
-// its attributes, or its content, and departs from none.
-func TestHold_QuoteIsTEIsQ(t *testing.T) {
-	schema, refused := Reference("tei")
-	if refused != nil {
-		t.Fatal(refused)
-	}
-	p, refused := Hold(&protocol.Signum{Name: "quotes", Follows: []*protocol.Follows{quotesFollowTEI()}}, "", "tei", schema)
-	if refused != nil {
-		t.Fatal(refused)
-	}
-	if len(p.Missing) > 0 {
-		t.Errorf("missing: %v", p.Missing)
-	}
-	for message, fields := range p.Unfollowed {
-		if len(fields) > 0 {
-			t.Errorf("%s has fields that follow nothing: %v", message, fields)
-		}
-	}
-	for _, clade := range p.Clades {
-		for _, item := range clade.Items {
-			if len(item.Departs) > 0 {
-				t.Errorf("%s.%s: %v", clade.Model, item.Column, item.Departs)
-			}
-		}
-	}
-}
-
-// quotesFollowTEI is how a Quote and an Interp follow q and interp, field by
-// attribute, with the words as the element's content.
-func quotesFollowTEI() *protocol.Follows {
-	pairs := [][2]string{
-		{"protocol.Quote.content", "q.content"},
-		{"protocol.Quote.who", "q.who"},
-		{"protocol.Quote.type", "q.type"},
-		{"protocol.Quote.source", "q.source"},
-		{"protocol.Quote.resp", "q.resp"},
-		{"protocol.Quote.cert", "q.cert"},
-		{"protocol.Quote.rend", "q.rend"},
-		{"protocol.Quote.ana", "q.ana"},
-		{"protocol.Quote.id", "q.xml:id"},
-		{"protocol.Interp.content", "interp.content"},
-		{"protocol.Interp.resp", "interp.resp"},
-		{"protocol.Interp.cert", "interp.cert"},
-		{"protocol.Interp.type", "interp.type"},
-		{"protocol.Interp.inst", "interp.inst"},
-		{"protocol.Interp.id", "interp.xml:id"},
-	}
-	follows := &protocol.Follows{Reference: "tei"}
-	for _, pair := range pairs {
-		follows.Columns = append(follows.Columns, &protocol.Corresponds{Field: pair[0], Column: pair[1]})
-	}
-	return follows
 }
 
 func columnNamed(t *testing.T, model Model, name string) Column {

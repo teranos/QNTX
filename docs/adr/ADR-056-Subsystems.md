@@ -19,7 +19,11 @@ Status: Implemented
 "and k qntx compiles it in"
 
 - A subsystem is its own repository and its own Go module, requiring `github.com/teranos/QNTX`. QNTX's `go.mod` requires nothing of it, so QNTX builds for everyone without it.
+
+"we separate it out from qntx like is demonstrated, it becomes an optional build, and k uses it, not q"
+
 - A binary carrying a subsystem is [cmd/qntx/main.go](https://github.com/teranos/QNTX/blob/main/cmd/qntx/main.go) with one more import: the subsystem's package. Everything qntx does is in `cmd/qntx/qntx` as `Main()`, so the subsystem's repository holds a `cmd/qntx` of three lines and builds the same node with the subsystem in it.
+- The optional build was a build tag, `qntxquote`, and a second nix package, `qntx-quotes`, both in QNTX. Both left with the subsystem: a build carries it by linking it, and nothing in QNTX names it.
 
 "a big ass patch isnt going to work for us"
 

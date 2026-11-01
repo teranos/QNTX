@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/parity"
@@ -135,8 +137,28 @@ func (h linkedHost) News() *statusline.NewsLog { return h.s.news }
 
 func (h linkedHost) MintedBy(did string) (string, bool) { return h.s.authHandler.MintedBy(did) }
 
+// AskGitHub asks GitHubService one operation as the App's installation, and
+// hands back GitHub's answer, or the service's own error as one.
 func (h linkedHost) AskGitHub(ctx context.Context, operation string, request any) ([]byte, error) {
-	return h.s.askGitHub(ctx, operation, request)
+	raw, err := json.Marshal(request)
+	if err != nil {
+		return nil, errors.Wrapf(err, "what %s takes did not encode", operation)
+	}
+	answered, err := h.s.gitHubService().Ask(services.AsInstallation(ctx), operation, raw)
+	if err != nil {
+		return nil, err
+	}
+	var said struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+	}
+	if err := json.Unmarshal(answered, &said); err != nil {
+		return nil, errors.Wrapf(err, "what %s answered did not read", operation)
+	}
+	if !said.Success {
+		return nil, errors.Newf("%s: %s", operation, said.Error)
+	}
+	return answered, nil
 }
 
 func (h linkedHost) Logger() *zap.SugaredLogger { return h.s.logger }

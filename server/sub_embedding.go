@@ -29,7 +29,6 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 	s.setupDistillSchedule(s.deps.cfg)
 	s.setupCheckpointSchedule()
 	s.setupCIWatch()
-	s.setupQuote()
 	s.setupWeeklyReport(s.deps.cfg)
 	// The node's mail is held from setupWeeklyReport on.
 	s.wireInvitations()
