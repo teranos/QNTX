@@ -3,7 +3,6 @@ package server
 import (
 	"database/sql"
 	"fmt"
-	"github.com/teranos/QNTX/server/quote"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -622,8 +621,7 @@ func TestGetDaemon(t *testing.T) {
 
 	// Verify registry has only built-in handlers (e.g. distill if configured),
 	// and what the subsystems linked into this build declare (ADR-056).
-	allowed := []string{"distill", "wal-checkpoint", watcher.CIWatchHandlerName, reportHandlerName,
-		watcher.QuoteProvenanceHandlerName, watcher.QuoteRemovalHandlerName, quote.LandedHandlerName}
+	allowed := []string{"distill", "wal-checkpoint", watcher.CIWatchHandlerName, reportHandlerName}
 	for _, sub := range subsystem.Registered() {
 		allowed = append(allowed, sub.Declare().GetHandlerNames()...)
 	}

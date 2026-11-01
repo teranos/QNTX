@@ -88,7 +88,7 @@ func TestStandingObserverNamesItsNamespace(t *testing.T) {
 		namespace: "ground",
 		logger:    zap.NewNop().Sugar(),
 	}
-	o.OnAttestationCreated(&types.As{ID: "c", Predicates: []string{watcher.QuoteClaimedPredicate}})
+	o.OnAttestationCreated(&types.As{ID: "c", Predicates: []string{watcher.CIPushedPredicate}})
 	if len(f.namespaces) != 1 || f.namespaces[0] != "ground" {
 		t.Errorf("the built-in ran in %v, not in the namespace the row landed in", f.namespaces)
 	}
