@@ -208,6 +208,12 @@ func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []floa
 			e.broadcastMatch(watcher.ID, as, similarity)
 		}
 
+		// A watcher that only tells has told. Past its rate it was queued, to
+		// be marked done later having run nothing.
+		if watcher.ActionType == storage.ActionTypeSemanticMatch || watcher.ActionType == storage.ActionTypeTell {
+			continue
+		}
+
 		// Rate-limited action execution (same logic as OnAttestationCreated)
 		if watcher.MaxFiresPerSecond == 0 {
 			continue
