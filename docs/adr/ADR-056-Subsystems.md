@@ -52,18 +52,20 @@ Status: Implemented
 
 - QNTX names no subsystem and decides none of a subsystem's policy. What is acceptable, what is refused, what goes back to whom: the subsystem's, in its own repository, as its organisation decides.
 
-## A node the App's webhook does not point at
+## 「[Opus 5.5] A node the App's webhook does not point at」
 
-"GitHub webhooks arrive here", on q, and the subsystem is on k.
+"GitHub webhooks arrive here"
+
+「[Opus 5.5] They arrive on q, and the subsystem is on k.」
 
 "if it doesnt, we need to make it do it"
 
-- A node forwards the App's deliveries to the URLs ROOT names (`POST /api/github/forward`, `GITHUB forward:<url>`), the body and GitHub's signature untouched, so the node receiving them verifies it with the App's webhook secret it holds too.
-- A forward is a job, written before the delivery is handled, so a delivery the node takes too long over still leaves. A delivery the far node did not answer stays failed until a sweep queues it again; a status the far node gave itself is an answer, kept on the failed job and not sent again.
+- 「[Opus 5.5] A node forwards the App's deliveries to the URLs ROOT names (`POST /api/github/forward`, `GITHUB forward:<url>`), the body and GitHub's signature untouched, so the node receiving them verifies it with the App's webhook secret it holds too.」
+- 「[Opus 5.5] A forward is a job, written before the delivery is handled, so a delivery the node takes too long over still leaves. A delivery the far node did not answer stays failed until a sweep queues it again; a status the far node gave itself is an answer, kept on the failed job and not sent again.」
 
 "why cant we make q relay it"
 
-- A subsystem on a node that does not hold the App asks GitHub through the node that does: ROOT's `GITHUB relay` line (`POST /api/github/relay`) names that node and where the token for its `github ask` is kept, never the token.
+- 「[Opus 5.5] A subsystem on a node that does not hold the App asks GitHub through the node that does: ROOT's `GITHUB relay` line (`POST /api/github/relay`) names that node and where the token for its `github ask` is kept, never the token.」
 
 ## What the contract does not carry
 
