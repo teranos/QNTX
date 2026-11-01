@@ -67,6 +67,7 @@ REACH is '/.well-known/oauth-protected-resource'                          of ANY
 # The node as an OIDC issuer (OpenID Connect Discovery 1.0): where Anthropic
 # reads the key the node's identity tokens are signed with.
 REACH is '/.well-known/openid-configuration' '/.well-known/jwks.json'     of ANYONE
+REACH is '/oidc/{namespace}/.well-known/openid-configuration' '/oidc/{namespace}/.well-known/jwks.json' of ANYONE
 # The node at Anthropic: the ids of the rule its identity token is traded at, ROOT's.
 REACH is '/api/anthropic'                                                 of ROOT
 REACH is '/api/anthropic/order'                                           of ROOT
@@ -185,7 +186,7 @@ REACH is '/api/elements' '/api/elements/{element}' '/api/elements/{element}/say'
 # has REACH on it". Who acts in the namespace reaches it, which the handler
 # asks of the admission; who may opt the namespace into one is its owner, ROOT
 # or SUPER, asked there too.
-REACH is '/api/agents/{namespace}' '/api/agents/{namespace}/say' '/api/agents/{namespace}/session' '/api/agents/{namespace}/login' of ROOT SUPER USER
+REACH is '/api/agents/{namespace}' '/api/agents/{namespace}/say' '/api/agents/{namespace}/session' '/api/agents/{namespace}/login' '/api/agents/{namespace}/anthropic' '/api/agents/{namespace}/issuer' of ROOT SUPER USER
 
 # A namespace's keys (ADR-051): "a model never lists, sets or reads a key", so
 # no TOKEN, and the handler refuses a token or a connector at any level; who
