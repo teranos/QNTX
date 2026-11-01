@@ -9,7 +9,6 @@ import (
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // RemoteATSStore is a gRPC client wrapper for the attestation store.
@@ -25,11 +24,9 @@ type RemoteATSStore struct {
 // NewRemoteATSStore creates a gRPC client connection to the ATSStore service.
 // The provided context is used for all gRPC operations and enables cancellation.
 func NewRemoteATSStore(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteATSStore, error) {
-	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	conn, err := dialService(endpoint, "ATSStore")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to ATSStore gRPC endpoint")
+		return nil, err
 	}
 
 	client := protocol.NewATSStoreServiceClient(conn)

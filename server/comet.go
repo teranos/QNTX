@@ -128,7 +128,7 @@ func (s *QNTXServer) cometsMovedBy(push forge.Push) []string {
 		return []string{}
 	}
 	rebuilding := []string{}
-	// An agent's ground is built from ground's main as every comet is.
+	// An agent's ground is built from ground's branch as every comet is.
 	if strings.EqualFold(push.Repo.Path, comet.Ground.Owner+"/"+comet.Ground.Repo) && push.Branch() == comet.Ground.Branch {
 		for _, home := range s.underGround.all() {
 			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)

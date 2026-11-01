@@ -312,32 +312,9 @@ func (q *Queue) DeleteJobWithChildren(jobID string) error {
 	// Cancel each child task based on its current status
 	for _, child := range children {
 		switch child.Status {
-		case JobStatusQueued:
-			// Cancel queued tasks immediately (they haven't started yet)
-			child.Cancel("parent job deleted")
-			if err := q.store.UpdateJob(child); err != nil {
-				err = errors.Wrapf(err, "failed to cancel child task %s", child.ID)
-				err = errors.WithDetail(err, fmt.Sprintf("Child job ID: %s", child.ID))
-				err = errors.WithDetail(err, fmt.Sprintf("Parent job ID: %s", jobID))
-				err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", child.HandlerName))
-				return err
-			}
-			q.notifySubscribers(child)
-
-		case JobStatusRunning:
-			// Cancel running tasks (workers will detect parent deletion)
-			child.Cancel("parent job deleted")
-			if err := q.store.UpdateJob(child); err != nil {
-				err = errors.Wrapf(err, "failed to cancel child task %s", child.ID)
-				err = errors.WithDetail(err, fmt.Sprintf("Child job ID: %s", child.ID))
-				err = errors.WithDetail(err, fmt.Sprintf("Parent job ID: %s", jobID))
-				err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", child.HandlerName))
-				return err
-			}
-			q.notifySubscribers(child)
-
-		case JobStatusPaused:
-			// Cancel paused tasks
+		case JobStatusQueued, JobStatusRunning, JobStatusPaused:
+			// Queued tasks are cancelled immediately (they haven't started yet),
+			// running ones too (workers will detect parent deletion), and so are paused ones.
 			child.Cancel("parent job deleted")
 			if err := q.store.UpdateJob(child); err != nil {
 				err = errors.Wrapf(err, "failed to cancel child task %s", child.ID)

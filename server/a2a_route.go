@@ -178,6 +178,20 @@ func (s *QNTXServer) namespaceAgentCard(r *http.Request, namespace string) (prot
 		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the agent of " + namespace + " was not read: " + err.Error()}
 	}
 	if !set {
+		row, _, codexSet, codexErr := s.newestAgentLine(namespace, agentLineCodex)
+		if codexErr != nil {
+			return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: codexErr.Error()}
+		}
+		if codexSet {
+			model, err := oneText(row.Attributes, "model", agentLineSubject, row.ID, namespace)
+			if err != nil {
+				return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+			}
+			line.spec.Model, set = model, true
+		}
+	}
+
+	if !set {
 		return nil, &a2a.Error{Name: "ExtendedAgentCardNotConfiguredError", Message: namespace + " opted into no agent"}
 	}
 	agents := s.agentsSignum()

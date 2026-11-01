@@ -1,0 +1,33 @@
+TEI P5 4.12.0, whose q is what a quote is, and interp what is made of one (ADR-055).
+
+The Guidelines specify themselves in ODD, one file per element and per class of
+attributes, under P5/Source/Specs at the commit P5_Release_4.12.0 points to:
+
+https://raw.githubusercontent.com/TEIC/TEI/113e933e21f016e2655518321e9d10214b8d9fcb/P5/Source/Specs/<name>.xml
+
+2231890a3f3e97c9c79afe528b0e624e263c63d5a4bca28469face4c95bbf9c2  Specs/q.xml
+bc97276bc796f2c88859027360d89ece1d3d1101eb0885bbae75cd78ccdb1d21  Specs/interp.xml
+b3f85e109303f4b930bd300b033f5904aee343dd04465ef589e06f71db3da799  Specs/att.global.xml
+a659e57852dedfd92c3c1ff1587b5dea99d3a11a762de5b5b8cae4f2b21c999f  Specs/att.global.analytic.xml
+2aea320b3d6c6170f786cfa0a21b18234b749dfc86acf39df8095846c801227c  Specs/att.global.change.xml
+54364255dd6d74914375153d0d012efd2b66388df908a3bc9ed38663cca1c930  Specs/att.global.facs.xml
+95d1ac4872bbfbf922931dd431a2dcfb4d5a129a2c9ac45b61026bc986cc5974  Specs/att.global.linking.xml
+844ad91879061c753b4e6c86cc047db6d75bd3a3da0d7eb82e7e797dd5ebb727  Specs/att.global.rendition.xml
+1c47780f0cf69454b6f01e480fde5fdca8ea4098ebbbd518d34b63100903425c  Specs/att.global.responsibility.xml
+fc09e4209239d333540d822911c951cefd6b4550335de5d56651882a5a3c3883  Specs/att.global.source.xml
+1d607c8a60affdca8ab4cd60ee6e32e711eb3a423983f2214bf20d298492da5f  Specs/att.ascribed.xml
+66ae398978d6d199ea9c51e16651152acc0716c8c94e419a12f5f4d49843f4fa  Specs/att.ascribed.directed.xml
+e2110ccfd7fb543e744e0061df56b410a59a3fee9a9183f7bf04b76d4133a9ca  Specs/att.cmc.xml
+cb9f8a5ec7bb32f780b209de9d3ef8d07d2349325f106b11f1038a4255291f75  Specs/att.interpLike.xml
+332195211c90c735ef381932851a32f5f99cb9d1c27272b9769c6163776cced2  Specs/att.typed.xml
+
+q is a member of att.global, att.ascribed.directed, att.cmc and att.typed;
+interp of att.global, att.cmc and att.interpLike. att.global's attributes are
+its own and those of the classes that are members of it: analytic, change,
+facs, linking, rendition, responsibility, source. Every class an element's
+attributes come from is pinned, so the reader resolves them as the Guidelines
+do. model.* classes say where an element may appear, not what it carries, and
+are not pinned. The two elements' pages, as published:
+
+https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/ref-q.html
+https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/ref-interp.html

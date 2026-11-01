@@ -23,11 +23,17 @@ import (
 // signature over the bytes the node will verify, timestamp in seconds.
 func signedBody(t *testing.T, actors []string, edit func(map[string]any)) (string, string) {
 	t.Helper()
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	did := access.EncodeDIDKey(pub)
+	return signedBodyBy(t, priv, actors, edit)
+}
+
+// signedBodyBy is signedBody signed with a key the caller already has.
+func signedBodyBy(t *testing.T, priv ed25519.PrivateKey, actors []string, edit func(map[string]any)) (string, string) {
+	t.Helper()
+	did := access.EncodeDIDKey(priv.Public().(ed25519.PublicKey))
 	as := &types.As{
 		ID:         "AS-SIGNED-IN-THE-BROWSER",
 		Subjects:   []string{"qntx"},
@@ -154,6 +160,33 @@ func TestASignedAttestationThroughATokenIsRefused(t *testing.T) {
 	_, rec := signingAs(t, tokenAdmission(), body, did)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// A token is an ed25519 seed, so its holder can sign as it (ADR-025): on k the
+// root token signed with its own seed and was refused as a key no User holds.
+func TestATokenSigningAsItselfIsStoredAsSigned(t *testing.T) {
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	did := access.EncodeDIDKey(priv.Public().(ed25519.PublicKey))
+	token := tokenAdmission()
+	token.Grant.DID = did
+	body, _ := signedBodyBy(t, priv, []string{did}, func(b map[string]any) { b["predicates"] = []string{"noted"} })
+	store, rec := signingAs(t, token, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 1})
+	if err != nil || len(found) != 1 {
+		t.Fatalf("read back %v, %v", found, err)
+	}
+	if found[0].SignerDID != did {
+		t.Fatalf("signer_did = %q, want the token's %q", found[0].SignerDID, did)
+	}
+	if err := signing.Verify(found[0]); err != nil {
+		t.Fatalf("what was stored no longer verifies: %v", err)
 	}
 }
 

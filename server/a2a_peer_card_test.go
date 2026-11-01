@@ -49,7 +49,7 @@ func aPeer(t *testing.T, answer func(p *standInPeer, w http.ResponseWriter, orig
 func (p *standInPeer) signedCard(t *testing.T, origin string, key ed25519.PrivateKey) []byte {
 	t.Helper()
 	card, err := a2a.Card{Name: "the agent of orchard, claude-sonnet-5-5", Description: "The namespace agent.", Version: "1.0.0",
-		URL: origin + "/a2a", Tenant: "orchard",
+		URL: origin + "/a2a", Tenant: "orchard", OutputModes: a2a.Modes,
 		Skills: []a2a.Skill{{ID: "say", Name: "say", Description: "Says something to it.", Tags: []string{"agent"}}},
 	}.Message()
 	require.NoError(t, err)

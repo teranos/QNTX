@@ -90,6 +90,11 @@ func claudeCodeDir() (string, error) {
 }
 
 func (agentSubsystem) Init(s *QNTXServer) (err error) {
+	home, err := nodeAgentHome()
+	if err != nil {
+		return err
+	}
+	s.agentsDir = filepath.Dir(home)
 	if !s.deps.cfg.Agent.Root.Named() {
 		return nil
 	}
@@ -111,12 +116,6 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	// No node holds Pi, so neither the Node Agent nor a namespace's agent runs in it:
 	// "disable Pi tmp as a Namespace Agent and as a Node Agent"
 
-	home, err := nodeAgentHome()
-	if err != nil {
-		return err
-	}
-	// Every agent the node runs is kept beside ROOT's (ADR-048).
-	s.agentsDir = filepath.Dir(home)
 	if err := s.nameNodeAgent(home); err != nil {
 		return err
 	}

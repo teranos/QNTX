@@ -3,10 +3,10 @@ package quote
 import (
 	"context"
 	"encoding/json"
-	quoted "github.com/teranos/QNTX/ats/quote"
 	"strconv"
 	"time"
 
+	quoted "github.com/teranos/QNTX/ats/quote"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
@@ -15,9 +15,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// quote.provenance is the built-in the standing quote row reaches. ground's
-// PostToolUse attests the quoted spans a write carried, sky streams the row
-// here, and each span is asked of the prompts in the namespace it landed in.
+// The numbers this package is made of, so none is read out of the code below.
+const (
+	// noteSpan is how much of a span the row's note carries; the detail has
+	// every span whole.
+	noteSpan = 80
+
+	// promptsCeiling is a read of every prompt a namespace holds. Zero would be
+	// none of them.
+	promptsCeiling = 1_000_000
+)
 
 // The namespace a standing row fired in, carried to the built-in it reaches.
 type namespaceKey struct{}
@@ -37,18 +44,30 @@ func NamespaceOf(ctx context.Context) string {
 	return ns
 }
 
+// IMPLEMENTME: speak spec at the boundary. A span measured here is a protocol.Quote:
+// content the span, who the person whose prompt it matched, source that prompt's
+// row, resp the actor that relayed it, cert the measurement. degree stays inside.
+
 // degree is one span that did not comply, and by how much.
 type degree struct {
 	Span        string `json:"span"`
-	Verdict     string `json:"verdict"`
+	Kind        string `json:"verdict"`
 	Corrections int    `json:"corrections"`
 	Length      int    `json:"length"`
+	// The prompt the span is nearest to: its row, who said it, when, in which session.
+	Row     string `json:"row,omitempty"`
+	Who     string `json:"who,omitempty"`
+	At      string `json:"at,omitempty"`
+	Session string `json:"session,omitempty"`
 }
 
 // Watch is quote.provenance: the claims a write carried, asked of the prompts.
 type Watch struct {
 	// prompts is every prompt the namespace holds, as typed.
-	prompts func(namespace string) ([]string, error)
+	prompts func(namespace string) ([]Said, error)
+	// measure is what was measured of each span against the prompts
+	// (ats/quote), which is Rust's.
+	measure func(spans, said []string) ([]quoted.Measurement, error)
 	news    *statusline.NewsLog
 	// Who the token that attested the claim speaks for, as ci.watch files it.
 	mintedBy func(did string) (string, bool)
@@ -63,7 +82,7 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrap(err, "quote.provenance payload is not an attestation")
 	}
 	if len(as.Actors) == 0 || as.Actors[0] == "" {
-		return errors.Newf("quote.provenance: attestation %s has no actor to address the verdict to", as.ID)
+		return errors.Newf("quote.provenance: attestation %s has no actor to address the result to", as.ID)
 	}
 	namespace := NamespaceOf(ctx)
 	if namespace == "" {
@@ -78,20 +97,28 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrapf(err, "quote.provenance: reading the prompts of %s for %s", namespace, as.ID)
 	}
 
+	measurements, err := h.measure(spans, Texts(said))
+	if err != nil {
+		return errors.Wrapf(err, "quote.provenance: measuring the spans of %s against the prompts of %s", as.ID, namespace)
+	}
+
 	var unsourced, stretched []string
 	var degrees []degree
-	for _, span := range spans {
-		v := quoted.VerdictOf(span, said)
-		switch v {
-		case quoted.Unsourced:
-			unsourced = append(unsourced, span)
-		case quoted.Stretched:
+	for i, span := range spans {
+		m := measurements[i]
+		switch {
+		case accepts(m):
+			continue
+		case near(m):
 			stretched = append(stretched, span)
 		default:
-			continue
+			unsourced = append(unsourced, span)
 		}
-		degrees = append(degrees, degree{Span: span, Verdict: v.String(),
-			Corrections: quoted.DegreeOf(span, said), Length: len(span)})
+		d := degree{Span: span, Kind: kind(m), Corrections: m.Corrections, Length: m.Length}
+		if near, ok := SaidAt(said, m); ok {
+			d.Row, d.Who, d.At, d.Session = near.Row, near.Who, near.At, near.Session
+		}
+		degrees = append(degrees, d)
 	}
 	if len(degrees) == 0 {
 		return nil
@@ -99,10 +126,6 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 	h.leave(as, namespace, unsourced, stretched, degrees, len(said))
 	return nil
 }
-
-// noteSpan is how much of a span the row's note carries; the detail has
-// every span whole.
-const noteSpan = 80
 
 func (h *Watch) leave(as types.As, namespace string, unsourced, stretched []string, degrees []degree, read int) {
 	caller := as.Actors[0]
@@ -171,7 +194,8 @@ func attrString(attrs map[string]any, key string) string {
 }
 
 // NewWatch is quote.provenance, asking prompts for what a namespace was told.
-func NewWatch(prompts func(namespace string) ([]string, error), news *statusline.NewsLog,
+func NewWatch(prompts func(namespace string) ([]Said, error),
+	measure func(spans, said []string) ([]quoted.Measurement, error), news *statusline.NewsLog,
 	mintedBy func(did string) (string, bool), logger *zap.SugaredLogger) *Watch {
-	return &Watch{prompts: prompts, news: news, mintedBy: mintedBy, logger: logger}
+	return &Watch{prompts: prompts, measure: measure, news: news, mintedBy: mintedBy, logger: logger}
 }

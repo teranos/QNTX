@@ -263,20 +263,15 @@ func (m *ServicesManager) startGitHubService(ctx context.Context) (string, error
 	if !ok {
 		return "", errors.Newf("the node handed no GitHubService before its plugin services started (%T)", m.github)
 	}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	m.githubServer = grpc.NewServer(grpc.UnaryInterceptor(handed.server.ForPlugins(handed.namespaces)))
 	protocol.RegisterGitHubServiceServer(m.githubServer, handed.server)
 
-	m.serve(ctx, "GitHub", m.githubServer, listener, &m.endpoints.GitHub)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("GitHub service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "GitHub", m.githubServer, listener, &m.endpoints.GitHub), nil
 }
 
 // startOptional starts a service the node boots without when it does not
@@ -287,6 +282,27 @@ func (m *ServicesManager) startOptional(service string, start func() (string, er
 		return m.degrade(service, errors.Wrap(err, "it did not start"))
 	}
 	return ServingAt(addr)
+}
+
+// listenLocal listens on a dynamic port. It is 127.0.0.1 and not "localhost",
+// to avoid IPv6 [::1] resolution.
+func listenLocal() (net.Listener, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to listen")
+	}
+	return listener, nil
+}
+
+// serveAt runs one gRPC service on the listener and says where it answers.
+func (m *ServicesManager) serveAt(
+	ctx context.Context, name string, server *grpc.Server, listener net.Listener, at *ServiceEndpoint,
+) string {
+	m.serve(ctx, name, server, listener, at)
+
+	addr := listener.Addr().String()
+	m.logger.Debugw(name+" service started", "address", addr)
+	return addr
 }
 
 // serve runs one gRPC service: it answers on the listener until that closes,
@@ -321,32 +337,23 @@ func (m *ServicesManager) serve(
 
 // startATSStoreService starts the ATSStore gRPC service
 func (m *ServicesManager) startATSStoreService(ctx context.Context) (string, error) {
-	// Listen on dynamic port
-	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	// Create gRPC server
 	m.atsStoreServer = grpc.NewServer()
 	protocol.RegisterATSStoreServiceServer(m.atsStoreServer, m.atsStore)
 
-	m.serve(ctx, "ATSStore", m.atsStoreServer, listener, &m.endpoints.ATSStore)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("ATSStore service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "ATSStore", m.atsStoreServer, listener, &m.endpoints.ATSStore), nil
 }
 
 // startQueueService starts the Queue gRPC service
 func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Queue, authToken string) (string, error) {
-	// Listen on dynamic port
-	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	// Create gRPC server
@@ -354,60 +361,43 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 	queueServer := services.NewQueueServer(queue, authToken, m.logger)
 	protocol.RegisterQueueServiceServer(m.queueServer, queueServer)
 
-	m.serve(ctx, "Queue", m.queueServer, listener, &m.endpoints.Queue)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("Queue service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "Queue", m.queueServer, listener, &m.endpoints.Queue), nil
 }
 
 // startScheduleService starts the Schedule gRPC service
 func (m *ServicesManager) startScheduleService(ctx context.Context) (string, error) {
-	// Listen on dynamic port
-	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	// Create gRPC server
 	m.scheduleServer = grpc.NewServer()
 	protocol.RegisterScheduleServiceServer(m.scheduleServer, m.scheduleSrv)
 
-	m.serve(ctx, "Schedule", m.scheduleServer, listener, &m.endpoints.Schedule)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("Schedule service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "Schedule", m.scheduleServer, listener, &m.endpoints.Schedule), nil
 }
 
 // startFileService starts the File gRPC service
 func (m *ServicesManager) startFileService(ctx context.Context, filesDir string, authToken string) (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	m.fileServiceServer = grpc.NewServer()
 	fileServer := services.NewFileServiceServer(filesDir, authToken, m.logger)
 	protocol.RegisterFileServiceServer(m.fileServiceServer, fileServer)
 
-	m.serve(ctx, "File", m.fileServiceServer, listener, &m.endpoints.FileService)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("File service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "File", m.fileServiceServer, listener, &m.endpoints.FileService), nil
 }
 
 // startLLMService starts the LLM routing gRPC service.
 // The server starts empty — providers register after their own initialization completes.
 func (m *ServicesManager) startLLMService(ctx context.Context, store ats.AttestationStore) (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	router := services.NewLLMServer(m.llmConfig, store, m.logger)
@@ -415,60 +405,45 @@ func (m *ServicesManager) startLLMService(ctx context.Context, store ats.Attesta
 	m.llmServer = grpc.NewServer()
 	protocol.RegisterLLMServiceServer(m.llmServer, router)
 
-	m.serve(ctx, "LLM", m.llmServer, listener, &m.endpoints.LLM)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("LLM service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "LLM", m.llmServer, listener, &m.endpoints.LLM), nil
 }
 
 // startEmbeddingService starts the Embedding gRPC service.
 // The server starts empty — the backend registers after the embedding engine initializes.
 func (m *ServicesManager) startEmbeddingService(ctx context.Context, authToken string) (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	m.embeddingRouter = services.NewEmbeddingServer(authToken, m.logger)
 	m.embeddingServer = grpc.NewServer()
 	protocol.RegisterEmbeddingServiceServer(m.embeddingServer, m.embeddingRouter)
 
-	m.serve(ctx, "Embedding", m.embeddingServer, listener, &m.endpoints.Embedding)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("Embedding service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "Embedding", m.embeddingServer, listener, &m.endpoints.Embedding), nil
 }
 
 // startVectorSearchService starts the VectorSearch routing gRPC service.
 // The server starts empty — the provider registers after its own initialization completes.
 func (m *ServicesManager) startVectorSearchService(ctx context.Context, authToken string) (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	m.vectorSearchRouter = services.NewVectorSearchServer(authToken, m.logger)
 	m.vectorSearchServer = grpc.NewServer()
 	protocol.RegisterVectorSearchServiceServer(m.vectorSearchServer, m.vectorSearchRouter)
 
-	m.serve(ctx, "VectorSearch", m.vectorSearchServer, listener, &m.endpoints.VectorSearch)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("VectorSearch service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "VectorSearch", m.vectorSearchServer, listener, &m.endpoints.VectorSearch), nil
 }
 
 // startSearchService starts the Search routing gRPC service.
 // The server starts empty — the provider registers after its own initialization completes.
 func (m *ServicesManager) startSearchService(ctx context.Context) (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	router := services.NewSearchServer(m.logger)
@@ -476,46 +451,31 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 	m.searchServer = grpc.NewServer()
 	protocol.RegisterSearchServiceServer(m.searchServer, router)
 
-	m.serve(ctx, "Search", m.searchServer, listener, &m.endpoints.Search)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("Search service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "Search", m.searchServer, listener, &m.endpoints.Search), nil
 }
 
 func (m *ServicesManager) startFetchService(ctx context.Context) (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	m.fetchServer = grpc.NewServer()
 	protocol.RegisterFetchServiceServer(m.fetchServer, m.fetchSrv)
 
-	m.serve(ctx, "Fetch", m.fetchServer, listener, &m.endpoints.Fetch)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("Fetch service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "Fetch", m.fetchServer, listener, &m.endpoints.Fetch), nil
 }
 
 func (m *ServicesManager) startMailService(ctx context.Context) (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := listenLocal()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to listen")
+		return "", err
 	}
 
 	m.mailServer = grpc.NewServer()
 	protocol.RegisterMailServiceServer(m.mailServer, m.mailSrv)
 
-	m.serve(ctx, "Mail", m.mailServer, listener, &m.endpoints.Mail)
-
-	addr := listener.Addr().String()
-	m.logger.Debugw("Mail service started", "address", addr)
-
-	return addr, nil
+	return m.serveAt(ctx, "Mail", m.mailServer, listener, &m.endpoints.Mail), nil
 }
 
 // MailServer is the mail service, for what the node mails in its own name

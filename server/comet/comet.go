@@ -24,9 +24,10 @@ import (
 // Platforms are the systems ground's flake names, as ground names the one it was built for.
 var Platforms = map[string]bool{"x86_64-linux": true, "aarch64-linux": true, "x86_64-darwin": true, "aarch64-darwin": true}
 
-// Name is one comet: a repository, for one platform, carrying one machine's controls.
+// Name is one comet: a repository's sand, for one platform and one engine ABI, carrying one machine's controls.
 // Machine is the owner/repo whose controls/ hold that machine's pbt: each machine's are in its own repository.
-type Name struct{ Owner, Repo, Platform, Machine string }
+// ABI is the engine the sand was built for (ground source/sandview.d SAND_ABI); a build is asked for without one.
+type Name struct{ Owner, Repo, Platform, ABI, Machine string }
 
 // MachineOf is the owner/repo a person named as the machine a comet carries the controls of.
 func MachineOf(named string) (string, error) {
@@ -43,8 +44,37 @@ func MachineOf(named string) (string, error) {
 	return named, nil
 }
 
-// Key is the comet as its path names it: owner/repo/platform.
-func (n Name) Key() string { return n.Owner + "/" + n.Repo + "/" + n.Platform }
+// Key is the comet as its path names it: owner/repo/platform, and its ABI when it names one.
+func (n Name) Key() string {
+	if n.ABI == "" {
+		return n.Base()
+	}
+	return n.Base() + "/" + n.ABI
+}
+
+// Base is what a build is for: owner/repo/platform, of whichever ABI ground's branch builds.
+func (n Name) Base() string { return n.Owner + "/" + n.Repo + "/" + n.Platform }
+
+// SandFile is the file a sand is for platform, as ground's make sand names it.
+func SandFile(platform string) string {
+	if strings.HasSuffix(platform, "-darwin") {
+		return "libground_sand.dylib"
+	}
+	return "libground_sand.so"
+}
+
+// digits is whether s is a decimal number, as ground prints its ABI.
+func digits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
 
 // Native is the system this node builds natively, as ground's flake names it.
 func Native() (string, error) {
@@ -56,16 +86,24 @@ func Native() (string, error) {
 	return platform, nil
 }
 
-// Of is the comet a /comet/{owner}/{repo}/{platform} path names.
+// Of is the comet a /comet/{owner}/{repo}/{platform}[/{abi}] path names.
 func Of(path string) (Name, error) {
 	rest, ok := strings.CutPrefix(path, "/comet/")
-	refused := errors.Newf("%s names no comet: a comet is /comet/{owner}/{repo}/{platform}", path)
+	refused := errors.Newf("%s names no comet: a comet is /comet/{owner}/{repo}/{platform}/{abi}, and built at /comet/{owner}/{repo}/{platform}", path)
 	if !ok || strings.HasPrefix(rest, "/") || strings.HasSuffix(rest, "/") {
 		return Name{}, refused
 	}
 	parts := strings.Split(rest, "/")
-	if len(parts) != 3 {
+	if len(parts) != 3 && len(parts) != 4 {
 		return Name{}, refused
+	}
+	abi := ""
+	if len(parts) == 4 {
+		if !digits(parts[3]) {
+			return Name{}, errors.Newf("%s names %s, which is no engine ABI: ground names its ABI in decimal digits", path, parts[3])
+		}
+		abi = parts[3]
+		parts = parts[:3]
 	}
 	for _, part := range parts {
 		// A name that is only dots climbs out of the comets directory.
@@ -76,7 +114,7 @@ func Of(path string) (Name, error) {
 	if !Platforms[parts[2]] {
 		return Name{}, errors.Newf("%s names %s, which is not a platform ground's flake names: x86_64-linux, aarch64-linux, x86_64-darwin or aarch64-darwin", path, parts[2])
 	}
-	return Name{Owner: parts[0], Repo: parts[1], Platform: parts[2]}, nil
+	return Name{Owner: parts[0], Repo: parts[1], Platform: parts[2], ABI: abi}, nil
 }
 
 // Declaration is the one project block a comet's sand holds besides ground's own controls.
@@ -95,13 +133,30 @@ func Dir() (string, error) {
 	return filepath.Join(home, ".qntx", "comets"), nil
 }
 
-// Path is where the comet n is kept on the node.
+// Path is where the comet n is kept on the node: the sand of its platform and ABI.
 func Path(n Name) (string, error) {
+	if n.ABI == "" {
+		return "", errors.Newf("the comet of %s names no engine ABI, and a sand is kept by the ABI it was built for", n.Key())
+	}
 	dir, err := Dir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, n.Owner, n.Repo, n.Platform, "ground"), nil
+	return filepath.Join(dir, n.Owner, n.Repo, n.Platform, n.ABI, SandFile(n.Platform)), nil
+}
+
+// BuiltABI is the engine ABI of the sand built in src, as ground's make sand wrote it beside the library.
+func BuiltABI(src string) (string, error) {
+	path := filepath.Join(src, "build", "libground_sand.abi")
+	said, err := os.ReadFile(path)
+	if err != nil {
+		return "", errors.Wrapf(err, "the sand built in %s does not say its engine ABI", src)
+	}
+	abi := strings.TrimSpace(string(said))
+	if !digits(abi) {
+		return "", errors.Newf("%s says %q, which is not an engine ABI", path, abi)
+	}
+	return abi, nil
 }
 
 // Repository is one repository as a comet, as the Ground element draws it (web/ts/ground-scene.ts Comet):
@@ -115,9 +170,10 @@ type Repository struct {
 	Builds []Built `json:"builds"`
 }
 
-// Built is one platform's ground built from a repository: its sha256 digest, its bytes and when it was built.
+// Built is one platform's sand built from a repository: the engine ABI it is for, its sha256 digest, its bytes and when it was built.
 type Built struct {
 	Platform string `json:"platform"`
+	ABI      string `json:"abi"`
 	Digest   string `json:"digest"`
 	Bytes    int64  `json:"bytes"`
 	At       string `json:"at"`
@@ -138,7 +194,7 @@ func Held(dir string, moved func(owner, repo string) (int, error)) ([]Repository
 	repos := []Repository{}
 	at := map[string]int{}
 	for _, n := range names {
-		path := filepath.Join(dir, n.Owner, n.Repo, n.Platform, "ground")
+		path := filepath.Join(dir, n.Owner, n.Repo, n.Platform, n.ABI, SandFile(n.Platform))
 		info, err := os.Stat(path)
 		if err != nil {
 			return nil, errors.Wrapf(err, "the comet at %s was not read", path)
@@ -158,7 +214,7 @@ func Held(dir string, moved func(owner, repo string) (int, error)) ([]Repository
 			at[key] = i
 			repos = append(repos, Repository{Repo: key, Built: true, Moved: count, State: observed, Builds: []Built{}})
 		}
-		repos[i].Builds = append(repos[i].Builds, Built{Platform: n.Platform, Digest: digest, Bytes: info.Size(), At: info.ModTime().UTC().Format(time.RFC3339)})
+		repos[i].Builds = append(repos[i].Builds, Built{Platform: n.Platform, ABI: n.ABI, Digest: digest, Bytes: info.Size(), At: info.ModTime().UTC().Format(time.RFC3339)})
 		repos[i].Size = max(repos[i].Size, float64(info.Size())/(1<<20))
 	}
 	return repos, nil
@@ -166,15 +222,20 @@ func Held(dir string, moved func(owner, repo string) (int, error)) ([]Repository
 
 // Names is each comet kept under dir, by name.
 func Names(dir string) ([]Name, error) {
-	found, err := filepath.Glob(filepath.Join(dir, "*", "*", "*", "ground"))
-	if err != nil {
-		return nil, errors.Wrapf(err, "the comets under %s were not listed", dir)
+	found := []string{}
+	for _, file := range []string{"libground_sand.dylib", "libground_sand.so"} {
+		kept, err := filepath.Glob(filepath.Join(dir, "*", "*", "*", "*", file))
+		if err != nil {
+			return nil, errors.Wrapf(err, "the comets under %s were not listed", dir)
+		}
+		found = append(found, kept...)
 	}
 	names := make([]Name, 0, len(found))
 	for _, path := range found {
-		platform := filepath.Dir(path)
+		abi := filepath.Dir(path)
+		platform := filepath.Dir(abi)
 		repo := filepath.Dir(platform)
-		n := Name{Owner: filepath.Base(filepath.Dir(repo)), Repo: filepath.Base(repo), Platform: filepath.Base(platform)}
+		n := Name{Owner: filepath.Base(filepath.Dir(repo)), Repo: filepath.Base(repo), Platform: filepath.Base(platform), ABI: filepath.Base(abi)}
 		machine, err := os.ReadFile(path + ".machine")
 		if err != nil {
 			return nil, errors.Wrapf(err, "the comet at %s does not say which machine's controls it carries", path)
@@ -186,13 +247,17 @@ func Names(dir string) ([]Name, error) {
 }
 
 // MovedBy is each kept comet a push to repo's branch moves: the project's own default branch,
-// or ground's main, which every comet is built from.
+// or ground's branch, which every comet is built from.
 func MovedBy(kept []Name, repo, branch, defaultBranch string) []Name {
 	moved := []Name{}
+	// One build per repository and platform: it builds whichever ABI ground's branch is, so the
+	// sands kept for older ABIs are not each built again.
+	building := map[string]bool{}
 	groundMoved := strings.EqualFold(repo, Ground.Owner+"/"+Ground.Repo) && branch == Ground.Branch
 	for _, n := range kept {
 		projectMoved := strings.EqualFold(repo, n.Owner+"/"+n.Repo) && branch == defaultBranch
-		if groundMoved || projectMoved {
+		if (groundMoved || projectMoved) && !building[n.Base()] {
+			building[n.Base()] = true
 			moved = append(moved, n)
 		}
 	}

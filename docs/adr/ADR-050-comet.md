@@ -33,7 +33,6 @@ Even faster when the builds are done by QNTX as Comet
 "
 
 - ground compiles one file, .ctfe/sand. wind folds it from three places on the operator's disk: ground's own controls/, controls/local/, and each declared project's controls/ with that project's `git ls-files` (ground tools/wind.d).
-- controls/local on the operator's machine holds 31 pbt files today: the qntx block with the node's URL and the token's path, seven projects by absolute path, permissions, org and sentry.
 
 ## The builder
 
@@ -57,10 +56,6 @@ Even faster when the builds are done by QNTX as Comet
   aarch64-darwin on x86_64-linux, ran on the operator's M1 on 2026-10-19,
   flags adhoc and linker-signed. `codesign -s -` runs on the machine that lands
   it (ground source/comet.d).
-- No SDK carries libgit2. An aarch64-darwin comet links the libgit2 the
-  operator's machine's ground loads, from its nix store.
-- Linked against Apple's stubs, the binary loads /usr/lib's sqlite3 and curl,
-  not the two Nix store dylibs the current binary names.
 - ground's ci/ci.nix builds aarch64-darwin on macos-latest for tags. The
   node's GitHubService has CreateAWorkflowDispatchEvent and
   DownloadAnArtifact.
@@ -72,9 +67,7 @@ TODO: move section to the root agent ADR
 "to get ground setup for the ROOT agent"
 
 - The node runs Claude Code with CLAUDE_CONFIG_DIR under the agent's home
-  (internal/claudecode/run.go). On the box that directory holds no
-  settings.json, and `which ground` finds nothing: the ROOT agent runs with no
-  hooks.
+  (internal/claudecode/run.go).
 - Its comet is the box's own: x86_64-linux, a sand whose qntx block names the
   node's own URL and the agent's token. ADR-048, The host agent, says whose
   DID the hook events are attested under.
@@ -83,9 +76,6 @@ TODO: move section to the root agent ADR
 TODO: talk about comet ui needs to be owned by Web
 "which is for all of this to be visible in the existing Element in the ui, remvoing the coment crosshatches"
 
-- The Comet stratum is `gr-unreal`, with a limit saying the comet does not
-  exist yet (web/ts/ground-element.ts). web/ts/ground-element.test.ts holds
-  Scry, Comet and Underground as the unreal three.
 - am ground answers started, left, watches, news, failed and ug
   (server/am_ground.go). Comet is answered beside ug: the builds, for whom,
   and the version each session's rows carry.
@@ -96,8 +86,6 @@ TODO: talk about comet ui needs to be owned by Web
 
 - Every turn passes `ready` in server/claude.go, which checks the Claude Code
   binary and the plan token. A comet held for the harness is checked there.
-- server/a2a_route.go answers UnsupportedOperationError to every operation and
-  serves no tenant.
 
 ## The node holds the private controls
 TODO: UI CONCERN
@@ -115,7 +103,7 @@ TODO: UI CONCERN
 
 - A comet is one sand for one user, one project and one platform.
 - The hook is `exec ground` on PATH: one binary that path-matches every
-  project. Per project there is one binary per repository. Claude Code reads
+  project. Claude Code reads
   hooks from a repository's own .claude settings as well as the user's; how
   both combine when both name ground is not verified.
 
@@ -132,8 +120,6 @@ TODO: UI CONCERN
   hook answers a systemMessage that the plugin is installed and not yet
   functional (ground plugin/hooks/hooks.json). The customer installs the
   plugin and presents a token; the hook says the platform and pulls.
-- A landed binary is renamed over the one running, never copied onto it
-  (ground Makefile, 2026-09-14).
 
 ## The stubs
 
@@ -145,7 +131,8 @@ TODO: UI CONCERN
 - The stubs are `sdk/MacOSX26.1.sdk` and `sdk/aarch64-darwin/libgit2.dylib` in
   the bootstrap bucket (the deploy repository's infra/macos-link-stubs.tf). The reconciler
   syncs them to the node's `~/.qntx/darwin-stubs` (infra/bootstrap/apply.sh),
-  where server/comet links against them.
+  where server/comet linked a whole ground against them. A sand imports no
+  symbol and links against nothing (server/comet sandLinked).
 
 ## Rituals
 
@@ -167,13 +154,15 @@ TODO: UI CONCERN
   `?digest` and HEAD answer the digest alone (server/comet).
 - The Darwin build on the box, end to end, with the stubs from S3: grove's
   aarch64-darwin comet, built on q, landed on the operator's machine.
-- A hook per repository: the universal ground hands a repository's hooks to
-  the comet landed for it (ground source/comet.d, main.d).
 - Landing: sky pulls the digest every five seconds and renames a checked
   comet over the one there (ground source/sky.d).
 - A push to a project's default branch, or to ground's main, rebuilds the
   comets it moves.
 - Comet on am ground, and the Comet stratum real.
+- A comet is the sand alone: POST `/comet/{owner}/{repo}/{platform}` builds
+  ground main's `make sand`, kept by the engine ABI it wrote; GET
+  `/comet/{owner}/{repo}/{platform}/{abi}` serves it to the ground of that ABI,
+  which loads it (ground source/sandload.d).
 - ground for the Node Agent: its settings.json runs it, and no turn is said to
   the agent until it stands. On q its rows name `ground comet a1ac2c0
   agent:root` and reached the node.

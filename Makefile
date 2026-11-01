@@ -9,13 +9,17 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-# Ground immediate delivery — notify active Claude sessions of build progress.
+# Ground immediate delivery — notify the Claude session that runs this make of build progress.
 # Usage: @$(call ground-notify,name,detail message)
+# The notice is addressed to the session make runs in (CLAUDE_CODE_SESSION_ID): ground
+# reads a session address before a project one, and a project address reaches every
+# session with that project as its cwd, which is not the one that built when make
+# runs in a checkout elsewhere. Without a session, the notice goes to nobody.
 GROUND_DB := $(HOME)/.local/share/ground/ground.db
 define ground-notify
-	@if [ -f "$(GROUND_DB)" ]; then \
+	@if [ -f "$(GROUND_DB)" ] && [ -n "$$CLAUDE_CODE_SESSION_ID" ]; then \
 		TS=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
-		sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-$(1)-' || strftime('%s','now'), '[\"qntx\"]', '[\"immediate:$(1)\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$TS', 'make', json_object('detail', '$(2) at ' || time('now','localtime'), 'after', 0))"; \
+		sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-$(1)-' || strftime('%s','now'), '[\"qntx\"]', '[\"immediate:$(1)\"]', '[\"session:$$CLAUDE_CODE_SESSION_ID\"]', '[\"make\"]', '$$TS', 'make', json_object('detail', '$(2) at ' || time('now','localtime'), 'after', 0))"; \
 	fi
 endef
 
@@ -23,7 +27,7 @@ endef
 VERSION_TAG := $(shell git describe --tags --match 'v*' --dirty 2>/dev/null || echo dev)
 GO_LDFLAGS = -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(VERSION_TAG)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'"
 
-BUILD_TAGS := rustsqlite,qntxwasm
+BUILD_TAGS := rustsqlite,qntxwasm,qntxquote
 
 cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM parser)
 	@echo "Building QNTX CLI with Rust optimizations (sqlite) and WASM (parser, fuzzy)..."
@@ -34,7 +38,7 @@ cli: rust-sqlite ats ## Build QNTX CLI binary (with Rust optimizations and WASM 
 	@# binary carries the static library, as a plugin's does.
 	@rm -f target/release/libats_sqlite.dylib target/release/deps/libats_sqlite.dylib target/release/libats_sqlite.so target/release/deps/libats_sqlite.so
 	@go build -tags "$(BUILD_TAGS)" $(GO_LDFLAGS) -o bin/qntx ./cmd/qntx || { \
-		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
+		if [ -f "$(GROUND_DB)" ] && [ -n "$$CLAUDE_CODE_SESSION_ID" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"session:$$CLAUDE_CODE_SESSION_ID\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
 
 # QuickDev: "One of the distributions of QNTX, purpose is to build FAST, help
@@ -163,7 +167,7 @@ rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO inte
 	@echo "Building Rust SQLite storage library..."
 	$(call ground-notify,rust-build,Rust: building ats-sqlite)
 	@cargo build --release --package ats-sqlite --features ffi --lib || { \
-		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-rust-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:rust-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Rust: ats-sqlite build FAILED\",\"after\":0}')"; fi; \
+		if [ -f "$(GROUND_DB)" ] && [ -n "$$CLAUDE_CODE_SESSION_ID" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-rust-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:rust-build-failed\"]', '[\"session:$$CLAUDE_CODE_SESSION_ID\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Rust: ats-sqlite build FAILED\",\"after\":0}')"; fi; \
 		exit 1; }
 	@echo "✓ libats_sqlite built in target/release/"
 	@echo "  Static:  libats_sqlite.a"

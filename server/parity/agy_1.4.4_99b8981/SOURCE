@@ -1,0 +1,10 @@
+Antigravity CLI (agy)
+
+Release: https://github.com/google-antigravity/antigravity-cli/releases/tag/1.4.4
+Git tag: 1.4.4
+Commit: 99b8981632ddf117c4eab7b1f82b615d4f683f01
+
+manifest.json records the release archives and their SHA-256 digests, the
+same digests ground's flake.nix pins agy 1.4.4 at. These are checksums of
+compressed archives, not of extracted binaries. No executable is bundled and
+this pin alone does not install or run agy.

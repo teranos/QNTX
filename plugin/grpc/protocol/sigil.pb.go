@@ -119,10 +119,14 @@ func (x *Signum) GetOasf() []string {
 // signa it holds. It is what fills A2A's AgentCard, which am node answers, and
 // the parity sigil holds it to that card.
 type Node struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Signa         []*Signum              `protobuf:"bytes,3,rep,name=signa,proto3" json:"signa,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Name        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Signa       []*Signum              `protobuf:"bytes,3,rep,name=signa,proto3" json:"signa,omitempty"`
+	// The media types the node gives, across every signum: JSON, everywhere.
+	// To A2A these are the card's default output modes, which a skill's own
+	// output modes override.
+	OutputModes   []string `protobuf:"bytes,4,rep,name=output_modes,json=outputModes,proto3" json:"output_modes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -174,6 +178,13 @@ func (x *Node) GetDescription() string {
 func (x *Node) GetSigna() []*Signum {
 	if x != nil {
 		return x.Signa
+	}
+	return nil
+}
+
+func (x *Node) GetOutputModes() []string {
+	if x != nil {
+		return x.OutputModes
 	}
 	return nil
 }
@@ -1338,7 +1349,9 @@ type NamespaceAgentSaid struct {
 	// What it answered in Claude Code.
 	Claude *ClaudeSaid `protobuf:"bytes,1,opt,name=claude,proto3" json:"claude,omitempty"`
 	// What it answered in Pi.
-	Pi            *PiSaid `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
+	Pi *PiSaid `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
+	// What the namespace agent answered in Codex.
+	Codex         *CodexSaid `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1383,6 +1396,13 @@ func (x *NamespaceAgentSaid) GetClaude() *ClaudeSaid {
 func (x *NamespaceAgentSaid) GetPi() *PiSaid {
 	if x != nil {
 		return x.Pi
+	}
+	return nil
+}
+
+func (x *NamespaceAgentSaid) GetCodex() *CodexSaid {
+	if x != nil {
+		return x.Codex
 	}
 	return nil
 }
@@ -1517,7 +1537,7 @@ func (x *NodeAgentAm) GetCodex() *CodexAm {
 	return nil
 }
 
-// CodexSaid is what the Node Agent answered in codex.
+// CodexSaid is what an agent answered in codex.
 type CodexSaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// What it answered.
@@ -1534,7 +1554,9 @@ type CodexSaid struct {
 	// How long the turn took.
 	TookMs float64 `protobuf:"fixed64,7,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
 	// Why a row of the session was not written down, when one was not.
-	Unwritten     string `protobuf:"bytes,8,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
+	Unwritten string `protobuf:"bytes,8,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
+	// The CLI thread used to resume, distinct from the transcript session.
+	Thread        string `protobuf:"bytes,9,opt,name=thread,proto3" json:"thread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1625,7 +1647,14 @@ func (x *CodexSaid) GetUnwritten() string {
 	return ""
 }
 
-// CodexAm is who the Node Agent is in codex and how the node runs it.
+func (x *CodexSaid) GetThread() string {
+	if x != nil {
+		return x.Thread
+	}
+	return ""
+}
+
+// CodexAm is who an agent is in codex and how the node runs it.
 type CodexAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Its own DID, which signs what it writes down.
@@ -2288,7 +2317,9 @@ type NamespaceAgentAm struct {
 	// Who the agent is and how it runs, in Claude Code.
 	Agent *ClaudeAm `protobuf:"bytes,3,opt,name=agent,proto3" json:"agent,omitempty"`
 	// Who the agent is and how it runs, in Pi.
-	Pi            *PiAm `protobuf:"bytes,4,opt,name=pi,proto3" json:"pi,omitempty"`
+	Pi *PiAm `protobuf:"bytes,4,opt,name=pi,proto3" json:"pi,omitempty"`
+	// Who the namespace agent is in Codex.
+	Codex         *CodexAm `protobuf:"bytes,5,opt,name=codex,proto3" json:"codex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2351,6 +2382,279 @@ func (x *NamespaceAgentAm) GetPi() *PiAm {
 	return nil
 }
 
+func (x *NamespaceAgentAm) GetCodex() *CodexAm {
+	if x != nil {
+		return x.Codex
+	}
+	return nil
+}
+
+// A Quote is TEI's q: words distinguished from the text around them, and whose
+// they are. The words are the one who said them's; everything else here is
+// about the words and never inside them (ADR-055).
+type Quote struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The words, verbatim: the element's content in TEI.
+	Content string `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
+	// Who said them, each a pointer to a person or an agent: TEI's who. An
+	// agent's name is rendered inside the quote, as [Fable].
+	Who []string `protobuf:"bytes,2,rep,name=who,proto3" json:"who,omitempty"`
+	// Whether the words were spoken, thought or written, or how else the quote
+	// is to be read: TEI's type, with its values.
+	Type string `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	// Where the words were taken from: a session, a transcript, a commit, a PR
+	// description, a memory. TEI's source.
+	Source []string `protobuf:"bytes,4,rep,name=source,proto3" json:"source,omitempty"`
+	// Who ascribed the words to who said them: the human who reported it after
+	// the fact, or the model that relayed it. TEI's resp.
+	Resp []string `protobuf:"bytes,5,rep,name=resp,proto3" json:"resp,omitempty"`
+	// How certain the ascription is: TEI's cert.
+	Cert string `protobuf:"bytes,6,opt,name=cert,proto3" json:"cert,omitempty"`
+	// How the quote was rendered where it was read: a person's quotation marks,
+	// or an agent's notation. TEI's rend.
+	Rend []string `protobuf:"bytes,7,rep,name=rend,proto3" json:"rend,omitempty"`
+	// The interpretations made of the words, each an Interp by its id, apart
+	// from the words and none of them theirs: TEI's ana.
+	Ana []string `protobuf:"bytes,8,rep,name=ana,proto3" json:"ana,omitempty"`
+	// The quote's own id, for an Interp to point to: TEI's xml:id.
+	Id            string `protobuf:"bytes,9,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Quote) Reset() {
+	*x = Quote{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Quote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Quote) ProtoMessage() {}
+
+func (x *Quote) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Quote.ProtoReflect.Descriptor instead.
+func (*Quote) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *Quote) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *Quote) GetWho() []string {
+	if x != nil {
+		return x.Who
+	}
+	return nil
+}
+
+func (x *Quote) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Quote) GetSource() []string {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *Quote) GetResp() []string {
+	if x != nil {
+		return x.Resp
+	}
+	return nil
+}
+
+func (x *Quote) GetCert() string {
+	if x != nil {
+		return x.Cert
+	}
+	return ""
+}
+
+func (x *Quote) GetRend() []string {
+	if x != nil {
+		return x.Rend
+	}
+	return nil
+}
+
+func (x *Quote) GetAna() []string {
+	if x != nil {
+		return x.Ana
+	}
+	return nil
+}
+
+func (x *Quote) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+// An Interp is TEI's interp: what someone made of a quote, kept apart from
+// the words and carrying none of their speaker's authority (ADR-055).
+type Interp struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The interpretation itself: the element's content.
+	Content string `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
+	// Whose interpretation it is, each a pointer: TEI's resp. An agent's, when
+	// an agent made it.
+	Resp []string `protobuf:"bytes,2,rep,name=resp,proto3" json:"resp,omitempty"`
+	// How certain of it they are: TEI's cert.
+	Cert string `protobuf:"bytes,3,opt,name=cert,proto3" json:"cert,omitempty"`
+	// What kind of thing it notes: TEI's type.
+	Type string `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	// The quotes it interprets, each by its id: TEI's inst.
+	Inst []string `protobuf:"bytes,5,rep,name=inst,proto3" json:"inst,omitempty"`
+	// Its own id, for a quote's ana to point to: TEI's xml:id.
+	Id            string `protobuf:"bytes,6,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Interp) Reset() {
+	*x = Interp{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Interp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Interp) ProtoMessage() {}
+
+func (x *Interp) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Interp.ProtoReflect.Descriptor instead.
+func (*Interp) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *Interp) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *Interp) GetResp() []string {
+	if x != nil {
+		return x.Resp
+	}
+	return nil
+}
+
+func (x *Interp) GetCert() string {
+	if x != nil {
+		return x.Cert
+	}
+	return ""
+}
+
+func (x *Interp) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Interp) GetInst() []string {
+	if x != nil {
+		return x.Inst
+	}
+	return nil
+}
+
+func (x *Interp) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+// Quotes is what transcripts quoted answers: each span in double quotes of the
+// text it was given, as a Quote.
+type Quotes struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One per span, in the order the text has them.
+	Quotes        []*Quote `protobuf:"bytes,1,rep,name=quotes,proto3" json:"quotes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Quotes) Reset() {
+	*x = Quotes{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Quotes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Quotes) ProtoMessage() {}
+
+func (x *Quotes) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Quotes.ProtoReflect.Descriptor instead.
+func (*Quotes) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *Quotes) GetQuotes() []*Quote {
+	if x != nil {
+		return x.Quotes
+	}
+	return nil
+}
+
 // Follows says which column of a reference each of a signum's fields is. The
 // reference is named, not described: its own schema says what its columns are.
 type Follows struct {
@@ -2364,7 +2668,7 @@ type Follows struct {
 
 func (x *Follows) Reset() {
 	*x = Follows{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2376,7 +2680,7 @@ func (x *Follows) String() string {
 func (*Follows) ProtoMessage() {}
 
 func (x *Follows) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2389,7 +2693,7 @@ func (x *Follows) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Follows.ProtoReflect.Descriptor instead.
 func (*Follows) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{26}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Follows) GetReference() string {
@@ -2428,7 +2732,7 @@ type Corresponds struct {
 
 func (x *Corresponds) Reset() {
 	*x = Corresponds{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2440,7 +2744,7 @@ func (x *Corresponds) String() string {
 func (*Corresponds) ProtoMessage() {}
 
 func (x *Corresponds) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2453,7 +2757,7 @@ func (x *Corresponds) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Corresponds.ProtoReflect.Descriptor instead.
 func (*Corresponds) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{27}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Corresponds) GetField() string {
@@ -2487,7 +2791,7 @@ type Fold struct {
 
 func (x *Fold) Reset() {
 	*x = Fold{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2499,7 +2803,7 @@ func (x *Fold) String() string {
 func (*Fold) ProtoMessage() {}
 
 func (x *Fold) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2512,7 +2816,7 @@ func (x *Fold) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Fold.ProtoReflect.Descriptor instead.
 func (*Fold) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{28}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Fold) GetField() string {
@@ -2559,7 +2863,7 @@ type Sigil struct {
 
 func (x *Sigil) Reset() {
 	*x = Sigil{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2571,7 +2875,7 @@ func (x *Sigil) String() string {
 func (*Sigil) ProtoMessage() {}
 
 func (x *Sigil) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2584,7 +2888,7 @@ func (x *Sigil) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sigil.ProtoReflect.Descriptor instead.
 func (*Sigil) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{29}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *Sigil) GetName() string {
@@ -2646,7 +2950,7 @@ type Param struct {
 
 func (x *Param) Reset() {
 	*x = Param{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2658,7 +2962,7 @@ func (x *Param) String() string {
 func (*Param) ProtoMessage() {}
 
 func (x *Param) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2671,7 +2975,7 @@ func (x *Param) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Param.ProtoReflect.Descriptor instead.
 func (*Param) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{30}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *Param) GetName() string {
@@ -2722,7 +3026,7 @@ type Field struct {
 
 func (x *Field) Reset() {
 	*x = Field{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2734,7 +3038,7 @@ func (x *Field) String() string {
 func (*Field) ProtoMessage() {}
 
 func (x *Field) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2747,7 +3051,7 @@ func (x *Field) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Field.ProtoReflect.Descriptor instead.
 func (*Field) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{31}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *Field) GetName() string {
@@ -2782,7 +3086,7 @@ type Endpoint struct {
 
 func (x *Endpoint) Reset() {
 	*x = Endpoint{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2794,7 +3098,7 @@ func (x *Endpoint) String() string {
 func (*Endpoint) ProtoMessage() {}
 
 func (x *Endpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2807,7 +3111,7 @@ func (x *Endpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Endpoint.ProtoReflect.Descriptor instead.
 func (*Endpoint) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{32}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *Endpoint) GetMethod() string {
@@ -2840,7 +3144,7 @@ type Refusal struct {
 
 func (x *Refusal) Reset() {
 	*x = Refusal{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2852,7 +3156,7 @@ func (x *Refusal) String() string {
 func (*Refusal) ProtoMessage() {}
 
 func (x *Refusal) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2865,7 +3169,7 @@ func (x *Refusal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Refusal.ProtoReflect.Descriptor instead.
 func (*Refusal) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{33}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *Refusal) GetWhy() string {
@@ -2900,11 +3204,12 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\afollows\x18\x03 \x03(\v2\x11.protocol.FollowsR\afollows\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x12\n" +
 	"\x04tags\x18\x05 \x03(\tR\x04tags\x12\x12\n" +
-	"\x04oasf\x18\x06 \x03(\tR\x04oasf\"d\n" +
+	"\x04oasf\x18\x06 \x03(\tR\x04oasf\"\x87\x01\n" +
 	"\x04Node\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12&\n" +
-	"\x05signa\x18\x03 \x03(\v2\x10.protocol.SignumR\x05signa\"\xde\x01\n" +
+	"\x05signa\x18\x03 \x03(\v2\x10.protocol.SignumR\x05signa\x12!\n" +
+	"\foutput_modes\x18\x04 \x03(\tR\voutputModes\"\xde\x01\n" +
 	"\n" +
 	"Transcript\x12\x18\n" +
 	"\asession\x18\x01 \x01(\tR\asession\x12\x1a\n" +
@@ -3002,10 +3307,11 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tsigned_in\x18\v \x01(\bR\bsignedIn\x12\x1f\n" +
 	"\vauth_method\x18\f \x01(\tR\n" +
 	"authMethod\x12\x16\n" +
-	"\x06models\x18\r \x03(\tR\x06models\"d\n" +
+	"\x06models\x18\r \x03(\tR\x06models\"\x8f\x01\n" +
 	"\x12NamespaceAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
-	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\"\x8a\x01\n" +
+	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
+	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\"\x8a\x01\n" +
 	"\rNodeAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
@@ -3013,7 +3319,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\vNodeAgentAm\x12*\n" +
 	"\x06claude\x18\x01 \x01(\v2\x12.protocol.ClaudeAmR\x06claude\x12\x1e\n" +
 	"\x02pi\x18\x02 \x01(\v2\x0e.protocol.PiAmR\x02pi\x12'\n" +
-	"\x05codex\x18\x03 \x01(\v2\x11.protocol.CodexAmR\x05codex\"\xf7\x01\n" +
+	"\x05codex\x18\x03 \x01(\v2\x11.protocol.CodexAmR\x05codex\"\x8f\x02\n" +
 	"\tCodexSaid\x12\x16\n" +
 	"\x06answer\x18\x01 \x01(\tR\x06answer\x12\x18\n" +
 	"\asession\x18\x02 \x01(\tR\asession\x12\x14\n" +
@@ -3022,7 +3328,8 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\finput_tokens\x18\x05 \x01(\x03R\vinputTokens\x12#\n" +
 	"\routput_tokens\x18\x06 \x01(\x03R\foutputTokens\x12\x17\n" +
 	"\atook_ms\x18\a \x01(\x01R\x06tookMs\x12\x1c\n" +
-	"\tunwritten\x18\b \x01(\tR\tunwritten\"\xf5\x01\n" +
+	"\tunwritten\x18\b \x01(\tR\tunwritten\x12\x16\n" +
+	"\x06thread\x18\t \x01(\tR\x06thread\"\xf5\x01\n" +
 	"\aCodexAm\x12\x10\n" +
 	"\x03did\x18\x01 \x01(\tR\x03did\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x18\n" +
@@ -3078,12 +3385,32 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"pi_version\x18\b \x01(\tR\tpiVersion\x12\x1b\n" +
 	"\tnot_ready\x18\t \x01(\tR\bnotReady\x12\x1a\n" +
 	"\bprovider\x18\n" +
-	" \x01(\tR\bprovider\"\x91\x01\n" +
+	" \x01(\tR\bprovider\"\xba\x01\n" +
 	"\x10NamespaceAgentAm\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x15\n" +
 	"\x06set_by\x18\x02 \x01(\tR\x05setBy\x12(\n" +
 	"\x05agent\x18\x03 \x01(\v2\x12.protocol.ClaudeAmR\x05agent\x12\x1e\n" +
-	"\x02pi\x18\x04 \x01(\v2\x0e.protocol.PiAmR\x02pi\"~\n" +
+	"\x02pi\x18\x04 \x01(\v2\x0e.protocol.PiAmR\x02pi\x12'\n" +
+	"\x05codex\x18\x05 \x01(\v2\x11.protocol.CodexAmR\x05codex\"\xbd\x01\n" +
+	"\x05Quote\x12\x18\n" +
+	"\acontent\x18\x01 \x01(\tR\acontent\x12\x10\n" +
+	"\x03who\x18\x02 \x03(\tR\x03who\x12\x12\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12\x16\n" +
+	"\x06source\x18\x04 \x03(\tR\x06source\x12\x12\n" +
+	"\x04resp\x18\x05 \x03(\tR\x04resp\x12\x12\n" +
+	"\x04cert\x18\x06 \x01(\tR\x04cert\x12\x12\n" +
+	"\x04rend\x18\a \x03(\tR\x04rend\x12\x10\n" +
+	"\x03ana\x18\b \x03(\tR\x03ana\x12\x0e\n" +
+	"\x02id\x18\t \x01(\tR\x02id\"\x82\x01\n" +
+	"\x06Interp\x12\x18\n" +
+	"\acontent\x18\x01 \x01(\tR\acontent\x12\x12\n" +
+	"\x04resp\x18\x02 \x03(\tR\x04resp\x12\x12\n" +
+	"\x04cert\x18\x03 \x01(\tR\x04cert\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\x12\x12\n" +
+	"\x04inst\x18\x05 \x03(\tR\x04inst\x12\x0e\n" +
+	"\x02id\x18\x06 \x01(\tR\x02id\"1\n" +
+	"\x06Quotes\x12'\n" +
+	"\x06quotes\x18\x01 \x03(\v2\x0f.protocol.QuoteR\x06quotes\"~\n" +
 	"\aFollows\x12\x1c\n" +
 	"\treference\x18\x01 \x01(\tR\treference\x12/\n" +
 	"\acolumns\x18\x02 \x03(\v2\x15.protocol.CorrespondsR\acolumns\x12$\n" +
@@ -3132,7 +3459,7 @@ func file_plugin_grpc_protocol_sigil_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*Signum)(nil),             // 0: protocol.Signum
 	(*Node)(nil),               // 1: protocol.Node
@@ -3160,18 +3487,21 @@ var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*NamespaceKey)(nil),       // 23: protocol.NamespaceKey
 	(*PiAm)(nil),               // 24: protocol.PiAm
 	(*NamespaceAgentAm)(nil),   // 25: protocol.NamespaceAgentAm
-	(*Follows)(nil),            // 26: protocol.Follows
-	(*Corresponds)(nil),        // 27: protocol.Corresponds
-	(*Fold)(nil),               // 28: protocol.Fold
-	(*Sigil)(nil),              // 29: protocol.Sigil
-	(*Param)(nil),              // 30: protocol.Param
-	(*Field)(nil),              // 31: protocol.Field
-	(*Endpoint)(nil),           // 32: protocol.Endpoint
-	(*Refusal)(nil),            // 33: protocol.Refusal
+	(*Quote)(nil),              // 26: protocol.Quote
+	(*Interp)(nil),             // 27: protocol.Interp
+	(*Quotes)(nil),             // 28: protocol.Quotes
+	(*Follows)(nil),            // 29: protocol.Follows
+	(*Corresponds)(nil),        // 30: protocol.Corresponds
+	(*Fold)(nil),               // 31: protocol.Fold
+	(*Sigil)(nil),              // 32: protocol.Sigil
+	(*Param)(nil),              // 33: protocol.Param
+	(*Field)(nil),              // 34: protocol.Field
+	(*Endpoint)(nil),           // 35: protocol.Endpoint
+	(*Refusal)(nil),            // 36: protocol.Refusal
 }
 var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
-	29, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
-	26, // 1: protocol.Signum.follows:type_name -> protocol.Follows
+	32, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
+	29, // 1: protocol.Signum.follows:type_name -> protocol.Follows
 	0,  // 2: protocol.Node.signa:type_name -> protocol.Signum
 	3,  // 3: protocol.Transcript.turns:type_name -> protocol.Turn
 	2,  // 4: protocol.Transcripts.transcripts:type_name -> protocol.Transcript
@@ -3181,26 +3511,29 @@ var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	10, // 8: protocol.ElementSessions.sessions:type_name -> protocol.ElementSession
 	12, // 9: protocol.NamespaceAgentSaid.claude:type_name -> protocol.ClaudeSaid
 	13, // 10: protocol.NamespaceAgentSaid.pi:type_name -> protocol.PiSaid
-	12, // 11: protocol.NodeAgentSaid.claude:type_name -> protocol.ClaudeSaid
-	13, // 12: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
-	18, // 13: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
-	14, // 14: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
-	24, // 15: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
-	19, // 16: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
-	21, // 17: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
-	23, // 18: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
-	14, // 19: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
-	24, // 20: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
-	27, // 21: protocol.Follows.columns:type_name -> protocol.Corresponds
-	28, // 22: protocol.Follows.folds:type_name -> protocol.Fold
-	30, // 23: protocol.Sigil.takes:type_name -> protocol.Param
-	31, // 24: protocol.Sigil.gives:type_name -> protocol.Field
-	32, // 25: protocol.Sigil.http:type_name -> protocol.Endpoint
-	26, // [26:26] is the sub-list for method output_type
-	26, // [26:26] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	18, // 11: protocol.NamespaceAgentSaid.codex:type_name -> protocol.CodexSaid
+	12, // 12: protocol.NodeAgentSaid.claude:type_name -> protocol.ClaudeSaid
+	13, // 13: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
+	18, // 14: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
+	14, // 15: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
+	24, // 16: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
+	19, // 17: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
+	21, // 18: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
+	23, // 19: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
+	14, // 20: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
+	24, // 21: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
+	19, // 22: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
+	26, // 23: protocol.Quotes.quotes:type_name -> protocol.Quote
+	30, // 24: protocol.Follows.columns:type_name -> protocol.Corresponds
+	31, // 25: protocol.Follows.folds:type_name -> protocol.Fold
+	33, // 26: protocol.Sigil.takes:type_name -> protocol.Param
+	34, // 27: protocol.Sigil.gives:type_name -> protocol.Field
+	35, // 28: protocol.Sigil.http:type_name -> protocol.Endpoint
+	29, // [29:29] is the sub-list for method output_type
+	29, // [29:29] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }
@@ -3214,7 +3547,7 @@ func file_plugin_grpc_protocol_sigil_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_sigil_proto_rawDesc), len(file_plugin_grpc_protocol_sigil_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   34,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

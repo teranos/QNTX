@@ -38,6 +38,9 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Builds the crates' dependencies once per Cargo.lock, kept as cargo
+    # artifacts, so a change to a crate compiles that crate and not tokio.
+    crane.url = "github:ipetkov/crane";
     # The Postgres the Supabase free tier runs, server/parity/postgres_<version>_<rev>.
     # Nothing follows ours: it is their build, so their cache serves it.
     supabase-postgres.url = "github:supabase/postgres/e60902168c6f9b4030151d61d0fd741b52eaafd3";
@@ -53,7 +56,7 @@
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix, supabase-postgres }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix, crane, supabase-postgres }:
     {
       # Shared vendorHash imported from single source of truth
       rootVendorHash = import ./nix/vendor-hash.nix;
@@ -84,124 +87,108 @@
             });
           }) { lockFile = ./Cargo.lock; };
 
-        # Build ats as WASM module (used by Go via go:embed)
-        ats-wasm = (pkgs.makeRustPlatform {
-          cargo = rustWasmToolchain;
-          rustc = rustWasmToolchain;
-        }).buildRustPackage {
-          pname = "ats-wasm";
-          version = self.rev or "dev";
-          src = ./.;
+        # "i doubt we need to build ats each and every time / or laye / or the go backend"
+        # The Rust derivations see only what the Rust build reads. A commit to
+        # Go, web or docs leaves them as they were, and nothing is rebuilt.
+        rustSrc = pkgs.lib.fileset.toSource {
+          root = ./.;
+          fileset = pkgs.lib.fileset.unions [
+            ./Cargo.toml
+            ./Cargo.lock
+            ./.cargo
+            ./crates
+            # Read from the crates by build scripts and include_str!.
+            ./internal/db/sqlite/migrations
+            ./internal/db/duckdb/migrations
+            ./internal/db/postgres/migrations
+            ./server/parity
+            ./plugin/grpc/protocol
+            ./ats/signing/testdata
+          ];
+        };
 
-          cargoDeps = crateSources;
+        # The workspace's own version. The git revision is not part of it: a
+        # derivation named after the commit is a new derivation every commit.
+        rustVersion = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
 
-          cargoBuildFlags = [ "-p" "ats-wasm" "--target" "wasm32-unknown-unknown" ];
+        # crane appends the vendor dir's config.toml to cargo's own, where the
+        # relative "cargo-vendor-dir" import-cargo-lock names no longer resolves.
+        # Same crates, same checksums, the directory by its full path.
+        cargoVendorDir = pkgs.runCommand "qntx-cargo-vendor" { } ''
+          mkdir $out
+          sed 's|directory = "cargo-vendor-dir"|directory = "${crateSources}"|' \
+            ${crateSources}/.cargo/config.toml > $out/config.toml
+          grep -q '${crateSources}' $out/config.toml
+        '';
+
+        craneHost = (crane.mkLib pkgs).overrideToolchain (fenix.packages.${system}.combine [
+          fenix.packages.${system}.stable.cargo
+          fenix.packages.${system}.stable.rustc
+        ]);
+        craneWasm = (crane.mkLib pkgs).overrideToolchain rustWasmToolchain;
+
+        # The three FFI libraries in one build: the dependencies they share
+        # are compiled once, with their features unified once, and the
+        # artifacts carry over from one Cargo.lock to the next crate change.
+        ffiArgs = {
+          pname = "ats-ffi";
+          version = rustVersion;
+          src = rustSrc;
+          inherit cargoVendorDir;
+          cargoExtraArgs = "--locked --lib -p ats-sqlite -p ats-duckdb -p ats-postgres --features ats-sqlite/ffi,ats-duckdb/ffi,ats-postgres/ffi";
+          # libduckdb as server/parity pins it, matching the bindings — dynamic link, no
+          # source compile. ats-postgres speaks the wire protocol itself: no libpq.
+          buildInputs = [ duckdbPinned ];
           doCheck = false;
+        };
+        ats-ffi-deps = craneHost.buildDepsOnly ffiArgs;
+        ats-ffi = craneHost.buildPackage (ffiArgs // {
+          cargoArtifacts = ats-ffi-deps;
+          # The shared library is .so on Linux and .dylib on Darwin; the macOS
+          # build-go job failed on a .so that is never written there.
+          installPhaseCommand = let so = pkgs.stdenv.hostPlatform.extensions.sharedLibrary; in ''
+            mkdir -p $out/lib $out/include
+            cp target/release/libats_sqlite.a target/release/libats_sqlite${so} $out/lib/
+            cp target/release/libats_duckdb.a target/release/libats_duckdb${so} $out/lib/
+            cp target/release/libats_postgres.a target/release/libats_postgres${so} $out/lib/
+            cp crates/ats-sqlite/include/storage_ffi.h $out/include/
+            cp crates/ats-duckdb/include/duckdb_ffi.h $out/include/
+            cp crates/ats-postgres/include/postgres_ffi.h $out/include/
+          '';
+        });
 
+        # ats as a WASM module (used by Go via go:embed).
+        wasmArgs = {
+          pname = "ats-wasm";
+          version = rustVersion;
+          src = rustSrc;
+          inherit cargoVendorDir;
+          cargoExtraArgs = "--locked -p ats-wasm";
+          CARGO_BUILD_TARGET = "wasm32-unknown-unknown";
           # wasm-ld from nixpkgs rather than the rust-lld the toolchain ships.
           # That one is dynamically linked against @rpath/libLLVM.dylib, which
           # is not in its own closure, so it aborts on darwin.
           nativeBuildInputs = [ pkgs.lld ];
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_LINKER = "${pkgs.lld}/bin/wasm-ld";
-
-          # buildRustPackage expects binaries in target/release/ but we cross-compile
-          installPhase = ''
+          doCheck = false;
+        };
+        ats-wasm-deps = craneWasm.buildDepsOnly wasmArgs;
+        ats-wasm = craneWasm.buildPackage (wasmArgs // {
+          cargoArtifacts = ats-wasm-deps;
+          installPhaseCommand = ''
             mkdir -p $out/lib
             cp target/wasm32-unknown-unknown/release/ats_wasm.wasm $out/lib/ats.wasm
           '';
-        };
-
-        # Build ats-sqlite as static library for CGO linking.
-        # Uses the same Rust toolchain as ats-wasm (fenix stable).
-        ats-sqlite-ffi = (pkgs.makeRustPlatform {
-          cargo = fenix.packages.${system}.stable.cargo;
-          rustc = fenix.packages.${system}.stable.rustc;
-        }).buildRustPackage {
-          pname = "ats-sqlite-ffi";
-          version = self.rev or "dev";
-          src = ./.;
-
-          cargoDeps = crateSources;
-
-          cargoBuildFlags = [ "-p" "ats-sqlite" "--features" "ffi" "--lib" ];
-          doCheck = false;
-
-          # buildRustPackage's default installPhase only copies binaries.
-          # We need the static/shared library from the build output.
-          postBuild = ''
-            mkdir -p $out/lib $out/include
-            find target -name 'libats_sqlite.a' -exec cp {} $out/lib/ \;
-            find target -name 'libats_sqlite.so' -exec cp {} $out/lib/ \;
-            cp crates/ats-sqlite/include/storage_ffi.h $out/include/
-          '';
-
-          # Skip default install (tries to find binaries, there are none)
-          installPhase = "true";
-        };
-
-        # Build ats-duckdb as static library for CGO linking (ADR-024).
-        # Peer of ats-sqlite-ffi. Uses Nix-provided libduckdb (no bundled compile).
-        ats-duckdb-ffi = (pkgs.makeRustPlatform {
-          cargo = fenix.packages.${system}.stable.cargo;
-          rustc = fenix.packages.${system}.stable.rustc;
-        }).buildRustPackage {
-          pname = "ats-duckdb-ffi";
-          version = self.rev or "dev";
-          src = ./.;
-
-          cargoDeps = crateSources;
-
-          cargoBuildFlags = [ "-p" "ats-duckdb" "--features" "ffi" "--lib" ];
-          doCheck = false;
-
-          # libduckdb as server/parity pins it, matching the bindings — dynamic link, no
-          # source compile.
-          buildInputs = [ duckdbPinned ];
-
-          postBuild = ''
-            mkdir -p $out/lib $out/include
-            find target -name 'libats_duckdb.a' -exec cp {} $out/lib/ \;
-            find target -name 'libats_duckdb.so' -exec cp {} $out/lib/ \;
-            cp crates/ats-duckdb/include/duckdb_ffi.h $out/include/
-          '';
-
-          installPhase = "true";
-        };
-
-        # Build ats-postgres as static library for CGO linking. Peer of
-        # ats-duckdb-ffi; the client speaks the wire protocol itself, so there
-        # is no libpq to link.
-        ats-postgres-ffi = (pkgs.makeRustPlatform {
-          cargo = fenix.packages.${system}.stable.cargo;
-          rustc = fenix.packages.${system}.stable.rustc;
-        }).buildRustPackage {
-          pname = "ats-postgres-ffi";
-          version = self.rev or "dev";
-          src = ./.;
-
-          cargoDeps = crateSources;
-
-          cargoBuildFlags = [ "-p" "ats-postgres" "--features" "ffi" "--lib" ];
-          doCheck = false;
-
-          postBuild = ''
-            mkdir -p $out/lib $out/include
-            find target -name 'libats_postgres.a' -exec cp {} $out/lib/ \;
-            find target -name 'libats_postgres.so' -exec cp {} $out/lib/ \;
-            cp crates/ats-postgres/include/postgres_ffi.h $out/include/
-          '';
-
-          installPhase = "true";
-        };
+        });
 
         # Common preBuild hook for Go derivations: copy WASM module and Rust FFI libs
         goWasmPreBuild = ''
           export GOWORK=off  # Build without workspace (use go.mod only)
           cp ${ats-wasm}/lib/ats.wasm ats/wasm/ats.wasm
           mkdir -p target/release
-          cp ${ats-sqlite-ffi}/lib/libats_sqlite.a target/release/
-          cp ${ats-duckdb-ffi}/lib/libats_duckdb.a target/release/
-          cp ${ats-postgres-ffi}/lib/libats_postgres.a target/release/
+          cp ${ats-ffi}/lib/libats_sqlite.a target/release/
+          cp ${ats-ffi}/lib/libats_duckdb.a target/release/
+          cp ${ats-ffi}/lib/libats_postgres.a target/release/
         '';
 
         # Pre-commit hooks configuration
@@ -279,8 +266,10 @@
         # docs/release.md
         versionTag = let v = builtins.getEnv "VERSION_TAG"; in
           if v == "" then "dev" else v;
-        qntx = pkgs.buildGoModule {
-          pname = "qntx";
+        # "we separate it out from qntx like is demonstrated, it becomes an optional build, and k uses it, not q"
+        # qntx leaves the quote subsystem out; qntx-quotes is qntx with it.
+        mkQntx = { pname, quotes }: pkgs.buildGoModule {
+          inherit pname;
           version = versionTag;
           src = ./.;
 
@@ -298,7 +287,9 @@
           # rustpostgres (the postgres backend via ats-postgres + postgrescgo).
           # Without rustduckdb, backend = "parquet" in am.toml would validate
           # but the duckdbcgo wrapper wouldn't be compiled in.
-          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" ];
+          # qntxquote (the quote subsystem, ADR-055) only where quotes is asked.
+          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" ]
+            ++ pkgs.lib.optional quotes "qntxquote";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -308,6 +299,8 @@
 
           subPackages = [ "cmd/qntx" ];
         };
+        qntx = mkQntx { pname = "qntx"; quotes = false; };
+        qntx-quotes = mkQntx { pname = "qntx-quotes"; quotes = true; };
 
         # "It should be private, owned by the node's deployment repository"
         # A line naming a path this QNTX does not answer stops the node at start,
@@ -400,15 +393,25 @@
         packages = {
           # QNTX CLI binary
           qntx = qntx;
+          # The same with the quote subsystem: k, home to the ground namespace.
+          qntx-quotes = qntx-quotes;
 
           # WASM module (ats compiled to wasm32-unknown-unknown)
           ats-wasm = ats-wasm;
 
           # Rust FFI static libraries — exposed so CI can build them directly
-          # without going through the full qntx binary build.
-          ats-sqlite-ffi = ats-sqlite-ffi;
-          ats-duckdb-ffi = ats-duckdb-ffi;
-          ats-postgres-ffi = ats-postgres-ffi;
+          # without going through the full qntx binary build. One build holds
+          # all three; the three names stay for the workflows that use them.
+          ats-ffi = ats-ffi;
+          ats-sqlite-ffi = ats-ffi;
+          ats-duckdb-ffi = ats-ffi;
+          ats-postgres-ffi = ats-ffi;
+
+          # The compiled dependencies, named so CI can push them to the cache:
+          # build-time inputs of qntx, they are not in its closure, and a node
+          # that could not fetch them compiled every crate again.
+          ats-ffi-deps = ats-ffi-deps;
+          ats-wasm-deps = ats-wasm-deps;
 
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args
@@ -509,6 +512,7 @@
         checks = {
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
+          qntx-quotes-build = qntx-quotes;
           docs-site-builds = self.packages.${system}.docs-site; # Ensure docs site builds
           docs-site-links = pkgs.runCommand "docs-site-link-check"
             {

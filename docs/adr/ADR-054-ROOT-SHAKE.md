@@ -12,7 +12,7 @@ Status: Implemented, mostly
 "each element and each user story is an agent as well."
 
 - Each element is its own agent: its own key derived from the node's for
-  `agent:element:<element>` ([ADR-048](./ADR-048-Node-Agent.md): an agent has its own DID
+  `agent:element:<element>` ([[ADR-048-Node-Agent]]: an agent has its own DID
   and attests as itself), its own token of ROOT's kind, its own session under
   `elements/<element>/`, its own turn. It stands where the Node Agent stands:
   the Node Agent's home, its ground, its credential, its git, as `[agent.root]`
@@ -47,8 +47,8 @@ Status: Implemented, mostly
 
 "THE CONVERSATION IS WITH THE ELEMENT"
 
-- The Node Agent ([ADR-048](./ADR-048-Node-Agent.md)) is responsible for the node. The
-  namespace agent ([ADR-053](./ADR-053-Namespace-Agents.md)) is the namespace's, set per
+- The Node Agent ([[ADR-048-Node-Agent]]) is responsible for the node. The
+  namespace agent ([[ADR-053-Namespace-Agents]]) is the namespace's, set per
   namespace or not at all. Neither is where an element's conversation lives:
   neither takes an `element`.
 
@@ -68,11 +68,23 @@ Status: Implemented, mostly
 - One `turn` per element agent: two shakes at one element wait on each other,
   two at two elements run at once.
 
+![[Screenshot 2026-10-28 at 14.49.20.png]]
+
 - Needs repo attached, namely QNTX, QNTX-App, QNTX-Web
 - And Memory store needs to be a thing,,  
+
+"it has happened that an element agent beleived it could not submit a pr and gave a patch to the Node Agent"
+
+- #1437 ends:
+
+"Made by parity-element, pushed by the Node Agent from the node."
 
 ### Review PR's submitted via ROOT SHAKE
 
 - https://github.com/teranos/QNTX-Web/pull/13
 - https://github.com/teranos/QNTX-Web/pull/26
 - https://github.com/teranos/QNTX-Web/pull/29 (Via Claude Console Managed Agents go SDK)
+- https://github.com/teranos/QNTX-Web/pull/30 (ax-9c91b609-3565-4df3-bf59-2533177fd2a6)
+- https://github.com/teranos/QNTX-Web/pull/31 (stories-element)
+- https://github.com/teranos/QNTX/pull/1436 (roles-element)
+- https://github.com/teranos/QNTX/pull/1437 (parity-element)
