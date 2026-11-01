@@ -212,3 +212,57 @@ func TestStartMovesAGlyphWatcherToTheIDTheCanvasNames(t *testing.T) {
 		t.Errorf("the moved SE watcher lost what it was: %q %q", se.SemanticQuery, se.ActionType)
 	}
 }
+
+// One AX watcher the store will not write again holds back none of the others.
+func TestOneWatcherThatWillNotSettleHoldsBackNoneOfTheOthers(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	ctx := context.Background()
+	store := storage.NewWatcherStore(db)
+
+	stuck := &storage.Watcher{ID: "ax-element-ax-a-stuck", Name: "AX stuck",
+		ActionType: storage.ActionTypePython, MaxFiresPerSecond: 1, Enabled: true, Filter: unbounded()}
+	next := &storage.Watcher{ID: "ax-element-ax-z-next", Name: "AX next",
+		ActionType: storage.ActionTypePython, MaxFiresPerSecond: 1, Enabled: true, Filter: unbounded()}
+	// Newest is listed first: the stuck one is written last, so it is reached first.
+	for _, w := range []*storage.Watcher{next, stuck} {
+		if err := store.Create(ctx, w); err != nil {
+			t.Fatalf("Create %s failed: %v", w.ID, err)
+		}
+		time.Sleep(1100 * time.Millisecond)
+	}
+	if _, err := db.Exec(`CREATE TRIGGER refuse_stuck BEFORE UPDATE ON watchers
+		WHEN OLD.id = 'ax-element-ax-a-stuck' BEGIN SELECT RAISE(ABORT, 'refused'); END`); err != nil {
+		t.Fatalf("refusing the stuck watcher failed: %v", err)
+	}
+
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://unused", zap.NewNop().Sugar())
+	q := engine.GetQueueStore()
+	for _, id := range []string{stuck.ID, next.ID} {
+		if err := q.Enqueue(&watcher.QueueEntry{WatcherID: id, AttestationJSON: `{"id":"AS-S"}`,
+			Reason: "paused", Attempt: 1, NotBefore: time.Now().Add(time.Hour)}); err != nil {
+			t.Fatalf("Enqueue for %s failed: %v", id, err)
+		}
+	}
+	if err := engine.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+	defer engine.Stop()
+
+	got, err := store.Get(ctx, next.ID)
+	if err != nil {
+		t.Fatalf("Get %s failed: %v", next.ID, err)
+	}
+	if got.ActionType != storage.ActionTypeTell {
+		t.Errorf("the watcher after the stuck one is %q, want tell", got.ActionType)
+	}
+	if n := queuedFor(t, q, next.ID); n != 0 {
+		t.Errorf("the watcher after the stuck one still has %d queued", n)
+	}
+	got, err = store.Get(ctx, stuck.ID)
+	if err != nil {
+		t.Fatalf("Get %s failed: %v", stuck.ID, err)
+	}
+	if got.ActionType != storage.ActionTypePython {
+		t.Errorf("the stuck watcher is %q, want it left as it was", got.ActionType)
+	}
+}

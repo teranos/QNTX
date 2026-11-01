@@ -40,8 +40,10 @@ func (e *Engine) settleStored() error {
 			continue
 		}
 		w.ActionType = storage.ActionTypeTell
+		// One watcher the store will not write again holds back none of the others.
 		if err := e.store.Update(e.ctx, w); err != nil {
-			return errors.Wrapf(err, "failed to make AX watcher %s a tell", w.ID)
+			e.logger.Warnw("An AX watcher that runs no code was left as it was", "watcher_id", w.ID, "error", err)
+			continue
 		}
 		purged, err := e.queueStore.PurgeForWatcher(w.ID)
 		if err != nil {
