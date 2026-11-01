@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/ed25519"
 	"net/http"
 	"net/http/httptest"
@@ -59,6 +60,29 @@ func TestNamespaceAnthropicFederationIsKeptOnlyInItsNamespace(t *testing.T) {
 	assert.False(t, console.sawAPIKey)
 }
 
+func TestNamespaceAnthropicFederationConfigurationRequiresAPerson(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	for _, admitted := range []auth.Admission{
+		func() auth.Admission {
+			token := auth.Admitted(auth.LevelToken, "garden")
+			token.Identity = "did:key:token"
+			token.Grant = &access.Grant{}
+			return token
+		}(),
+		func() auth.Admission {
+			connector := auth.Admitted(auth.LevelUser, "garden")
+			connector.Identity = "https://example.org/user"
+			connector.ClientDID = "did:key:zconnector"
+			return connector
+		}(),
+	} {
+		ctx := auth.WithAdmission(context.Background(), admitted)
+		_, refused := namespaceAnthropicAsking(ctx, sigil.Sent{"namespace": "garden"}, s)
+		require.NotNil(t, refused)
+		assert.Equal(t, sigil.NotAllowed, refused.GetWhy())
+	}
+}
+
 func TestNamespaceAnthropicAgentRunsRemotelyUsingFederationWithoutAnAPIKey(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "not-a-real-api-key")
 	s, _, stores := runningNamespaceAgents(t)
@@ -111,6 +135,33 @@ func TestNamespaceAnthropicAgentRunsRemotelyUsingFederationWithoutAnAPIKey(t *te
 	assert.NotEmpty(t, stores.store["garden"].rows, "the namespace owns its agent and transcript attestations")
 	system, _ := s.held.WriteWhatTheNodeKnowsOfItself()
 	assert.Empty(t, system.(*handed).rows)
+}
+
+func TestNamespaceManagedEnvironmentsAreScopedByAnthropicOrganization(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	console, base := standInConsole(t)
+	s.anthropicBaseURL = base
+
+	for _, item := range []struct {
+		namespace, organization string
+	}{
+		{namespace: "garden", organization: "377885f2-bf73-4758-9338-dcfe26b37568"},
+		{namespace: "orchard", organization: "84f05368-5ce6-4d93-bec6-1a17f0c37767"},
+		{namespace: "meadow", organization: "377885f2-bf73-4758-9338-dcfe26b37568"},
+	} {
+		kept := anthropicKept{ids: map[string]string{
+			"organization_id": item.organization, "service_account_id": "svac_" + item.namespace,
+			"federation_rule_id": "fdrl_" + item.namespace,
+		}}
+		client, err := s.namespaceAnthropicClient(item.namespace, kept)
+		require.NoError(t, err)
+		_, err = s.managedEnvironment(context.Background(), client, &rootAgent{namespace: item.namespace}, kept)
+		require.NoError(t, err)
+	}
+
+	console.mu.Lock()
+	assert.Equal(t, 2, console.made["environment"], "different organizations get different environments, while namespaces in one organization share theirs")
+	console.mu.Unlock()
 }
 
 func TestNamespaceIssuerKeysAreDerivedFromDistinctNamespaceInputs(t *testing.T) {

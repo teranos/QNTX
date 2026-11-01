@@ -111,3 +111,16 @@ func TestAnAgentsTenantAnswersWhatTheNodeDoesNotDoYet(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	assert.Contains(t, w.Body.String(), "UNSUPPORTED_OPERATION")
 }
+
+func TestAnthropicNamespaceAgentIsDescribedAtItsTenant(t *testing.T) {
+	srv, _ := servingGardens(t)
+	root := auth.Admitted(auth.LevelRoot)
+	root.Identity = "https://example.org/root"
+	require.NoError(t, srv.setAgentLine(root, "garden", agentLineAnthropic, map[string]any{"model": "claude-sonnet-5-5"}))
+
+	card, refused := srv.namespaceAgentCard(httptest.NewRequest(http.MethodGet, "/a2a/garden/extendedAgentCard", nil), "garden")
+	require.Nil(t, refused)
+	raw, err := protojson.Marshal(card)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"name":"the agent of garden, claude-sonnet-5-5"`)
+}

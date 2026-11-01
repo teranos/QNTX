@@ -102,7 +102,7 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 
 func (s *QNTXServer) runManagedWithClient(agent *rootAgent, said claudecode.Said, shot shaken, kept anthropicKept, client anthropic.Client, each func(claudecode.Message)) (claudecode.Answer, error) {
 	ctx := s.ctx
-	environment, err := s.managedEnvironment(ctx, client)
+	environment, err := s.managedEnvironment(ctx, client, agent, kept)
 	if err != nil {
 		return claudecode.Answer{}, err
 	}
@@ -256,11 +256,14 @@ func (s shaken) content(told string) ([]anthropic.BetaManagedAgentsUserMessageEv
 	}, nil
 }
 
-// managedEnvironment is the cloud Environment every element's agent runs in, made once.
-func (s *QNTXServer) managedEnvironment(ctx context.Context, client anthropic.Client) (string, error) {
+// managedEnvironment is the cloud Environment for an Anthropic organization, made once.
+func (s *QNTXServer) managedEnvironment(ctx context.Context, client anthropic.Client, agent *rootAgent, kept anthropicKept) (string, error) {
 	home := s.agentsDir
 	if s.nodeAgent != nil {
 		home = s.nodeAgent.home
+	}
+	if agent.namespace != "" && agent.namespace != auth.NamespaceSystem {
+		home = filepath.Join(s.agentsDir, "anthropic-organizations", slug.Of(kept.ids["organization_id"]))
 	}
 	file := filepath.Join(home, managedEnvironmentFile)
 	if held, err := os.ReadFile(file); err == nil {
@@ -268,14 +271,21 @@ func (s *QNTXServer) managedEnvironment(ctx context.Context, client anthropic.Cl
 	} else if !os.IsNotExist(err) {
 		return "", errors.Wrapf(err, "the Environment at Anthropic kept in %s did not read", file)
 	}
+	name := "qntx-element-agents"
+	if agent.namespace != "" && agent.namespace != auth.NamespaceSystem {
+		name = "qntx-namespace-agents"
+	}
 	made, err := client.Beta.Environments.New(ctx, anthropic.BetaEnvironmentNewParams{
-		Name: "qntx-element-agents",
+		Name: name,
 		Config: anthropic.BetaEnvironmentNewParamsConfigUnion{OfCloud: &anthropic.BetaCloudConfigParams{
 			Networking: anthropic.BetaCloudConfigParamsNetworkingUnion{OfUnrestricted: &anthropic.BetaUnrestrictedNetworkParam{}},
 		}},
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "no Environment was made at Anthropic for the node's element agents")
+		return "", errors.Wrapf(err, "no Environment was made at Anthropic for %s", managedAgentLabel(agent))
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
+		return "", errors.Wrapf(err, "could not create %s", filepath.Dir(file))
 	}
 	if err := os.WriteFile(file, []byte(made.ID), 0o600); err != nil {
 		return "", errors.Wrapf(err, "the Environment %s made at Anthropic was not kept in %s", made.ID, file)
