@@ -39,7 +39,7 @@ func TestAPluginsFaceIsRootsWithoutALine(t *testing.T) {
 }
 
 // pluginServingServer is servedForTest with auth on, one plugin enabled the
-// way cmd/qntx/main.go enables one, and a bearer token minted at each level.
+// way cmd/qntx/qntx/main.go enables one, and a bearer token minted at each level.
 func pluginServingServer(t *testing.T, name string) (*QNTXServer, map[auth.Level]string) {
 	t.Helper()
 

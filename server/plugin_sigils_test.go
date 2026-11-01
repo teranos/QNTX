@@ -94,7 +94,7 @@ func stubSignum(name string) *protocol.Signum {
 }
 
 // sigilServingServer is pluginServingServer with a plugin that hands the node
-// signa, served the way cmd/qntx/main.go serves them once Initialize is done.
+// signa, served the way cmd/qntx/qntx/main.go serves them once Initialize is done.
 func sigilServingServer(t *testing.T, p *sigilPlugin) (*QNTXServer, map[auth.Level]string) {
 	t.Helper()
 	srv, tokens := pluginServingServer(t, "other")

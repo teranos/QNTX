@@ -168,7 +168,9 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		fixed := g.fixturesOf(r.Context(), event, body)
-		respond(w, g.host.log(), http.StatusOK, map[string]any{"approvals": touched, "fixtures": fixed, "quotes": g.quotesOf(r.Context(), event, body)})
+		answer := map[string]any{"approvals": touched, "fixtures": fixed, "quotes": g.quotesOf(r.Context(), event, body)}
+		g.deliveredInto(answer, r.Context(), event, body)
+		respond(w, g.host.log(), http.StatusOK, answer)
 		return
 	}
 	var push gitHubPush
@@ -188,7 +190,23 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	dispatching := g.followsMovedBy(landed)
 	rebuilding := g.host.cometsMovedBy(landed)
 	fixed := g.fixturesOf(r.Context(), event, body)
-	respond(w, g.host.log(), http.StatusOK, map[string]any{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding, "fixtures": fixed, "quotes": g.quotesOf(r.Context(), event, body)})
+	answer := map[string]any{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding, "fixtures": fixed, "quotes": g.quotesOf(r.Context(), event, body)}
+	g.deliveredInto(answer, r.Context(), event, body)
+	respond(w, g.host.log(), http.StatusOK, answer)
+}
+
+// deliveredInto lays what each linked subsystem reading the event answered
+// into the webhook's answer, under the subsystem's name (ADR-056). A name the
+// node already answers under is the node's, and the subsystem's is said in
+// the log instead of over it.
+func (g *gitHub) deliveredInto(answer map[string]any, ctx context.Context, event string, body []byte) {
+	for name, said := range g.host.deliveries(ctx, event, body) {
+		if _, taken := answer[name]; taken {
+			g.host.log().Errorw("A subsystem answers a delivery under a name the node answers under", "subsystem", name, "event", event)
+			continue
+		}
+		answer[name] = said
+	}
 }
 
 // quotesOf is the quoted spans one delivery carried, measured against the

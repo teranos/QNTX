@@ -6,6 +6,7 @@ import (
 	"github.com/teranos/QNTX/server/quote"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/ats/watcher"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/subsystem"
 )
 
 // createTestDB is a local alias for qntxtest.CreateTestDB
@@ -618,11 +620,15 @@ func TestGetDaemon(t *testing.T) {
 		t.Fatal("daemon.Registry() returned nil")
 	}
 
-	// Verify registry has only built-in handlers (e.g. distill if configured)
-	handlers := registry.Names()
-	for _, h := range handlers {
-		if h != "distill" && h != "wal-checkpoint" && h != watcher.CIWatchHandlerName && h != reportHandlerName &&
-			h != watcher.QuoteProvenanceHandlerName && h != watcher.QuoteRemovalHandlerName && h != quote.LandedHandlerName {
+	// Verify registry has only built-in handlers (e.g. distill if configured),
+	// and what the subsystems linked into this build declare (ADR-056).
+	allowed := []string{"distill", "wal-checkpoint", watcher.CIWatchHandlerName, reportHandlerName,
+		watcher.QuoteProvenanceHandlerName, watcher.QuoteRemovalHandlerName, quote.LandedHandlerName}
+	for _, sub := range subsystem.Registered() {
+		allowed = append(allowed, sub.Declare().GetHandlerNames()...)
+	}
+	for _, h := range registry.Names() {
+		if !slices.Contains(allowed, h) {
 			t.Errorf("Unexpected handler registered: %s", h)
 		}
 	}

@@ -3,6 +3,7 @@ package quote
 import (
 	"context"
 	"encoding/json"
+	"github.com/teranos/QNTX/server/namespaces"
 	"strconv"
 	"time"
 
@@ -25,24 +26,6 @@ const (
 	// none of them.
 	promptsCeiling = 1_000_000
 )
-
-// The namespace a standing row fired in, carried to the built-in it reaches.
-type namespaceKey struct{}
-
-// WithNamespace carries the namespace a standing row fired in.
-func WithNamespace(ctx context.Context, namespace string) context.Context {
-	return context.WithValue(ctx, namespaceKey{}, namespace)
-}
-
-// NamespaceOf is the namespace carried, or the empty string when none was,
-// which the caller refuses out loud.
-func NamespaceOf(ctx context.Context) string {
-	ns, ok := ctx.Value(namespaceKey{}).(string)
-	if !ok {
-		return ""
-	}
-	return ns
-}
 
 // IMPLEMENTME: speak spec at the boundary. A span measured here is a protocol.Quote:
 // content the span, who the person whose prompt it matched, source that prompt's
@@ -84,7 +67,7 @@ func (h *Watch) Execute(ctx context.Context, job *async.Job) error {
 	if len(as.Actors) == 0 || as.Actors[0] == "" {
 		return errors.Newf("quote.provenance: attestation %s has no actor to address the result to", as.ID)
 	}
-	namespace := NamespaceOf(ctx)
+	namespace := namespaces.NamespaceOf(ctx)
 	if namespace == "" {
 		return errors.Newf("quote.provenance: attestation %s reached the built-in with no namespace to read prompts in", as.ID)
 	}

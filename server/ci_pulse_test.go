@@ -16,7 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/server/quote"
+	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -708,7 +708,7 @@ func TestCIWatchTakesARunsBenchAsAnAttestation(t *testing.T) {
 	h := handlerOver(gh, statusline.NewNewsLog())
 	store := groundStore(t, h)
 
-	if err := h.Execute(quote.WithNamespace(context.Background(), "Ground"), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+	if err := h.Execute(namespaces.WithNamespace(context.Background(), "Ground"), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 	got := benchesIn(t, store)
@@ -742,7 +742,7 @@ func TestCIWatchARunWithoutTheBenchWritesNothing(t *testing.T) {
 	h := handlerOver(gh, statusline.NewNewsLog())
 	store := groundStore(t, h)
 
-	if err := h.Execute(quote.WithNamespace(context.Background(), "Ground"), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
+	if err := h.Execute(namespaces.WithNamespace(context.Background(), "Ground"), jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("a run with no bench failed the push: %v", err)
 	}
 	if got := benchesIn(t, store); len(got) != 0 {
@@ -759,7 +759,7 @@ func TestCIWatchARearmedPushWritesTheBenchOnce(t *testing.T) {
 	h := handlerOver(gh, statusline.NewNewsLog())
 	h.booted = benchConcluded.Add(-time.Minute)
 	store := groundStore(t, h)
-	ctx := quote.WithNamespace(context.Background(), "Ground")
+	ctx := namespaces.WithNamespace(context.Background(), "Ground")
 
 	if err := h.Execute(ctx, jobFor(t, ciStatusAs("did:key:alice"))); err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -783,7 +783,7 @@ func TestCIWatchABenchThatIsNoRowIsAnError(t *testing.T) {
 			gh := benchGitHub(t, "bench-ctfe", held[0], held[1], 1)
 			h := handlerOver(gh, statusline.NewNewsLog())
 			store := groundStore(t, h)
-			err := h.Execute(quote.WithNamespace(context.Background(), "Ground"), jobFor(t, ciStatusAs("did:key:alice")))
+			err := h.Execute(namespaces.WithNamespace(context.Background(), "Ground"), jobFor(t, ciStatusAs("did:key:alice")))
 			if err == nil || !strings.Contains(err.Error(), benchRun) {
 				t.Fatalf("got %v; wanted an error naming %s", err, benchRun)
 			}

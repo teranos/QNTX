@@ -22,7 +22,6 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
-	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -383,7 +382,7 @@ func (h *ciWatchHandler) Execute(ctx context.Context, job *async.Job) error {
 				return nil
 			}
 			h.leave(as, addressee, caller, repo, branch, sha, runs, pushedAt)
-			return h.takeBenches(ctx, token, repo, fullSha, quote.NamespaceOf(ctx), runs)
+			return h.takeBenches(ctx, token, repo, fullSha, namespaces.NamespaceOf(ctx), runs)
 		}
 		// A push no workflow runs on lists no run, and waiting on it was two
 		// hours and then a failure. Not there a minute on is not coming.
@@ -1046,7 +1045,7 @@ func (s *QNTXServer) setupCIWatch() {
 			s.logger.Warnw("ci.watch could not re-arm a push", "id", as.ID, "error", err)
 			continue
 		}
-		ctx := quote.WithNamespace(s.ctx, push.namespace)
+		ctx := namespaces.WithNamespace(s.ctx, push.namespace)
 		sacred.Go("ci.watch rearm "+as.ID, func() {
 			job := &async.Job{ID: "rearm:" + as.ID, HandlerName: watcher.CIWatchHandlerName, Payload: payload, Source: rearmSource,
 				MadeBy: async.MadeByNoCaller, Pulse: async.NoPulse(), Started: async.At(time.Now()), Completed: async.NotYet()}
