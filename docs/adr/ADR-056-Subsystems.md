@@ -5,8 +5,8 @@ Status: Implemented
 
 "QNTX needs a formal contract for pluggable, optional, compiled-in subsystems. Agreed. And Quotes is the first one to use it. suggest a .proto for it"
 
-- The contract is `protocol.Subsystem` ([subsystem.proto](../../plugin/grpc/protocol/subsystem.proto)) and package [server/subsystem](../../server/subsystem/subsystem.go). The proto is what a subsystem declares; the package is how it registers, what it may ask of the node (`Host`), and how its declaration becomes rows and signa the node serves.
-- A subsystem registers itself from the package that links it, in `init`, with `subsystem.Register`. The node reads the registered at boot, in the `linked` step ([server/sub_linked.go](../../server/sub_linked.go)): its standing rows stand with QNTX's own (`watcher.Stand`), it is started with the node as its `Host`, and each built-in it declared is checked to be registered. Fatal when not: a build whose own subsystem does not start is a build that is wrong.
+- The contract is `protocol.Subsystem` ([subsystem.proto](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/subsystem.proto)) and package [server/subsystem](https://github.com/teranos/QNTX/blob/main/server/subsystem/subsystem.go). The proto is what a subsystem declares; the package is how it registers, what it may ask of the node (`Host`), and how its declaration becomes rows and signa the node serves.
+- A subsystem registers itself from the package that links it, in `init`, with `subsystem.Register`. The node reads the registered at boot, in the `linked` step ([server/sub_linked.go](https://github.com/teranos/QNTX/blob/main/server/sub_linked.go)): its standing rows stand with QNTX's own (`watcher.Stand`), it is started with the node as its `Host`, and each built-in it declared is checked to be registered. Fatal when not: a build whose own subsystem does not start is a build that is wrong.
 
 "not a fucking plugin"
 
@@ -19,7 +19,7 @@ Status: Implemented
 "and k qntx compiles it in"
 
 - A subsystem is its own repository and its own Go module, requiring `github.com/teranos/QNTX`. QNTX's `go.mod` requires nothing of it, so QNTX builds for everyone without it.
-- A binary carrying a subsystem is [cmd/qntx/main.go](../../cmd/qntx/main.go) with one more import: the subsystem's package. Everything qntx does is in `cmd/qntx/qntx` as `Main()`, so the subsystem's repository holds a `cmd/qntx` of three lines and builds the same node with the subsystem in it.
+- A binary carrying a subsystem is [cmd/qntx/main.go](https://github.com/teranos/QNTX/blob/main/cmd/qntx/main.go) with one more import: the subsystem's package. Everything qntx does is in `cmd/qntx/qntx` as `Main()`, so the subsystem's repository holds a `cmd/qntx` of three lines and builds the same node with the subsystem in it.
 
 "a big ass patch isnt going to work for us"
 
@@ -39,7 +39,7 @@ Status: Implemented
 
 "let's say a subsystem can provide its own Signa ?"
 
-- A subsystem's signa are served as the node's own: their paths on the HTTP API, their sigils as MCP tools, their operations in the document. `Subsystem.signa` is the shape; `Subsystem.Answers` the functions, by signum and sigil, since a function is not a shape ([sigil.proto](../../plugin/grpc/protocol/sigil.proto), `Sigil`).
+- A subsystem's signa are served as the node's own: their paths on the HTTP API, their sigils as MCP tools, their operations in the document. `Subsystem.signa` is the shape; `Subsystem.Answers` the functions, by signum and sigil, since a function is not a shape ([sigil.proto](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/sigil.proto), `Sigil`).
 - A subsystem does not add a sigil to a signum of QNTX's. A signum is served whole or not at all (`server/signa.go`, `checkedSigna`), and a sigil whose answer is a message this binary does not know is refused; a build without the subsystem would lose the whole signum.
 
 "And subsystems are also where you should be more free to encode org specific policy and descision."
@@ -50,6 +50,6 @@ Status: Implemented
 
 ## What the contract does not carry
 
-- Reach. The tablet is the deployment's, compiled in ([server/reach/tablet.go](../../server/reach/tablet.go)); a deployment builds with its own (`withTablet`, [flake.nix](../../flake.nix)). A subsystem's path no line names is served to ROOT alone, as any such path is.
-- Pinned references. `parity.Reference` reads QNTX's embedded pins ([server/parity/references.go](../../server/parity/references.go)). A subsystem's `Follows` names a reference QNTX pins.
+- Reach. The tablet is the deployment's, compiled in ([server/reach/tablet.go](https://github.com/teranos/QNTX/blob/main/server/reach/tablet.go)); a deployment builds with its own (`withTablet`, [flake.nix](https://github.com/teranos/QNTX/blob/main/flake.nix)). A subsystem's path no line names is served to ROOT alone, as any such path is.
+- Pinned references. `parity.Reference` reads QNTX's embedded pins ([server/parity/references.go](https://github.com/teranos/QNTX/blob/main/server/parity/references.go)). A subsystem's `Follows` names a reference QNTX pins.
 - A build tag. Linking is what makes a build carry a subsystem.
