@@ -78,6 +78,8 @@ var storeWriters = map[string]string{
 	"keepAnthropicLine": "the node's ANTHROPIC line, the ids of the rule its identity token is traded at " +
 		"and what ROOT's agents spend first, in system through WriteWhatTheNodeKnowsOfItself: a line about " +
 		"the node, and the reach table names /api/anthropic and /api/anthropic/order of ROOT alone",
+	"keepNamespaceAnthropicLine": "a namespace's Anthropic federation IDs, in that namespace's own store " +
+		"through Write as its admitted owner, ROOT or SUPER, after tokens and connectors are refused",
 	"setKeyLine": "a KEY line of a namespace (ADR-051), in the namespace's own store through Write as " +
 		"the setter is admitted, after keysAsking refuses a token or a connector and mayHandleKeys says " +
 		"they own the namespace, or are ROOT or SUPER",

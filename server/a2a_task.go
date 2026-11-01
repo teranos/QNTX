@@ -156,8 +156,35 @@ func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace strin
 	if err != nil {
 		return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the agent of " + namespace + " was not read: " + err.Error()}
 	}
+	harness := agentLineClaude
 	if !set {
-		return taskAgent{}, &a2a.Error{Name: "UnsupportedOperationError", Message: namespace + " opted into no agent in Claude Code"}
+		row, setBy, codexSet, codexErr := s.newestAgentLine(namespace, agentLineCodex)
+		if codexErr != nil {
+			return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: codexErr.Error()}
+		}
+		if codexSet {
+			model, err := oneText(row.Attributes, "model", agentLineSubject, row.ID, namespace)
+			if err != nil {
+				return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+			}
+			line, set, harness = agentLine{spec: agentSpec{Model: model}, setBy: setBy, at: row.Timestamp}, true, agentLineCodex
+		}
+	}
+	if !set {
+		row, setBy, anthropicSet, anthropicErr := s.newestAgentLine(namespace, agentLineAnthropic)
+		if anthropicErr != nil {
+			return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: anthropicErr.Error()}
+		}
+		if anthropicSet {
+			model, err := oneText(row.Attributes, "model", agentLineSubject, row.ID, namespace)
+			if err != nil {
+				return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+			}
+			line, set, harness = agentLine{spec: agentSpec{Model: model}, setBy: setBy, at: row.Timestamp}, true, agentLineAnthropic
+		}
+	}
+	if !set {
+		return taskAgent{}, &a2a.Error{Name: "UnsupportedOperationError", Message: namespace + " opted into no Claude Code, Codex or Anthropic agent"}
 	}
 	agent, refused := s.holdNamespaceAgent(namespace, line.spec.Model, line.setBy)
 	if refused != nil {
@@ -172,7 +199,7 @@ func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace strin
 	}}
 	return taskAgent{
 		taskLines: lines, agent: agent, called: agent.called, say: say,
-		asked: map[string]any{"harness": agentLineClaude, "namespace": namespace},
+		asked: map[string]any{"harness": harness, "namespace": namespace},
 	}, nil
 }
 

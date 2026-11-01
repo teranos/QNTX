@@ -18,6 +18,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
 	"github.com/teranos/QNTX/internal/claudecode"
+	"github.com/teranos/QNTX/internal/slug"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 )
@@ -46,6 +47,10 @@ func (s *QNTXServer) anthropicClient(kept anthropicKept) (anthropic.Client, erro
 	if err != nil {
 		return anthropic.Client{}, err
 	}
+	return s.federatedAnthropicClient(kept, i, s.nodeDID.DID, auth.NamespaceSystem)
+}
+
+func (s *QNTXServer) federatedAnthropicClient(kept anthropicKept, i *issuer, subject, namespace string) (anthropic.Client, error) {
 	base := s.anthropicBaseURL
 	if base == "" {
 		base = anthropicAPI
@@ -53,7 +58,7 @@ func (s *QNTXServer) anthropicClient(kept anthropicKept) (anthropic.Client, erro
 	return anthropic.NewClient(
 		option.WithoutEnvironmentDefaults(),
 		option.WithBaseURL(base),
-		option.WithFederationTokenProvider(i.identityTokenOf(s.nodeDID.DID, auth.NamespaceSystem), option.FederationOptions{
+		option.WithFederationTokenProvider(i.identityTokenOf(subject, namespace), option.FederationOptions{
 			FederationRuleID: kept.ids["federation_rule_id"], OrganizationID: kept.ids["organization_id"],
 			ServiceAccountID: kept.ids["service_account_id"], WorkspaceID: kept.ids["workspace_id"],
 		}),
@@ -62,6 +67,12 @@ func (s *QNTXServer) anthropicClient(kept anthropicKept) (anthropic.Client, erro
 
 // managedIsSaidToBe is what an element's agent at Anthropic is told it is.
 func managedIsSaidToBe(a *rootAgent) string {
+	if a.namespace != "" && a.namespace != auth.NamespaceSystem {
+		return "You are the shared agent of the namespace " + a.namespace + " on a QNTX node, running in Anthropic's environment, off the node. " +
+			"Your DID is " + a.did + ". The node's sigils are the tools of the MCP server named " + nodeAgentMCP +
+			", which you reach with your own token; they act in " + a.namespace + " and nowhere else. " +
+			"You hold no API key or credential of the node's."
+	}
 	if story := storyOf(a.element); story != "" {
 		return "You run at Anthropic, in a container of your own, not on the machine the node runs on. Your DID is " + a.did + ". " +
 			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " + elementsAware(a.element)
@@ -86,8 +97,12 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 	if err != nil {
 		return claudecode.Answer{}, err
 	}
+	return s.runManagedWithClient(agent, said, shot, kept, client, each)
+}
+
+func (s *QNTXServer) runManagedWithClient(agent *rootAgent, said claudecode.Said, shot shaken, kept anthropicKept, client anthropic.Client, each func(claudecode.Message)) (claudecode.Answer, error) {
 	ctx := s.ctx
-	environment, err := s.managedEnvironment(ctx, client)
+	environment, err := s.managedEnvironment(ctx, client, agent, kept)
 	if err != nil {
 		return claudecode.Answer{}, err
 	}
@@ -241,22 +256,36 @@ func (s shaken) content(told string) ([]anthropic.BetaManagedAgentsUserMessageEv
 	}, nil
 }
 
-// managedEnvironment is the cloud Environment every element's agent runs in, made once.
-func (s *QNTXServer) managedEnvironment(ctx context.Context, client anthropic.Client) (string, error) {
-	file := filepath.Join(s.nodeAgent.home, managedEnvironmentFile)
+// managedEnvironment is the cloud Environment for an Anthropic organization, made once.
+func (s *QNTXServer) managedEnvironment(ctx context.Context, client anthropic.Client, agent *rootAgent, kept anthropicKept) (string, error) {
+	home := s.agentsDir
+	if s.nodeAgent != nil {
+		home = s.nodeAgent.home
+	}
+	if agent.namespace != "" && agent.namespace != auth.NamespaceSystem {
+		home = filepath.Join(s.agentsDir, "anthropic-organizations", slug.Of(kept.ids["organization_id"]))
+	}
+	file := filepath.Join(home, managedEnvironmentFile)
 	if held, err := os.ReadFile(file); err == nil {
 		return strings.TrimSpace(string(held)), nil
 	} else if !os.IsNotExist(err) {
 		return "", errors.Wrapf(err, "the Environment at Anthropic kept in %s did not read", file)
 	}
+	name := "qntx-element-agents"
+	if agent.namespace != "" && agent.namespace != auth.NamespaceSystem {
+		name = "qntx-namespace-agents"
+	}
 	made, err := client.Beta.Environments.New(ctx, anthropic.BetaEnvironmentNewParams{
-		Name: "qntx-element-agents",
+		Name: name,
 		Config: anthropic.BetaEnvironmentNewParamsConfigUnion{OfCloud: &anthropic.BetaCloudConfigParams{
 			Networking: anthropic.BetaCloudConfigParamsNetworkingUnion{OfUnrestricted: &anthropic.BetaUnrestrictedNetworkParam{}},
 		}},
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "no Environment was made at Anthropic for the node's element agents")
+		return "", errors.Wrapf(err, "no Environment was made at Anthropic for %s", managedAgentLabel(agent))
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
+		return "", errors.Wrapf(err, "could not create %s", filepath.Dir(file))
 	}
 	if err := os.WriteFile(file, []byte(made.ID), 0o600); err != nil {
 		return "", errors.Wrapf(err, "the Environment %s made at Anthropic was not kept in %s", made.ID, file)
@@ -280,9 +309,10 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 	// Anthropic reaches the node from outside: at its public origin, not the address it serves on.
 	mcp := s.authHandler.PublicOrigin() + "/mcp"
 	made := held.Agent == ""
+	name := managedName(agent)
 	if made {
 		created, err := client.Beta.Agents.New(ctx, anthropic.BetaAgentNewParams{
-			Name:       "qntx-element-" + agent.element,
+			Name:       name,
 			Model:      anthropic.BetaManagedAgentsModelConfigParams{ID: anthropic.BetaManagedAgentsModel(model)},
 			System:     anthropic.String(managedIsSaidToBe(agent)),
 			MCPServers: []anthropic.BetaManagedAgentsURLMCPServerParams{{Name: nodeAgentMCP, URL: mcp}},
@@ -306,7 +336,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		}
 	}
 	if held.Vault == "" {
-		vault, err := client.Beta.Vaults.New(ctx, anthropic.BetaVaultNewParams{DisplayName: "qntx-element-" + agent.element})
+		vault, err := client.Beta.Vaults.New(ctx, anthropic.BetaVaultNewParams{DisplayName: name})
 		if err != nil {
 			return managedOf{}, errors.Wrapf(err, "no Vault was made at Anthropic for the element %s", agent.element)
 		}
@@ -341,8 +371,8 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 	// A Session that ends takes what the agent learned with it; its Memory does not.
 	if held.Memory == "" {
 		memory, err := client.Beta.MemoryStores.New(ctx, anthropic.BetaMemoryStoreNewParams{
-			Name:        "qntx-element-" + agent.element,
-			Description: anthropic.String("What you, the element " + agent.element + ", learned in your conversations with ROOT, kept for every conversation after."),
+			Name:        name,
+			Description: anthropic.String("What you, " + managedAgentLabel(agent) + ", learned in your conversations with ROOT, kept for every conversation after."),
 		})
 		if err != nil {
 			return managedOf{}, errors.Wrapf(err, "no Memory was made at Anthropic for the element %s", agent.element)
@@ -367,7 +397,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		session, err := client.Beta.Sessions.New(ctx, anthropic.BetaSessionNewParams{
 			Agent:         anthropic.BetaSessionNewParamsAgentUnion{OfString: anthropic.String(held.Agent)},
 			EnvironmentID: environment,
-			Title:         anthropic.String("the element " + agent.element),
+			Title:         anthropic.String(managedAgentLabel(agent)),
 			VaultIDs:      []string{held.Vault},
 			Resources:     []anthropic.BetaSessionNewParamsResourceUnion{{OfMemoryStore: &anthropic.BetaManagedAgentsMemoryStoreResourceParam{MemoryStoreID: held.Memory}}},
 		})
@@ -381,4 +411,18 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		s.logger.Infow("the element's agent runs at Anthropic", "element", agent.element, "agent", held.Agent, "vault", held.Vault, "memory", held.Memory, "session", held.Session)
 	}
 	return held, nil
+}
+
+func managedName(agent *rootAgent) string {
+	if agent.namespace != "" && agent.namespace != auth.NamespaceSystem {
+		return "qntx-namespace-" + slug.Of(agent.namespace)
+	}
+	return "qntx-element-" + agent.element
+}
+
+func managedAgentLabel(agent *rootAgent) string {
+	if agent.namespace != "" && agent.namespace != auth.NamespaceSystem {
+		return "the namespace " + agent.namespace
+	}
+	return "the element " + agent.element
 }

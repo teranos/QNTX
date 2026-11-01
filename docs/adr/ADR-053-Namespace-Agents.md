@@ -56,6 +56,41 @@ MCP token and Ground, and keeps its QNTX transcript session separate from the
 Codex thread used for resumption. See the [runtime documentation](https://github.com/teranos/QNTX/blob/main/internal/codex/README.md)
 for prerequisites and limits. Authentication setup is deferred.
 
+## Anthropic workload identity federation
+
+Story 28: USER runs the namespace agent at Anthropic
+
+```gherkin
+Feature: USER runs the namespace agent at Anthropic
+
+  "oidc for each namespace each with their own rpid"
+  "we will not be doing API key anymore"
+
+  Scenario: USER registers the namespace's issuer
+    Given I am standing in a namespace
+    When I register the namespace's issuer at https://platform.claude.com/settings/workload-identity-federation
+    And I give the namespace its rule and service account
+    Then the namespace's agent runs in Anthropic's environment, off the box
+    And my Anthropic organization pays for its model calls
+    And no Anthropic API key is kept
+```
+
+- `namespace_anthropic_issuer` gives the namespace's issuer URL and stable
+  subject to register at
+  [Anthropic workload identity federation](https://platform.claude.com/settings/workload-identity-federation).
+  Each namespace has a distinct issuer URL under `/oidc/` and its own
+  deterministically derived signing key.
+- `namespace_anthropic_set` keeps the organization's UUID, issuer ID, rule ID,
+  service-account ID and optional workspace ID as attestations in that
+  namespace. ROOT, SUPER or the namespace owner sets them; no API key is stored.
+- A namespace opts into `harness=anthropic` with `agents_set`. Its Claude model
+  calls run in Anthropic Managed Agents, authenticated with the namespace's
+  OIDC identity and federation rule. The namespace's token for the node's MCP
+  is held in Anthropic's Vault; the node does not hand Anthropic an API key.
+- The namespace's own Anthropic registration is independent of ROOT's
+  registration. The organization, rule and service-account IDs are not kept in
+  system or shared with another namespace.
+
 ## Not done
 
 - The namespace agent: its own DID derived from the node's key for that

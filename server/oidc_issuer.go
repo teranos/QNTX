@@ -18,12 +18,14 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/internal/access"
+	"github.com/teranos/QNTX/internal/slug"
 	errors "github.com/teranos/sacred-error"
 )
 
 const (
 	oidcDiscoveryPath = "/.well-known/openid-configuration"
 	oidcKeysPath      = "/.well-known/jwks.json"
+	namespaceOIDCPath = "/oidc/{namespace}"
 	// identityTokenAudience is who an identity token is for.
 	identityTokenAudience = "https://api.anthropic.com"
 	// identityTokenLifetime is within the issuer's maximum Anthropic holds it to.
@@ -46,6 +48,25 @@ func (s *QNTXServer) theIssuer() (*issuer, error) {
 		return nil, errors.New("this node runs without auth, so it has no public origin to issue identity tokens from")
 	}
 	return newIssuer(s.authHandler.PublicOrigin(), s.nodeDID.PrivateKey)
+}
+
+// namespaceIssuer is the issuer of namespace, with a URL and key of its own.
+func (s *QNTXServer) namespaceIssuer(namespace string) (*issuer, error) {
+	if s.nodeDID == nil {
+		return nil, errors.New("this node has no key of its own to derive a namespace issuer from")
+	}
+	if s.authHandler == nil {
+		return nil, errors.New("this node has no public origin to issue namespace identity tokens from")
+	}
+	key, err := access.DeriveKey(s.nodeDID.PrivateKey, "oidc:namespace:"+slug.Of(namespace))
+	if err != nil {
+		return nil, err
+	}
+	return newIssuer(s.authHandler.PublicOrigin()+namespaceOIDCURLPath(namespace), key)
+}
+
+func namespaceOIDCURLPath(namespace string) string {
+	return "/oidc/" + slug.Of(namespace)
 }
 
 // newIssuer is the issuer at url whose key is derived from node.
@@ -111,4 +132,58 @@ func (s *QNTXServer) HandleOIDCKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = writeJSON(w, http.StatusOK, jose.JSONWebKeySet{Keys: []jose.JSONWebKey{i.jwk}})
+}
+
+// HandleNamespaceOIDCDiscovery answers the issuer document for one namespace.
+func (s *QNTXServer) HandleNamespaceOIDCDiscovery(w http.ResponseWriter, r *http.Request) {
+	i, err := s.namespaceIssuerForPath(r.PathValue("namespace"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "this namespace issues no identity tokens: "+err.Error())
+		return
+	}
+	_ = writeJSON(w, http.StatusOK, map[string]any{
+		"issuer":                                i.url,
+		"jwks_uri":                              i.url + oidcKeysPath,
+		"id_token_signing_alg_values_supported": []string{string(jose.ES256)},
+		"response_types_supported":              []string{"id_token"},
+		"subject_types_supported":               []string{"public"},
+	})
+}
+
+// HandleNamespaceOIDCKeys answers the public key for one namespace's issuer.
+func (s *QNTXServer) HandleNamespaceOIDCKeys(w http.ResponseWriter, r *http.Request) {
+	i, err := s.namespaceIssuerForPath(r.PathValue("namespace"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "this namespace issues no identity tokens: "+err.Error())
+		return
+	}
+	_ = writeJSON(w, http.StatusOK, jose.JSONWebKeySet{Keys: []jose.JSONWebKey{i.jwk}})
+}
+
+func (s *QNTXServer) namespaceIssuerForPath(path string) (*issuer, error) {
+	if s.authHandler == nil {
+		return nil, errors.New("this node has no public origin")
+	}
+	known := s.held.Known()
+	if known == nil {
+		return nil, errors.New("this node keeps no namespace definitions")
+	}
+	namespaces, err := known.List()
+	if err != nil {
+		return nil, errors.Wrap(err, "namespace definitions did not answer")
+	}
+	var namespace string
+	for _, ns := range namespaces {
+		if slug.Of(ns.Name) != path {
+			continue
+		}
+		if namespace != "" {
+			return nil, errors.Newf("namespace path %q names more than one namespace", path)
+		}
+		namespace = ns.Name
+	}
+	if namespace == "" {
+		return nil, errors.Newf("no namespace has issuer path %q", path)
+	}
+	return s.namespaceIssuer(namespace)
 }

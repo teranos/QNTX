@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // "Each agent it hosts is described by an Agent Card and reached by its
@@ -78,6 +79,30 @@ func TestAMessageAtANamespaceIsATaskOfItsAgent(t *testing.T) {
 	assert.Equal(t, float64(1), at(listed, "totalSize"))
 	_, listed = askedOverA2A(t, s, root, http.MethodGet, "/a2a/tasks", "")
 	assert.Equal(t, float64(0), at(listed, "totalSize"))
+}
+
+func TestA2ACardAndTaskPreferTheSameNamespaceHarness(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	keyedNode(s)
+	root := auth.Admitted(auth.LevelRoot)
+	root.Identity = "https://example.org/root"
+	model := "gpt-5.3-codex"
+	require.NoError(t, s.setAgentLine(root, "garden", agentLineCodex, map[string]any{"model": model, "sandbox": "read-only"}))
+	require.NoError(t, s.setAgentLine(root, "garden", agentLineAnthropic, map[string]any{"model": "claude-sonnet-5-5"}))
+	home, err := s.agentHome("garden", model)
+	require.NoError(t, err)
+	underGround(t, home)
+	s.underGround.add(home)
+
+	task, refused := s.namespaceTaskAgent(root, "garden")
+	require.Nil(t, refused)
+	assert.Equal(t, agentLineCodex, task.asked["harness"])
+
+	card, refused := s.namespaceAgentCard(httptest.NewRequest(http.MethodGet, "/a2a/garden/extendedAgentCard", nil), "garden")
+	require.Nil(t, refused)
+	raw, err := protojson.Marshal(card)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"name":"the agent of garden, `+model+`"`)
 }
 
 // "AGENT PER ELEMENT, EACH ELEMENT IS ITS OWN CONVERSATION" (ADR-054): an
