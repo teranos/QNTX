@@ -223,10 +223,12 @@ func TestOneWatcherThatWillNotSettleHoldsBackNoneOfTheOthers(t *testing.T) {
 		ActionType: storage.ActionTypePython, MaxFiresPerSecond: 1, Enabled: true, Filter: unbounded()}
 	next := &storage.Watcher{ID: "ax-element-ax-z-next", Name: "AX next",
 		ActionType: storage.ActionTypePython, MaxFiresPerSecond: 1, Enabled: true, Filter: unbounded()}
-	for _, w := range []*storage.Watcher{stuck, next} {
+	// Newest is listed first: the stuck one is written last, so it is reached first.
+	for _, w := range []*storage.Watcher{next, stuck} {
 		if err := store.Create(ctx, w); err != nil {
 			t.Fatalf("Create %s failed: %v", w.ID, err)
 		}
+		time.Sleep(1100 * time.Millisecond)
 	}
 	if _, err := db.Exec(`CREATE TRIGGER refuse_stuck BEFORE UPDATE ON watchers
 		WHEN OLD.id = 'ax-element-ax-a-stuck' BEGIN SELECT RAISE(ABORT, 'refused'); END`); err != nil {
