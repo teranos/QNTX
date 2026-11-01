@@ -137,9 +137,25 @@ func (h *Handler) NewGitHubWebhook(mintedBy string) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "failed to mint the App's webhook secret")
 	}
+	if err := keepGitHubWebhook(table, mintedBy, secret); err != nil {
+		return "", err
+	}
+	return secret, nil
+}
+
+// SetGitHubWebhook keeps the webhook secret of the node forwarding deliveries here.
+func (h *Handler) SetGitHubWebhook(mintedBy, secret string) error {
+	table, ok := h.tokens.(*TokenTable)
+	if !ok {
+		return errors.Newf("the token store %T keeps no webhook secret", h.tokens)
+	}
+	return keepGitHubWebhook(table, mintedBy, secret)
+}
+
+func keepGitHubWebhook(table *TokenTable, mintedBy, secret string) error {
 	held, found, err := table.byHash(githubWebhookHash())
 	if err != nil {
-		return "", err
+		return err
 	}
 	if !found {
 		held = TokenRecord{
@@ -152,10 +168,7 @@ func (h *Handler) NewGitHubWebhook(mintedBy string) (string, error) {
 	}
 	held.MintedBy = mintedBy
 	held.GitHub = &GitHubSecret{Token: secret, Source: GitHubSourceWebhook}
-	if err := table.put(wholeToken(held)); err != nil {
-		return "", errors.Wrap(err, "the App's webhook secret was not kept")
-	}
-	return secret, nil
+	return errors.Wrap(table.put(wholeToken(held)), "the App's webhook secret was not kept")
 }
 
 // PublicOrigin is where this node answers from outside, the origin its
