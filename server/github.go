@@ -17,6 +17,7 @@ import (
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -64,6 +65,7 @@ type gitHubHost interface {
 	buildsMovedBy(forge.Push) []string
 	vaultsMovedBy(forge.Push) []string
 	cometsMovedBy(forge.Push) []string
+	enqueueForward(*async.Job) error
 }
 
 // TODO(forge): Credentials per forge host (see GitHubKeeper).
@@ -139,7 +141,8 @@ func (g *gitHub) signum() sigil.Signum {
 				},
 				{
 					Name:   "webhook",
-					Does:   "Generate the App's webhook secret, replacing the one before, and open the webhook's path. It is shown this once, to set in the App's settings.",
+					Does:   "Generate the App's webhook secret, replacing the one before, and open the webhook's path. It is shown this once, to set in the App's settings. Given a secret, keep that one instead: a node a delivery is forwarded to holds the secret of the node forwarding it.",
+					Takes:  []*protocol.Param{{Name: "secret", Says: "The webhook secret of the node forwarding deliveries here. Left out, one is generated."}},
 					Answer: "protocol.GitHubWebhook",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/webhook"},
 				},
@@ -178,6 +181,7 @@ func (g *gitHub) signum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/runner"},
 				},
 				githubFollowSigil(),
+				githubForwardSigil(),
 				githubAskSigils()[0],
 				githubAskSigils()[1],
 			},
@@ -190,6 +194,7 @@ func (g *gitHub) signum() sigil.Signum {
 			"webhook":      g.githubWebhook,
 			"webhook_path": g.githubWebhookPath,
 			"follow":       g.githubFollow,
+			"forward":      g.githubForward,
 			"ask":          g.githubAsk,
 			"operations":   g.githubOperations,
 		},
@@ -350,11 +355,17 @@ func (g *gitHub) githubRunner(ctx context.Context, sent sigil.Sent) (any, *proto
 	return &protocol.GitHubRunnerSet{Runner: g.runnerStatus(settings)}, nil
 }
 
-func (g *gitHub) githubWebhook(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+func (g *gitHub) githubWebhook(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	if g.host.login() == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no login, so it keeps no webhook secret"}
 	}
-	secret, err := g.host.login().NewGitHubWebhook(actorOf(ctx))
+	secret := sent["secret"]
+	var err error
+	if secret != "" {
+		err = g.host.login().SetGitHubWebhook(actorOf(ctx), secret)
+	} else {
+		secret, err = g.host.login().NewGitHubWebhook(actorOf(ctx))
+	}
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}

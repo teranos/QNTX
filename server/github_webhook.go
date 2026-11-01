@@ -144,6 +144,8 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	// TODO(forge): The event names (workflow_run, push, pull_request, check_run, check_suite) are GitHub's. The handler decodes forge events, and the adapter names its own.
 	event := r.Header.Get("X-GitHub-Event")
+	// Before the delivery is handled: this node being slow over it holds nobody else back.
+	g.forward(event, r.Header.Get("X-GitHub-Delivery"), r.Header.Get("X-Hub-Signature-256"), body)
 	if event == "workflow_run" {
 		var run gitHubWorkflowRun
 		if err := json.Unmarshal(body, &run); err != nil {
