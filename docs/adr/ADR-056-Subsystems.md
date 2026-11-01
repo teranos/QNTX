@@ -52,6 +52,15 @@ Status: Implemented
 
 - QNTX names no subsystem and decides none of a subsystem's policy. What is acceptable, what is refused, what goes back to whom: the subsystem's, in its own repository, as its organisation decides.
 
+## A node the App's webhook does not point at
+
+"GitHub webhooks arrive here", on q, and the subsystem is on k.
+
+"if it doesnt, we need to make it do it"
+
+- A node forwards the App's deliveries to the URLs ROOT names (`POST /api/github/forward`, `GITHUB forward:<url>`), the body and GitHub's signature untouched, so the node receiving them verifies it with the App's webhook secret it holds too.
+- A forward is a job, written before the delivery is handled, so a delivery the node takes too long over still leaves. A delivery the far node did not answer stays failed until a sweep queues it again; a status the far node gave itself is an answer, kept on the failed job and not sent again.
+
 ## What the contract does not carry
 
 - Reach. The tablet is the deployment's, compiled in ([server/reach/tablet.go](https://github.com/teranos/QNTX/blob/main/server/reach/tablet.go)); a deployment builds with its own (`withTablet`, [flake.nix](https://github.com/teranos/QNTX/blob/main/flake.nix)). A subsystem's path no line names is served to ROOT alone, as any such path is.
