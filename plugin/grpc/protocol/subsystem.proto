@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+import "plugin/grpc/protocol/domain.proto";
+import "plugin/grpc/protocol/sigil.proto";
+
+// A subsystem is compiled into a node by the main that links it, or left out
+// (ADR-056). This is what one declares; what it does is Go behind these names:
+// the functions that answer its sigils, the built-ins it registers, the
+// delivery listener it may be. None of that is here, as none of a sigil's is:
+// "a function is not a shape"
+//
+// QNTX itself names no subsystem. A subsystem is an organisation's: its own
+// repository, its own policy, linked into the node that organisation runs.
+message Subsystem {
+  // One word, the way a plugin is named: quotes.
+  string name = 1;
+  // The signa it holds, served as the node's own: their paths on the HTTP
+  // API, their sigils as MCP tools, their operations in the document. A
+  // sigil's answer is a message of the subsystem's own .proto, named in full.
+  repeated Signum signa = 2;
+  // What every namespace watches for it: rows of the standing table, each
+  // reaching one of its built-ins by handler_name. A row stands beside QNTX's
+  // own, on every namespace, from the node's start.
+  repeated WatcherRegistration standing = 3;
+  // The built-ins it registers at start, by name. A standing row reaches one;
+  // a job the subsystem enqueues itself reaches another.
+  repeated string handler_names = 4;
+  // What its messages and fields say of themselves, by full name, in its
+  // .proto's words: for the subsystem's own messages what protocol.says.json
+  // holds for QNTX's. A sigil's fields are described from here.
+  map<string, string> says = 5;
+  // The GitHub events it reads off the App's webhook, by GitHub's names for
+  // them: push, pull_request. Empty is a subsystem that reads no delivery.
+  repeated string github_events = 6;
+}

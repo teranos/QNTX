@@ -54,6 +54,11 @@ var subsystems = []subsystemEntry{
 	{sub: watcherSubsystem{}, policy: SubsystemWarn},
 	{sub: canvasSubsystem{}, policy: SubsystemFatal},
 	{sub: embeddingSubsystem{}, policy: SubsystemWarn},
+	// The subsystems linked into this build (ADR-056): after the daemon, the
+	// doors and the namespaces they are handed exist, before the namespaces
+	// start and the rows they stood are watched. Fatal: a build whose own
+	// subsystem does not start is a build that is wrong.
+	{sub: linkedSubsystem{}, policy: SubsystemFatal},
 	{sub: configWatcherSubsystem{}, policy: SubsystemWarn},
 }
 

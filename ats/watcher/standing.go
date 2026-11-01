@@ -47,29 +47,6 @@ const StandingDispatchSent = "standing-dispatch-sent"
 // accepted and what sky streams here. One spelling, shared with the handler.
 const DispatchSentPredicate = "immediate:dispatch"
 
-// StandingQuoteClaimed watches for ground attesting the quoted spans a write
-// carried. The handler it names asks each span of the namespace's prompts.
-const StandingQuoteClaimed = "standing-quote-claimed"
-
-// QuoteClaimedPredicate is what ground's PostToolUse writes and sky streams
-// here. One spelling, shared with the handler.
-const QuoteClaimedPredicate = "quote:claimed"
-
-// QuoteProvenanceHandlerName is the built-in the row above reaches.
-const QuoteProvenanceHandlerName = "quote.provenance"
-
-// StandingQuoteRemoved watches for ground attesting the quoted spans a commit
-// took out and put back nowhere. The handler it names asks which of them the
-// person said.
-const StandingQuoteRemoved = "standing-quote-removed"
-
-// QuoteRemovedPredicate is what ground writes after a commit and sky streams
-// here. One spelling, shared with the handler.
-const QuoteRemovedPredicate = "quote:removed"
-
-// QuoteRemovalHandlerName is the built-in the row above reaches.
-const QuoteRemovalHandlerName = "quote.removal"
-
 // StandingApproval tells the pages that an approval moved: asked, checked,
 // answered, merged or closed (ADR-052). The approvals element reads the lines
 // again; the row announcing one is not what it draws.
@@ -127,28 +104,6 @@ var standing = []storage.Watcher{
 		Enabled:           true,
 	},
 	{
-		ID:   StandingQuoteClaimed,
-		Name: "a write carried quoted spans",
-		// The write passed on the laptop; whether anybody said the words is
-		// asked here, of the prompts this namespace holds.
-		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{QuoteClaimedPredicate}},
-		ActionType:        storage.ActionTypeBuiltinExecute,
-		ActionData:        `{"handler_name":"` + QuoteProvenanceHandlerName + `"}`,
-		MaxFiresPerSecond: 10,
-		Enabled:           true,
-	},
-	{
-		ID:   StandingQuoteRemoved,
-		Name: "a commit took quoted spans out",
-		// The commit landed on the laptop; whether what it took out was the
-		// person's words is asked here, of the prompts this namespace holds.
-		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{QuoteRemovedPredicate}},
-		ActionType:        storage.ActionTypeBuiltinExecute,
-		ActionData:        `{"handler_name":"` + QuoteRemovalHandlerName + `"}`,
-		MaxFiresPerSecond: 10,
-		Enabled:           true,
-	},
-	{
 		ID:   StandingApproval,
 		Name: "an approval moved",
 		// The page holds the roll it drew; told, it reads the lines again and
@@ -161,11 +116,18 @@ var standing = []storage.Watcher{
 	},
 }
 
-// Standing is what every namespace watches, as fresh values. The engine lays
-// what a store holds over these, and a stored row cannot take one away.
+// Standing is what every namespace watches, as fresh values: what this build
+// is born with, then what the subsystems linked in stood (Stand). The engine
+// lays what a store holds over these, and a stored row cannot take one away.
 func Standing() []*storage.Watcher {
-	held := make([]*storage.Watcher, 0, len(standing))
+	stoodMu.RLock()
+	defer stoodMu.RUnlock()
+	held := make([]*storage.Watcher, 0, len(standing)+len(stood))
 	for _, w := range standing {
+		row := w
+		held = append(held, &row)
+	}
+	for _, w := range stood {
 		row := w
 		held = append(held, &row)
 	}
@@ -201,10 +163,8 @@ func standingReadsNoType(names []string) ([]*types.As, error) {
 // IsStanding reports whether an id belongs to the table. The routes that write
 // watchers ask this: a standing row is not a person's to edit or delete.
 func IsStanding(id string) bool {
-	for _, w := range standing {
-		if w.ID == id {
-			return true
-		}
-	}
-	return false
+	stoodMu.RLock()
+	defer stoodMu.RUnlock()
+	_, standing := standingRow(id)
+	return standing
 }

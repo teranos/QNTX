@@ -100,7 +100,7 @@ in
           # Test with core tags to ensure we test what we ship
           run = ''
             export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-            go test -tags "rustsqlite,qntxwasm,qntxquote" ./...
+            go test -tags "rustsqlite,qntxwasm" ./...
           '';
         }
       ];
@@ -114,7 +114,7 @@ in
           name = "Run integration tests";
           run = ''
             export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-            go test -tags="rustsqlite,qntxwasm,qntxquote,integration" ./...
+            go test -tags="rustsqlite,qntxwasm,integration" ./...
           '';
         }
       ];
