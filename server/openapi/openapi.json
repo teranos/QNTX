@@ -118,6 +118,20 @@
         "USER"
       ]
     },
+    "/api/agents/{namespace}/anthropic": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "USER"
+      ]
+    },
+    "/api/agents/{namespace}/issuer": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "USER"
+      ]
+    },
     "/api/agents/{namespace}/login": {
       "x-qntx-reach": [
         "ROOT",
@@ -993,6 +1007,16 @@
         "ANYONE"
       ],
       "x-qntx-prefix": true
+    },
+    "/oidc/{namespace}/.well-known/jwks.json": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/oidc/{namespace}/.well-known/openid-configuration": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
     },
     "/openapi.json": {
       "x-qntx-reach": [
