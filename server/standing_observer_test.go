@@ -7,7 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
-	"github.com/teranos/QNTX/server/quote"
+	"github.com/teranos/QNTX/server/namespaces"
 	"go.uber.org/zap"
 )
 
@@ -76,7 +76,7 @@ func TestStandingObserverWithNoExecutorFiresNothing(t *testing.T) {
 type fakeBuiltins struct{ namespaces []string }
 
 func (f *fakeBuiltins) ExecuteBuiltin(ctx context.Context, name string, as *types.As) error {
-	f.namespaces = append(f.namespaces, quote.NamespaceOf(ctx))
+	f.namespaces = append(f.namespaces, namespaces.NamespaceOf(ctx))
 	return nil
 }
 
@@ -88,7 +88,7 @@ func TestStandingObserverNamesItsNamespace(t *testing.T) {
 		namespace: "ground",
 		logger:    zap.NewNop().Sugar(),
 	}
-	o.OnAttestationCreated(&types.As{ID: "c", Predicates: []string{watcher.QuoteClaimedPredicate}})
+	o.OnAttestationCreated(&types.As{ID: "c", Predicates: []string{watcher.CIPushedPredicate}})
 	if len(f.namespaces) != 1 || f.namespaces[0] != "ground" {
 		t.Errorf("the built-in ran in %v, not in the namespace the row landed in", f.namespaces)
 	}

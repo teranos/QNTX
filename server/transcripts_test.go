@@ -3,8 +3,6 @@ package server
 import (
 	"context"
 	"github.com/teranos/QNTX/plugin"
-	"github.com/teranos/QNTX/server/parity"
-	"github.com/teranos/QNTX/server/quote"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,7 +13,6 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	"go.uber.org/zap/zaptest"
@@ -240,90 +237,9 @@ func TestAQueuedPromptIsTheHumanSpeaking(t *testing.T) {
 	assert.Equal(t, "and also, check open pr's", read[0].Turns[4].Text)
 }
 
-// Jenny: a quote is asked of what the person said, and that is the human turns
-// of the namespace's transcripts: nothing the agent said, nothing outside a session.
-// "make quote read the transcript's human turns?"
-func TestQuoteReadsTheTranscriptsHumanTurns(t *testing.T) {
-	store, db := qntxtest.CreateTestStore(t)
-	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
-	stray := streamed("c", "UserPromptSubmit", "", at, map[string]any{"prompt": "nowhere"})
-	stray.Contexts = []string{"project:teranos/QNTX"}
-	rows := append(aSession(at), stray,
-		streamed("ground:queued:1", "QueuedPromptSubmit", "s-2", at.Add(time.Hour), map[string]any{"prompt": "and also, check open pr's"}))
-	for _, as := range rows {
-		require.NoError(t, store.CreateAttestation(as))
-	}
-	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
-
-	said, err := s.namespaceSaid(auth.NamespaceDefault)
-	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"Build QNTX here", "and also, check open pr's"}, quote.Texts(said))
-	// Each prompt comes with its row: who typed it, when, in which session.
-	for _, one := range said {
-		if one.Row == "" || one.Session == "" || one.At == "" {
-			t.Errorf("a prompt without its row: %+v", one)
-		}
-	}
-}
-
 // "if SUPER cant access transcripts, make it so SUPER can access it"
 func TestTranscriptsAreRootsAndSupers(t *testing.T) {
 	compiled, err := reach.Reached()
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ROOT", "SUPER"}, compiled["/api/transcripts"])
-}
-
-// transcripts follows tei: a turn and a Quote are q, an Interp is interp, and
-// parity finds nothing of theirs missing from the pin and no departure.
-func TestTranscriptsFollowTEI(t *testing.T) {
-	schema, refused := parity.Reference("tei")
-	require.Nil(t, refused)
-	s := &QNTXServer{}
-	p, refused := parity.Hold(s.transcriptsSignum().Signum, "", "tei", schema)
-	require.Nil(t, refused)
-	assert.Empty(t, p.Missing)
-	// A turn's speaker and row are one value where TEI's who and source are
-	// lists: the one departure, shown rather than hidden. A Quote departs nowhere.
-	var departed []string
-	for _, clade := range p.Clades {
-		for _, item := range clade.Items {
-			for _, d := range item.Departs {
-				departed = append(departed, clade.Model+"."+item.Column+": "+d)
-			}
-		}
-	}
-	assert.ElementsMatch(t, []string{
-		"q.who: a list in the schema, and protocol.Turn.speaker is one value",
-		"q.source: a list in the schema, and protocol.Turn.of is one value",
-	}, departed)
-}
-
-// What an agent wrote is read from ground's rows with the session's model: the
-// words a Write put in a file, and an Edit's new string, each as a Wrote.
-func TestAgentWritesAreReadWithTheirSessionsModel(t *testing.T) {
-	store, db := qntxtest.CreateTestStore(t)
-	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
-	rows := []*types.As{
-		streamed("start", "SessionStart", "s-7", at, map[string]any{"model": "claude-opus-5-5", "source": "startup"}),
-		streamed("w1", "PostToolUse", "s-7", at.Add(time.Minute), map[string]any{"tool_name": "Write", "tool_input": map[string]any{"file_path": "docs/x.md", "content": "intro\nthe agent wrote this line\n"}}),
-		streamed("e1", "PostToolUse", "s-7", at.Add(2*time.Minute), map[string]any{"tool_name": "Edit", "tool_input": map[string]any{"file_path": "docs/x.md", "old_string": "a", "new_string": "and this one"}}),
-		streamed("r1", "PostToolUse", "s-7", at.Add(3*time.Minute), map[string]any{"tool_name": "Read", "tool_input": map[string]any{"file_path": "docs/x.md"}}),
-	}
-	for _, as := range rows {
-		require.NoError(t, store.CreateAttestation(as))
-	}
-	s := &QNTXServer{held: servingOne(db, store), logger: zaptest.NewLogger(t).Sugar()}
-	reading, err := s.held.Read(auth.NamespaceDefault)
-	require.NoError(t, err)
-	wrote, err := agentWritesIn(reading)
-	require.NoError(t, err)
-	require.Len(t, wrote, 2)
-	for _, w := range wrote {
-		assert.Equal(t, "claude-opus-5-5", w.Model)
-		assert.Equal(t, "s-7", w.Session)
-		assert.Equal(t, "docs/x.md", w.File)
-	}
-	if w, sure := quote.WroteLine(wrote, "  the agent wrote this line"); !sure || w.Row != "w1" {
-		t.Errorf("the line was not found in the agent's write: %+v %v", w, sure)
-	}
 }

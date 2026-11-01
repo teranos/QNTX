@@ -37,7 +37,6 @@ pub mod ax;
 pub mod classify;
 pub mod expand;
 pub mod parser;
-pub mod quote;
 pub mod similarity;
 pub mod span;
 pub mod storage;

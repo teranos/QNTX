@@ -47,29 +47,6 @@ const StandingDispatchSent = "standing-dispatch-sent"
 // accepted and what sky streams here. One spelling, shared with the handler.
 const DispatchSentPredicate = "immediate:dispatch"
 
-// StandingQuoteClaimed watches for ground attesting the quoted spans a write
-// carried. The handler it names asks each span of the namespace's prompts.
-const StandingQuoteClaimed = "standing-quote-claimed"
-
-// QuoteClaimedPredicate is what ground's PostToolUse writes and sky streams
-// here. One spelling, shared with the handler.
-const QuoteClaimedPredicate = "quote:claimed"
-
-// QuoteProvenanceHandlerName is the built-in the row above reaches.
-const QuoteProvenanceHandlerName = "quote.provenance"
-
-// StandingQuoteRemoved watches for ground attesting the quoted spans a commit
-// took out and put back nowhere. The handler it names asks which of them the
-// person said.
-const StandingQuoteRemoved = "standing-quote-removed"
-
-// QuoteRemovedPredicate is what ground writes after a commit and sky streams
-// here. One spelling, shared with the handler.
-const QuoteRemovedPredicate = "quote:removed"
-
-// QuoteRemovalHandlerName is the built-in the row above reaches.
-const QuoteRemovalHandlerName = "quote.removal"
-
 // StandingApproval tells the pages that an approval moved: asked, checked,
 // answered, merged or closed (ADR-052). The approvals element reads the lines
 // again; the row announcing one is not what it draws.
@@ -123,28 +100,6 @@ var standing = []storage.Watcher{
 		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{DispatchSentPredicate}},
 		ActionType:        storage.ActionTypeBuiltinExecute,
 		ActionData:        `{"handler_name":"` + CIWatchHandlerName + `"}`,
-		MaxFiresPerSecond: 10,
-		Enabled:           true,
-	},
-	{
-		ID:   StandingQuoteClaimed,
-		Name: "a write carried quoted spans",
-		// The write passed on the laptop; whether anybody said the words is
-		// asked here, of the prompts this namespace holds.
-		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{QuoteClaimedPredicate}},
-		ActionType:        storage.ActionTypeBuiltinExecute,
-		ActionData:        `{"handler_name":"` + QuoteProvenanceHandlerName + `"}`,
-		MaxFiresPerSecond: 10,
-		Enabled:           true,
-	},
-	{
-		ID:   StandingQuoteRemoved,
-		Name: "a commit took quoted spans out",
-		// The commit landed on the laptop; whether what it took out was the
-		// person's words is asked here, of the prompts this namespace holds.
-		Filter:            types.AxFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{QuoteRemovedPredicate}},
-		ActionType:        storage.ActionTypeBuiltinExecute,
-		ActionData:        `{"handler_name":"` + QuoteRemovalHandlerName + `"}`,
 		MaxFiresPerSecond: 10,
 		Enabled:           true,
 	},

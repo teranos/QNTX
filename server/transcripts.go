@@ -3,18 +3,15 @@ package server
 import (
 	"context"
 	"net/http"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
-	quotes "github.com/teranos/QNTX/ats/quote"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/namespaces"
-	"github.com/teranos/QNTX/server/quote"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
@@ -91,8 +88,7 @@ func (s *QNTXServer) transcriptsSignum() sigil.Signum {
 		Signum: &protocol.Signum{
 			Name:        "transcripts",
 			Description: "What was said and done in each agent session Ground recorded, read from the namespace the caller stands in.",
-			Tags:        []string{"transcripts", "agent", "session", "quote"},
-			Follows:     []*protocol.Follows{transcriptsFollowTEI()},
+			Tags:        []string{"transcripts", "agent", "session"},
 			Sigils: []*protocol.Sigil{
 				{
 					Name: "read",
@@ -104,18 +100,9 @@ func (s *QNTXServer) transcriptsSignum() sigil.Signum {
 					Answer: "protocol.Transcripts",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/transcripts"},
 				},
-				{
-					Name: "quoted",
-					Does: "The spans in double quotes of a text, each measured against what people said here, as TEI quotes: the words, whose they are, the turn they came from, and how many corrections away. A span inside an agent's quotation is the agent's and is not one.",
-					Takes: []*protocol.Param{
-						{Name: "text", Required: true, Says: "The words whose quoted spans are measured: a commit message, a PR description, a note."},
-					},
-					Answer: "protocol.Quotes",
-					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/transcripts/quoted"},
-				},
 			},
 		},
-		Answers: map[string]sigil.Answer{"read": s.transcriptsRead, "quoted": s.transcriptsQuoted},
+		Answers: map[string]sigil.Answer{"read": s.transcriptsRead},
 	}
 }
 
@@ -171,35 +158,6 @@ const maxHumanRead = 1_000_000
 // humanTurnsIn is everything the person said in the store: the human turns of
 // its transcripts, as typed. A store that will not answer is an error, not no
 // turns: the two read the same, and one of them calls every quote invented.
-// humanSaidIn is every prompt a namespace holds with the row it is in: who
-// typed it, when, in which session. What quote measures spans against.
-func humanSaidIn(store namespaces.Reading) ([]quote.Said, error) {
-	var said []quote.Said
-	for _, predicate := range humanPredicates {
-		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: maxHumanRead})
-		if err != nil {
-			return nil, errors.Wrapf(err, "reading %s", predicate)
-		}
-		for _, as := range found {
-			text, _ := as.Attributes["prompt"].(string)
-			if text == "" {
-				continue
-			}
-			// A prompt outside any session is no one's turn, as transcriptsOf reads them.
-			session := statusline.SessionOf(as.Contexts)
-			if session == "" {
-				continue
-			}
-			s := quote.Said{Text: text, Row: as.ID, At: as.Timestamp.UTC().Format(time.RFC3339), Session: session}
-			if len(as.Actors) > 0 {
-				s.Who = as.Actors[0]
-			}
-			said = append(said, s)
-		}
-	}
-	return said, nil
-}
-
 func humanTurnsIn(store namespaces.Reading) ([]string, error) {
 	var events []*types.As
 	for _, predicate := range humanPredicates {
@@ -428,161 +386,4 @@ func riteSaid(attrs map[string]any) string {
 		said += " " + strconv.Itoa(int(code))
 	}
 	return said
-}
-
-// transcriptsFollowTEI is how a transcript's turns and a Quote are TEI's q, and
-// an Interp its interp: the words as the element's content, the speaker as who,
-// the row as source. Transcripts are quotes a person said.
-func transcriptsFollowTEI() *protocol.Follows {
-	pairs := [][2]string{
-		{"protocol.Turn.text", "q.content"},
-		{"protocol.Turn.speaker", "q.who"},
-		{"protocol.Turn.of", "q.source"},
-		{"protocol.Quote.content", "q.content"},
-		{"protocol.Quote.who", "q.who"},
-		{"protocol.Quote.type", "q.type"},
-		{"protocol.Quote.source", "q.source"},
-		{"protocol.Quote.resp", "q.resp"},
-		{"protocol.Quote.cert", "q.cert"},
-		{"protocol.Quote.rend", "q.rend"},
-		{"protocol.Quote.ana", "q.ana"},
-		{"protocol.Quote.id", "q.xml:id"},
-		{"protocol.Interp.content", "interp.content"},
-		{"protocol.Interp.resp", "interp.resp"},
-		{"protocol.Interp.cert", "interp.cert"},
-		{"protocol.Interp.type", "interp.type"},
-		{"protocol.Interp.inst", "interp.inst"},
-		{"protocol.Interp.id", "interp.xml:id"},
-	}
-	follows := &protocol.Follows{Reference: "tei"}
-	for _, pair := range pairs {
-		follows.Columns = append(follows.Columns, &protocol.Corresponds{Field: pair[0], Column: pair[1]})
-	}
-	return follows
-}
-
-// transcriptsQuoted is transcripts quoted: the spans in double quotes of a
-// text, each measured against what people said in the namespace the caller
-// stands in, and answered as Quotes naming the turn each came from.
-func (s *QNTXServer) transcriptsQuoted(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	caller := sigil.Caller(ctx)
-	if caller == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "quotes are measured where their caller stands, and this asking carried no request"}
-	}
-	if !quotes.Carried {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "quotes are measured in Rust, which this build leaves out: it was built without qntxquote"}
-	}
-	if sent["text"] == "" {
-		return nil, &protocol.Refusal{Why: sigil.Missing, Param: "text", Says: "text is the words whose quoted spans are measured"}
-	}
-	spans := quote.Spans(sent["text"])
-	answer := &protocol.Quotes{}
-	if len(spans) == 0 {
-		return answer, nil
-	}
-	store, err := s.storeFor(caller)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no namespace to measure quotes in: " + err.Error()}
-	}
-	said, err := humanSaidIn(store)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the prompts did not read: " + err.Error()}
-	}
-	measured, err := quotes.Measure(spans, quote.Texts(said))
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	}
-	for i, span := range spans {
-		m := measured[i]
-		q := &protocol.Quote{Content: span, Type: "written", Rend: []string{`"`}, Cert: strconv.Itoa(m.Corrections)}
-		// Only a span the policy takes as the person's words names whose and from
-		// which turn; the nearest prompt to an unsourced one is no source.
-		if near, ok := quote.SaidAt(said, m); ok && quote.Near(m) {
-			q.Who = []string{near.Who}
-			q.Source = []string{near.Row}
-		}
-		answer.Quotes = append(answer.Quotes, q)
-	}
-	return answer, nil
-}
-
-// writePredicates are the rows that hold what a tool did; a Write or an Edit
-// among them holds the words an agent put in a file, in its tool_input.
-var writePredicates = []string{"PostToolUse", "GroundedPostToolUse"}
-
-// writingTools are the tools whose input is words put in a file.
-var writingTools = []string{"Write", "Edit", "MultiEdit", "NotebookEdit"}
-
-// agentWritesIn is every write an agent made in a namespace, as ground attested
-// it: the text, the file, the session, and the model the session ran on, read
-// off its SessionStart. What quote holds a landed line to, to be sure of whose it is.
-func agentWritesIn(store namespaces.Reading) ([]quote.Wrote, error) {
-	models := map[string]string{}
-	starts, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{"SessionStart"}, Limit: maxHumanRead})
-	if err != nil {
-		return nil, errors.Wrap(err, "reading SessionStart")
-	}
-	for _, as := range starts {
-		if model, _ := as.Attributes["model"].(string); model != "" {
-			models[statusline.SessionOf(as.Contexts)] = model
-		}
-	}
-	var writes []quote.Wrote
-	// What the agent said, as the Stop row holds its last message: a person
-	// quoting it is seen the same way as an agent's write.
-	for _, predicate := range []string{"Stop", "GroundedStop"} {
-		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: maxHumanRead})
-		if err != nil {
-			return nil, errors.Wrapf(err, "reading %s", predicate)
-		}
-		for _, as := range found {
-			said, _ := as.Attributes["last_assistant_message"].(string)
-			if said == "" {
-				continue
-			}
-			session := statusline.SessionOf(as.Contexts)
-			writes = append(writes, quote.Wrote{Text: said, Session: session, Model: models[session], Row: as.ID, At: as.Timestamp.UTC().Format(time.RFC3339)})
-		}
-	}
-	for _, predicate := range writePredicates {
-		found, err := store.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: maxHumanRead})
-		if err != nil {
-			return nil, errors.Wrapf(err, "reading %s", predicate)
-		}
-		for _, as := range found {
-			tool, _ := as.Attributes["tool_name"].(string)
-			if !slices.Contains(writingTools, tool) {
-				continue
-			}
-			input, _ := as.Attributes["tool_input"].(map[string]any)
-			file, _ := input["file_path"].(string)
-			session := statusline.SessionOf(as.Contexts)
-			for _, text := range writtenTexts(input) {
-				writes = append(writes, quote.Wrote{Text: text, File: file, Session: session, Model: models[session], Row: as.ID, At: as.Timestamp.UTC().Format(time.RFC3339)})
-			}
-		}
-	}
-	return writes, nil
-}
-
-// writtenTexts is the words a writing tool's input puts in a file: a Write's
-// content, an Edit's new_string, each of a MultiEdit's edits' new_string, a
-// NotebookEdit's new_source.
-func writtenTexts(input map[string]any) []string {
-	var texts []string
-	for _, key := range []string{"content", "new_string", "new_source"} {
-		if text, _ := input[key].(string); text != "" {
-			texts = append(texts, text)
-		}
-	}
-	if edits, _ := input["edits"].([]any); len(edits) > 0 {
-		for _, e := range edits {
-			if edit, _ := e.(map[string]any); edit != nil {
-				if text, _ := edit["new_string"].(string); text != "" {
-					texts = append(texts, text)
-				}
-			}
-		}
-	}
-	return texts
 }

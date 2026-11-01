@@ -3,7 +3,6 @@ package server
 import (
 	"database/sql"
 	"fmt"
-	"github.com/teranos/QNTX/server/quote"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -621,8 +620,7 @@ func TestGetDaemon(t *testing.T) {
 	// Verify registry has only built-in handlers (e.g. distill if configured)
 	handlers := registry.Names()
 	for _, h := range handlers {
-		if h != "distill" && h != "wal-checkpoint" && h != watcher.CIWatchHandlerName && h != reportHandlerName &&
-			h != watcher.QuoteProvenanceHandlerName && h != watcher.QuoteRemovalHandlerName && h != quote.LandedHandlerName {
+		if h != "distill" && h != "wal-checkpoint" && h != watcher.CIWatchHandlerName && h != reportHandlerName {
 			t.Errorf("Unexpected handler registered: %s", h)
 		}
 	}
