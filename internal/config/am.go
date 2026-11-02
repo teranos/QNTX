@@ -53,8 +53,8 @@ type NodeAgentConfig struct {
 type AgyConfig struct {
 	Model string `mapstructure:"model"` // The model, by agy's own id for it, as agy models lists it.
 	// TokenRef is the agent's Gemini API key, ssm:// or env:, as the plan token
-	// is. agy makes its model calls on it: its Google sign-in is a browser and
-	// the OS keyring, which are the node's and not the agent's.
+	// is. agy makes its model calls on it: its Google sign-in waits on a code
+	// pasted on its terminal, which a headless turn cannot give.
 	TokenRef string `mapstructure:"token"`
 }
 

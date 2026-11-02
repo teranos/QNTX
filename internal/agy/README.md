@@ -51,10 +51,14 @@ The agent's HOME is its own directory, holding agy's `.gemini/antigravity-cli`
 state and conversations, and its working directory is `work`. Node credentials
 are not inherited. `APIKey` is required and becomes `GEMINI_API_KEY`, with
 `modelProvider` set to `gemini` in the agent's agy settings, the other keys kept:
-agy reads the key only under that provider. Without a key agy reaches for a
-Google sign-in, in a browser and the OS keyring, which are the node's and not
-the agent's. This is process configuration isolation, not an OS identity or
-filesystem security boundary.
+agy reads the key only under that provider. Without a key agy asks for a
+Google sign-in: it prints an authorization URL and waits for the code to be
+pasted on its terminal, which a headless turn cannot answer, so a turn without
+a key is refused. agy keeps a sign-in in the OS keyring, or in a file where no
+D-Bus session bus is present (its changelog: "headless hosts and containers");
+where that file is, under the agent's HOME or not, is not verified. This is
+process configuration isolation, not an OS identity or filesystem security
+boundary.
 
 Each event reaches the callback, with tool and subagent payloads retained as JSON
 for a future transcript adapter. A successful answer requires a conversation ID

@@ -168,8 +168,8 @@ func TestRunCancellationWithInheritedStdout(t *testing.T) {
 	}
 }
 
-// Without its own key agy reaches for a Google sign-in, in a browser or the
-// node's keyring: neither is the agent's.
+// Without its own key agy asks for a Google sign-in, which a headless turn
+// cannot give.
 func TestRunRequiresExplicitConfiguration(t *testing.T) {
 	for _, s := range []Said{{}, {Binary: "unused", Home: t.TempDir(), APIKey: "k"}, {Binary: "unused", Home: t.TempDir(), Model: "test"}} {
 		if _, err := s.Run(context.Background(), nil); err == nil {

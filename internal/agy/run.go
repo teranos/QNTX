@@ -16,8 +16,8 @@ import (
 )
 
 // Said is one turn. An empty Session starts a conversation; otherwise agy resumes it.
-// APIKey belongs to this agent: agy's Google sign-in lives in a browser and the
-// OS keyring, which are the node's, so a turn without its own key is refused.
+// APIKey belongs to this agent. Without one agy asks for a Google sign-in, a
+// code pasted on its terminal, which a headless turn cannot give: it is refused.
 // This foundation runs headlessly; it does not implement permission callbacks.
 type Said struct {
 	Binary, Home, Session, Says, Model, APIKey string
