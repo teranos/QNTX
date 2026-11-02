@@ -55,6 +55,25 @@ func sayingToAgy(s *QNTXServer, sent sigil.Sent) (*protocol.AgySaid, *protocol.R
 	return answer.(*protocol.AgySaid), nil
 }
 
+// A turn outlasts the token it began on: what agy reads again is a fresh one, and
+// the node stops writing it when it is no longer connected.
+func TestAgysTokenIsRenewedWhileConnected(t *testing.T) {
+	s, _ := runningAgyToo(t)
+	agent := &rootAgent{home: t.TempDir()}
+	_, refused := s.agyAsTheNode(agent)
+	require.Nil(t, refused)
+	first, err := os.ReadFile(agyTokenFile(agent))
+	require.NoError(t, err)
+	info, err := os.Stat(agyTokenFile(agent))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+
+	require.NoError(t, s.renewAgyToken(agent))
+	second, err := os.ReadFile(agyTokenFile(agent))
+	require.NoError(t, err)
+	assert.NotEqual(t, string(first), string(second))
+}
+
 // A node not connected to Google Cloud says nothing to agy, and says where to connect it.
 func TestAgyIsSaidNothingUntilGoogleIsConnected(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)

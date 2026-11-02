@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/internal/acp"
 	"github.com/teranos/QNTX/internal/agy"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/comet"
@@ -97,20 +98,11 @@ func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refu
 	if !held {
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "agy runs as the node at Google Cloud, and this node is not connected to it: ROOT connects it from Node Connectors"}
 	}
-	i, err := s.theIssuer()
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	}
-	audience := googleAudience(kept.project.ProjectNumber)
-	token, err := i.identityTokenFor(s.nodeDID.DID, auth.NamespaceSystem, audience)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	}
-	dir := filepath.Join(agent.home, ".qntx-google")
-	tokenFile, credentials := filepath.Join(dir, "identity-token"), filepath.Join(dir, "external-account.json")
+	dir := filepath.Dir(agyTokenFile(agent))
+	tokenFile, credentials := agyTokenFile(agent), filepath.Join(dir, "external-account.json")
 	file, err := json.Marshal(map[string]any{
 		"type":                              "external_account",
-		"audience":                          audience,
+		"audience":                          googleAudience(kept.project.ProjectNumber),
 		"subject_token_type":                "urn:ietf:params:oauth:token-type:jwt",
 		"token_url":                         googleSTS + "/v1/token",
 		"service_account_impersonation_url": googleCredentials + "/v1/projects/-/serviceAccounts/" + kept.account + ":generateAccessToken",
@@ -120,7 +112,7 @@ func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refu
 		err = os.MkdirAll(dir, 0o700)
 	}
 	if err == nil {
-		err = os.WriteFile(tokenFile, []byte(token), 0o600)
+		err = s.writeAgyToken(agent, kept)
 	}
 	if err == nil {
 		err = os.WriteFile(credentials, file, 0o600)
@@ -128,7 +120,55 @@ func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refu
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "agy's identity at Google was not written to %s", dir).Error()}
 	}
+	if _, renewing := s.identityTokensRenewed.LoadOrStore(tokenFile, true); !renewing {
+		sacred.Go("agy.identity-token", func() { s.keepAgyTokenFresh(agent) })
+	}
 	return &agy.Google{Credentials: credentials, Project: kept.project.ProjectID, Location: agyLocation}, nil
+}
+
+// agyTokenFile is where agy reads the node's identity token for Google.
+func agyTokenFile(agent *rootAgent) string {
+	return filepath.Join(agent.home, ".qntx-google", "identity-token")
+}
+
+// writeAgyToken writes a fresh identity token for the node's pool at Google.
+func (s *QNTXServer) writeAgyToken(agent *rootAgent, kept googleKept) error {
+	i, err := s.theIssuer()
+	if err != nil {
+		return err
+	}
+	token, err := i.identityTokenFor(s.nodeDID.DID, auth.NamespaceSystem, googleAudience(kept.project.ProjectNumber))
+	if err != nil {
+		return err
+	}
+	return errors.Wrapf(os.WriteFile(agyTokenFile(agent), []byte(token), 0o600), "the identity token was not written to %s", agyTokenFile(agent))
+}
+
+// renewAgyToken rewrites the token, on the line as it is now. A node no longer
+// connected has nothing to renew.
+func (s *QNTXServer) renewAgyToken(agent *rootAgent) error {
+	kept, held, err := s.googleLine()
+	if err != nil || !held {
+		return err
+	}
+	return s.writeAgyToken(agent, kept)
+}
+
+// keepAgyTokenFresh rewrites it before the last one expires: a turn outlasts the
+// token, and agy's credentials read the file again at every exchange.
+func (s *QNTXServer) keepAgyTokenFresh(agent *rootAgent) {
+	tick := time.NewTicker(identityTokenLifetime / 2)
+	defer tick.Stop()
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-tick.C:
+			if err := s.renewAgyToken(agent); err != nil {
+				s.logger.Errorw("the identity token agy runs on at Google was not renewed", "file", agyTokenFile(agent), "error", err)
+			}
+		}
+	}
 }
 
 // agyPart is agy's part of one turn of the Node Agent: the node at Google, the
