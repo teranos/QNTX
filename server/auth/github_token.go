@@ -143,7 +143,7 @@ func (h *Handler) NewGitHubWebhook(mintedBy string) (string, error) {
 	return secret, nil
 }
 
-// SetGitHubWebhook keeps the webhook secret of the node forwarding deliveries here.
+// 「[Opus 5.5] SetGitHubWebhook keeps the webhook secret of the node forwarding deliveries here.」
 func (h *Handler) SetGitHubWebhook(mintedBy, secret string) error {
 	table, ok := h.tokens.(*TokenTable)
 	if !ok {
