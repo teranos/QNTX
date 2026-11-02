@@ -53,7 +53,11 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" did not answer for the card of the agent of "+namespace+": "+err.Error())
 	}
 	if err != nil {
-		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" answered "+strconv.Itoa(carried.status)+" for the card of the agent of "+namespace+": "+bounded(string(carried.body), saidDefectMost))
+		said := bounded(string(carried.body), saidDefectMost)
+		if carried.unread != nil {
+			said += " (the rest did not read: " + carried.unread.Error() + ")"
+		}
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" answered "+strconv.Itoa(carried.status)+" for the card of the agent of "+namespace+": "+said)
 	}
 	// The card is verified as the peer sent it: what it signed is ProtoJSON,
 	// and a2a-go v2.5's AgentCard does not keep all of it ("streaming": false
@@ -84,6 +88,8 @@ type peerCarrier struct {
 	origin *url.URL
 	status int
 	body   []byte
+	// unread is why the answer's body did not read to its end.
+	unread error
 }
 
 func (c *peerCarrier) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -98,10 +104,11 @@ func (c *peerCarrier) RoundTrip(r *http.Request) (*http.Response, error) {
 	c.status = resp.StatusCode
 	body, err := io.ReadAll(io.LimitReader(resp.Body, nodeBodyMost))
 	_ = resp.Body.Close()
+	c.body = body
 	if err != nil {
+		c.unread = err
 		return nil, err
 	}
-	c.body = body
 	shaped := body
 	if resp.StatusCode == http.StatusOK {
 		shaped = scopesShaped(body)

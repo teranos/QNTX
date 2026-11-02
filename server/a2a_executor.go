@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
@@ -59,17 +60,37 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 		// Its turn running is the Task working: "actively being processed by
 		// the agent" (TaskState), in the stream it prints to. A Task canceled
 		// before its turn ran is not working: its turn is stopped as it starts.
+		// The turn starting and its Task ending are told under one lock, so
+		// exactly one of them stops a turn that started as its Task ended.
+		var (
+			starting sync.Mutex
+			stopped  bool
+			running  string
+		)
 		started := make(chan string, 1)
 		turn := context.WithValue(ctx, taskStartsKey{}, func(session, stream string) {
-			if ctx.Err() != nil {
+			starting.Lock()
+			defer starting.Unlock()
+			if stopped || ctx.Err() != nil {
+				stopped = true
 				if err := claudecode.Interrupt(ta.agent.home, filepath.Base(stream)); err != nil {
 					e.s.logger.Errorw("a task ended before its turn started, and the turn was not stopped", "agent", ta.did, "task", id, "stream", stream, "error", err)
 				}
 				return
 			}
+			running = stream
 			e.s.taskStreams.Store(string(id), filepath.Base(stream))
 			started <- stream
 		})
+		// stop ends the turn as its Task ends: the one that started, or none
+		// to start after.
+		stop := func() {
+			starting.Lock()
+			stopped = true
+			stream := running
+			starting.Unlock()
+			e.interrupt(ta, id, stream)
+		}
 		asked := map[string]any{"says": says}
 		for name, value := range ta.asked {
 			asked[name] = value
@@ -79,24 +100,15 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 			answered <- ta.say.asking(reach.OverA2A, e.s.gate, e.s.reachingOver, call.request.WithContext(turn)).Ask(turn, asked)
 		})
 
-		stream := ""
 		for {
 			select {
-			case stream = <-started:
+			case <-started:
 				if !yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateWorking, nil), nil) {
-					e.interrupt(ta, id, stream)
+					stop()
 					return
 				}
 			case <-ctx.Done():
-				// A turn that started as its Task ended has told its stream
-				// and is stopped by it, read or not.
-				if stream == "" {
-					select {
-					case stream = <-started:
-					default:
-					}
-				}
-				e.interrupt(ta, id, stream)
+				stop()
 				return
 			case answer := <-answered:
 				e.ended(ec, ta, submitted, answer, yield)
