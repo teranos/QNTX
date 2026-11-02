@@ -10,7 +10,7 @@ option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 // https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10
 
 // POST /repos/{owner}/{repo}/check-runs
-// "i expect to see a button"
+// "「[Opus 5.5] i expect to see a button」"
 // 「[Opus 5.5] The page's body is a oneOf on status, and each arm takes these: name and」
 // 「[Opus 5.5] head_sha required, actions the buttons a person with write access can press.」
 message GitHubCreateACheckRunRequest {
