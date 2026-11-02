@@ -25,10 +25,6 @@ reads agy's own output format. 1.4.12 is the first pinned agy that has `agy acp`
 - `model` is the value of the session's `model` option as agy offers it over ACP:
   `gemini-3.8-flash`, not the `gemini-3.8-flash-low` of `agy models`. The thinking
   level is agy's separate `thought_level` option, which this harness does not set.
-- A namespace's agent runs in agy when it is set with `agents set`, harness
-  `agy` and a model. It makes its model calls on the namespace's key named
-  `gemini` ([ADR-051](../../docs/adr/ADR-051-namespace-keys.md)), which `keys set` asks
-  Gemini about. `server/namespace_agy.go`.
 - Its sigils are the other harnesses': `agent say|am|session` and
   `agents set|am|say|session`, with `harness` `agy`, answering `AgySaid` and `AgyAm`.
 - A turn runs under ground: its ground built, and the global hooks.json under
