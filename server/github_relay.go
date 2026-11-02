@@ -2,8 +2,8 @@ package server
 
 // "why cant we make q relay it"
 
-// A relay is ROOT's line that this node's subsystems ask GitHub through another
-// node, the one holding the App, by that node's own github ask (ADR-056).
+// 「[Opus 5.5] A relay is ROOT's line that this node's subsystems ask GitHub through another」
+// 「[Opus 5.5] node, the one holding the App, by that node's own github ask (ADR-056).」
 
 import (
 	"bytes"
@@ -23,18 +23,18 @@ import (
 
 const (
 	githubRelayLine = "relay"
-	// relayWait is how long the far node has to answer one operation.
+	// 「[Opus 5.5] relayWait is how long the far node has to answer one operation.」
 	relayWait = 2 * time.Minute
 )
 
-// GitHubRelay is the node this one asks GitHub through, and where the token it
-// asks with is kept.
+// 「[Opus 5.5] GitHubRelay is the node this one asks GitHub through, and where the token it」
+// 「[Opus 5.5] asks with is kept.」
 type GitHubRelay struct {
 	URL      string `json:"url"`
 	TokenRef string `json:"token_ref"`
 }
 
-// Relay is the node's relay, and whether it has one. An empty URL is one turned off.
+// 「[Opus 5.5] Relay is the node's relay, and whether it has one. An empty URL is one turned off.」
 func (r NodeRecords) Relay() (GitHubRelay, bool, error) {
 	newest, err := r.newest(githubSubject)
 	if err != nil {
@@ -50,12 +50,12 @@ func (r NodeRecords) Relay() (GitHubRelay, bool, error) {
 	return relay, relay.URL != "", nil
 }
 
-// SetRelay writes the relay whole.
+// 「[Opus 5.5] SetRelay writes the relay whole.」
 func (r NodeRecords) SetRelay(actor string, relay GitHubRelay) error {
 	return r.nodeRecord(actor, githubSubject, githubRelayLine, "_", map[string]any{"url": relay.URL, "token_ref": relay.TokenRef})
 }
 
-// relayTokenRef is whether ref says where a token is, rather than being one.
+// 「[Opus 5.5] relayTokenRef is whether ref says where a token is, rather than being one.」
 func relayTokenRef(ref string) error {
 	if !secretref.IsReference(ref) {
 		return errors.New("token_ref says where the token is kept, as env:NAME or ssm:///path, and never is the token")
@@ -63,7 +63,7 @@ func relayTokenRef(ref string) error {
 	return nil
 }
 
-// relayAsk asks the far node one operation and hands back GitHub's answer.
+// 「[Opus 5.5] relayAsk asks the far node one operation and hands back GitHub's answer.」
 func relayAsk(ctx context.Context, relay GitHubRelay, operation string, request []byte) ([]byte, error) {
 	token, err := secretref.Resolve(ctx, relay.TokenRef)
 	if err != nil {
