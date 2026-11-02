@@ -328,7 +328,7 @@ func (s *QNTXServer) connectGoogleCloud(ctx context.Context, token, named, by st
 	}
 	// Past the page: ROOT need not stay for it, and is told how it ended.
 	sacred.Go("google.proving", func() { s.proveGoogle(i, kept) })
-	return "The node is set up in " + p.ProjectID + " as " + account + ". Google is confirming it now, which can take some minutes. You will get a mail when it is done, or if it does not come through. You can close this window.", nil
+	return "The node is set up in " + p.ProjectID + " as " + account + ". Google is confirming it now, which can take some minutes. You will get a mail when it is done, or if it does not come through.", nil
 }
 
 // googleCreate makes what Google finishes on its own time, and keeps what was made before.

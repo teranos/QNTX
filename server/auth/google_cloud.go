@@ -187,7 +187,7 @@ func (h *Handler) connectGoogleCloud(w http.ResponseWriter, r *http.Request, tok
 		h.renderCloudStopped(w, err, project)
 		return
 	}
-	h.logger.Infow("the node is connected to Google Cloud", "by", by, "said", said)
+	h.logger.Infow("the node is set up at Google Cloud", "by", by, "said", said)
 	h.renderCeremonyPage(w, http.StatusOK, true, said)
 }
 
