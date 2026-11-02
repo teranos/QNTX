@@ -86,7 +86,7 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 // a2aServe asks of the request what the node asks of every one before the
 // SDK reads it, and hands it on.
 func (s *QNTXServer) a2aServe(w http.ResponseWriter, r *http.Request, exchange *a2aExchange, atNoTenant, atTenant http.Handler) {
-	tenant, rest, named := tenantOf(r.URL.Path)
+	tenant, rest, named := tenantOf(r.Method, r.URL.Path)
 	if !a2aRoute(r.Method, rest) {
 		exchange.jsonRPC = jsonRPCAsked(r)
 		said := ""
@@ -279,14 +279,15 @@ func writeA2AErrorOf(w http.ResponseWriter, err error) {
 	writeA2AError(w, status, code, a2asdk.ErrorReason(err), err.Error())
 }
 
-// The first path segment of each operation without a tenant: anything else
-// first is a tenant.
-var a2aOperationRoots = []string{"message:send", "message:stream", "tasks", "extendedAgentCard"}
-
-// tenantOf is the tenant a path names, and the operation's path after it.
-func tenantOf(path string) (string, string, bool) {
+// tenantOf is the tenant a request's path names, and the operation's path
+// after it. A path that is an operation without a tenant names none; any
+// other's first segment is a tenant, a namespace named tasks among them.
+func tenantOf(method, path string) (string, string, bool) {
+	if a2aRoute(method, path) {
+		return "", path, false
+	}
 	first, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
-	if first == "" || slices.Contains(a2aOperationRoots, first) {
+	if first == "" {
 		return "", path, false
 	}
 	return first, strings.TrimPrefix(path, "/"+first), true

@@ -154,3 +154,23 @@ func TestAPeerServingNoAgentThereIsNotFound(t *testing.T) {
 	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
 	assert.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 }
+
+// The person's token goes to the peer and nowhere else: a peer that redirects
+// the card elsewhere hands over no card, and the place it named is never
+// asked with the token.
+func TestAPeerRedirectingTheCardCarriesNoTokenAway(t *testing.T) {
+	var elsewhere []string
+	away := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		elsewhere = append(elsewhere, r.Header.Get("Authorization"))
+	}))
+	t.Cleanup(away.Close)
+	peer := aPeer(t, func(_ *standInPeer, w http.ResponseWriter, _ string) {
+		w.Header().Set("Location", away.URL+"/card")
+		w.WriteHeader(http.StatusFound)
+	})
+	srv, tokens := primaryOf(t, peer)
+
+	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
+	assert.Empty(t, elsewhere, "the redirect was followed")
+}
