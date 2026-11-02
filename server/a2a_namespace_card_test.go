@@ -65,9 +65,15 @@ func TestANamespaceAgentIsDescribedAtItsTenant(t *testing.T) {
 			Skills []struct {
 				ID string `json:"id"`
 			} `json:"skills"`
+			InputModes  []string `json:"defaultInputModes"`
+			OutputModes []string `json:"defaultOutputModes"`
 		}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &card))
 		assert.Equal(t, "the agent of garden, claude-sonnet-5-5", card.Name, path)
+		// A client sending the card's defaults as its acceptedOutputModes is
+		// one the agent answers.
+		assert.Equal(t, []string{a2a.Text}, card.InputModes, path)
+		assert.Equal(t, []string{a2a.Text}, card.OutputModes, path)
 		require.Len(t, card.Interfaces, 1, path)
 		assert.Equal(t, "garden", card.Interfaces[0].Tenant, path+": clients MUST set the tenant the interface declares")
 		assert.True(t, strings.HasSuffix(card.Interfaces[0].URL, "/a2a"), path)

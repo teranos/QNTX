@@ -60,6 +60,9 @@ type Card struct {
 	// ("Agents MUST authenticate requests using one of the schemes declared",
 	// §13.3).
 	Session string
+	// Defaults is the media types the card's skills take and give where a
+	// skill names none (defaultInputModes, defaultOutputModes). Nil is Modes.
+	Defaults []string
 }
 
 // Message is the card as lf.a2a.v1.AgentCard, read through the pinned spec, so
@@ -102,6 +105,10 @@ func (c Card) Message() (protoreflect.Message, error) {
 		// Either one: each SecurityRequirement is an alternative.
 		required = append(required, sessionRequired...)
 	}
+	defaults := c.Defaults
+	if defaults == nil {
+		defaults = Modes
+	}
 	body, err := json.Marshal(map[string]any{
 		"name":                c.Name,
 		"description":         c.Description,
@@ -114,8 +121,8 @@ func (c Card) Message() (protoreflect.Message, error) {
 		// authenticated with a scheme the card declares).
 		"securitySchemes":      schemes,
 		"securityRequirements": required,
-		"defaultInputModes":    Modes,
-		"defaultOutputModes":   Modes,
+		"defaultInputModes":    defaults,
+		"defaultOutputModes":   defaults,
 		"skills":               skills,
 	})
 	if err != nil {

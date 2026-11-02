@@ -93,8 +93,12 @@ func TestAMessageAtAnElementIsATaskOfItsAgent(t *testing.T) {
 	assert.Equal(t, "the element approvals-element", at(card, "name"))
 	assert.Equal(t, "element:approvals-element", at(card, "supportedInterfaces.0.tenant"))
 	assert.Equal(t, "say", at(card, "skills.0.id"))
+	assert.Equal(t, []any{"text/plain"}, at(card, "defaultOutputModes"))
 
-	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/element:approvals-element/message:send", saidToTheNode("what waits on me?", ""), tokens[auth.LevelRoot])
+	// A client takes back what the card's defaults say the agent gives.
+	accepted, err := json.Marshal(map[string]any{"acceptedOutputModes": at(card, "defaultOutputModes")})
+	require.NoError(t, err)
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/element:approvals-element/message:send", saidToTheNode("what waits on me?", string(accepted)), tokens[auth.LevelRoot])
 	require.Equal(t, http.StatusOK, code, sent)
 	assert.Equal(t, "TASK_STATE_COMPLETED", at(sent, "task.status.state"))
 	id := at(sent, "task.id").(string)

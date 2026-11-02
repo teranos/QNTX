@@ -164,6 +164,9 @@ func (s *QNTXServer) elementAgentCard(r *http.Request, element string) (proto.Me
 	card.Name = "the element " + element
 	card.Description = elements.GetDescription()
 	card.Tenant = elementTenantPrefix + element
+	// The agent takes text and gives text, and a client reading the card's
+	// defaults is told so: "acceptedOutputModes" naming none is refused.
+	card.Defaults = []string{a2a.Text}
 	card.Skills = []a2a.Skill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: elements.GetTags(), Modes: []string{a2a.Text}}}
 	return s.signedAgentCard(card, "the card of the element "+element)
 }
@@ -190,6 +193,9 @@ func (s *QNTXServer) namespaceAgentCard(r *http.Request, namespace string) (prot
 	card.Name = "the agent of " + namespace + ", " + line.spec.Model
 	card.Description = agents.GetDescription()
 	card.Tenant = namespace
+	// The agent takes text and gives text, and a client reading the card's
+	// defaults is told so: "acceptedOutputModes" naming none is refused.
+	card.Defaults = []string{a2a.Text}
 	card.Skills = []a2a.Skill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: agents.GetTags(), Modes: []string{a2a.Text}}}
 	return s.signedAgentCard(card, "the card of the agent of "+namespace)
 }
