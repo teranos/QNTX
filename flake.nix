@@ -303,7 +303,7 @@
           # rustpostgres (the postgres backend via ats-postgres + postgrescgo).
           # Without rustduckdb, backend = "parquet" in am.toml would validate
           # but the duckdbcgo wrapper wouldn't be compiled in.
-          # libacp: an ACP harness, agy among them, runs through libACP (internal/acp).
+          # libacp: an ACP harness runs through libACP (internal/acp).
           tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" "libacp" ];
 
           ldflags = [
