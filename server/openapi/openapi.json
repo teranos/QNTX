@@ -388,6 +388,11 @@
       ],
       "x-qntx-prefix": true
     },
+    "/api/google": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/keys/{namespace}": {
       "x-qntx-reach": [
         "ROOT",
