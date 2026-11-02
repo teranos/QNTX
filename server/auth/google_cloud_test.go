@@ -217,6 +217,22 @@ func TestROOTsGoogleConnectsTheNode(t *testing.T) {
 	assert.Equal(t, []connected{{"cloud-token", "the-project", "google:root-sub"}}, *handed)
 }
 
+// ROOT's yes for the costs goes to what wires them.
+func TestROOTsYesForCostsWiresTheCosts(t *testing.T) {
+	h, handed := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	var wired []connected
+	h.SetGoogleCosts(func(_ context.Context, token, by string) (string, error) {
+		wired = append(wired, connected{token, "", by})
+		return "wired", nil
+	})
+	done := consenting(t, h, "?project=the-project&thing=costs")
+	assert.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	assert.Contains(t, done.Body.String(), "wired")
+	assert.Equal(t, []connected{{"cloud-token", "", "google:root-sub"}}, wired)
+	assert.Empty(t, *handed, "the node is not connected again")
+}
+
 // Only ROOT's own Google account connects the node.
 func TestAnotherGoogleAccountDoesNotConnectTheNode(t *testing.T) {
 	h, handed := cloudHandler(t)
