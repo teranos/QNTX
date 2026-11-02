@@ -18,7 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// signedDelivery is a delivery as GitHub would hand it to the node.
+// 「[Opus 5.5] signedDelivery is a delivery as GitHub would hand it to the node.」
 func signedDelivery(t *testing.T, secret, event, guid string, body []byte) *http.Request {
 	t.Helper()
 	mac := hmac.New(sha256.New, []byte(secret))
@@ -55,8 +55,8 @@ func TestAForwardNamesAnHTTPURLWithAHost(t *testing.T) {
 	}
 }
 
-// What the far node verifies is what GitHub signed: the body and the signature
-// arrive untouched, so a node holding the App's secret takes the delivery.
+// 「[Opus 5.5] What the far node verifies is what GitHub signed: the body and the signature」
+// 「[Opus 5.5] arrive untouched, so a node holding the App's secret takes the delivery.」
 func TestAForwardCarriesTheDeliveryUntouched(t *testing.T) {
 	body := []byte(`{"ref":"refs/heads/main"}`)
 	var got *http.Request
@@ -77,8 +77,8 @@ func TestAForwardCarriesTheDeliveryUntouched(t *testing.T) {
 	assert.Equal(t, "sha256=abc", got.Header.Get("X-Hub-Signature-256"))
 }
 
-// A status the far node gave itself is an answer, and sending it again changes
-// nothing. Only silence is swept.
+// 「[Opus 5.5] A status the far node gave itself is an answer, and sending it again changes」
+// 「[Opus 5.5] nothing. Only silence is swept.」
 func TestOnlyAForwardNobodyAnsweredIsSentAgain(t *testing.T) {
 	status := http.StatusServiceUnavailable
 	far := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) }))
@@ -111,8 +111,8 @@ func TestOnlyAForwardNobodyAnsweredIsSentAgain(t *testing.T) {
 	assert.Equal(t, async.JobStatusFailed, job.Status)
 }
 
-// The forward is written before the delivery is handled, so the far node gets
-// what this node goes on to be slow over.
+// 「[Opus 5.5] The forward is written before the delivery is handled, so the far node gets」
+// 「[Opus 5.5] what this node goes on to be slow over.」
 func TestTheWebhookForwardsWhatItVerifiedAndNothingElse(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	s, _ := artifactServingServer(t, nil, nil)
@@ -138,7 +138,7 @@ func TestTheWebhookForwardsWhatItVerifiedAndNothingElse(t *testing.T) {
 	assert.Equal(t, async.JobStatusQueued, jobs[0].Status)
 }
 
-// A node the App's webhook does not point at holds the secret of the node it does.
+// 「[Opus 5.5] A node the App's webhook does not point at holds the secret of the node it does.」
 func TestANodeTakesTheSecretOfTheNodeThatForwardsToIt(t *testing.T) {
 	s := githubKnowingServer(t)
 	require.NoError(t, s.authHandler.SetGitHubWebhook(rootAccount, "the secret q holds"))
