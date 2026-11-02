@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -45,7 +44,7 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "no A2A client speaks to "+peer.Label+": "+err.Error())
 	}
 	defer func() { _ = client.Destroy() }()
-	handed, err := client.GetExtendedAgentCard(r.Context(), &a2asdk.GetExtendedAgentCardRequest{Tenant: namespace})
+	_, err = client.GetExtendedAgentCard(r.Context(), &a2asdk.GetExtendedAgentCardRequest{Tenant: namespace})
 	if carried.status == http.StatusNotFound {
 		return nil, a2aRefusal(a2asdk.ErrTaskNotFound, peer.Label+" serves no agent at tenant "+namespace)
 	}
@@ -59,11 +58,9 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 		}
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" answered "+strconv.Itoa(carried.status)+" for the card of the agent of "+namespace+": "+said)
 	}
-	raw, err := json.Marshal(handed)
-	if err != nil {
-		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card "+peer.Label+" handed over did not marshal: "+err.Error())
-	}
-	card, err := a2a.ReadCard(raw)
+	// The card is verified as the peer sent it, the bytes it signed: a2a-go
+	// writes some capabilities whether the card set them or not.
+	card, err := a2a.ReadCard(carried.body)
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" handed over no card for the agent of "+namespace+": "+err.Error())
 	}

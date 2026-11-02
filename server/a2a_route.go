@@ -172,6 +172,14 @@ func (s *QNTXServer) a2aServe(w http.ResponseWriter, r *http.Request, exchange *
 		tenant, named = queried, true
 		r.URL.Path = "/" + queried + rest
 	}
+	// A peer's card is handed over as the peer signed it: a2a-go writes some
+	// capabilities whether a card set them or not, and its signature is over
+	// what the peer sent.
+	if r.Method == http.MethodGet && rest == "/extendedAgentCard" && named && slices.ContainsFunc(s.peers(), serving(tenant)) {
+		exchange.operation = "GetExtendedAgentCard"
+		s.handOverPeersCard(w, r, tenant)
+		return
+	}
 	if r.Method == http.MethodGet && rest == "/extendedAgentCard" {
 		card := &a2aHeld{header: http.Header{}}
 		s.a2aDispatch(card, r, exchange, tenant, named, atNoTenant, atTenant)
@@ -179,6 +187,28 @@ func (s *QNTXServer) a2aServe(w http.ResponseWriter, r *http.Request, exchange *
 		return
 	}
 	s.a2aDispatch(w, r, exchange, tenant, named, atNoTenant, atTenant)
+}
+
+// handOverPeersCard answers the card of the agent a peer serves at tenant,
+// as the peer signed it.
+func (s *QNTXServer) handOverPeersCard(w http.ResponseWriter, r *http.Request, tenant string) {
+	card, err := s.a2aExtendedCard(r, tenant)
+	if err != nil {
+		writeA2AErrorOf(w, err)
+		return
+	}
+	body, err := protojson.Marshal(card.Interface())
+	if err != nil {
+		writeA2AErrorOf(w, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card did not marshal: "+err.Error()))
+		return
+	}
+	if cached(w, r, body) {
+		return
+	}
+	w.Header().Set("Content-Type", a2aContentType)
+	if _, err := w.Write(body); err != nil {
+		s.logger.Errorw("An A2A response was not delivered", "what", "GetExtendedAgentCard", "error", err)
+	}
 }
 
 // a2aDispatch hands the request to the SDK's binding, at its tenant or none.
