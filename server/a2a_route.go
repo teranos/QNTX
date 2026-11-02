@@ -117,7 +117,10 @@ func (s *QNTXServer) a2aServe(w http.ResponseWriter, r *http.Request, exchange *
 	}
 	// "Patch version numbers ... MUST not be considered when clients and
 	// servers negotiate protocol versions" (§3.6): the SDK is handed the
-	// Major.Minor the node read.
+	// Major.Minor the node read, on a request of its own, so a refusal still
+	// tells the version the client said.
+	r = r.Clone(r.Context())
+	exchange.request = r
 	r.Header.Set(a2asdk.SvcParamVersion, a2a.Version)
 	// "application/a2a+json SHOULD be used" (§11.1): a client that names no
 	// type it accepts is answered in it.
@@ -478,7 +481,7 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 			return ctx, nil, a2aRefusal(a2asdk.ErrInvalidParams, "pageSize must be between 1 and 100 inclusive, got 0")
 		}
 		// A status the client named that is no TaskState is not one left out.
-		if said := r.URL.Query().Get("status"); said != "" && asked.Status == a2asdk.TaskStateUnspecified {
+		if said := r.URL.Query().Get("status"); said != "" && said != "TASK_STATE_UNSPECIFIED" && asked.Status == a2asdk.TaskStateUnspecified {
 			return ctx, nil, a2aRefusal(a2asdk.ErrInvalidParams, "status "+said+" is no TaskState")
 		}
 		return ctx, nil, historyRefused(asked.HistoryLength)

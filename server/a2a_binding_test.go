@@ -171,3 +171,14 @@ func TestATenantNamedAfterAnOperationIsATenant(t *testing.T) {
 		assert.Equal(t, asked.tenant != "", named, asked.method+" "+asked.path)
 	}
 }
+
+// TASK_STATE_UNSPECIFIED is a TaskState a client names, and filters nothing;
+// a status that is no TaskState is refused.
+func TestAnUnspecifiedStatusListsEveryTask(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	w, _ := a2aSaid(t, srv, http.MethodGet, "/a2a/tasks?status=TASK_STATE_UNSPECIFIED", "", "1.0", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	w, said := a2aSaid(t, srv, http.MethodGet, "/a2a/tasks?status=TASK_STATE_RUNNING", "", "1.0", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Equal(t, "INVALID_ARGUMENT", said.Error.Status)
+}
