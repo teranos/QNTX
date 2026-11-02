@@ -154,3 +154,40 @@ func TestAPeerServingNoAgentThereIsNotFound(t *testing.T) {
 	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
 	assert.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 }
+
+// The person's token goes to the peer and nowhere else: a peer that redirects
+// the card elsewhere hands over no card, and the place it named is never
+// asked with the token.
+func TestAPeerRedirectingTheCardCarriesNoTokenAway(t *testing.T) {
+	var elsewhere []string
+	away := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		elsewhere = append(elsewhere, r.Header.Get("Authorization"))
+	}))
+	t.Cleanup(away.Close)
+	peer := aPeer(t, func(_ *standInPeer, w http.ResponseWriter, _ string) {
+		w.Header().Set("Location", away.URL+"/card")
+		w.WriteHeader(http.StatusFound)
+	})
+	srv, tokens := primaryOf(t, peer)
+
+	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
+	assert.Empty(t, elsewhere, "the redirect was followed")
+}
+
+// A card whose scopes are already a list, or null, is left as it is, not a
+// panic: a2a-go itself writes the list.
+func TestACardsScopesInAnyShapeAreRead(t *testing.T) {
+	for _, scopes := range []string{`[]`, `null`, `["read"]`, `{"list": ["read"]}`, `{}`} {
+		card := `{"securityRequirements": [{"schemes": {"bearer": ` + scopes + `}}], "skills": [{"securityRequirements": [{"schemes": {"bearer": ` + scopes + `}}]}]}`
+		assert.NotPanics(t, func() { scopesShaped([]byte(card)) }, scopes)
+	}
+	var shaped struct {
+		Requirements []struct {
+			Schemes map[string][]string `json:"schemes"`
+		} `json:"securityRequirements"`
+	}
+	require.NoError(t, json.Unmarshal(scopesShaped([]byte(`{"securityRequirements": [{"schemes": {"bearer": {"list": ["read"]}, "session": {}}}]}`)), &shaped))
+	assert.Equal(t, []string{"read"}, shaped.Requirements[0].Schemes["bearer"])
+	assert.Equal(t, []string{}, shaped.Requirements[0].Schemes["session"])
+}

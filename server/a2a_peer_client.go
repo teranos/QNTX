@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -32,11 +33,14 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" did not hand over the card of the agent of "+namespace+": "+err.Error())
 	}
-	carried := &peerCarrier{bearer: bearer}
+	carried := &peerCarrier{bearer: bearer, origin: peer.Origin}
 	at := strings.TrimSuffix(peer.Origin.JoinPath(a2aPrefix).String(), "/")
 	client, err := a2aclient.NewFromEndpoints(r.Context(),
 		[]*a2asdk.AgentInterface{{URL: at, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: namespace}},
-		a2aclient.WithRESTTransport(&http.Client{Timeout: peerCardTimeout, Transport: carried}))
+		// The person's token goes to the peer and nowhere else: a redirect is
+		// the peer's answer, not a place to follow it to.
+		a2aclient.WithRESTTransport(&http.Client{Timeout: peerCardTimeout, Transport: carried,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}))
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "no A2A client speaks to "+peer.Label+": "+err.Error())
 	}
@@ -74,13 +78,16 @@ const peerCardTimeout = 15 * time.Second
 // (a2a-go#437, fixed in v2.7): the card is handed to it in the shape it reads.
 type peerCarrier struct {
 	bearer string
+	origin *url.URL
 	status int
 	body   []byte
 }
 
 func (c *peerCarrier) RoundTrip(r *http.Request) (*http.Response, error) {
 	carried := r.Clone(r.Context())
-	carried.Header.Set("Authorization", "Bearer "+c.bearer)
+	if carried.URL.Scheme == c.origin.Scheme && carried.URL.Host == c.origin.Host {
+		carried.Header.Set("Authorization", "Bearer "+c.bearer)
+	}
 	resp, err := http.DefaultTransport.RoundTrip(carried)
 	if err != nil {
 		return nil, err
@@ -115,7 +122,12 @@ func scopesShaped(raw []byte) []byte {
 			declared, _ := requirement.(map[string]any)
 			schemes, _ := declared["schemes"].(map[string]any)
 			for name, scopes := range schemes {
-				listed, _ := scopes.(map[string]any)["list"].([]any)
+				// Scopes already a list, or null, are left as they are.
+				declared, isStringList := scopes.(map[string]any)
+				if !isStringList {
+					continue
+				}
+				listed, _ := declared["list"].([]any)
 				if listed == nil {
 					listed = []any{}
 				}
