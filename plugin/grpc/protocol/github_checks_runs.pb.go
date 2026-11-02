@@ -23,13 +23,22 @@ const (
 )
 
 // POST /repos/{owner}/{repo}/check-runs
-// The page lists status as the only body parameter.
+// "i expect to see a button"
+// The page's body is a oneOf on status, and each arm takes these: name and
+// head_sha required, actions the buttons a person with write access can press.
 type GitHubCreateACheckRunRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Owner         string                 `protobuf:"bytes,2,opt,name=owner,proto3" json:"owner,omitempty"`
-	Repo          string                 `protobuf:"bytes,3,opt,name=repo,proto3" json:"repo,omitempty"`
-	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	state         protoimpl.MessageState                  `protogen:"open.v1"`
+	Namespace     string                                  `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Owner         string                                  `protobuf:"bytes,2,opt,name=owner,proto3" json:"owner,omitempty"`
+	Repo          string                                  `protobuf:"bytes,3,opt,name=repo,proto3" json:"repo,omitempty"`
+	Status        string                                  `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	Name          string                                  `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	HeadSha       string                                  `protobuf:"bytes,6,opt,name=head_sha,json=headSha,proto3" json:"head_sha,omitempty"`
+	DetailsUrl    string                                  `protobuf:"bytes,7,opt,name=details_url,json=detailsUrl,proto3" json:"details_url,omitempty"`
+	ExternalId    string                                  `protobuf:"bytes,8,opt,name=external_id,json=externalId,proto3" json:"external_id,omitempty"`
+	Conclusion    string                                  `protobuf:"bytes,9,opt,name=conclusion,proto3" json:"conclusion,omitempty"`
+	Output        *GitHubUpdateACheckRunRequest_Output    `protobuf:"bytes,10,opt,name=output,proto3" json:"output,omitempty"`
+	Actions       []*GitHubUpdateACheckRunRequest_Actions `protobuf:"bytes,11,rep,name=actions,proto3" json:"actions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -90,6 +99,55 @@ func (x *GitHubCreateACheckRunRequest) GetStatus() string {
 		return x.Status
 	}
 	return ""
+}
+
+func (x *GitHubCreateACheckRunRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *GitHubCreateACheckRunRequest) GetHeadSha() string {
+	if x != nil {
+		return x.HeadSha
+	}
+	return ""
+}
+
+func (x *GitHubCreateACheckRunRequest) GetDetailsUrl() string {
+	if x != nil {
+		return x.DetailsUrl
+	}
+	return ""
+}
+
+func (x *GitHubCreateACheckRunRequest) GetExternalId() string {
+	if x != nil {
+		return x.ExternalId
+	}
+	return ""
+}
+
+func (x *GitHubCreateACheckRunRequest) GetConclusion() string {
+	if x != nil {
+		return x.Conclusion
+	}
+	return ""
+}
+
+func (x *GitHubCreateACheckRunRequest) GetOutput() *GitHubUpdateACheckRunRequest_Output {
+	if x != nil {
+		return x.Output
+	}
+	return nil
+}
+
+func (x *GitHubCreateACheckRunRequest) GetActions() []*GitHubUpdateACheckRunRequest_Actions {
+	if x != nil {
+		return x.Actions
+	}
+	return nil
 }
 
 type GitHubCreateACheckRunResponse struct {
@@ -2267,12 +2325,24 @@ var File_plugin_grpc_protocol_github_checks_runs_proto protoreflect.FileDescript
 
 const file_plugin_grpc_protocol_github_checks_runs_proto_rawDesc = "" +
 	"\n" +
-	"-plugin/grpc/protocol/github_checks_runs.proto\x12\bprotocol\x1a\x1cgoogle/protobuf/struct.proto\"~\n" +
+	"-plugin/grpc/protocol/github_checks_runs.proto\x12\bprotocol\x1a\x1cgoogle/protobuf/struct.proto\"\xa0\x03\n" +
 	"\x1cGitHubCreateACheckRunRequest\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x14\n" +
 	"\x05owner\x18\x02 \x01(\tR\x05owner\x12\x12\n" +
 	"\x04repo\x18\x03 \x01(\tR\x04repo\x12\x16\n" +
-	"\x06status\x18\x04 \x01(\tR\x06status\"\xf3\x05\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\x12\x19\n" +
+	"\bhead_sha\x18\x06 \x01(\tR\aheadSha\x12\x1f\n" +
+	"\vdetails_url\x18\a \x01(\tR\n" +
+	"detailsUrl\x12\x1f\n" +
+	"\vexternal_id\x18\b \x01(\tR\n" +
+	"externalId\x12\x1e\n" +
+	"\n" +
+	"conclusion\x18\t \x01(\tR\n" +
+	"conclusion\x12E\n" +
+	"\x06output\x18\n" +
+	" \x01(\v2-.protocol.GitHubUpdateACheckRunRequest.OutputR\x06output\x12H\n" +
+	"\aactions\x18\v \x03(\v2..protocol.GitHubUpdateACheckRunRequest.ActionsR\aactions\"\xf3\x05\n" +
 	"\x1dGitHubCreateACheckRunResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x0e\n" +
@@ -2557,33 +2627,35 @@ var file_plugin_grpc_protocol_github_checks_runs_proto_goTypes = []any{
 	(*structpb.Struct)(nil),                             // 25: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_github_checks_runs_proto_depIdxs = []int32{
-	20, // 0: protocol.GitHubCreateACheckRunResponse.output:type_name -> protocol.GitHubChecksRunsCheckRun.Output
-	21, // 1: protocol.GitHubCreateACheckRunResponse.check_suite:type_name -> protocol.GitHubChecksRunsCheckRun.CheckSuite
-	12, // 2: protocol.GitHubCreateACheckRunResponse.app:type_name -> protocol.GitHubChecksRunsGitHubApp
-	13, // 3: protocol.GitHubCreateACheckRunResponse.pull_requests:type_name -> protocol.GitHubChecksRunsPullRequestMinimal
-	14, // 4: protocol.GitHubCreateACheckRunResponse.deployment:type_name -> protocol.GitHubChecksRunsDeployment
-	16, // 5: protocol.GitHubUpdateACheckRunRequest.output:type_name -> protocol.GitHubUpdateACheckRunRequest.Output
-	17, // 6: protocol.GitHubUpdateACheckRunRequest.actions:type_name -> protocol.GitHubUpdateACheckRunRequest.Actions
-	15, // 7: protocol.GitHubListCheckRunAnnotationsResponse.items:type_name -> protocol.GitHubChecksRunsCheckAnnotation
-	11, // 8: protocol.GitHubListCheckRunsInACheckSuiteResponse.check_runs:type_name -> protocol.GitHubChecksRunsCheckRun
-	20, // 9: protocol.GitHubChecksRunsCheckRun.output:type_name -> protocol.GitHubChecksRunsCheckRun.Output
-	21, // 10: protocol.GitHubChecksRunsCheckRun.check_suite:type_name -> protocol.GitHubChecksRunsCheckRun.CheckSuite
-	12, // 11: protocol.GitHubChecksRunsCheckRun.app:type_name -> protocol.GitHubChecksRunsGitHubApp
-	13, // 12: protocol.GitHubChecksRunsCheckRun.pull_requests:type_name -> protocol.GitHubChecksRunsPullRequestMinimal
-	14, // 13: protocol.GitHubChecksRunsCheckRun.deployment:type_name -> protocol.GitHubChecksRunsDeployment
-	25, // 14: protocol.GitHubChecksRunsGitHubApp.owner:type_name -> google.protobuf.Struct
-	22, // 15: protocol.GitHubChecksRunsGitHubApp.permissions:type_name -> protocol.GitHubChecksRunsGitHubApp.PermissionsEntry
-	23, // 16: protocol.GitHubChecksRunsPullRequestMinimal.head:type_name -> protocol.GitHubChecksRunsPullRequestMinimal.Ref
-	23, // 17: protocol.GitHubChecksRunsPullRequestMinimal.base:type_name -> protocol.GitHubChecksRunsPullRequestMinimal.Ref
-	12, // 18: protocol.GitHubChecksRunsDeployment.performed_via_github_app:type_name -> protocol.GitHubChecksRunsGitHubApp
-	18, // 19: protocol.GitHubUpdateACheckRunRequest.Output.annotations:type_name -> protocol.GitHubUpdateACheckRunRequest.Output.Annotations
-	19, // 20: protocol.GitHubUpdateACheckRunRequest.Output.images:type_name -> protocol.GitHubUpdateACheckRunRequest.Output.Images
-	24, // 21: protocol.GitHubChecksRunsPullRequestMinimal.Ref.repo:type_name -> protocol.GitHubChecksRunsPullRequestMinimal.Ref.Repo
-	22, // [22:22] is the sub-list for method output_type
-	22, // [22:22] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	16, // 0: protocol.GitHubCreateACheckRunRequest.output:type_name -> protocol.GitHubUpdateACheckRunRequest.Output
+	17, // 1: protocol.GitHubCreateACheckRunRequest.actions:type_name -> protocol.GitHubUpdateACheckRunRequest.Actions
+	20, // 2: protocol.GitHubCreateACheckRunResponse.output:type_name -> protocol.GitHubChecksRunsCheckRun.Output
+	21, // 3: protocol.GitHubCreateACheckRunResponse.check_suite:type_name -> protocol.GitHubChecksRunsCheckRun.CheckSuite
+	12, // 4: protocol.GitHubCreateACheckRunResponse.app:type_name -> protocol.GitHubChecksRunsGitHubApp
+	13, // 5: protocol.GitHubCreateACheckRunResponse.pull_requests:type_name -> protocol.GitHubChecksRunsPullRequestMinimal
+	14, // 6: protocol.GitHubCreateACheckRunResponse.deployment:type_name -> protocol.GitHubChecksRunsDeployment
+	16, // 7: protocol.GitHubUpdateACheckRunRequest.output:type_name -> protocol.GitHubUpdateACheckRunRequest.Output
+	17, // 8: protocol.GitHubUpdateACheckRunRequest.actions:type_name -> protocol.GitHubUpdateACheckRunRequest.Actions
+	15, // 9: protocol.GitHubListCheckRunAnnotationsResponse.items:type_name -> protocol.GitHubChecksRunsCheckAnnotation
+	11, // 10: protocol.GitHubListCheckRunsInACheckSuiteResponse.check_runs:type_name -> protocol.GitHubChecksRunsCheckRun
+	20, // 11: protocol.GitHubChecksRunsCheckRun.output:type_name -> protocol.GitHubChecksRunsCheckRun.Output
+	21, // 12: protocol.GitHubChecksRunsCheckRun.check_suite:type_name -> protocol.GitHubChecksRunsCheckRun.CheckSuite
+	12, // 13: protocol.GitHubChecksRunsCheckRun.app:type_name -> protocol.GitHubChecksRunsGitHubApp
+	13, // 14: protocol.GitHubChecksRunsCheckRun.pull_requests:type_name -> protocol.GitHubChecksRunsPullRequestMinimal
+	14, // 15: protocol.GitHubChecksRunsCheckRun.deployment:type_name -> protocol.GitHubChecksRunsDeployment
+	25, // 16: protocol.GitHubChecksRunsGitHubApp.owner:type_name -> google.protobuf.Struct
+	22, // 17: protocol.GitHubChecksRunsGitHubApp.permissions:type_name -> protocol.GitHubChecksRunsGitHubApp.PermissionsEntry
+	23, // 18: protocol.GitHubChecksRunsPullRequestMinimal.head:type_name -> protocol.GitHubChecksRunsPullRequestMinimal.Ref
+	23, // 19: protocol.GitHubChecksRunsPullRequestMinimal.base:type_name -> protocol.GitHubChecksRunsPullRequestMinimal.Ref
+	12, // 20: protocol.GitHubChecksRunsDeployment.performed_via_github_app:type_name -> protocol.GitHubChecksRunsGitHubApp
+	18, // 21: protocol.GitHubUpdateACheckRunRequest.Output.annotations:type_name -> protocol.GitHubUpdateACheckRunRequest.Output.Annotations
+	19, // 22: protocol.GitHubUpdateACheckRunRequest.Output.images:type_name -> protocol.GitHubUpdateACheckRunRequest.Output.Images
+	24, // 23: protocol.GitHubChecksRunsPullRequestMinimal.Ref.repo:type_name -> protocol.GitHubChecksRunsPullRequestMinimal.Ref.Repo
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_github_checks_runs_proto_init() }

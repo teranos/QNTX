@@ -256,7 +256,7 @@
   "protocol.GitHubCompareTwoCommitsRequest": "GET /repos/{owner}/{repo}/compare/{basehead}",
   "protocol.GitHubCoreRate": "GitHubCoreRate is GitHub's core rate limit for a namespace's token.",
   "protocol.GitHubCoreRate.reset": "RFC 3339, to the nanosecond.",
-  "protocol.GitHubCreateACheckRunRequest": "POST /repos/{owner}/{repo}/check-runs The page lists status as the only body parameter.",
+  "protocol.GitHubCreateACheckRunRequest": "POST /repos/{owner}/{repo}/check-runs \"i expect to see a button\" The page's body is a oneOf on status, and each arm takes these: name and head_sha required, actions the buttons a person with write access can press.",
   "protocol.GitHubCreateACheckSuiteRequest": "POST /repos/{owner}/{repo}/check-suites",
   "protocol.GitHubCreateACommitCommentRequest": "POST /repos/{owner}/{repo}/commits/{commit_sha}/comments Response: same response schema as Get a commit comment.",
   "protocol.GitHubCreateACommitStatusRequest": "POST /repos/{owner}/{repo}/statuses/{sha}",
