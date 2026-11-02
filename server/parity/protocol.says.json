@@ -1,4 +1,11 @@
 {
+  "protocol.A2AAsked": "A2AAsked is what a2a ask answers: what an agent asked over A2A answered.",
+  "protocol.A2AAsked.agent": "Who was asked, as its card names it.",
+  "protocol.A2AAsked.answer": "What it answered: the text of its artifacts, or of its message.",
+  "protocol.A2AAsked.context": "The context it is in: said again, the next message continues it.",
+  "protocol.A2AAsked.state": "The state the Task reached, TASK_STATE_*, or empty for a message.",
+  "protocol.A2AAsked.task": "The Task the message became, when the agent answered with one.",
+  "protocol.A2AAsked.why": "Why it did not answer, when its Task failed or was rejected.",
   "protocol.Account": "Account is one provider account this User holds. Adding a provider adds a vocabulary rather than a field (ADR-030).",
   "protocol.Account.binding": "What proves this account belongs to a key this User holds. Without it the list above is an assertion, and the proof lives only in a browser.",
   "protocol.Account.canonical_id": "What that provider calls the account — Mastodon a profile URL, atproto a DID. It comes from the provider, or the binding was not signed.",

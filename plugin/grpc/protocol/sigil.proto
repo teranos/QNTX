@@ -281,6 +281,22 @@ message NodeAgentSaid {
   CodexSaid codex = 3;
 }
 
+// A2AAsked is what a2a ask answers: what an agent asked over A2A answered.
+message A2AAsked {
+  // Who was asked, as its card names it.
+  string agent = 1;
+  // The Task the message became, when the agent answered with one.
+  string task = 2;
+  // The context it is in: said again, the next message continues it.
+  string context = 3;
+  // The state the Task reached, TASK_STATE_*, or empty for a message.
+  string state = 4;
+  // What it answered: the text of its artifacts, or of its message.
+  string answer = 5;
+  // Why it did not answer, when its Task failed or was rejected.
+  string why = 6;
+}
+
 // NodeAgentAm is what agent am answers: who the Node Agent is and how the node
 // runs it, in the harness named.
 message NodeAgentAm {

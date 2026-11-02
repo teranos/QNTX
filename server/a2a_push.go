@@ -440,7 +440,12 @@ const a2aContentType = "application/a2a+json"
 // webhookClient POSTs to a webhook and nowhere else: the address it dials is
 // asked again, since DNS can answer differently there than when the config was
 // set, and a redirect is not followed somewhere the URL did not name.
-func webhookClient() *http.Client {
+func webhookClient() *http.Client { return publicClient(webhookTimeout) }
+
+// publicClient speaks to what the internet routes to and nowhere else, given
+// timeout for each request: the address it dials is asked where it is dialed,
+// and a redirect is not followed somewhere the URL did not name (§13.2).
+func publicClient(timeout time.Duration) *http.Client {
 	dialer := &net.Dialer{Timeout: webhookTimeout, Control: func(_, address string, _ syscall.RawConn) error {
 		host, _, err := net.SplitHostPort(address)
 		if err != nil {
@@ -456,7 +461,7 @@ func webhookClient() *http.Client {
 		return nil
 	}}
 	return &http.Client{
-		Timeout:       webhookTimeout,
+		Timeout:       timeout,
 		Transport:     &http.Transport{DialContext: dialer.DialContext},
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
