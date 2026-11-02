@@ -245,12 +245,15 @@ func (s *QNTXServer) writeTask(lines taskLines, task *a2asdk.Task, by string, al
 	if err != nil {
 		return errors.Wrapf(err, "failed to name the %s line of task %s", state, task.ID)
 	}
+	// The line is when it was written, which orders a Task's lines. The SDK
+	// stamps a state it changes to at the millisecond, and the Task it
+	// submits with no time at all: a line at the Task's own time sorts behind
+	// the line before it when both fall in one millisecond.
 	at := time.Now()
-	if task.Status.Timestamp != nil {
-		at = *task.Status.Timestamp
-	}
 	held := maskedTask(task)
-	held.Status.Timestamp = &at
+	if held.Status.Timestamp == nil {
+		held.Status.Timestamp = &at
+	}
 	snapshot, err := json.Marshal(held)
 	if err != nil {
 		return errors.Wrapf(err, "task %s did not marshal to be written", task.ID)
