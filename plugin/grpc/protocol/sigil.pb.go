@@ -1814,7 +1814,11 @@ type NodeGoogle struct {
 	// Whether what costs at Google is halted: 80% of the lower of budget and limit.
 	Halted bool `protobuf:"varint,18,opt,name=halted,proto3" json:"halted,omitempty"`
 	// Why it is.
-	HaltedWhy     string `protobuf:"bytes,19,opt,name=halted_why,json=haltedWhy,proto3" json:"halted_why,omitempty"`
+	HaltedWhy string `protobuf:"bytes,19,opt,name=halted_why,json=haltedWhy,proto3" json:"halted_why,omitempty"`
+	// The most ROOT lets the node spend in a day; zero is none.
+	DayLimit float64 `protobuf:"fixed64,22,opt,name=day_limit,json=dayLimit,proto3" json:"day_limit,omitempty"`
+	// What it has spent today, as far as Google has reported.
+	SpentToday    float64 `protobuf:"fixed64,23,opt,name=spent_today,json=spentToday,proto3" json:"spent_today,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1982,6 +1986,20 @@ func (x *NodeGoogle) GetHaltedWhy() string {
 	return ""
 }
 
+func (x *NodeGoogle) GetDayLimit() float64 {
+	if x != nil {
+		return x.DayLimit
+	}
+	return 0
+}
+
+func (x *NodeGoogle) GetSpentToday() float64 {
+	if x != nil {
+		return x.SpentToday
+	}
+	return 0
+}
+
 // GoogleBudget is what a budget at Google Cloud last reported.
 type GoogleBudget struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1995,8 +2013,10 @@ type GoogleBudget struct {
 	Currency string `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
 	// When the period began.
 	Since string `protobuf:"bytes,5,opt,name=since,proto3" json:"since,omitempty"`
-	// When Google published this.
-	At            string `protobuf:"bytes,6,opt,name=at,proto3" json:"at,omitempty"`
+	// When Google published this; empty until it first reports.
+	At string `protobuf:"bytes,6,opt,name=at,proto3" json:"at,omitempty"`
+	// How often it starts over: MONTH, QUARTER, YEAR, or CUSTOM.
+	Period        string `protobuf:"bytes,7,opt,name=period,proto3" json:"period,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2069,6 +2089,13 @@ func (x *GoogleBudget) GetSince() string {
 func (x *GoogleBudget) GetAt() string {
 	if x != nil {
 		return x.At
+	}
+	return ""
+}
+
+func (x *GoogleBudget) GetPeriod() string {
+	if x != nil {
+		return x.Period
 	}
 	return ""
 }
@@ -3374,7 +3401,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tanswering\x18\x06 \x01(\bR\tanswering\x12\x14\n" +
 	"\x05codex\x18\a \x01(\tR\x05codex\x12#\n" +
 	"\rcodex_version\x18\b \x01(\tR\fcodexVersion\x12\x1b\n" +
-	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\xa7\x04\n" +
+	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\xe5\x04\n" +
 	"\n" +
 	"NodeGoogle\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
@@ -3399,14 +3426,18 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x05limit\x18\x11 \x01(\x01R\x05limit\x12\x16\n" +
 	"\x06halted\x18\x12 \x01(\bR\x06halted\x12\x1d\n" +
 	"\n" +
-	"halted_why\x18\x13 \x01(\tR\thaltedWhy\"\x90\x01\n" +
+	"halted_why\x18\x13 \x01(\tR\thaltedWhy\x12\x1b\n" +
+	"\tday_limit\x18\x16 \x01(\x01R\bdayLimit\x12\x1f\n" +
+	"\vspent_today\x18\x17 \x01(\x01R\n" +
+	"spentToday\"\xa8\x01\n" +
 	"\fGoogleBudget\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04cost\x18\x02 \x01(\x01R\x04cost\x12\x16\n" +
 	"\x06budget\x18\x03 \x01(\x01R\x06budget\x12\x1a\n" +
 	"\bcurrency\x18\x04 \x01(\tR\bcurrency\x12\x14\n" +
 	"\x05since\x18\x05 \x01(\tR\x05since\x12\x0e\n" +
-	"\x02at\x18\x06 \x01(\tR\x02at\"\xe7\x03\n" +
+	"\x02at\x18\x06 \x01(\tR\x02at\x12\x16\n" +
+	"\x06period\x18\a \x01(\tR\x06period\"\xe7\x03\n" +
 	"\rNodeAnthropic\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
 	"\asubject\x18\x02 \x01(\tR\asubject\x12'\n" +

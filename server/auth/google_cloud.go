@@ -12,6 +12,7 @@ import (
 	"crypto/subtle"
 	"html"
 	"net/http"
+	"net/url"
 	"time"
 
 	errors "github.com/teranos/sacred-error"
@@ -57,6 +58,8 @@ type cloudPick struct {
 	token    string
 	ceremony string
 	by       string
+	handle   string
+	back     string
 }
 
 // cloudPickLife is how long ROOT's yes waits for the selection before it is let go.
@@ -68,11 +71,11 @@ func (h *Handler) SetGoogleCloudPick(projects GoogleCloudProjects, letGo func(to
 	h.googleCloudProjects, h.googleCloudLetGo = projects, letGo
 }
 
-// GoogleCostsConnect wires the node to its costs on ROOT's token, and says what it did.
-type GoogleCostsConnect func(ctx context.Context, token, by string) (string, error)
+// GoogleThingConnect sets up one thing of the node's at Google on ROOT's token, and says what it did.
+type GoogleThingConnect func(ctx context.Context, token, by string) (string, error)
 
 // SetGoogleCosts is what wires the node's costs once ROOT said yes.
-func (h *Handler) SetGoogleCosts(connect GoogleCostsConnect) { h.googleCosts = connect }
+func (h *Handler) SetGoogleCosts(connect GoogleThingConnect) { h.googleCosts = connect }
 
 // SetGoogleCloud is what connects the node once ROOT said yes.
 func (h *Handler) SetGoogleCloud(connect GoogleCloudConnect) { h.googleCloud = connect }
@@ -127,6 +130,7 @@ func (h *Handler) handleGoogleCloud(w http.ResponseWriter, r *http.Request) {
 		cloud:       true,
 		project:     r.URL.Query().Get("project"),
 		thing:       r.URL.Query().Get("thing"),
+		returnTo:    onPage(h.returnableTo(r), r.URL.Query().Get("page")),
 	})
 	if err != nil {
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false, "The ceremony was not recorded")
@@ -160,17 +164,17 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		h.renderCeremonyPage(w, http.StatusBadGateway, false, errNoGoogleToken.Error())
 		return
 	}
-	if fl.thing == "costs" && h.googleCosts != nil {
+	if connect := map[string]GoogleThingConnect{"costs": h.googleCosts}[fl.thing]; connect != nil {
 		ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
 		defer cancel()
-		said, err := h.googleCosts(ctx, acct.google, acct.CanonicalID)
+		said, err := connect(ctx, acct.google, acct.CanonicalID)
 		if err != nil {
-			h.logger.Errorw("The node's costs at Google Cloud were not connected", "by", acct.CanonicalID, "error", err)
-			h.renderCloudStopped(w, err, fl.project+"&thing=costs")
+			h.logger.Errorw("A thing of the node's at Google Cloud was not connected", "thing", fl.thing, "by", acct.CanonicalID, "error", err)
+			h.renderCloudStopped(w, err, fl.project, fl.thing, acct.Handle, fl.returnTo)
 			return
 		}
-		h.logger.Infow("the node's costs at Google Cloud are connected", "by", acct.CanonicalID, "said", said)
-		h.renderCeremonyPage(w, http.StatusOK, true, said)
+		h.logger.Infow("a thing of the node's at Google Cloud is connected", "thing", fl.thing, "by", acct.CanonicalID, "said", said)
+		h.renderCloudDone(w, said, fl.returnTo)
 		return
 	}
 	project := fl.project
@@ -182,38 +186,38 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		case err != nil:
 			h.googleCloudLetGo(acct.google)
 			h.logger.Errorw("ROOT's Google Cloud projects were not read", "by", acct.CanonicalID, "error", err)
-			h.renderCloudStopped(w, err, "")
+			h.renderCloudStopped(w, err, "", "", acct.Handle, fl.returnTo)
 			return
 		case len(seen) == 0:
 			h.googleCloudLetGo(acct.google)
 			h.renderCeremonyPage(w, http.StatusNotFound, false, "Your Google account sees no Google Cloud project to connect this node to.")
 			return
 		case len(seen) > 1:
-			h.renderCloudSelect(w, seen, acct.google, fl.ceremony, acct.CanonicalID)
+			h.renderCloudSelect(w, seen, acct.google, fl.ceremony, acct.CanonicalID, acct.Handle, fl.returnTo)
 			return
 		}
 		project = seen[0].ID
 	}
-	h.connectGoogleCloud(w, r, acct.google, project, acct.CanonicalID)
+	h.connectGoogleCloud(w, r, acct.google, project, acct.CanonicalID, acct.Handle, fl.returnTo)
 }
 
 // connectGoogleCloud sets the node up on ROOT's token, and says how that went.
-func (h *Handler) connectGoogleCloud(w http.ResponseWriter, r *http.Request, token, project, by string) {
+func (h *Handler) connectGoogleCloud(w http.ResponseWriter, r *http.Request, token, project, by, handle, back string) {
 	ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
 	defer cancel()
 	said, err := h.googleCloud(ctx, token, project, by)
 	if err != nil {
 		h.logger.Errorw("Google Cloud was not connected", "by", by, "project", project, "error", err)
-		h.renderCloudStopped(w, err, project)
+		h.renderCloudStopped(w, err, project, "", handle, back)
 		return
 	}
 	h.logger.Infow("the node is set up at Google Cloud", "by", by, "said", said)
-	h.renderCeremonyPage(w, http.StatusOK, true, said)
+	h.renderCloudDone(w, said, back)
 }
 
 // renderCloudSelect keeps ROOT's yes and asks which project the node belongs in.
 // "i press connect, i select project"
-func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudProject, token, ceremony, by string) {
+func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudProject, token, ceremony, by, handle, back string) {
 	ticket, err := randomTicket()
 	if err != nil {
 		h.googleCloudLetGo(token)
@@ -225,7 +229,7 @@ func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudPro
 	if h.cloudPicks == nil {
 		h.cloudPicks = map[string]cloudPick{}
 	}
-	h.cloudPicks[ticket] = cloudPick{token: token, ceremony: ceremony, by: by}
+	h.cloudPicks[ticket] = cloudPick{token: token, ceremony: ceremony, by: by, handle: handle, back: back}
 	h.cloudPicksMu.Unlock()
 	time.AfterFunc(cloudPickLife, func() {
 		if pick, held := h.takeCloudPick(ticket); held {
@@ -272,33 +276,81 @@ func (h *Handler) googleCloudSelected(w http.ResponseWriter, r *http.Request, ti
 		h.renderCeremonyPage(w, http.StatusForbidden, false, "This selection is spent, or was started somewhere else. Press Connect again.")
 		return
 	}
-	h.connectGoogleCloud(w, r, pick.token, r.URL.Query().Get("project"), pick.by)
+	h.connectGoogleCloud(w, r, pick.token, r.URL.Query().Get("project"), pick.by, pick.handle, pick.back)
 }
 
 // renderCloudStopped says what stopped the node connecting: what is wrong, where
 // to fix it when ROOT can, Try again, and all that was said.
 // "THE BARE MINIMUM A USER NEEDS TO CONTINUE ESSENTIALLY"
-func (h *Handler) renderCloudStopped(w http.ResponseWriter, err error, project string) {
-	again := googleCloudPath
-	if project != "" {
-		again += "?project=" + urlEncode(project)
+// asAccount is link at Google opened as the account that said yes: named nothing, Google
+// opens it as whichever account the browser signed in to first.
+func asAccount(link, handle string) string {
+	at, err := url.Parse(link)
+	if err != nil || handle == "" {
+		return link
 	}
-	says, full, fixAt := "The node was not connected to Google Cloud: "+err.Error(), "", ""
+	query := at.Query()
+	query.Set("authuser", handle)
+	at.RawQuery = query.Encode()
+	return at.String()
+}
+
+// backToQNTX is the way back to the page a connecting began on, as a press.
+func backToQNTX(back string) string {
+	if back == "" {
+		return ""
+	}
+	return `<p><a style="display:inline-block;padding:8px 12px;border:1px solid currentColor;color:#e6e4ef;text-decoration:none" href="` + html.EscapeString(back) + `">Back to QNTX</a></p>`
+}
+
+// renderCloudDone says what was set up, and offers the way back. A browser that named
+// no page gets the plain ceremony page.
+func (h *Handler) renderCloudDone(w http.ResponseWriter, said, back string) {
+	if back == "" {
+		h.renderCeremonyPage(w, http.StatusOK, true, said)
+		return
+	}
+	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
+		`<body style="background:#12111a;color:#2ecc71;font:14px ui-monospace,monospace;margin:0;padding:24px;word-break:break-word;overflow-wrap:break-word">` +
+		html.EscapeString(said) + backToQNTX(back)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if _, wrote := w.Write([]byte(page)); wrote != nil {
+		h.logger.Infow("the connecting's page was not delivered", "error", wrote)
+	}
+}
+
+func (h *Handler) renderCloudStopped(w http.ResponseWriter, err error, project, thing, handle, back string) {
+	asked := url.Values{}
+	if project != "" {
+		asked.Set("project", project)
+	}
+	if thing != "" {
+		asked.Set("thing", thing)
+	}
+	again := googleCloudPath
+	if len(asked) > 0 {
+		again += "?" + asked.Encode()
+	}
+	stopped := "The node was not connected to Google Cloud"
+	if thing != "" {
+		stopped = "Connect " + thing + " did not finish"
+	}
+	says, full, fixAt := stopped+": "+err.Error(), "", ""
 	var fix *GoogleCloudFix
 	if errors.As(err, &fix) {
-		says, full, fixAt = fix.Says, fix.Full, fix.Link
+		says, full, fixAt = fix.Says, fix.Full, asAccount(fix.Link, handle)
 	}
 	const link = `style="display:inline-block;margin:0 8px 8px 0;padding:8px 12px;border:1px solid currentColor;color:#e6e4ef;text-decoration:none"`
 	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
 		`<body style="background:#12111a;color:#e06060;font:14px ui-monospace,monospace;margin:0;padding:24px;word-break:break-word;overflow-wrap:break-word">` +
 		`<p>` + html.EscapeString(says) + `</p><p>`
 	if fixAt != "" {
-		page += `<a ` + link + ` target="_blank" rel="noopener" href="` + html.EscapeString(fixAt) + `">1. Turn it on at Google</a>`
+		page += `<a ` + link + ` target="_blank" rel="noopener" href="` + html.EscapeString(fixAt) + `">1. Do it at Google</a>`
 		page += `<a ` + link + ` href="` + html.EscapeString(again) + `">2. Try again</a>`
 	} else {
 		page += `<a ` + link + ` href="` + html.EscapeString(again) + `">Try again</a>`
 	}
-	page += `</p>`
+	page += `</p>` + backToQNTX(back)
 	if full != "" {
 		page += `<details style="color:#e6e4ef;opacity:.7"><summary>What Google said</summary>` + html.EscapeString(full) + `</details>`
 	}

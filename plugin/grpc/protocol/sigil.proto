@@ -377,6 +377,10 @@ message NodeGoogle {
   bool halted = 18;
   // Why it is.
   string halted_why = 19;
+  // The most ROOT lets the node spend in a day; zero is none.
+  double day_limit = 22;
+  // What it has spent today, as far as Google has reported.
+  double spent_today = 23;
 }
 
 // GoogleBudget is what a budget at Google Cloud last reported.
@@ -391,8 +395,10 @@ message GoogleBudget {
   string currency = 4;
   // When the period began.
   string since = 5;
-  // When Google published this.
+  // When Google published this; empty until it first reports.
   string at = 6;
+  // How often it starts over: MONTH, QUARTER, YEAR, or CUSTOM.
+  string period = 7;
 }
 
 // NodeAnthropic is what anthropic am and anthropic set answer: the node's
