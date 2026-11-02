@@ -93,7 +93,7 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			refuse(refused)
 			return
 		}
-		request, refused := read(op, r, params)
+		request, size, refused := read(op, r, params)
 		if refused != nil {
 			refuse(refused)
 			return
@@ -108,6 +108,10 @@ func HTTP(operations []Operation, served Served, answer Answer, undelivered Unde
 			}
 			if !at {
 				refuse(notFound("no agent is served at tenant " + tenant))
+				return
+			}
+			if size > TenantBodyMost {
+				refuse(tooLarge(TenantBodyMost, "an agent at a tenant"))
 				return
 			}
 		}
@@ -323,45 +327,63 @@ func matchPath(template, path string) (map[string]string, bool) {
 	return params, true
 }
 
+// The most a request body is read to: "Agents SHOULD implement appropriate
+// limits on message sizes, file sizes, and request complexity" (§13.4).
+// "Go ahead with 2mb limit node and 1mb for namespace and element agents"
+const (
+	NodeBodyMost   = 2 << 20
+	TenantBodyMost = 1 << 20
+)
+
+// tooLarge is a body over the most the agent it reaches takes.
+func tooLarge(most int, agent string) *Error {
+	return invalid("the body is more than " + strconv.Itoa(most) + " bytes, the most " + agent + " takes")
+}
+
 // read is the operation's request message: the JSON body (§11.4) or, for a
 // method without one, the query parameters by their camelCase names (§11.5),
-// then the path parameters. Fields the request does not have are ignored
-// (§5.7).
-func read(op Operation, r *http.Request, params map[string]string) (proto.Message, *Error) {
+// then the path parameters, and how many bytes its body was. Fields the
+// request does not have are ignored (§5.7).
+func read(op Operation, r *http.Request, params map[string]string) (proto.Message, int, *Error) {
 	request := dynamicpb.NewMessage(op.request)
+	size := 0
 	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: true}
 	switch r.Method {
 	case http.MethodGet, http.MethodDelete:
 		values, refused := queried(op.request, r)
 		if refused != nil {
-			return nil, refused
+			return nil, 0, refused
 		}
 		body, err := json.Marshal(values)
 		if err != nil {
-			return nil, invalid(err.Error())
+			return nil, 0, invalid(err.Error())
 		}
 		if err := unmarshal.Unmarshal(body, request); err != nil {
-			return nil, invalid("the query parameters are not a " + string(op.request.Name()) + ": " + err.Error())
+			return nil, 0, invalid("the query parameters are not a " + string(op.request.Name()) + ": " + err.Error())
 		}
 	default:
-		body, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(io.LimitReader(r.Body, NodeBodyMost+1))
 		if err != nil {
-			return nil, invalid("the body did not read: " + err.Error())
+			return nil, 0, invalid("the body did not read: " + err.Error())
 		}
+		if len(body) > NodeBodyMost {
+			return nil, 0, tooLarge(NodeBodyMost, "the Node Agent")
+		}
+		size = len(body)
 		if len(strings.TrimSpace(string(body))) > 0 {
 			if err := unmarshal.Unmarshal(body, request); err != nil {
-				return nil, invalid("the body is not a " + string(op.request.Name()) + ": " + err.Error())
+				return nil, 0, invalid("the body is not a " + string(op.request.Name()) + ": " + err.Error())
 			}
 		}
 	}
 	for name, value := range params {
 		field := op.request.Fields().ByName(protoreflect.Name(name))
 		if field == nil || field.Kind() != protoreflect.StringKind {
-			return nil, invalid(string(op.request.Name()) + " has no " + name + " to take from the path")
+			return nil, 0, invalid(string(op.request.Name()) + " has no " + name + " to take from the path")
 		}
 		request.Set(field, protoreflect.ValueOfString(value))
 	}
-	return request, nil
+	return request, size, nil
 }
 
 // queried is the query parameters the request has fields for, as JSON values

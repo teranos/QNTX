@@ -368,3 +368,57 @@ func TestAJSONRPCMethodThatIsNoNameIsNotSaidBack(t *testing.T) {
 		}
 	}
 }
+
+// sentOf is a SendMessageRequest whose body is size bytes, its one text part
+// padding it out.
+func sentOf(size int) string {
+	frame := `{"message": {"messageId": "m1", "role": "ROLE_USER", "parts": [{"text": ""}]}}`
+	return strings.Replace(frame, `"text": ""`, `"text": "`+strings.Repeat("x", size-len(frame))+`"`, 1)
+}
+
+// "Go ahead with 2mb limit node and 1mb for namespace and element agents": a
+// body over the most the agent it reaches takes is refused before any
+// operation is asked (§13.4).
+func TestABodyIsReadToTheMostItsAgentTakes(t *testing.T) {
+	for _, c := range []struct {
+		path    string
+		size    int
+		reached bool
+	}{
+		{"/message:send", NodeBodyMost, true},
+		{"/message:send", NodeBodyMost + 1, false},
+		{"/garden/message:send", TenantBodyMost, true},
+		{"/garden/message:send", TenantBodyMost + 1, false},
+	} {
+		reached := false
+		answer := func(_ context.Context, op Operation, _ proto.Message) (proto.Message, *Error) {
+			reached = true
+			return nil, Unsupported(op)
+		}
+		body := sentOf(c.size)
+		if len(body) != c.size {
+			t.Fatalf("the body is %d bytes, not %d", len(body), c.size)
+		}
+		w, said := serve(t, answer, "POST", c.path, body, v1)
+		if reached != c.reached {
+			t.Errorf("%d bytes at %s reached the answer %v", c.size, c.path, reached)
+		}
+		if !c.reached && (w.Code != http.StatusBadRequest || !strings.Contains(said.Error.Message, "the body is more than")) {
+			t.Errorf("%d bytes at %s answered %d %s", c.size, c.path, w.Code, said.Error.Message)
+		}
+	}
+}
+
+// A tenant named in the body is held to the tenant's most, as one in the path is.
+func TestABodyNamingItsTenantIsHeldToTheTenantsMost(t *testing.T) {
+	reached := false
+	answer := func(_ context.Context, op Operation, _ proto.Message) (proto.Message, *Error) {
+		reached = true
+		return nil, Unsupported(op)
+	}
+	body := strings.Replace(sentOf(TenantBodyMost+1), `{"message"`, `{"tenant": "garden", "message"`, 1)
+	w, said := serve(t, answer, "POST", "/message:send", body, v1)
+	if reached || w.Code != http.StatusBadRequest || !strings.Contains(said.Error.Message, "an agent at a tenant") {
+		t.Errorf("a tenant named in the body answered %d %s, reached %v", w.Code, said.Error.Message, reached)
+	}
+}
