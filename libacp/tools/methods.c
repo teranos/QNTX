@@ -1,5 +1,5 @@
-// methods META OUT: writes acp_methods.h, every method meta.json names, as the SDK generates its tables from
-// the same file: agentMethods, clientMethods and protocolMethods, each name to its wire name.
+// 「[Opus 5.5] methods META OUT: writes acp_methods.h, every method meta.json names, as the SDK generates its tables from」
+// 「[Opus 5.5] the same file: agentMethods, clientMethods and protocolMethods, each name to its wire name.」
 #include <json-c/json.h>
 
 #include <ctype.h>
@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
                 fclose(out);
                 return fail(meta, "a method's wire name is no string", name);
             }
-            // A name is a C identifier once upper-cased, and a wire name needs no escape in a C string.
+            // 「[Opus 5.5] A name is a C identifier once upper-cased, and a wire name needs no escape in a C string.」
             for (const char *c = name; *c != '\0'; c++) {
                 if (!islower((unsigned char) *c) && !isdigit((unsigned char) *c) && *c != '_') {
                     fclose(out);
