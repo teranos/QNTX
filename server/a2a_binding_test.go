@@ -148,7 +148,7 @@ func TestARefusalTheNodeWritesIsTheSDKsShape(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	assert.Equal(t, "FAILED_PRECONDITION", said.Error.Status)
 	assert.Equal(t, "UNSUPPORTED_OPERATION", said.reason())
-	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+	assert.Equal(t, "application/a2a+json", w.Header().Get("Content-Type"))
 }
 
 // A path that is an operation without a tenant names none; any other's first
@@ -170,4 +170,15 @@ func TestATenantNamedAfterAnOperationIsATenant(t *testing.T) {
 		assert.Equal(t, asked.rest, rest, asked.method+" "+asked.path)
 		assert.Equal(t, asked.tenant != "", named, asked.method+" "+asked.path)
 	}
+}
+
+// TASK_STATE_UNSPECIFIED is a TaskState a client names, and filters nothing;
+// a status that is no TaskState is refused.
+func TestAnUnspecifiedStatusListsEveryTask(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	w, _ := a2aSaid(t, srv, http.MethodGet, "/a2a/tasks?status=TASK_STATE_UNSPECIFIED", "", "1.0", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	w, said := a2aSaid(t, srv, http.MethodGet, "/a2a/tasks?status=TASK_STATE_RUNNING", "", "1.0", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Equal(t, "INVALID_ARGUMENT", said.Error.Status)
 }

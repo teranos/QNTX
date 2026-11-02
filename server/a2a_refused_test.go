@@ -214,3 +214,22 @@ func TestVersionsAndMethodsAreTheNodesWords(t *testing.T) {
 	assert.Equal(t, "ab…", bounded("abc", 2))
 	assert.Equal(t, "a?b", bounded("a\x00b", 10))
 }
+
+// A refusal tells the A2A-Version the client said, whatever Major.Minor the
+// SDK is handed (§3.6).
+func TestARefusalTellsTheVersionTheClientSaid(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	sent := toSentry(t)
+
+	r := asBearer(http.MethodGet, "/a2a/tasks/nothing", tokens[auth.LevelRoot])
+	r.Header.Set("A2A-Version", "1.0.1")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+
+	logs, _ := sent.said()
+	require.Len(t, logs, 1)
+	said, held := logAttr(logs[0], "a2a.version")
+	assert.True(t, held)
+	assert.Equal(t, "1.0.1", said)
+}

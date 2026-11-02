@@ -45,7 +45,7 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "no A2A client speaks to "+peer.Label+": "+err.Error())
 	}
 	defer func() { _ = client.Destroy() }()
-	_, err = client.GetExtendedAgentCard(r.Context(), &a2asdk.GetExtendedAgentCardRequest{Tenant: namespace})
+	handed, err := client.GetExtendedAgentCard(r.Context(), &a2asdk.GetExtendedAgentCardRequest{Tenant: namespace})
 	if carried.status == http.StatusNotFound {
 		return nil, a2aRefusal(a2asdk.ErrTaskNotFound, peer.Label+" serves no agent at tenant "+namespace)
 	}
@@ -59,10 +59,11 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 		}
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" answered "+strconv.Itoa(carried.status)+" for the card of the agent of "+namespace+": "+said)
 	}
-	// The card is verified as the peer sent it: what it signed is ProtoJSON,
-	// and a2a-go v2.5's AgentCard does not keep all of it ("streaming": false
-	// among it).
-	card, err := a2a.ReadCard(carried.body)
+	raw, err := json.Marshal(handed)
+	if err != nil {
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card "+peer.Label+" handed over did not marshal: "+err.Error())
+	}
+	card, err := a2a.ReadCard(raw)
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" handed over no card for the agent of "+namespace+": "+err.Error())
 	}
@@ -80,9 +81,7 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 const peerCardTimeout = 15 * time.Second
 
 // peerCarrier carries the person to a peer, their token on each request, and
-// keeps how the peer answered, the card as it sent it. a2a-go v2.5 reads a
-// card's security scopes as a list where a2a.proto declares a StringList
-// (a2a-go#437, fixed in v2.7): the card is handed to it in the shape it reads.
+// keeps how the peer answered.
 type peerCarrier struct {
 	bearer string
 	origin *url.URL
@@ -109,52 +108,7 @@ func (c *peerCarrier) RoundTrip(r *http.Request) (*http.Response, error) {
 		c.unread = err
 		return nil, err
 	}
-	shaped := body
-	if resp.StatusCode == http.StatusOK {
-		shaped = scopesShaped(body)
-	}
-	resp.Body, resp.ContentLength = io.NopCloser(bytes.NewReader(shaped)), int64(len(shaped))
+	resp.Body, resp.ContentLength = io.NopCloser(bytes.NewReader(body)), int64(len(body))
 	resp.Header.Del("Content-Length")
 	return resp, nil
-}
-
-// scopesShaped is a card's JSON with each security requirement's scopes as
-// a2a-go v2.5 reads them, a list, where a2a.proto declares a StringList.
-// Anything that is no card is left as it is.
-func scopesShaped(raw []byte) []byte {
-	var card map[string]any
-	if json.Unmarshal(raw, &card) != nil {
-		return raw
-	}
-	shape := func(held any) {
-		requirements, _ := held.([]any)
-		for _, requirement := range requirements {
-			declared, _ := requirement.(map[string]any)
-			schemes, _ := declared["schemes"].(map[string]any)
-			for name, scopes := range schemes {
-				// Scopes already a list, or null, are left as they are.
-				declared, isStringList := scopes.(map[string]any)
-				if !isStringList {
-					continue
-				}
-				listed, _ := declared["list"].([]any)
-				if listed == nil {
-					listed = []any{}
-				}
-				schemes[name] = listed
-			}
-		}
-	}
-	shape(card["securityRequirements"])
-	skills, _ := card["skills"].([]any)
-	for _, skill := range skills {
-		if held, isSkill := skill.(map[string]any); isSkill {
-			shape(held["securityRequirements"])
-		}
-	}
-	shaped, err := json.Marshal(card)
-	if err != nil {
-		return raw
-	}
-	return shaped
 }

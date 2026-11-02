@@ -175,23 +175,6 @@ func TestAPeerRedirectingTheCardCarriesNoTokenAway(t *testing.T) {
 	assert.Empty(t, elsewhere, "the redirect was followed")
 }
 
-// A card whose scopes are already a list, or null, is left as it is, not a
-// panic: a2a-go itself writes the list.
-func TestACardsScopesInAnyShapeAreRead(t *testing.T) {
-	for _, scopes := range []string{`[]`, `null`, `["read"]`, `{"list": ["read"]}`, `{}`} {
-		card := `{"securityRequirements": [{"schemes": {"bearer": ` + scopes + `}}], "skills": [{"securityRequirements": [{"schemes": {"bearer": ` + scopes + `}}]}]}`
-		assert.NotPanics(t, func() { scopesShaped([]byte(card)) }, scopes)
-	}
-	var shaped struct {
-		Requirements []struct {
-			Schemes map[string][]string `json:"schemes"`
-		} `json:"securityRequirements"`
-	}
-	require.NoError(t, json.Unmarshal(scopesShaped([]byte(`{"securityRequirements": [{"schemes": {"bearer": {"list": ["read"]}, "session": {}}}]}`)), &shaped))
-	assert.Equal(t, []string{"read"}, shaped.Requirements[0].Schemes["bearer"])
-	assert.Equal(t, []string{}, shaped.Requirements[0].Schemes["session"])
-}
-
 // A peer refusing the card says why, and the node hands its words on.
 func TestAPeerRefusingTheCardIsHeardOut(t *testing.T) {
 	peer := aPeer(t, func(_ *standInPeer, w http.ResponseWriter, _ string) {
