@@ -63,10 +63,15 @@ func newIssuer(url string, node ed25519.PrivateKey) (*issuer, error) {
 	return &issuer{url: url, key: key, jwk: jwk}, nil
 }
 
-// identityToken is a fresh identity token for agent: its subject is the
-// agent's DID, and namespace the namespace it stands in. Each carries its own
-// jti, so each is traded once.
+// identityToken is a fresh identity token for agent, for Anthropic.
 func (i *issuer) identityToken(subject, namespace string) (string, error) {
+	return i.identityTokenFor(subject, namespace, identityTokenAudience)
+}
+
+// identityTokenFor is a fresh identity token for agent, for the relying party
+// audience names: its subject is the agent's DID, and namespace the namespace
+// it stands in. Each carries its own jti, so each is traded once.
+func (i *issuer) identityTokenFor(subject, namespace, audience string) (string, error) {
 	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jose.JSONWebKey{Key: i.key, KeyID: i.jwk.KeyID}},
 		(&jose.SignerOptions{}).WithType("JWT"))
 	if err != nil {
@@ -74,7 +79,7 @@ func (i *issuer) identityToken(subject, namespace string) (string, error) {
 	}
 	now := time.Now()
 	claims := jwt.Claims{
-		Issuer: i.url, Subject: subject, Audience: jwt.Audience{identityTokenAudience},
+		Issuer: i.url, Subject: subject, Audience: jwt.Audience{audience},
 		IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now),
 		Expiry: jwt.NewNumericDate(now.Add(identityTokenLifetime)), ID: uuid.NewString(),
 	}

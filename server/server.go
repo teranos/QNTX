@@ -19,6 +19,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
@@ -102,6 +103,8 @@ type QNTXServer struct {
 	// What sends the node's own mail: the mail service, or, until the plugin
 	// services make it, what refuses each mail saying so.
 	nodeMailer nodeMailer
+	// googleOutcome stands in for mailing ROOT how connecting to Google Cloud ended.
+	googleOutcome func(services.NodeMail)
 	// The node's GitHub (ADR-043), made on first use.
 	githubOnce sync.Once
 	github     *gitHub
