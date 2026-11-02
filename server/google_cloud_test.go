@@ -300,11 +300,11 @@ func TestAProviderTrustingAnotherIssuerIsNotTheNodes(t *testing.T) {
 	assert.Equal(t, []string{"root-token"}, g.revoked)
 }
 
-// The login's project has Resource Manager off, as Google answered on the first
+// The project ROOT names has Resource Manager off, as Google answered on the first
 // real press: "Cloud Resource Manager API has not been used in project". The
 // APIs are the node's to enable, so they are enabled before anything is read, and
 // Google taking its time to say so is waited out.
-func TestTheLoginsProjectIsConnectedWithItsAPIsOff(t *testing.T) {
+func TestTheProjectROOTNamesIsConnectedWithItsAPIsOff(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	g := googleStandingIn(t, s, theProject)
 	g.managerOff, g.settling = true, 2
@@ -330,6 +330,15 @@ func TestAnAPITheNodeCannotTurnOnSaysWhereToTurnItOn(t *testing.T) {
 	assert.Equal(t, "https://console.developers.google.com/apis/api/serviceusage.googleapis.com/overview?project=123", fix.Link)
 	assert.Contains(t, fix.Full, "SERVICE_DISABLED")
 	assert.Equal(t, []string{"root-token"}, g.revoked)
+}
+
+// What ROOT selects from is every project its account sees, by id and name.
+func TestTheProjectsROOTSelectsFromAreThoseItsAccountSees(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	googleStandingIn(t, s, googleProject{ProjectID: "another", ProjectNumber: "9", Name: "Another"}, theProject)
+	seen, err := s.googleProjectsOf(context.Background(), "root-token")
+	require.NoError(t, err)
+	assert.Equal(t, []auth.GoogleCloudProject{{ID: "another", Name: "Another"}, {ID: "the-project"}}, seen)
 }
 
 // ROOT's account seeing several projects names one to connect in.

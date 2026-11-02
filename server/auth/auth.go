@@ -58,6 +58,12 @@ type Handler struct {
 	google *OperatorClient
 	// googleCloud connects the node to Google Cloud on ROOT's yes.
 	googleCloud GoogleCloudConnect
+	// googleCloudProjects is what ROOT's account sees to select from, and
+	// googleCloudLetGo lets ROOT's token go when no setup will.
+	googleCloudProjects GoogleCloudProjects
+	googleCloudLetGo    func(token string)
+	cloudPicksMu        sync.Mutex
+	cloudPicks          map[string]cloudPick
 	// auth.provider.apple, the same way: the key already resolved, nil on a
 	// node configured for no Apple.
 	apple *OperatorClient

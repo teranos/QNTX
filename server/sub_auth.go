@@ -374,6 +374,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// this node, when it is a peer, asks through its own primary.
 	authHandler.SetGitHubForPeers(githubForPeers, githubLocationForPeers)
 	authHandler.SetGoogleCloud(s.connectGoogleCloud)
+	authHandler.SetGoogleCloudPick(s.googleProjectsOf, s.letGoOfGoogle)
 	if through, locate, hasPrimary := authHandler.GitHubThroughThePrimary(); hasPrimary {
 		s.ciGitHubGet = githubThroughThePrimary(through)
 		s.ciGitHubToken = noGitHubToken

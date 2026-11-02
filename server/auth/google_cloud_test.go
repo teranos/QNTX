@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	errors "github.com/teranos/sacred-error"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,6 +52,13 @@ func googleAnswering(t *testing.T, sub string) {
 // consenting sends a browser to Google to connect the node, and back with code.
 func consenting(t *testing.T, h *Handler, query string) *httptest.ResponseRecorder {
 	t.Helper()
+	done, _ := consentingWith(t, h, query)
+	return done
+}
+
+// consentingWith is consenting, with the cookies the browser came back holding.
+func consentingWith(t *testing.T, h *Handler, query string) (*httptest.ResponseRecorder, []*http.Cookie) {
+	t.Helper()
 	start := httptest.NewRecorder()
 	h.handleGoogleCloud(start, httptest.NewRequest(http.MethodGet, googleCloudPath+query, nil))
 	require.Equal(t, http.StatusFound, start.Code, start.Body.String())
@@ -68,7 +77,91 @@ func consenting(t *testing.T, h *Handler, query string) *httptest.ResponseRecord
 	}
 	done := httptest.NewRecorder()
 	h.handleBindingCallback(done, back)
-	return done
+	return done, start.Result().Cookies()
+}
+
+// pickingHandler is a node whose ROOT's account sees projects, and keeps which
+// tokens it let go.
+func pickingHandler(t *testing.T, projects ...GoogleCloudProject) (*Handler, *[]connected, *[]string) {
+	t.Helper()
+	h, handed := cloudHandler(t)
+	var letGo []string
+	h.SetGoogleCloudPick(func(context.Context, string) ([]GoogleCloudProject, error) { return projects, nil },
+		func(token string) { letGo = append(letGo, token) })
+	return h, handed, &letGo
+}
+
+// hrefOf is the link whose text holds label on page.
+func hrefOf(t *testing.T, page, label string) string {
+	t.Helper()
+	at := strings.Index(page, label)
+	require.GreaterOrEqual(t, at, 0, page)
+	start := strings.LastIndex(page[:at], `href="`)
+	require.GreaterOrEqual(t, start, 0, page)
+	rest := page[start+len(`href="`):]
+	return html.UnescapeString(rest[:strings.Index(rest, `"`)])
+}
+
+// "i press connect, i select project, its not that hard bro"
+func TestROOTPressesConnectAndSelectsTheProject(t *testing.T) {
+	h, handed, _ := pickingHandler(t, GoogleCloudProject{ID: "sbvh-1", Name: "SBVH"}, GoogleCloudProject{ID: "qntx-2", Name: "QNTX"})
+	googleAnswering(t, "root-sub")
+	done, cookies := consentingWith(t, h, "")
+	require.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	page := done.Body.String()
+	assert.Contains(t, page, "SBVH")
+	assert.Contains(t, page, "qntx-2")
+	assert.Empty(t, *handed, "nothing is set up before ROOT selects")
+
+	selected := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, hrefOf(t, page, "qntx-2"), nil)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+	h.handleGoogleCloud(selected, req)
+	assert.Equal(t, http.StatusOK, selected.Code, selected.Body.String())
+	assert.Equal(t, []connected{{"cloud-token", "qntx-2", "google:root-sub"}}, *handed)
+
+	// What was selected is spent: the page's link does not connect twice.
+	again := httptest.NewRecorder()
+	h.handleGoogleCloud(again, req)
+	assert.Equal(t, http.StatusForbidden, again.Code)
+	assert.Len(t, *handed, 1)
+}
+
+// A browser that did not say yes selects nothing, and ROOT's selection stands.
+func TestAnotherBrowserDoesNotSelectTheProject(t *testing.T) {
+	h, handed, _ := pickingHandler(t, GoogleCloudProject{ID: "sbvh-1"}, GoogleCloudProject{ID: "qntx-2"})
+	googleAnswering(t, "root-sub")
+	done, _ := consentingWith(t, h, "")
+	selected := httptest.NewRecorder()
+	h.handleGoogleCloud(selected, httptest.NewRequest(http.MethodGet, hrefOf(t, done.Body.String(), "qntx-2"), nil))
+	assert.Equal(t, http.StatusForbidden, selected.Code)
+	assert.Empty(t, *handed)
+}
+
+// One project is no question.
+func TestOneProjectIsNotAsked(t *testing.T) {
+	h, handed, _ := pickingHandler(t, GoogleCloudProject{ID: "qntx-2"})
+	googleAnswering(t, "root-sub")
+	done := consenting(t, h, "")
+	assert.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	assert.Equal(t, []connected{{"cloud-token", "qntx-2", "google:root-sub"}}, *handed)
+}
+
+// The list not read is said as any stop is, and ROOT's token is let go.
+func TestAListThatDidNotReadLetsTheTokenGo(t *testing.T) {
+	h, handed := cloudHandler(t)
+	var letGo []string
+	h.SetGoogleCloudPick(func(context.Context, string) ([]GoogleCloudProject, error) {
+		return nil, &GoogleCloudFix{Says: "the API is off", Link: "https://console.cloud.google.com/turn-it-on", Full: "all that Google said"}
+	}, func(token string) { letGo = append(letGo, token) })
+	googleAnswering(t, "root-sub")
+	done := consenting(t, h, "")
+	assert.Equal(t, http.StatusBadGateway, done.Code)
+	assert.Contains(t, done.Body.String(), "the API is off")
+	assert.Empty(t, *handed)
+	assert.Equal(t, []string{"cloud-token"}, letGo)
 }
 
 func mustPath(t *testing.T, raw string) string {
@@ -76,14 +169,6 @@ func mustPath(t *testing.T, raw string) string {
 	parsed, err := url.Parse(raw)
 	require.NoError(t, err)
 	return parsed.Path
-}
-
-// An OAuth client ID opens with the number of the project it was made in: the
-// project ROOT "already set up the Google login in".
-func TestTheLoginsClientNamesItsProject(t *testing.T) {
-	assert.Equal(t, "606051110730", loginProject("606051110730-abc.apps.googleusercontent.com"))
-	assert.Equal(t, "", loginProject("client-id"))
-	assert.Equal(t, "", loginProject(""))
 }
 
 // "AND CLEARLY TELL THE USER WHATS UP", "THE BARE MINIMUM A USER NEEDS TO CONTINUE",

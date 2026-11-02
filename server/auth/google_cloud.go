@@ -38,24 +38,37 @@ func (f *GoogleCloudFix) Error() string { return f.Full }
 // project named or, named none, the one ROOT's account sees, and says what it set up.
 type GoogleCloudConnect func(ctx context.Context, token, project, by string) (string, error)
 
+// GoogleCloudProject is one project ROOT's account sees.
+type GoogleCloudProject struct {
+	ID   string
+	Name string
+}
+
+// GoogleCloudProjects is every project ROOT's account sees, on its token.
+type GoogleCloudProjects func(ctx context.Context, token string) ([]GoogleCloudProject, error)
+
+// cloudPick is ROOT's yes, kept until ROOT selects the project: only the browser
+// that said yes selects, once.
+type cloudPick struct {
+	token    string
+	ceremony string
+	by       string
+}
+
+// cloudPickLife is how long ROOT's yes waits for the selection before it is let go.
+const cloudPickLife = 10 * time.Minute
+
+// SetGoogleCloudPick is what ROOT selects a project from, and what lets ROOT's
+// token go when no setup will.
+func (h *Handler) SetGoogleCloudPick(projects GoogleCloudProjects, letGo func(token string)) {
+	h.googleCloudProjects, h.googleCloudLetGo = projects, letGo
+}
+
 // SetGoogleCloud is what connects the node once ROOT said yes.
 func (h *Handler) SetGoogleCloud(connect GoogleCloudConnect) { h.googleCloud = connect }
 
 // GoogleCloudPath is where ROOT connects the node, with the project as ?project=.
 func GoogleCloudPath() string { return googleCloudPath }
-
-// loginProject is the project an OAuth client was made in: its ID opens with the
-// project's number. Empty when it does not.
-func loginProject(clientID string) string {
-	end := 0
-	for end < len(clientID) && clientID[end] >= '0' && clientID[end] <= '9' {
-		end++
-	}
-	if end == 0 || end == len(clientID) || clientID[end] != '-' {
-		return ""
-	}
-	return clientID[:end]
-}
 
 // googleCloudAuthorize is Google's consent for the node's setup: the login's own
 // grant, with cloud-platform added to it.
@@ -83,6 +96,10 @@ func (h *Handler) handleGoogleCloud(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.googleCloud == nil {
 		h.renderCeremonyPage(w, http.StatusServiceUnavailable, false, "This node has nothing that connects it to Google Cloud")
+		return
+	}
+	if ticket := r.URL.Query().Get("selected"); ticket != "" {
+		h.googleCloudSelected(w, r, ticket)
 		return
 	}
 	ceremony, err := randomTicket()
@@ -132,21 +149,106 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		h.renderCeremonyPage(w, http.StatusBadGateway, false, errNoGoogleToken.Error())
 		return
 	}
+	project := fl.project
+	if project == "" && h.googleCloudProjects != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
+		defer cancel()
+		seen, err := h.googleCloudProjects(ctx, acct.google)
+		switch {
+		case err != nil:
+			h.googleCloudLetGo(acct.google)
+			h.logger.Errorw("ROOT's Google Cloud projects were not read", "by", acct.CanonicalID, "error", err)
+			h.renderCloudStopped(w, err, "")
+			return
+		case len(seen) == 0:
+			h.googleCloudLetGo(acct.google)
+			h.renderCeremonyPage(w, http.StatusNotFound, false, "Your Google account sees no Google Cloud project to connect this node to.")
+			return
+		case len(seen) > 1:
+			h.renderCloudSelect(w, seen, acct.google, fl.ceremony, acct.CanonicalID)
+			return
+		}
+		project = seen[0].ID
+	}
+	h.connectGoogleCloud(w, r, acct.google, project, acct.CanonicalID)
+}
+
+// connectGoogleCloud sets the node up on ROOT's token, and says how that went.
+func (h *Handler) connectGoogleCloud(w http.ResponseWriter, r *http.Request, token, project, by string) {
 	ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
 	defer cancel()
-	// "ROOT, who already set up the Google login in that project"
-	project := fl.project
-	if project == "" {
-		project = loginProject(fl.state.ClientID)
-	}
-	said, err := h.googleCloud(ctx, acct.google, project, acct.CanonicalID)
+	said, err := h.googleCloud(ctx, token, project, by)
 	if err != nil {
-		h.logger.Errorw("Google Cloud was not connected", "by", acct.CanonicalID, "project", fl.project, "error", err)
-		h.renderCloudStopped(w, err, fl.project)
+		h.logger.Errorw("Google Cloud was not connected", "by", by, "project", project, "error", err)
+		h.renderCloudStopped(w, err, project)
 		return
 	}
-	h.logger.Infow("the node is connected to Google Cloud", "by", acct.CanonicalID, "said", said)
+	h.logger.Infow("the node is connected to Google Cloud", "by", by, "said", said)
 	h.renderCeremonyPage(w, http.StatusOK, true, said)
+}
+
+// renderCloudSelect keeps ROOT's yes and asks which project the node belongs in.
+// "i press connect, i select project"
+func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudProject, token, ceremony, by string) {
+	ticket, err := randomTicket()
+	if err != nil {
+		h.googleCloudLetGo(token)
+		h.logger.Errorw("could not mint a ticket for selecting a Google Cloud project", "error", err)
+		h.renderCeremonyPage(w, http.StatusInternalServerError, false, "The selection was not recorded")
+		return
+	}
+	h.cloudPicksMu.Lock()
+	if h.cloudPicks == nil {
+		h.cloudPicks = map[string]cloudPick{}
+	}
+	h.cloudPicks[ticket] = cloudPick{token: token, ceremony: ceremony, by: by}
+	h.cloudPicksMu.Unlock()
+	time.AfterFunc(cloudPickLife, func() {
+		if pick, held := h.takeCloudPick(ticket); held {
+			h.googleCloudLetGo(pick.token)
+		}
+	})
+	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
+		`<body style="background:#12111a;color:#e6e4ef;font:14px ui-monospace,monospace;margin:0;padding:24px;word-break:break-word;overflow-wrap:break-word">` +
+		`<p>Which Google Cloud project does this node belong in?</p>`
+	for _, project := range seen {
+		called := project.ID
+		if project.Name != "" && project.Name != project.ID {
+			called = project.Name + " (" + project.ID + ")"
+		}
+		page += `<p><a style="display:inline-block;padding:8px 12px;border:1px solid currentColor;color:#e6e4ef;text-decoration:none" href="` +
+			html.EscapeString(googleCloudPath+"?selected="+urlEncode(ticket)+"&project="+urlEncode(project.ID)) + `">` + html.EscapeString(called) + `</a></p>`
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if _, wrote := w.Write([]byte(page)); wrote != nil {
+		h.logger.Infow("the Google Cloud selection was not delivered", "error", wrote)
+	}
+}
+
+// takeCloudPick hands out ROOT's kept yes, once.
+func (h *Handler) takeCloudPick(ticket string) (cloudPick, bool) {
+	h.cloudPicksMu.Lock()
+	defer h.cloudPicksMu.Unlock()
+	pick, held := h.cloudPicks[ticket]
+	delete(h.cloudPicks, ticket)
+	return pick, held
+}
+
+// googleCloudSelected is ROOT's selection: only from the browser that said yes,
+// and only once.
+func (h *Handler) googleCloudSelected(w http.ResponseWriter, r *http.Request, ticket string) {
+	h.cloudPicksMu.Lock()
+	pick, held := h.cloudPicks[ticket]
+	h.cloudPicksMu.Unlock()
+	if !held || subtle.ConstantTimeCompare([]byte(heldCeremony(r)), []byte(pick.ceremony)) != 1 {
+		h.renderCeremonyPage(w, http.StatusForbidden, false, "This selection is spent, or was started somewhere else. Press Connect again.")
+		return
+	}
+	if pick, held = h.takeCloudPick(ticket); !held {
+		h.renderCeremonyPage(w, http.StatusForbidden, false, "This selection is spent, or was started somewhere else. Press Connect again.")
+		return
+	}
+	h.connectGoogleCloud(w, r, pick.token, r.URL.Query().Get("project"), pick.by)
 }
 
 // renderCloudStopped says what stopped the node connecting: what is wrong, where

@@ -142,6 +142,7 @@ func waitFor(ctx context.Context, token, base string, op googleOperation) error 
 
 // googleProject is a project ROOT's account sees.
 type googleProject struct {
+	Name          string `json:"name"`
 	ProjectID     string `json:"projectId"`
 	ProjectNumber string `json:"projectNumber"`
 }
@@ -151,6 +152,21 @@ type googleProject struct {
 func stillDisabled(err error) bool {
 	var said *googleError
 	return errors.As(err, &said) && said.status == http.StatusForbidden && strings.Contains(said.said, "SERVICE_DISABLED")
+}
+
+// googleProjectsOf is every project ROOT's account sees, for ROOT to select from.
+func (s *QNTXServer) googleProjectsOf(ctx context.Context, token string) ([]auth.GoogleCloudProject, error) {
+	var seen struct {
+		Projects []googleProject `json:"projects"`
+	}
+	if err := googleCall(ctx, token, http.MethodGet, googleResourceManager+"/v1/projects?filter="+url.QueryEscape("lifecycleState:ACTIVE"), nil, &seen); err != nil {
+		return nil, googleFixOf(err)
+	}
+	projects := make([]auth.GoogleCloudProject, 0, len(seen.Projects))
+	for _, p := range seen.Projects {
+		projects = append(projects, auth.GoogleCloudProject{ID: p.ProjectID, Name: p.Name})
+	}
+	return projects, nil
 }
 
 // googleFixOf is err as what ROOT does about it, when it is an API the node could
