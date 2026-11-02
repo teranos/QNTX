@@ -28,8 +28,8 @@ import (
 // declares, an openapi.json as the operations and schemas of an OpenAPI
 // description. A .proto that imports by its path is pinned at that path:
 // oasf's are under agntcy/, its taxonomies under schema/, and the JSON Schema
-// its server gives a Record is record.schema.json. TEI's ODD is pinned under
-// Specs/ as the Guidelines keep it: tei is tei_4.12.0_113e933 (odd.go).
+// 「[Fable 5.1] its server gives a Record is record.schema.json. TEI's ODD is pinned under」
+// 「[Fable 5.1] Specs/ as the Guidelines keep it: tei is tei_4.12.0_113e933 (odd.go).」
 //
 //go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema */record.schema.json */Specs
 var pinned embed.FS
