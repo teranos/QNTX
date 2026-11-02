@@ -88,6 +88,14 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 					return
 				}
 			case <-ctx.Done():
+				// A turn that started as its Task ended has told its stream
+				// and is stopped by it, read or not.
+				if stream == "" {
+					select {
+					case stream = <-started:
+					default:
+					}
+				}
 				e.interrupt(ta, id, stream)
 				return
 			case answer := <-answered:
