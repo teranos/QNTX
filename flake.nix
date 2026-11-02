@@ -508,6 +508,9 @@
             {
               nativeBuildInputs = [ pkgs.lychee ];
               docsSite = self.packages.${system}.docs-site;
+              # lychee builds its HTTP client even --offline, and refuses to
+              # without CA certificates, which the sandbox has none of.
+              SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
             }
             ''
               # Check internal links only (offline mode)

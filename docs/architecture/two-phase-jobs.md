@@ -135,4 +135,4 @@ Parent-child job hierarchy:
 
 - [Pulse Async Architecture](pulse-async-ix.md)
 - [GRACE](../adr/ADR-036-GRACE.md) - What shutdown does to a job mid-flight
-- [Job Type Definitions](../types/async.md)
+- [Job Type Definitions](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go)

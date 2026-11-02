@@ -100,7 +100,7 @@ sha256sum -c qntx-VERSION-linux-amd64.tar.gz.sha256
 - Linux (amd64, arm64)
 - macOS (Apple Silicon)
 
-Unix-like hosts only — see [ADR-029](adr/ADR-029-windows.md).
+Unix-like hosts only — see [ADR-029](adr/ADR-029-Windows.md).
 
 **Note:** Replace `VERSION` with the actual version number (e.g., `0.17.3`). See [releases page](https://github.com/teranos/QNTX/releases) for all versions.
 

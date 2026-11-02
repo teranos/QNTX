@@ -79,7 +79,7 @@ GET /api/pulse/jobs/{job_id}/executions?limit=50&offset=0&status=completed
 }
 ```
 
-> **Type Reference**: See [Execution](../types/schedule.md#execution) and [ListExecutionsResponse](../types/server.md#listexecutionsresponse) type definitions.
+> **Type Reference**: See [Execution](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/schedule.proto) and [ListExecutionsResponse](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/schedule.proto) type definitions.
 
 ### Get Execution Details
 
