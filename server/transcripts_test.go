@@ -245,7 +245,7 @@ func TestTranscriptsAreRootsAndSupers(t *testing.T) {
 	assert.Equal(t, []string{"ROOT", "SUPER"}, compiled["/api/transcripts"])
 }
 
-// transcripts follows tei: a turn is q, and parity finds nothing of its
+// 「[Fable 5.1] transcripts follows tei: a turn is q, and parity finds nothing of its」
 // missing from the pin.
 func TestTranscriptsFollowTEI(t *testing.T) {
 	schema, refused := parity.Reference("tei")
@@ -254,8 +254,8 @@ func TestTranscriptsFollowTEI(t *testing.T) {
 	p, refused := parity.Hold(s.transcriptsSignum().Signum, "", "tei", schema)
 	require.Nil(t, refused)
 	assert.Empty(t, p.Missing)
-	// A turn's speaker and row are one value where TEI's who and source are
-	// lists: the one departure, shown rather than hidden.
+	// 「[Fable 5.1] A turn's speaker and row are one value where TEI's who and source are」
+	// 「[Fable 5.1] lists: the one departure, shown rather than hidden.」
 	var departed []string
 	for _, clade := range p.Clades {
 		for _, item := range clade.Items {
