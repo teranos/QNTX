@@ -1351,9 +1351,7 @@ type NamespaceAgentSaid struct {
 	// What it answered in Pi.
 	Pi *PiSaid `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
 	// What the namespace agent answered in Codex.
-	Codex *CodexSaid `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
-	// What it answered in agy.
-	Agy           *AgySaid `protobuf:"bytes,4,opt,name=agy,proto3" json:"agy,omitempty"`
+	Codex         *CodexSaid `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1405,13 +1403,6 @@ func (x *NamespaceAgentSaid) GetPi() *PiSaid {
 func (x *NamespaceAgentSaid) GetCodex() *CodexSaid {
 	if x != nil {
 		return x.Codex
-	}
-	return nil
-}
-
-func (x *NamespaceAgentSaid) GetAgy() *AgySaid {
-	if x != nil {
-		return x.Agy
 	}
 	return nil
 }
@@ -2062,7 +2053,11 @@ type NodeGoogle struct {
 	// Whether what costs at Google is halted: 80% of the lower of budget and limit.
 	Halted bool `protobuf:"varint,18,opt,name=halted,proto3" json:"halted,omitempty"`
 	// Why it is.
-	HaltedWhy     string `protobuf:"bytes,19,opt,name=halted_why,json=haltedWhy,proto3" json:"halted_why,omitempty"`
+	HaltedWhy string `protobuf:"bytes,19,opt,name=halted_why,json=haltedWhy,proto3" json:"halted_why,omitempty"`
+	// The most ROOT lets the node spend in a day; zero is none.
+	DayLimit float64 `protobuf:"fixed64,22,opt,name=day_limit,json=dayLimit,proto3" json:"day_limit,omitempty"`
+	// What it has spent today, as far as Google has reported.
+	SpentToday    float64 `protobuf:"fixed64,23,opt,name=spent_today,json=spentToday,proto3" json:"spent_today,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2244,6 +2239,20 @@ func (x *NodeGoogle) GetHaltedWhy() string {
 	return ""
 }
 
+func (x *NodeGoogle) GetDayLimit() float64 {
+	if x != nil {
+		return x.DayLimit
+	}
+	return 0
+}
+
+func (x *NodeGoogle) GetSpentToday() float64 {
+	if x != nil {
+		return x.SpentToday
+	}
+	return 0
+}
+
 // GoogleBudget is what a budget at Google Cloud last reported.
 type GoogleBudget struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -2257,8 +2266,10 @@ type GoogleBudget struct {
 	Currency string `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
 	// When the period began.
 	Since string `protobuf:"bytes,5,opt,name=since,proto3" json:"since,omitempty"`
-	// When Google published this.
-	At            string `protobuf:"bytes,6,opt,name=at,proto3" json:"at,omitempty"`
+	// When Google published this; empty until it first reports.
+	At string `protobuf:"bytes,6,opt,name=at,proto3" json:"at,omitempty"`
+	// How often it starts over: MONTH, QUARTER, YEAR, or CUSTOM.
+	Period        string `protobuf:"bytes,7,opt,name=period,proto3" json:"period,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2331,6 +2342,13 @@ func (x *GoogleBudget) GetSince() string {
 func (x *GoogleBudget) GetAt() string {
 	if x != nil {
 		return x.At
+	}
+	return ""
+}
+
+func (x *GoogleBudget) GetPeriod() string {
+	if x != nil {
+		return x.Period
 	}
 	return ""
 }
@@ -2882,9 +2900,7 @@ type NamespaceAgentAm struct {
 	// Who the agent is and how it runs, in Pi.
 	Pi *PiAm `protobuf:"bytes,4,opt,name=pi,proto3" json:"pi,omitempty"`
 	// Who the namespace agent is in Codex.
-	Codex *CodexAm `protobuf:"bytes,5,opt,name=codex,proto3" json:"codex,omitempty"`
-	// Who the namespace agent is in agy.
-	Agy           *AgyAm `protobuf:"bytes,6,opt,name=agy,proto3" json:"agy,omitempty"`
+	Codex         *CodexAm `protobuf:"bytes,5,opt,name=codex,proto3" json:"codex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2950,13 +2966,6 @@ func (x *NamespaceAgentAm) GetPi() *PiAm {
 func (x *NamespaceAgentAm) GetCodex() *CodexAm {
 	if x != nil {
 		return x.Codex
-	}
-	return nil
-}
-
-func (x *NamespaceAgentAm) GetAgy() *AgyAm {
-	if x != nil {
-		return x.Agy
 	}
 	return nil
 }
@@ -3613,12 +3622,11 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tsigned_in\x18\v \x01(\bR\bsignedIn\x12\x1f\n" +
 	"\vauth_method\x18\f \x01(\tR\n" +
 	"authMethod\x12\x16\n" +
-	"\x06models\x18\r \x03(\tR\x06models\"\xb4\x01\n" +
+	"\x06models\x18\r \x03(\tR\x06models\"\x8f\x01\n" +
 	"\x12NamespaceAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
-	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\x12#\n" +
-	"\x03agy\x18\x04 \x01(\v2\x11.protocol.AgySaidR\x03agy\"\xaf\x01\n" +
+	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\"\xaf\x01\n" +
 	"\rNodeAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
@@ -3668,7 +3676,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x03agy\x18\x05 \x01(\tR\x03agy\x12\x1f\n" +
 	"\vagy_version\x18\x06 \x01(\tR\n" +
 	"agyVersion\x12\x1b\n" +
-	"\tnot_ready\x18\a \x01(\tR\bnotReady\"\xe5\x04\n" +
+	"\tnot_ready\x18\a \x01(\tR\bnotReady\"\xa3\x05\n" +
 	"\n" +
 	"NodeGoogle\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
@@ -3696,14 +3704,18 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x05limit\x18\x11 \x01(\x01R\x05limit\x12\x16\n" +
 	"\x06halted\x18\x12 \x01(\bR\x06halted\x12\x1d\n" +
 	"\n" +
-	"halted_why\x18\x13 \x01(\tR\thaltedWhy\"\x90\x01\n" +
+	"halted_why\x18\x13 \x01(\tR\thaltedWhy\x12\x1b\n" +
+	"\tday_limit\x18\x16 \x01(\x01R\bdayLimit\x12\x1f\n" +
+	"\vspent_today\x18\x17 \x01(\x01R\n" +
+	"spentToday\"\xa8\x01\n" +
 	"\fGoogleBudget\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04cost\x18\x02 \x01(\x01R\x04cost\x12\x16\n" +
 	"\x06budget\x18\x03 \x01(\x01R\x06budget\x12\x1a\n" +
 	"\bcurrency\x18\x04 \x01(\tR\bcurrency\x12\x14\n" +
 	"\x05since\x18\x05 \x01(\tR\x05since\x12\x0e\n" +
-	"\x02at\x18\x06 \x01(\tR\x02at\"\xe7\x03\n" +
+	"\x02at\x18\x06 \x01(\tR\x02at\x12\x16\n" +
+	"\x06period\x18\a \x01(\tR\x06period\"\xe7\x03\n" +
 	"\rNodeAnthropic\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
 	"\asubject\x18\x02 \x01(\tR\asubject\x12'\n" +
@@ -3749,14 +3761,13 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"pi_version\x18\b \x01(\tR\tpiVersion\x12\x1b\n" +
 	"\tnot_ready\x18\t \x01(\tR\bnotReady\x12\x1a\n" +
 	"\bprovider\x18\n" +
-	" \x01(\tR\bprovider\"\xdd\x01\n" +
+	" \x01(\tR\bprovider\"\xba\x01\n" +
 	"\x10NamespaceAgentAm\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x15\n" +
 	"\x06set_by\x18\x02 \x01(\tR\x05setBy\x12(\n" +
 	"\x05agent\x18\x03 \x01(\v2\x12.protocol.ClaudeAmR\x05agent\x12\x1e\n" +
 	"\x02pi\x18\x04 \x01(\v2\x0e.protocol.PiAmR\x02pi\x12'\n" +
-	"\x05codex\x18\x05 \x01(\v2\x11.protocol.CodexAmR\x05codex\x12!\n" +
-	"\x03agy\x18\x06 \x01(\v2\x0f.protocol.AgyAmR\x03agy\"~\n" +
+	"\x05codex\x18\x05 \x01(\v2\x11.protocol.CodexAmR\x05codex\"~\n" +
 	"\aFollows\x12\x1c\n" +
 	"\treference\x18\x01 \x01(\tR\treference\x12/\n" +
 	"\acolumns\x18\x02 \x03(\v2\x15.protocol.CorrespondsR\acolumns\x12$\n" +
@@ -3859,32 +3870,30 @@ var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	12, // 9: protocol.NamespaceAgentSaid.claude:type_name -> protocol.ClaudeSaid
 	13, // 10: protocol.NamespaceAgentSaid.pi:type_name -> protocol.PiSaid
 	18, // 11: protocol.NamespaceAgentSaid.codex:type_name -> protocol.CodexSaid
-	20, // 12: protocol.NamespaceAgentSaid.agy:type_name -> protocol.AgySaid
-	12, // 13: protocol.NodeAgentSaid.claude:type_name -> protocol.ClaudeSaid
-	13, // 14: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
-	18, // 15: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
-	20, // 16: protocol.NodeAgentSaid.agy:type_name -> protocol.AgySaid
-	14, // 17: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
-	28, // 18: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
-	19, // 19: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
-	21, // 20: protocol.NodeAgentAm.agy:type_name -> protocol.AgyAm
-	23, // 21: protocol.NodeGoogle.budgets:type_name -> protocol.GoogleBudget
-	25, // 22: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
-	27, // 23: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
-	14, // 24: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
-	28, // 25: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
-	19, // 26: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
-	21, // 27: protocol.NamespaceAgentAm.agy:type_name -> protocol.AgyAm
-	31, // 28: protocol.Follows.columns:type_name -> protocol.Corresponds
-	32, // 29: protocol.Follows.folds:type_name -> protocol.Fold
-	34, // 30: protocol.Sigil.takes:type_name -> protocol.Param
-	35, // 31: protocol.Sigil.gives:type_name -> protocol.Field
-	36, // 32: protocol.Sigil.http:type_name -> protocol.Endpoint
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	12, // 12: protocol.NodeAgentSaid.claude:type_name -> protocol.ClaudeSaid
+	13, // 13: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
+	18, // 14: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
+	20, // 15: protocol.NodeAgentSaid.agy:type_name -> protocol.AgySaid
+	14, // 16: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
+	28, // 17: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
+	19, // 18: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
+	21, // 19: protocol.NodeAgentAm.agy:type_name -> protocol.AgyAm
+	23, // 20: protocol.NodeGoogle.budgets:type_name -> protocol.GoogleBudget
+	25, // 21: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
+	27, // 22: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
+	14, // 23: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
+	28, // 24: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
+	19, // 25: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
+	31, // 26: protocol.Follows.columns:type_name -> protocol.Corresponds
+	32, // 27: protocol.Follows.folds:type_name -> protocol.Fold
+	34, // 28: protocol.Sigil.takes:type_name -> protocol.Param
+	35, // 29: protocol.Sigil.gives:type_name -> protocol.Field
+	36, // 30: protocol.Sigil.http:type_name -> protocol.Endpoint
+	31, // [31:31] is the sub-list for method output_type
+	31, // [31:31] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }

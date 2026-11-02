@@ -108,7 +108,11 @@ func (b *standInBilling) answer(w http.ResponseWriter, r *http.Request) {
 	case path == "/v1/"+b.account+"/budgets" && r.Method == http.MethodGet:
 		listed := []map[string]any{}
 		for _, name := range b.budgets {
-			listed = append(listed, map[string]any{"name": b.account + "/budgets/" + name, "displayName": name})
+			listed = append(listed, map[string]any{
+				"name": b.account + "/budgets/" + name, "displayName": name,
+				"amount":       map[string]any{"specifiedAmount": map[string]any{"currencyCode": "EUR", "units": "20"}},
+				"budgetFilter": map[string]any{"calendarPeriod": "MONTH"},
+			})
 		}
 		write(map[string]any{"budgets": listed})
 	case strings.HasPrefix(path, "/v1/"+b.account+"/budgets/") && r.Method == http.MethodPatch:
@@ -262,6 +266,61 @@ func TestBudgetReportsAreKeptNewestFirst(t *testing.T) {
 	assert.InDelta(t, 20, am.GetBudgets()[0].GetBudget(), 0.001)
 	assert.Equal(t, "EUR", am.GetBudgets()[0].GetCurrency())
 	assert.False(t, am.GetHalted())
+}
+
+// "its also annoying we dont know if its euro or dollars": what a budget is in, and how
+// often it starts over, is known before Google first reports.
+func TestABudgetIsKnownBeforeGoogleReports(t *testing.T) {
+	s, _, _ := wiredForCosts(t)
+	am := rootAsksGoogle(t, s)
+	require.Len(t, am.GetBudgets(), 1)
+	budget := am.GetBudgets()[0]
+	assert.Equal(t, "monthly", budget.GetName())
+	assert.Equal(t, "EUR", budget.GetCurrency())
+	assert.Equal(t, "MONTH", budget.GetPeriod())
+	assert.InDelta(t, 20, budget.GetBudget(), 0.001)
+	assert.Empty(t, budget.GetAt(), "Google has not reported")
+}
+
+// "i want a max 1 per day as well": what was spent today halts at 80% of it, and the
+// next day starts over.
+func TestADayLimitHaltsUntilTomorrow(t *testing.T) {
+	s, b, mailed := wiredForCosts(t)
+	now := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
+	googleNow = func() time.Time { return now }
+	t.Cleanup(func() { googleNow = time.Now })
+
+	admitted := auth.Admitted(auth.LevelRoot)
+	admitted.Identity = "google:root-sub"
+	asked := httptest.NewRequest(http.MethodPost, "/api/google/limit", nil)
+	asked = asked.WithContext(auth.WithAdmission(asked.Context(), admitted))
+	_, refused := s.googleSignum().Answers["limit"](sigil.WithCaller(asked.Context(), asked), sigil.Sent{"amount": "1", "per": "day"})
+	require.Nil(t, refused)
+	assert.InDelta(t, 1, rootAsksGoogle(t, s).GetDayLimit(), 0.001)
+
+	b.says("b1", "a1", "2026-11-19T23:00:00Z", "monthly", 5, 20, "2026-11-01T00:00:00Z")
+	b.says("b1", "a2", "2026-11-20T06:00:00Z", "monthly", 5.5, 20, "2026-11-01T00:00:00Z")
+	require.NoError(t, s.googleCostsTick(context.Background()))
+	am := rootAsksGoogle(t, s)
+	assert.InDelta(t, 0.5, am.GetSpentToday(), 0.001)
+	assert.False(t, am.GetHalted(), "5.50 is under the budget's 80%, and 0.50 under the day's")
+
+	b.says("b1", "a3", "2026-11-20T11:00:00Z", "monthly", 5.8, 20, "2026-11-01T00:00:00Z")
+	require.NoError(t, s.googleCostsTick(context.Background()))
+	am = rootAsksGoogle(t, s)
+	assert.True(t, am.GetHalted(), "0.80 is 80%% of the day's 1")
+	assert.Contains(t, am.GetHaltedWhy(), "today")
+	require.Len(t, mailed, 1)
+	<-mailed
+
+	now = now.Add(24 * time.Hour)
+	require.NoError(t, s.googleCostsTick(context.Background()))
+	assert.False(t, rootAsksGoogle(t, s).GetHalted(), "tomorrow starts over")
+	require.Len(t, mailed, 1, "ROOT is told it resumed")
+
+	_, refused = s.googleSignum().Answers["limit"](sigil.WithCaller(asked.Context(), asked), sigil.Sent{"amount": "1", "per": "week"})
+	require.NotNil(t, refused)
+	assert.Equal(t, "per", refused.GetParam())
 }
 
 // A QNTX-side limit below Google's budget is what 80% is of.

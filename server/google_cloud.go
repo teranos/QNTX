@@ -502,7 +502,10 @@ func (s *QNTXServer) googleSignum() sigil.Signum {
 				{
 					Name:   "limit",
 					Does:   "Set the limit ROOT holds on this node: what costs at Google halts at 80% of the lower of it and the budget. Zero takes it off.",
-					Takes:  []*protocol.Param{{Name: "amount", Required: true, Says: "A number, in the budget's currency. Zero takes the limit off."}},
+					Takes: []*protocol.Param{
+						{Name: "amount", Required: true, Says: "A number, in the budget's currency. Zero takes the limit off."},
+						{Name: "per", OneOf: []string{"period", "day"}, Says: "What the limit is per: the budget's period, or a day. Named none, the period."},
+					},
 					Answer: "protocol.NodeGoogle",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/google/limit"},
 				},

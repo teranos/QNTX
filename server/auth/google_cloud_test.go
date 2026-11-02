@@ -265,6 +265,36 @@ func TestTryingAgainAsksForTheSameThing(t *testing.T) {
 	assert.Empty(t, *handed)
 }
 
+// "i also wish it had a button abck to qntx": back to the page it began on, on a door
+// of this node, and never anywhere else.
+func TestConnectingOffersTheWayBack(t *testing.T) {
+	h, _ := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	h.SetGoogleCosts(func(context.Context, string, string) (string, error) { return "wired", nil })
+	h.ownOrigins = []string{"https://web.example.org"}
+	require.NoError(t, h.SetDoors(nil))
+
+	begin := func(referer string) *httptest.ResponseRecorder {
+		start := httptest.NewRecorder()
+		asked := httptest.NewRequest(http.MethodGet, googleCloudPath+"?project=p&thing=costs&page=/branch/x/", nil)
+		asked.Header.Set("Referer", referer)
+		h.handleGoogleCloud(start, asked)
+		require.Equal(t, http.StatusFound, start.Code)
+		sent, err := url.Parse(start.Header().Get("Location"))
+		require.NoError(t, err)
+		back := httptest.NewRequest(http.MethodGet, callbackPath+"?state="+url.QueryEscape(sent.Query().Get("state"))+"&code=the-code", nil)
+		for _, cookie := range start.Result().Cookies() {
+			back.AddCookie(cookie)
+		}
+		done := httptest.NewRecorder()
+		h.handleBindingCallback(done, back)
+		return done
+	}
+
+	assert.Equal(t, "https://web.example.org/branch/x/", hrefOf(t, begin("https://web.example.org/").Body.String(), "Back to QNTX"))
+	assert.NotContains(t, begin("https://elsewhere.example.org/").Body.String(), "Back to QNTX")
+}
+
 // Only ROOT's own Google account connects the node.
 func TestAnotherGoogleAccountDoesNotConnectTheNode(t *testing.T) {
 	h, handed := cloudHandler(t)

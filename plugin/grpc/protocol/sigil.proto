@@ -268,8 +268,6 @@ message NamespaceAgentSaid {
   PiSaid pi = 2;
   // What the namespace agent answered in Codex.
   CodexSaid codex = 3;
-  // What it answered in agy.
-  AgySaid agy = 4;
 }
 
 // NodeAgentSaid is what agent say answers: what the Node Agent answered, in the
@@ -428,6 +426,10 @@ message NodeGoogle {
   bool halted = 18;
   // Why it is.
   string halted_why = 19;
+  // The most ROOT lets the node spend in a day; zero is none.
+  double day_limit = 22;
+  // What it has spent today, as far as Google has reported.
+  double spent_today = 23;
 }
 
 // GoogleBudget is what a budget at Google Cloud last reported.
@@ -442,8 +444,10 @@ message GoogleBudget {
   string currency = 4;
   // When the period began.
   string since = 5;
-  // When Google published this.
+  // When Google published this; empty until it first reports.
   string at = 6;
+  // How often it starts over: MONTH, QUARTER, YEAR, or CUSTOM.
+  string period = 7;
 }
 
 // NodeAnthropic is what anthropic am and anthropic set answer: the node's
@@ -562,8 +566,6 @@ message NamespaceAgentAm {
   PiAm pi = 4;
   // Who the namespace agent is in Codex.
   CodexAm codex = 5;
-  // Who the namespace agent is in agy.
-  AgyAm agy = 6;
 }
 
 // Follows says which column of a reference each of a signum's fields is. The

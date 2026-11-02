@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"slices"
@@ -46,6 +47,8 @@ const (
 	googleCostsLineSubject  = "GOOGLE-COSTS"
 	googleBudgetLineSubject = "GOOGLE-BUDGET"
 	googleLimitLineSubject  = "GOOGLE-LIMIT"
+	// "i want a max 1 per day as well"
+	googleDayLimitLineSubject = "GOOGLE-DAY-LIMIT"
 
 	googleBillingPages = "https://console.cloud.google.com/billing"
 	googleBillingPage  = "https://console.cloud.google.com/billing/linkedaccount"
@@ -267,23 +270,121 @@ type googleBudgetReport struct {
 	published                 time.Time
 }
 
+// googleBudgetSet is a budget as it is set at Google.
+type googleBudgetSet struct {
+	name, currency, period string
+	amount                 float64
+}
+
+// readGoogleBudgets reads the budgets as they are set at Google: what they are in, and
+// how often they start over, which is known before Google first reports.
+func (s *QNTXServer) readGoogleBudgets(ctx context.Context, token string) error {
+	lines, err := s.googleCostLines(googleCostsLineSubject)
+	if err != nil || len(lines) == 0 {
+		return err
+	}
+	account, _ := lines[0].Attributes["billing_account"].(string)
+	if account == "" {
+		return errors.Newf("%s line %s names no billing account", googleCostsLineSubject, lines[0].ID)
+	}
+	var listed struct {
+		Budgets []struct {
+			DisplayName string `json:"displayName"`
+			Amount      struct {
+				Specified struct {
+					Currency string `json:"currencyCode"`
+					Units    string `json:"units"`
+					Nanos    int64  `json:"nanos"`
+				} `json:"specifiedAmount"`
+			} `json:"amount"`
+			Filter struct {
+				Period string `json:"calendarPeriod"`
+				Custom any    `json:"customPeriod"`
+			} `json:"budgetFilter"`
+		} `json:"budgets"`
+	}
+	if err := googleCall(ctx, token, http.MethodGet, googleBudgets+"/v1/"+account+"/budgets", nil, &listed); err != nil {
+		return errors.Wrapf(err, "the budgets of %s were not read", account)
+	}
+	set := make([]googleBudgetSet, 0, len(listed.Budgets))
+	for _, budget := range listed.Budgets {
+		units, _ := strconv.ParseFloat(budget.Amount.Specified.Units, 64)
+		period := budget.Filter.Period
+		if period == "" && budget.Filter.Custom != nil {
+			period = "CUSTOM"
+		}
+		set = append(set, googleBudgetSet{
+			name: budget.DisplayName, currency: budget.Amount.Specified.Currency, period: period,
+			amount: units + float64(budget.Amount.Specified.Nanos)/1e9,
+		})
+	}
+	s.googleHaltMu.Lock()
+	s.googleBudgetsSet = set
+	s.googleHaltMu.Unlock()
+	return nil
+}
+
+// googleNow is the time a day is counted by.
+var googleNow = time.Now
+
+// googleSpentToday is the most any budget has spent today, and which: what it last
+// reported less what it reported before today in the same period. Before Google's first
+// report of a period that began earlier there is nothing to count from, so today is
+// counted from today's first report, and a report comes hours after the spending.
+func (s *QNTXServer) googleSpentToday() (spent float64, on googleBudgetReport, err error) {
+	reports, err := s.googleEveryBudgetReport()
+	if err != nil {
+		return 0, on, err
+	}
+	slices.SortStableFunc(reports, func(a, b googleBudgetReport) int { return a.published.Compare(b.published) })
+	byBudget := map[string][]googleBudgetReport{}
+	for _, report := range reports {
+		byBudget[report.id] = append(byBudget[report.id], report)
+	}
+	today := googleNow().UTC().Truncate(24 * time.Hour)
+	for _, each := range byBudget {
+		newest := each[len(each)-1]
+		if newest.published.Before(today) {
+			continue
+		}
+		base, counted := 0.0, false
+		for _, report := range each {
+			if report.since != newest.since {
+				continue
+			}
+			if report.published.Before(today) {
+				base, counted = report.cost, true
+			}
+		}
+		if !counted {
+			began, err := time.Parse(time.RFC3339Nano, newest.since)
+			if err != nil || began.Before(today) {
+				for _, report := range each {
+					if report.since == newest.since {
+						base = report.cost
+						break
+					}
+				}
+			}
+		}
+		// In cents: 5.80 less 5 is otherwise just under 0.80.
+		if today := math.Round((newest.cost-base)*100) / 100; today > spent {
+			spent, on = today, newest
+		}
+	}
+	return spent, on, nil
+}
+
 // googleBudgetReports is what each budget last reported, by when Google published it,
 // so a report arriving late does not stand over a newer one.
 func (s *QNTXServer) googleBudgetReports() ([]googleBudgetReport, error) {
-	lines, err := s.googleCostLines(googleBudgetLineSubject)
+	every, err := s.googleEveryBudgetReport()
 	if err != nil {
 		return nil, err
 	}
 	newest := map[string]googleBudgetReport{}
 	var order []string
-	for _, line := range lines {
-		text := func(name string) string { held, _ := line.Attributes[name].(string); return held }
-		number := func(name string) float64 { held, _ := line.Attributes[name].(float64); return held }
-		published, err := time.Parse(time.RFC3339Nano, text("published"))
-		if err != nil {
-			return nil, errors.Wrapf(err, "%s line %s holds no time it was published", googleBudgetLineSubject, line.ID)
-		}
-		report := googleBudgetReport{id: text("budget_id"), name: text("name"), currency: text("currency"), since: text("since"), cost: number("cost"), budget: number("budget"), published: published}
+	for _, report := range every {
 		held, seen := newest[report.id]
 		if !seen {
 			order = append(order, report.id)
@@ -298,6 +399,36 @@ func (s *QNTXServer) googleBudgetReports() ([]googleBudgetReport, error) {
 		reports = append(reports, newest[id])
 	}
 	return reports, nil
+}
+
+// googleEveryBudgetReport is every report the node keeps.
+func (s *QNTXServer) googleEveryBudgetReport() ([]googleBudgetReport, error) {
+	lines, err := s.googleCostLines(googleBudgetLineSubject)
+	if err != nil {
+		return nil, err
+	}
+	reports := make([]googleBudgetReport, 0, len(lines))
+	for _, line := range lines {
+		text := func(name string) string { held, _ := line.Attributes[name].(string); return held }
+		number := func(name string) float64 { held, _ := line.Attributes[name].(float64); return held }
+		published, err := time.Parse(time.RFC3339Nano, text("published"))
+		if err != nil {
+			return nil, errors.Wrapf(err, "%s line %s holds no time it was published", googleBudgetLineSubject, line.ID)
+		}
+		report := googleBudgetReport{id: text("budget_id"), name: text("name"), currency: text("currency"), since: text("since"), cost: number("cost"), budget: number("budget"), published: published}
+		reports = append(reports, report)
+	}
+	return reports, nil
+}
+
+// googleDayLimit is the most ROOT lets the node spend in a day; zero is none.
+func (s *QNTXServer) googleDayLimit() (float64, error) {
+	lines, err := s.googleCostLines(googleDayLimitLineSubject)
+	if err != nil || len(lines) == 0 {
+		return 0, err
+	}
+	amount, _ := lines[0].Attributes["amount"].(float64)
+	return amount, nil
 }
 
 // googleLimit is the limit ROOT set on this node; zero is none.
@@ -336,6 +467,19 @@ func (s *QNTXServer) googleSpendingHalted() (bool, string) {
 		}
 		if against > 0 && report.cost >= against*googleHaltsAt {
 			return true, fmt.Sprintf("%s has reached %.2f %s of %.2f, and what costs halts at %d%% of it", report.name, report.cost, report.currency, against, int(googleHaltsAt*100))
+		}
+	}
+	day, err := s.googleDayLimit()
+	if err != nil {
+		return true, err.Error()
+	}
+	if day > 0 {
+		spent, on, err := s.googleSpentToday()
+		if err != nil {
+			return true, err.Error()
+		}
+		if spent >= day*googleHaltsAt {
+			return true, fmt.Sprintf("%s has spent %.2f %s today of %.2f, and what costs halts at %d%% of it until tomorrow", on.name, spent, on.currency, day, int(googleHaltsAt*100))
 		}
 	}
 	return false, ""
@@ -420,6 +564,9 @@ func (s *QNTXServer) googleCostsTick(ctx context.Context) error {
 			return errors.Wrapf(err, "%d report(s) on %s were not acknowledged", len(acks), subscription)
 		}
 	}
+	if err := s.readGoogleBudgets(ctx, token); err != nil {
+		return err
+	}
 	s.googleHaltChanged()
 	return nil
 }
@@ -456,11 +603,32 @@ func (s *QNTXServer) googleCostsAm(am *protocol.NodeGoogle, connect string) *pro
 	if err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	s.googleHaltMu.Lock()
+	set := s.googleBudgetsSet
+	s.googleHaltMu.Unlock()
 	for _, report := range reports {
-		am.Budgets = append(am.Budgets, &protocol.GoogleBudget{
+		budget := &protocol.GoogleBudget{
 			Name: report.name, Cost: report.cost, Budget: report.budget, Currency: report.currency,
 			Since: report.since, At: report.published.Format(time.RFC3339),
-		})
+		}
+		for _, each := range set {
+			if each.name == report.name {
+				budget.Period = each.period
+			}
+		}
+		am.Budgets = append(am.Budgets, budget)
+	}
+	// A budget Google has not reported on yet is known by how it is set.
+	for _, each := range set {
+		if !slices.ContainsFunc(reports, func(r googleBudgetReport) bool { return r.name == each.name }) {
+			am.Budgets = append(am.Budgets, &protocol.GoogleBudget{Name: each.name, Budget: each.amount, Currency: each.currency, Period: each.period})
+		}
+	}
+	if am.DayLimit, err = s.googleDayLimit(); err != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	if am.SpentToday, _, err = s.googleSpentToday(); err != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	if am.Limit, err = s.googleLimit(); err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
@@ -479,7 +647,15 @@ func (s *QNTXServer) googleLimitSet(ctx context.Context, sent sigil.Sent) (any, 
 	if admitted, ok := auth.AdmissionFrom(ctx); ok && admitted.Identity != "" {
 		by = admitted.Identity
 	}
-	if refused := s.keepGoogleCostLine(googleLimitLineSubject, "set", by, map[string]any{"amount": amount}); refused != nil {
+	subject := googleLimitLineSubject
+	switch sent["per"] {
+	case "", "period":
+	case "day":
+		subject = googleDayLimitLineSubject
+	default:
+		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "per", Says: "per is period or day, and this is " + sent["per"]}
+	}
+	if refused := s.keepGoogleCostLine(subject, "set", by, map[string]any{"amount": amount}); refused != nil {
 		return nil, refused
 	}
 	s.googleHaltChanged()
