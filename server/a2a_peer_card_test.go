@@ -100,7 +100,9 @@ func TestThePrimaryHandsOverTheCardOfAnAgentAPeerServes(t *testing.T) {
 
 	require.Len(t, peer.asked, 1)
 	assert.Contains(t, peer.asked[0].Header.Get("Authorization"), "Bearer ", "the peer was not asked as the person")
-	assert.Equal(t, a2a.Version, peer.asked[0].URL.Query().Get("A2A-Version"))
+	// "the A2A-Version header or request parameter" (§3.6.2): a2a-go's client
+	// sends the header.
+	assert.Equal(t, a2a.Version, peer.asked[0].Header.Get("A2A-Version"))
 }
 
 // A card the peer did not sign is not handed over: one signed by another key,
