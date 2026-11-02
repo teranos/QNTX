@@ -2,10 +2,10 @@ package server
 
 // "if it doesnt, we need to make it do it"
 
-// The App's webhook points at one node. A forward is ROOT's line that this node
-// hands every delivery it verified to another node, untouched, as a job: written
-// before the delivery is handled, kept when the far node did not answer, and
-// queued again by a sweep (ADR-056).
+// 「[Opus 5.5] The App's webhook points at one node. A forward is ROOT's line that this node」
+// 「[Opus 5.5] hands every delivery it verified to another node, untouched, as a job: written」
+// 「[Opus 5.5] before the delivery is handled, kept when the far node did not answer, and」
+// 「[Opus 5.5] queued again by a sweep (ADR-056).」
 
 import (
 	"bytes"
@@ -28,24 +28,24 @@ import (
 const (
 	githubForwardLine  = "forward:"
 	forwardHandlerName = "github.forward"
-	// forwardUnanswered is on the error of a forward the far node never answered,
-	// which is what the sweep reads a failed job for.
+	// 「[Opus 5.5] forwardUnanswered is on the error of a forward the far node never answered,」
+	// 「[Opus 5.5] which is what the sweep reads a failed job for.」
 	forwardUnanswered = "the far node did not answer"
-	// forwardWait is how long the far node has: it handles the delivery before it answers.
+	// 「[Opus 5.5] forwardWait is how long the far node has: it handles the delivery before it answers.」
 	forwardWait = 2 * time.Minute
-	// forwardSweepEvery is how often a forward nobody answered is queued again.
+	// 「[Opus 5.5] forwardSweepEvery is how often a forward nobody answered is queued again.」
 	forwardSweepEvery = time.Minute
-	// forwardsSwept is how many failed jobs one sweep reads.
+	// 「[Opus 5.5] forwardsSwept is how many failed jobs one sweep reads.」
 	forwardsSwept = 1000
 )
 
-// GitHubForward is a node this node hands the App's deliveries to.
+// 「[Opus 5.5] GitHubForward is a node this node hands the App's deliveries to.」
 type GitHubForward struct {
 	URL     string `json:"url"`
 	Enabled bool   `json:"enabled"`
 }
 
-// Forwards are the forwards turned on, the newest line per URL.
+// 「[Opus 5.5] Forwards are the forwards turned on, the newest line per URL.」
 func (r NodeRecords) Forwards() ([]GitHubForward, error) {
 	newest, err := r.newest(githubSubject)
 	if err != nil {
@@ -64,12 +64,12 @@ func (r NodeRecords) Forwards() ([]GitHubForward, error) {
 	return forwards, nil
 }
 
-// SetForward writes one forward whole.
+// 「[Opus 5.5] SetForward writes one forward whole.」
 func (r NodeRecords) SetForward(actor string, f GitHubForward) error {
 	return r.nodeRecord(actor, githubSubject, githubForwardLine+f.URL, "_", map[string]any{"url": f.URL, "enabled": f.Enabled})
 }
 
-// forwardURL is whether raw names somewhere a delivery can be posted.
+// 「[Opus 5.5] forwardURL is whether raw names somewhere a delivery can be posted.」
 func forwardURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -81,7 +81,7 @@ func forwardURL(raw string) error {
 	return nil
 }
 
-// forwardPayload is one delivery as GitHub signed it, and where it goes.
+// 「[Opus 5.5] forwardPayload is one delivery as GitHub signed it, and where it goes.」
 type forwardPayload struct {
 	URL       string `json:"url"`
 	Event     string `json:"event"`
@@ -90,8 +90,8 @@ type forwardPayload struct {
 	Body      []byte `json:"body"`
 }
 
-// forwardJob is the job that hands one delivery to one node. Its ID is the
-// delivery's and the node's, so one delivery leaves once for each.
+// 「[Opus 5.5] forwardJob is the job that hands one delivery to one node. Its ID is the」
+// 「[Opus 5.5] delivery's and the node's, so one delivery leaves once for each.」
 func forwardJob(target, event, delivery, signature string, body []byte) (*async.Job, error) {
 	payload, err := json.Marshal(forwardPayload{URL: target, Event: event, Delivery: delivery, Signature: signature, Body: body})
 	if err != nil {
@@ -103,8 +103,8 @@ func forwardJob(target, event, delivery, signature string, body []byte) (*async.
 		Pulse: async.NoPulse(), Started: async.NotYet(), Completed: async.NotYet()}, nil
 }
 
-// forward queues the delivery for every node forwarded to. What goes wrong here
-// is said in the log and is not this node's answer to GitHub.
+// 「[Opus 5.5] forward queues the delivery for every node forwarded to. What goes wrong here」
+// 「[Opus 5.5] is said in the log and is not this node's answer to GitHub.」
 func (g *gitHub) forward(event, delivery, signature string, body []byte) {
 	logger := g.host.log().Named("forward")
 	forwards, err := g.host.nodeRecords().Forwards()
@@ -123,7 +123,7 @@ func (g *gitHub) forward(event, delivery, signature string, body []byte) {
 	}
 }
 
-// enqueueForward queues one forward on the daemon.
+// 「[Opus 5.5] enqueueForward queues one forward on the daemon.」
 func (s *QNTXServer) enqueueForward(job *async.Job) error {
 	if s.daemon == nil {
 		return errors.New("the node has no daemon to enqueue a forward on")
@@ -131,7 +131,7 @@ func (s *QNTXServer) enqueueForward(job *async.Job) error {
 	return s.daemon.GetQueue().Enqueue(job)
 }
 
-// forwardHandler posts one delivery to the node it is forwarded to.
+// 「[Opus 5.5] forwardHandler posts one delivery to the node it is forwarded to.」
 type forwardHandler struct {
 	client *http.Client
 	logger *zap.SugaredLogger
@@ -168,8 +168,8 @@ func (h *forwardHandler) Execute(ctx context.Context, job *async.Job) error {
 	return nil
 }
 
-// sweepForwards queues again every forward the far node never answered, and
-// says how many.
+// 「[Opus 5.5] sweepForwards queues again every forward the far node never answered, and」
+// 「[Opus 5.5] says how many.」
 func sweepForwards(queue *async.Queue, logger *zap.SugaredLogger) (int, error) {
 	failed, err := queue.ListJobs(async.JobStatusFailed, forwardsSwept)
 	if err != nil {
@@ -192,7 +192,7 @@ func sweepForwards(queue *async.Queue, logger *zap.SugaredLogger) (int, error) {
 	return swept, nil
 }
 
-// registerForwards makes the handler known to the daemon.
+// 「[Opus 5.5] registerForwards makes the handler known to the daemon.」
 func (s *QNTXServer) registerForwards() {
 	if s.daemon == nil {
 		return
@@ -200,7 +200,7 @@ func (s *QNTXServer) registerForwards() {
 	s.daemon.Registry().Register(&forwardHandler{client: &http.Client{Timeout: forwardWait}, logger: s.logger.Named("forward")})
 }
 
-// SweepForwards runs the sweep for as long as the node does.
+// 「[Opus 5.5] SweepForwards runs the sweep for as long as the node does.」
 func (s *QNTXServer) SweepForwards() {
 	if s.daemon == nil {
 		return
