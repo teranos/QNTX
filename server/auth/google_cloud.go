@@ -68,6 +68,12 @@ func (h *Handler) SetGoogleCloudPick(projects GoogleCloudProjects, letGo func(to
 	h.googleCloudProjects, h.googleCloudLetGo = projects, letGo
 }
 
+// GoogleCostsConnect wires the node to its costs on ROOT's token, and says what it did.
+type GoogleCostsConnect func(ctx context.Context, token, by string) (string, error)
+
+// SetGoogleCosts is what wires the node's costs once ROOT said yes.
+func (h *Handler) SetGoogleCosts(connect GoogleCostsConnect) { h.googleCosts = connect }
+
 // SetGoogleCloud is what connects the node once ROOT said yes.
 func (h *Handler) SetGoogleCloud(connect GoogleCloudConnect) { h.googleCloud = connect }
 
@@ -120,6 +126,7 @@ func (h *Handler) handleGoogleCloud(w http.ResponseWriter, r *http.Request) {
 		redirectURI: redirectURI,
 		cloud:       true,
 		project:     r.URL.Query().Get("project"),
+		thing:       r.URL.Query().Get("thing"),
 	})
 	if err != nil {
 		h.renderCeremonyPage(w, http.StatusInternalServerError, false, "The ceremony was not recorded")
@@ -151,6 +158,19 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 	}
 	if acct.google == "" {
 		h.renderCeremonyPage(w, http.StatusBadGateway, false, errNoGoogleToken.Error())
+		return
+	}
+	if fl.thing == "costs" && h.googleCosts != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
+		defer cancel()
+		said, err := h.googleCosts(ctx, acct.google, acct.CanonicalID)
+		if err != nil {
+			h.logger.Errorw("The node's costs at Google Cloud were not connected", "by", acct.CanonicalID, "error", err)
+			h.renderCloudStopped(w, err, fl.project+"&thing=costs")
+			return
+		}
+		h.logger.Infow("the node's costs at Google Cloud are connected", "by", acct.CanonicalID, "said", said)
+		h.renderCeremonyPage(w, http.StatusOK, true, said)
 		return
 	}
 	project := fl.project
