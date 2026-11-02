@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -47,8 +49,11 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 	if carried.status == http.StatusNotFound {
 		return nil, a2aRefusal(a2asdk.ErrTaskNotFound, peer.Label+" serves no agent at tenant "+namespace)
 	}
+	if err != nil && carried.status == 0 {
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" did not answer for the card of the agent of "+namespace+": "+err.Error())
+	}
 	if err != nil {
-		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" answered "+strconv.Itoa(carried.status)+" for the card of the agent of "+namespace+": "+err.Error())
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" answered "+strconv.Itoa(carried.status)+" for the card of the agent of "+namespace+": "+bounded(string(carried.body), saidDefectMost))
 	}
 	raw, err := json.Marshal(handed)
 	if err != nil {
@@ -77,6 +82,7 @@ type peerCarrier struct {
 	bearer string
 	origin *url.URL
 	status int
+	body   []byte
 }
 
 func (c *peerCarrier) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -89,5 +95,13 @@ func (c *peerCarrier) RoundTrip(r *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	c.status = resp.StatusCode
+	body, err := io.ReadAll(io.LimitReader(resp.Body, nodeBodyMost))
+	_ = resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	c.body = body
+	resp.Body, resp.ContentLength = io.NopCloser(bytes.NewReader(body)), int64(len(body))
+	resp.Header.Del("Content-Length")
 	return resp, nil
 }

@@ -118,10 +118,18 @@ func TestAPushConfigIsCreatedListedGotAndDeleted(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, listed)
 	assert.Empty(t, at(listed, "configs"))
 
-	code, refused := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/nothing/pushNotificationConfigs", `{"url": "`+hook+`"}`, root)
-	assert.Equal(t, http.StatusNotFound, code)
-	said, _ = json.Marshal(refused)
-	assert.Contains(t, string(said), "TASK_NOT_FOUND")
+	// A task no id names has no configs to create, list, get or delete.
+	for _, asked := range []struct{ method, path, body string }{
+		{http.MethodPost, "/a2a/tasks/nothing/pushNotificationConfigs", `{"url": "` + hook + `"}`},
+		{http.MethodGet, "/a2a/tasks/nothing/pushNotificationConfigs", ""},
+		{http.MethodGet, "/a2a/tasks/nothing/pushNotificationConfigs/c1", ""},
+		{http.MethodDelete, "/a2a/tasks/nothing/pushNotificationConfigs/c1", ""},
+	} {
+		code, refused := a2aAsked(t, srv, asked.method, asked.path, asked.body, root)
+		assert.Equal(t, http.StatusNotFound, code, asked.method+" "+asked.path)
+		said, _ = json.Marshal(refused)
+		assert.Contains(t, string(said), "TASK_NOT_FOUND", asked.method+" "+asked.path)
+	}
 }
 
 // "Reject private IP ranges ... Reject localhost and link-local addresses"

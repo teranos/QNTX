@@ -318,8 +318,8 @@ func a2aRoute(method, path string) bool {
 }
 
 // versionRefused is §3.6.2: the A2A-Version header or request parameter, an
-// empty one meaning 0.3, compared by Major.Minor alone. Empty is a version
-// the node speaks.
+// empty one meaning 0.3, compared by Major.Minor alone. Empty is 0.3, which
+// this node does not speak.
 func versionRefused(r *http.Request) string {
 	said := r.Header.Get(a2asdk.SvcParamVersion)
 	if said == "" {

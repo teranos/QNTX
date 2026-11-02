@@ -174,3 +174,17 @@ func TestAPeerRedirectingTheCardCarriesNoTokenAway(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
 	assert.Empty(t, elsewhere, "the redirect was followed")
 }
+
+// A peer refusing the card says why, and the node hands its words on.
+func TestAPeerRefusingTheCardIsHeardOut(t *testing.T) {
+	peer := aPeer(t, func(_ *standInPeer, w http.ResponseWriter, _ string) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("the orchard is being replanted"))
+	})
+	srv, tokens := primaryOf(t, peer)
+
+	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "answered 503")
+	assert.Contains(t, w.Body.String(), "the orchard is being replanted")
+}
