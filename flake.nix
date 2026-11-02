@@ -498,6 +498,8 @@
             duckdbPinned
             pkgs.python313
             pkgs.pkg-config
+            # libACP's one dependency: `make libacp` builds it here.
+            pkgs.json_c
             pkgs.protobuf
             pkgs.onnxruntime
             pkgs.wasm-pack
