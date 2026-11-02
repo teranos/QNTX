@@ -4,33 +4,25 @@
   inputs = {
     # Pinned to a revision, not a branch, and the revision is chosen for glibc.
     #
-    # This rev carries glibc 2.40 and the DuckDB server/parity pins. Both numbers
-    # are load-bearing and they are not independent:
+    # This rev carries glibc 2.44, DuckDB 1.5.5 and Go 1.26. The first two are
+    # load-bearing and they are not independent:
     #
     #   * libduckdb-sys generates its bindings against one DuckDB release, so the
     #     C library is not a free variable. `assert_library_version` fails the
-    #     process if the linked library ever stops matching the bindings.
+    #     process if the linked library ever stops matching the bindings: the
+    #     duckdb crate moves with this rev.
     #
-    #   * libduckdb links glibc, and the deployment ships it to a Debian box
-    #     (glibc 2.41) that supplies its own libc. glibc is backward compatible
-    #     and not forward compatible, so the build's glibc must be no newer than
-    #     the host's.
+    #   * libduckdb links glibc, and the deployment ships it to a box that
+    #     supplies its own libc. glibc is backward compatible and not forward
+    #     compatible, so the build's glibc must be no newer than the host's.
     #
-    # nixpkgs went 2.40-66 -> 2.42-47 in one step (190f166df, 2025-12-30) and
-    # never carried 2.41. DuckDB 1.5.4 exists only on the far side of that jump.
-    # So "DuckDB 1.5.4" and "a libc that Debian 13 can load" cannot both be had
-    # from nixpkgs — choosing the newer DuckDB chose glibc 2.42, and the host
-    # answered:
+    # The rev before this one, fb7944c, held glibc 2.40 and DuckDB 1.4.3 for a
+    # Debian 13 host (glibc 2.41): nixpkgs went 2.40-66 -> 2.42-47 in one step
+    # (190f166df, 2025-12-30), and a build past it was answered
     #   libc.so.6: version `GLIBC_ABI_GNU2_TLS' not found (required by libduckdb.so)
-    # Nothing in 1.5.0 touches what QNTX calls (Parquet, JSON, the C API are all
-    # unchanged), so the version is the cheaper thing to give up.
-    #
-    # Moving this rev forward means checking the host's glibc first. Raise it only
-    # together with the deployment's libc floor.
-    nixpkgs.url = "github:NixOS/nixpkgs/fb7944c166a3b630f177938e478f0378e64ce108";
-    # Go 1.26, which a2a-go v2.7 asks, from a nixpkgs that has it; every other
-    # package stays on the pin above.
-    nixpkgs-go.url = "github:NixOS/nixpkgs/0bb2eedc20e4739f29e8045034f2828ad7054f8f";
+    # Go 1.26, which a2a-go v2.7 asks, exists only past that step too.
+    # "Bump nix for the third time": the host's libc moves with this rev.
+    nixpkgs.url = "github:NixOS/nixpkgs/0bb2eedc20e4739f29e8045034f2828ad7054f8f";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
       # Use latest pre-commit-hooks compatible with nixpkgs 24.11
@@ -59,14 +51,13 @@
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, nixpkgs-go, flake-utils, pre-commit-hooks, fenix, crane, supabase-postgres }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix, crane, supabase-postgres }:
     {
       # Shared vendorHash imported from single source of truth
       rootVendorHash = import ./nix/vendor-hash.nix;
     } // (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        go = nixpkgs-go.legacyPackages.${system}.go_1_26;
 
         # The DuckDB server/parity pins — matches the duckdb crate, and is built against
         # a glibc the deployment box can load. See the nixpkgs input's comment
@@ -270,7 +261,7 @@
         # docs/release.md
         versionTag = let v = builtins.getEnv "VERSION_TAG"; in
           if v == "" then "dev" else v;
-        qntx = (pkgs.buildGoModule.override { inherit go; }) {
+        qntx = pkgs.buildGoModule {
           pname = "qntx";
           version = versionTag;
           src = ./.;
@@ -324,7 +315,7 @@
             qntx
 
             # Go toolchain
-            go # TODO: Remove - build-time only
+            pkgs.go # TODO: Remove - build-time only
             pkgs.git # TODO: Remove - build-time only
 
             # Proto compiler for proto-based builds
@@ -365,7 +356,7 @@
 
           config = {
             Env = [
-              "PATH=${pkgs.lib.makeBinPath [ qntx go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.python313 pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash pkgs.curl ]}"
+              "PATH=${pkgs.lib.makeBinPath [ qntx pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.python313 pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash pkgs.curl ]}"
               "PKG_CONFIG_PATH=${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [ pkgs.openssl ]}"
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
               "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}"
@@ -467,7 +458,7 @@
         # Development shell with same tools
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            go
+            pkgs.go
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt

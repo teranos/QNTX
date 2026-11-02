@@ -32,11 +32,9 @@ qntx-ffi-common = { path = "../qntx-ffi-common" }
 # lib.rs fails the process if the linked library ever disagrees.
 #
 # The crate tracked DuckDB's own version through 1.4.x, then switched to an
-# encoded scheme at 1.5.0 (1.10500.0 = DuckDB 1.5.0). So this plain version is
-# the DuckDB release of the same number, not an older crate release.
-#
-# Staying on 1.4.x is a glibc decision, not a DuckDB one — see flake.nix.
-duckdb = { version = "=1.4.3" }
+# encoded scheme at 1.5.0 (1.10500.0 = DuckDB 1.5.0): 1.10505.0 is DuckDB
+# 1.5.5. The DuckDB release moves with nixpkgs' glibc — see flake.nix.
+duckdb = { version = "=1.10505.0" }
 
 # Serialization
 serde.workspace = true
