@@ -51,7 +51,7 @@ func TestARelaysRefusalIsTheAskersError(t *testing.T) {
 	assert.Contains(t, err.Error(), "not ROOT")
 }
 
-// The line keeps where the token is, never the token: a line is read by whoever reads the node's records.
+// 「[Opus 5.5] The line keeps where the token is, never the token: a line is read by whoever reads the node's records.」
 func TestARelayLineHoldsAReferenceAndNotAToken(t *testing.T) {
 	assert.NoError(t, relayTokenRef("env:RELAY_TOKEN"))
 	assert.NoError(t, relayTokenRef("ssm:///k/box/relay-token"))
