@@ -102,7 +102,9 @@ func (s Said) Run(ctx context.Context, each func(acp.Update)) (Answer, error) {
 	}
 	got, err := acp.Run(ctx, agent, turn, func(u acp.Update) {
 		heard()
-		each(u)
+		if each != nil {
+			each(u)
+		}
 	})
 	answer := Answer{Text: got.Text, Session: got.Session, Used: got.Used, Size: got.Size, Took: got.Took}
 	if err != nil {
