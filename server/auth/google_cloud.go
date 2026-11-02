@@ -12,6 +12,7 @@ import (
 	"crypto/subtle"
 	"html"
 	"net/http"
+	"net/url"
 	"time"
 
 	errors "github.com/teranos/sacred-error"
@@ -57,6 +58,7 @@ type cloudPick struct {
 	token    string
 	ceremony string
 	by       string
+	handle   string
 }
 
 // cloudPickLife is how long ROOT's yes waits for the selection before it is let go.
@@ -169,7 +171,7 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		said, err := connect(ctx, acct.google, acct.CanonicalID)
 		if err != nil {
 			h.logger.Errorw("A thing of the node's at Google Cloud was not connected", "thing", fl.thing, "by", acct.CanonicalID, "error", err)
-			h.renderCloudStopped(w, err, fl.project+"&thing="+fl.thing)
+			h.renderCloudStopped(w, err, fl.project, fl.thing, acct.Handle)
 			return
 		}
 		h.logger.Infow("a thing of the node's at Google Cloud is connected", "thing", fl.thing, "by", acct.CanonicalID, "said", said)
@@ -185,29 +187,29 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		case err != nil:
 			h.googleCloudLetGo(acct.google)
 			h.logger.Errorw("ROOT's Google Cloud projects were not read", "by", acct.CanonicalID, "error", err)
-			h.renderCloudStopped(w, err, "")
+			h.renderCloudStopped(w, err, "", "", acct.Handle)
 			return
 		case len(seen) == 0:
 			h.googleCloudLetGo(acct.google)
 			h.renderCeremonyPage(w, http.StatusNotFound, false, "Your Google account sees no Google Cloud project to connect this node to.")
 			return
 		case len(seen) > 1:
-			h.renderCloudSelect(w, seen, acct.google, fl.ceremony, acct.CanonicalID)
+			h.renderCloudSelect(w, seen, acct.google, fl.ceremony, acct.CanonicalID, acct.Handle)
 			return
 		}
 		project = seen[0].ID
 	}
-	h.connectGoogleCloud(w, r, acct.google, project, acct.CanonicalID)
+	h.connectGoogleCloud(w, r, acct.google, project, acct.CanonicalID, acct.Handle)
 }
 
 // connectGoogleCloud sets the node up on ROOT's token, and says how that went.
-func (h *Handler) connectGoogleCloud(w http.ResponseWriter, r *http.Request, token, project, by string) {
+func (h *Handler) connectGoogleCloud(w http.ResponseWriter, r *http.Request, token, project, by, handle string) {
 	ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
 	defer cancel()
 	said, err := h.googleCloud(ctx, token, project, by)
 	if err != nil {
 		h.logger.Errorw("Google Cloud was not connected", "by", by, "project", project, "error", err)
-		h.renderCloudStopped(w, err, project)
+		h.renderCloudStopped(w, err, project, "", handle)
 		return
 	}
 	h.logger.Infow("the node is set up at Google Cloud", "by", by, "said", said)
@@ -216,7 +218,7 @@ func (h *Handler) connectGoogleCloud(w http.ResponseWriter, r *http.Request, tok
 
 // renderCloudSelect keeps ROOT's yes and asks which project the node belongs in.
 // "i press connect, i select project"
-func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudProject, token, ceremony, by string) {
+func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudProject, token, ceremony, by, handle string) {
 	ticket, err := randomTicket()
 	if err != nil {
 		h.googleCloudLetGo(token)
@@ -228,7 +230,7 @@ func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudPro
 	if h.cloudPicks == nil {
 		h.cloudPicks = map[string]cloudPick{}
 	}
-	h.cloudPicks[ticket] = cloudPick{token: token, ceremony: ceremony, by: by}
+	h.cloudPicks[ticket] = cloudPick{token: token, ceremony: ceremony, by: by, handle: handle}
 	h.cloudPicksMu.Unlock()
 	time.AfterFunc(cloudPickLife, func() {
 		if pick, held := h.takeCloudPick(ticket); held {
@@ -275,28 +277,52 @@ func (h *Handler) googleCloudSelected(w http.ResponseWriter, r *http.Request, ti
 		h.renderCeremonyPage(w, http.StatusForbidden, false, "This selection is spent, or was started somewhere else. Press Connect again.")
 		return
 	}
-	h.connectGoogleCloud(w, r, pick.token, r.URL.Query().Get("project"), pick.by)
+	h.connectGoogleCloud(w, r, pick.token, r.URL.Query().Get("project"), pick.by, pick.handle)
 }
 
 // renderCloudStopped says what stopped the node connecting: what is wrong, where
 // to fix it when ROOT can, Try again, and all that was said.
 // "THE BARE MINIMUM A USER NEEDS TO CONTINUE ESSENTIALLY"
-func (h *Handler) renderCloudStopped(w http.ResponseWriter, err error, project string) {
-	again := googleCloudPath
-	if project != "" {
-		again += "?project=" + urlEncode(project)
+// asAccount is link at Google opened as the account that said yes: named nothing, Google
+// opens it as whichever account the browser signed in to first.
+func asAccount(link, handle string) string {
+	at, err := url.Parse(link)
+	if err != nil || handle == "" {
+		return link
 	}
-	says, full, fixAt := "The node was not connected to Google Cloud: "+err.Error(), "", ""
+	query := at.Query()
+	query.Set("authuser", handle)
+	at.RawQuery = query.Encode()
+	return at.String()
+}
+
+func (h *Handler) renderCloudStopped(w http.ResponseWriter, err error, project, thing, handle string) {
+	asked := url.Values{}
+	if project != "" {
+		asked.Set("project", project)
+	}
+	if thing != "" {
+		asked.Set("thing", thing)
+	}
+	again := googleCloudPath
+	if len(asked) > 0 {
+		again += "?" + asked.Encode()
+	}
+	stopped := "The node was not connected to Google Cloud"
+	if thing != "" {
+		stopped = "Connect " + thing + " did not finish"
+	}
+	says, full, fixAt := stopped+": "+err.Error(), "", ""
 	var fix *GoogleCloudFix
 	if errors.As(err, &fix) {
-		says, full, fixAt = fix.Says, fix.Full, fix.Link
+		says, full, fixAt = fix.Says, fix.Full, asAccount(fix.Link, handle)
 	}
 	const link = `style="display:inline-block;margin:0 8px 8px 0;padding:8px 12px;border:1px solid currentColor;color:#e6e4ef;text-decoration:none"`
 	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
 		`<body style="background:#12111a;color:#e06060;font:14px ui-monospace,monospace;margin:0;padding:24px;word-break:break-word;overflow-wrap:break-word">` +
 		`<p>` + html.EscapeString(says) + `</p><p>`
 	if fixAt != "" {
-		page += `<a ` + link + ` target="_blank" rel="noopener" href="` + html.EscapeString(fixAt) + `">1. Turn it on at Google</a>`
+		page += `<a ` + link + ` target="_blank" rel="noopener" href="` + html.EscapeString(fixAt) + `">1. Do it at Google</a>`
 		page += `<a ` + link + ` href="` + html.EscapeString(again) + `">2. Try again</a>`
 	} else {
 		page += `<a ` + link + ` href="` + html.EscapeString(again) + `">Try again</a>`

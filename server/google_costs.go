@@ -21,6 +21,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
@@ -46,15 +47,15 @@ const (
 	googleBudgetLineSubject = "GOOGLE-BUDGET"
 	googleLimitLineSubject  = "GOOGLE-LIMIT"
 
-	googleBudgetsPage = "https://console.cloud.google.com/billing/budgets"
-	googleBillingPage = "https://console.cloud.google.com/billing/linkedaccount"
+	googleBillingPages = "https://console.cloud.google.com/billing"
+	googleBillingPage  = "https://console.cloud.google.com/billing/linkedaccount"
 )
 
 // googleCostServices are the APIs the costs run through.
 var googleCostServices = []string{"cloudbilling.googleapis.com", "billingbudgets.googleapis.com", "pubsub.googleapis.com"}
 
 // grantOn adds member to role in the policy of resource at, keeping what it held.
-// read is how that resource's policy is read: Pub/Sub answers a GET, the others a POST.
+// read is how that resource's policy is read: Cloud Billing and Pub/Sub answer a GET, Resource Manager a POST.
 func grantOn(ctx context.Context, token, at, read, role, member string) error {
 	var policy map[string]any
 	var body any
@@ -81,6 +82,66 @@ func grantOn(ctx context.Context, token, at, read, role, member string) error {
 	return googleCall(ctx, token, http.MethodPost, at+":setIamPolicy", map[string]any{"policy": policy}, nil)
 }
 
+// linkTheBilling links the one open billing account ROOT's account sees to the project,
+// and says which. None or several is ROOT's to settle, and what to do is said.
+func linkTheBilling(ctx context.Context, token, project string) (string, error) {
+	var seen struct {
+		Accounts []struct {
+			Name        string `json:"name"`
+			DisplayName string `json:"displayName"`
+			Open        bool   `json:"open"`
+		} `json:"billingAccounts"`
+	}
+	if err := googleCall(ctx, token, http.MethodGet, googleBilling+"/v1/billingAccounts", nil, &seen); err != nil {
+		return "", errors.Wrap(err, "the billing accounts ROOT sees were not read")
+	}
+	var open []string
+	var names []string
+	for _, account := range seen.Accounts {
+		if account.Open {
+			open = append(open, account.Name)
+			names = append(names, account.DisplayName+" ("+account.Name+")")
+		}
+	}
+	here := googleBillingPage + "?project=" + url.QueryEscape(project)
+	switch len(open) {
+	case 0:
+		return "", &auth.GoogleCloudFix{Says: "The Google account you said yes with has no open billing account, so " + project + " cannot be linked to one. Open one, then try again.", Link: googleBillingPages, Full: "billingAccounts lists " + strconv.Itoa(len(seen.Accounts)) + " account(s), none open"}
+	case 1:
+		if err := googleCall(ctx, token, http.MethodPut, googleBilling+"/v1/projects/"+url.PathEscape(project)+"/billingInfo", map[string]any{"billingAccountName": open[0]}, nil); err != nil {
+			return "", errors.Wrapf(err, "%s was not linked to %s", project, open[0])
+		}
+		return open[0], nil
+	}
+	return "", &auth.GoogleCloudFix{Says: "The Google account you said yes with has several open billing accounts: " + strings.Join(names, ", ") + ". Link the one for " + project + ", then try again.", Link: here, Full: "billingAccounts lists " + strings.Join(open, ", ")}
+}
+
+// proveGoogleCosts asks until Google lets the node read what its budgets report, as
+// proveGoogle does for acting as its account, and mails ROOT how it ended.
+func (s *QNTXServer) proveGoogleCosts() {
+	proving, cancel := context.WithTimeout(context.Background(), googleProving)
+	defer cancel()
+	var said error
+	for {
+		err := s.googleCostsTick(proving)
+		if err == nil {
+			s.logger.Infow("Google lets the node read its costs")
+			s.tellGoogleOutcome(googleOutcomeMail("The node reads what Google Cloud costs", "Google lets the node read what its budgets report. Google's first report can take several hours.\n"))
+			return
+		}
+		if said == nil || proving.Err() == nil {
+			said = err
+		}
+		select {
+		case <-proving.Done():
+			s.logger.Errorw("Google did not let the node read its costs", "error", said)
+			s.tellGoogleOutcome(googleOutcomeMail("The node does not read what Google Cloud costs", "Google did not let the node read what its budgets report.\n\nPress Connect costs again, and this is what Google said:\n"+said.Error()+"\n"))
+			return
+		case <-time.After(googleAsksAgain):
+		}
+	}
+}
+
 // connectGoogleCosts wires the node to its budgets on ROOT's token: it may read the
 // billing account, its budgets report to a topic of its own, and it pulls from that.
 // ROOT's token is let go once the node no longer needs it.
@@ -105,10 +166,16 @@ func (s *QNTXServer) connectGoogleCosts(ctx context.Context, token, by string) (
 		return "", errors.Wrapf(err, "the billing account of %s was not read", project)
 	}
 	if billing.Account == "" {
-		return "", &auth.GoogleCloudFix{Says: project + " has no billing account linked, so there are no costs to watch. Link one, then try again.", Link: googleBillingPage, Full: "billingInfo names no billingAccountName"}
+		// "why does it demand the user to know by heart"
+		if billing.Account, err = linkTheBilling(ctx, token, project); err != nil {
+			return "", err
+		}
+	}
+	if billing.Account == "" {
+		return "", &auth.GoogleCloudFix{Says: project + " has no billing account linked, so there are no costs to watch. Link one, then try again.", Link: googleBillingPage + "?project=" + url.QueryEscape(project), Full: "billingInfo names no billingAccountName"}
 	}
 	member := "serviceAccount:" + kept.account
-	if err := grantOn(ctx, token, googleBilling+"/v1/"+billing.Account, http.MethodPost, "roles/billing.viewer", member); err != nil {
+	if err := grantOn(ctx, token, googleBilling+"/v1/"+billing.Account, http.MethodGet, "roles/billing.viewer", member); err != nil {
 		return "", errors.Wrapf(err, "%s was not let read %s", kept.account, billing.Account)
 	}
 	topic := "projects/" + project + "/topics/" + googleCostsTopic
@@ -131,7 +198,7 @@ func (s *QNTXServer) connectGoogleCosts(ctx context.Context, token, by string) (
 		return "", errors.Wrapf(err, "the budgets of %s were not read", billing.Account)
 	}
 	if len(listed.Budgets) == 0 {
-		return "", &auth.GoogleCloudFix{Says: billing.Account + " has no budget, so nothing reports what it costs. Make one, then try again.", Link: googleBudgetsPage, Full: "the Budget API lists none"}
+		return "", &auth.GoogleCloudFix{Says: billing.Account + " has no budget, so nothing reports what it costs. Make one, then try again.", Link: googleBillingPages + "/" + strings.TrimPrefix(billing.Account, "billingAccounts/") + "/budgets", Full: "the Budget API lists none"}
 	}
 	for _, budget := range listed.Budgets {
 		rule := map[string]any{"notificationsRule": map[string]any{"pubsubTopic": topic, "schemaVersion": "1.0"}}
@@ -143,7 +210,8 @@ func (s *QNTXServer) connectGoogleCosts(ctx context.Context, token, by string) (
 	if refused := s.keepGoogleCostLine(googleCostsLineSubject, "wired", by, map[string]any{"billing_account": billing.Account}); refused != nil {
 		return "", errors.New(refused.Says)
 	}
-	return fmt.Sprintf("The node reads the costs of %s, from %d budget(s). Google's first report can take several hours. What costs halts at %d%% of the budget, and you get a mail when it does.", billing.Account, len(listed.Budgets), int(googleHaltsAt*100)), nil
+	sacred.Go("google.costs.proving", s.proveGoogleCosts)
+	return fmt.Sprintf("You get a mail once Google lets the node read them. The node reads the costs of %s, from %d budget(s). Google's first report can take several hours. What costs halts at %d%% of the budget, and you get a mail when it does.", billing.Account, len(listed.Budgets), int(googleHaltsAt*100)), nil
 }
 
 // keepGoogleCostLine writes one of the node's lines about its costs.

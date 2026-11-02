@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -31,6 +32,9 @@ type standInBilling struct {
 	waiting []map[string]any
 	acked   []string
 	enabled []string
+	// seen is the billing accounts ROOT's account sees, each open unless named closed.
+	seen   []string
+	closed []string
 }
 
 func billingStandingIn(t *testing.T, s *QNTXServer, account string, budgets ...string) *standInBilling {
@@ -61,8 +65,21 @@ func (b *standInBilling) answer(w http.ResponseWriter, r *http.Request) {
 		service := path[strings.Index(path, "/services/")+len("/services/"):]
 		b.enabled = append(b.enabled, strings.TrimSuffix(service, ":enable"))
 		write(googleOperation{Name: "operations/x", Done: true})
+	case path == "/v1/billingAccounts" && r.Method == http.MethodGet:
+		listed := []map[string]any{}
+		for _, name := range b.seen {
+			listed = append(listed, map[string]any{"name": name, "displayName": "the " + name, "open": !slices.Contains(b.closed, name)})
+		}
+		write(map[string]any{"billingAccounts": listed})
+	case path == "/v1/projects/the-project/billingInfo" && r.Method == http.MethodPut:
+		b.account = sent["billingAccountName"].(string)
+		write(map[string]any{"billingAccountName": b.account})
 	case path == "/v1/projects/the-project/billingInfo":
 		write(map[string]any{"billingAccountName": b.account, "billingEnabled": b.account != ""})
+	case strings.HasSuffix(path, ":getIamPolicy") && r.Method != http.MethodGet:
+		// Both Cloud Billing and Pub/Sub, by their discovery documents.
+		w.WriteHeader(http.StatusNotFound)
+		write(map[string]any{"error": map[string]any{"message": "getIamPolicy is a GET here"}})
 	case strings.HasSuffix(path, ":getIamPolicy"):
 		write(map[string]any{"etag": "e"})
 	case strings.HasSuffix(path, ":setIamPolicy"):
@@ -124,7 +141,7 @@ func connectedToGoogle(t *testing.T) (*QNTXServer, *standInGoogle) {
 	s, _, _ := runningNamespaceAgents(t)
 	g := googleStandingIn(t, s, theProject)
 	// Connecting proves itself in the background, and mails ROOT when it has.
-	proved := make(chan services.NodeMail, 1)
+	proved := make(chan services.NodeMail, 8)
 	s.googleOutcome = func(m services.NodeMail) { proved <- m }
 	_, err := s.connectGoogleCloud(context.Background(), "root-token", "the-project", "google:root-sub")
 	require.NoError(t, err)
@@ -161,15 +178,42 @@ func TestConnectingCostsWiresTheBudgetsToTheNode(t *testing.T) {
 	assert.Contains(t, am.GetCostsConnect(), "thing=costs")
 }
 
-// A project with no billing has nothing to watch, and what to do is said.
-func TestCostsWithNoBillingAccountSayWhatToDo(t *testing.T) {
+// "why does it demand the user to know by heart": the node knows its project, and
+// the one open billing account ROOT's account sees is linked to it.
+func TestTheOneOpenBillingAccountIsLinkedToTheProject(t *testing.T) {
 	s, _ := connectedToGoogle(t)
-	billingStandingIn(t, s, "")
+	b := billingStandingIn(t, s, "", "monthly")
+	b.seen, b.closed = []string{"billingAccounts/old", "billingAccounts/0-1"}, []string{"billingAccounts/old"}
+	_, err := s.connectGoogleCosts(context.Background(), "root-token", "google:root-sub")
+	require.NoError(t, err)
+	assert.Equal(t, "billingAccounts/0-1", b.account)
+	assert.True(t, rootAsksGoogle(t, s).GetCostsWired())
+}
+
+// None open is ROOT's to open, and what to do is said.
+func TestNoOpenBillingAccountSaysWhatToDo(t *testing.T) {
+	s, _ := connectedToGoogle(t)
+	b := billingStandingIn(t, s, "")
+	b.seen, b.closed = []string{"billingAccounts/old"}, []string{"billingAccounts/old"}
 	_, err := s.connectGoogleCosts(context.Background(), "root-token", "google:root-sub")
 	var fix *auth.GoogleCloudFix
 	require.True(t, errors.As(err, &fix), "%v", err)
-	assert.Contains(t, fix.Says, "no billing account")
-	assert.NotEmpty(t, fix.Link)
+	assert.Contains(t, fix.Says, "no open billing account")
+	assert.Empty(t, b.account)
+}
+
+// Several are named, not guessed.
+func TestSeveralBillingAccountsAreNamedNotGuessed(t *testing.T) {
+	s, _ := connectedToGoogle(t)
+	b := billingStandingIn(t, s, "")
+	b.seen = []string{"billingAccounts/a", "billingAccounts/b"}
+	_, err := s.connectGoogleCosts(context.Background(), "root-token", "google:root-sub")
+	var fix *auth.GoogleCloudFix
+	require.True(t, errors.As(err, &fix), "%v", err)
+	assert.Contains(t, fix.Says, "billingAccounts/a")
+	assert.Contains(t, fix.Says, "billingAccounts/b")
+	assert.Contains(t, fix.Link, "project=the-project", "where to do it, in the project it is for")
+	assert.Empty(t, b.account)
 }
 
 // A billing account with no budget reports nothing, and what to do is said.
@@ -180,15 +224,24 @@ func TestCostsWithNoBudgetSayWhatToDo(t *testing.T) {
 	var fix *auth.GoogleCloudFix
 	require.True(t, errors.As(err, &fix), "%v", err)
 	assert.Contains(t, fix.Says, "no budget")
-	assert.NotEmpty(t, fix.Link)
+	assert.Contains(t, fix.Link, "/billing/0-1/budgets", "where to do it, for the account it is about")
 }
 
 func wiredForCosts(t *testing.T) (*QNTXServer, *standInBilling, chan services.NodeMail) {
 	t.Helper()
 	s, _ := connectedToGoogle(t)
 	b := billingStandingIn(t, s, "billingAccounts/0-1", "monthly")
+	proved := make(chan services.NodeMail, 8)
+	s.googleOutcome = func(m services.NodeMail) { proved <- m }
 	_, err := s.connectGoogleCosts(context.Background(), "root-token-2", "google:root-sub")
 	require.NoError(t, err)
+	// "why not send a mail when its fine"
+	select {
+	case m := <-proved:
+		require.Contains(t, m.Subject, "reads what Google Cloud costs")
+	case <-time.After(10 * time.Second):
+		t.Fatal("wiring the costs never said how it ended")
+	}
 	mailed := make(chan services.NodeMail, 8)
 	s.googleOutcome = func(m services.NodeMail) { mailed <- m }
 	return s, b, mailed

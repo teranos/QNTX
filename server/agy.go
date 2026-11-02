@@ -118,6 +118,7 @@ func (s *QNTXServer) connectGoogleAgy(ctx context.Context, token, by string) (sa
 	if refused := s.keepGoogleCostLine(googleAgyLineSubject, "wired", by, map[string]any{"role": googleRunsModels}); refused != nil {
 		return "", errors.New(refused.Says)
 	}
+	s.tellGoogleOutcome(googleOutcomeMail("The node may call Vertex AI", "The node may call Vertex AI in "+kept.project.ProjectID+", for a turn in agy.\n"))
 	return "The node may call Vertex AI in " + kept.project.ProjectID + ". A turn in agy spends what that project spends, and halts with what costs.", nil
 }
 

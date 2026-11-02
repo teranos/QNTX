@@ -188,7 +188,8 @@ func TestAConnectThatStoppedSaysWhatToDo(t *testing.T) {
 	assert.Equal(t, http.StatusBadGateway, done.Code)
 	page := done.Body.String()
 	assert.Contains(t, page, "the API is off")
-	assert.Contains(t, page, `href="https://console.cloud.google.com/turn-it-on"`)
+	// As the account that said yes, for a browser holds more than one.
+	assert.Contains(t, page, `href="https://console.cloud.google.com/turn-it-on?authuser=root-sub%40example.com"`)
 	assert.Contains(t, page, `href="`+googleCloudPath+`?project=the-project"`)
 	assert.Contains(t, page, "Try again")
 	assert.Contains(t, page, "all that Google said")
@@ -246,6 +247,22 @@ func TestROOTsYesForAgyLetsTheNodeRunIt(t *testing.T) {
 	assert.Equal(t, http.StatusOK, done.Code, done.Body.String())
 	assert.Equal(t, []connected{{"cloud-token", "", "google:root-sub"}}, let)
 	assert.Empty(t, *handed, "the node is not connected again")
+}
+
+// Try again asks for the same thing: pressed for real, the thing went into the
+// project's name, and the node asked Google for a project called that.
+func TestTryingAgainAsksForTheSameThing(t *testing.T) {
+	h, handed := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	h.SetGoogleCosts(func(context.Context, string, string) (string, error) {
+		return "", &GoogleCloudFix{Says: "no billing", Link: "https://console.cloud.google.com/billing?project=the-project", Full: "all that Google said"}
+	})
+	page := consenting(t, h, "?project=the-project&thing=costs").Body.String()
+	again, err := url.Parse(hrefOf(t, page, "Try again"))
+	require.NoError(t, err)
+	assert.Equal(t, "the-project", again.Query().Get("project"))
+	assert.Equal(t, "costs", again.Query().Get("thing"))
+	assert.Empty(t, *handed)
 }
 
 // Only ROOT's own Google account connects the node.
