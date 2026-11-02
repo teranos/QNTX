@@ -389,9 +389,9 @@ func riteSaid(attrs map[string]any) string {
 	return said
 }
 
-// transcriptsFollowTEI is how a transcript's turns are TEI's q: the words as the
-// element's content, the speaker as who, the row as source. Transcripts are
-// quotes a person said.
+// 「[Fable 5.1] transcriptsFollowTEI is how a transcript's turns are TEI's q: the words as the」
+// 「[Fable 5.1] element's content, the speaker as who, the row as source. Transcripts are」
+// 「[Sonnet 5.5, Fable 5.1] quotes a person said.」
 func transcriptsFollowTEI() *protocol.Follows {
 	pairs := [][2]string{
 		{"protocol.Turn.text", "q.content"},
