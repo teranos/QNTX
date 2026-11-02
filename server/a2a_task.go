@@ -1,28 +1,22 @@
 package server
 
 import (
-	"context"
-	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/claudecode"
-	"github.com/teranos/QNTX/internal/sacred"
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
-	"google.golang.org/protobuf/proto"
 )
 
 // The Tasks of the agents the node hosts. "NODE is ROOT": the agent the node's
@@ -85,42 +79,45 @@ func (s *QNTXServer) systemTasks(did string) taskLines {
 	}}
 }
 
+// refused is an A2A error of kind base, in the node's own words.
+func a2aRefusal(base error, says string) error { return a2asdk.NewError(base, says) }
+
 // taskAgentAt is the agent a request reaches: the Node Agent at no tenant, and
 // at a tenant the element's or the namespace's agent it names.
-func (s *QNTXServer) taskAgentAt(r *http.Request, tenant string, named bool) (taskAgent, *a2a.Error) {
+func (s *QNTXServer) taskAgentAt(r *http.Request, tenant string) (taskAgent, error) {
 	admitted, gated := auth.AdmissionFrom(r.Context())
 	if !gated {
-		return taskAgent{}, a2a.Unauthenticated("a task is written down with who asked for it, and this asking came through no gate")
+		return taskAgent{}, a2aRefusal(a2asdk.ErrUnauthenticated, "a task is written down with who asked for it, and this asking came through no gate")
 	}
-	if s.nodeAgent == nil && (!named || strings.HasPrefix(tenant, elementTenantPrefix)) {
-		return taskAgent{}, &a2a.Error{Name: "UnsupportedOperationError", Message: s.thereIsNoNodeAgent().GetSays()}
+	if s.nodeAgent == nil && (tenant == "" || strings.HasPrefix(tenant, elementTenantPrefix)) {
+		return taskAgent{}, a2aRefusal(a2asdk.ErrUnsupportedOperation, s.thereIsNoNodeAgent().GetSays())
 	}
 	var ta taskAgent
-	var refused *a2a.Error
+	var err error
 	switch element, isElement := strings.CutPrefix(tenant, elementTenantPrefix); {
-	case !named:
-		ta, refused = s.nodeTaskAgent()
+	case tenant == "":
+		ta, err = s.nodeTaskAgent()
 	case isElement:
-		ta, refused = s.elementTaskAgent(element)
+		ta, err = s.elementTaskAgent(element)
 	default:
-		ta, refused = s.namespaceTaskAgent(admitted, tenant)
+		ta, err = s.namespaceTaskAgent(admitted, tenant)
 	}
-	if refused != nil {
-		return taskAgent{}, refused
+	if err != nil {
+		return taskAgent{}, err
 	}
 	// What the lines say of the say over A2A, before anything is written or
 	// read: the gate asks again when the turn is asked.
 	if reaching, anyone := s.reachingOver(reach.OverA2A, ta.say); !offeredTo(admitted, gated, reaching, anyone) {
-		return taskAgent{}, a2a.NotFound(ta.called + " is no agent " + spokenBy(r) + " reaches over A2A")
+		return taskAgent{}, a2aRefusal(a2asdk.ErrTaskNotFound, ta.called+" is no agent "+spokenBy(r)+" reaches over A2A")
 	}
 	return ta, nil
 }
 
 // nodeTaskAgent is the Node Agent, its Tasks in system.
-func (s *QNTXServer) nodeTaskAgent() (taskAgent, *a2a.Error) {
+func (s *QNTXServer) nodeTaskAgent() (taskAgent, error) {
 	say, found := s.sayOf(nodeAgentSignumName, nodeAgentSay)
 	if !found {
-		return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the " + nodeAgentSignumName + " signum has no " + nodeAgentSay + " to send the message to"}
+		return taskAgent{}, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the "+nodeAgentSignumName+" signum has no "+nodeAgentSay+" to send the message to")
 	}
 	return taskAgent{
 		taskLines: s.systemTasks(s.nodeAgent.did), agent: s.nodeAgent, called: "the Node Agent", say: say,
@@ -130,17 +127,17 @@ func (s *QNTXServer) nodeTaskAgent() (taskAgent, *a2a.Error) {
 
 // elementTaskAgent is the agent of element (ADR-054), its Tasks in system as
 // its session is: "this mechanism is special, its just for root".
-func (s *QNTXServer) elementTaskAgent(element string) (taskAgent, *a2a.Error) {
-	if _, refused := elementOf(sigil.Sent{"element": element}); refused != nil {
-		return taskAgent{}, a2a.NotFound(refused.GetSays())
+func (s *QNTXServer) elementTaskAgent(element string) (taskAgent, error) {
+	if _, refusal := elementOf(sigil.Sent{"element": element}); refusal != nil {
+		return taskAgent{}, a2aRefusal(a2asdk.ErrTaskNotFound, refusal.GetSays())
 	}
-	agent, refused := s.holdElementAgent(element)
-	if refused != nil {
-		return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: refused.GetSays()}
+	agent, refusal := s.holdElementAgent(element)
+	if refusal != nil {
+		return taskAgent{}, a2aRefusal(a2asdk.ErrInvalidAgentResponse, refusal.GetSays())
 	}
 	say, found := s.sayOf("elements", "say")
 	if !found {
-		return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the elements signum has no say to send the message to"}
+		return taskAgent{}, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the elements signum has no say to send the message to")
 	}
 	return taskAgent{
 		taskLines: s.systemTasks(agent.did), agent: agent, called: agent.called, say: say,
@@ -151,21 +148,21 @@ func (s *QNTXServer) elementTaskAgent(element string) (taskAgent, *a2a.Error) {
 // namespaceTaskAgent is the agent namespace opted into (ADR-048), its Tasks in
 // the namespace where its session is written, through Write as the caller is
 // admitted to act there.
-func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace string) (taskAgent, *a2a.Error) {
+func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace string) (taskAgent, error) {
 	line, set, err := s.agentLineOf(namespace)
 	if err != nil {
-		return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the agent of " + namespace + " was not read: " + err.Error()}
+		return taskAgent{}, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the agent of "+namespace+" was not read: "+err.Error())
 	}
 	if !set {
-		return taskAgent{}, &a2a.Error{Name: "UnsupportedOperationError", Message: namespace + " opted into no agent in Claude Code"}
+		return taskAgent{}, a2aRefusal(a2asdk.ErrUnsupportedOperation, namespace+" opted into no agent in Claude Code")
 	}
-	agent, refused := s.holdNamespaceAgent(namespace, line.spec.Model, line.setBy)
-	if refused != nil {
-		return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: refused.GetSays()}
+	agent, refusal := s.holdNamespaceAgent(namespace, line.spec.Model, line.setBy)
+	if refusal != nil {
+		return taskAgent{}, a2aRefusal(a2asdk.ErrInvalidAgentResponse, refusal.GetSays())
 	}
 	say, found := s.sayOf("agents", "say")
 	if !found {
-		return taskAgent{}, &a2a.Error{Name: "InvalidAgentResponseError", Message: "the agents signum has no say to send the message to"}
+		return taskAgent{}, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the agents signum has no say to send the message to")
 	}
 	lines := taskLines{did: agent.did, namespace: namespace, write: func() (ats.AttestationStore, error) {
 		return s.held.Write(admitted, namespace)
@@ -176,372 +173,30 @@ func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace strin
 	}, nil
 }
 
-// sendTask is SendMessage (§3.1.1): a new Task of the agent, one turn, asked
-// of its say through the gate as any surface asks it.
-func (s *QNTXServer) sendTask(r *http.Request, ta taskAgent, request proto.Message) (proto.Message, *a2a.Error) {
-	sent, err := a2a.ReadSent(request)
-	if err != nil {
-		return nil, a2a.Invalid(err.Error())
-	}
-	if sent.Role != "ROLE_USER" {
-		return nil, a2a.Invalid("a message sent to " + ta.called + " is the user's, and this one's role is " + sent.Role)
-	}
-	if sent.Push != nil {
-		if refused := webhookRefused(*sent.Push); refused != nil {
-			return nil, refused
-		}
-	}
-	says, refused := sent.Said()
-	if refused != nil {
-		return nil, refused
-	}
-	// A turn takes nothing more once it is said: a message naming a task is
-	// one no task here accepts (§3.1.1, §3.4.2).
-	if sent.TaskID != "" {
-		task, held, err := s.taskOf(ta.taskLines, sent.TaskID)
-		if err != nil {
-			return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-		}
-		if !held {
-			return nil, a2a.TaskNotFound(sent.TaskID)
-		}
-		return nil, &a2a.Error{Name: "UnsupportedOperationError", Message: "task " + task.ID + " is " + task.State + ": a task of " + ta.called + " is one turn, which takes nothing more once it is said"}
-	}
-
-	contextID, refused := s.contextOf(ta, sent.ContextID)
-	if refused != nil {
-		return nil, refused
-	}
-
-	id := uuid.NewString()
-	message, err := sent.InTask(id, contextID)
-	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	// A config sent with the message is the new Task's, set before the Task is
-	// written down, so its webhook is told of it from the first state on.
-	if sent.Push != nil {
-		push := *sent.Push
-		push.TaskID = id
-		if push.ID == "" {
-			push.ID = uuid.NewString()
-		}
-		if err := s.setPush(ta.taskLines, push, spokenBy(r)); err != nil {
-			return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-		}
-	}
-	// The turn is the node's, not the caller's: a caller that leaves does not
-	// stop it, and its Task is answered by its id after (§3.2.2). Canceling
-	// the Task does: a turn waiting to start never starts.
-	turn, stop := context.WithCancel(context.WithoutCancel(r.Context()))
-	s.taskStops.Store(id, stop)
-	// Its user is who spoke, as the turn writes them down (said_by).
-	if err := s.writeTaskLine(ta.taskLines, id, a2a.Submitted, spokenBy(r), time.Now(), map[string]any{
-		"message": masked(string(message)), "context_id": contextID,
-	}); err != nil {
-		s.taskStops.Delete(id)
-		stop()
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-
-	ended := make(chan error, 1)
-	sacred.Go("a task of an agent the node hosts", func() {
-		defer func() {
-			s.taskStops.Delete(id)
-			stop()
-		}()
-		err := s.performTask(turn, r.WithContext(turn), ta, id, contextID, says)
-		// Returned immediately, nobody waits on it: this is its one trace.
-		if err != nil {
-			s.logger.Errorw("a task ended and how it ended was not written", "agent", ta.did, "task", id, "error", err)
-		}
-		ended <- err
-	})
-	if !sent.ReturnImmediately {
-		select {
-		case err := <-ended:
-			if err != nil {
-				return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-			}
-		case <-r.Context().Done():
-			return nil, &a2a.Error{Message: "the caller left before task " + id + " ended; it is answered by its id"}
-		}
-	}
-	return s.taskAnswered(ta.taskLines, id, func(task a2a.Task) (proto.Message, error) { return task.Sending(sent.History) })
-}
-
 // contextOf is the context a Task of ta is in: the agent's one session. One not
 // kept yet is kept now, before the Task is answered: "If an agent generates a
 // new contextId, it MUST be included in the response" (§3.4.1). Its first turn
 // then starts the session under that id.
-func (s *QNTXServer) contextOf(ta taskAgent, asked string) (string, *a2a.Error) {
+func (s *QNTXServer) contextOf(ta taskAgent, asked string) (string, error) {
 	// Two first messages at once are one session.
 	s.taskEnds.Lock()
 	defer s.taskEnds.Unlock()
 	in := ta.agent.in(s.claudeHarness())
 	session, kept, err := ta.agent.sessionIn(in.file)
 	if err != nil {
-		return "", &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+		return "", a2aRefusal(a2asdk.ErrInvalidAgentResponse, err.Error())
 	}
 	// "If an agent cannot accept a client-provided contextId, it MUST reject
 	// the request with an error and MUST NOT generate a new contextId" (§3.4.1).
 	if asked != "" && (!kept || asked != session) {
-		return "", a2a.Invalid(ta.called + " is one session, and context " + asked + " is not it")
+		return "", a2aRefusal(a2asdk.ErrInvalidParams, ta.called+" is one session, and context "+asked+" is not it")
 	}
 	if !kept {
 		if err := ta.agent.keepIn(in.file, session); err != nil {
-			return "", &a2a.Error{Name: "InvalidAgentResponseError", Message: "the session of " + ta.called + " was not kept: " + err.Error()}
+			return "", a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the session of "+ta.called+" was not kept: "+err.Error())
 		}
 	}
 	return session, nil
-}
-
-// saidInClaude is an agent's answer as Claude Code gave it: the Node Agent's
-// and an element agent's, and a namespace agent's.
-type saidInClaude interface{ GetClaude() *protocol.ClaudeSaid }
-
-// performTask is one turn of the agent, asked of its say over A2A, and the
-// line of how it ended.
-func (s *QNTXServer) performTask(ctx context.Context, caller *http.Request, ta taskAgent, id, contextID, says string) error {
-	// Its turn running is the Task working: "actively being processed by the
-	// agent" (TaskState), in the session it runs in and the stream it prints to.
-	// A Task canceled before its turn ran is not working: its turn is stopped
-	// as it starts.
-	ctx = context.WithValue(ctx, taskStartsKey{}, func(session, stream string) {
-		s.taskEnds.Lock()
-		defer s.taskEnds.Unlock()
-		task, _, held, err := s.heldTask(ta.taskLines, id)
-		switch {
-		case err != nil:
-			s.logger.Errorw("a task started and what it is was not read", "agent", ta.did, "task", id, "stream", stream, "error", err)
-		case held && a2a.Terminal(task.State):
-			if err := claudecode.Interrupt(ta.agent.home, filepath.Base(stream)); err != nil {
-				s.logger.Errorw("a task ended before its turn started, and the turn was not stopped", "agent", ta.did, "task", id, "state", task.State, "stream", stream, "error", err)
-			}
-		default:
-			if err := s.writeTaskLine(ta.taskLines, id, a2a.Working, ta.did, time.Now(),
-				map[string]any{"context_id": session, "stream": filepath.Base(stream)}, streamContext(stream)); err != nil {
-				s.logger.Errorw("a task is working and was not written down as working", "agent", ta.did, "task", id, "stream", stream, "error", err)
-			}
-		}
-	})
-	asked := map[string]any{"says": says}
-	for name, value := range ta.asked {
-		asked[name] = value
-	}
-	answered := ta.say.asking(reach.OverA2A, s.gate, s.reachingOver, caller).Ask(ctx, asked)
-	state, ended := a2a.Failed, map[string]any{"context_id": contextID}
-	// The node stopping is not a followed turn ending: the next node reads the
-	// turn on from its stream and settles the Task (settleLeftTask). A turn
-	// that answered has no stream left, so its answer is written here. A turn
-	// no node reads on ends with the node that ran it.
-	if answered.Answer == nil && s.ctx.Err() != nil {
-		if ta.followed {
-			return nil
-		}
-		ended["why"] = "the node stopped while its turn ran"
-		return s.endTask(ta.taskLines, id, state, ta.did, ended)
-	}
-	switch {
-	case answered.Rejected != nil:
-		ended["why"] = "the gate turned it away: " + answered.Rejected.Body
-	case answered.Refusal != nil:
-		ended["why"] = refusalSays(answered.Refusal)
-	default:
-		said, isSaid := answered.Answer.(saidInClaude)
-		var claude *protocol.ClaudeSaid
-		if isSaid {
-			claude = said.GetClaude()
-		}
-		switch {
-		case claude == nil:
-			// A Task asks in Claude Code (above), so any other answer is not its.
-			ended["why"] = ta.called + " did not answer in Claude Code, which a Task asks it in"
-		case claude.GetIsError():
-			ended["why"], ended["context_id"] = masked(claude.GetAnswer()), claude.GetSession()
-		default:
-			state, ended["answer"], ended["context_id"] = a2a.Completed, masked(claude.GetAnswer()), claude.GetSession()
-		}
-	}
-	return s.endTask(ta.taskLines, id, state, ta.did, ended)
-}
-
-// endTask writes that task id ended in state, unless it ended already: a Task
-// ends once, by its turn, a restart or a cancel, whichever is first.
-func (s *QNTXServer) endTask(lines taskLines, id, state, by string, attributes map[string]any) error {
-	s.taskEnds.Lock()
-	defer s.taskEnds.Unlock()
-	task, _, held, err := s.heldTask(lines, id)
-	if err != nil {
-		return err
-	}
-	if held && a2a.Terminal(task.State) {
-		return nil
-	}
-	return s.writeTaskLine(lines, id, state, by, time.Now(), attributes)
-}
-
-// getTask is GetTask (§3.1.3): a Task of the agent, by its id.
-func (s *QNTXServer) getTask(ta taskAgent, request proto.Message) (proto.Message, *a2a.Error) {
-	id, limit, err := a2a.Asked(request)
-	if err != nil {
-		return nil, a2a.Invalid(err.Error())
-	}
-	return s.taskAnswered(ta.taskLines, id, func(task a2a.Task) (proto.Message, error) {
-		built, err := task.Response(limit)
-		if err != nil {
-			return nil, err
-		}
-		return built.Interface(), nil
-	})
-}
-
-// listTasks is ListTasks (§3.1.4): the agent's Tasks, the most recently
-// updated first, a page at a time. Who reaches the agent sees each of them.
-func (s *QNTXServer) listTasks(ta taskAgent, request proto.Message) (proto.Message, *a2a.Error) {
-	listing, refused := a2a.ReadListing(request)
-	if refused != nil {
-		return nil, refused
-	}
-	after, refused := cursorOf(listing.Token)
-	if refused != nil {
-		return nil, refused
-	}
-	tasks, err := s.tasks(ta.taskLines)
-	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	tasks = slices.DeleteFunc(tasks, func(task a2a.Task) bool {
-		return (listing.ContextID != "" && task.ContextID != listing.ContextID) ||
-			(listing.State != "" && task.State != listing.State) ||
-			(listing.Since && task.At.Before(listing.After))
-	})
-	// "Tasks MUST be sorted by last update time in descending order", and by
-	// id where two were updated at once, so a page ends at one place.
-	slices.SortFunc(tasks, func(a, b a2a.Task) int {
-		if at := b.At.Compare(a.At); at != 0 {
-			return at
-		}
-		return strings.Compare(a.ID, b.ID)
-	})
-	from := 0
-	if after != nil {
-		from = len(tasks)
-		if at := slices.IndexFunc(tasks, after.precedes); at >= 0 {
-			from = at
-		}
-	}
-	page := tasks[from:min(from+int(listing.Size), len(tasks))]
-	next := ""
-	if from+len(page) < len(tasks) {
-		next = cursorAt(page[len(page)-1])
-	}
-	listed, err := listing.Listed(page, next, len(tasks))
-	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	return listed, nil
-}
-
-// cursor is where a page of tasks ended: the task last on it.
-type cursor struct {
-	at time.Time
-	id string
-}
-
-// precedes is whether task comes after the cursor in the order tasks are
-// listed in.
-func (c cursor) precedes(task a2a.Task) bool {
-	return task.At.Before(c.at) || (task.At.Equal(c.at) && task.ID > c.id)
-}
-
-// cursorAt is the page token of a page ending at task.
-func cursorAt(task a2a.Task) string {
-	return base64.RawURLEncoding.EncodeToString([]byte(strconv.FormatInt(task.At.UnixNano(), 10) + ":" + task.ID))
-}
-
-// cursorOf is where the page token says the page before ended, nil for the
-// first page.
-func cursorOf(token string) (*cursor, *a2a.Error) {
-	if token == "" {
-		return nil, nil
-	}
-	said, err := base64.RawURLEncoding.DecodeString(token)
-	if err != nil {
-		return nil, a2a.Invalid("pageToken " + token + " is no page token this node gave: " + err.Error())
-	}
-	nanos, id, cut := strings.Cut(string(said), ":")
-	at, err := strconv.ParseInt(nanos, 10, 64)
-	if !cut || err != nil {
-		return nil, a2a.Invalid("pageToken " + token + " is no page token this node gave")
-	}
-	return &cursor{at: time.Unix(0, at), id: id}, nil
-}
-
-// cancelTask is CancelTask (§3.1.5): the Task ends canceled, and its turn
-// stops. "ROOT can do anything": who reaches the agent cancels any of its Tasks.
-func (s *QNTXServer) cancelTask(r *http.Request, ta taskAgent, request proto.Message) (proto.Message, *a2a.Error) {
-	id, err := a2a.Named(request)
-	if err != nil {
-		return nil, a2a.Invalid(err.Error())
-	}
-	stream, refused := s.endCanceled(ta.taskLines, id, spokenBy(r))
-	if refused != nil {
-		return nil, refused
-	}
-	// A turn waiting to start never starts, and one running is interrupted.
-	if stop, waiting := s.taskStops.Load(id); waiting {
-		stop.(context.CancelFunc)()
-	}
-	if stream != "" {
-		if err := claudecode.Interrupt(ta.agent.home, stream); err != nil {
-			return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: "task " + id + " is canceled, and its turn was not stopped: " + err.Error()}
-		}
-	}
-	return s.taskAnswered(ta.taskLines, id, func(task a2a.Task) (proto.Message, error) {
-		built, err := task.Response(a2a.HistoryLimit{})
-		if err != nil {
-			return nil, err
-		}
-		return built.Interface(), nil
-	})
-}
-
-// endCanceled writes that task id ended canceled by by, and gives the stream
-// its turn prints to when it is working.
-func (s *QNTXServer) endCanceled(lines taskLines, id, by string) (string, *a2a.Error) {
-	s.taskEnds.Lock()
-	defer s.taskEnds.Unlock()
-	task, stream, held, err := s.heldTask(lines, id)
-	if err != nil {
-		return "", &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	if !held {
-		return "", a2a.TaskNotFound(id)
-	}
-	if a2a.Terminal(task.State) {
-		return "", a2a.TaskNotCancelable(id, task.State)
-	}
-	if err := s.writeTaskLine(lines, id, a2a.Canceled, by, time.Now(), map[string]any{"context_id": task.ContextID}); err != nil {
-		return "", &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	return stream, nil
-}
-
-// taskAnswered is the task id names as answers gives it, or TaskNotFoundError.
-func (s *QNTXServer) taskAnswered(lines taskLines, id string, answers func(a2a.Task) (proto.Message, error)) (proto.Message, *a2a.Error) {
-	task, held, err := s.taskOf(lines, id)
-	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	if !held {
-		return nil, a2a.TaskNotFound(id)
-	}
-	answer, err := answers(task)
-	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	return answer, nil
 }
 
 // sayOf is the sigil a signum serves by name: the say an agent is asked by.
@@ -564,34 +219,85 @@ type taskStartsKey struct{}
 
 // taskStartsIn is what the turn ctx asks for tells once it runs, when ctx asks
 // it for a Task.
-func taskStartsIn(ctx context.Context) (func(session, stream string), bool) {
+func taskStartsIn(ctx contextValuer) (func(session, stream string), bool) {
 	starts, forATask := ctx.Value(taskStartsKey{}).(func(session, stream string))
 	return starts, forATask
 }
 
-// writeTaskLine writes that task id reached state, as by: who sent it, for the
-// state it was submitted in, and the agent for the states after. The line is in
-// the task and the agent; also is what else it is in.
-func (s *QNTXServer) writeTaskLine(lines taskLines, id, state, by string, at time.Time, attributes map[string]any, also ...string) error {
+// contextValuer is what taskStartsIn reads its tell from: a context.
+type contextValuer interface{ Value(key any) any }
+
+// A Task line holds the Task as it stands, whole: the lf.a2a.v1.Task JSON the
+// SDK reads and writes, its text masked. A line written before the node served
+// A2A through the SDK holds what changed instead, and is read the same.
+const taskSnapshot = "task"
+
+// writeTask writes the line of task reaching its state, as by: who sent it,
+// for the state it was submitted in, and the agent or who canceled it for the
+// states after. The line is in the task and the agent; also is what else it is in.
+func (s *QNTXServer) writeTask(lines taskLines, task *a2asdk.Task, by string, also ...string) error {
 	store, err := lines.write()
 	if err != nil {
-		return errors.Wrapf(err, "no store to write task %s in, in %s", id, lines.namespace)
+		return errors.Wrapf(err, "no store to write task %s in, in %s", task.ID, lines.namespace)
 	}
-	line, err := identity.GenerateASUIDWithRetry("AS", taskLineSubject, state, id, store.AttestationExists)
+	state := string(task.Status.State)
+	line, err := identity.GenerateASUIDWithRetry("AS", taskLineSubject, state, string(task.ID), store.AttestationExists)
 	if err != nil {
-		return errors.Wrapf(err, "failed to name the %s line of task %s", state, id)
+		return errors.Wrapf(err, "failed to name the %s line of task %s", state, task.ID)
 	}
-	if err := store.CreateAttestation(&types.As{
+	at := time.Now()
+	if task.Status.Timestamp != nil {
+		at = *task.Status.Timestamp
+	}
+	held := maskedTask(task)
+	held.Status.Timestamp = &at
+	snapshot, err := json.Marshal(held)
+	if err != nil {
+		return errors.Wrapf(err, "task %s did not marshal to be written", task.ID)
+	}
+	return errors.Wrapf(store.CreateAttestation(&types.As{
 		ID: line, Subjects: []string{taskLineSubject}, Predicates: []string{state},
-		Contexts: append([]string{taskContext(id), agentContext(lines.did)}, also...),
-		Actors:   []string{by}, Timestamp: at, CreatedAt: at, Source: "a2a", Attributes: attributes,
-	}); err != nil {
-		return errors.Wrapf(err, "the %s line of task %s was not written", state, id)
+		Contexts: append([]string{taskContext(string(task.ID)), agentContext(lines.did)}, also...),
+		Actors:   []string{by}, Timestamp: at, CreatedAt: at, Source: "a2a",
+		Attributes: map[string]any{"context_id": task.ContextID, taskSnapshot: string(snapshot)},
+	}), "the %s line of task %s was not written", state, task.ID)
+}
+
+// maskedTask is task with every text it holds masked, as the turn's own lines
+// are: what a person or the agent said can carry a secret.
+func maskedTask(task *a2asdk.Task) *a2asdk.Task {
+	copied := *task
+	maskParts := func(parts a2asdk.ContentParts) a2asdk.ContentParts {
+		out := make(a2asdk.ContentParts, 0, len(parts))
+		for _, part := range parts {
+			p := *part
+			if text, isText := p.Content.(a2asdk.Text); isText {
+				p.Content = a2asdk.Text(masked(string(text)))
+			}
+			out = append(out, &p)
+		}
+		return out
 	}
-	// "When a task update occurs, the agent sends an HTTP POST request to the
-	// configured webhook URL" (§4.3.3).
-	s.notify(lines, id)
-	return nil
+	maskMessage := func(m *a2asdk.Message) *a2asdk.Message {
+		if m == nil {
+			return nil
+		}
+		held := *m
+		held.Parts = maskParts(m.Parts)
+		return &held
+	}
+	copied.History = nil
+	for _, m := range task.History {
+		copied.History = append(copied.History, maskMessage(m))
+	}
+	copied.Artifacts = nil
+	for _, artifact := range task.Artifacts {
+		held := *artifact
+		held.Parts = maskParts(artifact.Parts)
+		copied.Artifacts = append(copied.Artifacts, &held)
+	}
+	copied.Status.Message = maskMessage(task.Status.Message)
+	return &copied
 }
 
 // taskContext is what a task's lines are in.
@@ -606,7 +312,9 @@ const agentContextPrefix = "agent:"
 
 // streamContext is what the line of a Task whose turn prints to stream is in
 // beside its task, so the turn is found by its stream after a restart.
-func streamContext(stream string) string { return "stream:" + filepath.Base(stream) }
+func streamContext(stream string) string { return streamContextPrefix + filepath.Base(stream) }
+
+const streamContextPrefix = "stream:"
 
 // agentOfLine is the agent a Task line is of. A line in no agent's context is
 // the Node Agent's: written before an agent at a tenant had Tasks of its own.
@@ -622,24 +330,19 @@ func (s *QNTXServer) agentOfLine(line *types.As) string {
 	return s.nodeAgent.did
 }
 
-// taskOf is the task id names, as its lines say it. False is no task of the
-// agent by that id.
-func (s *QNTXServer) taskOf(lines taskLines, id string) (a2a.Task, bool, error) {
-	task, _, held, err := s.heldTask(lines, id)
-	return task, held, err
-}
-
-// heldTask is taskOf, with the stream its turn prints to while it works.
-func (s *QNTXServer) heldTask(lines taskLines, id string) (a2a.Task, string, bool, error) {
+// heldTask is the task id names, as its lines say it, the stream its turn
+// prints to while it works, and how many lines it has: its version. False is
+// no task of the agent by that id.
+func (s *QNTXServer) heldTask(lines taskLines, id string) (*a2asdk.Task, string, int, bool, error) {
 	written, err := s.taskLinesIn(lines, []string{taskContext(id)})
 	if err != nil {
-		return a2a.Task{}, "", false, errors.Wrapf(err, "failed to read task %s", id)
+		return nil, "", 0, false, errors.Wrapf(err, "failed to read task %s", id)
 	}
 	if len(written) == 0 {
-		return a2a.Task{}, "", false, nil
+		return nil, "", 0, false, nil
 	}
 	task, stream, err := taskFrom(id, written)
-	return task, stream, err == nil, err
+	return task, stream, len(written), err == nil, err
 }
 
 // taskLinesIn is the agent's Task lines in contexts, or all of them for none.
@@ -657,7 +360,7 @@ func (s *QNTXServer) taskLinesIn(lines taskLines, contexts []string) ([]*types.A
 }
 
 // tasks is every Task of the agent, as its lines say each.
-func (s *QNTXServer) tasks(lines taskLines) ([]a2a.Task, error) {
+func (s *QNTXServer) tasks(lines taskLines) ([]*a2asdk.Task, error) {
 	written, err := s.taskLinesIn(lines, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read the tasks of %s", lines.did)
@@ -670,7 +373,7 @@ func (s *QNTXServer) tasks(lines taskLines) ([]a2a.Task, error) {
 		}
 		of[id] = append(of[id], line)
 	}
-	tasks := make([]a2a.Task, 0, len(of))
+	tasks := make([]*a2asdk.Task, 0, len(of))
 	for id, lines := range of {
 		task, _, err := taskFrom(id, lines)
 		if err != nil {
@@ -682,50 +385,140 @@ func (s *QNTXServer) tasks(lines taskLines) ([]a2a.Task, error) {
 }
 
 // taskFrom is task id as lines, its lines, say it, and the stream its turn
-// prints to while it works.
-func taskFrom(id string, lines []*types.As) (a2a.Task, string, error) {
+// prints to while it works. A line holding the Task whole is the Task from
+// then on; a line from before holds what changed, and is laid on the Task.
+func taskFrom(id string, lines []*types.As) (*a2asdk.Task, string, error) {
 	slices.SortFunc(lines, func(a, b *types.As) int { return a.Timestamp.Compare(b.Timestamp) })
-	task, stream := a2a.Task{ID: id}, ""
-	var err error
+	task, stream := &a2asdk.Task{ID: a2asdk.TaskID(id)}, ""
 	for _, line := range lines {
 		if len(line.Predicates) != 1 {
-			return a2a.Task{}, "", errors.Newf("%s line %s of task %s names %d states, and a line is one", taskLineSubject, line.ID, id, len(line.Predicates))
+			return nil, "", errors.Newf("%s line %s of task %s names %d states, and a line is one", taskLineSubject, line.ID, id, len(line.Predicates))
 		}
-		task.State, task.At = line.Predicates[0], line.Timestamp
-		if task.ContextID, err = oneText(line.Attributes, "context_id", taskLineSubject, line.ID, id); err != nil {
-			return a2a.Task{}, "", err
+		state := a2asdk.TaskState(line.Predicates[0])
+		for _, context := range line.Contexts {
+			if base, isStream := strings.CutPrefix(context, streamContextPrefix); isStream {
+				stream = base
+			}
 		}
-		switch task.State {
-		case a2a.Working:
-			// What it says is the session it runs in, read above, and the
-			// stream it prints to.
-			if stream, err = oneText(line.Attributes, "stream", taskLineSubject, line.ID, id); err != nil {
-				return a2a.Task{}, "", err
+		if snapshot, holds := line.Attributes[taskSnapshot].(string); holds {
+			whole := &a2asdk.Task{}
+			if err := json.Unmarshal([]byte(snapshot), whole); err != nil {
+				return nil, "", errors.Wrapf(err, "%s line %s of task %s holds no task", taskLineSubject, line.ID, id)
 			}
-		case a2a.Submitted:
-			message, err := oneText(line.Attributes, "message", taskLineSubject, line.ID, id)
-			if err != nil {
-				return a2a.Task{}, "", err
-			}
-			task.History = append(task.History, []byte(message))
-		case a2a.Completed:
-			if task.Answer, err = oneText(line.Attributes, "answer", taskLineSubject, line.ID, id); err != nil {
-				return a2a.Task{}, "", err
-			}
-		case a2a.Failed:
-			if task.Why, err = oneText(line.Attributes, "why", taskLineSubject, line.ID, id); err != nil {
-				return a2a.Task{}, "", err
-			}
-		case a2a.Canceled:
-			// Who canceled it is the line's actor.
-		default:
-			return a2a.Task{}, "", errors.Newf("%s line %s of task %s says %s, which is no state a task here reaches", taskLineSubject, line.ID, id, task.State)
+			task = whole
+			continue
+		}
+		if err := laidOn(task, state, line, id); err != nil {
+			return nil, "", err
 		}
 	}
-	if task.State != a2a.Working {
+	if task.Status.State != a2asdk.TaskStateWorking {
 		stream = ""
 	}
 	return task, stream, nil
+}
+
+// laidOn lays a line written before the SDK on task: the state it reached,
+// and what it said of it.
+func laidOn(task *a2asdk.Task, state a2asdk.TaskState, line *types.As, id string) error {
+	at := line.Timestamp
+	task.Status = a2asdk.TaskStatus{State: state, Timestamp: &at}
+	contextID, err := oneText(line.Attributes, "context_id", taskLineSubject, line.ID, id)
+	if err != nil {
+		return err
+	}
+	task.ContextID = contextID
+	switch state {
+	case a2asdk.TaskStateWorking, a2asdk.TaskStateCanceled:
+		// What it says is the session it runs in, read above; who canceled it
+		// is the line's actor.
+	case a2asdk.TaskStateSubmitted:
+		said, err := oneText(line.Attributes, "message", taskLineSubject, line.ID, id)
+		if err != nil {
+			return err
+		}
+		message := &a2asdk.Message{}
+		if err := json.Unmarshal([]byte(said), message); err != nil {
+			return errors.Wrapf(err, "%s line %s of task %s holds no message", taskLineSubject, line.ID, id)
+		}
+		task.History = append(task.History, message)
+	case a2asdk.TaskStateCompleted:
+		answer, err := oneText(line.Attributes, "answer", taskLineSubject, line.ID, id)
+		if err != nil {
+			return err
+		}
+		task.Artifacts = []*a2asdk.Artifact{answerArtifact(answer)}
+	case a2asdk.TaskStateFailed:
+		why, err := oneText(line.Attributes, "why", taskLineSubject, line.ID, id)
+		if err != nil {
+			return err
+		}
+		task.Status.Message = failedWhy(task.ID, task.ContextID, why)
+	default:
+		return errors.Newf("%s line %s of task %s says %s, which is no state a task here reaches", taskLineSubject, line.ID, id, state)
+	}
+	return nil
+}
+
+// answerArtifact is what the agent gave, as the Task's one artifact: "Results SHOULD
+// BE returned using Artifacts associated with a Task" (§3.7).
+func answerArtifact(answer string) *a2asdk.Artifact {
+	return &a2asdk.Artifact{ID: "answer", Name: "answer", Parts: a2asdk.ContentParts{textPart(answer)}}
+}
+
+// failedWhy is why task failed, as "A message associated with the status": the
+// agent's, saying why.
+func failedWhy(id a2asdk.TaskID, contextID, why string) *a2asdk.Message {
+	return &a2asdk.Message{
+		ID: string(id) + "-failed", ContextID: contextID, TaskID: id, Role: a2asdk.MessageRoleAgent,
+		Parts: a2asdk.ContentParts{textPart(why)},
+	}
+}
+
+// textPart is text, as text/plain.
+func textPart(text string) *a2asdk.Part {
+	part := a2asdk.NewTextPart(text)
+	part.MediaType = textPlain
+	return part
+}
+
+// textPlain is the media type the agents take and give.
+const textPlain = "text/plain"
+
+// endTask writes that task id ended in state, as by, unless it ended already:
+// a Task ends once, by its turn, a restart or a cancel, whichever is first.
+// answer is what it gave when it completed, why why it did not.
+func (s *QNTXServer) endTask(lines taskLines, id string, state a2asdk.TaskState, by, session, answer, why string) error {
+	s.taskEnds.Lock()
+	defer s.taskEnds.Unlock()
+	task, _, _, held, err := s.heldTask(lines, id)
+	if err != nil {
+		return err
+	}
+	if !held {
+		return errors.Newf("task %s has no lines to end", id)
+	}
+	if task.Status.State.Terminal() {
+		return nil
+	}
+	now := time.Now()
+	task.Status = a2asdk.TaskStatus{State: state, Timestamp: &now}
+	if session != "" {
+		task.ContextID = session
+	}
+	switch state {
+	case a2asdk.TaskStateCompleted:
+		task.Artifacts = []*a2asdk.Artifact{answerArtifact(answer)}
+	case a2asdk.TaskStateFailed:
+		task.Status.Message = failedWhy(task.ID, task.ContextID, why)
+	}
+	if err := s.writeTask(lines, task, by); err != nil {
+		return err
+	}
+	// "When a task update occurs, the agent sends an HTTP POST request to the
+	// configured webhook URL" (§4.3.3): no execution is left to send it.
+	s.notifySettled(lines, task)
+	return nil
 }
 
 // settleLeftTask writes how the Task whose turn printed to stream ended, once
@@ -746,17 +539,17 @@ func (s *QNTXServer) settleLeftTask(agent *rootAgent, session, stream string, an
 		if !found {
 			return errors.Newf("%s line %s names the stream %s and no task", taskLineSubject, line.ID, stream)
 		}
-		state, ended := a2a.Failed, map[string]any{"context_id": session}
+		state, gave, why := a2asdk.TaskStateFailed, "", ""
 		switch {
 		case unanswered != nil:
-			ended["why"] = masked(unanswered.Error())
+			why = masked(unanswered.Error())
 		case answer.IsError:
-			ended["why"] = masked(answer.Text)
+			why = masked(answer.Text)
 		default:
-			state, ended["answer"] = a2a.Completed, masked(answer.Text)
+			state, gave = a2asdk.TaskStateCompleted, masked(answer.Text)
 		}
 		did := s.agentOfLine(line)
-		if err := s.endTask(s.systemTasks(did), id, state, did, ended); err != nil {
+		if err := s.endTask(s.systemTasks(did), id, state, did, session, gave, why); err != nil {
 			return err
 		}
 	}
@@ -777,9 +570,9 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 	if err != nil {
 		return errors.Wrap(err, "failed to read the tasks the node's last process left")
 	}
-	why := map[string]string{
-		a2a.Submitted: "the node stopped before its turn started",
-		a2a.Working:   "the node stopped while its turn ran, and no stream was left to read how it ended",
+	why := map[a2asdk.TaskState]string{
+		a2asdk.TaskStateSubmitted: "the node stopped before its turn started",
+		a2asdk.TaskStateWorking:   "the node stopped while its turn ran, and no stream was left to read how it ended",
 	}
 	newest := map[string]*types.As{}
 	for _, line := range lines {
@@ -795,16 +588,12 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 		if len(line.Predicates) != 1 {
 			return errors.Newf("%s line %s of task %s names %d states, and a line is one", taskLineSubject, line.ID, id, len(line.Predicates))
 		}
-		said, left := why[line.Predicates[0]]
+		said, left := why[a2asdk.TaskState(line.Predicates[0])]
 		if !left || !line.Timestamp.Before(since) {
 			continue
 		}
-		contextID, err := oneText(line.Attributes, "context_id", taskLineSubject, line.ID, id)
-		if err != nil {
-			return err
-		}
 		did := s.agentOfLine(line)
-		if err := s.endTask(s.systemTasks(did), id, a2a.Failed, did, map[string]any{"context_id": contextID, "why": said}); err != nil {
+		if err := s.endTask(s.systemTasks(did), id, a2asdk.TaskStateFailed, did, "", "", said); err != nil {
 			return err
 		}
 	}

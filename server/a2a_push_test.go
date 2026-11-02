@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -71,7 +71,7 @@ func TestATaskSentWithAPushConfigIsPostedToItsWebhook(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, sent)
 	task := at(sent, "task.id").(string)
 
-	completed := stateOf(t, took, task, a2a.Completed)
+	completed := stateOf(t, took, task, string(a2asdk.TaskStateCompleted))
 	assert.Equal(t, "Bearer secure-client-token", completed.authorization)
 	assert.Equal(t, "application/a2a+json", completed.contentType)
 	assert.NotEmpty(t, at(completed.body, "task.artifacts"), "the completed task was POSTed without its answer")
@@ -128,9 +128,9 @@ func TestAPushConfigIsCreatedListedGotAndDeleted(t *testing.T) {
 // (§13.2): where the URL is set, and again where it is dialed.
 func TestAWebhookTheInternetDoesNotRouteToIsRefused(t *testing.T) {
 	for _, url := range []string{"http://127.0.0.1/hook", "http://10.0.0.1/hook", "http://169.254.169.254/latest", "http://localhost:8770/hook", "ftp://example.org/hook"} {
-		assert.NotNil(t, webhookRefused(a2a.Push{URL: url}), url)
+		assert.NotNil(t, webhookRefused(&a2asdk.PushConfig{URL: url}), url)
 	}
-	assert.Nil(t, webhookRefused(a2a.Push{URL: "https://client.example.com/webhook/a2a-notifications"}))
+	assert.Nil(t, webhookRefused(&a2asdk.PushConfig{URL: "https://client.example.com/webhook/a2a-notifications"}))
 
 	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Error("the node POSTed to a loopback address")
@@ -138,7 +138,7 @@ func TestAWebhookTheInternetDoesNotRouteToIsRefused(t *testing.T) {
 	t.Cleanup(hook.Close)
 	srv, _, _ := nodeAgentOverA2A(t, "")
 	// A name the URL check lets by, which resolves to loopback where it is dialed.
-	err := srv.post(a2a.Push{URL: strings.Replace(hook.URL, "127.0.0.1", "localhost", 1), TaskID: "t"}, []byte(`{}`))
+	err := srv.post(&a2asdk.PushConfig{URL: strings.Replace(hook.URL, "127.0.0.1", "localhost", 1), TaskID: "t"}, []byte(`{}`))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no public address")
 }
