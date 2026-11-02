@@ -91,6 +91,14 @@ func (c *Config) Validate() error {
 				return errors.Newf("agent.root.pi.thinking must be one of [%s], got %q", strings.Join(ThinkingLevels, ", "), pi.Thinking)
 			}
 		}
+		if agy := root.Agy; agy.Named() {
+			if agy.Model == "" || agy.TokenRef == "" {
+				return errors.New("agent.root.agy names a model and the Gemini API key it runs on, both or neither")
+			}
+			if err := secretref.Validate(agy.TokenRef); err != nil {
+				return errors.Wrap(err, "agent.root.agy.token is invalid")
+			}
+		}
 	}
 
 	// Plugin access tokens are references, never secrets. am.toml ships as a

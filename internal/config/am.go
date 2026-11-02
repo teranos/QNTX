@@ -44,6 +44,23 @@ type NodeAgentConfig struct {
 	Pi PiConfig `mapstructure:"pi"`
 	// "Codex Agent runtime as another first class citizen in QNTX besides Claude"
 	Codex CodexConfig `mapstructure:"codex"`
+	// "wiring it into node and namespace config as an actual harness"
+	Agy AgyConfig `mapstructure:"agy"`
+}
+
+// AgyConfig names how the Node Agent runs in agy. A node that names no model
+// runs it without agy.
+type AgyConfig struct {
+	Model string `mapstructure:"model"` // The model, by agy's own id for it, as agy models lists it.
+	// TokenRef is the agent's Gemini API key, ssm:// or env:, as the plan token
+	// is. agy makes its model calls on it: its Google sign-in is a browser and
+	// the OS keyring, which are the node's and not the agent's.
+	TokenRef string `mapstructure:"token"`
+}
+
+// Named reports whether am.toml names agy for the Node Agent.
+func (a AgyConfig) Named() bool {
+	return a.Model != "" || a.TokenRef != ""
 }
 
 // CodexConfig names how the Node Agent runs in codex. A node that names no

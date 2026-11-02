@@ -2,11 +2,29 @@
 
 > “making a start on agy as another harness”
 
-This package is the first runtime increment on top of Parity's agy pin
+> “wiring it into node and namespace config as an actual harness”
+
+This package runs agy on top of Parity's agy pin
 (`server/parity/agy_1.4.4_99b8981`), beside `internal/claudecode`, `internal/pi`
-and `internal/codex`. It is not yet registered as a Node Agent or namespace
-harness. See [ADR-048](../../docs/adr/ADR-048-Node-Agent.md) for the agent's
-identity and session requirements.
+and `internal/codex`. See [ADR-048](../../docs/adr/ADR-048-Node-Agent.md) for the
+agent's identity and session requirements.
+
+## As a harness
+
+- The Node Agent runs in agy when am.toml names `[agent.root.agy]`: `model`, by
+  agy's own id, and `token`, the `ssm://` or `env:` reference to its Gemini API
+  key, both or neither. Asked whether it is held to Opus or Fable, which agy on
+  a Gemini key never serves: “Exempt agy”. `server/agy.go`.
+- A namespace's agent runs in agy when it is set with `agents set`, harness
+  `agy` and a model. It makes its model calls on the namespace's key named
+  `gemini` ([ADR-051](../../docs/adr/ADR-051-namespace-keys.md)), which `keys set` asks
+  Gemini about. `server/namespace_agy.go`.
+- Its sigils are the other harnesses': `agent say|am|session` and
+  `agents set|am|say|session`, with `harness` `agy`, answering `AgySaid` and `AgyAm`.
+- A turn runs under ground: its ground built, and the global hooks.json under
+  its HOME (`~/.gemini/config/hooks.json`) running `ground_hook agy <Event>` on
+  each of agy's six events. agy's conversation is kept apart from the node's
+  session, which the transcript is written in, in `agy-conversation`.
 
 `Pinned().Ensure(ctx, dir)` downloads the platform archive named by Parity,
 checks its SHA-256 before extraction, and atomically installs the `antigravity`
@@ -51,13 +69,15 @@ is not published.
 
 ## Remaining integration
 
-- Node and namespace configuration, boot-time binary holding, and harness selection.
-- Protocol responses and signed transcript mapping.
-- Agent-owned MCP credentials, Google sign-in or ADC, and Ground hooks.
+- The node's MCP and the agent's system prompt: codex is handed both, agy neither.
+- The live tail: only Claude Code prints to a stream the node reads.
+- The QNTX-Web elements and the TypeScript of `AgySaid` and `AgyAm`.
+- Google sign-in or ADC.
 - Permission interaction: headless agy soft-denies a tool it would ask about.
 - A live authenticated model turn; current tests use fake subprocesses, plus an
-  opt-in real release installation/version check. A real turn was run with an
-  invalid key only: it reached Gemini and was refused.
+  opt-in real release installation/version check. A real turn was run through
+  the Node Agent with an invalid key only: it reached Gemini and was refused,
+  and agy ran the agent's ground on SessionStart, PreInvocation and Stop.
 
 ## Validation
 

@@ -32,6 +32,15 @@ const member = "antigravity"
 // "true" holds it: "1", "TRUE" and "yes" each let it update.
 const updates = "AGY_CLI_DISABLE_AUTO_UPDATE=true"
 
+// PinnedVersion is the agy Parity pins, as what is said of a turn names it.
+var PinnedVersion = func() string {
+	version, _, err := parity.Agy()
+	if err != nil {
+		return ""
+	}
+	return version
+}()
+
 func Pinned() (Pin, error) {
 	version, artifacts, err := parity.Agy()
 	if err != nil {

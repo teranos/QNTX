@@ -188,3 +188,46 @@ func TestNodeAgentOtherThanOpusOrFableIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// "wiring it into node and namespace config as an actual harness": agy runs
+// the model am.toml names on the Gemini API key it names. Asked whether the
+// Node Agent in agy is held to Opus or Fable, which agy on a Gemini key never
+// serves: "Exempt agy".
+func TestNodeAgentAgyLoads(t *testing.T) {
+	path := writeConfig(t, `
+[agent.root]
+model  = "claude-opus-5-5"
+effort = "low"
+
+[agent.root.agy]
+model = "gemini-3.8-flash-low"
+token = "env:GEMINI_API_KEY"
+`)
+	cfg, err := LoadFromFile(path)
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	agy := cfg.Agent.Root.Agy
+	if !agy.Named() || agy.Model != "gemini-3.8-flash-low" || agy.TokenRef != "env:GEMINI_API_KEY" {
+		t.Errorf("agy loaded as %+v", agy)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate = %v, want nil", err)
+	}
+}
+
+// agy named by half, or with its key written in, is refused.
+func TestNodeAgentAgyNamedByHalfIsRefused(t *testing.T) {
+	for want, body := range map[string]string{
+		"both or neither":      "[agent.root.agy]\nmodel = \"gemini-3.8-flash-low\"\n",
+		"agent.root.agy.token": "[agent.root.agy]\nmodel = \"gemini-3.8-flash-low\"\ntoken = \"AIza-literal\"\n",
+	} {
+		cfg, err := LoadFromFile(writeConfig(t, "[agent.root]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n"+body))
+		if err != nil {
+			t.Fatalf("LoadFromFile = %v", err)
+		}
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("Validate = %v, want it to say %s", err, want)
+		}
+	}
+}

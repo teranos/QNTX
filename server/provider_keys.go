@@ -21,6 +21,7 @@ var providersAt = map[string]string{
 	"anthropic":  "https://api.anthropic.com",
 	"openai":     "https://api.openai.com",
 	"openrouter": "https://openrouter.ai",
+	"gemini":     "https://generativelanguage.googleapis.com",
 }
 
 // providerKeyAsked is how the provider named is asked whether a key is one it
@@ -44,6 +45,12 @@ func providerKeyAsked(ctx context.Context, name, base, key string) (*http.Reques
 		asked, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/api/v1/key", nil)
 		if err == nil {
 			asked.Header.Set("Authorization", "Bearer "+key)
+		}
+		return asked, err
+	case "gemini":
+		asked, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/v1beta/models", nil)
+		if err == nil {
+			asked.Header.Set("x-goog-api-key", key)
 		}
 		return asked, err
 	}

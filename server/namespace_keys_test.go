@@ -104,7 +104,7 @@ func TestANamespacesKeysAreAPersonsToHandle(t *testing.T) {
 func providerIssuing(t *testing.T, issued string) string {
 	t.Helper()
 	at := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("x-api-key") == issued || r.Header.Get("Authorization") == "Bearer "+issued {
+		if r.Header.Get("x-api-key") == issued || r.Header.Get("x-goog-api-key") == issued || r.Header.Get("Authorization") == "Bearer "+issued {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
