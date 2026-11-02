@@ -48,19 +48,16 @@ type NodeAgentConfig struct {
 	Agy AgyConfig `mapstructure:"agy"`
 }
 
-// AgyConfig names how the Node Agent runs in agy. A node that names no model
-// runs it without agy.
+// AgyConfig turns the Node Agent on in agy. It runs as the node's own identity at
+// Google Cloud, which spends what that identity's project spends, so a node that
+// names no model does not run it.
 type AgyConfig struct {
 	Model string `mapstructure:"model"` // The model: the value of agy's session option model, as gemini-3.8-flash.
-	// TokenRef is the agent's Gemini API key, ssm:// or env:, as the plan token
-	// is. agy makes its model calls on it: its Google sign-in waits on a code
-	// pasted on its terminal, which a headless turn cannot give.
-	TokenRef string `mapstructure:"token"`
 }
 
 // Named reports whether am.toml names agy for the Node Agent.
 func (a AgyConfig) Named() bool {
-	return a.Model != "" || a.TokenRef != ""
+	return a.Model != ""
 }
 
 // CodexConfig names how the Node Agent runs in codex. A node that names no

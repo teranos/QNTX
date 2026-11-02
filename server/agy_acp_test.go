@@ -19,9 +19,9 @@ import (
 
 // "correct it for libACP client use for agy"
 // What is said to the Node Agent in agy is answered by `agy acp`, through
-// libACP's client: in the agent's own home, signed in with the Gemini key
-// am.toml names, the model set as its session's option, with the agent's
-// ground on every event agy sends.
+// libACP's client: in the agent's own home, signed in as the node at Google with
+// no key anywhere, the model set as its session's option, with the agent's ground
+// on every event agy sends.
 func TestWhatIsSaidToAgyIsAnsweredByAgy(t *testing.T) {
 	s, ran := runningAgyToo(t)
 
@@ -39,16 +39,32 @@ func TestWhatIsSaidToAgyIsAnsweredByAgy(t *testing.T) {
 	assert.Equal(t, "acp", args[0])
 	assert.Contains(t, args, "--sandbox")
 	input := strings.Join(ranWith(t, ran, "0", "input"), "\n")
-	assert.Contains(t, input, `"method":"authenticate","params":{"methodId":"gemini-api-key"}`)
+	assert.Contains(t, input, `"method":"authenticate","params":{"methodId":"agent-platform"}`)
 	assert.Contains(t, input, `"configId":"model","value":"gemini-3.8-flash"`)
 	assert.Contains(t, input, `"method":"session/new"`, "a first turn starts agy's session")
 
 	home := s.nodeAgent.home
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "HOME="+home)
-	assert.Contains(t, env, "GEMINI_API_KEY=the-agents-gemini-key")
+	credentials := filepath.Join(home, ".qntx-google", "external-account.json")
+	assert.Contains(t, env, "GOOGLE_APPLICATION_CREDENTIALS="+credentials)
+	assert.Contains(t, env, "GOOGLE_CLOUD_PROJECT=the-project")
+	assert.Contains(t, env, "GOOGLE_GENAI_USE_VERTEXAI=true")
+	for _, each := range env {
+		assert.False(t, strings.HasPrefix(each, "GEMINI_API_KEY="), "no key: %s", each)
+	}
+	written, err := os.ReadFile(credentials)
+	require.NoError(t, err)
+	var file map[string]any
+	require.NoError(t, json.Unmarshal(written, &file))
+	assert.Equal(t, "external_account", file["type"])
+	assert.Equal(t, googleAudience("123"), file["audience"])
+	assert.Contains(t, file["service_account_impersonation_url"], theAccount)
+	token := file["credential_source"].(map[string]any)["file"].(string)
+	info, err := os.Stat(token)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 	assert.Contains(t, env, "AGY_CLI_DISABLE_AUTO_UPDATE=true")
-	assert.NotContains(t, env, "GEMINI_API_KEY="+s.nodeAgent.token)
 
 	raw, err := os.ReadFile(filepath.Join(home, ".gemini", "config", "hooks.json"))
 	require.NoError(t, err)

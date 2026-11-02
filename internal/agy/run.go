@@ -17,14 +17,21 @@ import (
 // "correct it for libACP client use for agy"
 // agy is run as `agy acp`, its Agent Client Protocol server, through libACP's client (internal/acp).
 
+// Google is agy on the node's own identity at Google Cloud: Application Default
+// Credentials on an external_account file, in the node's project.
+type Google struct {
+	Credentials, Project, Location string
+}
+
 // Said is one turn. An empty Session starts one; otherwise agy continues it.
-// APIKey belongs to this agent. agy's other ACP sign-ins are a Google account's and
-// Application Default Credentials (its authMethods), none of them the agent's own:
-// a turn without its own key is refused.
+// It signs in as the node at Google. agy's other ACP sign-ins are a person's Google
+// account, or a key somebody has to bring: "i dont want byok".
 type Said struct {
 	Binary, Home, Session, Says string
 	// Model is the value of the session's model option, as agy offers it: gemini-3.8-flash.
-	Model, APIKey string
+	Model string
+	// Google is required: agy runs as nothing else.
+	Google *Google
 	// Env is what the agent's turn carries beyond its own home, as its git.
 	Env []string
 }
@@ -36,8 +43,9 @@ type Answer struct {
 	Took       time.Duration
 }
 
-// signIn is the authMethods id agy's ACP server offers for a Gemini API key, read from GEMINI_API_KEY.
-const signIn = "gemini-api-key"
+// signInGoogle is the authMethods id agy's ACP server offers for Application Default Credentials: "Gemini Enterprise
+// Agent Platform (formerly Vertex AI)".
+const signInGoogle = "agent-platform"
 
 // turnLog is where agy writes its log for a turn, in the agent's home: the error of a turn it ends
 // without one is there and nowhere else.
@@ -50,8 +58,8 @@ const terminated = "Agent execution terminated due to error."
 // Run is one turn of agy over ACP. A turn agy reports terminated, or stopped for any reason but
 // end_turn, is an error, with what agy's log says of it.
 func (s Said) Run(ctx context.Context, each func(acp.Update)) (Answer, error) {
-	if s.Binary == "" || s.Home == "" || s.Model == "" || s.APIKey == "" || s.Says == "" {
-		return Answer{}, errors.New("agy requires an explicit binary, agent home, model, the agent's own API key, and something said")
+	if s.Binary == "" || s.Home == "" || s.Model == "" || s.Google == nil || s.Says == "" {
+		return Answer{}, errors.New("agy requires an explicit binary, agent home, model, the node at Google, and something said")
 	}
 	home, err := filepath.Abs(s.Home)
 	if err != nil {
@@ -65,15 +73,21 @@ func (s Said) Run(ctx context.Context, each func(acp.Update)) (Answer, error) {
 	if err := os.Remove(log); err != nil && !os.IsNotExist(err) {
 		return Answer{}, errors.Wrapf(err, "could not clear %s", log)
 	}
+	signedIn := []string{
+		"GOOGLE_APPLICATION_CREDENTIALS=" + s.Google.Credentials,
+		"GOOGLE_CLOUD_PROJECT=" + s.Google.Project,
+		"GOOGLE_CLOUD_LOCATION=" + s.Google.Location,
+		"GOOGLE_GENAI_USE_VERTEXAI=true",
+	}
 	agent := acp.Agent{
 		Binary: s.Binary,
 		// The prompt goes in over ACP, never on the command line.
 		Args: []string{"acp", "--sandbox", "--disable-telemetry", "--log-file", log},
 		Dir:  work,
-		Env:  append(append(agentenv.Carried(), s.Env...), "HOME="+home, updates, "GEMINI_API_KEY="+s.APIKey),
+		Env:  append(append(append(agentenv.Carried(), s.Env...), "HOME="+home, updates), signedIn...),
 	}
 	turn := acp.Turn{
-		Cwd: work, Session: s.Session, Auth: signIn, Says: s.Says,
+		Cwd: work, Session: s.Session, Auth: signInGoogle, Says: s.Says,
 		Config: [][2]string{{"model", s.Model}},
 		Client: "qntx", Version: PinnedVersion,
 	}

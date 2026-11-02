@@ -56,7 +56,10 @@ const (
 
 // googleServices are the APIs the federation runs through: "Enable the IAM,
 // Resource Manager, Service Account Credentials, and Security Token Service APIs".
-var googleServices = []string{"iam.googleapis.com", "cloudresourcemanager.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com"}
+var googleServices = []string{"iam.googleapis.com", "cloudresourcemanager.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com", "aiplatform.googleapis.com"}
+
+// googleRunsModels lets the node's account call Vertex AI, which agy runs on.
+const googleRunsModels = "roles/aiplatform.user"
 
 // googleCalls is how the node asks Google.
 var googleCalls = &http.Client{Timeout: 30 * time.Second}
@@ -322,6 +325,9 @@ func (s *QNTXServer) connectGoogleCloud(ctx context.Context, token, named, by st
 	if err := s.nodeActsAs(ctx, token, p, account); err != nil {
 		return "", err
 	}
+	if err := grantInProject(ctx, token, p, googleRunsModels, "serviceAccount:"+account); err != nil {
+		return "", errors.Wrapf(err, "%s was not granted %s in %s", account, googleRunsModels, p.ProjectID)
+	}
 	kept := googleKept{project: p, pool: pool, provider: provider, account: account}
 	if refused := s.keepGoogleLine(by, kept); refused != nil {
 		return "", errors.New(refused.Says)
@@ -380,6 +386,30 @@ func (s *QNTXServer) nodeActsAs(ctx context.Context, token string, p googleProje
 		}
 	}
 	if err != nil {
+		return err
+	}
+	bindings, _ := policy["bindings"].([]any)
+	for _, b := range bindings {
+		binding, _ := b.(map[string]any)
+		if binding["role"] != role {
+			continue
+		}
+		members, _ := binding["members"].([]any)
+		if slices.Contains(members, any(member)) {
+			return nil
+		}
+		binding["members"] = append(members, member)
+		return googleCall(ctx, token, http.MethodPost, at+":setIamPolicy", map[string]any{"policy": policy}, nil)
+	}
+	policy["bindings"] = append(bindings, map[string]any{"role": role, "members": []string{member}})
+	return googleCall(ctx, token, http.MethodPost, at+":setIamPolicy", map[string]any{"policy": policy}, nil)
+}
+
+// grantInProject adds member to role in project's own policy, keeping what it held.
+func grantInProject(ctx context.Context, token string, p googleProject, role, member string) error {
+	at := googleResourceManager + "/v1/projects/" + p.ProjectID
+	var policy map[string]any
+	if err := googleCall(ctx, token, http.MethodPost, at+":getIamPolicy", map[string]any{}, &policy); err != nil {
 		return err
 	}
 	bindings, _ := policy["bindings"].([]any)

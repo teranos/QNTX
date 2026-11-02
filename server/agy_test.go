@@ -30,16 +30,15 @@ var agyAnswered = acptest.Script{Session: "conv-7", Updates: []string{
 	`{"sessionUpdate":"usage_update","used":14,"size":1000000}`,
 }}
 
-var flashInAgy = appcfg.AgyConfig{Model: "gemini-3.8-flash", TokenRef: "env:QNTX_TEST_GEMINI_KEY"}
+var flashInAgy = appcfg.AgyConfig{Model: "gemini-3.8-flash"}
 
 // runningAgyToo is the Node Agent of runningTheNodeAgent, with agy named and a
 // stand-in for it held.
 func runningAgyToo(t *testing.T) (s *QNTXServer, ran string) {
 	t.Helper()
-	t.Setenv("QNTX_TEST_GEMINI_KEY", "the-agents-gemini-key")
-	named := opusLow
-	named.Agy = flashInAgy
-	s, _ = runningTheNodeAgent(t, named)
+	s, _, _ = runningNamespaceAgents(t)
+	s.deps.cfg.Agent.Root.Agy = flashInAgy
+	require.Nil(t, s.keepGoogleLine("google:root-sub", googleKept{project: theProject, pool: thePool, provider: thePool + "/providers/node", account: theAccount}))
 	binary, ran := acptest.StandIn(t, agyAnswered)
 	fetched := make(chan struct{})
 	close(fetched)
@@ -56,13 +55,17 @@ func sayingToAgy(s *QNTXServer, sent sigil.Sent) (*protocol.AgySaid, *protocol.R
 	return answer.(*protocol.AgySaid), nil
 }
 
-// A key that does not resolve says nothing to agy, and says why.
-func TestAgyIsSaidNothingWithoutItsKey(t *testing.T) {
-	s, ran := runningAgyToo(t)
-	t.Setenv("QNTX_TEST_GEMINI_KEY", "")
+// A node not connected to Google Cloud says nothing to agy, and says where to connect it.
+func TestAgyIsSaidNothingUntilGoogleIsConnected(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	s.deps.cfg.Agent.Root.Agy = flashInAgy
+	binary, ran := acptest.StandIn(t, agyAnswered)
+	fetched := make(chan struct{})
+	close(fetched)
+	s.holdHarness("agy", &harnessHeld{name: "agy", fetched: fetched, path: binary})
 	_, refused := sayingToAgy(s, sigil.Sent{"says": "hello"})
 	require.NotNil(t, refused)
-	assert.Contains(t, refused.GetSays(), "Gemini API key")
+	assert.Contains(t, refused.GetSays(), "Node Connectors")
 	_, err := os.Stat(filepath.Join(ran, "0"))
 	assert.True(t, os.IsNotExist(err), "agy did not run")
 }

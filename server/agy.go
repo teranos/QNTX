@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,8 +12,8 @@ import (
 	"github.com/teranos/QNTX/internal/acp"
 	"github.com/teranos/QNTX/internal/agy"
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/comet"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -29,6 +30,8 @@ const (
 	// agyConversationFile is agy's own ACP session, kept apart from the
 	// node's session: agy names it on a first turn and resumes only that.
 	agyConversationFile = "agy-conversation"
+	// agyLocation is where Vertex AI serves agy's model.
+	agyLocation = "global"
 )
 
 // agyHarness is the Node Agent in agy.
@@ -84,19 +87,61 @@ func (s *QNTXServer) thereIsNoAgy() *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no agy, so the Node Agent does not run in it"}
 }
 
-// agyPart is agy's part of one turn of the Node Agent: the Gemini key am.toml
-// names, the agent's ground on every event agy sends, and its own conversation.
+// agyAsTheNode is agy signed in as the node at Google: an external_account file in
+// the agent's home, and the identity token it reads, fresh for the turn.
+func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refusal) {
+	kept, held, err := s.googleLine()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	if !held {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "agy runs as the node at Google Cloud, and this node is not connected to it: ROOT connects it from Node Connectors"}
+	}
+	i, err := s.theIssuer()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	audience := googleAudience(kept.project.ProjectNumber)
+	token, err := i.identityTokenFor(s.nodeDID.DID, auth.NamespaceSystem, audience)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	dir := filepath.Join(agent.home, ".qntx-google")
+	tokenFile, credentials := filepath.Join(dir, "identity-token"), filepath.Join(dir, "external-account.json")
+	file, err := json.Marshal(map[string]any{
+		"type":                              "external_account",
+		"audience":                          audience,
+		"subject_token_type":                "urn:ietf:params:oauth:token-type:jwt",
+		"token_url":                         googleSTS + "/v1/token",
+		"service_account_impersonation_url": googleCredentials + "/v1/projects/-/serviceAccounts/" + kept.account + ":generateAccessToken",
+		"credential_source":                 map[string]any{"file": tokenFile},
+	})
+	if err == nil {
+		err = os.MkdirAll(dir, 0o700)
+	}
+	if err == nil {
+		err = os.WriteFile(tokenFile, []byte(token), 0o600)
+	}
+	if err == nil {
+		err = os.WriteFile(credentials, file, 0o600)
+	}
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "agy's identity at Google was not written to %s", dir).Error()}
+	}
+	return &agy.Google{Credentials: credentials, Project: kept.project.ProjectID, Location: agyLocation}, nil
+}
+
+// agyPart is agy's part of one turn of the Node Agent: the node at Google, the
+// agent's ground on every event agy sends, and its own conversation.
 func (s *QNTXServer) agyPart(named appcfg.AgyConfig, agent *rootAgent) (aTurn, *protocol.Refusal) {
-	var binary, key string
+	var binary string
+	var google *agy.Google
 	return aTurn{
 		ready: func(ctx context.Context, _ string, kept bool) (bool, *protocol.Refusal) {
 			var err error
-			if key, err = secretref.Resolve(ctx, named.TokenRef); err != nil || key == "" {
-				why := "it resolved to nothing"
-				if err != nil {
-					why = err.Error()
-				}
-				return false, &protocol.Refusal{Why: sigil.Failed, Says: "the Gemini API key am.toml names for agy did not resolve: " + why}
+			var refused *protocol.Refusal
+			if google, refused = s.agyAsTheNode(agent); refused != nil {
+				return false, refused
 			}
 			if binary, err = s.harnessHeldBy(agentLineAgy).Path(ctx); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no agy to run: " + err.Error()}
@@ -111,7 +156,7 @@ func (s *QNTXServer) agyPart(named appcfg.AgyConfig, agent *rootAgent) (aTurn, *
 			if t.resumes {
 				conversation = agyConversationOf(agent.home)
 			}
-			return s.agyTurn(t, agent, agy.Said{Binary: binary, Home: agent.home, Session: conversation, Says: t.says, Model: named.Model, APIKey: key, Env: t.env})
+			return s.agyTurn(t, agent, agy.Said{Binary: binary, Home: agent.home, Session: conversation, Says: t.says, Model: named.Model, Google: google, Env: t.env})
 		},
 	}, nil
 }

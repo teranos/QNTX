@@ -18,10 +18,11 @@ reads agy's own output format. 1.4.12 is the first pinned agy that has `agy acp`
 
 ## As a harness
 
-- The Node Agent runs in agy when am.toml names `[agent.root.agy]`: `model` and
-  `token`, the `ssm://` or `env:` reference to its Gemini API key, both or
-  neither. Asked whether it is held to Opus or Fable, which agy on a Gemini key
-  never serves: “Exempt agy”. `server/agy.go`.
+- The Node Agent runs in agy when am.toml names `[agent.root.agy]` `model`, on a
+  node ROOT connected to Google Cloud. It runs as the node's own identity, with no
+  key: "i dont want byok". That spends what the node's project spends, so it is off
+  unless named. Asked whether it is held to Opus or Fable, which agy never serves:
+  “Exempt agy”. `server/agy.go`.
 - `model` is the value of the session's `model` option as agy offers it over ACP:
   `gemini-3.8-flash`, not the `gemini-3.8-flash-low` of `agy models`. The thinking
   level is agy's separate `thought_level` option, which this harness does not set.
@@ -40,12 +41,11 @@ reads agy's own output format. 1.4.12 is the first pinned agy that has `agy acp`
 in the agent's `work`, and over ACP:
 
 1. `initialize`, offering the agent no file system and no terminal.
-2. `authenticate` with `gemini-api-key`, the key in `GEMINI_API_KEY`. agy's other
-   `authMethods` are a Google account's sign-in (`oauth-personal`,
-   `oauth-business`) and Application Default Credentials (`agent-platform`),
-   none of them the agent's own: a turn without its own key is refused. Run
-   headless, without a key, agy's Google sign-in waited on a code pasted on its
-   terminal; where it keeps a sign-in on a host without D-Bus is not verified.
+2. `authenticate` with `agent-platform`: Application Default Credentials on an
+   `external_account` file the node writes in the agent's home, with an identity
+   token fresh for the turn. agy's other `authMethods` are a person's Google sign-in
+   (`oauth-personal`, `oauth-business`) and a key (`gemini-api-key`). Run headless,
+   its Google sign-in waited on a code pasted on its terminal.
 3. `session/new`, or `session/resume` of the session the agent last answered in.
 4. `session/set_config_option` `model`.
 5. `session/prompt`, the text whole. Each update reaches the caller as it comes.
