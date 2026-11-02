@@ -164,14 +164,11 @@ proto: ## Generate Go code from protobuf definitions (via Nix)
 # "each plugin needs to move into their own respective repo as well"
 
 # "can't we build the client into libACP and make QNTX use it as an optional subsystem?"
-# libACP's C, from ground at the rev internal/acp/libacp-rev pins, into target/libacp, where
-# internal/acp links it under the build tag libacp. It needs a C11 compiler, make, pkg-config and json-c.
-LIBACP_REV = $(shell tr -d '[:space:]' < internal/acp/libacp-rev)
+# libACP's C, the subtree in libacp/, into target/libacp, where internal/acp links it under
+# the build tag libacp. It needs a C11 compiler, make, pkg-config and json-c.
 libacp: ## Build libACP, the ACP client an ACP harness runs through (build tag libacp)
-	@rm -rf target/libacp-src && mkdir -p target/libacp-src
-	@curl -fsSL https://codeload.github.com/teranos/ground/tar.gz/$(LIBACP_REV) | tar -xz -C target/libacp-src --strip-components=1
-	@$(MAKE) -C target/libacp-src/libacp install PREFIX=$(CURDIR)/target/libacp
-	@echo "✓ libacp $(LIBACP_REV) in target/libacp"
+	@$(MAKE) -C libacp install PREFIX=$(CURDIR)/target/libacp
+	@echo "✓ libacp in target/libacp"
 
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
 	@echo "Building Rust SQLite storage library..."

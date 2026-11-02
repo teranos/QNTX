@@ -62,7 +62,7 @@ let
     }
 
     # "can't we build the client into libACP and make QNTX use it as an optional subsystem?"
-    # libACP's C at the rev internal/acp/libacp-rev pins, which an ACP harness runs through.
+    # libACP's C, the subtree in libacp/, which an ACP harness runs through.
     {
       name = "Build libACP";
       run = ''
@@ -76,7 +76,7 @@ let
     "**/*.go"
     "go.mod"
     "go.sum"
-    "internal/acp/libacp-rev"
+    "libacp/**"
   ];
 in
 {

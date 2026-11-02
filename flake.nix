@@ -269,23 +269,17 @@
         };
 
         # "can't we build the client into libACP and make QNTX use it as an optional subsystem?"
-        # libACP's C, from ground at the rev internal/acp/libacp-rev pins, as `make libacp` builds it.
+        # libACP's C, the subtree in libacp/, as `make libacp` builds it.
         # An ACP harness runs through it (internal/acp, build tag libacp).
         libacp = pkgs.stdenv.mkDerivation {
           pname = "libacp";
-          version = builtins.substring 0 7 libacpRev;
-          src = "${pkgs.fetchFromGitHub {
-            owner = "teranos";
-            repo = "ground";
-            rev = libacpRev;
-            hash = "sha256-gq6SqTMOuGz6BcOEc4sMvoiEwHA9mr0vWaCYiY6WOac=";
-          }}/libacp";
+          version = rustVersion;
+          src = ./libacp;
           nativeBuildInputs = [ pkgs.pkg-config ];
           buildInputs = [ pkgs.json_c ];
           buildPhase = "make";
           installPhase = "make install PREFIX=$out";
         };
-        libacpRev = pkgs.lib.removeSuffix "\n" (builtins.readFile ./internal/acp/libacp-rev);
 
         # docs/release.md
         versionTag = let v = builtins.getEnv "VERSION_TAG"; in
