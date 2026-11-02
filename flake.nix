@@ -268,6 +268,19 @@
           };
         };
 
+        # "can't we build the client into libACP and make QNTX use it as an optional subsystem?"
+        # libACP's C, the subtree in libacp/, as `make libacp` builds it.
+        # An ACP harness runs through it (internal/acp, build tag libacp).
+        libacp = pkgs.stdenv.mkDerivation {
+          pname = "libacp";
+          version = rustVersion;
+          src = ./libacp;
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.json_c ];
+          buildPhase = "make";
+          installPhase = "make install PREFIX=$out";
+        };
+
         # docs/release.md
         versionTag = let v = builtins.getEnv "VERSION_TAG"; in
           if v == "" then "dev" else v;
@@ -281,7 +294,7 @@
 
           # sqlite3.h needed by sqlite-vec CGO bindings (internal/db/connection.go).
           # libduckdb linked by crates/ats-duckdb — Nix build, no source recompile.
-          buildInputs = [ pkgs.sqlite duckdbPinned ];
+          buildInputs = [ pkgs.sqlite duckdbPinned libacp pkgs.json_c ];
 
           preBuild = goWasmPreBuild;
 
@@ -290,7 +303,8 @@
           # rustpostgres (the postgres backend via ats-postgres + postgrescgo).
           # Without rustduckdb, backend = "parquet" in am.toml would validate
           # but the duckdbcgo wrapper wouldn't be compiled in.
-          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" ];
+          # libacp: an ACP harness runs through libACP (internal/acp).
+          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" "libacp" ];
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -484,6 +498,8 @@
             duckdbPinned
             pkgs.python313
             pkgs.pkg-config
+            # libACP's one dependency: `make libacp` builds it here.
+            pkgs.json_c
             pkgs.protobuf
             pkgs.onnxruntime
             pkgs.wasm-pack
