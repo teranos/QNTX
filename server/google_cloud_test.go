@@ -19,6 +19,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "Given that I am ROOT and my google identity is the ROOT identity"
@@ -31,12 +32,18 @@ type standInGoogle struct {
 	mu       sync.Mutex
 	projects []googleProject
 	enabled  []string
-	pool     bool
-	provider map[string]any
-	account  bool
-	policy   map[string]any
-	revoked  []string
-	jwks     jose.JSONWebKeySet
+	// managerOff is Resource Manager disabled in the login's project, as a new
+	// project's is; settling is how many more asks it answers disabled once enabled.
+	managerOff bool
+	usageOff   bool
+	settling   int
+	listed     bool
+	pool       bool
+	provider   map[string]any
+	account    bool
+	policy     map[string]any
+	revoked    []string
+	jwks       jose.JSONWebKeySet
 }
 
 func googleStandingIn(t *testing.T, s *QNTXServer, projects ...googleProject) *standInGoogle {
@@ -79,13 +86,46 @@ func (g *standInGoogle) answer(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case path == "/v1/projects" && r.Method == http.MethodGet:
+		g.listed = true
 		if rootOnly() {
 			write(map[string]any{"projects": g.projects})
 		}
-	case strings.HasPrefix(path, "/v1/projects/123/services/") && strings.HasSuffix(path, ":enable"):
+	case strings.HasPrefix(path, "/v1/projects/") && !strings.Contains(strings.TrimPrefix(path, "/v1/projects/"), "/") && r.Method == http.MethodGet:
+		if !rootOnly() {
+			return
+		}
+		if g.managerOff || g.settling > 0 {
+			if !g.managerOff {
+				g.settling--
+			}
+			w.WriteHeader(http.StatusForbidden)
+			write(map[string]any{"error": map[string]any{"code": 403, "status": "PERMISSION_DENIED", "message": "Cloud Resource Manager API has not been used in project", "details": []any{map[string]any{"reason": "SERVICE_DISABLED"}}}})
+			return
+		}
+		named := strings.TrimPrefix(path, "/v1/projects/")
+		for _, p := range g.projects {
+			if p.ProjectID == named || p.ProjectNumber == named {
+				write(p)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusForbidden)
+		write(map[string]any{"error": map[string]any{"code": 403, "status": "PERMISSION_DENIED", "message": "the caller does not have permission"}})
+	case strings.Contains(path, "/services/") && strings.HasSuffix(path, ":enable"):
+		if g.usageOff {
+			w.WriteHeader(http.StatusForbidden)
+			write(map[string]any{"error": map[string]any{"code": 403, "status": "PERMISSION_DENIED", "details": []any{map[string]any{
+				"reason":   "SERVICE_DISABLED",
+				"metadata": map[string]any{"serviceTitle": "Service Usage API", "activationUrl": "https://console.developers.google.com/apis/api/serviceusage.googleapis.com/overview?project=123"},
+			}}}})
+			return
+		}
 		if rootOnly() {
-			service := strings.TrimSuffix(strings.TrimPrefix(path, "/v1/projects/123/services/"), ":enable")
+			service := strings.TrimSuffix(path[strings.Index(path, "/services/")+len("/services/"):], ":enable")
 			g.enabled = append(g.enabled, service)
+			if service == "cloudresourcemanager.googleapis.com" {
+				g.managerOff = false
+			}
 			write(googleOperation{Name: "operations/enable-" + service})
 		}
 	case strings.HasPrefix(path, "/v1/operations/") || strings.Contains(path, "/operations/"):
@@ -257,6 +297,38 @@ func TestAProviderTrustingAnotherIssuerIsNotTheNodes(t *testing.T) {
 	_, err := s.connectGoogleCloud(context.Background(), "root-token", "", "google:root-sub")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "https://another.example")
+	assert.Equal(t, []string{"root-token"}, g.revoked)
+}
+
+// The login's project has Resource Manager off, as Google answered on the first
+// real press: "Cloud Resource Manager API has not been used in project". The
+// APIs are the node's to enable, so they are enabled before anything is read, and
+// Google taking its time to say so is waited out.
+func TestTheLoginsProjectIsConnectedWithItsAPIsOff(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	g := googleStandingIn(t, s, theProject)
+	g.managerOff, g.settling = true, 2
+	said, err := s.connectGoogleCloud(context.Background(), "root-token", "123", "google:root-sub")
+	require.NoError(t, err)
+	assert.Contains(t, said, "the-project")
+	assert.False(t, g.listed, "a project named is not looked for among those listed")
+	assert.ElementsMatch(t, googleServices, g.enabled)
+	assert.True(t, rootAsksGoogle(t, s).GetAccepted())
+}
+
+// An API the node cannot turn on itself is ROOT's one thing to do, and what comes
+// back says which and where, with all that Google said.
+func TestAnAPITheNodeCannotTurnOnSaysWhereToTurnItOn(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	g := googleStandingIn(t, s, theProject)
+	g.usageOff = true
+	_, err := s.connectGoogleCloud(context.Background(), "root-token", "123", "google:root-sub")
+	require.Error(t, err)
+	var fix *auth.GoogleCloudFix
+	require.True(t, errors.As(err, &fix), err.Error())
+	assert.Contains(t, fix.Says, "Service Usage API")
+	assert.Equal(t, "https://console.developers.google.com/apis/api/serviceusage.googleapis.com/overview?project=123", fix.Link)
+	assert.Contains(t, fix.Full, "SERVICE_DISABLED")
 	assert.Equal(t, []string{"root-token"}, g.revoked)
 }
 

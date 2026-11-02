@@ -146,9 +146,63 @@ type googleProject struct {
 	ProjectNumber string `json:"projectNumber"`
 }
 
+// stillDisabled is Google saying an API is off in the project: not enabled yet,
+// or enabled and not yet known to be.
+func stillDisabled(err error) bool {
+	var said *googleError
+	return errors.As(err, &said) && said.status == http.StatusForbidden && strings.Contains(said.said, "SERVICE_DISABLED")
+}
+
+// googleFixOf is err as what ROOT does about it, when it is an API the node could
+// not turn on: Google names the API and where to turn it on. Anything else stays err.
+func googleFixOf(err error) error {
+	var said *googleError
+	if !stillDisabled(err) || !errors.As(err, &said) {
+		return err
+	}
+	var answer struct {
+		Error struct {
+			Details []struct {
+				Metadata struct {
+					ServiceTitle  string `json:"serviceTitle"`
+					ActivationURL string `json:"activationUrl"`
+				} `json:"metadata"`
+			} `json:"details"`
+		} `json:"error"`
+	}
+	if json.Unmarshal([]byte(said.said), &answer) != nil {
+		return err
+	}
+	for _, detail := range answer.Error.Details {
+		if detail.Metadata.ActivationURL != "" {
+			return &auth.GoogleCloudFix{
+				Says: "Google Cloud has the " + detail.Metadata.ServiceTitle + " turned off in your project, and the node cannot turn it on itself. Turn it on, then try again.",
+				Link: detail.Metadata.ActivationURL,
+				Full: err.Error(),
+			}
+		}
+	}
+	return err
+}
+
 // projectOf is the project the node is set up in: the one named, or the one
-// ROOT's account sees when it sees one.
+// ROOT's account sees when it sees one. Named, Resource Manager was just enabled
+// there, and Google takes its time to know it.
 func projectOf(ctx context.Context, token, named string) (googleProject, error) {
+	if named != "" {
+		for {
+			var p googleProject
+			err := googleCall(ctx, token, http.MethodGet, googleResourceManager+"/v1/projects/"+url.PathEscape(named), nil, &p)
+			if !stillDisabled(err) {
+				return p, err
+			}
+			select {
+			case <-ctx.Done():
+				return googleProject{}, errors.Wrapf(err, "Google did not take Resource Manager as enabled in %s in time", named)
+			case <-time.After(googleAsksAgain):
+			}
+		}
+	}
 	var seen struct {
 		Projects []googleProject `json:"projects"`
 	}
@@ -157,14 +211,9 @@ func projectOf(ctx context.Context, token, named string) (googleProject, error) 
 	}
 	var ids []string
 	for _, p := range seen.Projects {
-		if named != "" && (p.ProjectID == named || p.ProjectNumber == named) {
-			return p, nil
-		}
 		ids = append(ids, p.ProjectID)
 	}
 	switch {
-	case named != "":
-		return googleProject{}, errors.Newf("ROOT's Google account sees no project %s, and sees [%s]", named, strings.Join(ids, ", "))
 	case len(seen.Projects) == 1:
 		return seen.Projects[0], nil
 	case len(seen.Projects) == 0:
@@ -183,26 +232,44 @@ func googleAudience(projectNumber string) string {
 	return "//iam.googleapis.com/projects/" + projectNumber + "/locations/global/workloadIdentityPools/" + googlePool + "/providers/" + googleProvider
 }
 
+// enableGoogleServices turns on the APIs the federation runs through in project.
+func enableGoogleServices(ctx context.Context, token, project string) error {
+	for _, service := range googleServices {
+		var op googleOperation
+		if err := googleCall(ctx, token, http.MethodPost, googleServiceUsage+"/v1/projects/"+url.PathEscape(project)+"/services/"+service+":enable", map[string]any{}, &op); err != nil {
+			return errors.Wrapf(err, "%s was not enabled in %s", service, project)
+		}
+		if err := waitFor(ctx, token, googleServiceUsage, op); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // connectGoogleCloud sets the node up at Google Cloud on ROOT's token: the APIs
 // the federation runs through, a pool whose provider trusts the node's issuer,
 // a service account the node's DID may act as, and the node's GOOGLE line. ROOT's
 // token is let go once the node no longer needs it.
-func (s *QNTXServer) connectGoogleCloud(ctx context.Context, token, named, by string) (string, error) {
+func (s *QNTXServer) connectGoogleCloud(ctx context.Context, token, named, by string) (said string, err error) {
 	defer s.letGoOfGoogle(token)
+	defer func() { err = googleFixOf(err) }()
 	i, err := s.theIssuer()
 	if err != nil {
 		return "", err
+	}
+	// The APIs are the node's to enable, Resource Manager among them, so a project
+	// named has them on before it is read.
+	if named != "" {
+		if err := enableGoogleServices(ctx, token, named); err != nil {
+			return "", err
+		}
 	}
 	p, err := projectOf(ctx, token, named)
 	if err != nil {
 		return "", err
 	}
-	for _, service := range googleServices {
-		var op googleOperation
-		if err := googleCall(ctx, token, http.MethodPost, googleServiceUsage+"/v1/projects/"+p.ProjectNumber+"/services/"+service+":enable", map[string]any{}, &op); err != nil {
-			return "", errors.Wrapf(err, "%s was not enabled in %s", service, p.ProjectID)
-		}
-		if err := waitFor(ctx, token, googleServiceUsage, op); err != nil {
+	if named == "" {
+		if err := enableGoogleServices(ctx, token, p.ProjectNumber); err != nil {
 			return "", err
 		}
 	}

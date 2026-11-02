@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	errors "github.com/teranos/sacred-error"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -75,6 +76,46 @@ func mustPath(t *testing.T, raw string) string {
 	parsed, err := url.Parse(raw)
 	require.NoError(t, err)
 	return parsed.Path
+}
+
+// An OAuth client ID opens with the number of the project it was made in: the
+// project ROOT "already set up the Google login in".
+func TestTheLoginsClientNamesItsProject(t *testing.T) {
+	assert.Equal(t, "606051110730", loginProject("606051110730-abc.apps.googleusercontent.com"))
+	assert.Equal(t, "", loginProject("client-id"))
+	assert.Equal(t, "", loginProject(""))
+}
+
+// "AND CLEARLY TELL THE USER WHATS UP", "THE BARE MINIMUM A USER NEEDS TO CONTINUE",
+// "AND TRY AGAIN WHEN SHIT GOES WRONG": what is wrong in a line, where to fix it,
+// Try again, and all that Google said kept under them.
+func TestAConnectThatStoppedSaysWhatToDo(t *testing.T) {
+	h, _ := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	h.SetGoogleCloud(func(context.Context, string, string, string) (string, error) {
+		return "", errors.Wrap(&GoogleCloudFix{Says: "the API is off", Link: "https://console.cloud.google.com/turn-it-on", Full: "all that Google said"}, "the setup")
+	})
+	done := consenting(t, h, "?project=the-project")
+	assert.Equal(t, http.StatusBadGateway, done.Code)
+	page := done.Body.String()
+	assert.Contains(t, page, "the API is off")
+	assert.Contains(t, page, `href="https://console.cloud.google.com/turn-it-on"`)
+	assert.Contains(t, page, `href="`+googleCloudPath+`?project=the-project"`)
+	assert.Contains(t, page, "Try again")
+	assert.Contains(t, page, "all that Google said")
+}
+
+// Stopped on anything else, there is still Try again, and nothing to fix is offered.
+func TestAConnectThatFailedOffersTryAgain(t *testing.T) {
+	h, _ := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	h.SetGoogleCloud(func(context.Context, string, string, string) (string, error) {
+		return "", errors.New("the pool was not made")
+	})
+	page := consenting(t, h, "").Body.String()
+	assert.Contains(t, page, "the pool was not made")
+	assert.Contains(t, page, `href="`+googleCloudPath+`"`)
+	assert.NotContains(t, page, "Turn it on")
 }
 
 // ROOT says yes once, at Google, and the node is handed the token to set
