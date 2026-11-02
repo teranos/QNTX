@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
@@ -31,6 +33,12 @@ const (
 	// agyConversationFile is agy's own ACP session, kept apart from the
 	// node's session: agy names it on a first turn and resumes only that.
 	agyConversationFile = "agy-conversation"
+	// googleAgyLineSubject is the line of ROOT's yes for agy.
+	googleAgyLineSubject = "GOOGLE-AGY"
+	// googleRunsModels lets the node's account call Vertex AI, which agy runs on.
+	googleRunsModels = "roles/aiplatform.user"
+	// googleModelService is Vertex AI.
+	googleModelService = "aiplatform.googleapis.com"
 	// agyLocation is where Vertex AI serves agy's model.
 	agyLocation = "global"
 )
@@ -88,6 +96,37 @@ func (s *QNTXServer) thereIsNoAgy() *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no agy, so the Node Agent does not run in it"}
 }
 
+// connectGoogleAgy lets the node's account call Vertex AI on ROOT's token: its own
+// yes, for it is what spends. ROOT's token is let go once the node no longer needs it.
+func (s *QNTXServer) connectGoogleAgy(ctx context.Context, token, by string) (said string, err error) {
+	defer s.letGoOfGoogle(token)
+	defer func() { err = googleFixOf(err) }()
+	kept, held, err := s.googleLine()
+	if err != nil {
+		return "", err
+	}
+	if !held {
+		return "", errors.New("this node is not connected to Google Cloud yet: Connect it first")
+	}
+	if err := enableServices(ctx, token, kept.project.ProjectNumber, []string{googleModelService}); err != nil {
+		return "", err
+	}
+	at := googleResourceManager + "/v1/projects/" + kept.project.ProjectID
+	if err := grantOn(ctx, token, at, http.MethodPost, googleRunsModels, "serviceAccount:"+kept.account); err != nil {
+		return "", errors.Wrapf(err, "%s was not granted %s in %s", kept.account, googleRunsModels, kept.project.ProjectID)
+	}
+	if refused := s.keepGoogleCostLine(googleAgyLineSubject, "wired", by, map[string]any{"role": googleRunsModels}); refused != nil {
+		return "", errors.New(refused.Says)
+	}
+	return "The node may call Vertex AI in " + kept.project.ProjectID + ". A turn in agy spends what that project spends, and halts with what costs.", nil
+}
+
+// googleAgyWired is whether ROOT let the node call Vertex AI.
+func (s *QNTXServer) googleAgyWired() (bool, error) {
+	lines, err := s.googleCostLines(googleAgyLineSubject)
+	return len(lines) > 0, err
+}
+
 // agyAsTheNode is agy signed in as the node at Google: an external_account file in
 // the agent's home, and the identity token it reads, fresh for the turn.
 func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refusal) {
@@ -97,6 +136,13 @@ func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refu
 	}
 	if !held {
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "agy runs as the node at Google Cloud, and this node is not connected to it: ROOT connects it from Node Connectors"}
+	}
+	let, err := s.googleAgyWired()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	if !let {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "this node may not call Vertex AI yet: ROOT presses Connect agy under Google Cloud in Node Connectors"}
 	}
 	dir := filepath.Dir(agyTokenFile(agent))
 	tokenFile, credentials := agyTokenFile(agent), filepath.Join(dir, "external-account.json")
@@ -229,7 +275,15 @@ func agyConversationOf(home string) string {
 // agyTurn runs said, writes its ACP updates down as the session's rows, and keeps
 // the session agy answered in.
 func (s *QNTXServer) agyTurn(t turnRun, agent *rootAgent, said agy.Said) (*protocol.AgySaid, error) {
-	answer, err := said.Run(s.ctx, func(u acp.Update) { t.write(t.writes.rowsOfACP(u, agentLineAgy, t.now())) })
+	// A silent turn is told from beside the turn's own updates.
+	var writing sync.Mutex
+	write := func(rows []*types.As, err error) {
+		writing.Lock()
+		defer writing.Unlock()
+		t.write(rows, err)
+	}
+	said.Silent = func(why string) { write(t.writes.agySilent(why, t.now())) }
+	answer, err := said.Run(s.ctx, func(u acp.Update) { write(t.writes.rowsOfACP(u, agentLineAgy, t.now())) })
 	if answer.Session != "" && answer.Session != said.Session {
 		if keepErr := keepAgyConversation(agent.home, answer.Session); keepErr != nil {
 			if err == nil {
@@ -266,6 +320,12 @@ func keepAgyConversation(home, conversation string) error {
 		return errors.Wrapf(err, "could not close %s", f.Name())
 	}
 	return errors.Wrapf(os.Rename(f.Name(), filepath.Join(home, agyConversationFile)), "could not keep agy conversation %s in %s", conversation, home)
+}
+
+// agySilent is the row of a turn agy has said nothing of for a while, with what its log says.
+func (w sessionWriter) agySilent(why string, at time.Time) ([]*types.As, error) {
+	row, err := w.row("Notification", at, map[string]any{"notification_type": "agy", "message": why})
+	return []*types.As{row}, err
 }
 
 // agyFailed is the row of a turn agy did not answer.

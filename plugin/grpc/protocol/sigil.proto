@@ -416,6 +416,10 @@ message NodeGoogle {
   bool costs_wired = 14;
   // Where ROOT goes to connect them, by saying yes at Google once.
   string costs_connect = 15;
+  // Whether ROOT let the node call Vertex AI, which agy runs on.
+  bool agy_wired = 20;
+  // Where ROOT goes to let it, by saying yes at Google once.
+  string agy_connect = 21;
   // What each budget last reported.
   repeated GoogleBudget budgets = 16;
   // The limit ROOT set on this node; zero is none.

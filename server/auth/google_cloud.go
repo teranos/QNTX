@@ -68,11 +68,14 @@ func (h *Handler) SetGoogleCloudPick(projects GoogleCloudProjects, letGo func(to
 	h.googleCloudProjects, h.googleCloudLetGo = projects, letGo
 }
 
-// GoogleCostsConnect wires the node to its costs on ROOT's token, and says what it did.
-type GoogleCostsConnect func(ctx context.Context, token, by string) (string, error)
+// GoogleThingConnect sets up one thing of the node's at Google on ROOT's token, and says what it did.
+type GoogleThingConnect func(ctx context.Context, token, by string) (string, error)
 
 // SetGoogleCosts is what wires the node's costs once ROOT said yes.
-func (h *Handler) SetGoogleCosts(connect GoogleCostsConnect) { h.googleCosts = connect }
+func (h *Handler) SetGoogleCosts(connect GoogleThingConnect) { h.googleCosts = connect }
+
+// SetGoogleAgy is what lets the node call Vertex AI once ROOT said yes.
+func (h *Handler) SetGoogleAgy(connect GoogleThingConnect) { h.googleAgy = connect }
 
 // SetGoogleCloud is what connects the node once ROOT said yes.
 func (h *Handler) SetGoogleCloud(connect GoogleCloudConnect) { h.googleCloud = connect }
@@ -160,16 +163,16 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		h.renderCeremonyPage(w, http.StatusBadGateway, false, errNoGoogleToken.Error())
 		return
 	}
-	if fl.thing == "costs" && h.googleCosts != nil {
+	if connect := map[string]GoogleThingConnect{"costs": h.googleCosts, "agy": h.googleAgy}[fl.thing]; connect != nil {
 		ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
 		defer cancel()
-		said, err := h.googleCosts(ctx, acct.google, acct.CanonicalID)
+		said, err := connect(ctx, acct.google, acct.CanonicalID)
 		if err != nil {
-			h.logger.Errorw("The node's costs at Google Cloud were not connected", "by", acct.CanonicalID, "error", err)
-			h.renderCloudStopped(w, err, fl.project+"&thing=costs")
+			h.logger.Errorw("A thing of the node's at Google Cloud was not connected", "thing", fl.thing, "by", acct.CanonicalID, "error", err)
+			h.renderCloudStopped(w, err, fl.project+"&thing="+fl.thing)
 			return
 		}
-		h.logger.Infow("the node's costs at Google Cloud are connected", "by", acct.CanonicalID, "said", said)
+		h.logger.Infow("a thing of the node's at Google Cloud is connected", "thing", fl.thing, "by", acct.CanonicalID, "said", said)
 		h.renderCeremonyPage(w, http.StatusOK, true, said)
 		return
 	}

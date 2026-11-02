@@ -380,6 +380,10 @@ func (s *QNTXServer) googleCostsAm(am *protocol.NodeGoogle, connect string) *pro
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	am.CostsWired = wired
+	am.AgyConnect = connect + "?project=" + url.QueryEscape(am.GetProjectId()) + "&thing=agy"
+	if am.AgyWired, err = s.googleAgyWired(); err != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
 	reports, err := s.googleBudgetReports()
 	if err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}

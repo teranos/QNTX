@@ -2051,6 +2051,10 @@ type NodeGoogle struct {
 	CostsWired bool `protobuf:"varint,14,opt,name=costs_wired,json=costsWired,proto3" json:"costs_wired,omitempty"`
 	// Where ROOT goes to connect them, by saying yes at Google once.
 	CostsConnect string `protobuf:"bytes,15,opt,name=costs_connect,json=costsConnect,proto3" json:"costs_connect,omitempty"`
+	// Whether ROOT let the node call Vertex AI, which agy runs on.
+	AgyWired bool `protobuf:"varint,20,opt,name=agy_wired,json=agyWired,proto3" json:"agy_wired,omitempty"`
+	// Where ROOT goes to let it, by saying yes at Google once.
+	AgyConnect string `protobuf:"bytes,21,opt,name=agy_connect,json=agyConnect,proto3" json:"agy_connect,omitempty"`
 	// What each budget last reported.
 	Budgets []*GoogleBudget `protobuf:"bytes,16,rep,name=budgets,proto3" json:"budgets,omitempty"`
 	// The limit ROOT set on this node; zero is none.
@@ -2194,6 +2198,20 @@ func (x *NodeGoogle) GetCostsWired() bool {
 func (x *NodeGoogle) GetCostsConnect() string {
 	if x != nil {
 		return x.CostsConnect
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetAgyWired() bool {
+	if x != nil {
+		return x.AgyWired
+	}
+	return false
+}
+
+func (x *NodeGoogle) GetAgyConnect() string {
+	if x != nil {
+		return x.AgyConnect
 	}
 	return ""
 }
@@ -3650,7 +3668,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x03agy\x18\x05 \x01(\tR\x03agy\x12\x1f\n" +
 	"\vagy_version\x18\x06 \x01(\tR\n" +
 	"agyVersion\x12\x1b\n" +
-	"\tnot_ready\x18\a \x01(\tR\bnotReady\"\xa7\x04\n" +
+	"\tnot_ready\x18\a \x01(\tR\bnotReady\"\xe5\x04\n" +
 	"\n" +
 	"NodeGoogle\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
@@ -3670,7 +3688,10 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x03why\x18\r \x01(\tR\x03why\x12\x1f\n" +
 	"\vcosts_wired\x18\x0e \x01(\bR\n" +
 	"costsWired\x12#\n" +
-	"\rcosts_connect\x18\x0f \x01(\tR\fcostsConnect\x120\n" +
+	"\rcosts_connect\x18\x0f \x01(\tR\fcostsConnect\x12\x1b\n" +
+	"\tagy_wired\x18\x14 \x01(\bR\bagyWired\x12\x1f\n" +
+	"\vagy_connect\x18\x15 \x01(\tR\n" +
+	"agyConnect\x120\n" +
 	"\abudgets\x18\x10 \x03(\v2\x16.protocol.GoogleBudgetR\abudgets\x12\x14\n" +
 	"\x05limit\x18\x11 \x01(\x01R\x05limit\x12\x16\n" +
 	"\x06halted\x18\x12 \x01(\bR\x06halted\x12\x1d\n" +

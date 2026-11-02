@@ -377,6 +377,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authHandler.SetGoogleCloud(s.connectGoogleCloud)
 	authHandler.SetGoogleCloudPick(s.googleProjectsOf, s.letGoOfGoogle)
 	authHandler.SetGoogleCosts(s.connectGoogleCosts)
+	authHandler.SetGoogleAgy(s.connectGoogleAgy)
 	sacred.Go("google.costs", s.watchGoogleCosts)
 	if through, locate, hasPrimary := authHandler.GitHubThroughThePrimary(); hasPrimary {
 		s.ciGitHubGet = githubThroughThePrimary(through)

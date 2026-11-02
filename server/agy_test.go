@@ -39,6 +39,7 @@ func runningAgyToo(t *testing.T) (s *QNTXServer, ran string) {
 	s, _, _ = runningNamespaceAgents(t)
 	s.deps.cfg.Agent.Root.Agy = flashInAgy
 	require.Nil(t, s.keepGoogleLine("google:root-sub", googleKept{project: theProject, pool: thePool, provider: thePool + "/providers/node", account: theAccount}))
+	require.Nil(t, s.keepGoogleCostLine(googleAgyLineSubject, "wired", "google:root-sub", map[string]any{"role": googleRunsModels}))
 	binary, ran := acptest.StandIn(t, agyAnswered)
 	fetched := make(chan struct{})
 	close(fetched)
@@ -53,6 +54,36 @@ func sayingToAgy(s *QNTXServer, sent sigil.Sent) (*protocol.AgySaid, *protocol.R
 		return nil, refused
 	}
 	return answer.(*protocol.AgySaid), nil
+}
+
+// "per thing basis": connecting the node asks for nothing that spends. agy is its
+// own yes, and a node without it says where to give it.
+func TestAgyIsItsOwnYesAtGoogle(t *testing.T) {
+	s, g := connectedToGoogle(t)
+	s.deps.cfg.Agent.Root.Agy = flashInAgy
+	binary, _ := acptest.StandIn(t, agyAnswered)
+	fetched := make(chan struct{})
+	close(fetched)
+	s.holdHarness("agy", &harnessHeld{name: "agy", fetched: fetched, path: binary})
+
+	assert.NotContains(t, g.enabled, googleModelService)
+	am := rootAsksGoogle(t, s)
+	assert.False(t, am.GetAgyWired())
+	assert.Contains(t, am.GetAgyConnect(), "project=the-project&thing=agy")
+	_, refused := sayingToAgy(s, sigil.Sent{"says": "hello"})
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.NotFound, refused.GetWhy())
+	assert.Contains(t, refused.GetSays(), "Connect agy")
+
+	said, err := s.connectGoogleAgy(context.Background(), "root-token", "google:root-sub")
+	require.NoError(t, err)
+	assert.Contains(t, said, "the-project")
+	assert.Contains(t, g.enabled, googleModelService)
+	assert.Equal(t, []any{map[string]any{"role": googleRunsModels, "members": []any{"serviceAccount:" + theAccount}}}, g.projectBindings)
+	assert.True(t, rootAsksGoogle(t, s).GetAgyWired())
+	answer, refused := sayingToAgy(s, sigil.Sent{"says": "hello"})
+	require.Nil(t, refused, "%v", refused)
+	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
 }
 
 // A turn outlasts the token it began on: what agy reads again is a fresh one, and
@@ -82,6 +113,8 @@ func TestAgyIsHaltedAt80PercentAndResumesWhenTheBudgetFreesUp(t *testing.T) {
 	fetched := make(chan struct{})
 	close(fetched)
 	s.holdHarness("agy", &harnessHeld{name: "agy", fetched: fetched, path: binary})
+
+	require.Nil(t, s.keepGoogleCostLine(googleAgyLineSubject, "wired", "google:root-sub", map[string]any{"role": googleRunsModels}))
 
 	b.says("b1", "a1", "2026-11-20T00:00:00Z", "monthly", 16, 20, "2026-11-01T00:00:00Z")
 	require.NoError(t, s.googleCostsTick(context.Background()))

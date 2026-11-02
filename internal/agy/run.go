@@ -34,6 +34,9 @@ type Said struct {
 	Google *Google
 	// Env is what the agent's turn carries beyond its own home, as its git.
 	Env []string
+	// Silent is told when agy has said nothing of the turn for a while, with what
+	// its log says: a model answering 503 has agy retrying without a word.
+	Silent func(string)
 }
 
 type Answer struct {
@@ -91,7 +94,16 @@ func (s Said) Run(ctx context.Context, each func(acp.Update)) (Answer, error) {
 		Config: [][2]string{{"model", s.Model}},
 		Client: "qntx", Version: PinnedVersion,
 	}
-	got, err := acp.Run(ctx, agent, turn, each)
+	heard := func() {}
+	if s.Silent != nil {
+		var stop func()
+		heard, stop = watchSilence(silentAfter, func() string { return logged(log) }, s.Silent)
+		defer stop()
+	}
+	got, err := acp.Run(ctx, agent, turn, func(u acp.Update) {
+		heard()
+		each(u)
+	})
 	answer := Answer{Text: got.Text, Session: got.Session, Used: got.Used, Size: got.Size, Took: got.Took}
 	if err != nil {
 		return answer, errors.Wrapf(err, "agy %s", PinnedVersion)

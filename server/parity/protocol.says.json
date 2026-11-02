@@ -739,6 +739,8 @@
   "protocol.NodeAnthropic.workspace_id": "The workspace the traded token is scoped to (wrkspc_), as the wizard's snippet names it.",
   "protocol.NodeGoogle": "NodeGoogle is what google am answers: the node at Google Cloud, set up on ROOT's yes, and whether Google trades the node's identity token. \"Given that I am ROOT and my google identity is the ROOT identity\"",
   "protocol.NodeGoogle.accepted": "Whether Google traded it, and the node acted as its service account.",
+  "protocol.NodeGoogle.agy_connect": "Where ROOT goes to let it, by saying yes at Google once.",
+  "protocol.NodeGoogle.agy_wired": "Whether ROOT let the node call Vertex AI, which agy runs on.",
   "protocol.NodeGoogle.asked": "Whether Google was asked to trade the node's identity token.",
   "protocol.NodeGoogle.at": "When the node was connected.",
   "protocol.NodeGoogle.budgets": "What each budget last reported.",

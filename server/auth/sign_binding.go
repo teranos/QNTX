@@ -53,7 +53,7 @@ type flow struct {
 	// cloud is ROOT connecting the node to Google Cloud, in project when named.
 	cloud   bool
 	project string
-	// thing is what ROOT's yes is for, beyond connecting the node: "costs".
+	// thing is what ROOT's yes is for, beyond connecting the node: "costs", "agy".
 	thing     string
 	startedAt time.Time
 }

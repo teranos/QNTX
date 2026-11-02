@@ -290,7 +290,7 @@ func TestROOTsYesSetsTheNodeUpAtGoogleCloud(t *testing.T) {
 	assert.Equal(t, map[string]any{"google.subject": "assertion.sub"}, g.provider["attributeMapping"])
 	assert.True(t, g.bound(s.nodeDID.DID), "the node's DID acts as its service account")
 	assert.Equal(t, []string{"root-token"}, g.revoked, "the node keeps no credential of ROOT's")
-	assert.Equal(t, []any{map[string]any{"role": googleRunsModels, "members": []any{"serviceAccount:" + theAccount}}}, g.projectBindings, "the node's account may call Vertex AI")
+	assert.Empty(t, g.projectBindings, "connecting asks for nothing that spends")
 
 	am := rootAsksGoogle(t, s)
 	assert.True(t, am.GetAsked())

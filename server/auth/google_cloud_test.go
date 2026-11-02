@@ -233,6 +233,21 @@ func TestROOTsYesForCostsWiresTheCosts(t *testing.T) {
 	assert.Empty(t, *handed, "the node is not connected again")
 }
 
+// ROOT's yes for agy goes to what lets the node call Vertex AI.
+func TestROOTsYesForAgyLetsTheNodeRunIt(t *testing.T) {
+	h, handed := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	var let []connected
+	h.SetGoogleAgy(func(_ context.Context, token, by string) (string, error) {
+		let = append(let, connected{token, "", by})
+		return "let", nil
+	})
+	done := consenting(t, h, "?project=the-project&thing=agy")
+	assert.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	assert.Equal(t, []connected{{"cloud-token", "", "google:root-sub"}}, let)
+	assert.Empty(t, *handed, "the node is not connected again")
+}
+
 // Only ROOT's own Google account connects the node.
 func TestAnotherGoogleAccountDoesNotConnectTheNode(t *testing.T) {
 	h, handed := cloudHandler(t)
