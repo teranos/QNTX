@@ -56,6 +56,8 @@ type Handler struct {
 	// configured for no Google, which is what keeps it out of what the door
 	// offers rather than drawing a button that could only fail.
 	google *OperatorClient
+	// googleCloud connects the node to Google Cloud on ROOT's yes.
+	googleCloud GoogleCloudConnect
 	// auth.provider.apple, the same way: the key already resolved, nil on a
 	// node configured for no Apple.
 	apple *OperatorClient
@@ -568,6 +570,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer("/auth/binding/go", h.handleBindingGo)
 	mux.answer(callbackPath, h.handleBindingCallback)
 	mux.answer("/auth/binding/result", h.handleBindingResult)
+	// ROOT connects the node to Google Cloud, by its Google login's own client.
+	mux.answer(googleCloudPath, h.handleGoogleCloud)
 	// A root identity at a door does the passkey at home (ADR-030): the door
 	// sends the person here, and the session goes back by ticket.
 	mux.answer(homewardPath, h.handleHomeward)
