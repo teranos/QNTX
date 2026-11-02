@@ -107,6 +107,8 @@ type QNTXServer struct {
 	// googleHalted is whether ROOT was last told what costs at Google is halted.
 	googleHalted bool
 	googleHaltMu sync.Mutex
+	// googleBudgetsSet is the budgets as they are set at Google, as last read.
+	googleBudgetsSet []googleBudgetSet
 	// The node's GitHub (ADR-043), made on first use.
 	githubOnce sync.Once
 	github     *gitHub
