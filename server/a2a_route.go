@@ -53,7 +53,8 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		a2asrv.WithTaskStore(tasksOnLines{s}),
 		a2asrv.WithPushNotifications(pushesOnLines{s}, pushesSent{s}),
 		a2asrv.WithCallInterceptors(a2aGate{s}),
-		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{PushNotifications: true}),
+		a2asrv.WithExtendedAgentCardProducer(a2asrv.ExtendedAgentCardProducerFn(s.a2aExtendedCardOf)),
+		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{PushNotifications: true, ExtendedAgentCard: true}),
 	)
 	atNoTenant := a2asrv.NewRESTHandler(handler)
 	atTenant := a2asrv.NewTenantRESTHandler("/{*}", handler)
@@ -114,6 +115,15 @@ func (s *QNTXServer) a2aServe(w http.ResponseWriter, r *http.Request, exchange *
 		writeA2AError(w, http.StatusBadRequest, "FAILED_PRECONDITION", a2asdk.ErrorReason(a2asdk.ErrVersionNotSupported), refused)
 		return
 	}
+	// "Patch version numbers ... MUST not be considered when clients and
+	// servers negotiate protocol versions" (§3.6): the SDK is handed the
+	// Major.Minor the node read.
+	r.Header.Set(a2asdk.SvcParamVersion, a2a.Version)
+	// "application/a2a+json SHOULD be used" (§11.1): a client that names no
+	// type it accepts is answered in it.
+	if accepted := r.Header.Get("Accept"); accepted == "" || accepted == "*/*" {
+		r.Header.Set("Accept", a2aContentType)
+	}
 	// "streaming": false on the card (§3.3.4): the turn is answered whole.
 	if strings.HasSuffix(rest, ":subscribe") || rest == "/message:stream" {
 		writeA2AErrorOf(w, a2aRefusal(a2asdk.ErrUnsupportedOperation, r.Method+" "+a2aPrefix[:len(a2aPrefix)-1]+r.URL.Path+" streams, and this node does not stream yet"))
@@ -144,26 +154,9 @@ func (s *QNTXServer) a2aServe(w http.ResponseWriter, r *http.Request, exchange *
 		}
 		r.Body = io.NopCloser(bytes.NewReader(body))
 	}
-	// The card is the node's to write: lf.a2a.v1.AgentCard as ProtoJSON, as
-	// it is signed. a2a-go v2.5 writes a card's security requirements in
-	// another shape (a2a-go#437, fixed in v2.7).
-	if r.Method == http.MethodGet && rest == "/extendedAgentCard" {
-		exchange.operation = "GetExtendedAgentCard"
-		s.serveExtendedCard(w, r, tenant, named)
-		return
-	}
-	if named {
-		exchange.pathTenant = tenant
-		atTenant.ServeHTTP(w, r)
-		return
-	}
-	atNoTenant.ServeHTTP(w, r)
-}
-
-// serveExtendedCard is GetExtendedAgentCard: the card of the agent the tenant
-// names, wherever it named it, the node's at none.
-func (s *QNTXServer) serveExtendedCard(w http.ResponseWriter, r *http.Request, tenant string, named bool) {
-	if queried := r.URL.Query().Get("tenant"); !named && queried != "" {
+	// A tenant can arrive in the query of the card's route as well as its
+	// path, and is the same resource wherever it arrived (§3.3.2, §8.3.2).
+	if queried := r.URL.Query().Get("tenant"); !named && queried != "" && rest == "/extendedAgentCard" {
 		served, err := s.a2aServed(r, queried)
 		if err != nil {
 			writeA2AErrorOf(w, a2aRefusal(a2asdk.ErrInternalError, "whether an agent is served at tenant "+queried+" was not answered: "+err.Error()))
@@ -173,25 +166,63 @@ func (s *QNTXServer) serveExtendedCard(w http.ResponseWriter, r *http.Request, t
 			writeA2AErrorOf(w, a2aRefusal(a2asdk.ErrTaskNotFound, "no agent is served at tenant "+queried))
 			return
 		}
-		tenant = queried
+		tenant, named = queried, true
+		r.URL.Path = "/" + queried + rest
 	}
-	card, err := s.a2aExtendedCard(r, tenant)
-	if err != nil {
-		writeA2AErrorOf(w, err)
+	if r.Method == http.MethodGet && rest == "/extendedAgentCard" {
+		card := &a2aHeld{header: http.Header{}}
+		s.a2aDispatch(card, r, exchange, tenant, named, atNoTenant, atTenant)
+		card.answer(w, r)
 		return
 	}
-	body, err := protojson.Marshal(card.Interface())
-	if err != nil {
-		writeA2AErrorOf(w, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card did not marshal: "+err.Error()))
+	s.a2aDispatch(w, r, exchange, tenant, named, atNoTenant, atTenant)
+}
+
+// a2aDispatch hands the request to the SDK's binding, at its tenant or none.
+func (s *QNTXServer) a2aDispatch(w http.ResponseWriter, r *http.Request, exchange *a2aExchange, tenant string, named bool, atNoTenant, atTenant http.Handler) {
+	if named {
+		exchange.pathTenant = tenant
+		atTenant.ServeHTTP(w, r)
 		return
 	}
-	if cached(w, r, body) {
+	atNoTenant.ServeHTTP(w, r)
+}
+
+// a2aHeld holds an answer before it is given: the card, which is answered as
+// a client caches it.
+type a2aHeld struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (h *a2aHeld) Header() http.Header { return h.header }
+
+func (h *a2aHeld) WriteHeader(status int) {
+	if h.status == 0 {
+		h.status = status
+	}
+}
+
+func (h *a2aHeld) Write(body []byte) (int, error) {
+	if h.status == 0 {
+		h.status = http.StatusOK
+	}
+	return h.body.Write(body)
+}
+
+// answer gives what was held, a card as a client caches it.
+func (h *a2aHeld) answer(w http.ResponseWriter, r *http.Request) {
+	for name, values := range h.header {
+		w.Header()[name] = values
+	}
+	if h.status == http.StatusOK && cached(w, r, h.body.Bytes()) {
 		return
 	}
-	w.Header().Set("Content-Type", a2aContentType)
-	if _, err := w.Write(body); err != nil {
-		s.logger.Errorw("An A2A response was not delivered", "what", "GetExtendedAgentCard", "error", err)
+	if h.status != 0 {
+		w.WriteHeader(h.status)
 	}
+	_, _ = w.Write(h.body.Bytes())
 }
 
 // extendedCardMaxAge is how long a client keeps an extended card, short as the
@@ -313,7 +344,7 @@ func writeA2AError(w http.ResponseWriter, status int, code, reason, message stri
 	body, _ := json.Marshal(map[string]any{"error": map[string]any{
 		"code": status, "status": code, "message": message, "details": details,
 	}})
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", a2aContentType)
 	w.WriteHeader(status)
 	_, _ = w.Write(body)
 }
@@ -422,6 +453,10 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 	}
 	// A peer's agent is the peer's: the node hands over its card, and the rest
 	// is asked of the peer.
+	// The card is the caller's, and needs no agent to give it.
+	if exchange.operation == "GetExtendedAgentCard" {
+		return ctx, nil, nil
+	}
 	if tenant != "" && slices.ContainsFunc(g.s.peers(), serving(tenant)) {
 		return ctx, nil, a2aRefusal(a2asdk.ErrUnsupportedOperation, exchange.operation+" is asked of the peer that serves "+tenant)
 	}
@@ -440,6 +475,10 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 		// not one left out.
 		if r.URL.Query().Has("pageSize") && asked.PageSize == 0 {
 			return ctx, nil, a2aRefusal(a2asdk.ErrInvalidParams, "pageSize must be between 1 and 100 inclusive, got 0")
+		}
+		// A status the client named that is no TaskState is not one left out.
+		if said := r.URL.Query().Get("status"); said != "" && asked.Status == a2asdk.TaskStateUnspecified {
+			return ctx, nil, a2aRefusal(a2asdk.ErrInvalidParams, "status "+said+" is no TaskState")
 		}
 		return ctx, nil, historyRefused(asked.HistoryLength)
 	case *a2asdk.CancelTaskRequest:
@@ -554,6 +593,28 @@ func (s *QNTXServer) a2aServed(r *http.Request, tenant string) (bool, error) {
 		return false, err
 	}
 	return opted, nil
+}
+
+// a2aExtendedCardOf is the SDK's ExtendedAgentCardProducer: the card
+// a2aExtendedCard gives, signed as ProtoJSON and handed to the SDK to answer.
+func (s *QNTXServer) a2aExtendedCardOf(ctx context.Context, req *a2asdk.GetExtendedAgentCardRequest) (*a2asdk.AgentCard, error) {
+	exchange, held := a2aExchangeFrom(ctx)
+	if !held {
+		return nil, a2aRefusal(a2asdk.ErrInternalError, "an A2A call reached the node through no exchange")
+	}
+	card, err := s.a2aExtendedCard(exchange.request, req.Tenant)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := protojson.Marshal(card.Interface())
+	if err != nil {
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card did not marshal: "+err.Error())
+	}
+	answered := &a2asdk.AgentCard{}
+	if err := json.Unmarshal(raw, answered); err != nil {
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card is no card the SDK reads: "+err.Error())
+	}
+	return answered, nil
 }
 
 // a2aExtendedCard is GetExtendedAgentCard: the card of the agent the tenant

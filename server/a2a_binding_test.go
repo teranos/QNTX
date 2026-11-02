@@ -148,5 +148,5 @@ func TestARefusalTheNodeWritesIsTheSDKsShape(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	assert.Equal(t, "FAILED_PRECONDITION", said.Error.Status)
 	assert.Equal(t, "UNSUPPORTED_OPERATION", said.reason())
-	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+	assert.Equal(t, "application/a2a+json", w.Header().Get("Content-Type"))
 }
