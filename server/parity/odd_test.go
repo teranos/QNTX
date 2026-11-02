@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// What TEI P5 4.12.0 says of q, of interp and of their attributes is read
-// from the ODD pinned for it, with each attribute's class named as where it
-// was read.
+// 「[Fable 5.1] What TEI P5 4.12.0 says of q, of interp and of their attributes is read」
+// 「[Fable 5.1] from the ODD pinned for it, with each attribute's class named as where it」
+// 「[Fable 5.1] was read.」
 func TestReference_TEISays(t *testing.T) {
 	schema, refused := Reference("tei")
 	if refused != nil {
@@ -29,7 +29,7 @@ func TestReference_TEISays(t *testing.T) {
 			t.Errorf("q.%s is %+v, want %+v", want.Name, got, want)
 		}
 	}
-	// q's own type replaces att.typed's: one column, the element's.
+	// 「[Fable 5.1] q's own type replaces att.typed's: one column, the element's.」
 	if n := strings.Count(" "+names(q)+" ", " type "); n != 1 {
 		t.Errorf("q has type %d times: %s", n, names(q))
 	}
@@ -53,7 +53,7 @@ func TestReference_TEISays(t *testing.T) {
 	}
 }
 
-// A class an element is a member of and the pin lacks is named, not skipped.
+// 「[Fable 5.1] A class an element is a member of and the pin lacks is named, not skipped.」
 func TestParseODD_RefusesAnUnpinnedClass(t *testing.T) {
 	raw, err := pinned.ReadFile("tei_4.12.0_113e933/Specs/q.xml")
 	if err != nil {
