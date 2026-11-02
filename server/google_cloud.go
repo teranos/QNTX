@@ -258,9 +258,9 @@ func googleAudience(projectNumber string) string {
 	return "//iam.googleapis.com/projects/" + projectNumber + "/locations/global/workloadIdentityPools/" + googlePool + "/providers/" + googleProvider
 }
 
-// enableGoogleServices turns on the APIs the federation runs through in project.
-func enableGoogleServices(ctx context.Context, token, project string) error {
-	for _, service := range googleServices {
+// enableServices turns on services in project.
+func enableServices(ctx context.Context, token, project string, services []string) error {
+	for _, service := range services {
 		var op googleOperation
 		if err := googleCall(ctx, token, http.MethodPost, googleServiceUsage+"/v1/projects/"+url.PathEscape(project)+"/services/"+service+":enable", map[string]any{}, &op); err != nil {
 			return errors.Wrapf(err, "%s was not enabled in %s", service, project)
@@ -286,7 +286,7 @@ func (s *QNTXServer) connectGoogleCloud(ctx context.Context, token, named, by st
 	// The APIs are the node's to enable, Resource Manager among them, so a project
 	// named has them on before it is read.
 	if named != "" {
-		if err := enableGoogleServices(ctx, token, named); err != nil {
+		if err := enableServices(ctx, token, named, googleServices); err != nil {
 			return "", err
 		}
 	}
@@ -295,7 +295,7 @@ func (s *QNTXServer) connectGoogleCloud(ctx context.Context, token, named, by st
 		return "", err
 	}
 	if named == "" {
-		if err := enableGoogleServices(ctx, token, p.ProjectNumber); err != nil {
+		if err := enableServices(ctx, token, p.ProjectNumber, googleServices); err != nil {
 			return "", err
 		}
 	}
@@ -485,7 +485,7 @@ func (s *QNTXServer) googleLine() (googleKept, bool, error) {
 	if err != nil {
 		return googleKept{}, false, errors.Wrapf(err, "failed to read the node's %s line", googleLineSubject)
 	}
-	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{googleLineSubject}, Limit: ats.EveryRow})
+	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{googleLineSubject}, Predicates: []string{googleLinePredicate}, Limit: ats.EveryRow})
 	if err != nil {
 		return googleKept{}, false, errors.Wrapf(err, "failed to read the node's %s line", googleLineSubject)
 	}
@@ -529,13 +529,20 @@ func (s *QNTXServer) googleSignum() sigil.Signum {
 					Answer: "protocol.NodeGoogle",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/google"},
 				},
+				{
+					Name:   "limit",
+					Does:   "Set the limit ROOT holds on this node: what costs at Google halts at 80% of the lower of it and the budget. Zero takes it off.",
+					Takes:  []*protocol.Param{{Name: "amount", Required: true, Says: "A number, in the budget's currency. Zero takes the limit off."}},
+					Answer: "protocol.NodeGoogle",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/google/limit"},
+				},
 			},
 		},
-		Answers: map[string]sigil.Answer{"am": s.googleAm},
+		Answers: map[string]sigil.Answer{"am": s.googleAm, "limit": s.googleLimitSet},
 	}
 }
 
-func (s *QNTXServer) googleAm(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+func (s *QNTXServer) googleAm(ctx context.Context, _ sigil.Sent) (answer any, refused *protocol.Refusal) {
 	i, err := s.theIssuer()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
@@ -548,6 +555,11 @@ func (s *QNTXServer) googleAm(ctx context.Context, _ sigil.Sent) (any, *protocol
 	if !held {
 		return am, nil
 	}
+	defer func() {
+		if refused == nil {
+			refused = s.googleCostsAm(am, am.GetConnect())
+		}
+	}()
 	am.ProjectId, am.ProjectNumber, am.Pool, am.Provider, am.ServiceAccount = kept.project.ProjectID, kept.project.ProjectNumber, kept.pool, kept.provider, kept.account
 	am.SetBy, am.At = kept.setBy, kept.at.Format(time.RFC3339)
 	am.Asked = true

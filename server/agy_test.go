@@ -74,6 +74,29 @@ func TestAgysTokenIsRenewedWhileConnected(t *testing.T) {
 	assert.NotEqual(t, string(first), string(second))
 }
 
+// "everything that costs anything needs to be halted until the budget frees up"
+func TestAgyIsHaltedAt80PercentAndResumesWhenTheBudgetFreesUp(t *testing.T) {
+	s, b, _ := wiredForCosts(t)
+	s.deps.cfg.Agent.Root.Agy = flashInAgy
+	binary, _ := acptest.StandIn(t, agyAnswered)
+	fetched := make(chan struct{})
+	close(fetched)
+	s.holdHarness("agy", &harnessHeld{name: "agy", fetched: fetched, path: binary})
+
+	b.says("b1", "a1", "2026-11-20T00:00:00Z", "monthly", 16, 20, "2026-11-01T00:00:00Z")
+	require.NoError(t, s.googleCostsTick(context.Background()))
+	_, refused := sayingToAgy(s, sigil.Sent{"says": "hello"})
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.Failed, refused.GetWhy())
+	assert.Contains(t, refused.GetSays(), "halted")
+
+	b.says("b1", "a2", "2026-12-01T00:00:00Z", "monthly", 1, 20, "2026-12-01T00:00:00Z")
+	require.NoError(t, s.googleCostsTick(context.Background()))
+	answer, refused := sayingToAgy(s, sigil.Sent{"says": "hello"})
+	require.Nil(t, refused, "%v", refused)
+	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
+}
+
 // A node not connected to Google Cloud says nothing to agy, and says where to connect it.
 func TestAgyIsSaidNothingUntilGoogleIsConnected(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)

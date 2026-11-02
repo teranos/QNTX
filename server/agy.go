@@ -180,6 +180,10 @@ func (s *QNTXServer) agyPart(named appcfg.AgyConfig, agent *rootAgent) (aTurn, *
 		ready: func(ctx context.Context, _ string, kept bool) (bool, *protocol.Refusal) {
 			var err error
 			var refused *protocol.Refusal
+			// "everything that costs anything needs to be halted until the budget frees up"
+			if halted, why := s.googleSpendingHalted(); halted {
+				return false, &protocol.Refusal{Why: sigil.Failed, Says: "what costs at Google Cloud is halted, so agy does not run: " + why}
+			}
 			if google, refused = s.agyAsTheNode(agent); refused != nil {
 				return false, refused
 			}
