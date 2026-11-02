@@ -41,6 +41,9 @@ type account struct {
 	// github is the token a GitHub login was exchanged for, kept rather than
 	// discarded because ROOT's is the node's GitHub (ADR-043).
 	github *GitHubSecret
+	// google is the token a Google exchange was handed, spent only when ROOT
+	// said yes to connecting the node to Google Cloud.
+	google string
 }
 
 // kind is how a provider proves an account, which decides what the element asks
