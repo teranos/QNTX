@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -22,7 +23,9 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/named"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -57,6 +60,10 @@ var googleServices = []string{"iam.googleapis.com", "cloudresourcemanager.google
 
 // googleCalls is how the node asks Google.
 var googleCalls = &http.Client{Timeout: 30 * time.Second}
+
+// googleProving is how long the node asks Google to let it act before telling
+// ROOT it has not: a binding just made does not hold at once.
+var googleProving = 15 * time.Minute
 
 // googleAsksAgain is how long the node waits before asking whether Google finished.
 var googleAsksAgain = time.Second
@@ -315,10 +322,13 @@ func (s *QNTXServer) connectGoogleCloud(ctx context.Context, token, named, by st
 	if err := s.nodeActsAs(ctx, token, p, account); err != nil {
 		return "", err
 	}
-	if refused := s.keepGoogleLine(by, googleKept{project: p, pool: pool, provider: provider, account: account}); refused != nil {
+	kept := googleKept{project: p, pool: pool, provider: provider, account: account}
+	if refused := s.keepGoogleLine(by, kept); refused != nil {
 		return "", errors.New(refused.Says)
 	}
-	return "The node is connected to Google Cloud in " + p.ProjectID + ": it is " + account + " there, through " + provider + ".", nil
+	// Past the page: ROOT need not stay for it, and is told how it ended.
+	sacred.Go("google.proving", func() { s.proveGoogle(i, kept) })
+	return "The node is set up in " + p.ProjectID + " as " + account + ". Google is confirming it now, which can take some minutes. You will get a mail when it is done, or if it does not come through. You can close this window.", nil
 }
 
 // googleCreate makes what Google finishes on its own time, and keeps what was made before.
@@ -517,6 +527,63 @@ func (s *QNTXServer) googleAm(ctx context.Context, _ sigil.Sent) (any, *protocol
 	}
 	am.Accepted = true
 	return am, nil
+}
+
+// proveGoogle asks until Google trades the node's identity and lets it act as
+// its account: that, and not the setup having run, is being connected. ROOT is
+// told how it ended.
+func (s *QNTXServer) proveGoogle(i *issuer, kept googleKept) {
+	proving, cancel := context.WithTimeout(context.Background(), googleProving)
+	defer cancel()
+	// What Google last said: the wait running out is not what it said.
+	var said error
+	for {
+		_, err := s.googleAccessToken(proving, i, kept)
+		if err != nil && (said == nil || proving.Err() == nil) {
+			said = err
+		}
+		if err == nil {
+			s.logger.Infow("Google lets the node act", "project", kept.project.ProjectID, "account", kept.account)
+			s.tellGoogleOutcome(googleOutcomeMail("The node is connected to Google Cloud",
+				"Google lets the node act as "+kept.account+" in "+kept.project.ProjectID+".\n"))
+			return
+		}
+		select {
+		case <-proving.Done():
+			s.logger.Errorw("Google did not let the node act", "project", kept.project.ProjectID, "account", kept.account, "error", said)
+			s.tellGoogleOutcome(googleOutcomeMail("The node did not connect to Google Cloud",
+				"The node is set up in "+kept.project.ProjectID+", and Google did not let it act as "+kept.account+".\n\nPress Connect again in Node Connectors.\n\nWhat Google said:\n"+said.Error()+"\n"))
+			return
+		case <-time.After(googleAsksAgain):
+		}
+	}
+}
+
+// googleOutcomeMail is how connecting ended, as ROOT reads it.
+func googleOutcomeMail(subject, text string) services.NodeMail {
+	return services.NodeMail{
+		Name:    "google-cloud",
+		Subject: subject,
+		Bodies:  []services.MailBody{services.TextBody(text), services.HTMLBody("<pre>" + html.EscapeString(text) + "</pre>")},
+	}
+}
+
+// tellGoogleOutcome mails ROOT how connecting ended, and says so when it cannot.
+func (s *QNTXServer) tellGoogleOutcome(m services.NodeMail) {
+	if s.googleOutcome != nil {
+		s.googleOutcome(m)
+		return
+	}
+	root, found, err := s.authHandler.RootUser()
+	if err != nil || !found {
+		s.logger.Errorw("There is no ROOT User to mail how connecting to Google Cloud ended", "mail", m.Subject, "error", err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if _, _, err := s.nodeMailer.SendAsNode(ctx, root.ID, m); err != nil {
+		s.logger.Errorw("ROOT was not mailed how connecting to Google Cloud ended", "mail", m.Subject, "error", err)
+	}
 }
 
 // googleAccessToken is the node at Google, as kept names it: its identity token

@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -35,15 +36,18 @@ type standInGoogle struct {
 	// managerOff is Resource Manager disabled in the login's project, as a new
 	// project's is; settling is how many more asks it answers disabled once enabled.
 	managerOff bool
-	usageOff   bool
-	settling   int
-	listed     bool
-	pool       bool
-	provider   map[string]any
-	account    bool
-	policy     map[string]any
-	revoked    []string
-	jwks       jose.JSONWebKeySet
+	// actingOff is how many more asks to act as the account Google refuses,
+	// after the binding: the first real press read 403 a minute after it.
+	actingOff int
+	usageOff  bool
+	settling  int
+	listed    bool
+	pool      bool
+	provider  map[string]any
+	account   bool
+	policy    map[string]any
+	revoked   []string
+	jwks      jose.JSONWebKeySet
 }
 
 func googleStandingIn(t *testing.T, s *QNTXServer, projects ...googleProject) *standInGoogle {
@@ -180,6 +184,10 @@ func (g *standInGoogle) answer(w http.ResponseWriter, r *http.Request) {
 		g.revoked = append(g.revoked, r.URL.Query().Get("token"))
 	case path == "/v1/token":
 		g.exchange(w, r)
+	case path == "/v1/projects/-/serviceAccounts/"+theAccount+":generateAccessToken" && g.actingOff > 0:
+		g.actingOff--
+		w.WriteHeader(http.StatusForbidden)
+		write(map[string]any{"error": map[string]any{"code": 403, "status": "PERMISSION_DENIED", "message": "Permission 'iam.serviceAccounts.getAccessToken' denied on resource"}})
 	case path == "/v1/projects/-/serviceAccounts/"+theAccount+":generateAccessToken":
 		subject := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer sts-")
 		if !g.bound(subject) {
@@ -339,6 +347,61 @@ func TestTheProjectsROOTSelectsFromAreThoseItsAccountSees(t *testing.T) {
 	seen, err := s.googleProjectsOf(context.Background(), "root-token")
 	require.NoError(t, err)
 	assert.Equal(t, []auth.GoogleCloudProject{{ID: "another", Name: "Another"}, {ID: "the-project"}}, seen)
+}
+
+// "would be nice if we sent a mail when its done or if it did not come through"
+// "deliver outcome essentially"
+//
+// The page says the node is set up and that Google is confirming it, never
+// connected. ROOT is mailed once Google lets the node act.
+func TestROOTIsMailedOnceGoogleLetsTheNodeAct(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	g := googleStandingIn(t, s, theProject)
+	g.mu.Lock()
+	g.actingOff = 3
+	g.mu.Unlock()
+	mailed := make(chan services.NodeMail, 1)
+	s.googleOutcome = func(m services.NodeMail) { mailed <- m }
+	said, err := s.connectGoogleCloud(context.Background(), "root-token", "the-project", "google:root-sub")
+	require.NoError(t, err)
+	assert.Contains(t, said, "the-project")
+	assert.Contains(t, said, "mail")
+	assert.NotContains(t, said, "is connected")
+	select {
+	case m := <-mailed:
+		assert.Contains(t, m.Subject, "connected")
+		assert.NotContains(t, m.Subject, "not")
+	case <-time.After(10 * time.Second):
+		t.Fatal("ROOT was not mailed")
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	assert.Zero(t, g.actingOff, "the node asked until Google let it act")
+}
+
+// Google not letting the node act in the time given is mailed too, with what it said.
+func TestROOTIsMailedWhatGoogleSaidWhenItDidNotComeThrough(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	g := googleStandingIn(t, s, theProject)
+	g.mu.Lock()
+	g.actingOff = 1 << 30
+	g.mu.Unlock()
+	proving := googleProving
+	googleProving = 20 * time.Millisecond
+	t.Cleanup(func() { googleProving = proving })
+	mailed := make(chan services.NodeMail, 1)
+	s.googleOutcome = func(m services.NodeMail) { mailed <- m }
+	_, err := s.connectGoogleCloud(context.Background(), "root-token", "the-project", "google:root-sub")
+	require.NoError(t, err)
+	select {
+	case m := <-mailed:
+		assert.Contains(t, m.Subject, "did not connect")
+		require.NotEmpty(t, m.Bodies)
+		assert.Contains(t, m.Bodies[0].Content, "getAccessToken")
+		assert.Contains(t, m.Bodies[0].Content, "Connect")
+	case <-time.After(10 * time.Second):
+		t.Fatal("ROOT was not mailed")
+	}
 }
 
 // ROOT's account seeing several projects names one to connect in.
