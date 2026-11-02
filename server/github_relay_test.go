@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// "why cant we make q relay it"
+// "「[Opus 5.5] why cant we make q relay it」"
 func TestARelayAsksTheNodeThatHoldsTheApp(t *testing.T) {
 	var asked map[string]any
 	var bearer string
