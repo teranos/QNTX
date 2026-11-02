@@ -214,7 +214,8 @@ in
           name = "Package binary with bundled libduckdb";
           # qntx dynamically links Nix's libduckdb.so. Bundle it into lib/
           # next to the binary and rewrite the RPATH to $ORIGIN/lib so the
-          # tarball works on any Linux host (no LD_LIBRARY_PATH, no wrapper).
+          # tarball needs no LD_LIBRARY_PATH and no wrapper. libduckdb links
+          # the host's libc: glibc 2.44 or newer, as the nixpkgs pin builds it.
           run = ''
             mkdir -p release/lib
             cp result/bin/qntx release/qntx
