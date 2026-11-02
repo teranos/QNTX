@@ -115,8 +115,12 @@ func TestROOTPressesConnectAndSelectsTheProject(t *testing.T) {
 
 	selected := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, hrefOf(t, page, "qntx-2"), nil)
+	// As a browser sends them: only a cookie whose path holds the link. Pressed
+	// for real, the ceremony's cookie stayed behind at /auth/binding.
 	for _, cookie := range cookies {
-		req.AddCookie(cookie)
+		if strings.HasPrefix(req.URL.Path, cookie.Path) {
+			req.AddCookie(cookie)
+		}
 	}
 	h.handleGoogleCloud(selected, req)
 	assert.Equal(t, http.StatusOK, selected.Code, selected.Body.String())

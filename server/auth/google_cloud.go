@@ -20,6 +20,10 @@ import (
 // googleCloudPath is where ROOT is sent to Google to connect the node.
 const googleCloudPath = "/auth/google/cloud"
 
+// googleCloudSelectedPath is where ROOT's selection lands: under the path of the
+// ceremony's cookie, which is the browser's proof that it said yes.
+const googleCloudSelectedPath = ceremonyCookiePath + "/google-cloud"
+
 // googleCloudScope is what the node asks ROOT for beyond the login: Google
 // Cloud, which its setup is made in.
 const googleCloudScope = "https://www.googleapis.com/auth/cloud-platform"
@@ -217,7 +221,7 @@ func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudPro
 			called = project.Name + " (" + project.ID + ")"
 		}
 		page += `<p><a style="display:inline-block;padding:8px 12px;border:1px solid currentColor;color:#e6e4ef;text-decoration:none" href="` +
-			html.EscapeString(googleCloudPath+"?selected="+urlEncode(ticket)+"&project="+urlEncode(project.ID)) + `">` + html.EscapeString(called) + `</a></p>`
+			html.EscapeString(googleCloudSelectedPath+"?selected="+urlEncode(ticket)+"&project="+urlEncode(project.ID)) + `">` + html.EscapeString(called) + `</a></p>`
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if _, wrote := w.Write([]byte(page)); wrote != nil {

@@ -578,6 +578,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer("/auth/binding/result", h.handleBindingResult)
 	// ROOT connects the node to Google Cloud, by its Google login's own client.
 	mux.answer(googleCloudPath, h.handleGoogleCloud)
+	mux.answer(googleCloudSelectedPath, h.handleGoogleCloud)
 	// A root identity at a door does the passkey at home (ADR-030): the door
 	// sends the person here, and the session goes back by ticket.
 	mux.answer(homewardPath, h.handleHomeward)
