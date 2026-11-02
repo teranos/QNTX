@@ -24,8 +24,8 @@ const (
 
 // POST /repos/{owner}/{repo}/check-runs
 // "i expect to see a button"
-// The page's body is a oneOf on status, and each arm takes these: name and
-// head_sha required, actions the buttons a person with write access can press.
+// 「[Opus 5.5] The page's body is a oneOf on status, and each arm takes these: name and」
+// 「[Opus 5.5] head_sha required, actions the buttons a person with write access can press.」
 type GitHubCreateACheckRunRequest struct {
 	state         protoimpl.MessageState                  `protogen:"open.v1"`
 	Namespace     string                                  `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
