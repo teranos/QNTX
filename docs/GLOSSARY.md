@@ -31,7 +31,7 @@ Identified by `_distill: true` in attributes, `source: "distill"`, and predicate
 
 ### agy runtime
 
-“making a start on agy as another harness”: the [initial runtime package](https://github.com/teranos/QNTX/blob/main/internal/agy/README.md), beside Claude Code, Pi and Codex. “wiring it into node and namespace config as an actual harness”: the Node Agent runs in it under `[agent.root.agy]`, and a namespace's agent with `agents set`, harness `agy`, on the namespace's `gemini` key.
+“making a start on agy as another harness”: the [initial runtime package](https://github.com/teranos/QNTX/blob/main/internal/agy/README.md), beside Claude Code, Pi and Codex. “wiring it into node and namespace config as an actual harness”: the Node Agent runs in it under `[agent.root.agy]`, and a namespace's agent with `agents set`, harness `agy`, on the namespace's `gemini` key. “correct it for libACP client use for agy”: it runs as `agy acp`, agy 1.4.12's Agent Client Protocol server, through libACP's client ([internal/acp](https://github.com/teranos/QNTX/blob/main/internal/acp)).
 
 ## Symbols
 

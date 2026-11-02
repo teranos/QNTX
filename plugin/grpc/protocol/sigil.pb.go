@@ -1810,14 +1810,14 @@ type AgySaid struct {
 	Model string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
 	// The agy that ran.
 	AgyVersion string `protobuf:"bytes,4,opt,name=agy_version,json=agyVersion,proto3" json:"agy_version,omitempty"`
-	// What agy says the turn used, in tokens.
-	InputTokens  int64 `protobuf:"varint,5,opt,name=input_tokens,json=inputTokens,proto3" json:"input_tokens,omitempty"`
-	OutputTokens int64 `protobuf:"varint,6,opt,name=output_tokens,json=outputTokens,proto3" json:"output_tokens,omitempty"`
+	// The context agy last reported over ACP: the tokens in it, and its window.
+	ContextUsed int64 `protobuf:"varint,5,opt,name=context_used,json=contextUsed,proto3" json:"context_used,omitempty"`
+	ContextSize int64 `protobuf:"varint,6,opt,name=context_size,json=contextSize,proto3" json:"context_size,omitempty"`
 	// How long the turn took.
 	TookMs float64 `protobuf:"fixed64,7,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
 	// Why a row of the session was not written down, when one was not.
 	Unwritten string `protobuf:"bytes,8,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
-	// agy's own conversation, which it resumes, distinct from the transcript session.
+	// agy's own ACP session, which it resumes, distinct from the transcript session.
 	Conversation  string `protobuf:"bytes,9,opt,name=conversation,proto3" json:"conversation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1881,16 +1881,16 @@ func (x *AgySaid) GetAgyVersion() string {
 	return ""
 }
 
-func (x *AgySaid) GetInputTokens() int64 {
+func (x *AgySaid) GetContextUsed() int64 {
 	if x != nil {
-		return x.InputTokens
+		return x.ContextUsed
 	}
 	return 0
 }
 
-func (x *AgySaid) GetOutputTokens() int64 {
+func (x *AgySaid) GetContextSize() int64 {
 	if x != nil {
-		return x.OutputTokens
+		return x.ContextSize
 	}
 	return 0
 }
@@ -1921,7 +1921,7 @@ type AgyAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Its own DID, which signs what it writes down.
 	Did string `protobuf:"bytes,1,opt,name=did,proto3" json:"did,omitempty"`
-	// The model it runs, by agy's own id for it.
+	// The model it runs: the value of its session's model option, as agy offers it.
 	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
 	// The session it continues in agy, or empty before anything was said to it there.
 	Session string `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
@@ -3329,15 +3329,15 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tanswering\x18\x06 \x01(\bR\tanswering\x12\x14\n" +
 	"\x05codex\x18\a \x01(\tR\x05codex\x12#\n" +
 	"\rcodex_version\x18\b \x01(\tR\fcodexVersion\x12\x1b\n" +
-	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\x95\x02\n" +
+	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\x93\x02\n" +
 	"\aAgySaid\x12\x16\n" +
 	"\x06answer\x18\x01 \x01(\tR\x06answer\x12\x18\n" +
 	"\asession\x18\x02 \x01(\tR\asession\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x12\x1f\n" +
 	"\vagy_version\x18\x04 \x01(\tR\n" +
 	"agyVersion\x12!\n" +
-	"\finput_tokens\x18\x05 \x01(\x03R\vinputTokens\x12#\n" +
-	"\routput_tokens\x18\x06 \x01(\x03R\foutputTokens\x12\x17\n" +
+	"\fcontext_used\x18\x05 \x01(\x03R\vcontextUsed\x12!\n" +
+	"\fcontext_size\x18\x06 \x01(\x03R\vcontextSize\x12\x17\n" +
 	"\atook_ms\x18\a \x01(\x01R\x06tookMs\x12\x1c\n" +
 	"\tunwritten\x18\b \x01(\tR\tunwritten\x12\"\n" +
 	"\fconversation\x18\t \x01(\tR\fconversation\"\xb7\x01\n" +

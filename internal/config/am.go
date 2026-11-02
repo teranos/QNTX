@@ -51,7 +51,7 @@ type NodeAgentConfig struct {
 // AgyConfig names how the Node Agent runs in agy. A node that names no model
 // runs it without agy.
 type AgyConfig struct {
-	Model string `mapstructure:"model"` // The model, by agy's own id for it, as agy models lists it.
+	Model string `mapstructure:"model"` // The model: the value of agy's session option model, as gemini-3.8-flash.
 	// TokenRef is the agent's Gemini API key, ssm:// or env:, as the plan token
 	// is. agy makes its model calls on it: its Google sign-in waits on a code
 	// pasted on its terminal, which a headless turn cannot give.

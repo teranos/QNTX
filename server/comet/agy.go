@@ -8,8 +8,9 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// agyHooks are the events agy 1.4.4 sends, each of which ground answers as
-// `ground_hook agy <Event>`. A tool's events take matcher groups; the others
+// agyHooks are the events agy sends, each of which ground answers as
+// `ground_hook agy <Event>`; run as `agy acp`, 1.4.12 ran it for SessionStart,
+// PreInvocation and Stop of a turn that called no tool. A tool's events take matcher groups; the others
 // take their commands directly (antigravity.google/docs/hooks).
 var agyHooks = []string{"SessionStart", "PreToolUse", "PostToolUse", "PreInvocation", "PostInvocation", "Stop"}
 

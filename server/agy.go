@@ -2,14 +2,13 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/acp"
 	"github.com/teranos/QNTX/internal/agy"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/secretref"
@@ -27,7 +26,7 @@ import (
 const (
 	agentLineAgy   = "agy"
 	agySessionFile = "agy-session"
-	// agyConversationFile is agy's own conversation, kept apart from the
+	// agyConversationFile is agy's own ACP session, kept apart from the
 	// node's session: agy names it on a first turn and resumes only that.
 	agyConversationFile = "agy-conversation"
 )
@@ -138,11 +137,10 @@ func agyConversationOf(home string) string {
 	return strings.TrimSpace(string(held))
 }
 
-// agyTurn runs said, writes its stream down as the session's rows, and keeps
-// the conversation agy answered in.
+// agyTurn runs said, writes its ACP updates down as the session's rows, and keeps
+// the session agy answered in.
 func (s *QNTXServer) agyTurn(t turnRun, agent *rootAgent, said agy.Said) (*protocol.AgySaid, error) {
-	tools := map[int]bool{}
-	answer, err := said.Run(s.ctx, func(e agy.Event) { t.write(t.writes.rowsOfAgy(e, tools, t.now())) })
+	answer, err := said.Run(s.ctx, func(u acp.Update) { t.write(t.writes.rowsOfACP(u, agentLineAgy, t.now())) })
 	if answer.Session != "" && answer.Session != said.Session {
 		if keepErr := keepAgyConversation(agent.home, answer.Session); keepErr != nil {
 			if err == nil {
@@ -156,9 +154,10 @@ func (s *QNTXServer) agyTurn(t turnRun, agent *rootAgent, said agy.Said) (*proto
 		t.write(t.writes.agyFailed(err.Error(), t.now()))
 		return nil, err
 	}
+	t.write(t.writes.acpAnswered(answer.Text, t.now()))
 	return &protocol.AgySaid{
 		Answer: answer.Text, Session: t.session, Conversation: answer.Session, Model: said.Model, AgyVersion: agy.PinnedVersion,
-		InputTokens: answer.Usage.InputTokens, OutputTokens: answer.Usage.OutputTokens,
+		ContextUsed: int64(answer.Used), ContextSize: int64(answer.Size),
 		TookMs: float64(answer.Took.Milliseconds()), Unwritten: t.unwritten(),
 	}, nil
 }
@@ -178,56 +177,6 @@ func keepAgyConversation(home, conversation string) error {
 		return errors.Wrapf(err, "could not close %s", f.Name())
 	}
 	return errors.Wrapf(os.Rename(f.Name(), filepath.Join(home, agyConversationFile)), "could not keep agy conversation %s in %s", conversation, home)
-}
-
-// rowsOfAgy is one event of agy's stream as the hook events Claude Code's are
-// written as: its conversation starting, each tool it reached for, the turn's
-// end. tools holds the steps already written, which agy updates more than once.
-func (w sessionWriter) rowsOfAgy(e agy.Event, tools map[int]bool, at time.Time) ([]*types.As, error) {
-	switch e.Event {
-	case "init":
-		row, err := w.row("SessionStart", at, map[string]any{"source": "agy"})
-		return []*types.As{row}, err
-	case "step_update":
-		step := e.StepUpdate
-		if step == nil || step.StepType != "tool" || tools[step.StepIndex] {
-			return nil, nil
-		}
-		tools[step.StepIndex] = true
-		attrs := map[string]any{"tool_use_id": e.StepUpdate.ConversationID + ":" + strconv.Itoa(step.StepIndex), "tool_name": step.ToolName}
-		if len(step.ToolInfo) > 0 {
-			var info struct {
-				Parameters struct {
-					CommandLine  string `json:"CommandLine"`
-					TargetFile   string `json:"TargetFile"`
-					AbsolutePath string `json:"AbsolutePath"`
-				} `json:"parameters"`
-			}
-			if err := json.Unmarshal(step.ToolInfo, &info); err != nil {
-				return nil, errors.Wrapf(err, "the tool_info of agy step %d did not read", step.StepIndex)
-			}
-			// A command it runs is written as Claude Code's Bash, as codex's are.
-			if step.ToolName == "run_command" {
-				attrs["tool_name"], attrs["command"] = "Bash", info.Parameters.CommandLine
-			}
-			if file := info.Parameters.TargetFile + info.Parameters.AbsolutePath; file != "" {
-				attrs["file_path"] = file
-			}
-		}
-		row, err := w.row("PreToolUse", at, attrs)
-		return []*types.As{row}, err
-	case "result":
-		if e.Result == nil || e.Result.Status != "SUCCESS" {
-			return nil, nil
-		}
-		attrs := map[string]any{"last_assistant_message": e.Result.Response}
-		if w.effort != "" {
-			attrs["effort"] = map[string]any{"level": w.effort}
-		}
-		row, err := w.row("Stop", at, attrs)
-		return []*types.As{row}, err
-	}
-	return nil, nil
 }
 
 // agyFailed is the row of a turn agy did not answer.

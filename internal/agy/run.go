@@ -1,85 +1,57 @@
 package agy
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/internal/acp"
 	"github.com/teranos/QNTX/internal/agentenv"
 	errors "github.com/teranos/sacred-error"
 )
 
-// Said is one turn. An empty Session starts a conversation; otherwise agy resumes it.
-// APIKey belongs to this agent. Without one agy asks for a Google sign-in, a
-// code pasted on its terminal, which a headless turn cannot give: it is refused.
-// This foundation runs headlessly; it does not implement permission callbacks.
+// "correct it for libACP client use for agy"
+// agy is run as `agy acp`, its Agent Client Protocol server, through libACP's client (internal/acp).
+
+// Said is one turn. An empty Session starts one; otherwise agy continues it.
+// APIKey belongs to this agent. agy's other ACP sign-ins are a Google account's and
+// Application Default Credentials (its authMethods), none of them the agent's own:
+// a turn without its own key is refused.
 type Said struct {
-	Binary, Home, Session, Says, Model, APIKey string
+	Binary, Home, Session, Says string
+	// Model is the value of the session's model option, as agy offers it: gemini-3.8-flash.
+	Model, APIKey string
 	// Env is what the agent's turn carries beyond its own home, as its git.
 	Env []string
 }
 
-// Event preserves agy's stream for the future QNTX transcript adapter.
-// Shape: agy 1.4.4's --output-format stream-json, as it emits it and as
-// antigravity.google/docs/cli/headless documents it.
-type Event struct {
-	Event string `json:"event"`
-	// ConversationID is init's own, beside its payload.
-	ConversationID string          `json:"conversation_id"`
-	Init           json.RawMessage `json:"init"`
-	StepUpdate     *Step           `json:"step_update"`
-	Result         *Result         `json:"result"`
-}
-
-type Step struct {
-	ConversationID  string          `json:"conversation_id"`
-	StepIndex       int             `json:"step_index"`
-	State           string          `json:"state"`
-	StepType        string          `json:"step_type"`
-	ToolName        string          `json:"tool_name"`
-	TextDelta       string          `json:"text_delta"`
-	DurationSeconds float64         `json:"duration_seconds"`
-	Usage           *Usage          `json:"usage"`
-	ToolInfo        json.RawMessage `json:"tool_info"`
-	SubagentInfo    json.RawMessage `json:"subagent_info"`
-}
-
-type Result struct {
-	ConversationID  string  `json:"conversation_id"`
-	Status          string  `json:"status"`
-	Response        string  `json:"response"`
-	Error           string  `json:"error"`
-	DurationSeconds float64 `json:"duration_seconds"`
-	NumTurns        int     `json:"num_turns"`
-	Usage           Usage   `json:"usage"`
-	FinishedReason  string  `json:"finished_reason"`
-}
-
-type Usage struct {
-	InputTokens     int64 `json:"input_tokens"`
-	OutputTokens    int64 `json:"output_tokens"`
-	ThinkingTokens  int64 `json:"thinking_tokens"`
-	CacheReadTokens int64 `json:"cache_read_tokens"`
-	TotalTokens     int64 `json:"total_tokens"`
-}
-
 type Answer struct {
 	Text, Session string
-	Usage         Usage
-	Took          time.Duration
+	// Used and Size are the context agy last reported: tokens in it, and its window.
+	Used, Size uint64
+	Took       time.Duration
 }
 
-// Run requires a SUCCESS result for the requested conversation and a successful
-// process exit. A partial answer never turns a failed process into success.
-func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
-	if s.Binary == "" || s.Home == "" || s.Model == "" || s.APIKey == "" {
-		return Answer{}, errors.New("agy requires an explicit binary, agent home, model and the agent's own API key")
+// signIn is the authMethods id agy's ACP server offers for a Gemini API key, read from GEMINI_API_KEY.
+const signIn = "gemini-api-key"
+
+// turnLog is where agy writes its log for a turn, in the agent's home: the error of a turn it ends
+// without one is there and nowhere else.
+const turnLog = "agy-turn.log"
+
+// terminated is what agy says, as its message, of a turn it could not run. It ends that turn as
+// end_turn all the same.
+const terminated = "Agent execution terminated due to error."
+
+// Run is one turn of agy over ACP. A turn agy reports terminated, or stopped for any reason but
+// end_turn, is an error, with what agy's log says of it.
+func (s Said) Run(ctx context.Context, each func(acp.Update)) (Answer, error) {
+	if s.Binary == "" || s.Home == "" || s.Model == "" || s.APIKey == "" || s.Says == "" {
+		return Answer{}, errors.New("agy requires an explicit binary, agent home, model, the agent's own API key, and something said")
 	}
 	home, err := filepath.Abs(s.Home)
 	if err != nil {
@@ -89,185 +61,64 @@ func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
 	if err := os.MkdirAll(work, 0700); err != nil {
 		return Answer{}, errors.Wrapf(err, "could not create %s", work)
 	}
-	// GEMINI_API_KEY alone has no effect: agy reads it only under the gemini provider.
-	if err := geminiProvider(filepath.Join(home, ".gemini", "antigravity-cli", "settings.json")); err != nil {
-		return Answer{}, err
+	log := filepath.Join(home, turnLog)
+	if err := os.Remove(log); err != nil && !os.IsNotExist(err) {
+		return Answer{}, errors.Wrapf(err, "could not clear %s", log)
 	}
-	prompt, err := json.Marshal(map[string]any{"event": "user", "message": map[string]string{"content": s.Says}})
+	agent := acp.Agent{
+		Binary: s.Binary,
+		// The prompt goes in over ACP, never on the command line.
+		Args: []string{"acp", "--sandbox", "--disable-telemetry", "--log-file", log},
+		Dir:  work,
+		Env:  append(append(agentenv.Carried(), s.Env...), "HOME="+home, updates, "GEMINI_API_KEY="+s.APIKey),
+	}
+	turn := acp.Turn{
+		Cwd: work, Session: s.Session, Auth: signIn, Says: s.Says,
+		Config: [][2]string{{"model", s.Model}},
+		Client: "qntx", Version: PinnedVersion,
+	}
+	got, err := acp.Run(ctx, agent, turn, each)
+	answer := Answer{Text: got.Text, Session: got.Session, Used: got.Used, Size: got.Size, Took: got.Took}
 	if err != nil {
-		return Answer{}, errors.Wrap(err, "could not encode the prompt")
+		return answer, errors.Wrapf(err, "agy %s", PinnedVersion)
 	}
-	// The prompt goes in on stdin; the slash commands agy would read in it are text.
-	args := []string{"--input-format", "stream-json", "--output-format", "stream-json", "--model", s.Model, "--disable-slash-commands", "--sandbox"}
-	if s.Session != "" {
-		args = append(args, "--conversation", s.Session)
+	if strings.Contains(got.Text, terminated) {
+		return answer, errors.Newf("agy terminated the turn: %s", logged(log))
 	}
-	cmd := exec.CommandContext(ctx, s.Binary, args...)
-	cmd.Dir = work
-	cmd.Env = append(append(agentenv.Carried(), s.Env...), "HOME="+home, updates, "GEMINI_API_KEY="+s.APIKey)
-	// One message, then EOF: agy ends the session once the turn completes.
-	cmd.Stdin = bytes.NewReader(append(prompt, '\n'))
-	cmd.WaitDelay = time.Second
-	var stderr tailBuffer
-	cmd.Stderr = &stderr
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return Answer{}, errors.Wrapf(err, "could not read %s stdout", s.Binary)
-	}
-	started := time.Now()
-	if err := cmd.Start(); err != nil {
-		return Answer{}, errors.Wrapf(err, "could not start %s", s.Binary)
-	}
-	// A child retaining stdout must not keep cancellation blocked in Scan.
-	streamDone := make(chan struct{})
-	defer close(streamDone)
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = stdout.Close()
-		case <-streamDone:
-		}
-	}()
-	answer := Answer{}
-	completed := false
-	var streamErr error
-	// agy starts another conversation, with a warning, for one it does not have.
-	conversation := func(id string) {
-		switch {
-		case id == "" || (s.Session != "" && id != s.Session):
-			streamErr = errors.Newf("agy conversation %q does not match requested session %q", id, s.Session)
-		case answer.Session == "":
-			answer.Session = id
-		case id != answer.Session:
-			streamErr = errors.Newf("agy conversation %q changed to %q mid-turn", answer.Session, id)
-		}
-	}
-	lines := bufio.NewScanner(stdout)
-	lines.Buffer(make([]byte, 64*1024), 16*1024*1024)
-	for lines.Scan() {
-		line := lines.Bytes()
-		if len(bytes.TrimSpace(line)) == 0 {
-			continue
-		}
-		var e Event
-		if err := json.Unmarshal(line, &e); err != nil {
-			streamErr = errors.Wrap(err, "invalid agy JSON event")
-			break
-		}
-		if e.Event == "" {
-			streamErr = errors.New("agy JSON event has no event")
-			break
-		}
-		if each != nil {
-			each(e)
-		}
-		switch e.Event {
-		case "init":
-			conversation(e.ConversationID)
-		case "step_update":
-			if e.StepUpdate == nil {
-				streamErr = errors.New("agy step_update has no step")
-			} else {
-				conversation(e.StepUpdate.ConversationID)
-			}
-		case "result":
-			if e.Result == nil {
-				streamErr = errors.New("agy result has no result")
-				break
-			}
-			conversation(e.Result.ConversationID)
-			if streamErr == nil && e.Result.Status != "SUCCESS" {
-				streamErr = errors.Newf("agy turn ended %s: %s", e.Result.Status, e.Result.Error)
-			}
-			if streamErr == nil {
-				answer.Text = e.Result.Response
-				answer.Usage = e.Result.Usage
-				completed = true
-			}
-		}
-		if streamErr != nil {
-			break
-		}
-	}
-	if err := lines.Err(); err != nil && streamErr == nil {
-		streamErr = errors.Wrap(err, "agy stream was cut short")
-	}
-	if streamErr != nil {
-		_ = cmd.Process.Kill()
-	}
-	waitErr := cmd.Wait()
-	answer.Took = time.Since(started)
-	if ctx.Err() != nil {
-		return answer, errors.Wrapf(ctx.Err(), "agy %s stopped", s.Binary)
-	}
-	// agy writes its AGY_ERROR line to stderr; it is the error's detail.
-	if streamErr != nil {
-		if detail := stderr.String(); detail != "" {
-			return answer, errors.Wrapf(streamErr, "%s", detail)
-		}
-		return answer, streamErr
-	}
-	if waitErr != nil {
-		return answer, errors.Wrapf(waitErr, "agy %s failed: %s", s.Binary, stderr.String())
-	}
-	if !completed || answer.Session == "" {
-		return answer, errors.Newf("agy %s ended without a completed turn and conversation id: %s", s.Binary, stderr.String())
+	if got.Stop != "end_turn" {
+		return answer, errors.Newf("agy stopped the turn, %s: %s", got.Stop, strings.TrimSpace(got.Text))
 	}
 	return answer, nil
 }
 
-// geminiProvider sets modelProvider to gemini in agy's settings, keeping the rest.
-func geminiProvider(path string) error {
-	settings := map[string]any{}
-	raw, err := os.ReadFile(path)
-	switch {
-	case err == nil:
-		if err := json.Unmarshal(raw, &settings); err != nil {
-			return errors.Wrapf(err, "%s is not agy settings", path)
-		}
-		if settings["modelProvider"] == "gemini" {
-			return nil
-		}
-	case !os.IsNotExist(err):
-		return errors.Wrapf(err, "could not read %s", path)
-	}
-	settings["modelProvider"] = "gemini"
-	out, err := json.MarshalIndent(settings, "", "  ")
+// logged is the errors agy's log for the turn holds, the last of them last, or why there are none.
+func logged(path string) string {
+	f, err := os.Open(path)
 	if err != nil {
-		return errors.Wrapf(err, "could not encode %s", path)
+		return "its log did not open: " + err.Error()
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return errors.Wrapf(err, "could not create %s", filepath.Dir(path))
-	}
-	f, err := os.CreateTemp(filepath.Dir(path), "settings-*")
-	if err != nil {
-		return errors.Wrapf(err, "could not stage %s", path)
-	}
-	defer os.Remove(f.Name())
 	defer f.Close()
-	if _, err := f.Write(out); err != nil {
-		return errors.Wrapf(err, "could not write %s", f.Name())
+	// The end of it is the turn's end.
+	const keep = 64 * 1024
+	if info, err := f.Stat(); err == nil && info.Size() > keep {
+		_, _ = f.Seek(info.Size()-keep, io.SeekStart)
 	}
-	if err := f.Close(); err != nil {
-		return errors.Wrapf(err, "could not close %s", f.Name())
+	raw, err := io.ReadAll(f)
+	if err != nil {
+		return "its log did not read: " + err.Error()
 	}
-	return errors.Wrapf(os.Rename(f.Name(), path), "could not publish %s", path)
-}
-
-// Keep diagnostics bounded while the process is still running.
-type tailBuffer struct{ data []byte }
-
-func (b *tailBuffer) Write(p []byte) (int, error) {
-	n := len(p)
-	const limit = 4096
-	if len(p) >= limit {
-		b.data = append(b.data[:0], p[len(p)-limit:]...)
-	} else {
-		if excess := len(b.data) + len(p) - limit; excess > 0 {
-			b.data = b.data[excess:]
+	var errs []string
+	for _, line := range bytes.Split(raw, []byte("\n")) {
+		// glog's error lines: E, then the date.
+		if len(line) > 1 && line[0] == 'E' && line[1] >= '0' && line[1] <= '9' {
+			errs = append(errs, string(line))
 		}
-		b.data = append(b.data, p...)
 	}
-	return n, nil
+	if len(errs) == 0 {
+		return "its log, " + path + ", names no error"
+	}
+	if len(errs) > 3 {
+		errs = errs[len(errs)-3:]
+	}
+	return strings.Join(errs, "\n")
 }
-func (b *tailBuffer) String() string { return strings.TrimSpace(string(b.data)) }

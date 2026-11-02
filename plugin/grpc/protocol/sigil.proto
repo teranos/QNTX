@@ -353,14 +353,14 @@ message AgySaid {
   string model = 3;
   // The agy that ran.
   string agy_version = 4;
-  // What agy says the turn used, in tokens.
-  int64 input_tokens = 5;
-  int64 output_tokens = 6;
+  // The context agy last reported over ACP: the tokens in it, and its window.
+  int64 context_used = 5;
+  int64 context_size = 6;
   // How long the turn took.
   double took_ms = 7;
   // Why a row of the session was not written down, when one was not.
   string unwritten = 8;
-  // agy's own conversation, which it resumes, distinct from the transcript session.
+  // agy's own ACP session, which it resumes, distinct from the transcript session.
   string conversation = 9;
 }
 
@@ -368,7 +368,7 @@ message AgySaid {
 message AgyAm {
   // Its own DID, which signs what it writes down.
   string did = 1;
-  // The model it runs, by agy's own id for it.
+  // The model it runs: the value of its session's model option, as agy offers it.
   string model = 2;
   // The session it continues in agy, or empty before anything was said to it there.
   string session = 3;

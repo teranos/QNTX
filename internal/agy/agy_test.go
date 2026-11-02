@@ -130,7 +130,7 @@ func TestPinnedUsesParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Version != "1.4.4" || len(p.Artifacts) != 4 {
+	if p.Version != "1.4.12" || len(p.Artifacts) != 4 {
 		t.Fatalf("pin: %+v", p)
 	}
 }

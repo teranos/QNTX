@@ -56,8 +56,12 @@
           "run": "make rust-sqlite"
         },
         {
+          "name": "Build libACP",
+          "run": "sudo apt-get install -y libjson-c-dev\nmake libacp\n"
+        },
+        {
           "name": "Build",
-          "run": "go build ./..."
+          "run": "go build ./... && go build -tags libacp ./..."
         }
       ]
     },
@@ -113,8 +117,12 @@
           "run": "make rust-sqlite"
         },
         {
+          "name": "Build libACP",
+          "run": "sudo apt-get install -y libjson-c-dev\nmake libacp\n"
+        },
+        {
           "name": "Run integration tests",
-          "run": "export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH\ngo test -tags=\"rustsqlite,qntxwasm,integration\" ./...\n"
+          "run": "export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH\ngo test -tags=\"rustsqlite,qntxwasm,libacp,integration\" ./...\n"
         }
       ]
     },
@@ -170,8 +178,12 @@
           "run": "make rust-sqlite"
         },
         {
+          "name": "Build libACP",
+          "run": "sudo apt-get install -y libjson-c-dev\nmake libacp\n"
+        },
+        {
           "name": "Run tests",
-          "run": "export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH\ngo test -tags \"rustsqlite,qntxwasm\" ./...\n"
+          "run": "export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH\ngo test -tags \"rustsqlite,qntxwasm,libacp\" ./...\n"
         }
       ]
     }
@@ -186,6 +198,7 @@
         "**/*.go",
         "go.mod",
         "go.sum",
+        "internal/acp/libacp-rev",
         ".github/workflows/go.yml"
       ]
     },
@@ -196,7 +209,8 @@
       "paths": [
         "**/*.go",
         "go.mod",
-        "go.sum"
+        "go.sum",
+        "internal/acp/libacp-rev"
       ]
     },
     "workflow_dispatch": null
