@@ -1,6 +1,6 @@
 package server
 
-// "why cant we make q relay it"
+// "「[Opus 5.5] why cant we make q relay it」"
 
 // 「[Opus 5.5] A relay is ROOT's line that this node's subsystems ask GitHub through another」
 // 「[Opus 5.5] node, the one holding the App, by that node's own github ask (ADR-056).」
