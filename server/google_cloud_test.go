@@ -121,12 +121,12 @@ func (g *standInGoogle) answer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		g.account = true
-		write(map[string]any{"email": "qntx-node@the-project.iam.gserviceaccount.com"})
-	case path == "/v1/projects/the-project/serviceAccounts/qntx-node@the-project.iam.gserviceaccount.com:getIamPolicy":
+		write(map[string]any{"email": theAccount})
+	case path == "/v1/projects/the-project/serviceAccounts/"+theAccount+":getIamPolicy":
 		if rootOnly() {
 			write(g.policy)
 		}
-	case path == "/v1/projects/the-project/serviceAccounts/qntx-node@the-project.iam.gserviceaccount.com:setIamPolicy":
+	case path == "/v1/projects/the-project/serviceAccounts/"+theAccount+":setIamPolicy":
 		if !rootOnly() {
 			return
 		}
@@ -140,7 +140,7 @@ func (g *standInGoogle) answer(w http.ResponseWriter, r *http.Request) {
 		g.revoked = append(g.revoked, r.URL.Query().Get("token"))
 	case path == "/v1/token":
 		g.exchange(w, r)
-	case path == "/v1/projects/-/serviceAccounts/qntx-node@the-project.iam.gserviceaccount.com:generateAccessToken":
+	case path == "/v1/projects/-/serviceAccounts/"+theAccount+":generateAccessToken":
 		subject := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer sts-")
 		if !g.bound(subject) {
 			w.WriteHeader(http.StatusForbidden)
@@ -187,6 +187,9 @@ func (g *standInGoogle) bound(subject string) bool {
 
 var theProject = googleProject{ProjectID: "the-project", ProjectNumber: "123"}
 
+// theAccount is the node's service account in theProject, as the node names it.
+var theAccount = googleServiceAccount + "@" + theProject.ProjectID + ".iam.gserviceaccount.com"
+
 func rootAsksGoogle(t *testing.T, s *QNTXServer) *protocol.NodeGoogle {
 	t.Helper()
 	admitted := auth.Admitted(auth.LevelRoot)
@@ -228,7 +231,7 @@ func TestROOTsYesSetsTheNodeUpAtGoogleCloud(t *testing.T) {
 	assert.Equal(t, "123", am.GetProjectNumber())
 	assert.Equal(t, thePool, am.GetPool())
 	assert.Equal(t, thePool+"/providers/node", am.GetProvider())
-	assert.Equal(t, "qntx-node@the-project.iam.gserviceaccount.com", am.GetServiceAccount())
+	assert.Equal(t, theAccount, am.GetServiceAccount())
 	assert.Equal(t, "google:root-sub", am.GetSetBy())
 }
 
