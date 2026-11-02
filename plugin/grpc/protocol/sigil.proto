@@ -382,6 +382,38 @@ message AgyAm {
   string not_ready = 7;
 }
 
+// NodeGoogle is what google am answers: the node at Google Cloud, set up on
+// ROOT's yes, and whether Google trades the node's identity token.
+// "Given that I am ROOT and my google identity is the ROOT identity"
+message NodeGoogle {
+  // The node's OIDC issuer, which the node's pool at Google trusts.
+  string issuer = 1;
+  // The node's DID, the sub of its identity token.
+  string subject = 2;
+  // Where ROOT goes to connect the node, by saying yes at Google once.
+  string connect = 3;
+  // The project the node is set up in, by its id.
+  string project_id = 4;
+  // The same project by its number, which Google names the pool by.
+  string project_number = 5;
+  // The workload identity pool the node is set up in.
+  string pool = 6;
+  // The provider in the pool that trusts the node's issuer.
+  string provider = 7;
+  // The service account the node's identity acts as.
+  string service_account = 8;
+  // Who connected the node.
+  string set_by = 9;
+  // When the node was connected.
+  string at = 10;
+  // Whether Google was asked to trade the node's identity token.
+  bool asked = 11;
+  // Whether Google traded it, and the node acted as its service account.
+  bool accepted = 12;
+  // What Google said when it did not.
+  string why = 13;
+}
+
 // NodeAnthropic is what anthropic am and anthropic set answer: the node's
 // issuer and subject that ROOT registers at Anthropic, the ids of the rule its
 // identity token is traded at, and whether Anthropic accepted it.
