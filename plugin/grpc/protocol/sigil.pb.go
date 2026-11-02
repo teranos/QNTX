@@ -1802,7 +1802,19 @@ type NodeGoogle struct {
 	// Whether Google traded it, and the node acted as its service account.
 	Accepted bool `protobuf:"varint,12,opt,name=accepted,proto3" json:"accepted,omitempty"`
 	// What Google said when it did not.
-	Why           string `protobuf:"bytes,13,opt,name=why,proto3" json:"why,omitempty"`
+	Why string `protobuf:"bytes,13,opt,name=why,proto3" json:"why,omitempty"`
+	// Whether ROOT connected the node's costs.
+	CostsWired bool `protobuf:"varint,14,opt,name=costs_wired,json=costsWired,proto3" json:"costs_wired,omitempty"`
+	// Where ROOT goes to connect them, by saying yes at Google once.
+	CostsConnect string `protobuf:"bytes,15,opt,name=costs_connect,json=costsConnect,proto3" json:"costs_connect,omitempty"`
+	// What each budget last reported.
+	Budgets []*GoogleBudget `protobuf:"bytes,16,rep,name=budgets,proto3" json:"budgets,omitempty"`
+	// The limit ROOT set on this node; zero is none.
+	Limit float64 `protobuf:"fixed64,17,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Whether what costs at Google is halted: 80% of the lower of budget and limit.
+	Halted bool `protobuf:"varint,18,opt,name=halted,proto3" json:"halted,omitempty"`
+	// Why it is.
+	HaltedWhy     string `protobuf:"bytes,19,opt,name=halted_why,json=haltedWhy,proto3" json:"halted_why,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1928,6 +1940,139 @@ func (x *NodeGoogle) GetWhy() string {
 	return ""
 }
 
+func (x *NodeGoogle) GetCostsWired() bool {
+	if x != nil {
+		return x.CostsWired
+	}
+	return false
+}
+
+func (x *NodeGoogle) GetCostsConnect() string {
+	if x != nil {
+		return x.CostsConnect
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetBudgets() []*GoogleBudget {
+	if x != nil {
+		return x.Budgets
+	}
+	return nil
+}
+
+func (x *NodeGoogle) GetLimit() float64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *NodeGoogle) GetHalted() bool {
+	if x != nil {
+		return x.Halted
+	}
+	return false
+}
+
+func (x *NodeGoogle) GetHaltedWhy() string {
+	if x != nil {
+		return x.HaltedWhy
+	}
+	return ""
+}
+
+// GoogleBudget is what a budget at Google Cloud last reported.
+type GoogleBudget struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Its name at Google.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// What it has cost so far this period.
+	Cost float64 `protobuf:"fixed64,2,opt,name=cost,proto3" json:"cost,omitempty"`
+	// The budget's amount.
+	Budget float64 `protobuf:"fixed64,3,opt,name=budget,proto3" json:"budget,omitempty"`
+	// The currency of both.
+	Currency string `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
+	// When the period began.
+	Since string `protobuf:"bytes,5,opt,name=since,proto3" json:"since,omitempty"`
+	// When Google published this.
+	At            string `protobuf:"bytes,6,opt,name=at,proto3" json:"at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GoogleBudget) Reset() {
+	*x = GoogleBudget{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GoogleBudget) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GoogleBudget) ProtoMessage() {}
+
+func (x *GoogleBudget) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GoogleBudget.ProtoReflect.Descriptor instead.
+func (*GoogleBudget) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GoogleBudget) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *GoogleBudget) GetCost() float64 {
+	if x != nil {
+		return x.Cost
+	}
+	return 0
+}
+
+func (x *GoogleBudget) GetBudget() float64 {
+	if x != nil {
+		return x.Budget
+	}
+	return 0
+}
+
+func (x *GoogleBudget) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *GoogleBudget) GetSince() string {
+	if x != nil {
+		return x.Since
+	}
+	return ""
+}
+
+func (x *GoogleBudget) GetAt() string {
+	if x != nil {
+		return x.At
+	}
+	return ""
+}
+
 // NodeAnthropic is what anthropic am and anthropic set answer: the node's
 // issuer and subject that ROOT registers at Anthropic, the ids of the rule its
 // identity token is traded at, and whether Anthropic accepted it.
@@ -1971,7 +2116,7 @@ type NodeAnthropic struct {
 
 func (x *NodeAnthropic) Reset() {
 	*x = NodeAnthropic{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[21]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1983,7 +2128,7 @@ func (x *NodeAnthropic) String() string {
 func (*NodeAnthropic) ProtoMessage() {}
 
 func (x *NodeAnthropic) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[21]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1996,7 +2141,7 @@ func (x *NodeAnthropic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeAnthropic.ProtoReflect.Descriptor instead.
 func (*NodeAnthropic) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{21}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *NodeAnthropic) GetIssuer() string {
@@ -2127,7 +2272,7 @@ type AnthropicWindow struct {
 
 func (x *AnthropicWindow) Reset() {
 	*x = AnthropicWindow{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[22]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2139,7 +2284,7 @@ func (x *AnthropicWindow) String() string {
 func (*AnthropicWindow) ProtoMessage() {}
 
 func (x *AnthropicWindow) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[22]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2152,7 +2297,7 @@ func (x *AnthropicWindow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnthropicWindow.ProtoReflect.Descriptor instead.
 func (*AnthropicWindow) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{22}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *AnthropicWindow) GetWindow() string {
@@ -2197,7 +2342,7 @@ type NamespaceKeys struct {
 
 func (x *NamespaceKeys) Reset() {
 	*x = NamespaceKeys{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[23]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2209,7 +2354,7 @@ func (x *NamespaceKeys) String() string {
 func (*NamespaceKeys) ProtoMessage() {}
 
 func (x *NamespaceKeys) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[23]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2222,7 +2367,7 @@ func (x *NamespaceKeys) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NamespaceKeys.ProtoReflect.Descriptor instead.
 func (*NamespaceKeys) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{23}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *NamespaceKeys) GetNamespace() string {
@@ -2262,7 +2407,7 @@ type NamespaceKey struct {
 
 func (x *NamespaceKey) Reset() {
 	*x = NamespaceKey{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[24]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2274,7 +2419,7 @@ func (x *NamespaceKey) String() string {
 func (*NamespaceKey) ProtoMessage() {}
 
 func (x *NamespaceKey) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[24]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2287,7 +2432,7 @@ func (x *NamespaceKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NamespaceKey.ProtoReflect.Descriptor instead.
 func (*NamespaceKey) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{24}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *NamespaceKey) GetName() string {
@@ -2364,7 +2509,7 @@ type PiAm struct {
 
 func (x *PiAm) Reset() {
 	*x = PiAm{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[25]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2376,7 +2521,7 @@ func (x *PiAm) String() string {
 func (*PiAm) ProtoMessage() {}
 
 func (x *PiAm) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[25]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2389,7 +2534,7 @@ func (x *PiAm) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PiAm.ProtoReflect.Descriptor instead.
 func (*PiAm) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{25}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *PiAm) GetDid() string {
@@ -2482,7 +2627,7 @@ type NamespaceAgentAm struct {
 
 func (x *NamespaceAgentAm) Reset() {
 	*x = NamespaceAgentAm{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2494,7 +2639,7 @@ func (x *NamespaceAgentAm) String() string {
 func (*NamespaceAgentAm) ProtoMessage() {}
 
 func (x *NamespaceAgentAm) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2507,7 +2652,7 @@ func (x *NamespaceAgentAm) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NamespaceAgentAm.ProtoReflect.Descriptor instead.
 func (*NamespaceAgentAm) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{26}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *NamespaceAgentAm) GetNamespace() string {
@@ -2558,7 +2703,7 @@ type Follows struct {
 
 func (x *Follows) Reset() {
 	*x = Follows{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2570,7 +2715,7 @@ func (x *Follows) String() string {
 func (*Follows) ProtoMessage() {}
 
 func (x *Follows) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2583,7 +2728,7 @@ func (x *Follows) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Follows.ProtoReflect.Descriptor instead.
 func (*Follows) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{27}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *Follows) GetReference() string {
@@ -2622,7 +2767,7 @@ type Corresponds struct {
 
 func (x *Corresponds) Reset() {
 	*x = Corresponds{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2634,7 +2779,7 @@ func (x *Corresponds) String() string {
 func (*Corresponds) ProtoMessage() {}
 
 func (x *Corresponds) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2647,7 +2792,7 @@ func (x *Corresponds) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Corresponds.ProtoReflect.Descriptor instead.
 func (*Corresponds) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{28}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Corresponds) GetField() string {
@@ -2681,7 +2826,7 @@ type Fold struct {
 
 func (x *Fold) Reset() {
 	*x = Fold{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2693,7 +2838,7 @@ func (x *Fold) String() string {
 func (*Fold) ProtoMessage() {}
 
 func (x *Fold) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2706,7 +2851,7 @@ func (x *Fold) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Fold.ProtoReflect.Descriptor instead.
 func (*Fold) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{29}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Fold) GetField() string {
@@ -2753,7 +2898,7 @@ type Sigil struct {
 
 func (x *Sigil) Reset() {
 	*x = Sigil{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2765,7 +2910,7 @@ func (x *Sigil) String() string {
 func (*Sigil) ProtoMessage() {}
 
 func (x *Sigil) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2778,7 +2923,7 @@ func (x *Sigil) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sigil.ProtoReflect.Descriptor instead.
 func (*Sigil) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{30}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Sigil) GetName() string {
@@ -2840,7 +2985,7 @@ type Param struct {
 
 func (x *Param) Reset() {
 	*x = Param{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2852,7 +2997,7 @@ func (x *Param) String() string {
 func (*Param) ProtoMessage() {}
 
 func (x *Param) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2865,7 +3010,7 @@ func (x *Param) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Param.ProtoReflect.Descriptor instead.
 func (*Param) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{31}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *Param) GetName() string {
@@ -2916,7 +3061,7 @@ type Field struct {
 
 func (x *Field) Reset() {
 	*x = Field{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2928,7 +3073,7 @@ func (x *Field) String() string {
 func (*Field) ProtoMessage() {}
 
 func (x *Field) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2941,7 +3086,7 @@ func (x *Field) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Field.ProtoReflect.Descriptor instead.
 func (*Field) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{32}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *Field) GetName() string {
@@ -2976,7 +3121,7 @@ type Endpoint struct {
 
 func (x *Endpoint) Reset() {
 	*x = Endpoint{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2988,7 +3133,7 @@ func (x *Endpoint) String() string {
 func (*Endpoint) ProtoMessage() {}
 
 func (x *Endpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3001,7 +3146,7 @@ func (x *Endpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Endpoint.ProtoReflect.Descriptor instead.
 func (*Endpoint) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{33}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *Endpoint) GetMethod() string {
@@ -3034,7 +3179,7 @@ type Refusal struct {
 
 func (x *Refusal) Reset() {
 	*x = Refusal{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[34]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3046,7 +3191,7 @@ func (x *Refusal) String() string {
 func (*Refusal) ProtoMessage() {}
 
 func (x *Refusal) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[34]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3059,7 +3204,7 @@ func (x *Refusal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Refusal.ProtoReflect.Descriptor instead.
 func (*Refusal) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{34}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *Refusal) GetWhy() string {
@@ -3229,7 +3374,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tanswering\x18\x06 \x01(\bR\tanswering\x12\x14\n" +
 	"\x05codex\x18\a \x01(\tR\x05codex\x12#\n" +
 	"\rcodex_version\x18\b \x01(\tR\fcodexVersion\x12\x1b\n" +
-	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\xe2\x02\n" +
+	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\xa7\x04\n" +
 	"\n" +
 	"NodeGoogle\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
@@ -3246,7 +3391,22 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	" \x01(\tR\x02at\x12\x14\n" +
 	"\x05asked\x18\v \x01(\bR\x05asked\x12\x1a\n" +
 	"\baccepted\x18\f \x01(\bR\baccepted\x12\x10\n" +
-	"\x03why\x18\r \x01(\tR\x03why\"\xe7\x03\n" +
+	"\x03why\x18\r \x01(\tR\x03why\x12\x1f\n" +
+	"\vcosts_wired\x18\x0e \x01(\bR\n" +
+	"costsWired\x12#\n" +
+	"\rcosts_connect\x18\x0f \x01(\tR\fcostsConnect\x120\n" +
+	"\abudgets\x18\x10 \x03(\v2\x16.protocol.GoogleBudgetR\abudgets\x12\x14\n" +
+	"\x05limit\x18\x11 \x01(\x01R\x05limit\x12\x16\n" +
+	"\x06halted\x18\x12 \x01(\bR\x06halted\x12\x1d\n" +
+	"\n" +
+	"halted_why\x18\x13 \x01(\tR\thaltedWhy\"\x90\x01\n" +
+	"\fGoogleBudget\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04cost\x18\x02 \x01(\x01R\x04cost\x12\x16\n" +
+	"\x06budget\x18\x03 \x01(\x01R\x06budget\x12\x1a\n" +
+	"\bcurrency\x18\x04 \x01(\tR\bcurrency\x12\x14\n" +
+	"\x05since\x18\x05 \x01(\tR\x05since\x12\x0e\n" +
+	"\x02at\x18\x06 \x01(\tR\x02at\"\xe7\x03\n" +
 	"\rNodeAnthropic\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
 	"\asubject\x18\x02 \x01(\tR\asubject\x12'\n" +
@@ -3347,7 +3507,7 @@ func file_plugin_grpc_protocol_sigil_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*Signum)(nil),             // 0: protocol.Signum
 	(*Node)(nil),               // 1: protocol.Node
@@ -3370,24 +3530,25 @@ var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*CodexSaid)(nil),          // 18: protocol.CodexSaid
 	(*CodexAm)(nil),            // 19: protocol.CodexAm
 	(*NodeGoogle)(nil),         // 20: protocol.NodeGoogle
-	(*NodeAnthropic)(nil),      // 21: protocol.NodeAnthropic
-	(*AnthropicWindow)(nil),    // 22: protocol.AnthropicWindow
-	(*NamespaceKeys)(nil),      // 23: protocol.NamespaceKeys
-	(*NamespaceKey)(nil),       // 24: protocol.NamespaceKey
-	(*PiAm)(nil),               // 25: protocol.PiAm
-	(*NamespaceAgentAm)(nil),   // 26: protocol.NamespaceAgentAm
-	(*Follows)(nil),            // 27: protocol.Follows
-	(*Corresponds)(nil),        // 28: protocol.Corresponds
-	(*Fold)(nil),               // 29: protocol.Fold
-	(*Sigil)(nil),              // 30: protocol.Sigil
-	(*Param)(nil),              // 31: protocol.Param
-	(*Field)(nil),              // 32: protocol.Field
-	(*Endpoint)(nil),           // 33: protocol.Endpoint
-	(*Refusal)(nil),            // 34: protocol.Refusal
+	(*GoogleBudget)(nil),       // 21: protocol.GoogleBudget
+	(*NodeAnthropic)(nil),      // 22: protocol.NodeAnthropic
+	(*AnthropicWindow)(nil),    // 23: protocol.AnthropicWindow
+	(*NamespaceKeys)(nil),      // 24: protocol.NamespaceKeys
+	(*NamespaceKey)(nil),       // 25: protocol.NamespaceKey
+	(*PiAm)(nil),               // 26: protocol.PiAm
+	(*NamespaceAgentAm)(nil),   // 27: protocol.NamespaceAgentAm
+	(*Follows)(nil),            // 28: protocol.Follows
+	(*Corresponds)(nil),        // 29: protocol.Corresponds
+	(*Fold)(nil),               // 30: protocol.Fold
+	(*Sigil)(nil),              // 31: protocol.Sigil
+	(*Param)(nil),              // 32: protocol.Param
+	(*Field)(nil),              // 33: protocol.Field
+	(*Endpoint)(nil),           // 34: protocol.Endpoint
+	(*Refusal)(nil),            // 35: protocol.Refusal
 }
 var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
-	30, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
-	27, // 1: protocol.Signum.follows:type_name -> protocol.Follows
+	31, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
+	28, // 1: protocol.Signum.follows:type_name -> protocol.Follows
 	0,  // 2: protocol.Node.signa:type_name -> protocol.Signum
 	3,  // 3: protocol.Transcript.turns:type_name -> protocol.Turn
 	2,  // 4: protocol.Transcripts.transcripts:type_name -> protocol.Transcript
@@ -3402,23 +3563,24 @@ var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	13, // 13: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
 	18, // 14: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
 	14, // 15: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
-	25, // 16: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
+	26, // 16: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
 	19, // 17: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
-	22, // 18: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
-	24, // 19: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
-	14, // 20: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
-	25, // 21: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
-	19, // 22: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
-	28, // 23: protocol.Follows.columns:type_name -> protocol.Corresponds
-	29, // 24: protocol.Follows.folds:type_name -> protocol.Fold
-	31, // 25: protocol.Sigil.takes:type_name -> protocol.Param
-	32, // 26: protocol.Sigil.gives:type_name -> protocol.Field
-	33, // 27: protocol.Sigil.http:type_name -> protocol.Endpoint
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	21, // 18: protocol.NodeGoogle.budgets:type_name -> protocol.GoogleBudget
+	23, // 19: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
+	25, // 20: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
+	14, // 21: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
+	26, // 22: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
+	19, // 23: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
+	29, // 24: protocol.Follows.columns:type_name -> protocol.Corresponds
+	30, // 25: protocol.Follows.folds:type_name -> protocol.Fold
+	32, // 26: protocol.Sigil.takes:type_name -> protocol.Param
+	33, // 27: protocol.Sigil.gives:type_name -> protocol.Field
+	34, // 28: protocol.Sigil.http:type_name -> protocol.Endpoint
+	29, // [29:29] is the sub-list for method output_type
+	29, // [29:29] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }
@@ -3432,7 +3594,7 @@ func file_plugin_grpc_protocol_sigil_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_sigil_proto_rawDesc), len(file_plugin_grpc_protocol_sigil_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   35,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

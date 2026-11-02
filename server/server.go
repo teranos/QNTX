@@ -105,6 +105,9 @@ type QNTXServer struct {
 	nodeMailer nodeMailer
 	// googleOutcome stands in for mailing ROOT how connecting to Google Cloud ended.
 	googleOutcome func(services.NodeMail)
+	// googleHalted is whether ROOT was last told what costs at Google is halted.
+	googleHalted bool
+	googleHaltMu sync.Mutex
 	// The node's GitHub (ADR-043), made on first use.
 	githubOnce sync.Once
 	github     *gitHub

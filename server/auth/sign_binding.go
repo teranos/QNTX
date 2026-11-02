@@ -51,8 +51,10 @@ type flow struct {
 	// on the first authorization, and never puts it in the token.
 	name string
 	// cloud is ROOT connecting the node to Google Cloud, in project when named.
-	cloud     bool
-	project   string
+	cloud   bool
+	project string
+	// thing is what ROOT's yes is for, beyond connecting the node: "costs".
+	thing     string
 	startedAt time.Time
 }
 

@@ -62,6 +62,7 @@ type Handler struct {
 	// googleCloudLetGo lets ROOT's token go when no setup will.
 	googleCloudProjects GoogleCloudProjects
 	googleCloudLetGo    func(token string)
+	googleCosts         GoogleCostsConnect
 	cloudPicksMu        sync.Mutex
 	cloudPicks          map[string]cloudPick
 	// auth.provider.apple, the same way: the key already resolved, nil on a

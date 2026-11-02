@@ -365,6 +365,34 @@ message NodeGoogle {
   bool accepted = 12;
   // What Google said when it did not.
   string why = 13;
+  // Whether ROOT connected the node's costs.
+  bool costs_wired = 14;
+  // Where ROOT goes to connect them, by saying yes at Google once.
+  string costs_connect = 15;
+  // What each budget last reported.
+  repeated GoogleBudget budgets = 16;
+  // The limit ROOT set on this node; zero is none.
+  double limit = 17;
+  // Whether what costs at Google is halted: 80% of the lower of budget and limit.
+  bool halted = 18;
+  // Why it is.
+  string halted_why = 19;
+}
+
+// GoogleBudget is what a budget at Google Cloud last reported.
+message GoogleBudget {
+  // Its name at Google.
+  string name = 1;
+  // What it has cost so far this period.
+  double cost = 2;
+  // The budget's amount.
+  double budget = 3;
+  // The currency of both.
+  string currency = 4;
+  // When the period began.
+  string since = 5;
+  // When Google published this.
+  string at = 6;
 }
 
 // NodeAnthropic is what anthropic am and anthropic set answer: the node's
