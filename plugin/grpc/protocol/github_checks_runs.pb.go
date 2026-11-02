@@ -23,7 +23,7 @@ const (
 )
 
 // POST /repos/{owner}/{repo}/check-runs
-// "i expect to see a button"
+// "「[Opus 5.5] i expect to see a button」"
 // 「[Opus 5.5] The page's body is a oneOf on status, and each arm takes these: name and」
 // 「[Opus 5.5] head_sha required, actions the buttons a person with write access can press.」
 type GitHubCreateACheckRunRequest struct {
