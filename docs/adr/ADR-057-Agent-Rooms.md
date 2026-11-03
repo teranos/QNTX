@@ -27,3 +27,5 @@ think, creating a new abstraction about Rooms as a Plugin Provided service
 think, switch core + adapter as a plugin that provides us the Room abstraction.
 think, same thing for buzz.xyz
 
+https://docs.switchagents.ai/switch-rooms/internals/agent-connection#connect-over-the-websocket
+
