@@ -41,7 +41,7 @@ Future (Option B): plugins enqueue background LLM work as Pulse jobs instead of 
 
 ## Observability (planned — CWEV)
 
-Weave creation belongs in core, not in individual providers. Core sees all LLM traffic; providers only do inference. --> 
+Weave creation belongs in core, not in individual providers. Core sees all LLM traffic; providers only do inference. --> wasnt this moved already ?
 
 ## Provider resolution
 
