@@ -1,4 +1,4 @@
-// Package agy makes "a start on agy as another harness" beside Claude Code, Pi and Codex.
+// 「[Opus 5.5] Package agy makes "a start on agy as another harness" beside Claude Code, Pi and Codex.」
 package agy
 
 import (
@@ -24,15 +24,15 @@ type Pin struct {
 	Artifacts     map[string]Artifact
 }
 
-// member is what every agy archive holds: agy's installer puts it at ~/.local/bin/agy.
+// 「[Opus 5.5] member is what every agy archive holds: agy's installer puts it at ~/.local/bin/agy.」
 const member = "antigravity"
 
-// updates keeps a pinned agy the pinned agy. Unset, its first run replaces its
-// own executable with the newest release (1.4.4 became 1.4.12). Only the value
-// "true" holds it: "1", "TRUE" and "yes" each let it update.
+// 「[Opus 5.5] updates keeps a pinned agy the pinned agy. Unset, its first run replaces its」
+// 「[Opus 5.5] own executable with the newest release (1.4.4 became 1.4.12). Only the value」
+// 「[Opus 5.5] "true" holds it: "1", "TRUE" and "yes" each let it update.」
 const updates = "AGY_CLI_DISABLE_AUTO_UPDATE=true"
 
-// PinnedVersion is the agy Parity pins, as what is said of a turn names it.
+// 「[Opus 5.5] PinnedVersion is the agy Parity pins, as what is said of a turn names it.」
 var PinnedVersion = func() string {
 	version, _, err := parity.Agy()
 	if err != nil {
@@ -61,8 +61,8 @@ func Platform() (string, error) {
 	return runtime.GOOS + "-" + arch, nil
 }
 
-// Ensure verifies the archive on every call and extracts a fresh executable.
-// The pin authenticates the archive; a cached executable has no pinned hash.
+// 「[Opus 5.5] Ensure verifies the archive on every call and extracts a fresh executable.」
+// 「[Opus 5.5] The pin authenticates the archive; a cached executable has no pinned hash.」
 func (p Pin) Ensure(ctx context.Context, dir string) (string, error) {
 	platform, err := Platform()
 	if err != nil {
@@ -189,7 +189,7 @@ func extract(src io.Reader, target string) error {
 		}
 		found = true
 	}
-	// Drain gzip as well: its checksum follows the tar end marker.
+	// 「[Opus 5.5] Drain gzip as well: its checksum follows the tar end marker.」
 	if _, err := io.Copy(io.Discard, gz); err != nil {
 		return errors.Wrap(err, "agy gzip archive was cut short")
 	}
