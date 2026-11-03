@@ -28,9 +28,8 @@ registry.Register(externalProxy)
 Plugin characteristics:
 - Standalone binaries in `./qntx-plugins/` (first-party) or external repositories
 - Communicates to QNTX via gRPC only
-- Added, configured and enabled via the API or Signa
+- Added, configured and enabled via Signa
 - Run in separate processes for isolation
-- Discovered from configured search paths
 - [Hot-swappable](./ADR-002-plugin-configuration.md) — enable/disable at runtime without server restart
 
 ### Interface Contract
