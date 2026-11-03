@@ -1,7 +1,7 @@
 # ADR-050: Comet
 
 Date: 2026-10-08
-Status: Accepted 
+Status: 3nov, implemented mostly, what's left is polish 
 pre-0.9.0-polish-blocker 
 
 "the feature i am imagining is called comet"
