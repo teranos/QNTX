@@ -2,6 +2,7 @@
 
 Date: 2026-09-28
 Status: Proposed
+pre-0.9.0-polish-blocker 
 
 brandon: "So, this concept, it will be called Forge in the future, 1356, 1352, 1349 are where work already started."
 
