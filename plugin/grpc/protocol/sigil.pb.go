@@ -937,7 +937,7 @@ func (x *ElementSessions) GetSessions() []*ElementSession {
 // ClaudeSaid is what claude say answers.
 type ClaudeSaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// What it answered.
+	// 「[Opus 5.5] What it answered.」
 	Answer string `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
 	// Whether Claude Code reports the turn as failed, in the answer's words.
 	IsError bool `protobuf:"varint,2,opt,name=is_error,json=isError,proto3" json:"is_error,omitempty"`
@@ -945,7 +945,7 @@ type ClaudeSaid struct {
 	Subtype string `protobuf:"bytes,3,opt,name=subtype,proto3" json:"subtype,omitempty"`
 	// The session it was said in.
 	Session string `protobuf:"bytes,4,opt,name=session,proto3" json:"session,omitempty"`
-	// The model that answered.
+	// 「[Opus 5.5] The model that answered.」
 	Model string `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
 	// The Claude Code that ran.
 	ClaudeCode string `protobuf:"bytes,6,opt,name=claude_code,json=claudeCode,proto3" json:"claude_code,omitempty"`
@@ -955,9 +955,9 @@ type ClaudeSaid struct {
 	Denied []string `protobuf:"bytes,8,rep,name=denied,proto3" json:"denied,omitempty"`
 	// What Claude Code says the turn cost.
 	CostUsd float64 `protobuf:"fixed64,9,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
-	// How long the turn took.
+	// 「[Opus 5.5] How long the turn took.」
 	TookMs float64 `protobuf:"fixed64,10,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
-	// Why a row of the session was not written down, when one was not.
+	// 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
 	Unwritten     string `protobuf:"bytes,11,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1073,7 +1073,7 @@ func (x *ClaudeSaid) GetUnwritten() string {
 // PiSaid is what pi say answers.
 type PiSaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// What it answered.
+	// 「[Opus 5.5] What it answered.」
 	Answer string `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
 	// Whether the turn ended in error, in the answer's words.
 	IsError bool `protobuf:"varint,2,opt,name=is_error,json=isError,proto3" json:"is_error,omitempty"`
@@ -1081,15 +1081,15 @@ type PiSaid struct {
 	Stop string `protobuf:"bytes,3,opt,name=stop,proto3" json:"stop,omitempty"`
 	// The session it was said in.
 	Session string `protobuf:"bytes,4,opt,name=session,proto3" json:"session,omitempty"`
-	// The model that answered.
+	// 「[Opus 5.5] The model that answered.」
 	Model string `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
 	// The Pi that ran.
 	PiVersion string `protobuf:"bytes,6,opt,name=pi_version,json=piVersion,proto3" json:"pi_version,omitempty"`
 	// What Pi says the turn's model calls cost.
 	CostUsd float64 `protobuf:"fixed64,7,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
-	// How long the turn took.
+	// 「[Opus 5.5] How long the turn took.」
 	TookMs float64 `protobuf:"fixed64,8,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
-	// Why a row of the session was not written down, when one was not.
+	// 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
 	Unwritten     string `protobuf:"bytes,9,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1191,7 +1191,7 @@ func (x *PiSaid) GetUnwritten() string {
 // ClaudeAm is what claude am answers.
 type ClaudeAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Its own DID, which signs what it writes down.
+	// 「[Opus 5.5] Its own DID, which signs what it writes down.」
 	Did string `protobuf:"bytes,1,opt,name=did,proto3" json:"did,omitempty"`
 	// The model am.toml names.
 	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
@@ -1417,7 +1417,7 @@ type NodeAgentSaid struct {
 	Pi *PiSaid `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
 	// What it answered in codex.
 	Codex *CodexSaid `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
-	// What it answered in agy.
+	// 「[Opus 5.5] What it answered in agy.」
 	Agy           *AgySaid `protobuf:"bytes,4,opt,name=agy,proto3" json:"agy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1491,7 +1491,7 @@ type NodeAgentAm struct {
 	Pi *PiAm `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
 	// In codex.
 	Codex *CodexAm `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
-	// In agy.
+	// 「[Opus 5.5] In agy.」
 	Agy           *AgyAm `protobuf:"bytes,4,opt,name=agy,proto3" json:"agy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1558,20 +1558,20 @@ func (x *NodeAgentAm) GetAgy() *AgyAm {
 // CodexSaid is what an agent answered in codex.
 type CodexSaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// What it answered.
+	// 「[Opus 5.5] What it answered.」
 	Answer string `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
 	// The session it was said in: the node's, apart from codex's own thread.
 	Session string `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
-	// The model that answered.
+	// 「[Opus 5.5] The model that answered.」
 	Model string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
 	// The codex that ran.
 	CodexVersion string `protobuf:"bytes,4,opt,name=codex_version,json=codexVersion,proto3" json:"codex_version,omitempty"`
 	// What codex says the turn used, in tokens.
 	InputTokens  int64 `protobuf:"varint,5,opt,name=input_tokens,json=inputTokens,proto3" json:"input_tokens,omitempty"`
 	OutputTokens int64 `protobuf:"varint,6,opt,name=output_tokens,json=outputTokens,proto3" json:"output_tokens,omitempty"`
-	// How long the turn took.
+	// 「[Opus 5.5] How long the turn took.」
 	TookMs float64 `protobuf:"fixed64,7,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
-	// Why a row of the session was not written down, when one was not.
+	// 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
 	Unwritten string `protobuf:"bytes,8,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
 	// The CLI thread used to resume, distinct from the transcript session.
 	Thread        string `protobuf:"bytes,9,opt,name=thread,proto3" json:"thread,omitempty"`
@@ -1675,7 +1675,7 @@ func (x *CodexSaid) GetThread() string {
 // CodexAm is who an agent is in codex and how the node runs it.
 type CodexAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Its own DID, which signs what it writes down.
+	// 「[Opus 5.5] Its own DID, which signs what it writes down.」
 	Did string `protobuf:"bytes,1,opt,name=did,proto3" json:"did,omitempty"`
 	// The model am.toml names.
 	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
@@ -1790,25 +1790,25 @@ func (x *CodexAm) GetNotReady() string {
 	return ""
 }
 
-// AgySaid is what an agent answered in agy.
+// 「[Opus 5.5] AgySaid is what an agent answered in agy.」
 type AgySaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// What it answered.
+	// 「[Opus 5.5] What it answered.」
 	Answer string `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
-	// The session it was said in: the node's, apart from agy's own conversation.
+	// 「[Opus 5.5] The session it was said in: the node's, apart from agy's own conversation.」
 	Session string `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
-	// The model that answered.
+	// 「[Opus 5.5] The model that answered.」
 	Model string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	// The agy that ran.
+	// 「[Opus 5.5] The agy that ran.」
 	AgyVersion string `protobuf:"bytes,4,opt,name=agy_version,json=agyVersion,proto3" json:"agy_version,omitempty"`
-	// The context agy last reported over ACP: the tokens in it, and its window.
+	// 「[Opus 5.5] The context agy last reported over ACP: the tokens in it, and its window.」
 	ContextUsed int64 `protobuf:"varint,5,opt,name=context_used,json=contextUsed,proto3" json:"context_used,omitempty"`
 	ContextSize int64 `protobuf:"varint,6,opt,name=context_size,json=contextSize,proto3" json:"context_size,omitempty"`
-	// How long the turn took.
+	// 「[Opus 5.5] How long the turn took.」
 	TookMs float64 `protobuf:"fixed64,7,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
-	// Why a row of the session was not written down, when one was not.
+	// 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
 	Unwritten string `protobuf:"bytes,8,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
-	// agy's own ACP session, which it resumes, distinct from the transcript session.
+	// 「[Opus 5.5] agy's own ACP session, which it resumes, distinct from the transcript session.」
 	Conversation  string `protobuf:"bytes,9,opt,name=conversation,proto3" json:"conversation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1839,7 +1839,7 @@ func (x *AgySaid) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AgySaid.ProtoReflect.Descriptor instead.
+// 「[Opus 5.5] Deprecated: Use AgySaid.ProtoReflect.Descriptor instead.」
 func (*AgySaid) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{20}
 }
@@ -1907,22 +1907,22 @@ func (x *AgySaid) GetConversation() string {
 	return ""
 }
 
-// AgyAm is who an agent is in agy and how the node runs it.
+// 「[Opus 5.5] AgyAm is who an agent is in agy and how the node runs it.」
 type AgyAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Its own DID, which signs what it writes down.
+	// 「[Opus 5.5] Its own DID, which signs what it writes down.」
 	Did string `protobuf:"bytes,1,opt,name=did,proto3" json:"did,omitempty"`
-	// The model it runs: the value of its session's model option, as agy offers it.
+	// 「[Opus 5.5] The model it runs: the value of its session's model option, as agy offers it.」
 	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
-	// The session it continues in agy, or empty before anything was said to it there.
+	// 「[Opus 5.5] The session it continues in agy, or empty before anything was said to it there.」
 	Session string `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
-	// Whether it is in a turn in agy now.
+	// 「[Opus 5.5] Whether it is in a turn in agy now.」
 	Answering bool `protobuf:"varint,4,opt,name=answering,proto3" json:"answering,omitempty"`
-	// Where the agy it runs is, or empty when the node has none yet.
+	// 「[Opus 5.5] Where the agy it runs is, or empty when the node has none yet.」
 	Agy string `protobuf:"bytes,5,opt,name=agy,proto3" json:"agy,omitempty"`
-	// The agy this build pins.
+	// 「[Opus 5.5] The agy this build pins.」
 	AgyVersion string `protobuf:"bytes,6,opt,name=agy_version,json=agyVersion,proto3" json:"agy_version,omitempty"`
-	// Why it cannot be spoken to in agy, when it cannot.
+	// 「[Opus 5.5] Why it cannot be spoken to in agy, when it cannot.」
 	NotReady      string `protobuf:"bytes,7,opt,name=not_ready,json=notReady,proto3" json:"not_ready,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1953,7 +1953,7 @@ func (x *AgyAm) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AgyAm.ProtoReflect.Descriptor instead.
+// 「[Opus 5.5] Deprecated: Use AgyAm.ProtoReflect.Descriptor instead.」
 func (*AgyAm) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{21}
 }
@@ -2042,9 +2042,9 @@ type NodeGoogle struct {
 	CostsWired bool `protobuf:"varint,14,opt,name=costs_wired,json=costsWired,proto3" json:"costs_wired,omitempty"`
 	// Where ROOT goes to connect them, by saying yes at Google once.
 	CostsConnect string `protobuf:"bytes,15,opt,name=costs_connect,json=costsConnect,proto3" json:"costs_connect,omitempty"`
-	// Whether ROOT let the node call Vertex AI, which agy runs on.
+	// 「[Opus 5.5] Whether ROOT let the node call Vertex AI, which agy runs on.」
 	AgyWired bool `protobuf:"varint,20,opt,name=agy_wired,json=agyWired,proto3" json:"agy_wired,omitempty"`
-	// Where ROOT goes to let it, by saying yes at Google once.
+	// 「[Opus 5.5] Where ROOT goes to let it, by saying yes at Google once.」
 	AgyConnect string `protobuf:"bytes,21,opt,name=agy_connect,json=agyConnect,proto3" json:"agy_connect,omitempty"`
 	// What each budget last reported.
 	Budgets []*GoogleBudget `protobuf:"bytes,16,rep,name=budgets,proto3" json:"budgets,omitempty"`
@@ -2760,7 +2760,7 @@ func (x *NamespaceKey) GetWhy() string {
 // PiAm is what pi am answers.
 type PiAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Its own DID, which signs what it writes down.
+	// 「[Opus 5.5] Its own DID, which signs what it writes down.」
 	Did string `protobuf:"bytes,1,opt,name=did,proto3" json:"did,omitempty"`
 	// The model it runs in Pi: am.toml's for the Node Agent, the AGENT line's for
 	// a namespace's agent.
