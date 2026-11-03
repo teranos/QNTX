@@ -1,4 +1,4 @@
-# ADR-014: LLM as a Plugin-Provided Service
+
 
 ## Status
 Implemented
