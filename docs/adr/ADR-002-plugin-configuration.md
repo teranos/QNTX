@@ -4,9 +4,6 @@ Plugins are added, configured, enabled and disabled at runtime.
 
 "I log in to QNTX, open the plugin element, press +, enter a repository URL and confirm. The plugin starts disabled; I edit its config and enable it, and I don't think about it anymore."
 
-"i expect it to be a bigger + button as part of the list, like an empty plugin ready to become something."
-
-
 "it is qntx that actually owns this"
 
 A plugin is its record on the node: its repository, whether it is enabled, and its config. The plugin element and the `plugins` signum write the record. This document is the reference for how a plugin gets onto a node and stays running there.
