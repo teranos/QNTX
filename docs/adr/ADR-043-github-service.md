@@ -6,11 +6,11 @@ pre-0.9.0-polish-blocker
 
 brandon: "So, this concept, it will be called Forge in the future, 1356, 1352, 1349 are where work already started."
 
-"GitHubService needs to be a thing, and QNTX should own it."
+"ForgeService needs to be a thing, and QNTX should own it."
 
-"because of the GitHubService the ratelimit is kept in one place"
+"because of the ForgeService the ratelimit is kept in one place"
 
-"the GitHubService is per namespace, QNTX should be able to deal with multiple tokens set by Authenticated users"
+"the ForgeService is per namespace, QNTX should be able to deal with multiple tokens set by Authenticated users"
 
 
 "to see which namespaces have it enabled and if their auth is correct, and wheter is comes from them setting an access token or via OAuth (Oauth path doesnt exist yet, but will)"
