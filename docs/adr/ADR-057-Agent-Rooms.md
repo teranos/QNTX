@@ -20,7 +20,7 @@ think shared message board
 
 think Agent participation in multiple rooms
 
-think, making our Agent Harnesses work with switch 
+
 
 think, creating a new abstraction about Rooms as a Plugin Provided service
 
@@ -29,6 +29,7 @@ think, same thing for buzz.xyz
 
 https://docs.switchagents.ai/switch-rooms/internals/agent-connection#connect-over-the-websocket
 
+think, making our Agent Harnesses work with switch agents
 - Check if this will work in a way that a Plugin Provided Service can use the existing QNTX managed harnesses. 
 
 Rooms as a Plugin Provided service 
