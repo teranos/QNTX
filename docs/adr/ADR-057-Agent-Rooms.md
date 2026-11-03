@@ -13,4 +13,9 @@ think buzz.xyz
 
 think [[Agent Swarm]]s
 
-think telegram, 
+think telegram, slack, etc. 
+
+
+think shared message board
+
+think Agent parti
