@@ -9,10 +9,7 @@
 All non-core functionality is implemented through plugin provided services.
 
 Every plugin implements similar interfaces for equivalent work and follows the same lifecycle. A plugin can decide how much of the contract it implements 
-
-
 ### Plugin Boundary
-
 
 - A plugin that provides a service registers it with core. Other plugins can consume these services through `ServiceRegistry` without knowing which plugin implemented the `.proto`.
 - No direct plugin-to-plugin calls.
