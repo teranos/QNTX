@@ -12,37 +12,22 @@ brandon: "so, i do receive the e-mail, but there are errors in there about tryin
 "for a user that is one of the root identities, i want to receive a weekly report."
 "y attestations got created per namespace"
 "x users registered per namespace"
-
 "z node restarts"
-
 "downtime over last week"
-
 "downtime over last 3 weeks"
-
 "CPU over 7 days graph"
-
 "MEM over 7 days graph"
-
 "boot.subsystem.took over 7 days"
-
 "7d total host.net.in"
-
 "7d total host.net.out"
-
 "query took over 7d, top three slowest query"
-
 "host swap over 7d graph"
-
 "top 3 4xx, top 3 5xx"
-
 "top 3 handler failures"
-
 "can you do it please to the degree that is feasible given sentry access?"
 
 "I WANT TO SEE THE THREE MOST FREQUENTLY OCCURING ONES"
-
 "AND FOR HANDLER THE SAME"
-
 "I WANT TO SEE WHAT WAS TRIED TO ACCESS INSTEAD"
 
 - The 4xx and 5xx are the three paths asked for most, with their status.
