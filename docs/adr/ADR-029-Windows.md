@@ -18,8 +18,7 @@ stable and alive and no maintenance"
 "and honestly, i think about just deleting it after all"
 
 "ok, delete it"
-
-"focus on getting rid of windows"
+"focus on getting rid of windows support"
 
 ## Consequences
 
