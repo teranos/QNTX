@@ -3,3 +3,7 @@
 [[ADR-053-Namespace-Agents]]
 [[ADR-055-Agent-Memory]]
 
+
+
+Agent rooms
+
