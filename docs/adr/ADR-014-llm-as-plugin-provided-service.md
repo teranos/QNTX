@@ -1,7 +1,7 @@
 
 
 ## Status
-Implemented, check for streaming 
+Implemented, check for streaming changes andor document it
 
 in progress: otari
 ## Context
