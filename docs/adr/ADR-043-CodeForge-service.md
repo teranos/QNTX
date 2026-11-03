@@ -43,7 +43,7 @@ redelivering the webhook's deliveries.
 
 
 
-A `GITHUB` token is the third kind, after `OAUTH` and `REFRESH`.
+A `GITHUB` token is the another kind, after `OAUTH` and `REFRESH`.
 
 "the node should be the root identity github for github as a base"
 
