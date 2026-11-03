@@ -14,8 +14,8 @@ Every plugin implements similar interfaces for equivalent work and follows the s
 ### Plugin Boundary
 
 
-- A plugin that provides a service registers it with core. Other plugins can consume these services through `ServiceRegistry` without knowing which plugin implemented the proto.
-- No direct plugin-to-plugin calls — core mediates all inter-plugin communication.
+- A plugin that provides a service registers it with core. Other plugins can consume these services through `ServiceRegistry` without knowing which plugin implemented the `.proto`.
+- No direct plugin-to-plugin calls.
 
 ### Plugin Model
 
