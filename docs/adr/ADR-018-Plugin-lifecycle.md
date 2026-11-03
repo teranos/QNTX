@@ -7,6 +7,8 @@
 
 
 Is this more about Plugin lifecycle ?
+
+
 ## Context
 
 Plugins are separate processes that communicate with QNTX over gRPC. The lifecycle — boot, initialization, health monitoring, restart, shutdown — has implicit contracts that caused real bugs: double initialization, stale connections, silent watcher failures. This ADR documents the full plugin lifecycle and the watcher subsystem as canonical references.
