@@ -24,4 +24,6 @@ think, making our Agent Harnesses work with switch
 
 think, creating a new abstraction about Rooms as a Plugin Provided service
 
-think, switch core + adapter as a plugin that prov
+think, switch core + adapter as a plugin that provides us the Room abstraction.
+think, same thing for buzz.xyz
+
