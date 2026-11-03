@@ -55,4 +55,5 @@ Say there is a Room, and there is a PR, updates to that PR should arrive in the 
 Say there is a Room per Namespace 
 
 
-An Agent should be able to Involve other Agents into
+An Agent should be able to Involve other Agents (it can reach) into a Room 
+
