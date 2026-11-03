@@ -10,19 +10,10 @@ All non-core functionality is implemented through plugin provided services.
 
 Every plugin implements similar interfaces for equivalent work and follows the same lifecycle. A plugin can decide how much of the contract it implements 
 
-### Minimal Core Philosophy
-
-QNTX core is supposed to be minimal and runs without any plugins:
-- **Core components**: ATS (attestation system), Database (⊔), Pulse (꩜), Server
-- **All domains are plugins**: Code, finance, legal, biotech, etc. are external plugins
-- **Optional by default**: No plugins enabled in default configuration
-- **Explicit opt-in**: Users add and enable plugins in the plugin element
-
-This ensures QNTX core remains focused on infrastructure, not domain logic.
 
 ### Plugin Boundary
 
-- Plugins are **isolated** — no shared memory, no direct method calls. Communication flows through core-mediated gRPC services and the shared attestation store.
+
 - A plugin that provides a service (LLM, search, embedding, Python) registers it with core. Other plugins consume these services through `ServiceRegistry` without knowing which plugin provides them.
 - No direct plugin-to-plugin calls — core mediates all inter-plugin communication.
 
