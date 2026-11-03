@@ -132,4 +132,4 @@ Optional interfaces extend the base — a plugin opts in by implementing them:
 
 - [ADR-002: Plugin Configuration Management](./ADR-002-plugin-configuration.md)
 - [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
-- [ADR-043: GitHubService](./ADR-043-github-service.md) — plugins as records in the node's system store, builds from the runner
+- [ADR-043: GitHubService](ADR-043-CodeForge-service.md) — plugins as records in the node's system store, builds from the runner
