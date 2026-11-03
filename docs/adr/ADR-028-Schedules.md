@@ -2,8 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-06
-**Related:** [[ADR-018-watcher-lifecycle]], ADR-024 (Parquet Storage Backend)
-
+**Related:** [[ADR-018-watcher-lifecycle]] 
 ## Context
 
 > A schedule kept running after the decorator that declared it was removed.
