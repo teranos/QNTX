@@ -8,11 +8,11 @@
 
 All non-core functionality is implemented through plugin provided services.
 
-Every plugin implements similar interfaces for equivalent work and follows the same lifecycle. A plugin can decide how much of the contract it implements  it can provide HTTP endpoints, WebSocket handlers, gRPC services, custom element, or any combination. Improvements to QNTX core services benefit all plugins automatically.
+Every plugin implements similar interfaces for equivalent work and follows the same lifecycle. A plugin can decide how much of the contract it implements 
 
 ### Minimal Core Philosophy
 
-QNTX core is minimal and runs without any plugins:
+QNTX core is supposed to be minimal and runs without any plugins:
 - **Core components**: ATS (attestation system), Database (⊔), Pulse (꩜), Server
 - **All domains are plugins**: Code, finance, legal, biotech, etc. are external plugins
 - **Optional by default**: No plugins enabled in default configuration
