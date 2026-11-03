@@ -174,9 +174,6 @@ When things go wrong, QNTX emits:
 - WebSocket keepalive requirement is discoverable before hitting the error
 - Error messages can be cross-referenced against this document
 
-### Negative
-
-- Another document to maintain as the watcher system evolves
 
 ## Related
 
