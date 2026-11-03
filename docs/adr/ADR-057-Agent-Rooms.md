@@ -5,7 +5,7 @@
 [[ADR-055-Agent-Memory]]
 
 
-pre-0.9.0-polish-blocker 
+pre-0.999.0-polish-blocker 
 
 Agent rooms
 
