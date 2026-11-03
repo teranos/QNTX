@@ -31,7 +31,7 @@ brandon: "So, this concept, it will be called Forge in the future, 1356, 1352, 1
 
 ## Decided
 
-"that means no am.toml"
+
 
 
 The App's own credentials are the operator's, and they are in am.toml under
@@ -41,7 +41,7 @@ ceremony spends. `private_key` is the App's private key, PEM, which signs the
 JWT GitHub requires of a call made as the App itself, such as listing and
 redelivering the webhook's deliveries.
 
-"it would not be an attestation"
+
 
 A `GITHUB` token is the third kind, after `OAUTH` and `REFRESH`.
 
