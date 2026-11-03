@@ -6,7 +6,9 @@
 
 ## Decision
 
-All non-core functionality is implemented through [[provided]] plugins. Every plugin implements the same interface and follows the same lifecycle. A plugin decides how much it implements — it can provide HTTP endpoints, WebSocket handlers, gRPC services, custom element, or any combination. Improvements to QNTX core services benefit all plugins automatically.
+All non-core functionality is implemented through plugin provided services.
+
+Every plugin implements the same interface and follows the same lifecycle. A plugin decides how much it implements — it can provide HTTP endpoints, WebSocket handlers, gRPC services, custom element, or any combination. Improvements to QNTX core services benefit all plugins automatically.
 
 ### Minimal Core Philosophy
 
