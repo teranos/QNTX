@@ -6,12 +6,12 @@ import (
 	"time"
 )
 
-// silentAfter is how long a turn says nothing before it is told. Measured: gemini-3.8-flash
-// answered 503 and agy said nothing for 3 minutes, which reads as a hang.
+// 「[Opus 5.5] silentAfter is how long a turn says nothing before it is told. Measured: gemini-3.8-flash」
+// 「[Opus 5.5] answered 503 and agy said nothing for 3 minutes, which reads as a hang.」
 var silentAfter = time.Minute
 
-// watchSilence tells told, with what logs says, each time after passes without heard being
-// called. stop ends it, and nothing is told after stop returns.
+// 「[Opus 5.5] watchSilence tells told, with what logs says, each time after passes without heard being」
+// 「[Opus 5.5] called. stop ends it, and nothing is told after stop returns.」
 func watchSilence(after time.Duration, logs func() string, told func(string)) (heard, stop func()) {
 	var last atomic.Int64
 	last.Store(time.Now().UnixNano())
