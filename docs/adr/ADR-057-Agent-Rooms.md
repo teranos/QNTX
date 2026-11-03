@@ -10,7 +10,7 @@ pre-0.999.0-polish-blocker
 
 Agent rooms
 
-
+Inside of a QNTX Cluster, only one node is ever respon
 
 think https://docs.switchagents.ai/
 
