@@ -6,12 +6,7 @@
 
 ## Context
 
-QNTX initially had software development functionality (git ingestion, GitHub integration, gopls language server, code editor) tightly coupled to the core. This created challenges:
 
-1. **Scope Creep**: Core repository accumulated domain-specific code (code, biotech, finance, etc.)
-2. **Coupling**: Domain logic mixed with core attestation/graph infrastructure
-3. **Maintenance**: Changes to one domain risked breaking others
-4. **Third-Party Extensions**: No mechanism for private/external domain implementations
 
 ## Decision
 
