@@ -1,7 +1,7 @@
 # ADR-038: MCP
 
 Date: 2026-09-15
-Status: Active and in use, how obs
+Status: Active and in use, how observable is this through sentry? Or through 
 
 Is QNTX's role in MCP to be the host?
 
