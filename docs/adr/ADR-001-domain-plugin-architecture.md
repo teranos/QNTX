@@ -6,7 +6,7 @@
 
 ## Decision
 
-Every plugin implements similar interfaces for equivalent work and follows the same lifecycle. A plugin maintainer decides how much of the contract they want to implement.  
+Every plugin implements similar interfaces for equivalent work and follows the same lifecycle. The plugin maintainer decides how much of the providedcontract they want to implement.  
 ### Plugin Boundary
 
 - A plugin that provides a service registers it with core. Other plugins can consume these services through `ServiceRegistry` without knowing which plugin implemented the `.proto`.
