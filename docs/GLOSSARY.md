@@ -29,9 +29,9 @@ Identified by `_distill: true` in attributes, `source: "distill"`, and predicate
 
 “making an early start on the Codex Agent runtime”: the [initial runtime package](https://github.com/teranos/QNTX/blob/main/internal/codex/README.md), beside Claude Code and Pi. It runs as a Node Agent and as a selectable namespace harness, with a persisted thread and signed transcript. Namespace authentication setup remains separate work.
 
-### agy runtime
+### 「[Opus 5.5] agy runtime」
 
-“making a start on agy as another harness”: the [initial runtime package](https://github.com/teranos/QNTX/blob/main/internal/agy/README.md), beside Claude Code, Pi and Codex. “wiring it into node and namespace config as an actual harness”: the Node Agent runs in it under `[agent.root.agy]`, and a namespace's agent with `agents set`, harness `agy`, on the namespace's `gemini` key. “correct it for libACP client use for agy”: it runs as `agy acp`, agy 1.4.12's Agent Client Protocol server, through libACP's client ([internal/acp](https://github.com/teranos/QNTX/blob/main/internal/acp)).
+「[Opus 5.5] “making a start on agy as another harness”: the [initial runtime package](https://github.com/teranos/QNTX/blob/main/internal/agy/README.md), beside Claude Code, Pi and Codex. “wiring it into node and namespace config as an actual harness”: the Node Agent runs in it under `[agent.root.agy]`, and a namespace's agent with `agents set`, harness `agy`, on the namespace's `gemini` key. “correct it for libACP client use for agy”: it runs as `agy acp`, agy 1.4.12's Agent Client Protocol server, through libACP's client ([internal/acp](https://github.com/teranos/QNTX/blob/main/internal/acp)).」
 
 ## Symbols
 
