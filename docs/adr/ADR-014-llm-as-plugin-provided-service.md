@@ -23,7 +23,7 @@ The original `LLMChatRequest` carried `system_prompt` + `user_prompt` — two st
 
 A `repeated ChatMessage messages` field (field 8) extends the protocol to carry full conversation history. Both plugins already send a messages array internally — scry passes it to `llama_chat_apply_template`, OpenRouter posts it to the `/v1/chat/completions` endpoint. The change is accepting a longer array, not a structural redesign. --> what change? is this a changelog or an ADR ?
 
-`system_prompt` and `user_prompt` are deprecated. When `messages` is populated it takes precedence; the old fields remain for backwards compatibility. 
+`system_prompt` and `user_prompt` are deprecated. When `messages` is populated it takes precedence; the old fields remain for backwards compatibility. 0.888.0-blocker is to actually delet
 
 A prompt's history is the canvas. `ConversationAssembler` (`server/conversation.go`) walks the composition DAG upstream from the current element, queries prompt-result attestations for each ancestor, and builds an ordered message array sorted by timestamp. `HandlePromptDirect` injects this history into `ChatRequest.Messages` before forwarding to the LLM plugin. Neither plugin stores conversation state; they receive a snapshot and execute.
 
