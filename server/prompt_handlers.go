@@ -55,6 +55,9 @@ type PromptDirectResponse struct {
 	CompletionTokens int                   `json:"completion_tokens,omitempty"`
 	TotalTokens      int                   `json:"total_tokens,omitempty"`
 	Error            string                `json:"error,omitempty"`
+	// Served is how the call was served, when its provider reports it:
+	// requested provider and model beside the upstream that served it.
+	Served *provider.Served `json:"served,omitempty"`
 }
 
 // Result represents the output of a prompt execution
@@ -311,6 +314,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		PromptTokens:     resp.Usage.PromptTokens,
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
+		Served:           resp.Served,
 	}
 
 	respond(w, s.logger, http.StatusOK, response)
@@ -477,6 +481,12 @@ func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, r
 		},
 		CreatedAt: now,
 	}
+	// What the provider reports of how the call was served, each under its
+	// own name: the subject stays the model asked for, and what answered is
+	// written beside it, never over it.
+	for key, value := range servedAttributes(resp.Served) {
+		as.Attributes[key] = value
+	}
 
 	if err := s.held.Served().CreateAttestation(as); err != nil {
 		s.logger.Warnw("Failed to create prompt-result attestation",
@@ -512,6 +522,7 @@ func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient pr
 	var content strings.Builder
 	var streamModel string
 	var promptTokens, completionTokens, totalTokens int
+	var served *provider.Served
 
 	for chunk := range streamChan {
 		if chunk.Error != nil {
@@ -533,6 +544,10 @@ func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient pr
 			msg.PromptTokens = chunk.PromptTokens
 			msg.CompletionTokens = chunk.CompletionTokens
 			msg.TotalTokens = chunk.TotalTokens
+		}
+		if chunk.Served != nil {
+			msg.Served = chunk.Served
+			served = chunk.Served
 		}
 
 		if chunk.Signal != nil {
@@ -584,7 +599,38 @@ func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient pr
 			CompletionTokens: completionTokens,
 			TotalTokens:      totalTokens,
 		},
+		Served: served,
 	}
+}
+
+// servedAttributes are a provider's report of how a call was served, as
+// attestation attributes; a field it did not report is left out.
+func servedAttributes(served *provider.Served) map[string]any {
+	attrs := map[string]any{}
+	if served == nil {
+		return attrs
+	}
+	for key, value := range map[string]string{
+		"requested_provider": served.RequestedProvider,
+		"requested_model":    served.RequestedModel,
+		"upstream_provider":  served.UpstreamProvider,
+		"executed_model":     served.ExecutedModel,
+		"response_model":     served.ResponseModel,
+		"request_id":         served.RequestID,
+		"pricing_source":     served.PricingSource,
+	} {
+		if value != "" {
+			attrs[key] = value
+		}
+	}
+	if served.CostUSD != nil {
+		attrs["cost_usd"] = *served.CostUSD
+	}
+	if served.AttemptCount > 0 {
+		attrs["attempt_count"] = served.AttemptCount
+		attrs["fallback"] = served.Fallback
+	}
+	return attrs
 }
 
 // PromptSaveRequest represents a request to save a prompt

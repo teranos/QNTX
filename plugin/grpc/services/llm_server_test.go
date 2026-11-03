@@ -106,3 +106,57 @@ func TestLLMServer_AnUnknownProviderIsRefused(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `LLM provider "nonexistent" is not registered`)
 }
+
+// A provider's report of how a call was served is woven beside the model the
+// provider answered with: the policy asked for, the upstream and model that
+// served it, the gateway's request id and its cost, each under its own name.
+func TestLLMServer_TheServedReportIsWovenBesideTheModel(t *testing.T) {
+	srv, store := newTestLLMServer(zap.NewNop().Sugar())
+	cost := "0.000023"
+	srv.RegisterProvider("otari", &stubLLMClient{chatResp: &protocol.LLMChatResponse{
+		Content: "hello", Model: "good-model", TotalTokens: 17,
+		Served: &protocol.LLMServed{
+			RequestedProvider: "otari",
+			RequestedModel:    "fast",
+			UpstreamProvider:  "secondary",
+			ExecutedModel:     "good-model",
+			ResponseModel:     "fast",
+			RequestId:         "a445a48d-c606-4b70-bce6-04790f3705e2",
+			CostUsd:           &cost,
+			PricingSource:     "deployment",
+			AttemptCount:      2,
+			Fallback:          true,
+		},
+	}})
+
+	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{UserPrompt: "hi", Provider: "otari", Model: "fast"})
+	require.NoError(t, err)
+
+	woven := <-store.woven
+	assert.Equal(t, []string{"model:good-model"}, woven.Subjects)
+	assert.Equal(t, "otari", woven.Attributes["requested_provider"])
+	assert.Equal(t, "fast", woven.Attributes["requested_model"])
+	assert.Equal(t, "secondary", woven.Attributes["upstream_provider"])
+	assert.Equal(t, "good-model", woven.Attributes["executed_model"])
+	assert.Equal(t, "fast", woven.Attributes["response_model"])
+	assert.Equal(t, "a445a48d-c606-4b70-bce6-04790f3705e2", woven.Attributes["request_id"])
+	assert.Equal(t, "0.000023", woven.Attributes["cost_usd"])
+	assert.Equal(t, "deployment", woven.Attributes["pricing_source"])
+	assert.Equal(t, 2, woven.Attributes["attempt_count"])
+	assert.Equal(t, true, woven.Attributes["fallback"])
+}
+
+// A provider that reports nothing past its model weaves no served fields: an
+// absent report is not filled in with what was asked.
+func TestLLMServer_NoServedReportWeavesNoServedFields(t *testing.T) {
+	srv, store := newTestLLMServer(zap.NewNop().Sugar())
+	srv.RegisterProvider("gaze", &stubLLMClient{chatResp: &protocol.LLMChatResponse{Content: "hi", Model: "Qwen"}})
+
+	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{UserPrompt: "hi", Provider: "gaze", Model: "Qwen"})
+	require.NoError(t, err)
+
+	woven := <-store.woven
+	for _, key := range []string{"requested_provider", "requested_model", "upstream_provider", "executed_model", "response_model", "request_id", "cost_usd", "pricing_source", "attempt_count", "fallback"} {
+		assert.NotContains(t, woven.Attributes, key)
+	}
+}
