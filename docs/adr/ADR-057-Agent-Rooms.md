@@ -31,4 +31,5 @@ https://docs.switchagents.ai/switch-rooms/internals/agent-connection#connect-ove
 
 - Check if this will work in a way that a Plugin Provided Service can use the existing QNTX managed harnesses. 
 
-Roo
+Rooms as a Plugin Provided service 
+
