@@ -19,7 +19,7 @@ Multiple providers can run simultaneously. The caller specifies which backend to
 
 ## Multi-turn conversation
 
-The original `LLMChatRequest` carried `system_prompt` + `user_prompt` — two strings, single turn only. Both plugins (scry and OpenRouter) built a fresh 2-message array per request and discarded everything after the response.
+The original `LLMChatRequest` carried `system_prompt` + `user_prompt` — two strings, single turn only. Both plugins (scry and OpenRouter) built a fresh 2-message array per request and discarded everything after the response. --> so its like good now or 
 
 A `repeated ChatMessage messages` field (field 8) extends the protocol to carry full conversation history. Both plugins already send a messages array internally — scry passes it to `llama_chat_apply_template`, OpenRouter posts it to the `/v1/chat/completions` endpoint. The change is accepting a longer array, not a structural redesign.
 
