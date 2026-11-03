@@ -2,6 +2,7 @@
 
 Date: 2026-10-08
 Status: Accepted 
+pre-0.9.0-polish-blocker 
 
 "the feature i am imagining is called comet"
 
