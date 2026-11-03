@@ -1,7 +1,7 @@
 # ADR-018: Plugin Lifecycle, Watchers, and DX
 
 **Status:** Accepted
-**Date:** 2026-05-03
+**Date:** 2026-11-03
 **Deciders:** Brandon
 **Related:** [[ADR-003-plugin-communication]]  [[ADR-004-plugin-pulse-integration]] 
 
