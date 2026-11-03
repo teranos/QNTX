@@ -63,7 +63,7 @@ ROOT generates the webhook's secret with the `github` signum's webhook sigil, se
 
 `plugins_list` says per plugin, as `setup`, what still stands between it and its tools working besides Enable: a build its record names and cannot run, or one that has not landed yet. Empty is nothing. What a running plugin's schema requires is the schema's, not the record's.
 
-**Check:** GitHubService is asked, as the node, whether the repository and the plugin's directory in it are there, and for its README ([ADR-043](./ADR-043-github-service.md)). Check only reads.
+**Check:** GitHubService is asked, as the node, whether the repository and the plugin's directory in it are there, and for its README ([ADR-043](ADR-043-CodeForge-service.md)). Check only reads.
 
 **Add:** the plugin is recorded with its repository URL, disabled, in the system store.
 
@@ -93,6 +93,6 @@ A plugin is its own signum, and the routes it declares are its sigils (ADR-001).
 
 - [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
 - [ADR-018: Plugin Lifecycle, Watchers, and Developer Experience](./ADR-018-watcher-lifecycle.md)
-- [ADR-043: GitHubService](./ADR-043-github-service.md)
+- [ADR-043: GitHubService](ADR-043-CodeForge-service.md)
 - [ADR-046: A plugin stands in a namespace](./ADR-046-a-plugin-stands-in-a-namespace.md)
 - [Plugin API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json)
