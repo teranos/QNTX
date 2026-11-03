@@ -25,5 +25,5 @@ stable and alive and no maintenance"
 
 "and windows support should end in docs as well if there is any mention of it"
 
-"or the docs should be clear that qntx is targetted to be used on unix-like
+"or the docs should be clear that qntx is targeted to be used on unix-like
 systems and never windows as the direct host"
