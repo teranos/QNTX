@@ -10,9 +10,7 @@ brandon: "so, i do receive the e-mail, but there are errors in there about tryin
 "let's say QNTX also has it's own built in messages it would like to send sometimes via email"
 
 "for a user that is one of the root identities, i want to receive a weekly report."
-
 "y attestations got created per namespace"
-
 "x users registered per namespace"
 
 "z node restarts"
