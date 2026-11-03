@@ -92,7 +92,7 @@ A plugin is its own signum, and the routes it declares are its sigils (ADR-001).
 ## Related
 
 - [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
-- [ADR-018: Plugin Lifecycle, Watchers, and Developer Experience](./ADR-018-watcher-lifecycle.md)
+- [ADR-018: Plugin Lifecycle, Watchers, and Developer Experience](ADR-018-Plugin-lifecycle.md)
 - [ADR-043: GitHubService](ADR-043-CodeForge-service.md)
 - [ADR-046: A plugin stands in a namespace](./ADR-046-a-plugin-stands-in-a-namespace.md)
 - [Plugin API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json)
