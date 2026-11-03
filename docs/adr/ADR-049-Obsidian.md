@@ -55,7 +55,7 @@ every device through Sync.
 
 "you need to do some separate shit first before you can use your synced obsidian vault" --> "check if we can link to the user story instead"
 
-todo: link the us
+todo: link the userstories as an Obsidian managed thing, linked via the Element, it wou
 
 - `vault list` says per vault, as `setup`, that its copy is not on the box at its path, and nothing when it is. Setting it up there is by hand until #1091.
 
