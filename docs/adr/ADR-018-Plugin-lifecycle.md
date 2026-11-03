@@ -11,7 +11,7 @@ Is this more about Plugin lifecycle ?
 Then this must be the right place to discuss dynamically shutting down and starting plugins based on how much they are used and system stress. So the system always keeps serving, but degrades partially based on org specific characteristics 
 ## Context
 
-Plugins are separate processes that communicate with QNTX over gRPC. The lifecycle — boot, initialization, health monitoring, restart, shutdown — has implicit contracts that caused real bugs: double initialization, stale connections, silent watcher failures. This ADR documents the full plugin lifecycle and the watcher subsystem as canonical references.
+Plugins are separate processes that communicate with QNTX over gRPC. The lifecycle — boot, initialization, health monitoring, restart, shutdown (cooldown ?) — has implicit contracts that caused real bugs: double initialization, stale connections, silent watcher failures. This ADR documents the full plugin lifecycle and the watcher subsystem as canonical references.
 
 ### Problems observed
 
