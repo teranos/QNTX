@@ -53,3 +53,5 @@ Say a Node Agent is allowed to write into Element Room's but Element Agents cant
 Say there is a Room, and there is a PR, updates to that PR should arrive in the relevant Room. Including things like CI an comments. 
 
 Say there is a Room per Namespace 
+
+
