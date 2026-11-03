@@ -45,7 +45,7 @@ tells the page when one moved.
 
 "Me, the human the logged in user." The answer is a route, `POST
 /api/approvals/answer`, no sigil and no tool, as the git credential is
-(ADR-048): a sigil is a tool to whoever reaches it, and the agent reaches
+([[ADR-048-Node-Agent]]): a sigil is a tool to whoever reaches it, and the agent reaches
 every tool. The reach table names it and the list of ROOT, and the handler
 refuses a token however ROOT the token is, and a session that names nobody. The actor on
 the line is the route the human logged in by.
