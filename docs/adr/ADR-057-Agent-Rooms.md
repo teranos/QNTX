@@ -40,4 +40,8 @@ Say there is a Deployment Room, PR's can be sent to it, and the room specific ru
 
 Say the Agy, Claude, Codex Node Agents are all in the Node Room 
 
-Say you can wake a specific Agent 
+Say you can wake a specific Agent so it will check the room
+
+Say an Agent session is still a session as you know, 
+
+Say 
