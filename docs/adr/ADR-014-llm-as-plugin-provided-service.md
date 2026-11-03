@@ -3,7 +3,7 @@
 ## Status
 Implemented
 
-in progress: 
+in progress: otari
 ## Context
 LLM access already works. The `qntx-openrouter` plugin provides prompt execution via HTTP endpoints and Pulse async job handlers. Any plugin can enqueue a Pulse job to `prompt.execute` and get results as attestations.
 
