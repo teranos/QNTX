@@ -59,7 +59,7 @@ every device through Sync.
 
 "you would think there would be a Obsidian Element to make it a bit easier"
 
-"docs tracking in that Element as well"
+"docs tracking configured in the Obsidian Element"
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
 
