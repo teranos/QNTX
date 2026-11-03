@@ -1,6 +1,6 @@
 # ADR-028: Schedules
 
-**Status:** Accepted
+**Status:** Accepted, needs to be more formalised and used in the syste
 **Date:** 2026-08-06
 **Related:** [[ADR-018-watcher-lifecycle]] 
 ## Context
