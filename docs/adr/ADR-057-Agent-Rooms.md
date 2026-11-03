@@ -18,4 +18,6 @@ think telegram, slack, etc.
 
 think shared message board
 
-think Agent parti
+think Agent participation in multiple rooms
+
+think, making our Agent Harnesses work with 
