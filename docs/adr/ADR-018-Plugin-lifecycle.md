@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-05-03
 **Deciders:** Brandon
-**Related:** [[ADR-003-plugin-communication]]  ADR-004 (Plugin-Pulse Integration)
+**Related:** [[ADR-003-plugin-communication]]  [[ADR-004-plugin-pulse-integration]] 
 
 
 Is this more about Plugin lifecycle ?
