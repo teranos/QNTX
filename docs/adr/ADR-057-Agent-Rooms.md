@@ -1,3 +1,5 @@
 
 [[ADR-048-Node-Agent]]
-[[ADR-]]
+[[ADR-053-Namespace-Agents]]
+[[ADR-055-Agent-Memory]]
+
