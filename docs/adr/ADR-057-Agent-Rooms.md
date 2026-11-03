@@ -29,5 +29,6 @@ think, same thing for buzz.xyz
 
 https://docs.switchagents.ai/switch-rooms/internals/agent-connection#connect-over-the-websocket
 
-Check if this will work in a way that a Plugin Provided Service can use the existing QNTX managed harnesses. 
+- Check if this will work in a way that a Plugin Provided Service can use the existing QNTX managed harnesses. 
 
+Roo
