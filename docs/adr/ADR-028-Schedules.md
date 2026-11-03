@@ -6,14 +6,11 @@
 
 ## Context
 
-> `scheduled_pulse_jobs` reads `YES NO` in `make parity`. No ADR covers schedules.
->
 > A schedule kept running after the decorator that declared it was removed.
 
 ## Decision
 
 "nothing ever gets removed bro, it gets superseded"
-
 
 > a watcher is cold declaration plus hot tally
 
