@@ -63,7 +63,7 @@ every device through Sync.
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
 
-"and to be able to say that some folder or file "
+"and to be able to say that some folder or file belongs to an Agent Room"
 
 ## Which folders are the vault's
 
@@ -104,5 +104,5 @@ folder itself carries nothing.
 - One vault today, synced by a systemd unit on the box as root. Every vault  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node  record (server/vault.go). 
 - A vault per namespace is that line in the  namespace, its reach lines there, and one sync process per vault.
 
-## Rooms
+
 
