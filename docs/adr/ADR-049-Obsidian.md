@@ -2,6 +2,8 @@
 
 Date: 2026-10-06
 Status: Developed in pr #1094 - I think its merged because i am using obsidian to write this now.
+pre-0.9.0-polish-blocker 
+
 
 "i want to integrate better with Obsidian's sync service if possible, and have Obsidian be a QNTX thing, I would rather have that than to reinvent everything Obsidian does, i tried that before actually, and i got somewhere, but truth be told is that Obsidian is really good at what it is and I like using it as is."
 
