@@ -40,3 +40,4 @@ Say there is a Deployment Room, PR's can be sent to it, and the room specific ru
 
 Say the Agy, Claude, Codex Node Agents are all in the Node Room 
 
+Say you can wake a specific Agent 
