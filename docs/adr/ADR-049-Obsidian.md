@@ -87,6 +87,7 @@ As datapunt's inputs are named on its plugin record, `github.com/owner/repo@bran
 
 - A note main had and has no more is removed from the vault. A note main  never had is the vault's own and stays.
 
+- wether an Agent can 
 ## What reaches the repository
 
 "i don't want that to be automatically opted in, and i want to set what the name of the branch would be in the obsidian element in the binding."
