@@ -20,4 +20,6 @@ think shared message board
 
 think Agent participation in multiple rooms
 
-think, making our Agent Harnesses work with 
+think, making our Agent Harnesses work with switch 
+
+think, creating a new abstraction about Rooms as a Plugin Provided serve
