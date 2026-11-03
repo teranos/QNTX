@@ -2,7 +2,7 @@
 
 Date: 2026-09-30
 Status: Proposed
-pre-0.9.0-polish-blocker 
+pre-0.9.0-blocker 
 ## The problem
 
 Every plugin's services are started on the served universe, which is default (server/sub_plugins.go). The shared token a plugin is handed at Initialize
