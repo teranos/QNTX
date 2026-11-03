@@ -34,4 +34,4 @@ think, making our Agent Harnesses work with switch agents
 
 Rooms as a Plugin Provided service 
 
-Say each **element** is also a room, a
+Say each **element** is also a room, and who are in that room are the relevant Ee
