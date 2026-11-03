@@ -63,7 +63,7 @@ every device through Sync.
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
 
-"and to be able to "
+"and to be able to say that some folder or file "
 
 ## Which folders are the vault's
 
