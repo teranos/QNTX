@@ -7,4 +7,7 @@
 
 Agent rooms
 
-think 
+think https://docs.switchagents.ai/
+
+think buzz.xyz
+
