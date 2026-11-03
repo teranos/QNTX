@@ -21,7 +21,7 @@ Every plugin implements similar interfaces for equivalent work and follows the s
 
 All plugins are standalone binaries loaded at runtime via gRPC ([Plugin gRPC API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto)):
 
-- Plugins implement `DomainPlugin` interface inside their own binaries
+-  Plugins implement `DomainPlugin` interface inside their own binaries
 - `ExternalDomainProxy` proxies gRPC calls to plugin processes
 - `PluginServer` wrapper exposes the plugin's implementation via gRPC
 
