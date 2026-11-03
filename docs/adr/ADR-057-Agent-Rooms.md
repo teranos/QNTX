@@ -22,4 +22,6 @@ think Agent participation in multiple rooms
 
 think, making our Agent Harnesses work with switch 
 
-think, creating a new abstraction about Rooms as a Plugin Provided serve
+think, creating a new abstraction about Rooms as a Plugin Provided service
+
+think, switch core + adapter as a plugin that prov
