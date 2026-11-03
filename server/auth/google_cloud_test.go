@@ -234,6 +234,21 @@ func TestROOTsYesForCostsWiresTheCosts(t *testing.T) {
 	assert.Empty(t, *handed, "the node is not connected again")
 }
 
+// ROOT's yes for agy goes to what lets the node call Vertex AI.
+func TestROOTsYesForAgyLetsTheNodeRunIt(t *testing.T) {
+	h, handed := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	var let []connected
+	h.SetGoogleAgy(func(_ context.Context, token, by string) (string, error) {
+		let = append(let, connected{token, "", by})
+		return "let", nil
+	})
+	done := consenting(t, h, "?project=the-project&thing=agy")
+	assert.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	assert.Equal(t, []connected{{"cloud-token", "", "google:root-sub"}}, let)
+	assert.Empty(t, *handed, "the node is not connected again")
+}
+
 // Try again asks for the same thing: pressed for real, the thing went into the
 // project's name, and the node asked Google for a project called that.
 func TestTryingAgainAsksForTheSameThing(t *testing.T) {

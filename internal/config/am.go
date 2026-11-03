@@ -44,6 +44,20 @@ type NodeAgentConfig struct {
 	Pi PiConfig `mapstructure:"pi"`
 	// "Codex Agent runtime as another first class citizen in QNTX besides Claude"
 	Codex CodexConfig `mapstructure:"codex"`
+	// "wiring it into node and namespace config as an actual harness"
+	Agy AgyConfig `mapstructure:"agy"`
+}
+
+// AgyConfig turns the Node Agent on in agy. It runs as the node's own identity at
+// Google Cloud, which spends what that identity's project spends, so a node that
+// names no model does not run it.
+type AgyConfig struct {
+	Model string `mapstructure:"model"` // The model: the value of agy's session option model, as gemini-3.8-flash.
+}
+
+// Named reports whether am.toml names agy for the Node Agent.
+func (a AgyConfig) Named() bool {
+	return a.Model != ""
 }
 
 // CodexConfig names how the Node Agent runs in codex. A node that names no

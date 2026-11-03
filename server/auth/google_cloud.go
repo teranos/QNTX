@@ -77,6 +77,9 @@ type GoogleThingConnect func(ctx context.Context, token, by string) (string, err
 // SetGoogleCosts is what wires the node's costs once ROOT said yes.
 func (h *Handler) SetGoogleCosts(connect GoogleThingConnect) { h.googleCosts = connect }
 
+// SetGoogleAgy is what lets the node call Vertex AI once ROOT said yes.
+func (h *Handler) SetGoogleAgy(connect GoogleThingConnect) { h.googleAgy = connect }
+
 // SetGoogleCloud is what connects the node once ROOT said yes.
 func (h *Handler) SetGoogleCloud(connect GoogleCloudConnect) { h.googleCloud = connect }
 
@@ -164,7 +167,7 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		h.renderCeremonyPage(w, http.StatusBadGateway, false, errNoGoogleToken.Error())
 		return
 	}
-	if connect := map[string]GoogleThingConnect{"costs": h.googleCosts}[fl.thing]; connect != nil {
+	if connect := map[string]GoogleThingConnect{"costs": h.googleCosts, "agy": h.googleAgy}[fl.thing]; connect != nil {
 		ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
 		defer cancel()
 		said, err := connect(ctx, acct.google, acct.CanonicalID)

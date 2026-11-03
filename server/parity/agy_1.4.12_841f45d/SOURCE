@@ -1,0 +1,13 @@
+Antigravity CLI (agy)
+
+Release: https://github.com/google-antigravity/antigravity-cli/releases/tag/1.4.12
+Git tag: 1.4.12
+Commit: 841f45db2226ce15f5d1f52c580e35181e74ff68
+
+manifest.json records the release archives and their SHA-256 digests, each
+read from the release's own archive. These are checksums of compressed
+archives, not of extracted binaries. No executable is bundled and this pin
+alone does not install or run agy.
+
+1.4.12 is the first agy this pin holds that serves the Agent Client Protocol:
+`agy acp`, which 1.4.4 does not have.
