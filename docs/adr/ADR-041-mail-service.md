@@ -18,7 +18,7 @@ Status: almost done actually
 
 ## Governance
 
-"this is an auth question, deferred, assume only ROOT has governance over gRPC calls"
+"ROOT has governance"
 
 ## Address
 
