@@ -5,7 +5,7 @@ Status: Active and in use, how observable is this through sentry? Or through tel
 
 Is QNTX's role in MCP to be the host?
 
-"YES, AND THE MCP FOR QNTX ITSELF IS THE FIRST ONE TO OCCUPY, BUT WE COULD EVEN DO OTHER ONES" -> which we do now, I have yet to confirm 
+"YES, AND THE MCP FOR QNTX ITSELF IS THE FIRST ONE TO OCCUPY, BUT WE COULD EVEN DO OTHER ONES" -> which we do now, I have yet to confirm it per namespace though.
 
 Does an MCP client require dynamic client registration, or does it accept a client minted by hand?
 
