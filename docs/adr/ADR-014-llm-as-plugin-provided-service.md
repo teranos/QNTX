@@ -27,7 +27,7 @@ A `repeated ChatMessage messages` field (field 8) extends the protocol to carry 
 
 A prompt's history is the canvas. `ConversationAssembler` (`server/conversation.go`) walks the composition DAG upstream from the current element, queries prompt-result attestations for each ancestor, and builds an ordered message array sorted by timestamp. `HandlePromptDirect` injects this history into `ChatRequest.Messages` before forwarding to the LLM plugin. Neither plugin stores conversation state; they receive a snapshot and execute. --> i mean like, it can be, i tried to explore this idea, but, now we use the Agent Element, like with the [[ADR-048-Node-Agent]]
 
-The frontend must `await canvasSyncQueue.flush()` before firing the API call — the assembler reads composition edges from the DB, and the canvas sync pipeline is async. Without the flush, the composition created by `extendComposition` may not be persisted yet when the backend queries it.
+The frontend must `await canvasSyncQueue.flush()` before firing the API call — the assembler reads composition edges from the DB, and the canvas sync pipeline is async. Without the flush, the composition created by `extendComposition` may not be persisted yet when the backend queries it. --> So what?
 
 ## Queuing (PULS)
 
