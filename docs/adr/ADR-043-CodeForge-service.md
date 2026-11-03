@@ -1,4 +1,4 @@
-# ADR-043: GitHubService
+
 
 Date: 2026-09-28
 Status: Proposed
