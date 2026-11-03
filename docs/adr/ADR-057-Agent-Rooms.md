@@ -44,4 +44,4 @@ Say you can wake a specific Agent so it will check the room
 
 Say an Agent session is still a session as you know, but it communicates with the room, or rather it has access to it. 
 
-Say there is
+Say there is 1 agent responsible for Observability and it only writes to the Node room and it is allowed to wake up
