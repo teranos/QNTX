@@ -63,6 +63,8 @@ every device through Sync.
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
 
+"and to be able to "
+
 ## Which folders are the vault's
 
 "So, we could do the Same for Obsidian"
