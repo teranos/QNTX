@@ -7,3 +7,4 @@
 
 Agent rooms
 
+think 
