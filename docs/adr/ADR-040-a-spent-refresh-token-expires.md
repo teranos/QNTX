@@ -9,4 +9,5 @@ It is kept until its own `expires_at`, and dropped then.
 
 Nothing does this yet. Brandon: Why not?
 
-Why is
+Why is this an ADR?
+
