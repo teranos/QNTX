@@ -37,7 +37,7 @@ Direct gRPC has no queuing. Providers like scry are single-threaded — when mul
 
 This keeps the streaming gRPC path intact — no async/sync bridge needed. The caller still holds the `StreamChat` connection; it just waits longer when the provider is busy instead of deadlining.
 
-Future (Option B): plugins enqueue background LLM work as Pulse jobs instead of calling `StreamChat` directly. The Pulse worker executes the job, including LLM calls through the controlled `LLMServer` path. Interactive prompts stay direct.
+Future (Option B): plugins enqueue background LLM work as Pulse jobs instead of calling `StreamChat` directly. The Pulse worker executes the job, including LLM calls through the controlled `LLMServer` path. Interactive prompts stay direct. --> 
 
 ## Observability (planned — CWEV)
 
