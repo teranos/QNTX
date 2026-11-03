@@ -8,3 +8,5 @@ A revoked refresh token's record is kept so that presenting it again is a replay
 It is kept until its own `expires_at`, and dropped then.
 
 Nothing does this yet. Brandon: Why not?
+
+Why is
