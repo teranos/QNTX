@@ -76,8 +76,7 @@ As datapunt's inputs are named on its plugin record, `github.com/owner/repo@bran
 
 "name both ends"
 
-- A folder is `github.com/owner/repo@branch:path=place`, the place being where in the
-  vault it is. A place is inside the vault, and no place is another's or
+- A folder is `github.com/owner/repo@branch:path=place`, the place being where in the vault it is. A place is inside the vault, and no place is another's or
   holds another, so a note is one folder's.
 
 
