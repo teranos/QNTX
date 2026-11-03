@@ -42,6 +42,4 @@ Say the Agy, Claude, Codex Node Agents are all in the Node Room
 
 Say you can wake a specific Agent so it will check the room
 
-Say an Agent session is still a session as you know, 
-
-Say 
+Say an Agent session is still a session as you know, but it communicates with the room, or rather it has 
