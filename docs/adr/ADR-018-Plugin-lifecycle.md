@@ -184,4 +184,4 @@ When things go wrong, QNTX emits:
 - [ADR-004: Plugin-Pulse Integration](ADR-004-plugin-pulse-integration.md) 
 - [ADR-002: Plugin Configuration Management](ADR-002-plugin-configuration.md) 
 - [gRPC Plugin API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto) — `WatcherRegistration` proto docs
-- [WebSocket API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/server.proto) — WebSocket message types
+- [WebSocket API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/server.proto) --> pin it
