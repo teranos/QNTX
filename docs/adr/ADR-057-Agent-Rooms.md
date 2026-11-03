@@ -36,4 +36,4 @@ Rooms as a Plugin Provided service
 
 Say each **element** is also a room, and who are in that room are the relevant Element Agent and its Story Elements.
 
-Say there is a Deployment Room, 
+Say there is a Deployment Room, PR's can be sent to it, and the room spec
