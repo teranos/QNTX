@@ -18,10 +18,10 @@ import (
 )
 
 // "correct it for libACP client use for agy"
-// What is said to the Node Agent in agy is answered by `agy acp`, through
-// libACP's client: in the agent's own home, signed in as the node at Google with
-// no key anywhere, the model set as its session's option, with the agent's ground
-// on every event agy sends.
+// 「[Opus 5.5] What is said to the Node Agent in agy is answered by `agy acp`, through」
+// 「[Opus 5.5] libACP's client: in the agent's own home, signed in as the node at Google with」
+// 「[Opus 5.5] no key anywhere, the model set as its session's option, with the agent's ground」
+// 「[Opus 5.5] on every event agy sends.」
 func TestWhatIsSaidToAgyIsAnsweredByAgy(t *testing.T) {
 	s, ran := runningAgyToo(t)
 
@@ -77,8 +77,8 @@ func TestWhatIsSaidToAgyIsAnsweredByAgy(t *testing.T) {
 	}
 }
 
-// agy names its session on the first turn; the next resumes that one, and both
-// are written down in the one session.
+// 「[Opus 5.5] agy names its session on the first turn; the next resumes that one, and both」
+// 「[Opus 5.5] are written down in the one session.」
 func TestAgyResumesItsOwnConversationInTheOneSession(t *testing.T) {
 	s, ran := runningAgyToo(t)
 
@@ -93,7 +93,7 @@ func TestAgyResumesItsOwnConversationInTheOneSession(t *testing.T) {
 	assert.NotContains(t, input, `"method":"session/new"`)
 }
 
-// The session reads as the other harnesses' do.
+// 「[Opus 5.5] The session reads as the other harnesses' do.」
 func TestAgySessionReadsAsTheOthers(t *testing.T) {
 	s, _ := runningAgyToo(t)
 	_, refused := sayingToAgy(s, sigil.Sent{"says": "how long has the box been up?"})

@@ -98,7 +98,7 @@ type conn struct {
 	next       int
 	each       func(Update)
 	permission func(Asked) string
-	// quiet holds back the updates a session told again replays, which the caller was told before.
+	// 「[Opus 5.5] quiet holds back the updates a session told again replays, which the caller was told before.」
 	quiet bool
 	// answer is what the turn's updates said so far.
 	answer *Answer
@@ -190,8 +190,8 @@ func (c *conn) turn(t Turn) (Answer, error) {
 		write := func(id *C.char, m *C.acp_buffer) C.acp_status {
 			return C.acp_client_session_resume_write(id, sid, cwd, nil, 0, m)
 		}
-		// Continuing tells the session again as updates, session/load always and agy's session/resume
-		// too; the caller has them already, and they are not this turn's answer.
+		// 「[Opus 5.5] Continuing tells the session again as updates, session/load always and agy's session/resume」
+		// 「[Opus 5.5] too; the caller has them already, and they are not this turn's answer.」
 		c.quiet = true
 		if !resumes {
 			method = "session/load"

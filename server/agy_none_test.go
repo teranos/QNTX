@@ -10,7 +10,7 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// A QNTX built without libACP runs no ACP harness, and says so where it is spoken to.
+// 「[Opus 5.5] A QNTX built without libACP runs no ACP harness, and says so where it is spoken to.」
 func TestAgyWithoutLibACPSaysWhy(t *testing.T) {
 	s, _ := runningAgyToo(t)
 	_, refused := sayingToAgy(s, sigil.Sent{"says": "hello"})

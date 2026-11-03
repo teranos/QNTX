@@ -189,9 +189,9 @@ func TestNodeAgentOtherThanOpusOrFableIsRefused(t *testing.T) {
 	}
 }
 
-// "wiring it into node and namespace config as an actual harness": agy runs
-// the model am.toml names. Asked whether the Node Agent in agy is held to Opus
-// or Fable, which agy never serves: "Exempt agy".
+// 「[Opus 5.5] "wiring it into node and namespace config as an actual harness": agy runs」
+// 「[Opus 5.5] the model am.toml names. Asked whether the Node Agent in agy is held to Opus」
+// 「[Opus 5.5] or Fable, which agy never serves: "Exempt agy".」
 func TestNodeAgentAgyLoads(t *testing.T) {
 	path := writeConfig(t, `
 [agent.root]

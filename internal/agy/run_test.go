@@ -12,8 +12,8 @@ import (
 )
 
 // "correct it for libACP client use for agy"
-// agy 1.4.12 speaks ACP as `agy acp`: signed in as the node at Google, the model set as the
-// session's model option, and the prompt said whole.
+// 「[Opus 5.5] agy 1.4.12 speaks ACP as `agy acp`: signed in as the node at Google, the model set as the」
+// 「[Opus 5.5] session's model option, and the prompt said whole.」
 func TestRunSpeaksACPInItsOwnEnvironment(t *testing.T) {
 	t.Setenv("GEMINI_API_KEY", "node-secret")
 	t.Setenv("GOOGLE_API_KEY", "node-secret")
@@ -73,8 +73,8 @@ func TestRunSpeaksACPInItsOwnEnvironment(t *testing.T) {
 	}
 }
 
-// agy ends a turn it could not run as end_turn, with a warning for its message; the error itself is in
-// its log. The turn fails, with the log's words.
+// 「[Opus 5.5] agy ends a turn it could not run as end_turn, with a warning for its message; the error itself is in」
+// 「[Opus 5.5] its log. The turn fails, with the log's words.」
 func TestRunRefusesATerminatedTurnAsSuccess(t *testing.T) {
 	binary, _ := acptest.StandIn(t, acptest.Script{
 		Updates: []string{`{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"\n⚠ Agent execution terminated due to error.\n"}}`},
@@ -87,7 +87,7 @@ func TestRunRefusesATerminatedTurnAsSuccess(t *testing.T) {
 	}
 }
 
-// A stop other than end_turn is no answer.
+// 「[Opus 5.5] A stop other than end_turn is no answer.」
 func TestRunRefusesAnotherStop(t *testing.T) {
 	binary, _ := acptest.StandIn(t, acptest.Script{Stop: "refusal"})
 	_, err := (Said{Binary: binary, Home: t.TempDir(), Says: "hi", Model: "m", Google: &Google{Credentials: "/c", Project: "p", Location: "global"}}).Run(context.Background(), nil)

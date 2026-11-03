@@ -20,8 +20,8 @@ import (
 // "wiring it into node and namespace config as an actual harness"
 
 // "correct it for libACP client use for agy"
-// What a stand-in for `agy acp` tells of a turn that ran one command and
-// answered, as ACP session updates.
+// 「[Opus 5.5] What a stand-in for `agy acp` tells of a turn that ran one command and」
+// 「[Opus 5.5] answered, as ACP session updates.」
 var agyAnswered = acptest.Script{Session: "conv-7", Updates: []string{
 	`{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"how long has the box been up?"}}`,
 	`{"sessionUpdate":"tool_call","toolCallId":"t1","title":"uptime","kind":"execute","status":"pending","rawInput":{"command":"uptime"}}`,
@@ -32,8 +32,8 @@ var agyAnswered = acptest.Script{Session: "conv-7", Updates: []string{
 
 var flashInAgy = appcfg.AgyConfig{Model: "gemini-3.8-flash"}
 
-// runningAgyToo is the Node Agent of runningTheNodeAgent, with agy named and a
-// stand-in for it held.
+// 「[Opus 5.5] runningAgyToo is the Node Agent of runningTheNodeAgent, with agy named and a」
+// 「[Opus 5.5] stand-in for it held.」
 func runningAgyToo(t *testing.T) (s *QNTXServer, ran string) {
 	t.Helper()
 	s, _, _ = runningNamespaceAgents(t)
@@ -56,8 +56,8 @@ func sayingToAgy(s *QNTXServer, sent sigil.Sent) (*protocol.AgySaid, *protocol.R
 	return answer.(*protocol.AgySaid), nil
 }
 
-// "per thing basis": connecting the node asks for nothing that spends. agy is its
-// own yes, and a node without it says where to give it.
+// 「[Opus 5.5] "per thing basis": connecting the node asks for nothing that spends. agy is its」
+// 「[Opus 5.5] own yes, and a node without it says where to give it.」
 func TestAgyIsItsOwnYesAtGoogle(t *testing.T) {
 	s, g := connectedToGoogle(t)
 	s.deps.cfg.Agent.Root.Agy = flashInAgy
@@ -86,8 +86,8 @@ func TestAgyIsItsOwnYesAtGoogle(t *testing.T) {
 	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
 }
 
-// A turn outlasts the token it began on: what agy reads again is a fresh one, and
-// the node stops writing it when it is no longer connected.
+// 「[Opus 5.5] A turn outlasts the token it began on: what agy reads again is a fresh one, and」
+// 「[Opus 5.5] the node stops writing it when it is no longer connected.」
 func TestAgysTokenIsRenewedWhileConnected(t *testing.T) {
 	s, _ := runningAgyToo(t)
 	agent := &rootAgent{home: t.TempDir()}
@@ -130,7 +130,7 @@ func TestAgyIsHaltedAt80PercentAndResumesWhenTheBudgetFreesUp(t *testing.T) {
 	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
 }
 
-// A node not connected to Google Cloud says nothing to agy, and says where to connect it.
+// 「[Opus 5.5] A node not connected to Google Cloud says nothing to agy, and says where to connect it.」
 func TestAgyIsSaidNothingUntilGoogleIsConnected(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	s.deps.cfg.Agent.Root.Agy = flashInAgy
@@ -145,7 +145,7 @@ func TestAgyIsSaidNothingUntilGoogleIsConnected(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "agy did not run")
 }
 
-// A node whose am.toml names no agy has none to speak to, and says where.
+// 「[Opus 5.5] A node whose am.toml names no agy has none to speak to, and says where.」
 func TestANodeThatNamesNoAgyHasNoneToSpeakTo(t *testing.T) {
 	s, _ := runningTheNodeAgent(t, opusLow)
 	_, refused := sayingToAgy(s, sigil.Sent{"says": "hello"})
@@ -154,7 +154,7 @@ func TestANodeThatNamesNoAgyHasNoneToSpeakTo(t *testing.T) {
 	assert.Contains(t, refused.GetSays(), "[agent.root.agy]")
 }
 
-// agy says who answers in it and how it is run.
+// 「[Opus 5.5] agy says who answers in it and how it is run.」
 func TestAgySaysWhoItIs(t *testing.T) {
 	s, _ := runningAgyToo(t)
 	is, refused := s.harnessAm(s.agyHarness())

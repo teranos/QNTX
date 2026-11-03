@@ -14,12 +14,12 @@ import (
 	"github.com/teranos/QNTX/server/comet"
 )
 
-// The pinned agy, run for real over ACP as the node at Google, with its hooks installed as a turn
-// installs them and a ground_hook that keeps each event it was run for. This spends what the project
-// spends. Opt in with the binary, the node's external_account file and its project:
+// 「[Opus 5.5] The pinned agy, run for real over ACP as the node at Google, with its hooks installed as a turn」
+// 「[Opus 5.5] installs them and a ground_hook that keeps each event it was run for. This spends what the project」
+// 「[Opus 5.5] spends. Opt in with the binary, the node's external_account file and its project:」
 //
-//	QNTX_AGY_BINARY=/absolute/path/to/agy QNTX_AGY_CREDENTIALS=/absolute/external-account.json \
-//	QNTX_AGY_PROJECT=the-project go test -tags libacp ./internal/agy -run TestLivePinnedAgyOverACP -v
+//「[Opus 5.5] 	QNTX_AGY_BINARY=/absolute/path/to/agy QNTX_AGY_CREDENTIALS=/absolute/external-account.json \」
+//「[Opus 5.5] 	QNTX_AGY_PROJECT=the-project go test -tags libacp ./internal/agy -run TestLivePinnedAgyOverACP -v」
 func TestLivePinnedAgyOverACP(t *testing.T) {
 	binary, credentials, project := os.Getenv("QNTX_AGY_BINARY"), os.Getenv("QNTX_AGY_CREDENTIALS"), os.Getenv("QNTX_AGY_PROJECT")
 	if binary == "" || credentials == "" || project == "" {

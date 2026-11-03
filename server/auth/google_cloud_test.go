@@ -234,7 +234,7 @@ func TestROOTsYesForCostsWiresTheCosts(t *testing.T) {
 	assert.Empty(t, *handed, "the node is not connected again")
 }
 
-// ROOT's yes for agy goes to what lets the node call Vertex AI.
+// 「[Opus 5.5] ROOT's yes for agy goes to what lets the node call Vertex AI.」
 func TestROOTsYesForAgyLetsTheNodeRunIt(t *testing.T) {
 	h, handed := cloudHandler(t)
 	googleAnswering(t, "root-sub")

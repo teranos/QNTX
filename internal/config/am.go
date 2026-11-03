@@ -48,14 +48,14 @@ type NodeAgentConfig struct {
 	Agy AgyConfig `mapstructure:"agy"`
 }
 
-// AgyConfig turns the Node Agent on in agy. It runs as the node's own identity at
-// Google Cloud, which spends what that identity's project spends, so a node that
-// names no model does not run it.
+// 「[Opus 5.5] AgyConfig turns the Node Agent on in agy. It runs as the node's own identity at」
+// 「[Opus 5.5] Google Cloud, which spends what that identity's project spends, so a node that」
+// 「[Opus 5.5] names no model does not run it.」
 type AgyConfig struct {
 	Model string `mapstructure:"model"` // The model: the value of agy's session option model, as gemini-3.8-flash.
 }
 
-// Named reports whether am.toml names agy for the Node Agent.
+// 「[Opus 5.5] Named reports whether am.toml names agy for the Node Agent.」
 func (a AgyConfig) Named() bool {
 	return a.Model != ""
 }

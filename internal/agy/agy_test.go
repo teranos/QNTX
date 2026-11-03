@@ -135,7 +135,7 @@ func TestPinnedUsesParity(t *testing.T) {
 	}
 }
 
-// Opt in with a downloaded release archive; no model credentials are used.
+// 「[Opus 5.5] Opt in with a downloaded release archive; no model credentials are used.」
 func TestReleaseArchive(t *testing.T) {
 	archivePath := os.Getenv("QNTX_AGY_ARCHIVE")
 	if archivePath == "" {
