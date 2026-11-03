@@ -6,10 +6,10 @@
 
 ## Context
 
-"why does the windows pipeline keep failing, as if it doesnt want to stay
-stable and alive and no mainenance"
+"why does the windows pipeline keep failing, as if it doesn't want to stay
+stable and alive and no maintenance"
 
-"what is forcing the maintenence burden on it?"
+"what is forcing the maintenance burden on it?"
 
 "why is having a windows pipeline not free"
 
