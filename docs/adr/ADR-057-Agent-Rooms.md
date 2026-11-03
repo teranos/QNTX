@@ -46,4 +46,5 @@ Say an Agent session is still a session as you know, but it communicates with th
 
 Say there is 1 agent responsible for Observability and it only writes to the Node room and it is allowed to wake up different Node Agents, or different Element Agents.
 
-Say a Node Agent is allowed to write into Element Room's but Element 
+Say a Node Agent is allowed to write into Element Room's but Element Agents cant write into Node Room
+
