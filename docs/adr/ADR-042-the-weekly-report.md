@@ -1,7 +1,7 @@
 # ADR-042: The weekly report
 
 Date: 2026-09-25
-Status: Proposed, Update Requested, may do it, probably not, is likely to be candidate for what would be Scheduled agents. or Schedules in general. like [[ADR-028-schedules]], 
+Status: Proposed, Update Requested, may do it, probably not, is likely to be candidate for what would be Scheduled agents. or Schedules in general. like [[ADR-028-schedules]], Isn't ADR-28 actually the thing that want's to be use
 
 
 
