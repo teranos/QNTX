@@ -41,11 +41,11 @@ Future (Option B): plugins enqueue background LLM work as Pulse jobs instead of 
 
 ## Observability (planned — CWEV)
 
-Weave creation belongs in core, not in individual providers. Core sees all LLM traffic; providers only do inference. --> wasnt this moved already ? Also, you would think it may make sense to look at lang
+Weave creation belongs in core, not in individual providers. Core sees all LLM traffic; providers only do inference. --> wasnt this moved already ? Also, you would think it may make sense to look at langchain finally.
 
 ## Provider resolution
 
 The server owns provider resolution — the UI never references plugin names. `/ws/llm` proxies WebSocket connections to the active LLM provider, and `resolveProvider` falls back to the default registered provider when the configured name is stale or missing.
 
 ## Consequences
-This is the first service in `ServiceRegistry` provided by a plugin rather than by core. The routing and registration pattern must be designed with that in mind.
+This is the first service in `ServiceRegistry` provided by a plugin rather than by core. The routing and registration pattern must be designed with that in mind. --> whatever...
