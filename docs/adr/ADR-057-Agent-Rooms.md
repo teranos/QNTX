@@ -11,3 +11,6 @@ think https://docs.switchagents.ai/
 
 think buzz.xyz
 
+think [[Agent Swarm]]s
+
+think telegram, 
