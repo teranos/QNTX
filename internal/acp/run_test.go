@@ -93,8 +93,8 @@ func fakeAgent(scenario string) int {
 			fmt.Fprintf(os.Stderr, "fake agent: resume said %s\n", r.Params)
 			return 4
 		}
-		// agy tells the session again before it answers: pressed for real, the last
-		// answer came glued to the front of the new one.
+		// 「[Opus 5.5] agy tells the session again before it answers: pressed for real, the last」
+		// 「[Opus 5.5] answer came glued to the front of the new one.」
 		update(`{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"what it said before"}}`)
 		answer(r, `{}`)
 	} else {
