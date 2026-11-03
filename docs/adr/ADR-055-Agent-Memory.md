@@ -43,7 +43,7 @@ Preserving the words is only the beginning. Preserving the discipline of interpr
 
 An agent should be free to interpret human speech, but it should never inherit the human's authority merely by interpreting it.
 
-## 「[Fable 5.1] Quotes from an agent」
+## 「[Opus 5.5] Quotes from an agent」
 
 "ah, right, it was more about quote provenance than memory per se"
 
@@ -87,7 +87,7 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 - [ ] 「[Fable 5.1] The signum that keeps a Quote, so the node holds it to tei.」
 - [ ] 「[Fable 5.1] C2PA, for the material a quote arrives in, pinned as TEI is.」
 
-## 「[Fable 5.1] The process」
+## 「[Opus 5.5] The process」
 
 "there needs to be a process"
 
