@@ -6,7 +6,6 @@ Plugins are added, configured, enabled and disabled at runtime.
 
 "i expect it to be a bigger + button as part of the list, like an empty plugin ready to become something."
 
-"it should have been two stage, first stage is check if its even possible, and 2nd is to commit to adding it for real"
 
 "it is qntx that actually owns this"
 
