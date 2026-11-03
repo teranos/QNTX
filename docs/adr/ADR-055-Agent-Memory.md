@@ -1,4 +1,4 @@
-pre-0.9.0-polish-blocker 
+pre-0.999.0-polish-blocker 
 
 > [spec.c2pa.org](https://spec.c2pa.org)
 > With the increasing velocity of digital content and the increasing availability of powerful creation and editing techniques, establishing the provenance of media is critical to ensure transparency, understanding, and ultimately, trust. 
