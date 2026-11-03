@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// A model answering 503 has agy retrying without a word, which reads as a hang.
+// 「[Opus 5.5] A model answering 503 has agy retrying without a word, which reads as a hang.」
 func TestASilentTurnIsToldWithWhatItsLogSays(t *testing.T) {
 	told := make(chan string, 8)
 	_, stop := watchSilence(20*time.Millisecond, func() string { return "E1102 503 UNAVAILABLE" }, func(says string) { told <- says })
@@ -21,7 +21,7 @@ func TestASilentTurnIsToldWithWhatItsLogSays(t *testing.T) {
 	}
 }
 
-// A turn that keeps talking is not told, and a stopped watch tells nothing more.
+// 「[Opus 5.5] A turn that keeps talking is not told, and a stopped watch tells nothing more.」
 func TestATalkingTurnIsNotTold(t *testing.T) {
 	told := make(chan string, 8)
 	heard, stop := watchSilence(200*time.Millisecond, func() string { return "" }, func(says string) { told <- says })
