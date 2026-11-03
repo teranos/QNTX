@@ -1,7 +1,7 @@
 # ADR-042: The weekly report
 
 Date: 2026-09-25
-Status: Proposed, Update Requested, may do it, probably not, is likely to be candidate for what would be Scheduled agents. or Schedules in general. like [[ADR-028-schedules]], Isn't ADR-28 actually the thing that want's to be used? like the way this feature is now, today, it seems like a simple weekly schedule, like, i cant even interact with this, or it doesnt feel like it, or its not intuitive, and the feat is broken somehow anyways, 
+Status: Proposed, Update Requested, may do it, probably not, is likely to be candidate for what would be Scheduled agents. or Schedules in general. like [[ADR-028-schedules]], Isn't ADR-28 actually the thing that want's to be used? like the way this feature is now, today, it seems like a simple weekly schedule, like, i cant even interact with this, or it doesnt feel like it, or its not intuitive, and the feat is broken somehow anyways, or its not clear that sentry isnt healthy, and . well, i could keep going at this.
 
 
 
