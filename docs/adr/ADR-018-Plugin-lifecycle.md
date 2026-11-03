@@ -1,8 +1,8 @@
-# ADR-018: Plugin Lifecycle, Watchers, and Developer Experience
+# ADR-018: Plugin Lifecycle, Watchers, and DX
 
 **Status:** Accepted
 **Date:** 2026-05-03
-**Deciders:** QNTX Core Team
+**Deciders:** Brandon
 **Related:** ADR-003 (Plugin Communication), ADR-004 (Plugin-Pulse Integration)
 
 
