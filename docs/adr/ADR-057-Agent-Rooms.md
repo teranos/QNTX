@@ -48,4 +48,4 @@ Say there is 1 agent responsible for Observability and it only writes to the Nod
 
 Say a Node Agent is allowed to write into Element Room's but Element Agents cant write into Node Room
 
-Say there is a Room, and there is a PR, updates to 
+Say there is a Room, and there is a PR, updates to that PR should arrive in the relevant Room. 
