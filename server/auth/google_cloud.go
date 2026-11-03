@@ -77,7 +77,7 @@ type GoogleThingConnect func(ctx context.Context, token, by string) (string, err
 // SetGoogleCosts is what wires the node's costs once ROOT said yes.
 func (h *Handler) SetGoogleCosts(connect GoogleThingConnect) { h.googleCosts = connect }
 
-// SetGoogleAgy is what lets the node call Vertex AI once ROOT said yes.
+// 「[Opus 5.5] SetGoogleAgy is what lets the node call Vertex AI once ROOT said yes.」
 func (h *Handler) SetGoogleAgy(connect GoogleThingConnect) { h.googleAgy = connect }
 
 // SetGoogleCloud is what connects the node once ROOT said yes.
