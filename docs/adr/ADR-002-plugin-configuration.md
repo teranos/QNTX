@@ -12,9 +12,6 @@ Plugins are added, configured, enabled and disabled at runtime.
 
 A plugin is its record on the node: its repository, whether it is enabled, and its config. The plugin element and the `plugins` signum write the record. This document is the reference for how a plugin gets onto a node and stays running there.
 
-## 1. The plugin element
-
-The + is an empty plugin at the end of the list. Press it and enter the plugin's repository URL. Check asks whether the repo resolves; Add commits it. It is added disabled. Its config is edited in the element, and Enable starts it.
 
 ## 2. Sigils and API
 
