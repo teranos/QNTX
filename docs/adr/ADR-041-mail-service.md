@@ -46,15 +46,6 @@ A Send carries images inline; the html shows each by `cid:<content_id>`.
 
 "ses being enabled for use with email service can be enabled in the am.toml"
 
-## Dark
-
-"but i do still want the dark themed qntx tokens css email template"
-
-QNTX keeps a second template, dark.
-
-"why not just use the real source"
-
-"it just needs to fit with the rest of qntx"
 
 ## Not done
 
