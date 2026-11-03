@@ -24,26 +24,26 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// The Node Agent in agy, a fourth harness (ADR-048).
+// 「[Opus 5.5] The Node Agent in agy, a fourth harness (ADR-048).」
 // "wiring it into node and namespace config as an actual harness"
 
 const (
 	agentLineAgy   = "agy"
 	agySessionFile = "agy-session"
-	// agyConversationFile is agy's own ACP session, kept apart from the
-	// node's session: agy names it on a first turn and resumes only that.
+	// 「[Opus 5.5] agyConversationFile is agy's own ACP session, kept apart from the」
+	// 「[Opus 5.5] node's session: agy names it on a first turn and resumes only that.」
 	agyConversationFile = "agy-conversation"
-	// googleAgyLineSubject is the line of ROOT's yes for agy.
+	// 「[Opus 5.5] googleAgyLineSubject is the line of ROOT's yes for agy.」
 	googleAgyLineSubject = "GOOGLE-AGY"
-	// googleRunsModels lets the node's account call Vertex AI, which agy runs on.
+	// 「[Opus 5.5] googleRunsModels lets the node's account call Vertex AI, which agy runs on.」
 	googleRunsModels = "roles/aiplatform.user"
-	// googleModelService is Vertex AI.
+	// 「[Opus 5.5] googleModelService is Vertex AI.」
 	googleModelService = "aiplatform.googleapis.com"
-	// agyLocation is where Vertex AI serves agy's model.
+	// 「[Opus 5.5] agyLocation is where Vertex AI serves agy's model.」
 	agyLocation = "global"
 )
 
-// agyHarness is the Node Agent in agy.
+// 「[Opus 5.5] agyHarness is the Node Agent in agy.」
 func (s *QNTXServer) agyHarness() *harness {
 	named := func() appcfg.AgyConfig { return s.deps.cfg.Agent.Root.Agy }
 	return &harness{
@@ -64,8 +64,8 @@ func (s *QNTXServer) agyHarness() *harness {
 	}
 }
 
-// holdAgy fetches the agy Parity pins into dir, off the boot's own time, as
-// holdCodex does codex.
+// 「[Opus 5.5] holdAgy fetches the agy Parity pins into dir, off the boot's own time, as」
+// 「[Opus 5.5] holdCodex does codex.」
 func holdAgy(ctx context.Context, dir string, spawn func(string, func()), logger *zap.SugaredLogger) *harnessHeld {
 	held := &harnessHeld{name: "agy", fetched: make(chan struct{})}
 	spawn("agent.agy", func() {
@@ -85,7 +85,7 @@ func holdAgy(ctx context.Context, dir string, spawn func(string, func()), logger
 	return held
 }
 
-// thereIsNoAgy is why the Node Agent cannot be spoken to in agy on this node.
+// 「[Opus 5.5] thereIsNoAgy is why the Node Agent cannot be spoken to in agy on this node.」
 func (s *QNTXServer) thereIsNoAgy() *protocol.Refusal {
 	if s.nodeAgent == nil {
 		return s.thereIsNoNodeAgent()
@@ -96,8 +96,8 @@ func (s *QNTXServer) thereIsNoAgy() *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no agy, so the Node Agent does not run in it"}
 }
 
-// connectGoogleAgy lets the node's account call Vertex AI on ROOT's token: its own
-// yes, for it is what spends. ROOT's token is let go once the node no longer needs it.
+// 「[Opus 5.5] connectGoogleAgy lets the node's account call Vertex AI on ROOT's token: its own」
+// 「[Opus 5.5] yes, for it is what spends. ROOT's token is let go once the node no longer needs it.」
 func (s *QNTXServer) connectGoogleAgy(ctx context.Context, token, by string) (said string, err error) {
 	defer s.letGoOfGoogle(token)
 	defer func() { err = googleFixOf(err) }()
@@ -122,14 +122,14 @@ func (s *QNTXServer) connectGoogleAgy(ctx context.Context, token, by string) (sa
 	return "The node may call Vertex AI in " + kept.project.ProjectID + ". A turn in agy spends what that project spends, and halts with what costs.", nil
 }
 
-// googleAgyWired is whether ROOT let the node call Vertex AI.
+// 「[Opus 5.5] googleAgyWired is whether ROOT let the node call Vertex AI.」
 func (s *QNTXServer) googleAgyWired() (bool, error) {
 	lines, err := s.googleCostLines(googleAgyLineSubject)
 	return len(lines) > 0, err
 }
 
-// agyAsTheNode is agy signed in as the node at Google: an external_account file in
-// the agent's home, and the identity token it reads, fresh for the turn.
+// 「[Opus 5.5] agyAsTheNode is agy signed in as the node at Google: an external_account file in」
+// 「[Opus 5.5] the agent's home, and the identity token it reads, fresh for the turn.」
 func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refusal) {
 	kept, held, err := s.googleLine()
 	if err != nil {
@@ -173,12 +173,12 @@ func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refu
 	return &agy.Google{Credentials: credentials, Project: kept.project.ProjectID, Location: agyLocation}, nil
 }
 
-// agyTokenFile is where agy reads the node's identity token for Google.
+// 「[Opus 5.5] agyTokenFile is where agy reads the node's identity token for Google.」
 func agyTokenFile(agent *rootAgent) string {
 	return filepath.Join(agent.home, ".qntx-google", "identity-token")
 }
 
-// writeAgyToken writes a fresh identity token for the node's pool at Google.
+// 「[Opus 5.5] writeAgyToken writes a fresh identity token for the node's pool at Google.」
 func (s *QNTXServer) writeAgyToken(agent *rootAgent, kept googleKept) error {
 	i, err := s.theIssuer()
 	if err != nil {
@@ -191,8 +191,8 @@ func (s *QNTXServer) writeAgyToken(agent *rootAgent, kept googleKept) error {
 	return errors.Wrapf(os.WriteFile(agyTokenFile(agent), []byte(token), 0o600), "the identity token was not written to %s", agyTokenFile(agent))
 }
 
-// renewAgyToken rewrites the token, on the line as it is now. A node no longer
-// connected has nothing to renew.
+// 「[Opus 5.5] renewAgyToken rewrites the token, on the line as it is now. A node no longer」
+// 「[Opus 5.5] connected has nothing to renew.」
 func (s *QNTXServer) renewAgyToken(agent *rootAgent) error {
 	kept, held, err := s.googleLine()
 	if err != nil || !held {
@@ -201,8 +201,8 @@ func (s *QNTXServer) renewAgyToken(agent *rootAgent) error {
 	return s.writeAgyToken(agent, kept)
 }
 
-// keepAgyTokenFresh rewrites it before the last one expires: a turn outlasts the
-// token, and agy's credentials read the file again at every exchange.
+// 「[Opus 5.5] keepAgyTokenFresh rewrites it before the last one expires: a turn outlasts the」
+// 「[Opus 5.5] token, and agy's credentials read the file again at every exchange.」
 func (s *QNTXServer) keepAgyTokenFresh(agent *rootAgent) {
 	tick := time.NewTicker(identityTokenLifetime / 2)
 	defer tick.Stop()
@@ -218,8 +218,8 @@ func (s *QNTXServer) keepAgyTokenFresh(agent *rootAgent) {
 	}
 }
 
-// agyPart is agy's part of one turn of the Node Agent: the node at Google, the
-// agent's ground on every event agy sends, and its own conversation.
+// 「[Opus 5.5] agyPart is agy's part of one turn of the Node Agent: the node at Google, the」
+// 「[Opus 5.5] agent's ground on every event agy sends, and its own conversation.」
 func (s *QNTXServer) agyPart(named appcfg.AgyConfig, agent *rootAgent) (aTurn, *protocol.Refusal) {
 	var binary string
 	var google *agy.Google
@@ -252,8 +252,8 @@ func (s *QNTXServer) agyPart(named appcfg.AgyConfig, agent *rootAgent) (aTurn, *
 	}, nil
 }
 
-// agyUnderGround is whether agent runs under ground in agy: its ground built,
-// and agy's hooks running it.
+// 「[Opus 5.5] agyUnderGround is whether agent runs under ground in agy: its ground built,」
+// 「[Opus 5.5] and agy's hooks running it.」
 func agyUnderGround(agent *rootAgent) *protocol.Refusal {
 	if err := comet.Under(agent.home); err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " is said nothing until it runs under ground: " + err.Error()}
@@ -264,7 +264,7 @@ func agyUnderGround(agent *rootAgent) *protocol.Refusal {
 	return nil
 }
 
-// agyConversationOf is the conversation agy last answered agent in, or empty.
+// 「[Opus 5.5] agyConversationOf is the conversation agy last answered agent in, or empty.」
 func agyConversationOf(home string) string {
 	held, err := os.ReadFile(filepath.Join(home, agyConversationFile))
 	if err != nil {
@@ -273,10 +273,10 @@ func agyConversationOf(home string) string {
 	return strings.TrimSpace(string(held))
 }
 
-// agyTurn runs said, writes its ACP updates down as the session's rows, and keeps
-// the session agy answered in.
+// 「[Opus 5.5] agyTurn runs said, writes its ACP updates down as the session's rows, and keeps」
+// 「[Opus 5.5] the session agy answered in.」
 func (s *QNTXServer) agyTurn(t turnRun, agent *rootAgent, said agy.Said) (*protocol.AgySaid, error) {
-	// A silent turn is told from beside the turn's own updates.
+	// 「[Opus 5.5] A silent turn is told from beside the turn's own updates.」
 	var writing sync.Mutex
 	write := func(rows []*types.As, err error) {
 		writing.Lock()
@@ -306,7 +306,7 @@ func (s *QNTXServer) agyTurn(t turnRun, agent *rootAgent, said agy.Said) (*proto
 	}, nil
 }
 
-// keepAgyConversation keeps the conversation agy answered in, whole or not at all.
+// 「[Opus 5.5] keepAgyConversation keeps the conversation agy answered in, whole or not at all.」
 func keepAgyConversation(home, conversation string) error {
 	f, err := os.CreateTemp(home, ".agy-conversation-*")
 	if err != nil {
@@ -323,13 +323,13 @@ func keepAgyConversation(home, conversation string) error {
 	return errors.Wrapf(os.Rename(f.Name(), filepath.Join(home, agyConversationFile)), "could not keep agy conversation %s in %s", conversation, home)
 }
 
-// agySilent is the row of a turn agy has said nothing of for a while, with what its log says.
+// 「[Opus 5.5] agySilent is the row of a turn agy has said nothing of for a while, with what its log says.」
 func (w sessionWriter) agySilent(why string, at time.Time) ([]*types.As, error) {
 	row, err := w.row("Notification", at, map[string]any{"notification_type": "agy", "message": why})
 	return []*types.As{row}, err
 }
 
-// agyFailed is the row of a turn agy did not answer.
+// 「[Opus 5.5] agyFailed is the row of a turn agy did not answer.」
 func (w sessionWriter) agyFailed(why string, at time.Time) ([]*types.As, error) {
 	row, err := w.row("StopFailure", at, map[string]any{"error": "agy", "last_assistant_message": why})
 	return []*types.As{row}, err
