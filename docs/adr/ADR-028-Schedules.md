@@ -1,6 +1,6 @@
 # ADR-028: Schedules
 
-**Status:** Accepted, needs to be more formalised and used in the syste
+**Status:** Accepted, needs to be more formalised and used in the system, not just via handlers and wathers
 **Date:** 2026-08-06
 **Related:** [[ADR-018-watcher-lifecycle]] 
 ## Context
