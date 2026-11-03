@@ -1,7 +1,7 @@
 # ADR-042: The weekly report
 
 Date: 2026-09-25
-Status: Proposed
+Status: Proposed, Update Requested
 
 
 
