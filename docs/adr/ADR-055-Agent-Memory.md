@@ -26,7 +26,7 @@ Allow all Agent Harnesses to leverage memories created in Managed Agents.
 
 
 - [ ] View Memory store's in Agents Element
-- [ ] Actually, this should be it's own Memory Element
+- [ ] Actually, this should be it's own Memory Element in QNTX
 - [ ] 
 
 make sure this is a thing for
