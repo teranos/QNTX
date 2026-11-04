@@ -102,6 +102,44 @@ func Descriptors(name string) ([]protoreflect.FileDescriptor, *protocol.Refusal)
 	return compileAt(dir, protos)
 }
 
+// Says is what each message, field, service and method of the .proto files pinned for
+// the reference named says of itself, by full name, in the reference's own
+// comments. One that says nothing is left out.
+func Says(name string) (map[string]string, *protocol.Refusal) {
+	files, refused := Descriptors(name)
+	if refused != nil {
+		return nil, refused
+	}
+	says := map[string]string{}
+	keep := func(d protoreflect.Descriptor) {
+		if said := saysOf(d); said != "" {
+			says[string(d.FullName())] = said
+		}
+	}
+	var messagesSay func(protoreflect.MessageDescriptors)
+	messagesSay = func(messages protoreflect.MessageDescriptors) {
+		for i := 0; i < messages.Len(); i++ {
+			message := messages.Get(i)
+			keep(message)
+			for j := 0; j < message.Fields().Len(); j++ {
+				keep(message.Fields().Get(j))
+			}
+			messagesSay(message.Messages())
+		}
+	}
+	for _, file := range files {
+		messagesSay(file.Messages())
+		for i := 0; i < file.Services().Len(); i++ {
+			keep(file.Services().Get(i))
+			methods := file.Services().Get(i).Methods()
+			for j := 0; j < methods.Len(); j++ {
+				keep(methods.Get(j))
+			}
+		}
+	}
+	return says, nil
+}
+
 // pinnedAt is the one directory pinned for the reference named, and its files.
 func pinnedAt(name string) (string, []string, *protocol.Refusal) {
 	entries, err := fs.ReadDir(pinned, ".")

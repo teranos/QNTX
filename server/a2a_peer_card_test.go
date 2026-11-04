@@ -100,7 +100,9 @@ func TestThePrimaryHandsOverTheCardOfAnAgentAPeerServes(t *testing.T) {
 
 	require.Len(t, peer.asked, 1)
 	assert.Contains(t, peer.asked[0].Header.Get("Authorization"), "Bearer ", "the peer was not asked as the person")
-	assert.Equal(t, a2a.Version, peer.asked[0].URL.Query().Get("A2A-Version"))
+	// "the A2A-Version header or request parameter" (§3.6.2): a2a-go's client
+	// sends the header.
+	assert.Equal(t, a2a.Version, peer.asked[0].Header.Get("A2A-Version"))
 }
 
 // A card the peer did not sign is not handed over: one signed by another key,
@@ -151,4 +153,65 @@ func TestAPeerServingNoAgentThereIsNotFound(t *testing.T) {
 
 	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
 	assert.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+}
+
+// The person's token goes to the peer and nowhere else: a peer that redirects
+// the card elsewhere hands over no card, and the place it named is never
+// asked with the token.
+func TestAPeerRedirectingTheCardCarriesNoTokenAway(t *testing.T) {
+	var elsewhere []string
+	away := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		elsewhere = append(elsewhere, r.Header.Get("Authorization"))
+	}))
+	t.Cleanup(away.Close)
+	peer := aPeer(t, func(_ *standInPeer, w http.ResponseWriter, _ string) {
+		w.Header().Set("Location", away.URL+"/card")
+		w.WriteHeader(http.StatusFound)
+	})
+	srv, tokens := primaryOf(t, peer)
+
+	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
+	assert.Empty(t, elsewhere, "the redirect was followed")
+}
+
+// A peer refusing the card says why, and the node hands its words on.
+func TestAPeerRefusingTheCardIsHeardOut(t *testing.T) {
+	peer := aPeer(t, func(_ *standInPeer, w http.ResponseWriter, _ string) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("the orchard is being replanted"))
+	})
+	srv, tokens := primaryOf(t, peer)
+
+	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "answered 503")
+	assert.Contains(t, w.Body.String(), "the orchard is being replanted")
+}
+
+// A card is verified as the peer signed it: one that leaves a capability
+// unset, which a2a-go writes when it re-encodes a card, is still the peer's.
+func TestACardLeavingACapabilityUnsetIsThePeers(t *testing.T) {
+	peer := aPeer(t, func(p *standInPeer, w http.ResponseWriter, origin string) {
+		card, err := a2a.Card{Name: "the agent of orchard, claude-sonnet-5-5", Description: "The namespace agent.", Version: "1.0.0",
+			URL: origin + "/a2a", Tenant: "orchard", OutputModes: a2a.Modes,
+			Skills: []a2a.Skill{{ID: "say", Name: "say", Description: "Says something to it.", Tags: []string{"agent"}}},
+		}.Message()
+		require.NoError(t, err)
+		capabilities := card.Get(card.Descriptor().Fields().ByName("capabilities")).Message()
+		capabilities.Clear(capabilities.Descriptor().Fields().ByName("streaming"))
+		require.NoError(t, a2a.Sign(card, p.key, nodedid.KeyIDOf(p.did)))
+		body, err := protojson.Marshal(card.Interface())
+		require.NoError(t, err)
+		require.NotContains(t, string(body), "streaming")
+		_, err = w.Write(body)
+		require.NoError(t, err)
+	})
+	srv, tokens := primaryOf(t, peer)
+
+	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	handed, err := a2a.ReadCard(w.Body.Bytes())
+	require.NoError(t, err)
+	require.NoError(t, a2a.Verify(handed, peer.key.Public().(ed25519.PublicKey), nodedid.KeyIDOf(peer.did)))
 }

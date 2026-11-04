@@ -40,6 +40,8 @@ require (
 	github.com/teranos/sacred-error v0.0.0-20261010164404-b510f6387028
 )
 
+require github.com/a2aproject/a2a-go/v2 v2.7.0
+
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
