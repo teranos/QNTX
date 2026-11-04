@@ -38,7 +38,6 @@ every device through Sync.
   readable there, by the node and by the NODE agent ([[ADR-048-Node-Agent]]).
 
 "but you make a good point about NODE agent"
-
 "just make it do everything essentially"
 
 - The NODE agent sets the vault up on the box and keeps it syncing: `ob login`,
