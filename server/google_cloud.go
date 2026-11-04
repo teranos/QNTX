@@ -364,8 +364,13 @@ func providerTrusts(ctx context.Context, token, provider, issuer string) error {
 // nodeActsAs lets the node's DID act as account: Workload Identity User for its
 // principal in the node's pool, added to what the account's policy held.
 func (s *QNTXServer) nodeActsAs(ctx context.Context, token string, p googleProject, account string) error {
+	return actsAs(ctx, token, p, account, "principal://iam.googleapis.com/"+googlePoolOf(p)+"/subject/"+s.nodeDID.DID)
+}
+
+// actsAs lets member act as account: Workload Identity User, added to what the
+// account's policy held.
+func actsAs(ctx context.Context, token string, p googleProject, account, member string) error {
 	const role = "roles/iam.workloadIdentityUser"
-	member := "principal://iam.googleapis.com/" + googlePoolOf(p) + "/subject/" + s.nodeDID.DID
 	at := googleIAM + "/v1/projects/" + p.ProjectID + "/serviceAccounts/" + account
 	var policy map[string]any
 	// A service account just made is not at once visible to its policy.
@@ -464,6 +469,11 @@ func (s *QNTXServer) googleLine() (googleKept, bool, error) {
 	if err != nil {
 		return googleKept{}, false, errors.Wrapf(err, "failed to read the node's %s line", googleLineSubject)
 	}
+	return keptOfNewest(found, auth.NamespaceSystem)
+}
+
+// keptOfNewest is the newest of the GOOGLE lines found in namespace. False is none.
+func keptOfNewest(found []*types.As, namespace string) (googleKept, bool, error) {
 	var newest *types.As
 	for _, as := range found {
 		if newest == nil || as.Timestamp.After(newest.Timestamp) {
@@ -478,7 +488,8 @@ func (s *QNTXServer) googleLine() (googleKept, bool, error) {
 		"project_id": &kept.project.ProjectID, "project_number": &kept.project.ProjectNumber,
 		"pool": &kept.pool, "provider": &kept.provider, "service_account": &kept.account,
 	} {
-		if *into, err = oneText(newest.Attributes, name, googleLineSubject, newest.ID, auth.NamespaceSystem); err != nil {
+		var err error
+		if *into, err = oneText(newest.Attributes, name, googleLineSubject, newest.ID, namespace); err != nil {
 			return googleKept{}, false, err
 		}
 	}
@@ -617,6 +628,26 @@ func (s *QNTXServer) googleAccessToken(ctx context.Context, i *issuer, kept goog
 	if err != nil {
 		return "", err
 	}
+	traded, err := stsTrade(asking, subject, audience)
+	if err != nil {
+		return "", errors.Wrapf(err, "Google's token exchange did not trade the identity of %s", s.nodeDID.DID)
+	}
+	var acting struct {
+		AccessToken string `json:"accessToken"`
+	}
+	if err := googleCall(asking, traded, http.MethodPost, googleCredentials+"/v1/projects/-/serviceAccounts/"+kept.account+":generateAccessToken",
+		map[string]any{"scope": []string{googleCloudScope}}, &acting); err != nil {
+		return "", errors.Wrapf(err, "the node's identity may not act as %s", kept.account)
+	}
+	if acting.AccessToken == "" {
+		return "", errors.Newf("Google gave no token for %s", kept.account)
+	}
+	return acting.AccessToken, nil
+}
+
+// stsTrade trades subject, an identity token the node issued, at Google's token
+// exchange for audience, and answers the federated token.
+func stsTrade(ctx context.Context, subject, audience string) (string, error) {
 	form := url.Values{
 		"grant_type":           {"urn:ietf:params:oauth:grant-type:token-exchange"},
 		"audience":             {audience},
@@ -625,7 +656,7 @@ func (s *QNTXServer) googleAccessToken(ctx context.Context, i *issuer, kept goog
 		"subject_token":        {subject},
 		"subject_token_type":   {"urn:ietf:params:oauth:token-type:jwt"},
 	}
-	req, err := http.NewRequestWithContext(asking, http.MethodPost, googleSTS+"/v1/token", strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, googleSTS+"/v1/token", strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", errors.Wrap(err, "the node could not ask Google's token exchange")
 	}
@@ -637,7 +668,7 @@ func (s *QNTXServer) googleAccessToken(ctx context.Context, i *issuer, kept goog
 	defer answered.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(answered.Body, 1<<16))
 	if answered.StatusCode != http.StatusOK {
-		return "", errors.Newf("Google's token exchange did not trade the identity of %s at %s: %s", s.nodeDID.DID, audience, strings.TrimSpace(string(raw)))
+		return "", errors.Newf("at %s Google answered %s", audience, strings.TrimSpace(string(raw)))
 	}
 	var traded struct {
 		AccessToken string `json:"access_token"`
@@ -645,15 +676,5 @@ func (s *QNTXServer) googleAccessToken(ctx context.Context, i *issuer, kept goog
 	if err := json.Unmarshal(raw, &traded); err != nil || traded.AccessToken == "" {
 		return "", errors.Newf("Google's token exchange answered no token: %s", strings.TrimSpace(string(raw)))
 	}
-	var acting struct {
-		AccessToken string `json:"accessToken"`
-	}
-	if err := googleCall(asking, traded.AccessToken, http.MethodPost, googleCredentials+"/v1/projects/-/serviceAccounts/"+kept.account+":generateAccessToken",
-		map[string]any{"scope": []string{googleCloudScope}}, &acting); err != nil {
-		return "", errors.Wrapf(err, "the node's identity may not act as %s", kept.account)
-	}
-	if acting.AccessToken == "" {
-		return "", errors.Newf("Google gave no token for %s", kept.account)
-	}
-	return acting.AccessToken, nil
+	return traded.AccessToken, nil
 }

@@ -1351,7 +1351,9 @@ type NamespaceAgentSaid struct {
 	// What it answered in Pi.
 	Pi *PiSaid `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
 	// What the namespace agent answered in Codex.
-	Codex         *CodexSaid `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
+	Codex *CodexSaid `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
+	// 「[Opus 5.5] What the namespace agent answered in agy.」
+	Agy           *AgySaid `protobuf:"bytes,4,opt,name=agy,proto3" json:"agy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1403,6 +1405,13 @@ func (x *NamespaceAgentSaid) GetPi() *PiSaid {
 func (x *NamespaceAgentSaid) GetCodex() *CodexSaid {
 	if x != nil {
 		return x.Codex
+	}
+	return nil
+}
+
+func (x *NamespaceAgentSaid) GetAgy() *AgySaid {
+	if x != nil {
+		return x.Agy
 	}
 	return nil
 }
@@ -1923,7 +1932,9 @@ type AgyAm struct {
 	// 「[Opus 5.5] The agy this build pins.」
 	AgyVersion string `protobuf:"bytes,6,opt,name=agy_version,json=agyVersion,proto3" json:"agy_version,omitempty"`
 	// 「[Opus 5.5] Why it cannot be spoken to in agy, when it cannot.」
-	NotReady      string `protobuf:"bytes,7,opt,name=not_ready,json=notReady,proto3" json:"not_ready,omitempty"`
+	NotReady string `protobuf:"bytes,7,opt,name=not_ready,json=notReady,proto3" json:"not_ready,omitempty"`
+	// 「[Opus 5.5] Where a namespace's owner connects it to Google Cloud, which its agent runs on in agy.」
+	GoogleConnect string `protobuf:"bytes,8,opt,name=google_connect,json=googleConnect,proto3" json:"google_connect,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2003,6 +2014,13 @@ func (x *AgyAm) GetAgyVersion() string {
 func (x *AgyAm) GetNotReady() string {
 	if x != nil {
 		return x.NotReady
+	}
+	return ""
+}
+
+func (x *AgyAm) GetGoogleConnect() string {
+	if x != nil {
+		return x.GoogleConnect
 	}
 	return ""
 }
@@ -3056,7 +3074,9 @@ type NamespaceAgentAm struct {
 	// Who the agent is and how it runs, in Pi.
 	Pi *PiAm `protobuf:"bytes,4,opt,name=pi,proto3" json:"pi,omitempty"`
 	// Who the namespace agent is in Codex.
-	Codex         *CodexAm `protobuf:"bytes,5,opt,name=codex,proto3" json:"codex,omitempty"`
+	Codex *CodexAm `protobuf:"bytes,5,opt,name=codex,proto3" json:"codex,omitempty"`
+	// 「[Opus 5.5] Who the namespace agent is in agy.」
+	Agy           *AgyAm `protobuf:"bytes,6,opt,name=agy,proto3" json:"agy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3122,6 +3142,13 @@ func (x *NamespaceAgentAm) GetPi() *PiAm {
 func (x *NamespaceAgentAm) GetCodex() *CodexAm {
 	if x != nil {
 		return x.Codex
+	}
+	return nil
+}
+
+func (x *NamespaceAgentAm) GetAgy() *AgyAm {
+	if x != nil {
+		return x.Agy
 	}
 	return nil
 }
@@ -3778,11 +3805,12 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tsigned_in\x18\v \x01(\bR\bsignedIn\x12\x1f\n" +
 	"\vauth_method\x18\f \x01(\tR\n" +
 	"authMethod\x12\x16\n" +
-	"\x06models\x18\r \x03(\tR\x06models\"\x8f\x01\n" +
+	"\x06models\x18\r \x03(\tR\x06models\"\xb4\x01\n" +
 	"\x12NamespaceAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
-	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\"\xaf\x01\n" +
+	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\x12#\n" +
+	"\x03agy\x18\x04 \x01(\v2\x11.protocol.AgySaidR\x03agy\"\xaf\x01\n" +
 	"\rNodeAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
@@ -3823,7 +3851,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\fcontext_size\x18\x06 \x01(\x03R\vcontextSize\x12\x17\n" +
 	"\atook_ms\x18\a \x01(\x01R\x06tookMs\x12\x1c\n" +
 	"\tunwritten\x18\b \x01(\tR\tunwritten\x12\"\n" +
-	"\fconversation\x18\t \x01(\tR\fconversation\"\xb7\x01\n" +
+	"\fconversation\x18\t \x01(\tR\fconversation\"\xde\x01\n" +
 	"\x05AgyAm\x12\x10\n" +
 	"\x03did\x18\x01 \x01(\tR\x03did\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x18\n" +
@@ -3832,7 +3860,8 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x03agy\x18\x05 \x01(\tR\x03agy\x12\x1f\n" +
 	"\vagy_version\x18\x06 \x01(\tR\n" +
 	"agyVersion\x12\x1b\n" +
-	"\tnot_ready\x18\a \x01(\tR\bnotReady\"\xf5\x05\n" +
+	"\tnot_ready\x18\a \x01(\tR\bnotReady\x12%\n" +
+	"\x0egoogle_connect\x18\b \x01(\tR\rgoogleConnect\"\xf5\x05\n" +
 	"\n" +
 	"NodeGoogle\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
@@ -3936,13 +3965,14 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"pi_version\x18\b \x01(\tR\tpiVersion\x12\x1b\n" +
 	"\tnot_ready\x18\t \x01(\tR\bnotReady\x12\x1a\n" +
 	"\bprovider\x18\n" +
-	" \x01(\tR\bprovider\"\xba\x01\n" +
+	" \x01(\tR\bprovider\"\xdd\x01\n" +
 	"\x10NamespaceAgentAm\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x15\n" +
 	"\x06set_by\x18\x02 \x01(\tR\x05setBy\x12(\n" +
 	"\x05agent\x18\x03 \x01(\v2\x12.protocol.ClaudeAmR\x05agent\x12\x1e\n" +
 	"\x02pi\x18\x04 \x01(\v2\x0e.protocol.PiAmR\x02pi\x12'\n" +
-	"\x05codex\x18\x05 \x01(\v2\x11.protocol.CodexAmR\x05codex\"~\n" +
+	"\x05codex\x18\x05 \x01(\v2\x11.protocol.CodexAmR\x05codex\x12!\n" +
+	"\x03agy\x18\x06 \x01(\v2\x0f.protocol.AgyAmR\x03agy\"~\n" +
 	"\aFollows\x12\x1c\n" +
 	"\treference\x18\x01 \x01(\tR\treference\x12/\n" +
 	"\acolumns\x18\x02 \x03(\v2\x15.protocol.CorrespondsR\acolumns\x12$\n" +
@@ -4046,31 +4076,33 @@ var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	12, // 9: protocol.NamespaceAgentSaid.claude:type_name -> protocol.ClaudeSaid
 	13, // 10: protocol.NamespaceAgentSaid.pi:type_name -> protocol.PiSaid
 	18, // 11: protocol.NamespaceAgentSaid.codex:type_name -> protocol.CodexSaid
-	12, // 12: protocol.NodeAgentSaid.claude:type_name -> protocol.ClaudeSaid
-	13, // 13: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
-	18, // 14: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
-	20, // 15: protocol.NodeAgentSaid.agy:type_name -> protocol.AgySaid
-	14, // 16: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
-	29, // 17: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
-	19, // 18: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
-	21, // 19: protocol.NodeAgentAm.agy:type_name -> protocol.AgyAm
-	24, // 20: protocol.NodeGoogle.budgets:type_name -> protocol.GoogleBudget
-	23, // 21: protocol.NodeGoogle.items:type_name -> protocol.GoogleSpendItem
-	26, // 22: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
-	28, // 23: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
-	14, // 24: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
-	29, // 25: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
-	19, // 26: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
-	32, // 27: protocol.Follows.columns:type_name -> protocol.Corresponds
-	33, // 28: protocol.Follows.folds:type_name -> protocol.Fold
-	35, // 29: protocol.Sigil.takes:type_name -> protocol.Param
-	36, // 30: protocol.Sigil.gives:type_name -> protocol.Field
-	37, // 31: protocol.Sigil.http:type_name -> protocol.Endpoint
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	20, // 12: protocol.NamespaceAgentSaid.agy:type_name -> protocol.AgySaid
+	12, // 13: protocol.NodeAgentSaid.claude:type_name -> protocol.ClaudeSaid
+	13, // 14: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
+	18, // 15: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
+	20, // 16: protocol.NodeAgentSaid.agy:type_name -> protocol.AgySaid
+	14, // 17: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
+	29, // 18: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
+	19, // 19: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
+	21, // 20: protocol.NodeAgentAm.agy:type_name -> protocol.AgyAm
+	24, // 21: protocol.NodeGoogle.budgets:type_name -> protocol.GoogleBudget
+	23, // 22: protocol.NodeGoogle.items:type_name -> protocol.GoogleSpendItem
+	26, // 23: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
+	28, // 24: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
+	14, // 25: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
+	29, // 26: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
+	19, // 27: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
+	21, // 28: protocol.NamespaceAgentAm.agy:type_name -> protocol.AgyAm
+	32, // 29: protocol.Follows.columns:type_name -> protocol.Corresponds
+	33, // 30: protocol.Follows.folds:type_name -> protocol.Fold
+	35, // 31: protocol.Sigil.takes:type_name -> protocol.Param
+	36, // 32: protocol.Sigil.gives:type_name -> protocol.Field
+	37, // 33: protocol.Sigil.http:type_name -> protocol.Endpoint
+	34, // [34:34] is the sub-list for method output_type
+	34, // [34:34] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }

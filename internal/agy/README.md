@@ -26,6 +26,15 @@
 - 「[Opus 5.5] `model` is the value of the session's `model` option as agy offers it over ACP:」
   「[Opus 5.5] `gemini-3.8-flash`, not the `gemini-3.8-flash-low` of `agy models`. The thinking」
   「[Opus 5.5] level is agy's separate `thought_level` option, which this harness does not set.」
+- 「[Opus 5.5] A namespace's agent runs in agy when it is set with `agents set`, harness `agy`」
+  「[Opus 5.5] and a model. It runs as its namespace at its owner's Google Cloud, on no key: "A」
+  「[Opus 5.5] Namespace Owner logs in with their own oicd for their namespace access to agy, like how」
+  「[Opus 5.5] Root does for Node". The owner connects it at」
+  「[Opus 5.5] `/auth/google/cloud?thing=agy&namespace=<namespace>`, and the node issues its」
+  「[Opus 5.5] identity token for the namespace's agent, with the namespace as a claim its owner's」
+  「[Opus 5.5] provider maps. It spends what the owner's project spends, which the node does not」
+  「[Opus 5.5] meter. It takes no Task over A2A, so it is not served there. `server/google_namespace.go`,」
+  「[Opus 5.5] `server/namespace_agy.go`.」
 - 「[Opus 5.5] Its sigils are the other harnesses': `agent say|am|session` and」
   「[Opus 5.5] `agents set|am|say|session`, with `harness` `agy`, answering `AgySaid` and `AgyAm`.」
 - 「[Opus 5.5] A turn runs under ground: its ground built, and the global hooks.json under」

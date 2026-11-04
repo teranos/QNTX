@@ -347,3 +347,115 @@ func TestTheGoogleLoginAsksForNoCloud(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, login, "cloud-platform")
 }
+
+// "A Namespace Owner logs in with their own oicd for their namespace access to agy, like how Root does for Node"
+
+type namespaceConnected struct{ token, project, by, namespace string }
+
+// owningHandler is a node whose garden is owned by the Google account owner-sub.
+func owningHandler(t *testing.T, projects ...GoogleCloudProject) (*Handler, *[]namespaceConnected) {
+	t.Helper()
+	h, handed, _ := owningHandlerLettingGo(t, projects...)
+	return h, handed
+}
+
+// owningHandlerLettingGo is owningHandler, keeping which tokens it let go.
+func owningHandlerLettingGo(t *testing.T, projects ...GoogleCloudProject) (*Handler, *[]namespaceConnected, *[]string) {
+	t.Helper()
+	h, _, letGo := pickingHandler(t, projects...)
+	var handed []namespaceConnected
+	h.SetGoogleNamespace(func(namespace string) (string, error) {
+		if namespace != "garden" {
+			return "", errors.Newf("no namespace %s", namespace)
+		}
+		return "google:owner-sub", nil
+	}, func(_ context.Context, token, project, by, namespace string) (string, error) {
+		handed = append(handed, namespaceConnected{token, project, by, namespace})
+		return "garden is set up", nil
+	})
+	return h, &handed, letGo
+}
+
+// The namespace's owner says yes at Google, and the namespace is set up in the
+// project they select.
+func TestTheOwnersGoogleConnectsTheirNamespace(t *testing.T) {
+	h, handed := owningHandler(t, GoogleCloudProject{ID: "gardens-project"}, GoogleCloudProject{ID: "other-project"})
+	googleAnswering(t, "owner-sub")
+	done, cookies := consentingWith(t, h, "?thing=agy&namespace=garden")
+	require.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	page := done.Body.String()
+	assert.Contains(t, page, "garden spend in")
+	assert.Empty(t, *handed)
+
+	selected := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, hrefOf(t, page, "gardens-project"), nil)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+	h.handleGoogleCloud(selected, req)
+	assert.Equal(t, http.StatusOK, selected.Code, selected.Body.String())
+	assert.Equal(t, []namespaceConnected{{"cloud-token", "gardens-project", "google:owner-sub", "garden"}}, *handed)
+}
+
+// Only the owner's own Google account connects their namespace: not ROOT's either.
+func TestAnotherGoogleAccountDoesNotConnectTheNamespace(t *testing.T) {
+	for _, sub := range []string{"someone-else", "root-sub"} {
+		h, handed, letGo := owningHandlerLettingGo(t, GoogleCloudProject{ID: "gardens-project"})
+		googleAnswering(t, sub)
+		done := consenting(t, h, "?thing=agy&namespace=garden")
+		assert.Equal(t, http.StatusForbidden, done.Code, sub)
+		assert.Contains(t, done.Body.String(), "not the Google account of garden")
+		assert.Empty(t, *handed, sub)
+		assert.Equal(t, []string{"cloud-token"}, *letGo, "what Google handed a refused account is let go")
+	}
+}
+
+// A namespace that stopped says Try again for that namespace.
+func TestANamespaceThatStoppedOffersTryAgainForIt(t *testing.T) {
+	h, _ := owningHandler(t, GoogleCloudProject{ID: "gardens-project"})
+	h.SetGoogleNamespace(func(string) (string, error) { return "google:owner-sub", nil },
+		func(context.Context, string, string, string, string) (string, error) {
+			return "", errors.New("the pool was not made")
+		})
+	googleAnswering(t, "owner-sub")
+	page := consenting(t, h, "?thing=agy&namespace=garden").Body.String()
+	assert.Contains(t, page, "the pool was not made")
+	assert.Contains(t, page, `href="`+html.EscapeString(googleCloudPath+"?namespace=garden&project=gardens-project&thing=agy")+`"`)
+}
+
+// The owner is a person: the identity their namespace names and the Google account
+// that says yes are two routes of one User.
+func TestTheOwnersOtherRouteConnectsTheirNamespace(t *testing.T) {
+	h, handed := owningHandler(t, GoogleCloudProject{ID: "gardens-project"})
+	h.users = &memUsers{held: []User{{ID: "US-GARDENER", Level: LevelUser, Accounts: []UserAccount{{CanonicalID: "https://example.org/gardener"}, {CanonicalID: "google:owner-sub"}}}}}
+	h.SetGoogleNamespace(func(string) (string, error) { return "https://example.org/gardener", nil },
+		func(_ context.Context, token, project, by, namespace string) (string, error) {
+			*handed = append(*handed, namespaceConnected{token, project, by, namespace})
+			return "garden is set up", nil
+		})
+	googleAnswering(t, "owner-sub")
+	done := consenting(t, h, "?thing=agy&namespace=garden")
+	assert.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	assert.Equal(t, []namespaceConnected{{"cloud-token", "gardens-project", "google:owner-sub", "garden"}}, *handed)
+}
+
+// A namespace whose owner changed while the project was being selected is not
+// connected by the owner it had, and their token is let go.
+func TestAnOwnerChangedWhileSelectingDoesNotConnect(t *testing.T) {
+	h, handed, letGo := owningHandlerLettingGo(t, GoogleCloudProject{ID: "gardens-project"}, GoogleCloudProject{ID: "other-project"})
+	googleAnswering(t, "owner-sub")
+	done, cookies := consentingWith(t, h, "?thing=agy&namespace=garden")
+	require.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	connect := h.googleNamespace
+	h.SetGoogleNamespace(func(string) (string, error) { return "google:new-owner", nil }, connect)
+
+	selected := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, hrefOf(t, done.Body.String(), "gardens-project"), nil)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+	h.handleGoogleCloud(selected, req)
+	assert.Equal(t, http.StatusForbidden, selected.Code)
+	assert.Empty(t, *handed)
+	assert.Equal(t, []string{"cloud-token"}, *letGo)
+}

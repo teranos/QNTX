@@ -60,13 +60,15 @@ type Handler struct {
 	googleCloud GoogleCloudConnect
 	// googleCloudProjects is what ROOT's account sees to select from, and
 	// googleCloudLetGo lets ROOT's token go when no setup will.
-	googleCloudProjects GoogleCloudProjects
-	googleCloudLetGo    func(token string)
-	googleCosts         GoogleThingConnect
-	googleAgy           GoogleThingConnect
-	googleKey           GoogleKeyConnect
-	cloudPicksMu        sync.Mutex
-	cloudPicks          map[string]cloudPick
+	googleCloudProjects  GoogleCloudProjects
+	googleCloudLetGo     func(token string)
+	googleCosts          GoogleThingConnect
+	googleAgy            GoogleThingConnect
+	googleKey            GoogleKeyConnect
+	googleNamespace      GoogleNamespaceConnect
+	googleNamespaceOwner GoogleNamespaceOwner
+	cloudPicksMu         sync.Mutex
+	cloudPicks           map[string]cloudPick
 	// auth.provider.apple, the same way: the key already resolved, nil on a
 	// node configured for no Apple.
 	apple *OperatorClient

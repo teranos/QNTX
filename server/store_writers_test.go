@@ -84,6 +84,10 @@ var storeWriters = map[string]string{
 		"WriteWhatTheNodeKnowsOfItself: a line about the node. Reached from the Google ceremony's callback, " +
 		"an /auth/… route anyone reaches, only once Google named the account that said yes and h.IsRoot " +
 		"says it is ROOT's: \"Given that I am ROOT and my google identity is the ROOT identity\"",
+	"keepNamespaceGoogleLine": "a namespace's GOOGLE line, what it was set up as at its owner's Google Cloud, in the " +
+		"namespace's own store through Write as its owner is admitted to act there. Reached from the Google ceremony's " +
+		"callback, an /auth/… route anyone reaches, only once Google named the account that said yes and SameUser says " +
+		"it is the namespace's owner's: \"A Namespace Owner logs in with their own oicd for their namespace access to agy, like how Root does for Node\"",
 	"setKeyLine": "a KEY line of a namespace (ADR-051), in the namespace's own store through Write as " +
 		"the setter is admitted, after keysAsking refuses a token or a connector and mayHandleKeys says " +
 		"they own the namespace, or are ROOT or SUPER",
