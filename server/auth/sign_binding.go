@@ -54,7 +54,9 @@ type flow struct {
 	cloud   bool
 	project string
 	// 「[Opus 5.5] thing is what ROOT's yes is for, beyond connecting the node: "costs", "agy".」
-	thing     string
+	thing string
+	// 「[Opus 5.5] namespace is whose key the yes makes, when thing is "key".」
+	namespace string
 	startedAt time.Time
 }
 

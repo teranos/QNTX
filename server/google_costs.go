@@ -210,6 +210,10 @@ func (s *QNTXServer) connectGoogleCosts(ctx context.Context, token, by string) (
 			return "", errors.Wrapf(err, "%s was not told to report to %s", budget.Name, topic)
 		}
 	}
+	// "one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item."
+	if err := s.meterTheNode(ctx, token, billing.Account, topic, by, kept); err != nil {
+		return "", err
+	}
 	if refused := s.keepGoogleCostLine(googleCostsLineSubject, "wired", by, map[string]any{"billing_account": billing.Account}); refused != nil {
 		return "", errors.New(refused.Says)
 	}
@@ -272,8 +276,10 @@ type googleBudgetReport struct {
 
 // googleBudgetSet is a budget as it is set at Google.
 type googleBudgetSet struct {
-	name, currency, period string
-	amount                 float64
+	// 「[Opus 5.5] id is what its reports carry; projects is its scope, none being the whole account.」
+	id, name, currency, period string
+	projects                   []string
+	amount                     float64
 }
 
 // readGoogleBudgets reads the budgets as they are set at Google: what they are in, and
@@ -289,6 +295,7 @@ func (s *QNTXServer) readGoogleBudgets(ctx context.Context, token string) error 
 	}
 	var listed struct {
 		Budgets []struct {
+			Name        string `json:"name"`
 			DisplayName string `json:"displayName"`
 			Amount      struct {
 				Specified struct {
@@ -298,8 +305,9 @@ func (s *QNTXServer) readGoogleBudgets(ctx context.Context, token string) error 
 				} `json:"specifiedAmount"`
 			} `json:"amount"`
 			Filter struct {
-				Period string `json:"calendarPeriod"`
-				Custom any    `json:"customPeriod"`
+				Period   string   `json:"calendarPeriod"`
+				Custom   any      `json:"customPeriod"`
+				Projects []string `json:"projects"`
 			} `json:"budgetFilter"`
 		} `json:"budgets"`
 	}
@@ -314,6 +322,7 @@ func (s *QNTXServer) readGoogleBudgets(ctx context.Context, token string) error 
 			period = "CUSTOM"
 		}
 		set = append(set, googleBudgetSet{
+			id: budget.Name[strings.LastIndex(budget.Name, "/")+1:], projects: budget.Filter.Projects,
 			name: budget.DisplayName, currency: budget.Amount.Specified.Currency, period: period,
 			amount: units + float64(budget.Amount.Specified.Nanos)/1e9,
 		})
@@ -327,25 +336,28 @@ func (s *QNTXServer) readGoogleBudgets(ctx context.Context, token string) error 
 // googleNow is the time a day is counted by.
 var googleNow = time.Now
 
-// googleSpentToday is the most any budget has spent today, and which: what it last
-// reported less what it reported before today in the same period. Before Google's first
+// 「[Opus 5.5] googleSpentTodayOn is what the budget of id has spent today, and its newest report:」
+// what it last reported less what it reported before today in the same period. Before Google's first
 // report of a period that began earlier there is nothing to count from, so today is
 // counted from today's first report, and a report comes hours after the spending.
-func (s *QNTXServer) googleSpentToday() (spent float64, on googleBudgetReport, err error) {
+func (s *QNTXServer) googleSpentTodayOn(id string) (spent float64, on googleBudgetReport, err error) {
 	reports, err := s.googleEveryBudgetReport()
 	if err != nil {
 		return 0, on, err
 	}
 	slices.SortStableFunc(reports, func(a, b googleBudgetReport) int { return a.published.Compare(b.published) })
-	byBudget := map[string][]googleBudgetReport{}
+	var each []googleBudgetReport
 	for _, report := range reports {
-		byBudget[report.id] = append(byBudget[report.id], report)
+		if report.id == id {
+			each = append(each, report)
+		}
 	}
 	today := googleNow().UTC().Truncate(24 * time.Hour)
-	for _, each := range byBudget {
+	if len(each) > 0 {
 		newest := each[len(each)-1]
+		on = newest
 		if newest.published.Before(today) {
-			continue
+			return 0, on, nil
 		}
 		base, counted := 0.0, false
 		for _, report := range each {
@@ -368,9 +380,7 @@ func (s *QNTXServer) googleSpentToday() (spent float64, on googleBudgetReport, e
 			}
 		}
 		// In cents: 5.80 less 5 is otherwise just under 0.80.
-		if today := math.Round((newest.cost-base)*100) / 100; today > spent {
-			spent, on = today, newest
-		}
+		spent = math.Round((newest.cost-base)*100) / 100
 	}
 	return spent, on, nil
 }
@@ -421,85 +431,52 @@ func (s *QNTXServer) googleEveryBudgetReport() ([]googleBudgetReport, error) {
 	return reports, nil
 }
 
-// googleDayLimit is the most ROOT lets the node spend in a day; zero is none.
-func (s *QNTXServer) googleDayLimit() (float64, error) {
-	lines, err := s.googleCostLines(googleDayLimitLineSubject)
-	if err != nil || len(lines) == 0 {
+// 「[Opus 5.5] googleItemLimit is ROOT's newest limit of subject on item: a period's, or a day's.」
+// 「[Opus 5.5] A line naming no item was set before items were, on the node. Zero is none.」
+func (s *QNTXServer) googleItemLimit(subject, item string) (float64, error) {
+	lines, err := s.googleCostLines(subject)
+	if err != nil {
 		return 0, err
 	}
-	amount, _ := lines[0].Attributes["amount"].(float64)
-	return amount, nil
+	for _, line := range lines {
+		on, _ := line.Attributes["item"].(string)
+		if on == "" {
+			on = googleNodeItem
+		}
+		if on == item {
+			amount, _ := line.Attributes["amount"].(float64)
+			return amount, nil
+		}
+	}
+	return 0, nil
 }
 
-// googleLimit is the limit ROOT set on this node; zero is none.
-func (s *QNTXServer) googleLimit() (float64, error) {
-	lines, err := s.googleCostLines(googleLimitLineSubject)
-	if err != nil || len(lines) == 0 {
-		return 0, err
-	}
-	amount, _ := lines[0].Attributes["amount"].(float64)
-	return amount, nil
-}
-
-// googleSpendingHalted is whether what costs at Google is halted, and which budget
-// says so: 80% of the lower of its amount and ROOT's limit here. What it cannot read
-// counts as halted, for a node that does not know what it spends does not spend.
-func (s *QNTXServer) googleSpendingHalted() (bool, string) {
-	wired, err := s.googleCostsWired()
-	if err != nil {
-		return true, err.Error()
-	}
-	if !wired {
-		return false, ""
-	}
-	reports, err := s.googleBudgetReports()
-	if err != nil {
-		return true, err.Error()
-	}
-	limit, err := s.googleLimit()
-	if err != nil {
-		return true, err.Error()
-	}
-	for _, report := range reports {
-		against := report.budget
-		if limit > 0 && limit < against {
-			against = limit
-		}
-		if against > 0 && report.cost >= against*googleHaltsAt {
-			return true, fmt.Sprintf("%s has reached %.2f %s of %.2f, and what costs halts at %d%% of it", report.name, report.cost, report.currency, against, int(googleHaltsAt*100))
-		}
-	}
-	day, err := s.googleDayLimit()
-	if err != nil {
-		return true, err.Error()
-	}
-	if day > 0 {
-		spent, on, err := s.googleSpentToday()
-		if err != nil {
-			return true, err.Error()
-		}
-		if spent >= day*googleHaltsAt {
-			return true, fmt.Sprintf("%s has spent %.2f %s today of %.2f, and what costs halts at %d%% of it until tomorrow", on.name, spent, on.currency, day, int(googleHaltsAt*100))
-		}
-	}
-	return false, ""
-}
-
-// googleHaltChanged mails ROOT when the halt turned on or off, once each way.
+// googleHaltChanged mails ROOT when an item's halt turned on or off, once each way, and
+// 「[Opus 5.5] names the item: the others run on.」
 func (s *QNTXServer) googleHaltChanged() {
-	halted, why := s.googleSpendingHalted()
-	s.googleHaltMu.Lock()
-	changed := halted != s.googleHalted
-	s.googleHalted = halted
-	s.googleHaltMu.Unlock()
-	if !changed {
+	items, err := s.googleSpendItems()
+	if err != nil {
+		s.logger.Errorw("What spends at Google was not read to say what halted", "error", err)
 		return
 	}
-	if halted {
-		s.tellGoogleOutcome(googleOutcomeMail("What costs at Google Cloud is halted", why+".\n\nThe node stays connected. It resumes by itself when the budget frees up.\n"))
-		return
+	for _, item := range items {
+		halted, why := s.googleItemHalted(item.name)
+		s.googleHaltMu.Lock()
+		if s.googleHalted == nil {
+			s.googleHalted = map[string]bool{}
+		}
+		changed := halted != s.googleHalted[item.name]
+		s.googleHalted[item.name] = halted
+		s.googleHaltMu.Unlock()
+		if !changed {
+			continue
+		}
+		if halted {
+			s.tellGoogleOutcome(googleOutcomeMail("What "+item.called()+" spends at Google Cloud is halted", why+".\n\nThe node stays connected, and nothing else halts for it. It resumes by itself when the budget frees up.\n"))
+			continue
+		}
+		s.tellGoogleOutcome(googleOutcomeMail("What "+item.called()+" spends at Google Cloud has resumed", "The budget freed up.\n"))
 	}
-	s.tellGoogleOutcome(googleOutcomeMail("What costs at Google Cloud has resumed", "The budget freed up.\n"))
 }
 
 // googleCostsTick reads what the budgets reported since the last time, keeps it,
@@ -590,6 +567,7 @@ func (s *QNTXServer) watchGoogleCosts() {
 // googleCostsAm fills in what the node knows of its costs.
 func (s *QNTXServer) googleCostsAm(am *protocol.NodeGoogle, connect string) *protocol.Refusal {
 	am.CostsConnect = connect + "?project=" + url.QueryEscape(am.GetProjectId()) + "&thing=costs"
+	am.KeyConnect = connect + "?project=" + url.QueryEscape(am.GetProjectId()) + "&thing=key&namespace="
 	wired, err := s.googleCostsWired()
 	if err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
@@ -624,16 +602,35 @@ func (s *QNTXServer) googleCostsAm(am *protocol.NodeGoogle, connect string) *pro
 			am.Budgets = append(am.Budgets, &protocol.GoogleBudget{Name: each.name, Budget: each.amount, Currency: each.currency, Period: each.period})
 		}
 	}
-	if am.DayLimit, err = s.googleDayLimit(); err != nil {
+	items, err := s.googleSpendItems()
+	if err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	if am.SpentToday, _, err = s.googleSpentToday(); err != nil {
-		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	for _, item := range items {
+		spending := &protocol.GoogleSpendItem{Name: item.name, Kind: item.kind, ProjectId: item.project.ProjectID, ProjectNumber: item.project.ProjectNumber, Budget: item.budget}
+		if item.budget != "" {
+			for _, report := range reports {
+				if report.id == item.meter() {
+					spending.Cost = report.cost
+				}
+			}
+			if spending.SpentToday, _, err = s.googleSpentTodayOn(item.meter()); err != nil {
+				return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+			}
+		}
+		if spending.Limit, err = s.googleItemLimit(googleLimitLineSubject, item.name); err != nil {
+			return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		}
+		if spending.DayLimit, err = s.googleItemLimit(googleDayLimitLineSubject, item.name); err != nil {
+			return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		}
+		spending.Halted, spending.HaltedWhy = s.googleItemHalted(item.name)
+		am.Items = append(am.Items, spending)
+		// 「[Opus 5.5] What the node itself spends stays where it was answered before items were.」
+		if item.name == googleNodeItem {
+			am.Limit, am.DayLimit, am.SpentToday, am.Halted, am.HaltedWhy = spending.Limit, spending.DayLimit, spending.SpentToday, spending.Halted, spending.HaltedWhy
+		}
 	}
-	if am.Limit, err = s.googleLimit(); err != nil {
-		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	}
-	am.Halted, am.HaltedWhy = s.googleSpendingHalted()
 	return nil
 }
 
@@ -647,6 +644,15 @@ func (s *QNTXServer) googleLimitSet(ctx context.Context, sent sigil.Sent) (any, 
 	if admitted, ok := auth.AdmissionFrom(ctx); ok && admitted.Identity != "" {
 		by = admitted.Identity
 	}
+	item := strings.TrimSpace(sent["item"])
+	if item == "" {
+		item = googleNodeItem
+	}
+	if _, found, err := s.googleSpendItemNamed(item); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	} else if !found {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "item", Says: "nothing spends at Google as " + item + ": node, or a namespace whose key was made there"}
+	}
 	subject := googleLimitLineSubject
 	switch sent["per"] {
 	case "", "period":
@@ -655,7 +661,7 @@ func (s *QNTXServer) googleLimitSet(ctx context.Context, sent sigil.Sent) (any, 
 	default:
 		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "per", Says: "per is period or day, and this is " + sent["per"]}
 	}
-	if refused := s.keepGoogleCostLine(subject, "set", by, map[string]any{"amount": amount}); refused != nil {
+	if refused := s.keepGoogleCostLine(subject, "set", by, map[string]any{"amount": amount, "item": item}); refused != nil {
 		return nil, refused
 	}
 	s.googleHaltChanged()
