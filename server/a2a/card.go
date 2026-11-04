@@ -3,6 +3,7 @@ package a2a
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/teranos/QNTX/server/parity"
 	errors "github.com/teranos/sacred-error"
@@ -65,6 +66,9 @@ type Card struct {
 	// §13.3).
 	Session string
 }
+
+// Version is the A2A version this node speaks, Major.Minor (§3.6).
+const Version = "1.0"
 
 // Message is the card as lf.a2a.v1.AgentCard, read through the pinned spec, so
 // it cannot carry what the proto does not declare.
@@ -216,4 +220,18 @@ func message(name protoreflect.FullName) (protoreflect.MessageDescriptor, error)
 		}
 	}
 	return nil, errors.Newf("the pinned a2a declares no %s", name)
+}
+
+// Text is the media type the agents take and give.
+const Text = "text/plain"
+
+// Matches is whether an If-None-Match header names etag.
+func Matches(header, etag string) bool {
+	for _, tag := range strings.Split(header, ",") {
+		tag = strings.TrimPrefix(strings.TrimSpace(tag), "W/")
+		if tag == "*" || tag == etag {
+			return true
+		}
+	}
+	return false
 }

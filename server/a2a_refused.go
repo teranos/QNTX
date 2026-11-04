@@ -9,6 +9,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/getsentry/sentry-go"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
@@ -41,9 +42,18 @@ const (
 	saidDefectMost    = 500
 )
 
+// a2aRefusalSaid is one request the node answered with an error: the
+// operation the SDK read it as, empty when none was; the JSON-RPC method (§9)
+// it called when it was JSON-RPC, as the client wrote it; and the answer.
+type a2aRefusalSaid struct {
+	Operation, JSONRPC string
+	Status             int
+	Reason, Message    string
+}
+
 // kindOf is a defect for a 5xx or an answer the node could not give, and expected otherwise.
-func kindOf(refused *a2a.Error, status int) refusalKind {
-	if status >= http.StatusInternalServerError || refused.Name == "InvalidAgentResponseError" {
+func kindOf(refusal a2aRefusalSaid) refusalKind {
+	if refusal.Status >= http.StatusInternalServerError || refusal.Reason == a2asdk.ErrorReason(a2asdk.ErrInvalidAgentResponse) {
 		return refusedDefect
 	}
 	return refusedExpected
@@ -58,12 +68,15 @@ func withRefusalSaid(ctx context.Context) (context.Context, *atomic.Bool) {
 }
 
 // a2aRefused counts every refused A2A request, and writes down as many as the limits let through.
-func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2a.Refusal) {
+func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 	if said, held := r.Context().Value(refusalSaidKey{}).(*atomic.Bool); held {
 		said.Store(true)
 	}
-	status, reason := refusal.Err.Said()
-	kind := kindOf(refusal.Err, status)
+	status, reason := refusal.Status, refusal.Reason
+	if reason == "" {
+		reason = http.StatusText(status)
+	}
+	kind := kindOf(refusal)
 	binding := "http+json"
 	if refusal.JSONRPC != "" {
 		binding = "jsonrpc"
@@ -112,7 +125,7 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2a.Refusal) {
 
 // a2aDefect is a Sentry issue per operation and reason, and a line in the node's own log.
 // The words it was answered with are the node's own, so they are said.
-func (s *QNTXServer) a2aDefect(ctx context.Context, refusal a2a.Refusal, status int, said map[string]string) {
+func (s *QNTXServer) a2aDefect(ctx context.Context, refusal a2aRefusalSaid, status int, said map[string]string) {
 	hub := sentry.GetHubFromContext(ctx)
 	if hub == nil {
 		hub = sentry.CurrentHub()
@@ -126,12 +139,12 @@ func (s *QNTXServer) a2aDefect(ctx context.Context, refusal a2a.Refusal, status 
 				scope.SetTag(key, value)
 			}
 		}
-		scope.SetContext("a2a", sentry.Context{"status": status, "says": bounded(refusal.Err.Message, saidDefectMost)})
+		scope.SetContext("a2a", sentry.Context{"status": status, "says": bounded(refusal.Message, saidDefectMost)})
 		hub.CaptureMessage("An A2A request failed on the node's side")
 	})
 	s.logger.Warnw("An A2A request failed on the node's side",
 		"operation", refusal.Operation, "reason", said["a2a.reason"], "status", status,
-		"request_id", said["request_id"], "says", bounded(refusal.Err.Message, saidDefectMost))
+		"request_id", said["request_id"], "says", bounded(refusal.Message, saidDefectMost))
 }
 
 // methodOf is the HTTP verb, or OTHER: a count's slices are the node's words, not the client's.

@@ -77,7 +77,7 @@ type JobHandler interface {
 }
 ```
 
-> **Type Reference**: See [Job](../types/async.md#job), [PulseState](../types/async.md#pulsestate), and [Progress](../types/async.md#progress) type definitions.
+> **Type Reference**: See [Job](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go), [PulseState](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go), and [Progress](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go) type definitions.
 
 **Generic Architecture:**
 - No JobType enum - handlers identified by string name
@@ -87,7 +87,7 @@ type JobHandler interface {
 
 ### Configuration
 
-Example Pulse configuration (see [config package](../../internal/config/README.md) for full config system):
+Example Pulse configuration (see [config package](https://github.com/teranos/QNTX/blob/main/internal/config/README.md) for full config system):
 
 ```toml
 [pulse]
