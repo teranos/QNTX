@@ -13,7 +13,6 @@ package server
 
 import (
 	"context"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -94,34 +93,27 @@ func (s *QNTXServer) vaultSend(ctx context.Context, sent sigil.Sent) (any, *prot
 	return s.vaultList(ctx, sent)
 }
 
-// vaultNotesAt is every note under root, by its path below it, and its content.
+// "i DONT want the binding to include subdirs"
+
+// vaultNotesAt is every note directly in root, by its name, and its content.
+// A folder inside root is not the binding's, nor is a note in one.
 func vaultNotesAt(root string) (map[string][]byte, error) {
 	notes := map[string][]byte{}
-	err := filepath.WalkDir(root, func(at string, d fs.DirEntry, err error) error {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return notes, errors.Wrapf(err, "the notes in %s were not read", root)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || !strings.HasSuffix(entry.Name(), noteSuffix) {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(root, entry.Name()))
 		if err != nil {
-			return err
+			return notes, errors.Wrapf(err, "the notes in %s were not read", root)
 		}
-		if at != root && strings.HasPrefix(d.Name(), ".") {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if d.IsDir() || !strings.HasSuffix(d.Name(), noteSuffix) {
-			return nil
-		}
-		under, err := filepath.Rel(root, at)
-		if err != nil {
-			return err
-		}
-		content, err := os.ReadFile(at)
-		if err != nil {
-			return err
-		}
-		notes[filepath.ToSlash(under)] = content
-		return nil
-	})
-	return notes, errors.Wrapf(err, "the notes under %s were not read", root)
+		notes[entry.Name()] = content
+	}
+	return notes, nil
 }
 
 // vaultSent is what sending one folder did.
