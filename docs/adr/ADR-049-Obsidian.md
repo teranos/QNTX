@@ -65,7 +65,8 @@ TODO: link the userstories as an Obsidian managed thing, linked via the Element,
 ## Which folders are the vault's
 
 `github.com/owner/repo@branch:path`
-([[ADR-002-plugin-configuration]]), the vault's folders are named on a record on the node, 
+([[ADR-002-plugin-configuration]], 
+the vault's folders are named on a record on the node, 
 and the folder itself carries nothing.
 
 "name both ends"
