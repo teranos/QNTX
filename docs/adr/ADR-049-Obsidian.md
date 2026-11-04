@@ -64,10 +64,9 @@ TODO: link the userstories as an Obsidian managed thing, linked via the Element,
 
 ## Which folders are the vault's
 
-"So, we could do the Same for Obsidian"
-
-As datapunt's inputs are named on its plugin record, `github.com/owner/repo@branch:path`
-([[ADR-002-plugin-configuration]]), the vault's folders are named on a record on the node, and the folder itself carries nothing.
+`github.com/owner/repo@branch:path`
+([[ADR-002-plugin-configuration]]), the vault's folders are named on a record on the node, 
+and the folder itself carries nothing.
 
 "name both ends"
 
