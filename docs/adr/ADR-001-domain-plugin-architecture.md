@@ -2,42 +2,21 @@
 
 **Status:** Accepted (revised 2026-05-18)
 **Date:** 2026-01-04
-**Deciders:** QNTX Core Team
-
-## Context
-
-QNTX initially had software development functionality (git ingestion, GitHub integration, gopls language server, code editor) tightly coupled to the core. This created challenges:
-
-1. **Scope Creep**: Core repository accumulated domain-specific code (code, biotech, finance, etc.)
-2. **Coupling**: Domain logic mixed with core attestation/graph infrastructure
-3. **Maintenance**: Changes to one domain risked breaking others
-4. **Third-Party Extensions**: No mechanism for private/external domain implementations
+**Deciders:** Brandon
 
 ## Decision
 
-We adopt a **plugin architecture** where all non-core functionality is implemented as plugins. Every plugin implements the same interface and follows the same lifecycle. A plugin decides how much it implements — it can provide HTTP endpoints, WebSocket handlers, gRPC services, custom element, or any combination. Improvements to QNTX core services benefit all plugins automatically.
-
-### Minimal Core Philosophy
-
-QNTX core is minimal and runs without any plugins:
-- **Core components**: ATS (attestation system), Database (⊔), Pulse (꩜), Server
-- **All domains are plugins**: Code, finance, legal, biotech, etc. are external plugins
-- **Optional by default**: No plugins enabled in default configuration
-- **Explicit opt-in**: Users add and enable plugins in the plugin element
-
-This ensures QNTX core remains focused on infrastructure, not domain logic.
-
+Every plugin implements similar interfaces for equivalent work and follows the same lifecycle. The plugin maintainer decides how much of the provided contract they want to implement.  
 ### Plugin Boundary
 
-- Plugins are **isolated** — no shared memory, no direct method calls. Communication flows through core-mediated gRPC services and the shared attestation store.
-- A plugin that provides a service (LLM, search, embedding, Python) registers it with core. Other plugins consume these services through `ServiceRegistry` without knowing which plugin provides them.
-- No direct plugin-to-plugin calls — core mediates all inter-plugin communication.
+- A plugin that provides a service registers it with core. Other plugins can consume these services through `ServiceRegistry` without knowing which plugin implemented the `.proto`.
+- No direct plugin-to-plugin calls.
 
 ### Plugin Model
 
-All plugins are **external** — standalone binaries loaded at runtime via gRPC ([Plugin gRPC API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto)):
+All plugins are standalone binaries loaded at runtime via gRPC ([Plugin gRPC API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto)):
 
-- Plugins implement `DomainPlugin` interface inside their own binaries
+-  Plugins implement `DomainPlugin` interface inside their own binaries
 - `ExternalDomainProxy` proxies gRPC calls to plugin processes
 - `PluginServer` wrapper exposes the plugin's implementation via gRPC
 
@@ -48,10 +27,9 @@ registry.Register(externalProxy)
 
 Plugin characteristics:
 - Standalone binaries in `./qntx-plugins/` (first-party) or external repositories
-- Communicate via gRPC only
-- Added, configured and enabled in the plugin element, not am.toml ([ADR-043](./ADR-043-github-service.md))
+- Communicates to QNTX via gRPC only
+- Added, configured and enabled via Signa
 - Run in separate processes for isolation
-- Discovered from configured search paths
 - [Hot-swappable](./ADR-002-plugin-configuration.md) — enable/disable at runtime without server restart
 
 ### Interface Contract
@@ -154,4 +132,4 @@ Optional interfaces extend the base — a plugin opts in by implementing them:
 
 - [ADR-002: Plugin Configuration Management](./ADR-002-plugin-configuration.md)
 - [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
-- [ADR-043: GitHubService](./ADR-043-github-service.md) — plugins as records in the node's system store, builds from the runner
+- [ADR-043: GitHubService](ADR-043-CodeForge-service.md) — plugins as records in the node's system store, builds from the runner

@@ -2,6 +2,7 @@
 
 Date: 2026-10-10
 Status: Unpolished
+pre-0.999.0-polish-blocker 
 
 "There is an interactive element, 
 It lets me approve something."
@@ -44,12 +45,12 @@ tells the page when one moved.
 
 "Me, the human the logged in user." The answer is a route, `POST
 /api/approvals/answer`, no sigil and no tool, as the git credential is
-(ADR-048): a sigil is a tool to whoever reaches it, and the agent reaches
+([[ADR-048-Node-Agent]]): a sigil is a tool to whoever reaches it, and the agent reaches
 every tool. The reach table names it and the list of ROOT, and the handler
 refuses a token however ROOT the token is, and a session that names nobody. The actor on
 the line is the route the human logged in by.
 
-The node merges as the App's installation where the repository is ([[ADR-043-github-service]]),
+The node merges as the App's installation where the repository is ([[ADR-043-CodeForge-service]]),
 at the head the human saw: GitHub refuses a merge whose `sha` moved. The merge is written down by the human.
 
 ## The PR story

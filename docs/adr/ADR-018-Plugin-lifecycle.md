@@ -1,13 +1,19 @@
-# ADR-018: Plugin Lifecycle, Watchers, and Developer Experience
+# ADR-018: Plugin Lifecycle, Watchers, and DX
 
 **Status:** Accepted
-**Date:** 2026-05-03
-**Deciders:** QNTX Core Team
-**Related:** ADR-003 (Plugin Communication), ADR-004 (Plugin-Pulse Integration)
+**Date:** Question 2026-11-03
+**Deciders:** Brandon
+**Related:** [[ADR-001-domain-plugin-architecture]], [[ADR-003-plugin-communication]] , [[ADR-004-plugin-pulse-integration]] 
 
+
+Is this more about Plugin lifecycle ?
+
+Then this must be the right place to discuss dynamically shutting down and starting plugins based on how much they are used and system stress. So the system always keeps serving, but degrades partially based on org specific characteristics 
 ## Context
 
-Plugins are separate processes that communicate with QNTX over gRPC. The lifecycle — boot, initialization, health monitoring, restart, shutdown — has implicit contracts that caused real bugs: double initialization, stale connections, silent watcher failures. This ADR documents the full plugin lifecycle and the watcher subsystem as canonical references.
+Plugins are separate processes that communicate with QNTX over gRPC. The lifecycle — boot, initialisation, health monitoring, restart, shutdown (cooldown ?) — has implicit contracts that caused real bugs: double initialisation, stale connections, silent watcher failures. 
+
+This ADR documents the full plugin lifecycle and the watcher subsystem as canonical references.
 
 ### Problems observed
 
@@ -168,14 +174,11 @@ When things go wrong, QNTX emits:
 - WebSocket keepalive requirement is discoverable before hitting the error
 - Error messages can be cross-referenced against this document
 
-### Negative
-
-- Another document to maintain as the watcher system evolves
 
 ## Related
 
-- [ADR-003: Plugin Communication](ADR-003-plugin-communication.md) — watchers are the reactive complement to attestation polling
-- [ADR-004: Plugin-Pulse Integration](ADR-004-plugin-pulse-integration.md) — Phase 5 introduced watchers
-- [ADR-002: Plugin Configuration Management](ADR-002-plugin-configuration.md) — watcher registration during enable/disable
-- [gRPC Plugin API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto) — `WatcherRegistration` proto docs
-- [WebSocket API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/server.proto) — WebSocket message types
+- [ADR-003: Plugin Communication](ADR-003-plugin-communication.md) 
+- [ADR-004: Plugin-Pulse Integration](ADR-004-plugin-pulse-integration.md) 
+- [ADR-002: Plugin Configuration Management](ADR-002-plugin-configuration.md) 
+- [gRPC Plugin API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto) --> pin it automatically
+- [WebSocket API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/server.proto) --> pin it automatically

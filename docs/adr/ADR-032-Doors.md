@@ -8,7 +8,7 @@ set by it's `rp_id` in the `am.toml`
 
 Registration is attested.
 
-By default any public [[ADR-031-the-user|User]] registering through a door is a `PUBLIC_REGISTRATION` level user.
+By default any public [[ADR-031-Users|User]] registering through a door is a `PUBLIC_REGISTRATION` level user.
 
 Registering at one door isn't the same as registering at another door. 
 The rung buys logging in and being attested. It reaches no attestation store, and the refusal names no namespace — somebody who reaches nothing learns nothing about what is there.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted, not in use today
 
 ## Context
 

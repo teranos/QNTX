@@ -6,10 +6,10 @@
 
 ## Context
 
-"why does the windows pipeline keep failing, as if it doesnt want to stay
-stable and alive and no mainenance"
+"why does the windows pipeline keep failing, as if it doesn't want to stay
+stable and alive and no maintenance"
 
-"what is forcing the maintenence burden on it?"
+"what is forcing the maintenance burden on it?"
 
 "why is having a windows pipeline not free"
 
@@ -18,12 +18,11 @@ stable and alive and no mainenance"
 "and honestly, i think about just deleting it after all"
 
 "ok, delete it"
-
-"focus on getting rid of windows"
+"focus on getting rid of windows support"
 
 ## Consequences
 
 "and windows support should end in docs as well if there is any mention of it"
 
-"or the docs should be clear that qntx is targetted to be used on unix-like
+"or the docs should be clear that qntx is targeted to be used on unix-like
 systems and never windows as the direct host"
