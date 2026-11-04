@@ -134,6 +134,12 @@ type vaultSent struct {
 	Refused   error
 }
 
+// proposalOf is what a folder that sends proposes: its branch, into the
+// default branch the folder is bound to.
+func proposalOf(source buildSource, branch string) forge.Proposal {
+	return forge.Proposal{Repo: source.Repo, Branch: branch, Into: source.Branch}
+}
+
 // branchHeld makes sure branch is on the source's repository, made from the
 // default branch when it is not yet.
 func (s *QNTXServer) branchHeld(ctx context.Context, source buildSource, branch string) error {
@@ -141,26 +147,7 @@ func (s *QNTXServer) branchHeld(ctx context.Context, source buildSource, branch 
 	if err != nil {
 		return err
 	}
-	_, err = host.Branch(ctx, forge.AsApp, source.Repo, branch)
-	var absent forge.Refused
-	if !errors.As(err, &absent) {
-		return err
-	}
-	from, err := host.Branch(ctx, forge.AsApp, source.Repo, source.Branch)
-	var fromAbsent forge.Refused
-	if errors.As(err, &fromAbsent) {
-		return errors.Newf("%s is not on %s (%s), and %s, which it would be made from, is not either: %s",
-			branch, source.Repo, absent.Says, source.Branch, fromAbsent.Says)
-	}
-	if err != nil {
-		return err
-	}
-	err = host.CreateBranch(ctx, forge.AsApp, source.Repo, branch, from)
-	var refused forge.Refused
-	if errors.As(err, &refused) {
-		return errors.Newf("%s is not on %s (%s), and was not made from %s: %s", branch, source.Repo, absent.Says, source.Branch, refused.Says)
-	}
-	return err
+	return proposalOf(source, branch).HoldBranch(ctx, host, forge.AsApp)
 }
 
 // sendVaultFolder commits each note the vault holds differently from branch,
@@ -205,6 +192,7 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		unders = append(unders, under)
 	}
 	slices.Sort(unders)
+	edits := make([]forge.Edit, 0, len(unders)+len(onBranch))
 	for _, under := range unders {
 		content := notes[under]
 		was, there := held[under]
@@ -214,37 +202,22 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		file := path.Join(source.Path, under)
 		message := vault.Name + ": " + path.Join(place, under)
 		if there {
-			err = host.ReplaceFile(ctx, forge.AsApp, source.Repo, branch, file, content, was.sha, message)
+			edits = append(edits, forge.Replaced(file, content, was.sha, message))
 		} else {
-			err = host.AddFile(ctx, forge.AsApp, source.Repo, branch, file, content, message)
+			edits = append(edits, forge.Added(file, content, message))
 		}
-		var refused forge.Refused
-		if errors.As(err, &refused) {
-			sent.Refused = errors.Newf("%s was not committed to %s of %s: %s", file, branch, source.Repo, refused.Says)
-			return sent
-		}
-		if err != nil {
-			sent.Refused = err
-			return sent
-		}
-		sent.Committed = append(sent.Committed, file)
 	}
 	for _, note := range onBranch {
 		if _, kept := notes[note.under]; kept {
 			continue
 		}
-		err := host.DeleteFile(ctx, forge.AsApp, source.Repo, branch, note.path, note.sha,
-			vault.Name+": "+path.Join(place, note.under)+" is gone from the vault")
-		var refused forge.Refused
-		if errors.As(err, &refused) {
-			sent.Refused = errors.Newf("%s was not removed from %s of %s: %s", note.path, branch, source.Repo, refused.Says)
-			return sent
-		}
-		if err != nil {
-			sent.Refused = err
-			return sent
-		}
-		sent.Removed = append(sent.Removed, note.path)
+		edits = append(edits, forge.Removed(note.path, note.sha, vault.Name+": "+path.Join(place, note.under)+" is gone from the vault"))
+	}
+	done, err := proposalOf(source, branch).Commit(ctx, host, forge.AsApp, edits)
+	sent.Committed, sent.Removed = done.Put, done.Removed
+	if err != nil {
+		sent.Refused = err
+		return sent
 	}
 	pull, err := s.pullHeld(ctx, source, branch, vault.Name, place, len(sent.Committed)+len(sent.Removed) > 0)
 	sent.Pull, sent.Refused = pull, err
@@ -258,30 +231,15 @@ func (s *QNTXServer) pullHeld(ctx context.Context, source buildSource, branch, v
 	if err != nil {
 		return "", err
 	}
-	open, found, err := host.ChangeFrom(ctx, forge.AsApp, source.Repo, branch, source.Branch)
-	var refused forge.Refused
-	if errors.As(err, &refused) {
-		return "", errors.Newf("the open pull requests from %s of %s were not listed: %s", branch, source.Repo, refused.Says)
-	}
-	if err != nil {
-		return "", err
-	}
-	if found {
-		return open.URL, nil
-	}
+	proposal := proposalOf(source, branch)
 	if !sentSomething {
-		return "", nil
+		open, _, err := proposal.OpenChange(ctx, host, forge.AsApp)
+		return open.URL, err
 	}
-	made, err := host.NewChange(ctx, forge.AsApp, source.Repo, branch, source.Branch,
+	held, err := proposal.Propose(ctx, host, forge.AsApp,
 		"Obsidian "+vault+": "+place,
 		"What the vault "+vault+" holds in "+place+", sent to "+branch+" (QNTX ADR-049). It stays open, and is merged when somebody merges it.")
-	if errors.As(err, &refused) {
-		return "", errors.Newf("no pull request from %s into %s of %s was opened: %s", branch, source.Branch, source.Repo, refused.Says)
-	}
-	if err != nil {
-		return "", err
-	}
-	return made.URL, nil
+	return held.URL, err
 }
 
 // vaultLooked is what a sending folder held when it was last sent, and when
