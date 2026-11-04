@@ -45,6 +45,10 @@ Core weaves every call `LLMServer` answers through `Chat` and `StreamChat` (`cre
 
 "you would think it may make sense to look at langchain finally."
 
+"but otari can own it i thought"
+
+otari records what it serves: usage rows with their cost, and traces of an agent session, its turns and the spans inside them, and it takes OTLP in ([DOMAINS.md](https://github.com/mozilla-ai/otari/blob/ca0231e6e1694c6cee8bf7467779183b48739981/DOMAINS.md)). The `otari` plugin ([otari-qntx](https://github.com/teranos/otari-qntx/tree/plugin)) gives the node what otari reported of a call as `LLMServed`: the provider and model that served it, otari's request id, and the cost.
+
 ## Provider resolution
 
 The server owns provider resolution — the UI never references plugin names. A call names its provider, else it is `llm.provider` in am.toml (`prompt.ProviderNamed`), and `/ws/llm` proxies to that one. `LLMServer.resolveProvider` refuses a name that is not registered: no other provider answers in its place.
