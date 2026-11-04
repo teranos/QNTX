@@ -107,7 +107,7 @@ func (s *QNTXServer) connectGoogleNamespace(ctx context.Context, token, named, b
 		"attributeMapping": map[string]string{"google.subject": "assertion.sub", "attribute.namespace": "assertion.namespace"},
 	})
 	if alreadyThere(err) {
-		err = providerMapsNamespaces(ctx, token, provider, i.url)
+		err = s.providerMapsNamespaces(ctx, token, provider, i, p, namespace)
 	}
 	if err != nil {
 		return "", errors.Wrapf(err, "the provider %s was not made", provider)
@@ -158,35 +158,34 @@ func (s *QNTXServer) keepNamespaceGoogleLine(by, namespace string, kept googleKe
 	}), "the %s line %s of %s was not kept", googleLineSubject, id, namespace)
 }
 
-// providerMapsNamespaces is whether the namespaces' provider made before can trade a
-// namespace's token: it is enabled, trusts the node's issuer, maps the namespace from
-// its claim, which the namespace's binding is to, maps a subject, as Google requires,
-// and holds no condition of its own, which the node never set and cannot read for
-// what it lets through.
-func providerMapsNamespaces(ctx context.Context, token, provider, issuer string) error {
+// providerMapsNamespaces is whether the namespaces' provider made before can stand
+// behind namespace's agent: it trusts the node's issuer, maps the namespace from its
+// claim, which the namespace's binding is to, and Google's token exchange trades a
+// token the node issues for namespace there. Whatever else the provider was set up
+// with, the exchange is what says whether it lets the agent in.
+func (s *QNTXServer) providerMapsNamespaces(ctx context.Context, token, provider string, i *issuer, p googleProject, namespace string) error {
 	var made struct {
-		Disabled bool   `json:"disabled"`
-		State    string `json:"state"`
-		OIDC     struct {
+		OIDC struct {
 			IssuerURI string `json:"issuerUri"`
 		} `json:"oidc"`
-		AttributeMapping   map[string]string `json:"attributeMapping"`
-		AttributeCondition string            `json:"attributeCondition"`
+		AttributeMapping map[string]string `json:"attributeMapping"`
 	}
 	if err := googleCall(ctx, token, http.MethodGet, googleIAM+"/v1/"+provider, nil, &made); err != nil {
 		return err
 	}
-	switch {
-	case made.Disabled || (made.State != "" && made.State != "ACTIVE"):
-		return errors.Newf("%s is disabled at Google, so it trades no namespace's token: enable it, or delete it and connect again", provider)
-	case made.OIDC.IssuerURI != issuer:
-		return errors.Newf("%s trusts %s, not this node's issuer %s", provider, made.OIDC.IssuerURI, issuer)
-	case made.AttributeMapping["attribute.namespace"] != "assertion.namespace":
+	if made.OIDC.IssuerURI != i.url {
+		return errors.Newf("%s trusts %s, not this node's issuer %s", provider, made.OIDC.IssuerURI, i.url)
+	}
+	if made.AttributeMapping["attribute.namespace"] != "assertion.namespace" {
 		return errors.Newf("%s maps attribute.namespace from %q, and a namespace's agent is let act only where it is assertion.namespace", provider, made.AttributeMapping["attribute.namespace"])
-	case made.AttributeMapping["google.subject"] == "":
-		return errors.Newf("%s maps no google.subject, which Google requires of a provider", provider)
-	case made.AttributeCondition != "":
-		return errors.Newf("%s holds the condition %q, which the node never set: remove it, or delete the provider and connect again", provider, made.AttributeCondition)
+	}
+	audience := namespaceGoogleAudience(p.ProjectNumber)
+	asked, err := i.identityTokenFor(s.nodeDID.DID, namespace, audience)
+	if err != nil {
+		return err
+	}
+	if _, err := stsTrade(ctx, asked, audience); err != nil {
+		return errors.Wrapf(err, "%s does not trade a token for %s: enable it, remove what keeps it out, or delete it and connect again", provider, namespace)
 	}
 	return nil
 }

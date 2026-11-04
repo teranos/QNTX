@@ -161,6 +161,18 @@ func (g *ownersGoogle) exchange(w http.ResponseWriter, r *http.Request) {
 	}
 	require.NoError(g.t, parsed.Claims(g.jwks.Key(parsed.Headers[0].KeyID)[0].Key, &claims, &namespace))
 	audience := "//iam.googleapis.com/" + gardensPool + "/providers/" + googleNamespaceProvider
+	// As Google does: a provider disabled, holding a condition, or mapping its subject
+	// from a claim the token does not carry, trades nothing.
+	mapping, _ := g.provider["attributeMapping"].(map[string]any)
+	subject, _ := mapping["google.subject"].(string)
+	disabled, _ := g.provider["disabled"].(bool)
+	condition, _ := g.provider["attributeCondition"].(string)
+	derives := subject != "" && !strings.Contains(strings.NewReplacer("assertion.sub", "", "assertion.namespace", "").Replace(subject), "assertion.")
+	if disabled || condition != "" || !derives {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"error":"invalid_grant","error_description":"the provider does not accept this token"}`)
+		return
+	}
 	if r.PostForm.Get("audience") != audience || !slices.Contains([]string(claims.Audience), audience) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = io.WriteString(w, `{"error":"invalid_grant"}`)
@@ -305,24 +317,31 @@ func TestAProviderNotMappingTheNamespaceIsNotKept(t *testing.T) {
 	require.NoError(t, err, "one that maps it is kept")
 }
 
-// A provider made before that maps the namespace is kept whatever subject it maps; one
-// disabled, or holding a condition the node never set, is not.
+// A provider made before that maps the namespace is kept when Google trades a token
+// for the namespace there, whatever subject it maps; one disabled, holding a condition,
+// or mapping its subject from a claim the token does not carry, is not.
 func TestAProviderMadeBeforeIsKeptOnlyWhenItCanTradeTheToken(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	g := ownersGoogleStandingIn(t, s)
 	issuer, err := s.theIssuer()
 	require.NoError(t, err)
-	mapping := map[string]any{"google.subject": "assertion.namespace + '/' + assertion.sub", "attribute.namespace": "assertion.namespace"}
-	for says, provider := range map[string]map[string]any{
-		"disabled":  {"oidc": map[string]any{"issuerUri": issuer.url}, "attributeMapping": mapping, "disabled": true},
-		"condition": {"oidc": map[string]any{"issuerUri": issuer.url}, "attributeMapping": mapping, "attributeCondition": "assertion.namespace == 'orchard'"},
+	mapping := func(subject string) map[string]any {
+		return map[string]any{"google.subject": subject, "attribute.namespace": "assertion.namespace"}
+	}
+	for why, provider := range map[string]map[string]any{
+		"disabled":        {"oidc": map[string]any{"issuerUri": issuer.url}, "attributeMapping": mapping("assertion.sub"), "disabled": true},
+		"condition":       {"oidc": map[string]any{"issuerUri": issuer.url}, "attributeMapping": mapping("assertion.sub"), "attributeCondition": "assertion.namespace == 'orchard'"},
+		"a missing claim": {"oidc": map[string]any{"issuerUri": issuer.url}, "attributeMapping": mapping("assertion.email")},
 	} {
 		g.provider = provider
 		_, err := s.connectGoogleNamespace(context.Background(), "owner-token", "gardens-project", gardener, "garden")
-		require.Error(t, err, says)
-		assert.Contains(t, err.Error(), says)
+		require.Error(t, err, why)
+		assert.Contains(t, err.Error(), "does not trade a token for garden", why)
+		_, held, err := s.namespaceGoogleLine("garden")
+		require.NoError(t, err)
+		assert.False(t, held, why)
 	}
-	g.provider = map[string]any{"oidc": map[string]any{"issuerUri": issuer.url}, "attributeMapping": mapping, "state": "ACTIVE"}
+	g.provider = map[string]any{"oidc": map[string]any{"issuerUri": issuer.url}, "attributeMapping": mapping("assertion.namespace + '/' + assertion.sub")}
 	_, err = s.connectGoogleNamespace(context.Background(), "owner-token", "gardens-project", gardener, "garden")
 	require.NoError(t, err)
 }
