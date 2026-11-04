@@ -937,6 +937,13 @@
         "ANYONE"
       ]
     },
+    "/i/name": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN"
+      ]
+    },
     "/i/picture": {
       "x-qntx-reach": [
         "ROOT",
