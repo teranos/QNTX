@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/otlp"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
@@ -105,6 +106,16 @@ func init() {
 		// client the meter is a no-op, and a call site that has to ask whether
 		// metrics are on is a call site that will one day ask wrong.
 		measure.Start()
+
+		// 「[Fable 5.1] Spans leave over OTLP when the environment names where」
+		// 「[Fable 5.1] (internal/otlp). Like Sentry, failing to start it is said on the」
+		// 「[Fable 5.1] terminal and is not a reason for a node not to run.」
+		if err := otlp.Start(context.Background(), version.VersionTag); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP span export: %v\n", err)
+		}
+		if endpoint, _ := otlp.Said(); otlp.Running() {
+			logger.Infow("Shipping spans over OTLP", "endpoint", endpoint, "release", version.VersionTag)
+		}
 
 		if logger.SentryRunning() {
 			// Logs and numbers leaving the machine is a thing the operator gets
@@ -727,8 +738,18 @@ func Main() {
 		logger.Errorw("Fatal error", "error", err)
 		// The error that ended the process is the one worth shipping,
 		// and os.Exit runs no defers. Drain before leaving.
+		flushSpans()
 		logger.FlushSentry()
 		os.Exit(1)
 	}
+	flushSpans()
 	logger.FlushSentry()
+}
+
+// 「[Fable 5.1] flushSpans sends the spans the OTLP batch still holds before the」
+// 「[Fable 5.1] process ends, and says so on the terminal when they did not leave.」
+func flushSpans() {
+	if err := otlp.Flush(); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+	}
 }
