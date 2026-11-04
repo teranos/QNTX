@@ -36,7 +36,7 @@ every device through Sync.
 - Sync is end-to-end encrypted, and the box is one of the ends: the vault is
   readable there, by the node and by the NODE agent ([[ADR-048-Node-Agent]]).
 
-TODO: figure out today state, the way the below text reads is as if the Node Agent is doing the syncing (spending a turn for nothing?), if that's true, that's not good. it seems like something we should be able to deal with mechanically, and we can deal with the probable merge conflict when we get to the point where we want to merge, as one of the things you do once per development cycle, the conflict should be talked about, not automatically judged upon and resolved by some Age
+TODO: figure out today state, the way the below text reads is as if the Node Agent is doing the syncing (spending a turn for nothing?), if that's true, that's not good. it seems like something we should be able to deal with mechanically, and we can deal with the probable merge conflict when we get to the point where we want to merge, as one of the things you do once per development cycle, the conflict should be talked about, not automatically judged upon and resolved by some Agent, these are the changes that are supposed to accrue in one PR, and modifications to ADR's should be blocked with a friend
 
 "but you make a good point about NODE agent"
 "just make it do everything essentially"
