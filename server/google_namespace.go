@@ -158,26 +158,35 @@ func (s *QNTXServer) keepNamespaceGoogleLine(by, namespace string, kept googleKe
 	}), "the %s line %s of %s was not kept", googleLineSubject, id, namespace)
 }
 
-// providerMapsNamespaces is whether the namespaces' provider made before trusts the
-// node's issuer and maps the namespace from its claim, which the namespace's binding
-// is to.
+// providerMapsNamespaces is whether the namespaces' provider made before can trade a
+// namespace's token: it is enabled, trusts the node's issuer, maps the namespace from
+// its claim, which the namespace's binding is to, maps a subject, as Google requires,
+// and holds no condition of its own, which the node never set and cannot read for
+// what it lets through.
 func providerMapsNamespaces(ctx context.Context, token, provider, issuer string) error {
 	var made struct {
-		OIDC struct {
+		Disabled bool   `json:"disabled"`
+		State    string `json:"state"`
+		OIDC     struct {
 			IssuerURI string `json:"issuerUri"`
 		} `json:"oidc"`
-		AttributeMapping map[string]string `json:"attributeMapping"`
+		AttributeMapping   map[string]string `json:"attributeMapping"`
+		AttributeCondition string            `json:"attributeCondition"`
 	}
 	if err := googleCall(ctx, token, http.MethodGet, googleIAM+"/v1/"+provider, nil, &made); err != nil {
 		return err
 	}
-	if made.OIDC.IssuerURI != issuer {
+	switch {
+	case made.Disabled || (made.State != "" && made.State != "ACTIVE"):
+		return errors.Newf("%s is disabled at Google, so it trades no namespace's token: enable it, or delete it and connect again", provider)
+	case made.OIDC.IssuerURI != issuer:
 		return errors.Newf("%s trusts %s, not this node's issuer %s", provider, made.OIDC.IssuerURI, issuer)
-	}
-	for attribute, from := range map[string]string{"google.subject": "assertion.sub", "attribute.namespace": "assertion.namespace"} {
-		if made.AttributeMapping[attribute] != from {
-			return errors.Newf("%s maps %s from %q, and a namespace's agent is let act only where it is %s", provider, attribute, made.AttributeMapping[attribute], from)
-		}
+	case made.AttributeMapping["attribute.namespace"] != "assertion.namespace":
+		return errors.Newf("%s maps attribute.namespace from %q, and a namespace's agent is let act only where it is assertion.namespace", provider, made.AttributeMapping["attribute.namespace"])
+	case made.AttributeMapping["google.subject"] == "":
+		return errors.Newf("%s maps no google.subject, which Google requires of a provider", provider)
+	case made.AttributeCondition != "":
+		return errors.Newf("%s holds the condition %q, which the node never set: remove it, or delete the provider and connect again", provider, made.AttributeCondition)
 	}
 	return nil
 }
