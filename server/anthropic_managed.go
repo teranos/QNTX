@@ -378,7 +378,8 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		if err := keep(); err != nil {
 			return managedOf{}, err
 		}
-		s.logger.Infow("the element's agent runs at Anthropic", "element", agent.element, "agent", held.Agent, "vault", held.Vault, "memory", held.Memory, "session", held.Session)
+		// The model is said here because nothing a Session's events carry names it (6SION).
+		s.logger.Infow("the element's agent runs at Anthropic", "element", agent.element, "agent", held.Agent, "model", model, "vault", held.Vault, "memory", held.Memory, "session", held.Session)
 	}
 	return held, nil
 }
