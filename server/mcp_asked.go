@@ -10,6 +10,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -96,6 +97,13 @@ func (a *mcpAsked) recording(tool string, handler mcp.ToolHandler) mcp.ToolHandl
 		}
 		a.begins(tool, traceparent)
 		result, err := handler(withMCPAsked(ctx, a), req)
+		// An answer the MCP server cannot marshal is answered to nobody: it
+		// writes no response at all, and the caller waits until it gives up.
+		if result != nil {
+			if _, unwritable := json.Marshal(result); unwritable != nil {
+				result = refused("the answer of %s was not handed on: it did not marshal: %v", tool, unwritable)
+			}
+		}
 		a.hands(result, ctx.Err())
 		return result, err
 	}

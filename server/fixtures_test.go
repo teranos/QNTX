@@ -22,6 +22,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	errors "github.com/teranos/sacred-error"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
@@ -100,6 +101,32 @@ func TestTimTheNodeAgentReadsFixtures(t *testing.T) {
 
 	element := s.fixtured(context.Background(), agentAdmission(auth.ElementAgentLabel+":users"), answerOf(real))
 	assert.Equal(t, "tim@example.com", spoken(element))
+}
+
+// 6SION: GitHub's answer to a branch read carries a signed commit's payload,
+// an address between angle brackets, which JSON writes with an escape before
+// it. The scanner reads the answer's strings, so the answer is JSON after it.
+func TestTimAnAnswerIsStillJSONWithItsFixtures(t *testing.T) {
+	s, _ := fixturesServer(t)
+	real := "someone" + "@" + "gmail.com"
+	s.scrubWith = func(ctx context.Context, text string) (string, string, error) {
+		if strings.Contains(text, `\u003c`) {
+			return "", "", errors.New("the scanner was handed the answer's JSON, not its strings")
+		}
+		return standInScanner(ctx, text)
+	}
+	body, err := json.Marshal(map[string]any{"answer": map[string]any{"payload": "committer GitHub <" + real + "> 1 +0000\n\ngo.sum", "size": 7}})
+	require.NoError(t, err)
+	require.Contains(t, string(body), `\u003c`)
+
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}, StructuredContent: json.RawMessage(body)})
+	require.False(t, answered.IsError, spoken(answered))
+	want := `{"answer":{"payload":"committer GitHub <tim@example.com> 1 +0000\n\ngo.sum","size":7}}`
+	assert.JSONEq(t, want, spoken(answered))
+	assert.JSONEq(t, want, string(answered.StructuredContent.(json.RawMessage)))
+	_, err = json.Marshal(answered)
+	require.NoError(t, err, "an answer that does not marshal is answered to nobody")
 }
 
 func TestSpikeAUserReadsTheAnswerAsItIs(t *testing.T) {

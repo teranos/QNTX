@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -75,4 +76,20 @@ func TestAnMCPToolCallNobodyAnsweredSaysWhatItWasIn(t *testing.T) {
 	before := logs.Len()
 	listed.ends(&writtenBack{ResponseWriter: httptest.NewRecorder()})
 	assert.Equal(t, before, logs.Len())
+}
+
+// 6SION: an answer the MCP server cannot marshal was answered to nobody, and
+// the caller waited until it gave up. It is a tool error the caller reads.
+func TestAnAnswerThatDoesNotMarshalIsRefused(t *testing.T) {
+	core, _ := observer.New(zapcore.InfoLevel)
+	asked := &mcpAsked{arrived: time.Now(), logger: zap.New(core).Sugar()}
+	handler := asked.recording("github_ask", func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{StructuredContent: json.RawMessage(`{"payload":"committer GitHub \spike"}`)}, nil
+	})
+
+	result, err := handler(context.Background(), &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{}})
+	require.NoError(t, err)
+	asked.ends(&writtenBack{ResponseWriter: httptest.NewRecorder()})
+	require.True(t, result.IsError)
+	assert.Contains(t, textOf(t, result), "did not marshal")
 }

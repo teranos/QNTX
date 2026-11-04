@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -88,7 +89,7 @@ func (s *QNTXServer) fixtured(ctx context.Context, admitted auth.Admission, resu
 		if !ok {
 			continue
 		}
-		scrubbed, found, err := s.scrub(ctx, text.Text)
+		scrubbed, found, err := s.scrubSaid(ctx, text.Text)
 		if err != nil {
 			return refused("the answer was not handed on: it could not be made into fixtures: %v", err)
 		}
@@ -101,13 +102,121 @@ func (s *QNTXServer) fixtured(ctx context.Context, admitted auth.Admission, resu
 	}
 	if raw, ok := result.StructuredContent.(json.RawMessage); ok && len(raw) > 0 {
 		mcpAskedOf(ctx).now(mcpMakingStructuredFixtures)
-		scrubbed, _, err := s.scrub(ctx, string(raw))
+		scrubbed, _, err := s.scrubJSON(ctx, raw)
 		if err != nil {
 			return refused("the answer was not handed on: it could not be made into fixtures: %v", err)
 		}
 		result.StructuredContent = json.RawMessage(scrubbed)
 	}
 	return result
+}
+
+// scrubSaid is a tool's text with fixtures: JSON by its strings, and anything
+// else as the text it is.
+func (s *QNTXServer) scrubSaid(ctx context.Context, text string) (string, string, error) {
+	if json.Valid([]byte(text)) {
+		scrubbed, found, err := s.scrubJSON(ctx, []byte(text))
+		return string(scrubbed), found, err
+	}
+	return s.scrub(ctx, text)
+}
+
+// jsonBetween stands between the strings of a JSON value handed to the scanner
+// as one text: a line of its own that no shape the scanner knows runs across.
+const jsonBetween = "\n\x1f\n"
+
+// scrubJSON is a JSON value with fixtures in its strings, keys and values, and
+// what was found. The scanner reads the strings and never the JSON.
+//
+// 6SION: read as text, the escape before an address was taken for the
+// address's own letters. What was left of it was not JSON, the MCP server
+// could not marshal it, and it answered the caller nothing.
+func (s *QNTXServer) scrubJSON(ctx context.Context, raw []byte) ([]byte, string, error) {
+	read := json.NewDecoder(bytes.NewReader(raw))
+	read.UseNumber()
+	var held any
+	if err := read.Decode(&held); err != nil {
+		return nil, "", errors.Wrap(err, "the answer did not read as JSON")
+	}
+	words := jsonWords(held, nil)
+	if len(words) == 0 {
+		return raw, "", nil
+	}
+	for _, word := range words {
+		if strings.Contains(word, jsonBetween) {
+			return nil, "", errors.New("a string of the answer holds what stands between its strings for the scanner")
+		}
+	}
+	scrubbed, found, err := s.scrub(ctx, strings.Join(words, jsonBetween))
+	if err != nil {
+		return nil, "", err
+	}
+	back := strings.Split(scrubbed, jsonBetween)
+	if len(back) != len(words) {
+		return nil, "", errors.Newf("the scanner was handed %d strings of the answer and gave %d back", len(words), len(back))
+	}
+	written, err := json.Marshal(jsonWith(held, &back))
+	if err != nil {
+		return nil, "", errors.Wrap(err, "the answer with its fixtures did not marshal")
+	}
+	return written, found, nil
+}
+
+// jsonKeys are an object's keys in the one order its strings are read and
+// written back in.
+func jsonKeys(object map[string]any) []string {
+	keys := make([]string, 0, len(object))
+	for key := range object {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// jsonWords are every string of a JSON value, keys and values, after into.
+func jsonWords(value any, into []string) []string {
+	switch held := value.(type) {
+	case string:
+		into = append(into, held)
+	case []any:
+		for _, each := range held {
+			into = jsonWords(each, into)
+		}
+	case map[string]any:
+		for _, key := range jsonKeys(held) {
+			into = append(into, key)
+			into = jsonWords(held[key], into)
+		}
+	}
+	return into
+}
+
+// jsonWith is a JSON value with words in place of its strings, taken from the
+// front of words in the order jsonWords read them.
+func jsonWith(value any, words *[]string) any {
+	next := func() string {
+		word := (*words)[0]
+		*words = (*words)[1:]
+		return word
+	}
+	switch held := value.(type) {
+	case string:
+		return next()
+	case []any:
+		with := make([]any, len(held))
+		for i, each := range held {
+			with[i] = jsonWith(each, words)
+		}
+		return with
+	case map[string]any:
+		with := make(map[string]any, len(held))
+		for _, key := range jsonKeys(held) {
+			named := next()
+			with[named] = jsonWith(held[key], words)
+		}
+		return with
+	}
+	return value
 }
 
 // The parts of GitHub's deliveries that are words somebody wrote.
