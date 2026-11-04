@@ -16,7 +16,7 @@ https://platform.claude.com/dashboard
 - Integrate with Claude Console API's 'Memory store'
 - And later 'dreams' as well
 
-- 
+- Interesting to think about an [[obsi]]
 
 bidirectional sync between our abstraction of the memory store.
 
