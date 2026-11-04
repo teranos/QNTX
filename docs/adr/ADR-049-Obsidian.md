@@ -60,7 +60,7 @@ TODO: link the userstories as an Obsidian managed thing, linked via the Element,
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
 
-"and to be able to say that some folder or file belongs to an Agent Room"
+"TODO: and to be able to say that some folder or file belongs to an Agent Room"
 
 ## Which folders are the vault's
 
@@ -69,7 +69,7 @@ TODO: link the userstories as an Obsidian managed thing, linked via the Element,
 The vault's folders are named on a record on the node, 
 and the folder itself carries nothing.
 
-"name both ends"
+"name both ends:"
 - A folder is `github.com/owner/repo@branch:path=place`, the place being where in the vault it is. A place is inside the vault, and no place is another's or
   holds another, so a note is one folder's.
 
