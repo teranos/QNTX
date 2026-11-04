@@ -6,24 +6,28 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/subsystem"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "QNTX needs a formal contract for pluggable, optional, compiled-in subsystems."
 // linkedForTest is one: a signum, a standing row, a built-in, a delivery
 // listener. Registered the way a real one is, from the package that links it.
 type linkedForTest struct {
-	host      subsystem.Host
-	delivered []string
+	host        subsystem.Host
+	delivered   []string
+	reportFails bool
 }
 
 const linkedName = "fake"
@@ -77,6 +81,16 @@ func (f *linkedForTest) Delivered(_ context.Context, event string, body []byte) 
 		return nil, err
 	}
 	return []string{e.Ref}, nil
+}
+
+func (f *linkedForTest) Reported(_ context.Context, start, end time.Time) ([]subsystem.ReportSection, error) {
+	if f.reportFails {
+		return nil, errors.New("the fake had nothing to read")
+	}
+	return []subsystem.ReportSection{{
+		Title: "What the fake saw",
+		Rows:  []subsystem.ReportRow{{Label: "from:", Value: start.Format(time.RFC3339)}, {Value: "to " + end.Format(time.RFC3339)}},
+	}}, nil
 }
 
 func linkedServer(t *testing.T) (*QNTXServer, *linkedForTest) {
@@ -162,4 +176,46 @@ func TestALinkedSubsystemThatFailsADeliveryIsSaidByName(t *testing.T) {
 	said := srv.deliveries(context.Background(), "push", []byte(`not json`))
 	got, _ := said[linkedName].(string)
 	assert.True(t, strings.HasPrefix(got, "error: "), "said %v", said)
+}
+
+// reportingServer is the node the report's own tests gather on, with the fake
+// linked in.
+func reportingServer(t *testing.T) (*QNTXServer, *linkedForTest) {
+	t.Helper()
+	f := &linkedForTest{}
+	require.NoError(t, subsystem.Register(f))
+	t.Cleanup(func() { subsystem.Withdraw(linkedName) })
+	return rootKnowingServer(t), f
+}
+
+// A linked subsystem with a part in the weekly report is asked for the week,
+// and what it answered is in the mail after the node's own sections.
+func TestALinkedSubsystemsPartIsInTheWeeklyReport(t *testing.T) {
+	srv, _ := reportingServer(t)
+	r := srv.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil)
+	mail, err := renderReport(r)
+	require.NoError(t, err)
+	for _, kind := range []services.MailBodyKind{services.MailHTML, services.MailText} {
+		body := nodeBody(t, mail, kind)
+		assert.Contains(t, body, "What the fake saw")
+		assert.Contains(t, body, reportEnd.Add(-reportWeek).Format(time.RFC3339))
+		assert.Contains(t, body, "to "+reportEnd.Format(time.RFC3339))
+		assert.Less(t, strings.Index(body, "Top 3 handler failures"), strings.Index(body, "What the fake saw"))
+	}
+}
+
+// One that fails is said in the mail under its name, and the report still
+// goes out.
+func TestALinkedSubsystemThatFailsItsPartIsSaidByName(t *testing.T) {
+	srv, f := reportingServer(t)
+	f.reportFails = true
+	r := srv.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil)
+	mail, err := renderReport(r)
+	require.NoError(t, err)
+	for _, kind := range []services.MailBodyKind{services.MailHTML, services.MailText} {
+		body := nodeBody(t, mail, kind)
+		assert.Contains(t, body, "From "+linkedName)
+		assert.Contains(t, body, "the fake had nothing to read")
+		assert.Contains(t, body, "Top 3 handler failures")
+	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/subsystem"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -52,6 +53,9 @@ type Report struct {
 	Failures         []async.HandlerFailures
 	FailuresErr      string
 
+	// What each linked subsystem said of the week (ADR-056).
+	Linked []linkedPart
+
 	// Why Sentry was not asked at all, when it was not.
 	SentryErr string
 
@@ -68,6 +72,13 @@ type Report struct {
 	Status4xx, Status5xx statusRanks
 
 	Downtime downtime
+}
+
+// linkedPart is what one linked subsystem said of the week, or why it did not.
+type linkedPart struct {
+	Subsystem string
+	Sections  []subsystem.ReportSection
+	Err       string
 }
 
 type namespaceCount struct {
@@ -130,6 +141,7 @@ func (s *QNTXServer) gatherReport(ctx context.Context, end time.Time, sentry sen
 	r.Registrations, r.RegistrationsErr = s.registrationsPerNamespace(r.Window)
 	r.Restarts, r.RestartsErr = s.restartsIn(r.Window)
 	r.Failures, r.FailuresErr = s.failedHandlers(r.Window)
+	r.Linked = linkedParts(ctx, r.Window)
 
 	if sentryErr != nil {
 		r.SentryErr = sentryErr.Error()
@@ -320,6 +332,27 @@ func (s *QNTXServer) failedHandlers(w sentryread.Window) ([]async.HandlerFailure
 		return nil, err.Error()
 	}
 	return failed, ""
+}
+
+// linkedParts asks every linked subsystem that has a part in the report
+// (subsystem.Reported) for the week. QNTX names none of them and decides none
+// of what they say.
+func linkedParts(ctx context.Context, w sentryread.Window) []linkedPart {
+	var parts []linkedPart
+	for _, sub := range subsystem.Registered() {
+		reporter, reports := sub.(subsystem.Reported)
+		if !reports {
+			continue
+		}
+		part := linkedPart{Subsystem: sub.Declare().GetName()}
+		sections, err := reporter.Reported(ctx, w.Start, w.End)
+		if err != nil {
+			part.Err = err.Error()
+		}
+		part.Sections = sections
+		parts = append(parts, part)
+	}
+	return parts
 }
 
 // ---------------------------------------------------------------------------

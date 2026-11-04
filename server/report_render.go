@@ -135,6 +135,7 @@ func reportWindow(r Report, drawn map[string]bool) services.MailWindow {
 		}
 	}
 	sections = append(sections, failures)
+	sections = append(sections, linkedSections(r.Linked)...)
 
 	return services.MailWindow{
 		TitleAlone: true,
@@ -156,6 +157,28 @@ func countSection(title string, counts []namespaceCount, err string) services.Ma
 		}
 	}
 	return s
+}
+
+// linkedSections is what the linked subsystems said, each section as it was
+// handed over. A subsystem that failed is said under its name.
+func linkedSections(parts []linkedPart) []services.MailSection {
+	var sections []services.MailSection
+	for _, part := range parts {
+		for _, handed := range part.Sections {
+			s := services.MailSection{Title: handed.Title}
+			if len(handed.Rows) == 0 {
+				s.Rows = []services.MailRow{none()}
+			}
+			for _, row := range handed.Rows {
+				s.Rows = append(s.Rows, services.MailRow{Label: row.Label, Value: row.Value, Unlabelled: row.Label == ""})
+			}
+			sections = append(sections, s)
+		}
+		if part.Err != "" {
+			sections = append(sections, services.MailSection{Title: "From " + part.Subsystem, Rows: []services.MailRow{said(part.Err)}})
+		}
+	}
+	return sections
 }
 
 // sentrySections is the sections Sentry filled.
@@ -318,6 +341,25 @@ func renderReportText(r Report) string {
 			w("  %s: %s", f.Handler, f.Error)
 		}
 	})
+	for _, part := range r.Linked {
+		for _, handed := range part.Sections {
+			w("\n%s", handed.Title)
+			if len(handed.Rows) == 0 {
+				w("  None.")
+			}
+			for _, row := range handed.Rows {
+				if row.Label == "" {
+					w("  %s", row.Value)
+				} else {
+					w("  %s %s", row.Label, row.Value)
+				}
+			}
+		}
+		if part.Err != "" {
+			w("\nFrom %s", part.Subsystem)
+			w("  %s", part.Err)
+		}
+	}
 	return b.String()
 }
 
