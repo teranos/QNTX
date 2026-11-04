@@ -27,6 +27,8 @@ Both ways: what is written in the vault reaches QNTX, and what QNTX holds reache
 
 ## On-Prem
 
+TODO: Figure out if we need to apply a similar rule to this Obsidian thing, like, if we say that only one node can at a time ever be in ownership of serving [[ADR-057-Agent-Rooms|Rooms]], it would lo
+
 Obsidian Headless (`obsidian-headless`, open beta, Node.js 22 or later) is
 Obsidian's own client for Sync without the app: `ob login`, `ob sync-setup`,
 `ob sync --continuous`. On the box it keeps a copy of the vault, which is how the ROOT agent reaches it as files, and what is written into that copy reaches
@@ -36,7 +38,7 @@ every device through Sync.
 - Sync is end-to-end encrypted, and the box is one of the ends: the vault is
   readable there, by the node and by the NODE agent ([[ADR-048-Node-Agent]]).
 
-TODO: figure out today state, the way the below text reads is as if the Node Agent is doing the syncing (spending a turn for nothing?), if that's true, that's not good. it seems like something we should be able to deal with mechanically, and we can deal with the probable merge conflict when we get to the point where we want to merge, as one of the things you do once per development cycle, the conflict should be talked about, not automatically judged upon and resolved by some Agent, these are the changes that are supposed to accrue in one PR, and modifications to ADR's should be blocked with a friend
+TODO: figure out today state, the way the below text reads is as if the Node Agent is doing the syncing (spending a turn for nothing?), if that's true, that's not good. it seems like something we should be able to deal with mechanically, and we can deal with the probable merge conflict when we get to the point where we want to merge, as one of the things you do once per development cycle, the conflict should be talked about, not automatically judged upon and resolved by some Agent, these are the changes that are supposed to accrue in one PR, and modifications to ADR's should be blocked with a friendly reminder on cadence and scope and pacing and the process of the Obsidian Authoring Cycle. 
 
 "but you make a good point about NODE agent"
 "just make it do everything essentially"
