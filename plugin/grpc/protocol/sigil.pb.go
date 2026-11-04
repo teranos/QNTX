@@ -937,7 +937,7 @@ func (x *ElementSessions) GetSessions() []*ElementSession {
 // ClaudeSaid is what claude say answers.
 type ClaudeSaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// What it answered.
+	// 「[Opus 5.5] What it answered.」
 	Answer string `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
 	// Whether Claude Code reports the turn as failed, in the answer's words.
 	IsError bool `protobuf:"varint,2,opt,name=is_error,json=isError,proto3" json:"is_error,omitempty"`
@@ -945,7 +945,7 @@ type ClaudeSaid struct {
 	Subtype string `protobuf:"bytes,3,opt,name=subtype,proto3" json:"subtype,omitempty"`
 	// The session it was said in.
 	Session string `protobuf:"bytes,4,opt,name=session,proto3" json:"session,omitempty"`
-	// The model that answered.
+	// 「[Opus 5.5] The model that answered.」
 	Model string `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
 	// The Claude Code that ran.
 	ClaudeCode string `protobuf:"bytes,6,opt,name=claude_code,json=claudeCode,proto3" json:"claude_code,omitempty"`
@@ -955,9 +955,9 @@ type ClaudeSaid struct {
 	Denied []string `protobuf:"bytes,8,rep,name=denied,proto3" json:"denied,omitempty"`
 	// What Claude Code says the turn cost.
 	CostUsd float64 `protobuf:"fixed64,9,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
-	// How long the turn took.
+	// 「[Opus 5.5] How long the turn took.」
 	TookMs float64 `protobuf:"fixed64,10,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
-	// Why a row of the session was not written down, when one was not.
+	// 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
 	Unwritten     string `protobuf:"bytes,11,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1073,7 +1073,7 @@ func (x *ClaudeSaid) GetUnwritten() string {
 // PiSaid is what pi say answers.
 type PiSaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// What it answered.
+	// 「[Opus 5.5] What it answered.」
 	Answer string `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
 	// Whether the turn ended in error, in the answer's words.
 	IsError bool `protobuf:"varint,2,opt,name=is_error,json=isError,proto3" json:"is_error,omitempty"`
@@ -1081,15 +1081,15 @@ type PiSaid struct {
 	Stop string `protobuf:"bytes,3,opt,name=stop,proto3" json:"stop,omitempty"`
 	// The session it was said in.
 	Session string `protobuf:"bytes,4,opt,name=session,proto3" json:"session,omitempty"`
-	// The model that answered.
+	// 「[Opus 5.5] The model that answered.」
 	Model string `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
 	// The Pi that ran.
 	PiVersion string `protobuf:"bytes,6,opt,name=pi_version,json=piVersion,proto3" json:"pi_version,omitempty"`
 	// What Pi says the turn's model calls cost.
 	CostUsd float64 `protobuf:"fixed64,7,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
-	// How long the turn took.
+	// 「[Opus 5.5] How long the turn took.」
 	TookMs float64 `protobuf:"fixed64,8,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
-	// Why a row of the session was not written down, when one was not.
+	// 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
 	Unwritten     string `protobuf:"bytes,9,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1191,7 +1191,7 @@ func (x *PiSaid) GetUnwritten() string {
 // ClaudeAm is what claude am answers.
 type ClaudeAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Its own DID, which signs what it writes down.
+	// 「[Opus 5.5] Its own DID, which signs what it writes down.」
 	Did string `protobuf:"bytes,1,opt,name=did,proto3" json:"did,omitempty"`
 	// The model am.toml names.
 	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
@@ -1416,7 +1416,9 @@ type NodeAgentSaid struct {
 	// What it answered in Pi.
 	Pi *PiSaid `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
 	// What it answered in codex.
-	Codex         *CodexSaid `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
+	Codex *CodexSaid `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
+	// 「[Opus 5.5] What it answered in agy.」
+	Agy           *AgySaid `protobuf:"bytes,4,opt,name=agy,proto3" json:"agy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1472,6 +1474,13 @@ func (x *NodeAgentSaid) GetCodex() *CodexSaid {
 	return nil
 }
 
+func (x *NodeAgentSaid) GetAgy() *AgySaid {
+	if x != nil {
+		return x.Agy
+	}
+	return nil
+}
+
 // NodeAgentAm is what agent am answers: who the Node Agent is and how the node
 // runs it, in the harness named.
 type NodeAgentAm struct {
@@ -1481,7 +1490,9 @@ type NodeAgentAm struct {
 	// In Pi.
 	Pi *PiAm `protobuf:"bytes,2,opt,name=pi,proto3" json:"pi,omitempty"`
 	// In codex.
-	Codex         *CodexAm `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
+	Codex *CodexAm `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
+	// 「[Opus 5.5] In agy.」
+	Agy           *AgyAm `protobuf:"bytes,4,opt,name=agy,proto3" json:"agy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1537,23 +1548,30 @@ func (x *NodeAgentAm) GetCodex() *CodexAm {
 	return nil
 }
 
+func (x *NodeAgentAm) GetAgy() *AgyAm {
+	if x != nil {
+		return x.Agy
+	}
+	return nil
+}
+
 // CodexSaid is what an agent answered in codex.
 type CodexSaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// What it answered.
+	// 「[Opus 5.5] What it answered.」
 	Answer string `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
 	// The session it was said in: the node's, apart from codex's own thread.
 	Session string `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
-	// The model that answered.
+	// 「[Opus 5.5] The model that answered.」
 	Model string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
 	// The codex that ran.
 	CodexVersion string `protobuf:"bytes,4,opt,name=codex_version,json=codexVersion,proto3" json:"codex_version,omitempty"`
 	// What codex says the turn used, in tokens.
 	InputTokens  int64 `protobuf:"varint,5,opt,name=input_tokens,json=inputTokens,proto3" json:"input_tokens,omitempty"`
 	OutputTokens int64 `protobuf:"varint,6,opt,name=output_tokens,json=outputTokens,proto3" json:"output_tokens,omitempty"`
-	// How long the turn took.
+	// 「[Opus 5.5] How long the turn took.」
 	TookMs float64 `protobuf:"fixed64,7,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
-	// Why a row of the session was not written down, when one was not.
+	// 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
 	Unwritten string `protobuf:"bytes,8,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
 	// The CLI thread used to resume, distinct from the transcript session.
 	Thread        string `protobuf:"bytes,9,opt,name=thread,proto3" json:"thread,omitempty"`
@@ -1657,7 +1675,7 @@ func (x *CodexSaid) GetThread() string {
 // CodexAm is who an agent is in codex and how the node runs it.
 type CodexAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Its own DID, which signs what it writes down.
+	// 「[Opus 5.5] Its own DID, which signs what it writes down.」
 	Did string `protobuf:"bytes,1,opt,name=did,proto3" json:"did,omitempty"`
 	// The model am.toml names.
 	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
@@ -1772,6 +1790,569 @@ func (x *CodexAm) GetNotReady() string {
 	return ""
 }
 
+// 「[Opus 5.5] AgySaid is what an agent answered in agy.」
+type AgySaid struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 「[Opus 5.5] What it answered.」
+	Answer string `protobuf:"bytes,1,opt,name=answer,proto3" json:"answer,omitempty"`
+	// 「[Opus 5.5] The session it was said in: the node's, apart from agy's own conversation.」
+	Session string `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	// 「[Opus 5.5] The model that answered.」
+	Model string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	// 「[Opus 5.5] The agy that ran.」
+	AgyVersion string `protobuf:"bytes,4,opt,name=agy_version,json=agyVersion,proto3" json:"agy_version,omitempty"`
+	// 「[Opus 5.5] The context agy last reported over ACP: the tokens in it, and its window.」
+	ContextUsed int64 `protobuf:"varint,5,opt,name=context_used,json=contextUsed,proto3" json:"context_used,omitempty"`
+	ContextSize int64 `protobuf:"varint,6,opt,name=context_size,json=contextSize,proto3" json:"context_size,omitempty"`
+	// 「[Opus 5.5] How long the turn took.」
+	TookMs float64 `protobuf:"fixed64,7,opt,name=took_ms,json=tookMs,proto3" json:"took_ms,omitempty"`
+	// 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
+	Unwritten string `protobuf:"bytes,8,opt,name=unwritten,proto3" json:"unwritten,omitempty"`
+	// 「[Opus 5.5] agy's own ACP session, which it resumes, distinct from the transcript session.」
+	Conversation  string `protobuf:"bytes,9,opt,name=conversation,proto3" json:"conversation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgySaid) Reset() {
+	*x = AgySaid{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgySaid) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgySaid) ProtoMessage() {}
+
+func (x *AgySaid) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// 「[Opus 5.5] Deprecated: Use AgySaid.ProtoReflect.Descriptor instead.」
+func (*AgySaid) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *AgySaid) GetAnswer() string {
+	if x != nil {
+		return x.Answer
+	}
+	return ""
+}
+
+func (x *AgySaid) GetSession() string {
+	if x != nil {
+		return x.Session
+	}
+	return ""
+}
+
+func (x *AgySaid) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *AgySaid) GetAgyVersion() string {
+	if x != nil {
+		return x.AgyVersion
+	}
+	return ""
+}
+
+func (x *AgySaid) GetContextUsed() int64 {
+	if x != nil {
+		return x.ContextUsed
+	}
+	return 0
+}
+
+func (x *AgySaid) GetContextSize() int64 {
+	if x != nil {
+		return x.ContextSize
+	}
+	return 0
+}
+
+func (x *AgySaid) GetTookMs() float64 {
+	if x != nil {
+		return x.TookMs
+	}
+	return 0
+}
+
+func (x *AgySaid) GetUnwritten() string {
+	if x != nil {
+		return x.Unwritten
+	}
+	return ""
+}
+
+func (x *AgySaid) GetConversation() string {
+	if x != nil {
+		return x.Conversation
+	}
+	return ""
+}
+
+// 「[Opus 5.5] AgyAm is who an agent is in agy and how the node runs it.」
+type AgyAm struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 「[Opus 5.5] Its own DID, which signs what it writes down.」
+	Did string `protobuf:"bytes,1,opt,name=did,proto3" json:"did,omitempty"`
+	// 「[Opus 5.5] The model it runs: the value of its session's model option, as agy offers it.」
+	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+	// 「[Opus 5.5] The session it continues in agy, or empty before anything was said to it there.」
+	Session string `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	// 「[Opus 5.5] Whether it is in a turn in agy now.」
+	Answering bool `protobuf:"varint,4,opt,name=answering,proto3" json:"answering,omitempty"`
+	// 「[Opus 5.5] Where the agy it runs is, or empty when the node has none yet.」
+	Agy string `protobuf:"bytes,5,opt,name=agy,proto3" json:"agy,omitempty"`
+	// 「[Opus 5.5] The agy this build pins.」
+	AgyVersion string `protobuf:"bytes,6,opt,name=agy_version,json=agyVersion,proto3" json:"agy_version,omitempty"`
+	// 「[Opus 5.5] Why it cannot be spoken to in agy, when it cannot.」
+	NotReady      string `protobuf:"bytes,7,opt,name=not_ready,json=notReady,proto3" json:"not_ready,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgyAm) Reset() {
+	*x = AgyAm{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgyAm) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgyAm) ProtoMessage() {}
+
+func (x *AgyAm) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// 「[Opus 5.5] Deprecated: Use AgyAm.ProtoReflect.Descriptor instead.」
+func (*AgyAm) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *AgyAm) GetDid() string {
+	if x != nil {
+		return x.Did
+	}
+	return ""
+}
+
+func (x *AgyAm) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *AgyAm) GetSession() string {
+	if x != nil {
+		return x.Session
+	}
+	return ""
+}
+
+func (x *AgyAm) GetAnswering() bool {
+	if x != nil {
+		return x.Answering
+	}
+	return false
+}
+
+func (x *AgyAm) GetAgy() string {
+	if x != nil {
+		return x.Agy
+	}
+	return ""
+}
+
+func (x *AgyAm) GetAgyVersion() string {
+	if x != nil {
+		return x.AgyVersion
+	}
+	return ""
+}
+
+func (x *AgyAm) GetNotReady() string {
+	if x != nil {
+		return x.NotReady
+	}
+	return ""
+}
+
+// NodeGoogle is what google am answers: the node at Google Cloud, set up on
+// ROOT's yes, and whether Google trades the node's identity token.
+// "Given that I am ROOT and my google identity is the ROOT identity"
+type NodeGoogle struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The node's OIDC issuer, which the node's pool at Google trusts.
+	Issuer string `protobuf:"bytes,1,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	// The node's DID, the sub of its identity token.
+	Subject string `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	// Where ROOT goes to connect the node, by saying yes at Google once.
+	Connect string `protobuf:"bytes,3,opt,name=connect,proto3" json:"connect,omitempty"`
+	// The project the node is set up in, by its id.
+	ProjectId string `protobuf:"bytes,4,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	// The same project by its number, which Google names the pool by.
+	ProjectNumber string `protobuf:"bytes,5,opt,name=project_number,json=projectNumber,proto3" json:"project_number,omitempty"`
+	// The workload identity pool the node is set up in.
+	Pool string `protobuf:"bytes,6,opt,name=pool,proto3" json:"pool,omitempty"`
+	// The provider in the pool that trusts the node's issuer.
+	Provider string `protobuf:"bytes,7,opt,name=provider,proto3" json:"provider,omitempty"`
+	// The service account the node's identity acts as.
+	ServiceAccount string `protobuf:"bytes,8,opt,name=service_account,json=serviceAccount,proto3" json:"service_account,omitempty"`
+	// Who connected the node.
+	SetBy string `protobuf:"bytes,9,opt,name=set_by,json=setBy,proto3" json:"set_by,omitempty"`
+	// When the node was connected.
+	At string `protobuf:"bytes,10,opt,name=at,proto3" json:"at,omitempty"`
+	// Whether Google was asked to trade the node's identity token.
+	Asked bool `protobuf:"varint,11,opt,name=asked,proto3" json:"asked,omitempty"`
+	// Whether Google traded it, and the node acted as its service account.
+	Accepted bool `protobuf:"varint,12,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	// What Google said when it did not.
+	Why string `protobuf:"bytes,13,opt,name=why,proto3" json:"why,omitempty"`
+	// Whether ROOT connected the node's costs.
+	CostsWired bool `protobuf:"varint,14,opt,name=costs_wired,json=costsWired,proto3" json:"costs_wired,omitempty"`
+	// Where ROOT goes to connect them, by saying yes at Google once.
+	CostsConnect string `protobuf:"bytes,15,opt,name=costs_connect,json=costsConnect,proto3" json:"costs_connect,omitempty"`
+	// 「[Opus 5.5] Whether ROOT let the node call Vertex AI, which agy runs on.」
+	AgyWired bool `protobuf:"varint,20,opt,name=agy_wired,json=agyWired,proto3" json:"agy_wired,omitempty"`
+	// 「[Opus 5.5] Where ROOT goes to let it, by saying yes at Google once.」
+	AgyConnect string `protobuf:"bytes,21,opt,name=agy_connect,json=agyConnect,proto3" json:"agy_connect,omitempty"`
+	// What each budget last reported.
+	Budgets []*GoogleBudget `protobuf:"bytes,16,rep,name=budgets,proto3" json:"budgets,omitempty"`
+	// The limit ROOT set on this node; zero is none.
+	Limit float64 `protobuf:"fixed64,17,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Whether what costs at Google is halted: 80% of the lower of budget and limit.
+	Halted bool `protobuf:"varint,18,opt,name=halted,proto3" json:"halted,omitempty"`
+	// Why it is.
+	HaltedWhy string `protobuf:"bytes,19,opt,name=halted_why,json=haltedWhy,proto3" json:"halted_why,omitempty"`
+	// The most ROOT lets the node spend in a day; zero is none.
+	DayLimit float64 `protobuf:"fixed64,22,opt,name=day_limit,json=dayLimit,proto3" json:"day_limit,omitempty"`
+	// What it has spent today, as far as Google has reported.
+	SpentToday    float64 `protobuf:"fixed64,23,opt,name=spent_today,json=spentToday,proto3" json:"spent_today,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeGoogle) Reset() {
+	*x = NodeGoogle{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeGoogle) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeGoogle) ProtoMessage() {}
+
+func (x *NodeGoogle) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeGoogle.ProtoReflect.Descriptor instead.
+func (*NodeGoogle) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *NodeGoogle) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetConnect() string {
+	if x != nil {
+		return x.Connect
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetProjectNumber() string {
+	if x != nil {
+		return x.ProjectNumber
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetPool() string {
+	if x != nil {
+		return x.Pool
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetServiceAccount() string {
+	if x != nil {
+		return x.ServiceAccount
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetSetBy() string {
+	if x != nil {
+		return x.SetBy
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetAt() string {
+	if x != nil {
+		return x.At
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetAsked() bool {
+	if x != nil {
+		return x.Asked
+	}
+	return false
+}
+
+func (x *NodeGoogle) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+func (x *NodeGoogle) GetWhy() string {
+	if x != nil {
+		return x.Why
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetCostsWired() bool {
+	if x != nil {
+		return x.CostsWired
+	}
+	return false
+}
+
+func (x *NodeGoogle) GetCostsConnect() string {
+	if x != nil {
+		return x.CostsConnect
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetAgyWired() bool {
+	if x != nil {
+		return x.AgyWired
+	}
+	return false
+}
+
+func (x *NodeGoogle) GetAgyConnect() string {
+	if x != nil {
+		return x.AgyConnect
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetBudgets() []*GoogleBudget {
+	if x != nil {
+		return x.Budgets
+	}
+	return nil
+}
+
+func (x *NodeGoogle) GetLimit() float64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *NodeGoogle) GetHalted() bool {
+	if x != nil {
+		return x.Halted
+	}
+	return false
+}
+
+func (x *NodeGoogle) GetHaltedWhy() string {
+	if x != nil {
+		return x.HaltedWhy
+	}
+	return ""
+}
+
+func (x *NodeGoogle) GetDayLimit() float64 {
+	if x != nil {
+		return x.DayLimit
+	}
+	return 0
+}
+
+func (x *NodeGoogle) GetSpentToday() float64 {
+	if x != nil {
+		return x.SpentToday
+	}
+	return 0
+}
+
+// GoogleBudget is what a budget at Google Cloud last reported.
+type GoogleBudget struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Its name at Google.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// What it has cost so far this period.
+	Cost float64 `protobuf:"fixed64,2,opt,name=cost,proto3" json:"cost,omitempty"`
+	// The budget's amount.
+	Budget float64 `protobuf:"fixed64,3,opt,name=budget,proto3" json:"budget,omitempty"`
+	// The currency of both.
+	Currency string `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
+	// When the period began.
+	Since string `protobuf:"bytes,5,opt,name=since,proto3" json:"since,omitempty"`
+	// When Google published this; empty until it first reports.
+	At string `protobuf:"bytes,6,opt,name=at,proto3" json:"at,omitempty"`
+	// How often it starts over: MONTH, QUARTER, YEAR, or CUSTOM.
+	Period        string `protobuf:"bytes,7,opt,name=period,proto3" json:"period,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GoogleBudget) Reset() {
+	*x = GoogleBudget{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GoogleBudget) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GoogleBudget) ProtoMessage() {}
+
+func (x *GoogleBudget) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GoogleBudget.ProtoReflect.Descriptor instead.
+func (*GoogleBudget) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GoogleBudget) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *GoogleBudget) GetCost() float64 {
+	if x != nil {
+		return x.Cost
+	}
+	return 0
+}
+
+func (x *GoogleBudget) GetBudget() float64 {
+	if x != nil {
+		return x.Budget
+	}
+	return 0
+}
+
+func (x *GoogleBudget) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *GoogleBudget) GetSince() string {
+	if x != nil {
+		return x.Since
+	}
+	return ""
+}
+
+func (x *GoogleBudget) GetAt() string {
+	if x != nil {
+		return x.At
+	}
+	return ""
+}
+
+func (x *GoogleBudget) GetPeriod() string {
+	if x != nil {
+		return x.Period
+	}
+	return ""
+}
+
 // NodeAnthropic is what anthropic am and anthropic set answer: the node's
 // issuer and subject that ROOT registers at Anthropic, the ids of the rule its
 // identity token is traded at, and whether Anthropic accepted it.
@@ -1815,7 +2396,7 @@ type NodeAnthropic struct {
 
 func (x *NodeAnthropic) Reset() {
 	*x = NodeAnthropic{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[20]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1827,7 +2408,7 @@ func (x *NodeAnthropic) String() string {
 func (*NodeAnthropic) ProtoMessage() {}
 
 func (x *NodeAnthropic) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[20]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1840,7 +2421,7 @@ func (x *NodeAnthropic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeAnthropic.ProtoReflect.Descriptor instead.
 func (*NodeAnthropic) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{20}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *NodeAnthropic) GetIssuer() string {
@@ -1971,7 +2552,7 @@ type AnthropicWindow struct {
 
 func (x *AnthropicWindow) Reset() {
 	*x = AnthropicWindow{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[21]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1983,7 +2564,7 @@ func (x *AnthropicWindow) String() string {
 func (*AnthropicWindow) ProtoMessage() {}
 
 func (x *AnthropicWindow) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[21]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1996,7 +2577,7 @@ func (x *AnthropicWindow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnthropicWindow.ProtoReflect.Descriptor instead.
 func (*AnthropicWindow) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{21}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *AnthropicWindow) GetWindow() string {
@@ -2041,7 +2622,7 @@ type NamespaceKeys struct {
 
 func (x *NamespaceKeys) Reset() {
 	*x = NamespaceKeys{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[22]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2053,7 +2634,7 @@ func (x *NamespaceKeys) String() string {
 func (*NamespaceKeys) ProtoMessage() {}
 
 func (x *NamespaceKeys) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[22]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2066,7 +2647,7 @@ func (x *NamespaceKeys) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NamespaceKeys.ProtoReflect.Descriptor instead.
 func (*NamespaceKeys) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{22}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *NamespaceKeys) GetNamespace() string {
@@ -2106,7 +2687,7 @@ type NamespaceKey struct {
 
 func (x *NamespaceKey) Reset() {
 	*x = NamespaceKey{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[23]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2118,7 +2699,7 @@ func (x *NamespaceKey) String() string {
 func (*NamespaceKey) ProtoMessage() {}
 
 func (x *NamespaceKey) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[23]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2131,7 +2712,7 @@ func (x *NamespaceKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NamespaceKey.ProtoReflect.Descriptor instead.
 func (*NamespaceKey) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{23}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *NamespaceKey) GetName() string {
@@ -2179,7 +2760,7 @@ func (x *NamespaceKey) GetWhy() string {
 // PiAm is what pi am answers.
 type PiAm struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Its own DID, which signs what it writes down.
+	// 「[Opus 5.5] Its own DID, which signs what it writes down.」
 	Did string `protobuf:"bytes,1,opt,name=did,proto3" json:"did,omitempty"`
 	// The model it runs in Pi: am.toml's for the Node Agent, the AGENT line's for
 	// a namespace's agent.
@@ -2208,7 +2789,7 @@ type PiAm struct {
 
 func (x *PiAm) Reset() {
 	*x = PiAm{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[24]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2220,7 +2801,7 @@ func (x *PiAm) String() string {
 func (*PiAm) ProtoMessage() {}
 
 func (x *PiAm) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[24]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2233,7 +2814,7 @@ func (x *PiAm) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PiAm.ProtoReflect.Descriptor instead.
 func (*PiAm) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{24}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *PiAm) GetDid() string {
@@ -2326,7 +2907,7 @@ type NamespaceAgentAm struct {
 
 func (x *NamespaceAgentAm) Reset() {
 	*x = NamespaceAgentAm{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[25]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2338,7 +2919,7 @@ func (x *NamespaceAgentAm) String() string {
 func (*NamespaceAgentAm) ProtoMessage() {}
 
 func (x *NamespaceAgentAm) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[25]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2351,7 +2932,7 @@ func (x *NamespaceAgentAm) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NamespaceAgentAm.ProtoReflect.Descriptor instead.
 func (*NamespaceAgentAm) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{25}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *NamespaceAgentAm) GetNamespace() string {
@@ -2402,7 +2983,7 @@ type Follows struct {
 
 func (x *Follows) Reset() {
 	*x = Follows{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2414,7 +2995,7 @@ func (x *Follows) String() string {
 func (*Follows) ProtoMessage() {}
 
 func (x *Follows) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[26]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2427,7 +3008,7 @@ func (x *Follows) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Follows.ProtoReflect.Descriptor instead.
 func (*Follows) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{26}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Follows) GetReference() string {
@@ -2466,7 +3047,7 @@ type Corresponds struct {
 
 func (x *Corresponds) Reset() {
 	*x = Corresponds{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2478,7 +3059,7 @@ func (x *Corresponds) String() string {
 func (*Corresponds) ProtoMessage() {}
 
 func (x *Corresponds) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[27]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2491,7 +3072,7 @@ func (x *Corresponds) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Corresponds.ProtoReflect.Descriptor instead.
 func (*Corresponds) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{27}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Corresponds) GetField() string {
@@ -2525,7 +3106,7 @@ type Fold struct {
 
 func (x *Fold) Reset() {
 	*x = Fold{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2537,7 +3118,7 @@ func (x *Fold) String() string {
 func (*Fold) ProtoMessage() {}
 
 func (x *Fold) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[28]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2550,7 +3131,7 @@ func (x *Fold) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Fold.ProtoReflect.Descriptor instead.
 func (*Fold) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{28}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *Fold) GetField() string {
@@ -2597,7 +3178,7 @@ type Sigil struct {
 
 func (x *Sigil) Reset() {
 	*x = Sigil{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2609,7 +3190,7 @@ func (x *Sigil) String() string {
 func (*Sigil) ProtoMessage() {}
 
 func (x *Sigil) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[29]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2622,7 +3203,7 @@ func (x *Sigil) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sigil.ProtoReflect.Descriptor instead.
 func (*Sigil) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{29}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *Sigil) GetName() string {
@@ -2684,7 +3265,7 @@ type Param struct {
 
 func (x *Param) Reset() {
 	*x = Param{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2696,7 +3277,7 @@ func (x *Param) String() string {
 func (*Param) ProtoMessage() {}
 
 func (x *Param) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[30]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2709,7 +3290,7 @@ func (x *Param) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Param.ProtoReflect.Descriptor instead.
 func (*Param) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{30}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *Param) GetName() string {
@@ -2760,7 +3341,7 @@ type Field struct {
 
 func (x *Field) Reset() {
 	*x = Field{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2772,7 +3353,7 @@ func (x *Field) String() string {
 func (*Field) ProtoMessage() {}
 
 func (x *Field) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[31]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2785,7 +3366,7 @@ func (x *Field) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Field.ProtoReflect.Descriptor instead.
 func (*Field) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{31}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *Field) GetName() string {
@@ -2820,7 +3401,7 @@ type Endpoint struct {
 
 func (x *Endpoint) Reset() {
 	*x = Endpoint{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2832,7 +3413,7 @@ func (x *Endpoint) String() string {
 func (*Endpoint) ProtoMessage() {}
 
 func (x *Endpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[32]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2845,7 +3426,7 @@ func (x *Endpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Endpoint.ProtoReflect.Descriptor instead.
 func (*Endpoint) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{32}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *Endpoint) GetMethod() string {
@@ -2878,7 +3459,7 @@ type Refusal struct {
 
 func (x *Refusal) Reset() {
 	*x = Refusal{}
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2890,7 +3471,7 @@ func (x *Refusal) String() string {
 func (*Refusal) ProtoMessage() {}
 
 func (x *Refusal) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[33]
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2903,7 +3484,7 @@ func (x *Refusal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Refusal.ProtoReflect.Descriptor instead.
 func (*Refusal) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{33}
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *Refusal) GetWhy() string {
@@ -3045,15 +3626,17 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x12NamespaceAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
-	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\"\x8a\x01\n" +
+	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\"\xaf\x01\n" +
 	"\rNodeAgentSaid\x12,\n" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
-	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\"\x82\x01\n" +
+	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\x12#\n" +
+	"\x03agy\x18\x04 \x01(\v2\x11.protocol.AgySaidR\x03agy\"\xa5\x01\n" +
 	"\vNodeAgentAm\x12*\n" +
 	"\x06claude\x18\x01 \x01(\v2\x12.protocol.ClaudeAmR\x06claude\x12\x1e\n" +
 	"\x02pi\x18\x02 \x01(\v2\x0e.protocol.PiAmR\x02pi\x12'\n" +
-	"\x05codex\x18\x03 \x01(\v2\x11.protocol.CodexAmR\x05codex\"\x8f\x02\n" +
+	"\x05codex\x18\x03 \x01(\v2\x11.protocol.CodexAmR\x05codex\x12!\n" +
+	"\x03agy\x18\x04 \x01(\v2\x0f.protocol.AgyAmR\x03agy\"\x8f\x02\n" +
 	"\tCodexSaid\x12\x16\n" +
 	"\x06answer\x18\x01 \x01(\tR\x06answer\x12\x18\n" +
 	"\asession\x18\x02 \x01(\tR\asession\x12\x14\n" +
@@ -3073,7 +3656,66 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\tanswering\x18\x06 \x01(\bR\tanswering\x12\x14\n" +
 	"\x05codex\x18\a \x01(\tR\x05codex\x12#\n" +
 	"\rcodex_version\x18\b \x01(\tR\fcodexVersion\x12\x1b\n" +
-	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\xe7\x03\n" +
+	"\tnot_ready\x18\t \x01(\tR\bnotReady\"\x93\x02\n" +
+	"\aAgySaid\x12\x16\n" +
+	"\x06answer\x18\x01 \x01(\tR\x06answer\x12\x18\n" +
+	"\asession\x18\x02 \x01(\tR\asession\x12\x14\n" +
+	"\x05model\x18\x03 \x01(\tR\x05model\x12\x1f\n" +
+	"\vagy_version\x18\x04 \x01(\tR\n" +
+	"agyVersion\x12!\n" +
+	"\fcontext_used\x18\x05 \x01(\x03R\vcontextUsed\x12!\n" +
+	"\fcontext_size\x18\x06 \x01(\x03R\vcontextSize\x12\x17\n" +
+	"\atook_ms\x18\a \x01(\x01R\x06tookMs\x12\x1c\n" +
+	"\tunwritten\x18\b \x01(\tR\tunwritten\x12\"\n" +
+	"\fconversation\x18\t \x01(\tR\fconversation\"\xb7\x01\n" +
+	"\x05AgyAm\x12\x10\n" +
+	"\x03did\x18\x01 \x01(\tR\x03did\x12\x14\n" +
+	"\x05model\x18\x02 \x01(\tR\x05model\x12\x18\n" +
+	"\asession\x18\x03 \x01(\tR\asession\x12\x1c\n" +
+	"\tanswering\x18\x04 \x01(\bR\tanswering\x12\x10\n" +
+	"\x03agy\x18\x05 \x01(\tR\x03agy\x12\x1f\n" +
+	"\vagy_version\x18\x06 \x01(\tR\n" +
+	"agyVersion\x12\x1b\n" +
+	"\tnot_ready\x18\a \x01(\tR\bnotReady\"\xa3\x05\n" +
+	"\n" +
+	"NodeGoogle\x12\x16\n" +
+	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
+	"\asubject\x18\x02 \x01(\tR\asubject\x12\x18\n" +
+	"\aconnect\x18\x03 \x01(\tR\aconnect\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x04 \x01(\tR\tprojectId\x12%\n" +
+	"\x0eproject_number\x18\x05 \x01(\tR\rprojectNumber\x12\x12\n" +
+	"\x04pool\x18\x06 \x01(\tR\x04pool\x12\x1a\n" +
+	"\bprovider\x18\a \x01(\tR\bprovider\x12'\n" +
+	"\x0fservice_account\x18\b \x01(\tR\x0eserviceAccount\x12\x15\n" +
+	"\x06set_by\x18\t \x01(\tR\x05setBy\x12\x0e\n" +
+	"\x02at\x18\n" +
+	" \x01(\tR\x02at\x12\x14\n" +
+	"\x05asked\x18\v \x01(\bR\x05asked\x12\x1a\n" +
+	"\baccepted\x18\f \x01(\bR\baccepted\x12\x10\n" +
+	"\x03why\x18\r \x01(\tR\x03why\x12\x1f\n" +
+	"\vcosts_wired\x18\x0e \x01(\bR\n" +
+	"costsWired\x12#\n" +
+	"\rcosts_connect\x18\x0f \x01(\tR\fcostsConnect\x12\x1b\n" +
+	"\tagy_wired\x18\x14 \x01(\bR\bagyWired\x12\x1f\n" +
+	"\vagy_connect\x18\x15 \x01(\tR\n" +
+	"agyConnect\x120\n" +
+	"\abudgets\x18\x10 \x03(\v2\x16.protocol.GoogleBudgetR\abudgets\x12\x14\n" +
+	"\x05limit\x18\x11 \x01(\x01R\x05limit\x12\x16\n" +
+	"\x06halted\x18\x12 \x01(\bR\x06halted\x12\x1d\n" +
+	"\n" +
+	"halted_why\x18\x13 \x01(\tR\thaltedWhy\x12\x1b\n" +
+	"\tday_limit\x18\x16 \x01(\x01R\bdayLimit\x12\x1f\n" +
+	"\vspent_today\x18\x17 \x01(\x01R\n" +
+	"spentToday\"\xa8\x01\n" +
+	"\fGoogleBudget\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04cost\x18\x02 \x01(\x01R\x04cost\x12\x16\n" +
+	"\x06budget\x18\x03 \x01(\x01R\x06budget\x12\x1a\n" +
+	"\bcurrency\x18\x04 \x01(\tR\bcurrency\x12\x14\n" +
+	"\x05since\x18\x05 \x01(\tR\x05since\x12\x0e\n" +
+	"\x02at\x18\x06 \x01(\tR\x02at\x12\x16\n" +
+	"\x06period\x18\a \x01(\tR\x06period\"\xe7\x03\n" +
 	"\rNodeAnthropic\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
 	"\asubject\x18\x02 \x01(\tR\asubject\x12'\n" +
@@ -3174,7 +3816,7 @@ func file_plugin_grpc_protocol_sigil_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*Signum)(nil),             // 0: protocol.Signum
 	(*Node)(nil),               // 1: protocol.Node
@@ -3196,24 +3838,28 @@ var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*NodeAgentAm)(nil),        // 17: protocol.NodeAgentAm
 	(*CodexSaid)(nil),          // 18: protocol.CodexSaid
 	(*CodexAm)(nil),            // 19: protocol.CodexAm
-	(*NodeAnthropic)(nil),      // 20: protocol.NodeAnthropic
-	(*AnthropicWindow)(nil),    // 21: protocol.AnthropicWindow
-	(*NamespaceKeys)(nil),      // 22: protocol.NamespaceKeys
-	(*NamespaceKey)(nil),       // 23: protocol.NamespaceKey
-	(*PiAm)(nil),               // 24: protocol.PiAm
-	(*NamespaceAgentAm)(nil),   // 25: protocol.NamespaceAgentAm
-	(*Follows)(nil),            // 26: protocol.Follows
-	(*Corresponds)(nil),        // 27: protocol.Corresponds
-	(*Fold)(nil),               // 28: protocol.Fold
-	(*Sigil)(nil),              // 29: protocol.Sigil
-	(*Param)(nil),              // 30: protocol.Param
-	(*Field)(nil),              // 31: protocol.Field
-	(*Endpoint)(nil),           // 32: protocol.Endpoint
-	(*Refusal)(nil),            // 33: protocol.Refusal
+	(*AgySaid)(nil),            // 20: protocol.AgySaid
+	(*AgyAm)(nil),              // 21: protocol.AgyAm
+	(*NodeGoogle)(nil),         // 22: protocol.NodeGoogle
+	(*GoogleBudget)(nil),       // 23: protocol.GoogleBudget
+	(*NodeAnthropic)(nil),      // 24: protocol.NodeAnthropic
+	(*AnthropicWindow)(nil),    // 25: protocol.AnthropicWindow
+	(*NamespaceKeys)(nil),      // 26: protocol.NamespaceKeys
+	(*NamespaceKey)(nil),       // 27: protocol.NamespaceKey
+	(*PiAm)(nil),               // 28: protocol.PiAm
+	(*NamespaceAgentAm)(nil),   // 29: protocol.NamespaceAgentAm
+	(*Follows)(nil),            // 30: protocol.Follows
+	(*Corresponds)(nil),        // 31: protocol.Corresponds
+	(*Fold)(nil),               // 32: protocol.Fold
+	(*Sigil)(nil),              // 33: protocol.Sigil
+	(*Param)(nil),              // 34: protocol.Param
+	(*Field)(nil),              // 35: protocol.Field
+	(*Endpoint)(nil),           // 36: protocol.Endpoint
+	(*Refusal)(nil),            // 37: protocol.Refusal
 }
 var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
-	29, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
-	26, // 1: protocol.Signum.follows:type_name -> protocol.Follows
+	33, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
+	30, // 1: protocol.Signum.follows:type_name -> protocol.Follows
 	0,  // 2: protocol.Node.signa:type_name -> protocol.Signum
 	3,  // 3: protocol.Transcript.turns:type_name -> protocol.Turn
 	2,  // 4: protocol.Transcripts.transcripts:type_name -> protocol.Transcript
@@ -3227,24 +3873,27 @@ var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	12, // 12: protocol.NodeAgentSaid.claude:type_name -> protocol.ClaudeSaid
 	13, // 13: protocol.NodeAgentSaid.pi:type_name -> protocol.PiSaid
 	18, // 14: protocol.NodeAgentSaid.codex:type_name -> protocol.CodexSaid
-	14, // 15: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
-	24, // 16: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
-	19, // 17: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
-	21, // 18: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
-	23, // 19: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
-	14, // 20: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
-	24, // 21: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
-	19, // 22: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
-	27, // 23: protocol.Follows.columns:type_name -> protocol.Corresponds
-	28, // 24: protocol.Follows.folds:type_name -> protocol.Fold
-	30, // 25: protocol.Sigil.takes:type_name -> protocol.Param
-	31, // 26: protocol.Sigil.gives:type_name -> protocol.Field
-	32, // 27: protocol.Sigil.http:type_name -> protocol.Endpoint
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	20, // 15: protocol.NodeAgentSaid.agy:type_name -> protocol.AgySaid
+	14, // 16: protocol.NodeAgentAm.claude:type_name -> protocol.ClaudeAm
+	28, // 17: protocol.NodeAgentAm.pi:type_name -> protocol.PiAm
+	19, // 18: protocol.NodeAgentAm.codex:type_name -> protocol.CodexAm
+	21, // 19: protocol.NodeAgentAm.agy:type_name -> protocol.AgyAm
+	23, // 20: protocol.NodeGoogle.budgets:type_name -> protocol.GoogleBudget
+	25, // 21: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
+	27, // 22: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
+	14, // 23: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
+	28, // 24: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
+	19, // 25: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
+	31, // 26: protocol.Follows.columns:type_name -> protocol.Corresponds
+	32, // 27: protocol.Follows.folds:type_name -> protocol.Fold
+	34, // 28: protocol.Sigil.takes:type_name -> protocol.Param
+	35, // 29: protocol.Sigil.gives:type_name -> protocol.Field
+	36, // 30: protocol.Sigil.http:type_name -> protocol.Endpoint
+	31, // [31:31] is the sub-list for method output_type
+	31, // [31:31] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }
@@ -3258,7 +3907,7 @@ func file_plugin_grpc_protocol_sigil_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_sigil_proto_rawDesc), len(file_plugin_grpc_protocol_sigil_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   34,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

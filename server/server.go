@@ -19,6 +19,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
@@ -51,7 +52,8 @@ type QNTXServer struct {
 	harnessBinaries       harnessesHeld                 // Each harness the Node Agent runs in, as this node holds its binary, by the harness's name (ADR-048)
 	nodeAgent             *rootAgent                    // The Node Agent this node runs; nil when am.toml names none (ADR-048)
 	taskEnds              sync.Mutex                    // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
-	taskStops             sync.Map                      // Each Task of the Node Agent this process runs, by id, to the context.CancelFunc that keeps its turn from starting
+	taskStreams           sync.Map                      // Each Task whose turn this process runs, by id, to the stream the turn prints to
+	taskCancels           sync.Map                      // Each Task canceled in this process, by id, to who canceled it
 	pushing               sync.Map                      // Each Task with push notifications, by id, to the *sync.Mutex its notifications go out under one after another
 	noNodeAgent           error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents       agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
@@ -101,6 +103,13 @@ type QNTXServer struct {
 	// What sends the node's own mail: the mail service, or, until the plugin
 	// services make it, what refuses each mail saying so.
 	nodeMailer nodeMailer
+	// googleOutcome stands in for mailing ROOT how connecting to Google Cloud ended.
+	googleOutcome func(services.NodeMail)
+	// googleHalted is whether ROOT was last told what costs at Google is halted.
+	googleHalted bool
+	googleHaltMu sync.Mutex
+	// googleBudgetsSet is the budgets as they are set at Google, as last read.
+	googleBudgetsSet []googleBudgetSet
 	// The node's GitHub (ADR-043), made on first use.
 	githubOnce sync.Once
 	github     *gitHub

@@ -49,7 +49,12 @@ type flow struct {
 	// name is what the provider said the person is called on the way back,
 	// when it says it there rather than at the exchange. Apple posts it once,
 	// on the first authorization, and never puts it in the token.
-	name      string
+	name string
+	// cloud is ROOT connecting the node to Google Cloud, in project when named.
+	cloud   bool
+	project string
+	// 「[Opus 5.5] thing is what ROOT's yes is for, beyond connecting the node: "costs", "agy".」
+	thing     string
 	startedAt time.Time
 }
 
@@ -405,6 +410,11 @@ func (h *Handler) handleBindingCallback(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		h.renderCeremonyPage(w, http.StatusBadRequest, false,
 			"This ceremony is unknown, already finished, or older than ten minutes")
+		return
+	}
+
+	if fl.cloud {
+		h.googleCloudCallback(w, r, fl, code)
 		return
 	}
 

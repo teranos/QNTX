@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -13,16 +14,15 @@ import (
 	"syscall"
 	"time"
 
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2asrv/push"
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/sacred"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // A Task's push notifications (§3.1.7–§3.1.10, §4.3).
@@ -53,14 +53,6 @@ const pushSealed = "push"
 // pushContext is what a config's lines are in.
 func pushContext(id string) string { return "push:" + id }
 
-// The push notification config operations (§3.1.7–§3.1.10).
-const (
-	createPush = "CreateTaskPushNotificationConfig"
-	getPush    = "GetTaskPushNotificationConfig"
-	listPushes = "ListTaskPushNotificationConfigs"
-	deletePush = "DeleteTaskPushNotificationConfig"
-)
-
 // webhookAddress is whether the node POSTs a notification to ip: what the
 // internet routes to, as a provider's host is (auth.IsPublicIP). "Agents
 // SHOULD validate webhook URLs to prevent SSRF (Server-Side Request Forgery)
@@ -84,151 +76,149 @@ var webhookBackoff = time.Second
 // does: "Reject private IP ranges ... Reject localhost and link-local
 // addresses" (§13.2). A name is asked again where it is dialed, since DNS can
 // answer differently there.
-func webhookRefused(push a2a.Push) *a2a.Error {
+func webhookRefused(push *a2asdk.PushConfig) error {
 	u, err := url.Parse(push.URL)
 	if err != nil {
-		return a2a.Invalid("url " + push.URL + " is no URL: " + err.Error())
+		return a2aRefusal(a2asdk.ErrInvalidParams, "url "+push.URL+" is no URL: "+err.Error())
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return a2a.Invalid("url " + push.URL + " is no http or https URL to POST to")
+		return a2aRefusal(a2asdk.ErrInvalidParams, "url "+push.URL+" is no http or https URL to POST to")
 	}
 	host := strings.ToLower(u.Hostname())
 	if host == "" {
-		return a2a.Invalid("url " + push.URL + " names no host")
+		return a2aRefusal(a2asdk.ErrInvalidParams, "url "+push.URL+" names no host")
 	}
 	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
-		return a2a.Invalid("url " + push.URL + " is localhost, which the node POSTs no notification to")
+		return a2aRefusal(a2asdk.ErrInvalidParams, "url "+push.URL+" is localhost, which the node POSTs no notification to")
 	}
 	if ip := net.ParseIP(host); ip != nil && !webhookAddress(ip) {
-		return a2a.Invalid("url " + push.URL + " is " + ip.String() + ", which is no public address the node POSTs a notification to")
+		return a2aRefusal(a2asdk.ErrInvalidParams, "url "+push.URL+" is "+ip.String()+", which is no public address the node POSTs a notification to")
 	}
 	return nil
 }
 
-// createTaskPush is CreateTaskPushNotificationConfig (§3.1.7): a webhook for a
-// Task of the agent, there from now until the config is deleted.
-func (s *QNTXServer) createTaskPush(r *http.Request, ta taskAgent, request proto.Message) (proto.Message, *a2a.Error) {
-	push, refused := a2a.ReadPush(request)
-	if refused != nil {
+// pushesOnLines is the SDK's push.ConfigStore over the PUSH lines of the agent
+// each call reaches. A config is answered without its credentials: what a
+// client handed the node to speak with is not answered, as a namespace's keys
+// are not (ADR-051). The node's sender reads them from the lines.
+type pushesOnLines struct{ s *QNTXServer }
+
+var _ push.ConfigStore = pushesOnLines{}
+
+func (p pushesOnLines) Save(ctx context.Context, task a2asdk.TaskID, config *a2asdk.PushConfig) (*a2asdk.PushConfig, error) {
+	call, err := a2aCallFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if refused := webhookRefused(config); refused != nil {
 		return nil, refused
 	}
-	if refused := webhookRefused(push); refused != nil {
-		return nil, refused
-	}
-	if refused := s.taskHeld(ta.taskLines, push.TaskID); refused != nil {
-		return nil, refused
-	}
+	saved := *config
+	saved.TaskID = task
 	// "Created configuration with assigned ID" (§3.1.7): the client's, when it
 	// names one, and setting it again sets it anew.
-	if push.ID == "" {
-		push.ID = uuid.NewString()
+	if saved.ID == "" {
+		saved.ID = uuid.NewString()
 	}
-	if err := s.setPush(ta.taskLines, push, spokenBy(r)); err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+	if err := p.s.setPush(call.agent.taskLines, &saved, spokenBy(call.request)); err != nil {
+		return nil, err
 	}
-	return pushAnswered(push, request)
+	return answeredPush(&saved, call.tenant), nil
 }
 
-// getTaskPush is GetTaskPushNotificationConfig (§3.1.8).
-func (s *QNTXServer) getTaskPush(ta taskAgent, request proto.Message) (proto.Message, *a2a.Error) {
-	task, id, err := a2a.PushNamed(request)
+func (p pushesOnLines) Get(ctx context.Context, task a2asdk.TaskID, id string) (*a2asdk.PushConfig, error) {
+	call, err := a2aCallFrom(ctx)
 	if err != nil {
-		return nil, a2a.Invalid(err.Error())
+		return nil, err
 	}
-	if refused := s.taskHeld(ta.taskLines, task); refused != nil {
-		return nil, refused
-	}
-	pushes, err := s.pushesOf(ta.taskLines, task)
+	pushes, err := p.s.pushesOf(call.agent.taskLines, string(task))
 	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+		return nil, err
 	}
-	at := slices.IndexFunc(pushes, func(push a2a.Push) bool { return push.ID == id })
+	at := slices.IndexFunc(pushes, func(push *a2asdk.PushConfig) bool { return push.ID == id })
 	if at < 0 {
-		return nil, a2a.PushConfigNotFound(task, id)
+		// "The operation MUST fail if the configuration does not exist or the
+		// client lacks access" (§3.1.8).
+		return nil, a2aRefusal(a2asdk.ErrTaskNotFound, "task "+string(task)+" has no push notification config "+id)
 	}
-	return pushAnswered(pushes[at], request)
+	return answeredPush(pushes[at], call.tenant), nil
 }
 
-// listTaskPushes is ListTaskPushNotificationConfigs (§3.1.9): "all active push
-// notification configurations for the specified task".
-func (s *QNTXServer) listTaskPushes(ta taskAgent, request proto.Message) (proto.Message, *a2a.Error) {
-	task, err := a2a.PushesOf(request)
+// List is "all active push notification configurations for the specified
+// task" (§3.1.9).
+func (p pushesOnLines) List(ctx context.Context, task a2asdk.TaskID) ([]*a2asdk.PushConfig, error) {
+	call, err := a2aCallFrom(ctx)
 	if err != nil {
-		return nil, a2a.Invalid(err.Error())
+		return nil, err
 	}
-	if refused := s.taskHeld(ta.taskLines, task); refused != nil {
-		return nil, refused
-	}
-	pushes, err := s.pushesOf(ta.taskLines, task)
+	pushes, err := p.s.pushesOf(call.agent.taskLines, string(task))
 	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+		return nil, err
 	}
-	tenant, _ := a2a.TenantOf(request)
-	listed, err := a2a.PushesListed(pushes, tenant)
-	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	return listed, nil
-}
-
-// deleteTaskPush is DeleteTaskPushNotificationConfig (§3.1.10): "No further
-// notifications will be sent to the configured webhook after deletion. This
-// operation MUST be idempotent", so a config already gone is deleted again
-// with nothing written.
-func (s *QNTXServer) deleteTaskPush(r *http.Request, ta taskAgent, request proto.Message) (proto.Message, *a2a.Error) {
-	task, id, err := a2a.PushNamed(request)
-	if err != nil {
-		return nil, a2a.Invalid(err.Error())
-	}
-	if refused := s.taskHeld(ta.taskLines, task); refused != nil {
-		return nil, refused
-	}
-	pushes, err := s.pushesOf(ta.taskLines, task)
-	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	if slices.ContainsFunc(pushes, func(push a2a.Push) bool { return push.ID == id }) {
-		if err := s.writePushLine(ta.taskLines, a2a.Push{ID: id, TaskID: task}, pushDeleted, spokenBy(r), map[string]any{}); err != nil {
-			return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-		}
-	}
-	return &emptypb.Empty{}, nil
-}
-
-// taskHeld is TaskNotFoundError when the agent has no task id, nil when it has.
-func (s *QNTXServer) taskHeld(lines taskLines, id string) *a2a.Error {
-	_, held, err := s.taskOf(lines, id)
-	if err != nil {
-		return &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
-	}
-	if !held {
-		return a2a.TaskNotFound(id)
-	}
-	return nil
-}
-
-// pushAnswered is the config as an operation answers it, at the tenant the
-// request named.
-func pushAnswered(push a2a.Push, request proto.Message) (proto.Message, *a2a.Error) {
-	tenant, _ := a2a.TenantOf(request)
-	answered, err := push.Response(tenant)
-	if err != nil {
-		return nil, &a2a.Error{Name: "InvalidAgentResponseError", Message: err.Error()}
+	answered := make([]*a2asdk.PushConfig, 0, len(pushes))
+	for _, push := range pushes {
+		answered = append(answered, answeredPush(push, call.tenant))
 	}
 	return answered, nil
 }
 
+// Delete is "No further notifications will be sent to the configured webhook
+// after deletion. This operation MUST be idempotent" (§3.1.10), so a config
+// already gone is deleted again with nothing written.
+func (p pushesOnLines) Delete(ctx context.Context, task a2asdk.TaskID, id string) error {
+	call, err := a2aCallFrom(ctx)
+	if err != nil {
+		return err
+	}
+	pushes, err := p.s.pushesOf(call.agent.taskLines, string(task))
+	if err != nil {
+		return err
+	}
+	if !slices.ContainsFunc(pushes, func(push *a2asdk.PushConfig) bool { return push.ID == id }) {
+		return nil
+	}
+	return p.s.writePushLine(call.agent.taskLines, &a2asdk.PushConfig{ID: id, TaskID: task}, pushDeleted, spokenBy(call.request), map[string]any{})
+}
+
+func (p pushesOnLines) DeleteAll(ctx context.Context, task a2asdk.TaskID) error {
+	call, err := a2aCallFrom(ctx)
+	if err != nil {
+		return err
+	}
+	pushes, err := p.s.pushesOf(call.agent.taskLines, string(task))
+	if err != nil {
+		return err
+	}
+	for _, push := range pushes {
+		if err := p.Delete(ctx, task, push.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// answeredPush is the config as an operation answers it, at the tenant the
+// request named, its credentials left out.
+func answeredPush(config *a2asdk.PushConfig, tenant string) *a2asdk.PushConfig {
+	answered := *config
+	answered.Tenant = tenant
+	if config.Auth != nil {
+		answered.Auth = &a2asdk.PushAuthInfo{Scheme: config.Auth.Scheme}
+	}
+	return &answered
+}
+
 // setPush writes the config down for its Task, its credentials sealed.
-func (s *QNTXServer) setPush(lines taskLines, push a2a.Push, by string) error {
+func (s *QNTXServer) setPush(lines taskLines, push *a2asdk.PushConfig, by string) error {
 	attributes := map[string]any{"url": push.URL}
 	if push.Token != "" {
 		attributes["token"] = push.Token
 	}
-	if push.Scheme != "" {
-		attributes["scheme"] = push.Scheme
+	if push.Auth != nil && push.Auth.Scheme != "" {
+		attributes["scheme"] = push.Auth.Scheme
 	}
-	if push.Credentials != "" {
-		sealed, err := s.sealFor(pushSealed, lines.namespace, push.Credentials)
+	if push.Auth != nil && push.Auth.Credentials != "" {
+		sealed, err := s.sealFor(pushSealed, lines.namespace, push.Auth.Credentials)
 		if err != nil {
 			return errors.Wrapf(err, "the credentials of push notification config %s of task %s were not sealed", push.ID, push.TaskID)
 		}
@@ -238,7 +228,7 @@ func (s *QNTXServer) setPush(lines taskLines, push a2a.Push, by string) error {
 }
 
 // writePushLine writes that the config was set or deleted, as by.
-func (s *QNTXServer) writePushLine(lines taskLines, push a2a.Push, said, by string, attributes map[string]any) error {
+func (s *QNTXServer) writePushLine(lines taskLines, push *a2asdk.PushConfig, said, by string, attributes map[string]any) error {
 	store, err := lines.write()
 	if err != nil {
 		return errors.Wrapf(err, "no store to write push notification config %s of task %s in, in %s", push.ID, push.TaskID, lines.namespace)
@@ -250,14 +240,14 @@ func (s *QNTXServer) writePushLine(lines taskLines, push a2a.Push, said, by stri
 	at := time.Now()
 	return errors.Wrapf(store.CreateAttestation(&types.As{
 		ID: line, Subjects: []string{pushLineSubject}, Predicates: []string{said},
-		Contexts: []string{taskContext(push.TaskID), agentContext(lines.did), pushContext(push.ID)},
+		Contexts: []string{taskContext(string(push.TaskID)), agentContext(lines.did), pushContext(push.ID)},
 		Actors:   []string{by}, Timestamp: at, CreatedAt: at, Source: "a2a", Attributes: attributes,
 	}), "the %s line of push notification config %s of task %s was not written", said, push.ID, push.TaskID)
 }
 
 // pushesOf is every config the task has, oldest set first, credentials
 // unsealed for the webhook.
-func (s *QNTXServer) pushesOf(lines taskLines, task string) ([]a2a.Push, error) {
+func (s *QNTXServer) pushesOf(lines taskLines, task string) ([]*a2asdk.PushConfig, error) {
 	reading, err := s.held.Read(lines.namespace)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read the push notification configs of task %s", task)
@@ -280,7 +270,7 @@ func (s *QNTXServer) pushesOf(lines taskLines, task string) ([]a2a.Push, error) 
 		}
 		newest[id] = line
 	}
-	pushes := []a2a.Push{}
+	pushes := []*a2asdk.PushConfig{}
 	for _, id := range order {
 		line := newest[id]
 		if len(line.Predicates) != 1 {
@@ -289,16 +279,20 @@ func (s *QNTXServer) pushesOf(lines taskLines, task string) ([]a2a.Push, error) 
 		if line.Predicates[0] == pushDeleted {
 			continue
 		}
-		push := a2a.Push{ID: id, TaskID: task}
+		push := &a2asdk.PushConfig{ID: id, TaskID: a2asdk.TaskID(task)}
 		if push.URL, err = oneText(line.Attributes, "url", pushLineSubject, line.ID, task); err != nil {
 			return nil, err
 		}
 		push.Token, _ = line.Attributes["token"].(string)
-		push.Scheme, _ = line.Attributes["scheme"].(string)
+		scheme, _ := line.Attributes["scheme"].(string)
+		credentials := ""
 		if sealed, holds := line.Attributes["credentials"].(string); holds {
-			if push.Credentials, err = s.unsealFor(pushSealed, lines.namespace, sealed); err != nil {
+			if credentials, err = s.unsealFor(pushSealed, lines.namespace, sealed); err != nil {
 				return nil, errors.Wrapf(err, "the credentials of push notification config %s of task %s did not open", id, task)
 			}
+		}
+		if scheme != "" || credentials != "" {
+			push.Auth = &a2asdk.PushAuthInfo{Scheme: scheme, Credentials: credentials}
 		}
 		pushes = append(pushes, push)
 	}
@@ -315,18 +309,47 @@ func pushIn(line *types.As) (string, bool) {
 	return "", false
 }
 
-// notify POSTs the task as it now stands to each of its webhooks. A task's notifications go one after
-// another, each as the task stands when it goes, so a webhook is never told an
-// older state after a newer one.
-func (s *QNTXServer) notify(lines taskLines, task string) {
+// pushesSent is the SDK's push.Sender: each event a Task reaches tells each
+// of its webhooks the Task as it then stands (§4.3.3). A webhook not answering
+// does not fail the Task: its notifications go out beside it.
+type pushesSent struct{ s *QNTXServer }
+
+var _ push.Sender = pushesSent{}
+
+func (p pushesSent) SendPush(ctx context.Context, config *a2asdk.PushConfig, _ a2asdk.Event) error {
+	call, err := a2aCallFrom(ctx)
+	if err != nil {
+		return err
+	}
+	p.s.notify(call.agent.taskLines, string(config.TaskID), config.ID)
+	return nil
+}
+
+// notifySettled tells each webhook of a Task the node settled with no
+// execution left to tell them: a restart, or a turn read on from its stream.
+func (s *QNTXServer) notifySettled(lines taskLines, task *a2asdk.Task) {
+	pushes, err := s.pushesOf(lines, string(task.ID))
+	if err != nil {
+		s.logger.Errorw("a task was settled and its push notifications were not read", "agent", lines.did, "task", task.ID, "error", err)
+		return
+	}
+	for _, push := range pushes {
+		s.notify(lines, string(task.ID), push.ID)
+	}
+}
+
+// notify POSTs the task as it now stands to its webhook config. A task's
+// notifications go one after another, each as the task stands when it goes,
+// so a webhook is never told an older state after a newer one.
+func (s *QNTXServer) notify(lines taskLines, task, config string) {
 	held, _ := s.pushing.LoadOrStore(task, &sync.Mutex{})
 	one := held.(*sync.Mutex)
 	sacred.Go("the push notifications of a task", func() {
 		one.Lock()
 		defer one.Unlock()
-		ended, err := s.notifyNow(lines, task)
+		ended, err := s.notifyNow(lines, task, config)
 		if err != nil {
-			s.logger.Errorw("a task was updated and its push notifications were not sent", "agent", lines.did, "task", task, "error", err)
+			s.logger.Errorw("a task was updated and its push notification was not delivered", "agent", lines.did, "task", task, "config", config, "error", err)
 		}
 		// A task that ended reaches no state after it (endTask).
 		if ended {
@@ -335,41 +358,39 @@ func (s *QNTXServer) notify(lines taskLines, task string) {
 	})
 }
 
-// notifyNow is notify's POSTs, one webhook after another, and whether the task
-// has ended.
-func (s *QNTXServer) notifyNow(lines taskLines, task string) (bool, error) {
-	held, found, err := s.taskOf(lines, task)
+// notifyNow is notify's POST: the task as it stands, to the config as its
+// lines hold it, credentials unsealed; and whether the task has ended.
+func (s *QNTXServer) notifyNow(lines taskLines, task, config string) (bool, error) {
+	held, _, _, found, err := s.heldTask(lines, task)
 	if err != nil {
 		return false, err
 	}
 	if !found {
 		return false, errors.Newf("task %s was updated and has no lines", task)
 	}
-	ended := a2a.Terminal(held.State)
+	ended := held.Status.State.Terminal()
 	pushes, err := s.pushesOf(lines, task)
 	if err != nil {
 		return ended, err
 	}
-	if len(pushes) == 0 {
+	at := slices.IndexFunc(pushes, func(push *a2asdk.PushConfig) bool { return push.ID == config })
+	if at < 0 {
+		// Deleted since: "No further notifications will be sent" (§3.1.10).
 		return ended, nil
 	}
-	body, err := held.Notification()
+	// "The payload uses the same StreamResponse format as streaming
+	// operations" (§4.3.3), here the Task as it now stands.
+	body, err := json.Marshal(a2asdk.StreamResponse{Event: held})
 	if err != nil {
-		return ended, err
+		return ended, errors.Wrapf(err, "the notification of task %s did not marshal", task)
 	}
-	for _, push := range pushes {
-		if err := s.deliver(push, body); err != nil {
-			// One webhook not answering is no reason the next is not told.
-			s.logger.Errorw("a push notification was not delivered", "agent", lines.did, "task", task, "config", push.ID, "url", push.URL, "state", held.State, "error", err)
-		}
-	}
-	return ended, nil
+	return ended, s.deliver(pushes[at], body)
 }
 
 // deliver POSTs body to the webhook, again after a backoff that doubles while
 // it does not answer 2xx: "Clients MUST respond with HTTP 2xx status codes to
 // acknowledge successful receipt" (§4.3.3).
-func (s *QNTXServer) deliver(push a2a.Push, body []byte) error {
+func (s *QNTXServer) deliver(push *a2asdk.PushConfig, body []byte) error {
 	wait := webhookBackoff
 	var last error
 	for attempt := 1; attempt <= webhookAttempts; attempt++ {
@@ -390,16 +411,16 @@ func (s *QNTXServer) deliver(push a2a.Push, body []byte) error {
 
 // post is one POST of body to the webhook, with the credentials the config
 // carries: "Authorization: {authentication_scheme} {credentials}" (§4.3.3).
-func (s *QNTXServer) post(push a2a.Push, body []byte) error {
+func (s *QNTXServer) post(push *a2asdk.PushConfig, body []byte) error {
 	ctx, cancel := context.WithTimeout(s.ctx, webhookTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, push.URL, bytes.NewReader(body))
 	if err != nil {
 		return errors.Wrapf(err, "no request to POST the notification of task %s to %s", push.TaskID, push.URL)
 	}
-	req.Header.Set("Content-Type", a2a.ContentType)
-	if push.Scheme != "" {
-		req.Header.Set("Authorization", strings.TrimSpace(push.Scheme+" "+push.Credentials))
+	req.Header.Set("Content-Type", a2aContentType)
+	if push.Auth != nil && push.Auth.Scheme != "" {
+		req.Header.Set("Authorization", strings.TrimSpace(push.Auth.Scheme+" "+push.Auth.Credentials))
 	}
 	resp, err := webhookClient().Do(req)
 	if err != nil {
@@ -412,6 +433,9 @@ func (s *QNTXServer) post(push a2a.Push, body []byte) error {
 	}
 	return nil
 }
+
+// a2aContentType is the media type A2A's HTTP+JSON binding speaks in.
+const a2aContentType = "application/a2a+json"
 
 // webhookClient POSTs to a webhook and nowhere else: the address it dials is
 // asked again, since DNS can answer differently there than when the config was

@@ -31,7 +31,12 @@ import (
 // signa is every signum the node holds: its own, every linked subsystem's
 // (ADR-056), and every ready plugin's.
 func (s *QNTXServer) signa() []sigil.Signum {
-	own := []sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.openapiSignum(), s.paritySignum(), s.transcriptsSignum(), s.vaultSignum(), s.agentsSignum(), s.keysSignum(), s.anthropicSignum(), s.approvalsSignum(), s.nodeAgentSignum(), s.elementsSignum()}
+	own := []sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.openapiSignum(), s.paritySignum(), s.transcriptsSignum(), s.vaultSignum(), s.agentsSignum(), s.keysSignum(), s.anthropicSignum(), s.googleSignum(), s.approvalsSignum(), s.nodeAgentSignum(), s.elementsSignum()}
+	if a2a, err := s.a2aClientSignum(); err != nil {
+		s.logger.Errorw("a signum is not served", "signum", "a2a", "error", err)
+	} else {
+		own = append(own, a2a)
+	}
 	own = append(own, s.linkedSigna()...)
 	return append(own, s.pluginSigna()...)
 }
@@ -402,7 +407,12 @@ func protoJSONMessage(message protoreflect.MessageDescriptor, defs map[string]an
 		return nil
 	}
 	if message.ParentFile().Package() == "google.protobuf" {
-		return errors.Newf("%s is written by protojson in a form of its own", name)
+		form, known := protoJSONForms[name]
+		if !known {
+			return errors.Newf("%s is written by protojson in a form of its own", name)
+		}
+		defs[name] = form
+		return nil
 	}
 	properties := map[string]any{}
 	required := []string{}
@@ -448,6 +458,19 @@ func protoJSONMessage(message protoreflect.MessageDescriptor, defs map[string]an
 	}
 	def["required"] = required
 	return nil
+}
+
+// protoJSONForms are the forms of their own protojson writes google.protobuf's
+// messages in, as the ProtoJSON format states them
+// (https://protobuf.dev/programming-guides/json/): Timestamp an RFC 3339
+// string, Struct an object, Value any JSON value, ListValue an array, Empty an
+// empty object.
+var protoJSONForms = map[string]map[string]any{
+	"google.protobuf.Timestamp": {"type": "string", "format": "date-time"},
+	"google.protobuf.Struct":    {"type": "object"},
+	"google.protobuf.Value":     {},
+	"google.protobuf.ListValue": {"type": "array"},
+	"google.protobuf.Empty":     {"type": "object"},
 }
 
 // defsRef is how a schema refers to a message it holds under $defs.

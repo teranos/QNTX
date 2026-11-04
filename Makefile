@@ -1,4 +1,4 @@
-.PHONY: cli web-css test test-suite test-parquet test-postgres test-coverage test-verbose clean server dev install proto rust-sqlite ats laye wasm-tarballs parity says openapi quickdev publish-crates
+.PHONY: cli web-css test test-suite test-parquet test-postgres test-coverage test-verbose clean server dev install proto rust-sqlite ats laye wasm-tarballs parity says openapi quickdev publish-crates libacp
 
 # The frontend is teranos/QNTX-Web. web/ here is the CSS QNTX itself reads (web/README.md).
 QNTX_WEB ?= ../QNTX-Web
@@ -162,6 +162,13 @@ proto: ## Generate Go code from protobuf definitions (via Nix)
 
 # Plugins are their own repositories, on a node through their record (ADR-002).
 # "each plugin needs to move into their own respective repo as well"
+
+# "can't we build the client into libACP and make QNTX use it as an optional subsystem?"
+# libACP's C, the subtree in libacp/, into target/libacp, where internal/acp links it under
+# the build tag libacp. It needs a C11 compiler, make, pkg-config and json-c.
+libacp: ## Build libACP, the ACP client an ACP harness runs through (build tag libacp)
+	@$(MAKE) -C libacp install PREFIX=$(CURDIR)/target/libacp
+	@echo "✓ libacp in target/libacp"
 
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
 	@echo "Building Rust SQLite storage library..."

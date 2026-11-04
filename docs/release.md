@@ -18,7 +18,9 @@ Unix-like hosts only — see [ADR-029](adr/ADR-029-Windows.md).
 
 Branch and tag tarballs have the same shape. Linux only, because Linux is what gets deployed.
 
-Every tarball bundles Nix's `libduckdb.so` in `lib/` beside the binary, with the RPATH rewritten to `$ORIGIN/lib`, so it runs on any Linux host with no `LD_LIBRARY_PATH` and no wrapper.
+Every tarball bundles Nix's `libduckdb.so` in `lib/` beside the binary, with the RPATH rewritten to `$ORIGIN/lib`, so it runs with no `LD_LIBRARY_PATH` and no wrapper.
+
+`libduckdb.so` links the host's own libc, and the nixpkgs pin builds it against glibc 2.44: a tarball runs on a Linux host with glibc 2.44 or newer, and not on one older, Debian 13 (2.41) and Ubuntu 24.04 (2.39) among them: "Accepted".
 
 ## Version
 

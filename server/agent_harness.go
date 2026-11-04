@@ -48,7 +48,7 @@ type harnessSigil struct {
 
 // harnesses is every harness the Node Agent runs in.
 func (s *QNTXServer) harnesses() []*harness {
-	return []*harness{s.claudeHarness(), s.piHarness(), s.codexHarness()}
+	return []*harness{s.claudeHarness(), s.piHarness(), s.codexHarness(), s.agyHarness()}
 }
 
 // nodeAgentPath is where the Node Agent's sigils answer, whichever harness a turn runs in.
@@ -61,7 +61,7 @@ const nodeAgentPath = "/api/agent"
 // nodeAgentSignum is the Node Agent's say, am and session, in the harness named, and its sign-in
 // to Claude Code.
 func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
-	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi, agentLineCodex}, Says: "The harness it runs in: claude for Claude Code, pi for Pi, codex for codex."}
+	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi, agentLineCodex, agentLineAgy}, Says: "The harness it runs in: claude for Claude Code, pi for Pi, codex for codex, agy for agy."}
 	claude := s.claudeHarness()
 	login := s.loginSigil()
 	return sigil.Signum{
@@ -113,6 +113,8 @@ func (s *QNTXServer) harnessNamed(sent sigil.Sent) (*harness, *protocol.Refusal)
 		return s.piHarness(), nil
 	case agentLineCodex:
 		return s.codexHarness(), nil
+	case agentLineAgy:
+		return s.agyHarness(), nil
 	}
 	return nil, notAHarness(sent)
 }
@@ -133,6 +135,8 @@ func (s *QNTXServer) nodeAgentSay(ctx context.Context, sent sigil.Sent) (any, *p
 		return &protocol.NodeAgentSaid{Pi: said}, nil
 	case *protocol.CodexSaid:
 		return &protocol.NodeAgentSaid{Codex: said}, nil
+	case *protocol.AgySaid:
+		return &protocol.NodeAgentSaid{Agy: said}, nil
 	}
 	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent answered in " + h.called + " as no Coding Agent Harness this node runs"}
 }
@@ -153,6 +157,8 @@ func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *prot
 		return &protocol.NodeAgentAm{Pi: am}, nil
 	case *protocol.CodexAm:
 		return &protocol.NodeAgentAm{Codex: am}, nil
+	case *protocol.AgyAm:
+		return &protocol.NodeAgentAm{Agy: am}, nil
 	}
 	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent said who it is in " + h.called + " as no Coding Agent Harness this node runs"}
 }

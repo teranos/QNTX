@@ -1,0 +1,10 @@
+prefix=@PREFIX@
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: libacp
+Description: The Agent Client Protocol, agent and client side, in C11 with a C ABI
+Version: 0.1.0-dev
+Requires.private: json-c
+Libs: -L${libdir} -lacp
+Cflags: -I${includedir}

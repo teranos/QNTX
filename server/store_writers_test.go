@@ -78,6 +78,12 @@ var storeWriters = map[string]string{
 	"keepAnthropicLine": "the node's ANTHROPIC line, the ids of the rule its identity token is traded at " +
 		"and what ROOT's agents spend first, in system through WriteWhatTheNodeKnowsOfItself: a line about " +
 		"the node, and the reach table names /api/anthropic and /api/anthropic/order of ROOT alone",
+	"keepGoogleCostLine": "the node's GOOGLE-COSTS, GOOGLE-BUDGET, GOOGLE-LIMIT, GOOGLE-DAY-LIMIT and GOOGLE-AGY lines, in system through " +
+		"WriteWhatTheNodeKnowsOfItself: ROOT's yes at Google or ROOT's limit, and what Google's budgets reported to the node",
+	"keepGoogleLine": "the node's GOOGLE line, what it was set up as at Google Cloud, in system through " +
+		"WriteWhatTheNodeKnowsOfItself: a line about the node. Reached from the Google ceremony's callback, " +
+		"an /auth/… route anyone reaches, only once Google named the account that said yes and h.IsRoot " +
+		"says it is ROOT's: \"Given that I am ROOT and my google identity is the ROOT identity\"",
 	"setKeyLine": "a KEY line of a namespace (ADR-051), in the namespace's own store through Write as " +
 		"the setter is admitted, after keysAsking refuses a token or a connector and mayHandleKeys says " +
 		"they own the namespace, or are ROOT or SUPER",

@@ -166,6 +166,8 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	// Listening already, so what GitHub sends again waits at the socket rather
 	// than being refused before Serve takes it.
 	s.wg.Go("github.deliveriesCatchUp", s.CatchUpDeliveries)
+	s.registerForwards()
+	s.wg.Go("github.forwardsSweep", s.SweepForwards)
 	return s.httpServer.Serve(listener)
 }
 

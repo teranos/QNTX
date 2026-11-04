@@ -177,7 +177,7 @@ var githubRoutes = map[string]githubRoute{
 	// https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2026-03-10#list-workflow-runs-for-a-workflow
 	"ListWorkflowRunsForAWorkflow": {method: http.MethodGet, path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs", query: []string{"actor", "branch", "event", "status", "per_page", "page", "created", "exclude_pull_requests", "check_suite_id", "head_sha"}, body: noBody{}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#create-a-check-run
-	"CreateACheckRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-runs", body: jsonBody{"status"}},
+	"CreateACheckRun": {method: http.MethodPost, path: "/repos/{owner}/{repo}/check-runs", body: jsonBody{"status", "name", "head_sha", "details_url", "external_id", "conclusion", "output", "actions"}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#get-a-check-run
 	"GetACheckRun": {method: http.MethodGet, path: "/repos/{owner}/{repo}/check-runs/{check_run_id}", body: noBody{}},
 	// https://docs.github.com/en/rest/checks/runs?apiVersion=2026-03-10#update-a-check-run

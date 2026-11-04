@@ -47,155 +47,6 @@
         );
 }
 
-/* Right-click spawn nebula — 3D cloud of cursor elements */
-.canvas-spawn-menu {
-    position: fixed;
-    background: none;
-    border: none;
-    z-index: 10002;
-    perspective: 800px;
-    transform-style: preserve-3d;
-}
-
-/* Nebula element — borderless symbol floating in 3D */
-.canvas-spawn-button {
-    position: absolute;
-    width: auto;
-    height: auto;
-    border: none;
-    background: none;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: var(--font-size-lg);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transform-style: preserve-3d;
-    transition: color 0.3s ease, font-size 0.3s ease, opacity 0.3s ease;
-    padding: 8px;
-}
-
-/* Hovered element — comes forward, flattens, grows */
-.canvas-spawn-button:hover {
-    color: rgba(255, 255, 255, 1);
-    font-size: var(--font-size-lg);
-    z-index: 1;
-}
-
-/* Non-hovered siblings fade back when any sibling is hovered */
-.canvas-spawn-menu:has(.canvas-spawn-button:hover) .canvas-spawn-button:not(:hover) {
-    opacity: 0.35;
-}
-
-.canvas-spawn-button:active {
-    transform: scale(0.95) !important;
-}
-
-.canvas-spawn-button:focus-visible {
-    outline: 2px solid var(--accent-color, #4a9eff);
-    outline-offset: 2px;
-}
-
-/* Contextual reveal panel — appears on hover, interactive */
-.spawn-context-reveal {
-    position: absolute;
-    left: calc(100% + 12px);
-    top: 50%;
-    transform: translateY(-50%) translateZ(0);
-    background: rgba(30, 30, 30, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--border-radius);
-    padding: 12px 16px;
-    color: rgba(255, 255, 255, 0.85);
-    font-size: var(--font-size-sm);
-    white-space: nowrap;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.canvas-spawn-button:hover .spawn-context-reveal {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.spawn-context-reveal strong {
-    font-size: var(--font-size-md);
-    display: block;
-    margin-bottom: 4px;
-}
-
-.spawn-context-desc {
-    color: rgba(255, 255, 255, 0.65);
-    line-height: 1.4;
-}
-
-.spawn-context-hint {
-    color: rgba(255, 255, 255, 0.4);
-    font-size: var(--font-size-sm);
-    margin-top: 4px;
-    font-style: italic;
-}
-
-/* Placement mode scrim — dims canvas during spawn flow */
-.placement-scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 10001;
-    pointer-events: none;
-    transition: background-color 200ms ease;
-}
-
-/* Phase 1: Menu open — heavy dim */
-.placement-scrim--menu {
-    background-color: rgba(0, 0, 0, 0.6);
-}
-
-/* Phase 2: Carrying — lighter dim */
-.placement-scrim--carrying {
-    background-color: rgba(0, 0, 0, 0.3);
-}
-
-/* Cursor element — follows mouse during placement carrying phase */
-.cursor {
-    position: fixed;
-    pointer-events: none;
-    z-index: 10003;
-    font-size: var(--font-size-lg);
-    color: rgba(255, 255, 255, 0.95);
-    background: none;
-    border: none;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transform: translate(-50%, -50%);
-}
-
-/* Ax segment glow — all triplet values light up when carrying an ax cursor */
-.ax-placement-active [data-ax-segment] {
-    text-shadow: 0 0 6px currentColor, 0 0 12px currentColor;
-    cursor: pointer;
-    transition: text-shadow 150ms ease;
-}
-
-/* Thread building — hide system cursor, element symbols glow as targets */
-.thread-building-active {
-    cursor: none;
-}
-
-.thread-building-active .symbol {
-    text-shadow: 0 0 6px currentColor, 0 0 12px currentColor;
-    cursor: none;
-    transition: text-shadow 150ms ease, transform 150ms ease;
-}
-
-.thread-snap-target {
-    text-shadow: 0 0 8px currentColor, 0 0 16px currentColor, 0 0 24px currentColor;
-    transform: scale(1.3);
-}
-
 /* Breadcrumb bar — nesting trail at top of expanded subcanvas */
 .canvas-breadcrumb-bar {
     display: flex;
@@ -309,10 +160,6 @@
         font-size: var(--font-size-lg);
     }
 
-    .canvas-spawn-button {
-        font-size: var(--font-size-lg);
-        padding: 12px;
-    }
 }
 
 /* Python editor elements on canvas — brand colors applied inline in py-element.ts */
@@ -335,6 +182,8 @@
    Re-enable on editable elements so typing still works. */
 .canvas-workspace {
     user-select: none;
+    /* A held finger opens the spawn menu (@teranos/elements), not iOS's callout. */
+    -webkit-touch-callout: none;
 }
 .canvas-workspace input,
 .canvas-workspace textarea,
@@ -387,17 +236,6 @@
 .canvas-element-selected {
     outline: 2px solid rgba(122, 202, 122, 0.4);
     outline-offset: 2px;
-}
-
-/* Thread element selected — no border, glow the symbol in thread color */
-.canvas-thread-element.canvas-element-selected {
-    outline: none;
-}
-
-.canvas-thread-element.canvas-element-selected .symbol {
-    text-shadow: 0 0 8px currentColor, 0 0 16px currentColor, 0 0 24px currentColor;
-    transform: scale(1.2);
-    transition: text-shadow 150ms ease, transform 150ms ease;
 }
 
 /* Action bar - floating toolbar above selected element */

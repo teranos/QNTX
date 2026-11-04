@@ -109,5 +109,6 @@ func googleExchange(ctx context.Context, st providerState, code, redirectURI str
 		Handle:      who.Email,
 		Name:        who.Name,
 		Picture:     who.Picture,
+		google:      token.AccessToken,
 	}, nil
 }

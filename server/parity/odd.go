@@ -14,18 +14,18 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// TEI specifies itself in ODD: an elementSpec per element and a classSpec per
-// class of attributes, each saying what it is in English and other languages,
-// pinned under Specs/ as the Guidelines keep them (P5/Source/Specs).
+// 「[Fable 5.1] TEI specifies itself in ODD: an elementSpec per element and a classSpec per」
+// 「[Fable 5.1] class of attributes, each saying what it is in English and other languages,」
+// 「[Fable 5.1] pinned under Specs/ as the Guidelines keep them (P5/Source/Specs).」
 
-// An element is a model. Its columns are its attributes: its own attList, and
-// those of every class it is a member of, each with the classes that class
-// declares itself a member of, as the Guidelines resolve them.
+// 「[Fable 5.1] An element is a model. Its columns are its attributes: its own attList, and」
+// 「[Fable 5.1] those of every class it is a member of, each with the classes that class」
+// 「[Fable 5.1] declares itself a member of, as the Guidelines resolve them.」
 
-// The column named content is the element's content model, since a quote's
-// words are the element's content and no attribute.
+// 「[Fable 5.1] The column named content is the element's content model, since a quote's」
+// 「[Fable 5.1] words are the element's content and no attribute.」
 
-// oddSpec is an elementSpec or a classSpec as its file declares it.
+// 「[Fable 5.1] oddSpec is an elementSpec or a classSpec as its file declares it.」
 type oddSpec struct {
 	XMLName xml.Name
 	Ident   string      `xml:"ident,attr"`
@@ -36,8 +36,8 @@ type oddSpec struct {
 	Atts    []oddAttDef `xml:"attList>attDef"`
 }
 
-// oddDesc is one desc, in one language, with its markup kept: an attribute
-// named in it is written as <att>ana</att>.
+// 「[Fable 5.1] oddDesc is one desc, in one language, with its markup kept: an attribute」
+// 「[Fable 5.1] named in it is written as <att>ana</att>.」
 type oddDesc struct {
 	Lang  string `xml:"http://www.w3.org/XML/1998/namespace lang,attr"`
 	Inner string `xml:",innerxml"`
@@ -51,8 +51,8 @@ type oddContent struct {
 	MacroRef *oddKey `xml:"macroRef"`
 }
 
-// oddAttDef is one attribute: its name, whether it is required, what it says
-// of itself, and its datatype with how many values it takes.
+// 「[Fable 5.1] oddAttDef is one attribute: its name, whether it is required, what it says」
+// 「[Fable 5.1] of itself, and its datatype with how many values it takes.」
 type oddAttDef struct {
 	Ident    string    `xml:"ident,attr"`
 	Usage    string    `xml:"usage,attr"`
@@ -66,9 +66,9 @@ type oddAttDef struct {
 	} `xml:"datatype"`
 }
 
-// ParseODD reads the elements of the ODD files given, by their path in the
-// pin, as models with their attributes resolved through the classes pinned
-// beside them. A class the pin lacks is the pin's to add, and is named.
+// 「[Fable 5.1] ParseODD reads the elements of the ODD files given, by their path in the」
+// 「[Fable 5.1] pin, as models with their attributes resolved through the classes pinned」
+// 「[Fable 5.1] beside them. A class the pin lacks is the pin's to add, and is named.」
 func ParseODD(files map[string][]byte) ([]Model, error) {
 	classes := map[string]*oddSpec{}
 	classFile := map[string]string{}
@@ -110,8 +110,8 @@ func ParseODD(files map[string][]byte) ([]Model, error) {
 				seen[att.Ident] = true
 				model.Columns = append(model.Columns, columnOf(att, classFile[class]+" · "+class+"."+att.Ident))
 			}
-			// att.global declares itself a member of att.global.responsibility
-			// and the rest: a class carries the attributes of the classes it is in.
+			// 「[Fable 5.1] att.global declares itself a member of att.global.responsibility」
+			// 「[Fable 5.1] and the rest: a class carries the attributes of the classes it is in.」
 			for _, m := range spec.Members {
 				if !strings.HasPrefix(m.Key, "att.") {
 					continue
@@ -123,7 +123,7 @@ func ParseODD(files map[string][]byte) ([]Model, error) {
 			return nil
 		}
 		for _, m := range element.Members {
-			// A model.* class says where an element may appear, not what it carries.
+			// 「[Fable 5.1] A model.* class says where an element may appear, not what it carries.」
 			if !strings.HasPrefix(m.Key, "att.") {
 				continue
 			}
@@ -136,8 +136,8 @@ func ParseODD(files map[string][]byte) ([]Model, error) {
 	return models, nil
 }
 
-// contentColumn is an element's content model as a column: the macro it
-// refers to, or text.
+// 「[Fable 5.1] contentColumn is an element's content model as a column: the macro it」
+// 「[Fable 5.1] refers to, or text.」
 func contentColumn(content *oddContent) Column {
 	column := Column{Name: "content", Type: "text"}
 	if content != nil && content.MacroRef != nil {
@@ -146,8 +146,8 @@ func contentColumn(content *oddContent) Column {
 	return column
 }
 
-// columnOf is one attribute as a column; from is where it was read when it
-// comes from a class and not the element's own list.
+// 「[Fable 5.1] columnOf is one attribute as a column; from is where it was read when it」
+// 「[Fable 5.1] comes from a class and not the element's own list.」
 func columnOf(att oddAttDef, from string) Column {
 	column := Column{Name: att.Ident, Required: att.Usage == "req", Says: english(att.Descs)}
 	if column.Says != "" {
@@ -167,7 +167,7 @@ func columnOf(att oddAttDef, from string) Column {
 	return column
 }
 
-// english is what a spec says of itself in English, as prose.
+// 「[Fable 5.1] english is what a spec says of itself in English, as prose.」
 func english(descs []oddDesc) string {
 	for _, d := range descs {
 		if d.Lang == "en" {
@@ -177,8 +177,8 @@ func english(descs []oddDesc) string {
 	return ""
 }
 
-// prose is a desc's markup as its words: a tag such as <att> dropped to the
-// text it holds, entities read, and lines joined.
+// 「[Fable 5.1] prose is a desc's markup as its words: a tag such as <att> dropped to the」
+// 「[Fable 5.1] text it holds, entities read, and lines joined.」
 func prose(inner string) string {
 	var b strings.Builder
 	tag := false
@@ -195,7 +195,7 @@ func prose(inner string) string {
 	return strings.Join(strings.Fields(html.UnescapeString(b.String())), " ")
 }
 
-// oddAt is the elements of the ODD files of dir as a reference.
+// 「[Fable 5.1] oddAt is the elements of the ODD files of dir as a reference.」
 func oddAt(dir string, names []string) (Schema, *protocol.Refusal) {
 	files := map[string][]byte{}
 	for _, name := range names {
@@ -212,12 +212,12 @@ func oddAt(dir string, names []string) (Schema, *protocol.Refusal) {
 	return Schema{Models: models, fits: oddFits}, nil
 }
 
-// xsdText is the XSD datatypes TEI refers to by name rather than by a teidata
-// key, each a string: xml:id is an ID.
+// 「[Fable 5.1] xsdText is the XSD datatypes TEI refers to by name rather than by a teidata」
+// 「[Fable 5.1] key, each a string: xml:id is an ID.」
 var xsdText = []string{"ID", "IDREF", "IDREFS", "NCName", "NMTOKEN", "NMTOKENS", "Name", "anyURI", "string", "token"}
 
-// oddFits is whether a field of a kind can be held in an attribute of a TEI
-// datatype, or in an element's content, which is text.
+// 「[Fable 5.1] oddFits is whether a field of a kind can be held in an attribute of a TEI」
+// 「[Fable 5.1] datatype, or in an element's content, which is text.」
 func oddFits(kind protoreflect.Kind, column Column) bool {
 	switch kind {
 	case protoreflect.StringKind:

@@ -137,12 +137,19 @@ func (h linkedHost) News() *statusline.NewsLog { return h.s.news }
 
 func (h linkedHost) MintedBy(did string) (string, bool) { return h.s.authHandler.MintedBy(did) }
 
-// AskGitHub asks GitHubService one operation as the App's installation, and
-// hands back GitHub's answer, or the service's own error as one.
+// 「[Fable 5.1] AskGitHub asks GitHubService one operation as the App's installation, and」
+// 「[Fable 5.1] hands back GitHub's answer, or the service's own error as one.」
 func (h linkedHost) AskGitHub(ctx context.Context, operation string, request any) ([]byte, error) {
 	raw, err := json.Marshal(request)
 	if err != nil {
 		return nil, errors.Wrapf(err, "what %s takes did not encode", operation)
+	}
+	relay, relayed, err := h.s.nodeRecords().Relay()
+	if err != nil {
+		return nil, errors.Wrapf(err, "whether %s goes through another node was not read", operation)
+	}
+	if relayed {
+		return relayAsk(ctx, relay, operation, raw)
 	}
 	answered, err := h.s.gitHubService().Ask(services.AsInstallation(ctx), operation, raw)
 	if err != nil {

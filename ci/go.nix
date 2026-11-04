@@ -60,12 +60,23 @@ let
       name = "Build Rust SQLite library";
       run = "make rust-sqlite";
     }
+
+    # "can't we build the client into libACP and make QNTX use it as an optional subsystem?"
+    # libACP's C, the subtree in libacp/, which an ACP harness runs through.
+    {
+      name = "Build libACP";
+      run = ''
+        sudo apt-get install -y libjson-c-dev
+        make libacp
+      '';
+    }
   ];
 
   goPaths = [
     "**/*.go"
     "go.mod"
     "go.sum"
+    "libacp/**"
   ];
 in
 {
@@ -100,7 +111,7 @@ in
           # Test with core tags to ensure we test what we ship
           run = ''
             export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-            go test -tags "rustsqlite,qntxwasm" ./...
+            go test -tags "rustsqlite,qntxwasm,libacp" ./...
           '';
         }
       ];
@@ -114,7 +125,7 @@ in
           name = "Run integration tests";
           run = ''
             export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-            go test -tags="rustsqlite,qntxwasm,integration" ./...
+            go test -tags="rustsqlite,qntxwasm,libacp,integration" ./...
           '';
         }
       ];
@@ -126,7 +137,7 @@ in
       steps = [ checkout ] ++ toolchain ++ [
         {
           name = "Build";
-          run = "go build ./...";
+          run = "go build ./... && go build -tags libacp ./...";
         }
       ];
     };
