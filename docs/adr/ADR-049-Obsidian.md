@@ -27,7 +27,7 @@ Both ways: what is written in the vault reaches QNTX, and what QNTX holds reache
 
 ## On-Prem
 
-TODO: Figure out if we need to apply a similar rule to this Obsidian thing, like, if we say that only one node can at a time ever be in ownership of serving [[ADR-057-Agent-Rooms|Rooms]], it would logically come to follow that the Vault and the Room should always be served by the same node, the same thing can be said for [[ADR-055-Agent-Memory]], So, you could say that **Obsidian**+**Memory**+**Room** are one logically served unit if you will.  
+TODO: Figure out if we need to apply a similar rule to this Obsidian thing, like, if we say that only one node can at a time ever be in ownership of serving [[ADR-057-Agent-Rooms|Rooms]], it would logically come to follow that the Vault and the Room should always be served by the same node, the same thing can be said for [[ADR-055-Agent-Memory]], So, you could say that **Vault**+**Memory**+**Room** are one logically served unit if you will.  Is the real crystalised 
 
 Obsidian Headless (`obsidian-headless`, open beta, Node.js 22 or later) is
 Obsidian's own client for Sync without the app: `ob login`, `ob sync-setup`,
