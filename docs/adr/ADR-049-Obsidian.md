@@ -1,6 +1,7 @@
 # ADR-049: Obsidian
 
 Date: 2026-10-06
+Update: 2026
 Status: Developed in pr #1094 - I think its merged because i am using obsidian to write this now.
 pre-0.888.0-polish-blocker 
 
