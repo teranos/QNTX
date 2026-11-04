@@ -30,6 +30,7 @@ Allow all Agent Harnesses to leverage memories created in Managed Agents.
 
 make sure this is a thing for
 - [ ] [[ADR-053-Namespace-Agents]]
+	- [ ] https://github.com/teranos/QNTX/pull/1491
 - [x] [[ADR-048-Node-Agent]]
 - [ ] [[Elements]] Agents
 
