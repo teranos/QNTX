@@ -86,3 +86,6 @@ ROOT's client is minted as one (`"root": true`) and names no namespace: only ROO
 ROOT's client answers at `/mcp`, the node's MCP server.
 
 "all clients can die"
+
+---
+
