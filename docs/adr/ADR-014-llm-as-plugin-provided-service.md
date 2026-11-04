@@ -19,15 +19,11 @@ Multiple providers can run simultaneously. The caller specifies which backend to
 
 ## Multi-turn conversation
 
-The original `LLMChatRequest` carried `system_prompt` + `user_prompt` — two strings, single turn only. Both plugins (scry and OpenRouter) built a fresh 2-message array per request and discarded everything after the response. --> so its like good now or what?
-
-A `repeated ChatMessage messages` field (field 8) extends the protocol to carry full conversation history. Both plugins already send a messages array internally — scry passes it to `llama_chat_apply_template`, OpenRouter posts it to the `/v1/chat/completions` endpoint. The change is accepting a longer array, not a structural redesign. --> what change? is this a changelog or an ADR ?
+`LLMChatRequest.messages` (field 8, `repeated ChatMessage`) carries the full conversation history. scry passes the array to `llama_chat_apply_template`, OpenRouter posts it to the `/v1/chat/completions` endpoint.
 
 `system_prompt` and `user_prompt` are deprecated. When `messages` is populated it takes precedence; the old fields remain for backwards compatibility. 0.888.0-blocker is to actually delete deprecated stuff
 
 A prompt's history is the canvas. `ConversationAssembler` (`server/conversation.go`) walks the composition DAG upstream from the current element, queries prompt-result attestations for each ancestor, and builds an ordered message array sorted by timestamp. `HandlePromptDirect` injects this history into `ChatRequest.Messages` before forwarding to the LLM plugin. Neither plugin stores conversation state; they receive a snapshot and execute. --> i mean like, it can be, i tried to explore this idea, but, now we use the Agent Element, like with the [[ADR-048-Node-Agent]]
-
-The frontend must `await canvasSyncQueue.flush()` before firing the API call — the assembler reads composition edges from the DB, and the canvas sync pipeline is async. Without the flush, the composition created by `extendComposition` may not be persisted yet when the backend queries it. --> So what?
 
 ## Queuing (PULS)
 
