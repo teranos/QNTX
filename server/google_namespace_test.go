@@ -91,7 +91,14 @@ func (g *ownersGoogle) answer(w http.ResponseWriter, r *http.Request) {
 			g.pool = true
 			write(googleOperation{Name: gardensPool + "/operations/made"})
 		}
+	case path == "/v1/"+gardensPool+"/providers/"+googleNamespaceProvider && r.Method == http.MethodGet:
+		write(g.provider)
 	case path == "/v1/"+gardensPool+"/providers" && r.URL.Query().Get("workloadIdentityPoolProviderId") == googleNamespaceProvider:
+		if g.provider != nil {
+			w.WriteHeader(http.StatusConflict)
+			write(map[string]any{"error": map[string]any{"status": "ALREADY_EXISTS"}})
+			return
+		}
 		if owners() {
 			require.NoError(g.t, json.NewDecoder(r.Body).Decode(&g.provider))
 			write(googleOperation{Name: gardensPool + "/providers/namespaces/operations/made"})
@@ -260,4 +267,40 @@ func TestTheNamespacesOwnerIsWhoItsDefinitionNames(t *testing.T) {
 	owner, err := s.namespaceGoogleOwner("garden")
 	require.NoError(t, err)
 	assert.Equal(t, gardener, owner)
+}
+
+// A namespace whose owner changed spends nothing of the owner who connected it: its
+// new owner connects it.
+func TestANewOwnerConnectsTheNamespaceAgain(t *testing.T) {
+	s, _, in := runningNamespaceAgents(t)
+	gardenConnected(t, s)
+	in.owner["garden"] = visitor
+	_, held, err := s.namespaceGoogleLine("garden")
+	require.NoError(t, err)
+	assert.False(t, held)
+	agent, refused := s.holdNamespaceAgent("garden", "gemini-3.8-flash", gardener)
+	require.Nil(t, refused)
+	_, refused = s.agyAsTheNamespace(agent)
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "/auth/google/cloud?namespace=garden&thing=agy")
+}
+
+// A namespaces' provider made before is kept only when it maps the namespace from
+// the node's claim, which the binding is to.
+func TestAProviderNotMappingTheNamespaceIsNotKept(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	g := ownersGoogleStandingIn(t, s)
+	issuer, err := s.theIssuer()
+	require.NoError(t, err)
+	g.provider = map[string]any{"oidc": map[string]any{"issuerUri": issuer.url}, "attributeMapping": map[string]any{"google.subject": "assertion.sub"}}
+	_, err = s.connectGoogleNamespace(context.Background(), "owner-token", "gardens-project", gardener, "garden")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "attribute.namespace")
+	_, held, err := s.namespaceGoogleLine("garden")
+	require.NoError(t, err)
+	assert.False(t, held)
+
+	g.provider["attributeMapping"] = map[string]any{"google.subject": "assertion.sub", "attribute.namespace": "assertion.namespace"}
+	_, err = s.connectGoogleNamespace(context.Background(), "owner-token", "gardens-project", gardener, "garden")
+	require.NoError(t, err, "one that maps it is kept")
 }

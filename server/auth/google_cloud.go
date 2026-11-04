@@ -326,6 +326,10 @@ func (h *Handler) googleCloudSelected(w http.ResponseWriter, r *http.Request, ti
 		return
 	}
 	if pick.namespace != "" {
+		// Ownership is asked again: it may have changed while the project was being selected.
+		if !h.ownsNamespace(w, pick.token, pick.by, pick.handle, pick.namespace) {
+			return
+		}
 		h.connectGoogleNamespace(w, r, pick.token, r.URL.Query().Get("project"), pick.by, pick.handle, pick.back, pick.namespace)
 		return
 	}
@@ -335,19 +339,7 @@ func (h *Handler) googleCloudSelected(w http.ResponseWriter, r *http.Request, ti
 // namespaceGoogleCallback is where Google returns a namespace owner's yes: the account
 // is the owner's or nothing is set up, and the project is the owner's to select.
 func (h *Handler) namespaceGoogleCallback(w http.ResponseWriter, r *http.Request, fl flow, acct account) {
-	if h.googleNamespace == nil || h.googleNamespaceOwner == nil {
-		h.renderCeremonyPage(w, http.StatusServiceUnavailable, false, "This node has nothing that connects a namespace to Google Cloud")
-		return
-	}
-	owner, err := h.googleNamespaceOwner(fl.namespace)
-	if err != nil {
-		h.renderCeremonyPage(w, http.StatusNotFound, false, err.Error())
-		return
-	}
-	if !h.sameUser(owner, acct.CanonicalID) {
-		h.logger.Infow("a namespace was not connected to Google Cloud: the account is not its owner's", "namespace", fl.namespace, "canonical_id", acct.CanonicalID)
-		h.renderCeremonyPage(w, http.StatusForbidden, false,
-			acct.Handle+" is not the Google account of "+fl.namespace+"'s owner, and only its owner's connects it to Google Cloud")
+	if !h.ownsNamespace(w, acct.google, acct.CanonicalID, acct.Handle, fl.namespace) {
 		return
 	}
 	if acct.google == "" {
@@ -378,6 +370,30 @@ func (h *Handler) namespaceGoogleCallback(w http.ResponseWriter, r *http.Request
 	h.connectGoogleNamespace(w, r, acct.google, project, acct.CanonicalID, acct.Handle, fl.returnTo, fl.namespace)
 }
 
+// ownsNamespace is whether by, who said yes at Google, is namespace's owner. When not,
+// it says so, and the token Google handed is let go.
+func (h *Handler) ownsNamespace(w http.ResponseWriter, token, by, handle, namespace string) bool {
+	refuse := func(status int, says string) bool {
+		if token != "" && h.googleCloudLetGo != nil {
+			h.googleCloudLetGo(token)
+		}
+		h.renderCeremonyPage(w, status, false, says)
+		return false
+	}
+	if h.googleNamespace == nil || h.googleNamespaceOwner == nil {
+		return refuse(http.StatusServiceUnavailable, "This node has nothing that connects a namespace to Google Cloud")
+	}
+	owner, err := h.googleNamespaceOwner(namespace)
+	if err != nil {
+		return refuse(http.StatusNotFound, err.Error())
+	}
+	if !h.SameUser(owner, by) {
+		h.logger.Infow("a namespace was not connected to Google Cloud: the account is not its owner's", "namespace", namespace, "canonical_id", by)
+		return refuse(http.StatusForbidden, handle+" is not the Google account of "+namespace+"'s owner, and only its owner's connects it to Google Cloud")
+	}
+	return true
+}
+
 // connectGoogleNamespace sets namespace up on its owner's token, and says how that went.
 func (h *Handler) connectGoogleNamespace(w http.ResponseWriter, r *http.Request, token, project, by, handle, back, namespace string) {
 	ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
@@ -392,9 +408,9 @@ func (h *Handler) connectGoogleNamespace(w http.ResponseWriter, r *http.Request,
 	h.renderCloudDone(w, said, back)
 }
 
-// sameUser is whether two identities are one person: the same identity, or two
+// SameUser is whether two identities are one person: the same identity, or two
 // routes of one User (ADR-031).
-func (h *Handler) sameUser(a, b string) bool {
+func (h *Handler) SameUser(a, b string) bool {
 	if a == "" || b == "" {
 		return false
 	}

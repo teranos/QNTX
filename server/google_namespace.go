@@ -107,7 +107,7 @@ func (s *QNTXServer) connectGoogleNamespace(ctx context.Context, token, named, b
 		"attributeMapping": map[string]string{"google.subject": "assertion.sub", "attribute.namespace": "assertion.namespace"},
 	})
 	if alreadyThere(err) {
-		err = providerTrusts(ctx, token, provider, i.url)
+		err = providerMapsNamespaces(ctx, token, provider, i.url)
 	}
 	if err != nil {
 		return "", errors.Wrapf(err, "the provider %s was not made", provider)
@@ -158,9 +158,50 @@ func (s *QNTXServer) keepNamespaceGoogleLine(by, namespace string, kept googleKe
 	}), "the %s line %s of %s was not kept", googleLineSubject, id, namespace)
 }
 
-// namespaceGoogleLine reads namespace's newest GOOGLE line. False is a namespace
-// its owner has not connected.
+// providerMapsNamespaces is whether the namespaces' provider made before trusts the
+// node's issuer and maps the namespace from its claim, which the namespace's binding
+// is to.
+func providerMapsNamespaces(ctx context.Context, token, provider, issuer string) error {
+	var made struct {
+		OIDC struct {
+			IssuerURI string `json:"issuerUri"`
+		} `json:"oidc"`
+		AttributeMapping map[string]string `json:"attributeMapping"`
+	}
+	if err := googleCall(ctx, token, http.MethodGet, googleIAM+"/v1/"+provider, nil, &made); err != nil {
+		return err
+	}
+	if made.OIDC.IssuerURI != issuer {
+		return errors.Newf("%s trusts %s, not this node's issuer %s", provider, made.OIDC.IssuerURI, issuer)
+	}
+	for attribute, from := range map[string]string{"google.subject": "assertion.sub", "attribute.namespace": "assertion.namespace"} {
+		if made.AttributeMapping[attribute] != from {
+			return errors.Newf("%s maps %s from %q, and a namespace's agent is let act only where it is %s", provider, attribute, made.AttributeMapping[attribute], from)
+		}
+	}
+	return nil
+}
+
+// namespaceGoogleLine reads namespace's newest GOOGLE line, while whoever connected it
+// still owns it. False is a namespace its owner has not connected: one connected by an
+// owner it no longer has spends nothing of theirs.
 func (s *QNTXServer) namespaceGoogleLine(namespace string) (googleKept, bool, error) {
+	kept, held, err := s.namespaceGoogleLineAsKept(namespace)
+	if err != nil || !held {
+		return kept, held, err
+	}
+	owner, err := s.namespaceGoogleOwner(namespace)
+	if err != nil {
+		return googleKept{}, false, err
+	}
+	if owner == kept.setBy || (s.authHandler != nil && s.authHandler.SameUser(owner, kept.setBy)) {
+		return kept, true, nil
+	}
+	return googleKept{}, false, nil
+}
+
+// namespaceGoogleLineAsKept reads namespace's newest GOOGLE line, whoever connected it.
+func (s *QNTXServer) namespaceGoogleLineAsKept(namespace string) (googleKept, bool, error) {
 	reading, err := s.held.Read(namespace)
 	if err != nil {
 		return googleKept{}, false, errors.Wrapf(err, "failed to read the %s line of %s", googleLineSubject, namespace)
