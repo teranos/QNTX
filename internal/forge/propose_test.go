@@ -3,6 +3,7 @@ package forge
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -78,6 +79,26 @@ func (s *shelf) DeleteFile(_ context.Context, _ Acting, _ Repo, branch, path, sh
 	}
 	delete(s.branches[branch], path)
 	return nil
+}
+
+func (s *shelf) Entries(_ context.Context, _ Acting, _ Repo, ref, dir string) ([]Entry, error) {
+	if _, isFile := s.branches[ref][dir]; isFile {
+		return nil, NotADirectory{Kind: "file"}
+	}
+	var entries []Entry
+	for path, content := range s.branches[ref] {
+		in, name := Root, path
+		if cut := strings.LastIndex(path, "/"); cut >= 0 {
+			in, name = path[:cut], path[cut+1:]
+		}
+		if in == dir {
+			entries = append(entries, Entry{Name: name, Path: path, SHA: shelfBlob(content), Kind: File})
+		}
+	}
+	if len(entries) == 0 {
+		return nil, Refused{Says: "the shelf has no " + dir}
+	}
+	return entries, nil
 }
 
 func (s *shelf) ChangeFrom(_ context.Context, _ Acting, _ Repo, head, base string) (Change, bool, error) {
@@ -168,4 +189,19 @@ func TestAnEditThatSaysNothingIsNotCommitted(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "README.md")
 	assert.Empty(t, on.asked)
+}
+
+// What a branch holds at a path is asked of the forge a directory at a time,
+// and a directory the forge has none of holds nothing.
+func TestAProposalKnowsWhatItsBranchHolds(t *testing.T) {
+	on, proposal := shelved(t)
+	require.NoError(t, proposal.HoldBranch(t.Context(), on, AsApp))
+
+	held, err := proposal.Holds(t.Context(), on, AsApp, []string{"README.md", "new.md", "notes/new.md"})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"README.md": shelfBlob("as trunk has it")}, held)
+
+	_, err = proposal.Holds(t.Context(), on, AsApp, []string{"README.md/inside.md"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "README.md is a file")
 }

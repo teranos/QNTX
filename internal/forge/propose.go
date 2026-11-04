@@ -2,6 +2,7 @@ package forge
 
 import (
 	"context"
+	"strings"
 
 	errors "github.com/teranos/sacred-error"
 )
@@ -86,6 +87,46 @@ func (p Proposal) HoldBranch(ctx context.Context, on Forge, as Acting) error {
 		return errors.Newf("%s is not on %s (%s), and was not made from %s: %s", p.Branch, p.Repo, absent.Says, p.Into, refused.Says)
 	}
 	return err
+}
+
+// Holds is the blob the proposal's branch holds at each of paths, for the
+// ones it holds a file at: what an edit of that file replaces or removes. A
+// directory the forge says it has none of holds nothing.
+func (p Proposal) Holds(ctx context.Context, on Forge, as Acting, paths []string) (map[string]string, error) {
+	asked := map[string]bool{}
+	for _, file := range paths {
+		asked[file] = true
+	}
+	held := map[string]string{}
+	listed := map[string]bool{}
+	for _, file := range paths {
+		dir := Root
+		if cut := strings.LastIndex(file, "/"); cut >= 0 {
+			dir = file[:cut]
+		}
+		if listed[dir] {
+			continue
+		}
+		listed[dir] = true
+		entries, err := on.Entries(ctx, as, p.Repo, p.Branch, dir)
+		var absent Refused
+		if errors.As(err, &absent) {
+			continue
+		}
+		var notADirectory NotADirectory
+		if errors.As(err, &notADirectory) {
+			return nil, errors.Newf("%s is a %s of %s on %s, not a folder, so no file is held in it", dir, notADirectory.Kind, p.Repo, p.Branch)
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			if entry.Kind == File && asked[entry.Path] {
+				held[entry.Path] = entry.SHA
+			}
+		}
+	}
+	return held, nil
 }
 
 // Commit puts each edit on the proposal's branch, in the order given, a commit
