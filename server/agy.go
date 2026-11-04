@@ -14,7 +14,6 @@ import (
 	"github.com/teranos/QNTX/internal/acp"
 	"github.com/teranos/QNTX/internal/agy"
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/comet"
@@ -145,11 +144,17 @@ func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refu
 	if !let {
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "this node may not call Vertex AI yet: ROOT presses Connect agy under Google Cloud in Node Connectors"}
 	}
+	return s.agyAt(agent, kept, googleAudience(kept.project.ProjectNumber), func() error { return s.writeAgyToken(agent, kept) })
+}
+
+// agyAt writes agy's external_account file for kept in the agent's home, beside the
+// identity token write writes, and keeps that token fresh while agy may read it.
+func (s *QNTXServer) agyAt(agent *rootAgent, kept googleKept, audience string, write func() error) (*agy.Google, *protocol.Refusal) {
 	dir := filepath.Dir(agyTokenFile(agent))
 	tokenFile, credentials := agyTokenFile(agent), filepath.Join(dir, "external-account.json")
 	file, err := json.Marshal(map[string]any{
 		"type":                              "external_account",
-		"audience":                          googleAudience(kept.project.ProjectNumber),
+		"audience":                          audience,
 		"subject_token_type":                "urn:ietf:params:oauth:token-type:jwt",
 		"token_url":                         googleSTS + "/v1/token",
 		"service_account_impersonation_url": googleCredentials + "/v1/projects/-/serviceAccounts/" + kept.account + ":generateAccessToken",
@@ -159,7 +164,7 @@ func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refu
 		err = os.MkdirAll(dir, 0o700)
 	}
 	if err == nil {
-		err = s.writeAgyToken(agent, kept)
+		err = write()
 	}
 	if err == nil {
 		err = os.WriteFile(credentials, file, 0o600)
@@ -167,9 +172,7 @@ func (s *QNTXServer) agyAsTheNode(agent *rootAgent) (*agy.Google, *protocol.Refu
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "agy's identity at Google was not written to %s", dir).Error()}
 	}
-	if _, renewing := s.identityTokensRenewed.LoadOrStore(tokenFile, true); !renewing {
-		sacred.Go("agy.identity-token", func() { s.keepAgyTokenFresh(agent) })
-	}
+	s.startAgyRenewal(agent)
 	return &agy.Google{Credentials: credentials, Project: kept.project.ProjectID, Location: agyLocation}, nil
 }
 
@@ -194,6 +197,13 @@ func (s *QNTXServer) writeAgyToken(agent *rootAgent, kept googleKept) error {
 // 「[Opus 5.5] renewAgyToken rewrites the token, on the line as it is now. A node no longer」
 // 「[Opus 5.5] connected has nothing to renew.」
 func (s *QNTXServer) renewAgyToken(agent *rootAgent) error {
+	if standsInANamespace(agent) {
+		kept, held, err := s.namespaceGoogleLine(agent.namespace)
+		if err != nil || !held {
+			return err
+		}
+		return s.writeNamespaceAgyToken(agent, kept)
+	}
 	kept, held, err := s.googleLine()
 	if err != nil || !held {
 		return err

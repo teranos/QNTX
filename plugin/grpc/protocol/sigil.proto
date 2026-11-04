@@ -268,6 +268,8 @@ message NamespaceAgentSaid {
   PiSaid pi = 2;
   // What the namespace agent answered in Codex.
   CodexSaid codex = 3;
+  // 「[Opus 5.5] What the namespace agent answered in agy.」
+  AgySaid agy = 4;
 }
 
 // NodeAgentSaid is what agent say answers: what the Node Agent answered, in the
@@ -378,6 +380,8 @@ message AgyAm {
   string agy_version = 6;
   // 「[Opus 5.5] Why it cannot be spoken to in agy, when it cannot.」
   string not_ready = 7;
+  // 「[Opus 5.5] Where a namespace's owner connects it to Google Cloud, which its agent runs on in agy.」
+  string google_connect = 8;
 }
 
 // NodeGoogle is what google am answers: the node at Google Cloud, set up on
@@ -598,6 +602,8 @@ message NamespaceAgentAm {
   PiAm pi = 4;
   // Who the namespace agent is in Codex.
   CodexAm codex = 5;
+  // 「[Opus 5.5] Who the namespace agent is in agy.」
+  AgyAm agy = 6;
 }
 
 // Follows says which column of a reference each of a signum's fields is. The

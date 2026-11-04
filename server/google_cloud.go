@@ -364,8 +364,13 @@ func providerTrusts(ctx context.Context, token, provider, issuer string) error {
 // nodeActsAs lets the node's DID act as account: Workload Identity User for its
 // principal in the node's pool, added to what the account's policy held.
 func (s *QNTXServer) nodeActsAs(ctx context.Context, token string, p googleProject, account string) error {
+	return actsAs(ctx, token, p, account, "principal://iam.googleapis.com/"+googlePoolOf(p)+"/subject/"+s.nodeDID.DID)
+}
+
+// actsAs lets member act as account: Workload Identity User, added to what the
+// account's policy held.
+func actsAs(ctx context.Context, token string, p googleProject, account, member string) error {
 	const role = "roles/iam.workloadIdentityUser"
-	member := "principal://iam.googleapis.com/" + googlePoolOf(p) + "/subject/" + s.nodeDID.DID
 	at := googleIAM + "/v1/projects/" + p.ProjectID + "/serviceAccounts/" + account
 	var policy map[string]any
 	// A service account just made is not at once visible to its policy.
@@ -464,6 +469,11 @@ func (s *QNTXServer) googleLine() (googleKept, bool, error) {
 	if err != nil {
 		return googleKept{}, false, errors.Wrapf(err, "failed to read the node's %s line", googleLineSubject)
 	}
+	return keptOfNewest(found, auth.NamespaceSystem)
+}
+
+// keptOfNewest is the newest of the GOOGLE lines found in namespace. False is none.
+func keptOfNewest(found []*types.As, namespace string) (googleKept, bool, error) {
 	var newest *types.As
 	for _, as := range found {
 		if newest == nil || as.Timestamp.After(newest.Timestamp) {
@@ -478,7 +488,8 @@ func (s *QNTXServer) googleLine() (googleKept, bool, error) {
 		"project_id": &kept.project.ProjectID, "project_number": &kept.project.ProjectNumber,
 		"pool": &kept.pool, "provider": &kept.provider, "service_account": &kept.account,
 	} {
-		if *into, err = oneText(newest.Attributes, name, googleLineSubject, newest.ID, auth.NamespaceSystem); err != nil {
+		var err error
+		if *into, err = oneText(newest.Attributes, name, googleLineSubject, newest.ID, namespace); err != nil {
 			return googleKept{}, false, err
 		}
 	}

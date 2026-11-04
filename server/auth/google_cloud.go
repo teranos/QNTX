@@ -60,6 +60,8 @@ type cloudPick struct {
 	by       string
 	handle   string
 	back     string
+	// namespace is whose owner said yes, or empty for ROOT's yes for the node.
+	namespace string
 }
 
 // cloudPickLife is how long ROOT's yes waits for the selection before it is let go.
@@ -86,6 +88,21 @@ type GoogleKeyConnect func(ctx context.Context, token, by, namespace string) (st
 // 「[Opus 5.5] SetGoogleKey is what makes a namespace's key, in a project of its own, once ROOT said yes.」
 // "one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item."
 func (h *Handler) SetGoogleKey(connect GoogleKeyConnect) { h.googleKey = connect }
+
+// "A Namespace Owner logs in with their own oicd for their namespace access to agy, like how Root does for Node"
+
+// GoogleNamespaceConnect sets namespace up at Google Cloud on its owner's token, in
+// the project named, and says what it set up.
+type GoogleNamespaceConnect func(ctx context.Context, token, project, by, namespace string) (string, error)
+
+// GoogleNamespaceOwner is who owns namespace, as its definition names them.
+type GoogleNamespaceOwner func(namespace string) (string, error)
+
+// SetGoogleNamespace is what connects a namespace once its owner said yes, and who
+// its owner is.
+func (h *Handler) SetGoogleNamespace(owner GoogleNamespaceOwner, connect GoogleNamespaceConnect) {
+	h.googleNamespaceOwner, h.googleNamespace = owner, connect
+}
 
 // SetGoogleCloud is what connects the node once ROOT said yes.
 func (h *Handler) SetGoogleCloud(connect GoogleCloudConnect) { h.googleCloud = connect }
@@ -165,6 +182,10 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		h.renderCeremonyPage(w, http.StatusUnauthorized, false, "The Google exchange did not complete: "+err.Error())
 		return
 	}
+	if fl.thing == "agy" && fl.namespace != "" {
+		h.namespaceGoogleCallback(w, r, fl, acct)
+		return
+	}
 	if !h.IsRoot(acct.CanonicalID) {
 		h.logger.Infow("Google Cloud was not connected: the account is not ROOT's", "canonical_id", acct.CanonicalID)
 		h.renderCeremonyPage(w, http.StatusForbidden, false,
@@ -217,7 +238,7 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 			h.renderCeremonyPage(w, http.StatusNotFound, false, "Your Google account sees no Google Cloud project to connect this node to.")
 			return
 		case len(seen) > 1:
-			h.renderCloudSelect(w, seen, acct.google, fl.ceremony, acct.CanonicalID, acct.Handle, fl.returnTo)
+			h.renderCloudSelect(w, seen, acct.google, fl.ceremony, acct.CanonicalID, acct.Handle, fl.returnTo, "")
 			return
 		}
 		project = seen[0].ID
@@ -241,7 +262,7 @@ func (h *Handler) connectGoogleCloud(w http.ResponseWriter, r *http.Request, tok
 
 // renderCloudSelect keeps ROOT's yes and asks which project the node belongs in.
 // "i press connect, i select project"
-func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudProject, token, ceremony, by, handle, back string) {
+func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudProject, token, ceremony, by, handle, back, namespace string) {
 	ticket, err := randomTicket()
 	if err != nil {
 		h.googleCloudLetGo(token)
@@ -253,16 +274,20 @@ func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudPro
 	if h.cloudPicks == nil {
 		h.cloudPicks = map[string]cloudPick{}
 	}
-	h.cloudPicks[ticket] = cloudPick{token: token, ceremony: ceremony, by: by, handle: handle, back: back}
+	h.cloudPicks[ticket] = cloudPick{token: token, ceremony: ceremony, by: by, handle: handle, back: back, namespace: namespace}
 	h.cloudPicksMu.Unlock()
 	time.AfterFunc(cloudPickLife, func() {
 		if pick, held := h.takeCloudPick(ticket); held {
 			h.googleCloudLetGo(pick.token)
 		}
 	})
+	asked := "Which Google Cloud project does this node belong in?"
+	if namespace != "" {
+		asked = "Which Google Cloud project does " + namespace + " spend in?"
+	}
 	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
 		`<body style="background:#12111a;color:#e6e4ef;font:14px ui-monospace,monospace;margin:0;padding:24px;word-break:break-word;overflow-wrap:break-word">` +
-		`<p>Which Google Cloud project does this node belong in?</p>`
+		`<p>` + html.EscapeString(asked) + `</p>`
 	for _, project := range seen {
 		called := project.ID
 		if project.Name != "" && project.Name != project.ID {
@@ -300,7 +325,94 @@ func (h *Handler) googleCloudSelected(w http.ResponseWriter, r *http.Request, ti
 		h.renderCeremonyPage(w, http.StatusForbidden, false, "This selection is spent, or was started somewhere else. Press Connect again.")
 		return
 	}
+	if pick.namespace != "" {
+		h.connectGoogleNamespace(w, r, pick.token, r.URL.Query().Get("project"), pick.by, pick.handle, pick.back, pick.namespace)
+		return
+	}
 	h.connectGoogleCloud(w, r, pick.token, r.URL.Query().Get("project"), pick.by, pick.handle, pick.back)
+}
+
+// namespaceGoogleCallback is where Google returns a namespace owner's yes: the account
+// is the owner's or nothing is set up, and the project is the owner's to select.
+func (h *Handler) namespaceGoogleCallback(w http.ResponseWriter, r *http.Request, fl flow, acct account) {
+	if h.googleNamespace == nil || h.googleNamespaceOwner == nil {
+		h.renderCeremonyPage(w, http.StatusServiceUnavailable, false, "This node has nothing that connects a namespace to Google Cloud")
+		return
+	}
+	owner, err := h.googleNamespaceOwner(fl.namespace)
+	if err != nil {
+		h.renderCeremonyPage(w, http.StatusNotFound, false, err.Error())
+		return
+	}
+	if !h.sameUser(owner, acct.CanonicalID) {
+		h.logger.Infow("a namespace was not connected to Google Cloud: the account is not its owner's", "namespace", fl.namespace, "canonical_id", acct.CanonicalID)
+		h.renderCeremonyPage(w, http.StatusForbidden, false,
+			acct.Handle+" is not the Google account of "+fl.namespace+"'s owner, and only its owner's connects it to Google Cloud")
+		return
+	}
+	if acct.google == "" {
+		h.renderCeremonyPage(w, http.StatusBadGateway, false, errNoGoogleToken.Error())
+		return
+	}
+	project := fl.project
+	if project == "" && h.googleCloudProjects != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
+		defer cancel()
+		seen, err := h.googleCloudProjects(ctx, acct.google)
+		switch {
+		case err != nil:
+			h.googleCloudLetGo(acct.google)
+			h.logger.Errorw("a namespace owner's Google Cloud projects were not read", "namespace", fl.namespace, "by", acct.CanonicalID, "error", err)
+			h.renderCloudStopped(w, err, "", fl.thing, fl.namespace, acct.Handle, fl.returnTo)
+			return
+		case len(seen) == 0:
+			h.googleCloudLetGo(acct.google)
+			h.renderCeremonyPage(w, http.StatusNotFound, false, "Your Google account sees no Google Cloud project for "+fl.namespace+" to spend in.")
+			return
+		case len(seen) > 1:
+			h.renderCloudSelect(w, seen, acct.google, fl.ceremony, acct.CanonicalID, acct.Handle, fl.returnTo, fl.namespace)
+			return
+		}
+		project = seen[0].ID
+	}
+	h.connectGoogleNamespace(w, r, acct.google, project, acct.CanonicalID, acct.Handle, fl.returnTo, fl.namespace)
+}
+
+// connectGoogleNamespace sets namespace up on its owner's token, and says how that went.
+func (h *Handler) connectGoogleNamespace(w http.ResponseWriter, r *http.Request, token, project, by, handle, back, namespace string) {
+	ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
+	defer cancel()
+	said, err := h.googleNamespace(ctx, token, project, by, namespace)
+	if err != nil {
+		h.logger.Errorw("a namespace was not connected to Google Cloud", "namespace", namespace, "by", by, "project", project, "error", err)
+		h.renderCloudStopped(w, err, project, "agy", namespace, handle, back)
+		return
+	}
+	h.logger.Infow("a namespace is set up at Google Cloud", "namespace", namespace, "by", by, "said", said)
+	h.renderCloudDone(w, said, back)
+}
+
+// sameUser is whether two identities are one person: the same identity, or two
+// routes of one User (ADR-031).
+func (h *Handler) sameUser(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	if a == b {
+		return true
+	}
+	if h.users == nil {
+		return false
+	}
+	first, found, err := h.users.ByRoute(a)
+	if err != nil || !found {
+		return false
+	}
+	second, found, err := h.users.ByRoute(b)
+	if err != nil || !found {
+		return false
+	}
+	return first.ID != "" && first.ID == second.ID
 }
 
 // renderCloudStopped says what stopped the node connecting: what is wrong, where
