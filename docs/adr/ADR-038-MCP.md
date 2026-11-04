@@ -89,4 +89,4 @@ ROOT's client answers at `/mcp`, the node's MCP server.
 
 ---
 
-> I do actually wonder, 
+> I do actually wonder, how we configure our Agent harnesses 
