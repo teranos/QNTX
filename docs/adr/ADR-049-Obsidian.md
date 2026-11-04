@@ -33,13 +33,13 @@ Obsidian's own client for Sync without the app: `ob login`, `ob sync-setup`,
 every device through Sync.
 
 "Fine, i will deal with this"
-
 - Sync is end-to-end encrypted, and the box is one of the ends: the vault is
   readable there, by the node and by the NODE agent ([[ADR-048-Node-Agent]]).
 
+
+
 "but you make a good point about NODE agent"
 "just make it do everything essentially"
-
 - The NODE agent sets the vault up on the box and keeps it syncing: `ob login`,
   `ob sync-setup`, `ob sync --continuous`. Each takes its answers as flags
   (`--email`, `--password`, `--mfa`, `--vault`, `--path`), so none of it waits
