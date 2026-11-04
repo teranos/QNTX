@@ -89,4 +89,4 @@ ROOT's client answers at `/mcp`, the node's MCP server.
 
 ---
 
-> I do actually wonder, how we configure our Agent harnesses MCP today. Think QNTX being a client of MCP 
+> I do actually wonder, how we configure our Agent harnesses MCP today. Think QNTX being a client of MCP in addition to just being the server. 
