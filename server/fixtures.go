@@ -88,13 +88,19 @@ func (s *QNTXServer) fixtured(ctx context.Context, admitted auth.Admission, resu
 		if !ok {
 			continue
 		}
-		scrubbed, _, err := s.scrub(ctx, text.Text)
+		scrubbed, found, err := s.scrub(ctx, text.Text)
 		if err != nil {
 			return refused("the answer was not handed on: it could not be made into fixtures: %v", err)
+		}
+		// What the scanner counted, by shape, is on the call's line: the calls
+		// of 6SION nobody answered were the ones whose answer carried a mail address.
+		if found != "" {
+			mcpAskedOf(ctx).says("fixtures_found", found)
 		}
 		result.Content[i] = &mcp.TextContent{Text: scrubbed}
 	}
 	if raw, ok := result.StructuredContent.(json.RawMessage); ok && len(raw) > 0 {
+		mcpAskedOf(ctx).now(mcpMakingStructuredFixtures)
 		scrubbed, _, err := s.scrub(ctx, string(raw))
 		if err != nil {
 			return refused("the answer was not handed on: it could not be made into fixtures: %v", err)

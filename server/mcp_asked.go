@@ -25,6 +25,8 @@ const (
 	mcpAsking = "asking"
 	// What it answered is with the scanner (fixtures.go).
 	mcpMakingFixtures = "making_fixtures"
+	// The same answer as structured content is with the scanner.
+	mcpMakingStructuredFixtures = "making_structured_fixtures"
 	// The answer is the MCP server's to write to whoever called.
 	mcpWritingBack = "writing_back"
 )
