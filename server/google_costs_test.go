@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
@@ -35,11 +37,16 @@ type standInBilling struct {
 	// seen is the billing accounts ROOT's account sees, each open unless named closed.
 	seen   []string
 	closed []string
+	// made is each budget the node made, by its id, as it was asked for.
+	made  map[string]map[string]any
+	order []string
+	// linked is each project's billing account, as the node linked it.
+	linked map[string]string
 }
 
 func billingStandingIn(t *testing.T, s *QNTXServer, account string, budgets ...string) *standInBilling {
 	t.Helper()
-	b := &standInBilling{account: account, budgets: budgets, patched: map[string]string{}, roles: map[string][]string{}}
+	b := &standInBilling{account: account, budgets: budgets, patched: map[string]string{}, roles: map[string][]string{}, made: map[string]map[string]any{}, linked: map[string]string{}}
 	served := httptest.NewServer(http.HandlerFunc(b.answer))
 	t.Cleanup(served.Close)
 	billing, budgeting, pubsub, usage := googleBilling, googleBudgets, googlePubSub, googleServiceUsage
@@ -76,6 +83,9 @@ func (b *standInBilling) answer(w http.ResponseWriter, r *http.Request) {
 		write(map[string]any{"billingAccountName": b.account})
 	case path == "/v1/projects/the-project/billingInfo":
 		write(map[string]any{"billingAccountName": b.account, "billingEnabled": b.account != ""})
+	case strings.HasPrefix(path, "/v1/projects/") && strings.HasSuffix(path, "/billingInfo") && r.Method == http.MethodPut:
+		b.linked[strings.TrimSuffix(strings.TrimPrefix(path, "/v1/projects/"), "/billingInfo")] = sent["billingAccountName"].(string)
+		write(map[string]any{"billingAccountName": sent["billingAccountName"]})
 	case strings.HasSuffix(path, ":getIamPolicy") && r.Method != http.MethodGet:
 		// Both Cloud Billing and Pub/Sub, by their discovery documents.
 		w.WriteHeader(http.StatusNotFound)
@@ -114,7 +124,18 @@ func (b *standInBilling) answer(w http.ResponseWriter, r *http.Request) {
 				"budgetFilter": map[string]any{"calendarPeriod": "MONTH"},
 			})
 		}
+		for _, id := range b.order {
+			made := b.made[id]
+			listed = append(listed, map[string]any{
+				"name": b.account + "/budgets/" + id, "displayName": made["displayName"],
+				"amount": made["amount"], "budgetFilter": made["budgetFilter"],
+			})
+		}
 		write(map[string]any{"budgets": listed})
+	case path == "/v1/"+b.account+"/budgets" && r.Method == http.MethodPost:
+		id := "made-" + strconv.Itoa(len(b.order)+1)
+		b.made[id], b.order = sent, append(b.order, id)
+		write(map[string]any{"name": b.account + "/budgets/" + id})
 	case strings.HasPrefix(path, "/v1/"+b.account+"/budgets/") && r.Method == http.MethodPatch:
 		rule := sent["notificationsRule"].(map[string]any)
 		if rule["schemaVersion"] != "1.0" {
@@ -255,16 +276,15 @@ func wiredForCosts(t *testing.T) (*QNTXServer, *standInBilling, chan services.No
 // whatever order it came in.
 func TestBudgetReportsAreKeptNewestFirst(t *testing.T) {
 	s, b, _ := wiredForCosts(t)
-	b.says("b1", "ack-new", "2026-11-02T12:00:00Z", "monthly", 3.5, 20, "2026-11-01T00:00:00Z")
-	b.says("b1", "ack-old", "2026-11-02T06:00:00Z", "monthly", 1, 20, "2026-11-01T00:00:00Z")
+	b.says("monthly", "ack-new", "2026-11-02T12:00:00Z", "monthly", 3.5, 20, "2026-11-01T00:00:00Z")
+	b.says("monthly", "ack-old", "2026-11-02T06:00:00Z", "monthly", 1, 20, "2026-11-01T00:00:00Z")
 	require.NoError(t, s.googleCostsTick(context.Background()))
 	assert.ElementsMatch(t, []string{"ack-new", "ack-old"}, b.acked)
 	am := rootAsksGoogle(t, s)
-	require.Len(t, am.GetBudgets(), 1)
-	assert.Equal(t, "monthly", am.GetBudgets()[0].GetName())
-	assert.InDelta(t, 3.5, am.GetBudgets()[0].GetCost(), 0.001)
-	assert.InDelta(t, 20, am.GetBudgets()[0].GetBudget(), 0.001)
-	assert.Equal(t, "EUR", am.GetBudgets()[0].GetCurrency())
+	monthly := budgetNamed(t, am, "monthly")
+	assert.InDelta(t, 3.5, monthly.GetCost(), 0.001)
+	assert.InDelta(t, 20, monthly.GetBudget(), 0.001)
+	assert.Equal(t, "EUR", monthly.GetCurrency())
 	assert.False(t, am.GetHalted())
 }
 
@@ -273,9 +293,7 @@ func TestBudgetReportsAreKeptNewestFirst(t *testing.T) {
 func TestABudgetIsKnownBeforeGoogleReports(t *testing.T) {
 	s, _, _ := wiredForCosts(t)
 	am := rootAsksGoogle(t, s)
-	require.Len(t, am.GetBudgets(), 1)
-	budget := am.GetBudgets()[0]
-	assert.Equal(t, "monthly", budget.GetName())
+	budget := budgetNamed(t, am, "monthly")
 	assert.Equal(t, "EUR", budget.GetCurrency())
 	assert.Equal(t, "MONTH", budget.GetPeriod())
 	assert.InDelta(t, 20, budget.GetBudget(), 0.001)
@@ -298,14 +316,15 @@ func TestADayLimitHaltsUntilTomorrow(t *testing.T) {
 	require.Nil(t, refused)
 	assert.InDelta(t, 1, rootAsksGoogle(t, s).GetDayLimit(), 0.001)
 
-	b.says("b1", "a1", "2026-11-19T23:00:00Z", "monthly", 5, 20, "2026-11-01T00:00:00Z")
-	b.says("b1", "a2", "2026-11-20T06:00:00Z", "monthly", 5.5, 20, "2026-11-01T00:00:00Z")
+	meter, _ := meterOf(t, b, theProject.ProjectNumber)
+	b.says(meter, "a1", "2026-11-19T23:00:00Z", "qntx node", 5, 0, "2026-11-01T00:00:00Z")
+	b.says(meter, "a2", "2026-11-20T06:00:00Z", "qntx node", 5.5, 0, "2026-11-01T00:00:00Z")
 	require.NoError(t, s.googleCostsTick(context.Background()))
 	am := rootAsksGoogle(t, s)
 	assert.InDelta(t, 0.5, am.GetSpentToday(), 0.001)
 	assert.False(t, am.GetHalted(), "5.50 is under the budget's 80%, and 0.50 under the day's")
 
-	b.says("b1", "a3", "2026-11-20T11:00:00Z", "monthly", 5.8, 20, "2026-11-01T00:00:00Z")
+	b.says(meter, "a3", "2026-11-20T11:00:00Z", "qntx node", 5.8, 0, "2026-11-01T00:00:00Z")
 	require.NoError(t, s.googleCostsTick(context.Background()))
 	am = rootAsksGoogle(t, s)
 	assert.True(t, am.GetHalted(), "0.80 is 80%% of the day's 1")
@@ -326,9 +345,10 @@ func TestADayLimitHaltsUntilTomorrow(t *testing.T) {
 // A QNTX-side limit below Google's budget is what 80% is of.
 func TestAQNTXSideLimitHaltsBeforeGooglesBudget(t *testing.T) {
 	s, b, mailed := wiredForCosts(t)
-	b.says("b1", "a1", "2026-11-20T00:00:00Z", "monthly", 8, 20, "2026-11-01T00:00:00Z")
+	meter, _ := meterOf(t, b, theProject.ProjectNumber)
+	b.says(meter, "a1", "2026-11-20T00:00:00Z", "qntx node", 8, 0, "2026-11-01T00:00:00Z")
 	require.NoError(t, s.googleCostsTick(context.Background()))
-	halted, _ := s.googleSpendingHalted()
+	halted, _ := s.googleItemHalted(googleNodeItem)
 	assert.False(t, halted)
 
 	admitted := auth.Admitted(auth.LevelRoot)
@@ -358,15 +378,15 @@ func TestAQNTXSideLimitHaltsBeforeGooglesBudget(t *testing.T) {
 // and it resumes when the next period's report frees the budget.
 func TestWhatCostsHaltsAt80PercentAndResumesWhenTheBudgetFreesUp(t *testing.T) {
 	s, b, mailed := wiredForCosts(t)
-	b.says("b1", "a1", "2026-11-20T00:00:00Z", "monthly", 15.99, 20, "2026-11-01T00:00:00Z")
+	b.says("monthly", "a1", "2026-11-20T00:00:00Z", "monthly", 15.99, 20, "2026-11-01T00:00:00Z")
 	require.NoError(t, s.googleCostsTick(context.Background()))
-	halted, _ := s.googleSpendingHalted()
+	halted, _ := s.googleItemHalted(googleNodeItem)
 	assert.False(t, halted, "under 80%")
 	assert.Empty(t, mailed)
 
-	b.says("b1", "a2", "2026-11-21T00:00:00Z", "monthly", 16, 20, "2026-11-01T00:00:00Z")
+	b.says("monthly", "a2", "2026-11-21T00:00:00Z", "monthly", 16, 20, "2026-11-01T00:00:00Z")
 	require.NoError(t, s.googleCostsTick(context.Background()))
-	halted, why := s.googleSpendingHalted()
+	halted, why := s.googleItemHalted(googleNodeItem)
 	assert.True(t, halted)
 	assert.Contains(t, why, "monthly")
 	assert.True(t, rootAsksGoogle(t, s).GetHalted())
@@ -374,13 +394,13 @@ func TestWhatCostsHaltsAt80PercentAndResumesWhenTheBudgetFreesUp(t *testing.T) {
 	require.Len(t, mailed, 1)
 	assert.Contains(t, (<-mailed).Subject, "halted")
 
-	b.says("b1", "a3", "2026-11-22T00:00:00Z", "monthly", 17, 20, "2026-11-01T00:00:00Z")
+	b.says("monthly", "a3", "2026-11-22T00:00:00Z", "monthly", 17, 20, "2026-11-01T00:00:00Z")
 	require.NoError(t, s.googleCostsTick(context.Background()))
 	assert.Empty(t, mailed, "told once, not with every report")
 
-	b.says("b1", "a4", "2026-12-01T06:00:00Z", "monthly", 0.2, 20, "2026-12-01T00:00:00Z")
+	b.says("monthly", "a4", "2026-12-01T06:00:00Z", "monthly", 0.2, 20, "2026-12-01T00:00:00Z")
 	require.NoError(t, s.googleCostsTick(context.Background()))
-	halted, _ = s.googleSpendingHalted()
+	halted, _ = s.googleItemHalted(googleNodeItem)
 	assert.False(t, halted)
 	require.Len(t, mailed, 1)
 	assert.Contains(t, (<-mailed).Subject, "resumed")
@@ -390,7 +410,19 @@ func TestWhatCostsHaltsAt80PercentAndResumesWhenTheBudgetFreesUp(t *testing.T) {
 func TestANodeNotWiredForCostsHaltsNothing(t *testing.T) {
 	s, _ := connectedToGoogle(t)
 	require.NoError(t, s.googleCostsTick(context.Background()))
-	halted, _ := s.googleSpendingHalted()
+	halted, _ := s.googleItemHalted(googleNodeItem)
 	assert.False(t, halted)
 	assert.False(t, rootAsksGoogle(t, s).GetCostsWired())
+}
+
+// budgetNamed is the budget of that name in what google am answers.
+func budgetNamed(t *testing.T, am *protocol.NodeGoogle, name string) *protocol.GoogleBudget {
+	t.Helper()
+	for _, budget := range am.GetBudgets() {
+		if budget.GetName() == name {
+			return budget
+		}
+	}
+	t.Fatalf("google am names no budget %s: %v", name, am.GetBudgets())
+	return nil
 }

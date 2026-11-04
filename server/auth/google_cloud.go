@@ -80,6 +80,13 @@ func (h *Handler) SetGoogleCosts(connect GoogleThingConnect) { h.googleCosts = c
 // 「[Opus 5.5] SetGoogleAgy is what lets the node call Vertex AI once ROOT said yes.」
 func (h *Handler) SetGoogleAgy(connect GoogleThingConnect) { h.googleAgy = connect }
 
+// 「[Opus 5.5] GoogleKeyConnect makes a namespace's key at Google on ROOT's token, and says what it did.」
+type GoogleKeyConnect func(ctx context.Context, token, by, namespace string) (string, error)
+
+// 「[Opus 5.5] SetGoogleKey is what makes a namespace's key, in a project of its own, once ROOT said yes.」
+// "one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item."
+func (h *Handler) SetGoogleKey(connect GoogleKeyConnect) { h.googleKey = connect }
+
 // SetGoogleCloud is what connects the node once ROOT said yes.
 func (h *Handler) SetGoogleCloud(connect GoogleCloudConnect) { h.googleCloud = connect }
 
@@ -133,6 +140,7 @@ func (h *Handler) handleGoogleCloud(w http.ResponseWriter, r *http.Request) {
 		cloud:       true,
 		project:     r.URL.Query().Get("project"),
 		thing:       r.URL.Query().Get("thing"),
+		namespace:   r.URL.Query().Get("namespace"),
 		returnTo:    onPage(h.returnableTo(r), r.URL.Query().Get("page")),
 	})
 	if err != nil {
@@ -167,13 +175,26 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		h.renderCeremonyPage(w, http.StatusBadGateway, false, errNoGoogleToken.Error())
 		return
 	}
+	if fl.thing == "key" && h.googleKey != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
+		defer cancel()
+		said, err := h.googleKey(ctx, acct.google, acct.CanonicalID, fl.namespace)
+		if err != nil {
+			h.logger.Errorw("A namespace's key at Google Cloud was not made", "namespace", fl.namespace, "by", acct.CanonicalID, "error", err)
+			h.renderCloudStopped(w, err, fl.project, fl.thing, fl.namespace, acct.Handle, fl.returnTo)
+			return
+		}
+		h.logger.Infow("a namespace's key at Google Cloud is made", "namespace", fl.namespace, "by", acct.CanonicalID, "said", said)
+		h.renderCloudDone(w, said, fl.returnTo)
+		return
+	}
 	if connect := map[string]GoogleThingConnect{"costs": h.googleCosts, "agy": h.googleAgy}[fl.thing]; connect != nil {
 		ctx, cancel := context.WithTimeout(r.Context(), googleCloudSetup)
 		defer cancel()
 		said, err := connect(ctx, acct.google, acct.CanonicalID)
 		if err != nil {
 			h.logger.Errorw("A thing of the node's at Google Cloud was not connected", "thing", fl.thing, "by", acct.CanonicalID, "error", err)
-			h.renderCloudStopped(w, err, fl.project, fl.thing, acct.Handle, fl.returnTo)
+			h.renderCloudStopped(w, err, fl.project, fl.thing, "", acct.Handle, fl.returnTo)
 			return
 		}
 		h.logger.Infow("a thing of the node's at Google Cloud is connected", "thing", fl.thing, "by", acct.CanonicalID, "said", said)
@@ -189,7 +210,7 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 		case err != nil:
 			h.googleCloudLetGo(acct.google)
 			h.logger.Errorw("ROOT's Google Cloud projects were not read", "by", acct.CanonicalID, "error", err)
-			h.renderCloudStopped(w, err, "", "", acct.Handle, fl.returnTo)
+			h.renderCloudStopped(w, err, "", "", "", acct.Handle, fl.returnTo)
 			return
 		case len(seen) == 0:
 			h.googleCloudLetGo(acct.google)
@@ -211,7 +232,7 @@ func (h *Handler) connectGoogleCloud(w http.ResponseWriter, r *http.Request, tok
 	said, err := h.googleCloud(ctx, token, project, by)
 	if err != nil {
 		h.logger.Errorw("Google Cloud was not connected", "by", by, "project", project, "error", err)
-		h.renderCloudStopped(w, err, project, "", handle, back)
+		h.renderCloudStopped(w, err, project, "", "", handle, back)
 		return
 	}
 	h.logger.Infow("the node is set up at Google Cloud", "by", by, "said", said)
@@ -322,13 +343,16 @@ func (h *Handler) renderCloudDone(w http.ResponseWriter, said, back string) {
 	}
 }
 
-func (h *Handler) renderCloudStopped(w http.ResponseWriter, err error, project, thing, handle, back string) {
+func (h *Handler) renderCloudStopped(w http.ResponseWriter, err error, project, thing, namespace, handle, back string) {
 	asked := url.Values{}
 	if project != "" {
 		asked.Set("project", project)
 	}
 	if thing != "" {
 		asked.Set("thing", thing)
+	}
+	if namespace != "" {
+		asked.Set("namespace", namespace)
 	}
 	again := googleCloudPath
 	if len(asked) > 0 {

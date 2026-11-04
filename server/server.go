@@ -105,8 +105,8 @@ type QNTXServer struct {
 	nodeMailer nodeMailer
 	// googleOutcome stands in for mailing ROOT how connecting to Google Cloud ended.
 	googleOutcome func(services.NodeMail)
-	// googleHalted is whether ROOT was last told what costs at Google is halted.
-	googleHalted bool
+	// 「[Opus 5.5] googleHalted is, for each spend item, whether ROOT was last told it is halted.」
+	googleHalted map[string]bool
 	googleHaltMu sync.Mutex
 	// googleBudgetsSet is the budgets as they are set at Google, as last read.
 	googleBudgetsSet []googleBudgetSet
