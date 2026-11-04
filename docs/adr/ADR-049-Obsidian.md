@@ -2,7 +2,7 @@
 
 Date: 2026-10-06
 Status: Developed in pr #1094 - I think its merged because i am using obsidian to write this now.
-pre-0.998.0-polish-blocker 
+pre-0.888.0-polish-blocker 
 
 
 "i want to integrate better with Obsidian's sync service if possible, and have Obsidian be a QNTX thing, I would rather have that than to reinvent everything Obsidian does, i tried that before actually, and i got somewhere, but truth be told is that Obsidian is really good at what it is and I like using it as is."
@@ -14,7 +14,6 @@ pre-0.998.0-polish-blocker
 Both ways: what is written in the vault reaches QNTX, and what QNTX holds reaches the vault.
 
 "1. a persistent branch exists for all repo's that the Vault we assign directory space to."
-
 "2. meaning, for a given doc folder in one of our repositories, an indication of some sorts is made,"
 
 "3. QNTX receives webhooks on most events github dispatches"
