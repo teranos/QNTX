@@ -36,7 +36,7 @@ every device through Sync.
 - Sync is end-to-end encrypted, and the box is one of the ends: the vault is
   readable there, by the node and by the NODE agent ([[ADR-048-Node-Agent]]).
 
-
+TODO: figure out today state, the way the below text read
 
 "but you make a good point about NODE agent"
 "just make it do everything essentially"
