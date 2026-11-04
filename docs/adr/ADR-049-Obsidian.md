@@ -104,4 +104,4 @@ As datapunt's inputs are named on its plugin record, `github.com/owner/repo@bran
 
 ## Quotes
 
-TODO: Figure out how this interact
+TODO: Figure out how this interacts with [[QNTX-Quote]] [[ADR-056-Subsystems]]
