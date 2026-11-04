@@ -71,6 +71,11 @@ ats = { package = "qntx-ats", path = "crates/ats", version = "0.2.44" }
 qntx-proto = { path = "crates/qntx-proto", version = "0.2.44" }
 qntx-grpc = { path = "crates/qntx-grpc", version = "0.2.44" }
 
+# OpenTelemetry: pinned exactly, the three crates move together
+opentelemetry = "=0.33.1"
+opentelemetry_sdk = "=0.33.1"
+opentelemetry-otlp = "=0.33.1"
+
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
