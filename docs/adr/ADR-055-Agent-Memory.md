@@ -1,3 +1,4 @@
+pre-0.999.0-polish-blocker 
 
 > [spec.c2pa.org](https://spec.c2pa.org)
 > With the increasing velocity of digital content and the increasing availability of powerful creation and editing techniques, establishing the provenance of media is critical to ensure transparency, understanding, and ultimately, trust. 
@@ -15,7 +16,7 @@ https://platform.claude.com/dashboard
 - Integrate with Claude Console API's 'Memory store'
 - And later 'dreams' as well
 
-
+- Interesting to think about an [[ADR-049-Obsidian|Obsidian]] linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory.
 
 bidirectional sync between our abstraction of the memory store.
 
@@ -25,11 +26,13 @@ Allow all Agent Harnesses to leverage memories created in Managed Agents.
 
 
 - [ ] View Memory store's in Agents Element
+- [ ] Actually, this should be it's own Memory Element in QNTX
 - [ ] 
 
 make sure this is a thing for
 - [ ] [[ADR-053-Namespace-Agents]]
-- [ ] [[ADR-048-Node-Agent]]
+	- [ ] https://github.com/teranos/QNTX/pull/1491
+- [x] [[ADR-048-Node-Agent]]
 - [ ] [[Elements]] Agents
 
 

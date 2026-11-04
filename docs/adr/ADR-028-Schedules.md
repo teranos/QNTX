@@ -1,20 +1,15 @@
 # ADR-028: Schedules
 
-**Status:** Accepted
+**Status:** Accepted, needs to be more formalised and used in the system, not just via handlers and watchers. needs more work. 
 **Date:** 2026-08-06
-**Related:** ADR-018 (Watcher Lifecycle), ADR-024 (Parquet Storage Backend)
-
+**Related:** [[ADR-018-Plugin-lifecycle]] 
 ## Context
 
-> `scheduled_pulse_jobs` reads `YES NO` in `make parity`. No ADR covers schedules.
->
 > A schedule kept running after the decorator that declared it was removed.
 
 ## Decision
 
 "nothing ever gets removed bro, it gets superseded"
-
-"make it YES YES"
 
 > a watcher is cold declaration plus hot tally
 

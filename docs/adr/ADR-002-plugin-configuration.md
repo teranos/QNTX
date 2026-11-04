@@ -4,17 +4,10 @@ Plugins are added, configured, enabled and disabled at runtime.
 
 "I log in to QNTX, open the plugin element, press +, enter a repository URL and confirm. The plugin starts disabled; I edit its config and enable it, and I don't think about it anymore."
 
-"i expect it to be a bigger + button as part of the list, like an empty plugin ready to become something."
-
-"it should have been two stage, first stage is check if its even possible, and 2nd is to commit to adding it for real"
-
 "it is qntx that actually owns this"
 
 A plugin is its record on the node: its repository, whether it is enabled, and its config. The plugin element and the `plugins` signum write the record. This document is the reference for how a plugin gets onto a node and stays running there.
 
-## 1. The plugin element
-
-The + is an empty plugin at the end of the list. Press it and enter the plugin's repository URL. Check asks whether the repo resolves; Add commits it. It is added disabled. Its config is edited in the element, and Enable starts it.
 
 ## 2. Sigils and API
 
@@ -70,7 +63,7 @@ ROOT generates the webhook's secret with the `github` signum's webhook sigil, se
 
 `plugins_list` says per plugin, as `setup`, what still stands between it and its tools working besides Enable: a build its record names and cannot run, or one that has not landed yet. Empty is nothing. What a running plugin's schema requires is the schema's, not the record's.
 
-**Check:** GitHubService is asked, as the node, whether the repository and the plugin's directory in it are there, and for its README ([ADR-043](./ADR-043-github-service.md)). Check only reads.
+**Check:** GitHubService is asked, as the node, whether the repository and the plugin's directory in it are there, and for its README ([ADR-043](ADR-043-CodeForge-service.md)). Check only reads.
 
 **Add:** the plugin is recorded with its repository URL, disabled, in the system store.
 
@@ -99,7 +92,7 @@ A plugin is its own signum, and the routes it declares are its sigils (ADR-001).
 ## Related
 
 - [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
-- [ADR-018: Plugin Lifecycle, Watchers, and Developer Experience](./ADR-018-watcher-lifecycle.md)
-- [ADR-043: GitHubService](./ADR-043-github-service.md)
+- [ADR-018: Plugin Lifecycle, Watchers, and Developer Experience](ADR-018-Plugin-lifecycle.md)
+- [ADR-043: GitHubService](ADR-043-CodeForge-service.md)
 - [ADR-046: A plugin stands in a namespace](./ADR-046-a-plugin-stands-in-a-namespace.md)
 - [Plugin API reference](https://github.com/teranos/QNTX/blob/main/server/openapi/openapi.json)
