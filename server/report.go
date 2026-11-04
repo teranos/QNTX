@@ -37,6 +37,7 @@ const (
 type sentryAsker interface {
 	Table(ctx context.Context, q sentryread.TableQuery) ([]map[string]any, error)
 	Series(ctx context.Context, q sentryread.SeriesQuery) ([]sentryread.Point, error)
+	Outcomes(ctx context.Context, category string, w sentryread.Window) ([]sentryread.Outcome, error)
 }
 
 // Report is one week of the node, as the mail says it.
@@ -70,6 +71,11 @@ type Report struct {
 	QueryErr string
 
 	Status4xx, Status5xx statusRanks
+
+	// What became of the error events the node sent, and the error lines it
+	// logged most.
+	ErrorEvents errorEvents
+	ErrorLines  errorLines
 
 	Downtime downtime
 }
@@ -120,6 +126,23 @@ type statusRanks struct {
 	Err   string
 }
 
+// errorEvents is what Sentry did with the error events the node sent: how
+// many it took, and how many were dropped, by Sentry's own outcome and reason.
+type errorEvents struct {
+	Outcomes []sentryread.Outcome
+	Err      string
+}
+
+type errorLine struct {
+	Message string
+	Count   int
+}
+
+type errorLines struct {
+	Lines []errorLine
+	Err   string
+}
+
 // downtime is minutes without a CPU sample: the node's own view of being down,
 // sampled once a minute. Counted from Since, the first hour Sentry holds a
 // sample for, when that is inside the window.
@@ -157,6 +180,8 @@ func (s *QNTXServer) gatherReport(ctx context.Context, end time.Time, sentry sen
 	r.Query, r.QueryErr = queryTook(ctx, sentry, env, r.Window)
 	r.Status4xx = statusesIn(ctx, sentry, env, r.Window, 400, 500)
 	r.Status5xx = statusesIn(ctx, sentry, env, r.Window, 500, 600)
+	r.ErrorEvents = errorEventsIn(ctx, sentry, r.Window)
+	r.ErrorLines = errorLinesIn(ctx, sentry, env, r.Window)
 	r.Downtime = downtimeUpTo(ctx, sentry, env, end)
 	return r
 }
@@ -486,6 +511,64 @@ func statusesIn(ctx context.Context, sentry sentryAsker, env string, w sentryrea
 		ranks = append(ranks, statusRank{Path: text(row["path"]), Status: int(number(row[status])), Count: int(number(row["count()"]))})
 	}
 	return statusRanks{Ranks: ranks}
+}
+
+// "Sentry Error ingest still dead."
+//
+// "its not clear that sentry isnt healthy"
+//
+// What Sentry did with the error events of the week, from Sentry's own count
+// of what it took and what it dropped: an event it dropped is in none of the
+// other sections. Counted in whole hours, as Sentry counts them, and of the
+// whole project, since an outcome carries no environment.
+func errorEventsIn(ctx context.Context, sentry sentryAsker, w sentryread.Window) errorEvents {
+	hours := sentryread.Window{Start: w.Start.UTC().Truncate(time.Hour), End: w.End.UTC().Truncate(time.Hour)}
+	outcomes, err := sentry.Outcomes(ctx, sentryread.CategoryError, hours)
+	if err != nil {
+		return errorEvents{Err: err.Error()}
+	}
+	// What was taken first, then what was dropped most.
+	slices.SortStableFunc(outcomes, func(a, b sentryread.Outcome) int {
+		if (a.Outcome == outcomeAccepted) != (b.Outcome == outcomeAccepted) {
+			if a.Outcome == outcomeAccepted {
+				return -1
+			}
+			return 1
+		}
+		return int(b.Count - a.Count)
+	})
+	return errorEvents{Outcomes: outcomes}
+}
+
+// outcomeAccepted is Sentry's outcome for an event it took.
+const outcomeAccepted = "accepted"
+
+// "weekly cybernetic loop is missing"
+//
+// The three error lines the node logged most in the week, with how often: a
+// flush that fails every five seconds or a node that refuses a connection is
+// a line here in the week it happens.
+func errorLinesIn(ctx context.Context, sentry sentryAsker, env string, w sentryread.Window) errorLines {
+	query := "severity:error"
+	if env != "" {
+		query += " AND environment:" + env
+	}
+	rows, err := sentry.Table(ctx, sentryread.TableQuery{
+		Dataset: sentryread.DatasetLogs,
+		Fields:  []string{"message", "count()"},
+		Query:   query,
+		Sort:    "-count()",
+		Limit:   reportTop,
+		Window:  w,
+	})
+	if err != nil {
+		return errorLines{Err: err.Error()}
+	}
+	lines := make([]errorLine, 0, len(rows))
+	for _, row := range rows {
+		lines = append(lines, errorLine{Message: text(row["message"]), Count: int(number(row["count()"]))})
+	}
+	return errorLines{Lines: lines}
 }
 
 // "downtime over last week", "downtime over last 3 weeks"
