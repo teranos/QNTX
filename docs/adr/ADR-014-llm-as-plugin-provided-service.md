@@ -23,7 +23,11 @@ Multiple providers can run simultaneously. The caller specifies which backend to
 
 `system_prompt` and `user_prompt` are deprecated. When `messages` is populated it takes precedence; the old fields remain for backwards compatibility. 0.888.0-blocker is to actually delete deprecated stuff
 
-A prompt's history is the canvas. `ConversationAssembler` (`server/conversation.go`) walks the composition DAG upstream from the current element, queries prompt-result attestations for each ancestor, and builds an ordered message array sorted by timestamp. `HandlePromptDirect` injects this history into `ChatRequest.Messages` before forwarding to the LLM plugin. Neither plugin stores conversation state; they receive a snapshot and execute. --> i mean like, it can be, i tried to explore this idea, but, now we use the Agent Element, like with the [[ADR-048-Node-Agent]]
+A canvas prompt's history is the canvas. `ConversationAssembler` (`server/conversation.go`) walks the composition DAG upstream from the current element, queries prompt-result attestations for each ancestor, and builds an ordered message array sorted by timestamp. `HandlePromptDirect` injects this history into `ChatRequest.Messages` before forwarding to the LLM plugin. Neither plugin stores conversation state; they receive a snapshot and execute.
+
+"i tried to explore this idea, but, now we use the Agent Element, like with the [[ADR-048-Node-Agent]]"
+
+An element's agent is its own conversation in a Coding Agent Harness (`elements say`, `server/element_agent.go`), as the Node Agent's is.
 
 ## Queuing (PULS)
 
@@ -33,15 +37,17 @@ Direct gRPC has no queuing. Providers like scry are single-threaded — when mul
 
 This keeps the streaming gRPC path intact — no async/sync bridge needed. The caller still holds the `StreamChat` connection; it just waits longer when the provider is busy instead of deadlining.
 
-Future (Option B): plugins enqueue background LLM work as Pulse jobs instead of calling `StreamChat` directly. The Pulse worker executes the job, including LLM calls through the controlled `LLMServer` path. Interactive prompts stay direct. --> is this future still worth pursuing? what do we have and what can we concretely do?
+Background LLM work that runs as a Pulse job (`prompt.execute`, `ats/so/actions/prompt/handler.go`) reaches the provider through `LLMServer`, as an interactive prompt does.
 
-## Observability (planned — CWEV)
+## Observability
 
-Weave creation belongs in core, not in individual providers. Core sees all LLM traffic; providers only do inference. --> wasnt this moved already ? Also, you would think it may make sense to look at langchain finally.
+Core weaves every call `LLMServer` answers through `Chat` and `StreamChat` (`createWeave`, `plugin/grpc/services/llm_server.go`); providers only do inference. A stream the node opens for itself (`StreamChatClient`, which `/api/prompt/direct` uses for an element) is not woven.
+
+"you would think it may make sense to look at langchain finally."
 
 ## Provider resolution
 
-The server owns provider resolution — the UI never references plugin names. `/ws/llm` proxies WebSocket connections to the active LLM provider, and `resolveProvider` falls back to the default registered provider when the configured name is stale or missing.
+The server owns provider resolution — the UI never references plugin names. A call names its provider, else it is `llm.provider` in am.toml (`prompt.ProviderNamed`), and `/ws/llm` proxies to that one. `LLMServer.resolveProvider` refuses a name that is not registered: no other provider answers in its place.
 
 ## Consequences
-This is the first service in `ServiceRegistry` provided by a plugin rather than by core. The routing and registration pattern must be designed with that in mind. --> whatever...
+This is the first service in `ServiceRegistry` provided by a plugin rather than by core.
