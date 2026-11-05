@@ -164,14 +164,15 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 			failed = append(failed, event.RawJSON())
 		case "session.status_idle", "session.status_terminated":
 			// One message comes as blocks cut wherever a citation sits: they are read back to back.
-			answer := claudecode.Answer{Text: strings.Join(text, ""), Session: held.Session, Model: said.Model}
+			answer := claudecode.Answer{Text: strings.Join(text, ""), Session: held.Session, Model: said.Model, Subtype: "success"}
+			// 「[Opus 5.5] A turn that failed says which way, in Claude Code's own words for a result.」
 			if len(text) == 0 && len(failed) > 0 {
-				answer.Text, answer.IsError = strings.Join(failed, "\n"), true
+				answer.Text, answer.IsError, answer.Subtype = strings.Join(failed, "\n"), true, "error_during_execution"
 			}
 			// 「[Opus 5.5] A Session at its cap pauses, idle, and takes nothing new until the cap is raised」
 			// 「[Opus 5.5] (managed-agents/budgets, When a session reaches its budget).」
 			if event.Type == "session.status_idle" && event.StopReason.Type == "budget_reached" {
-				answer.IsError = true
+				answer.IsError, answer.Subtype = true, "budget_reached"
 				answer.Text = strings.TrimSpace(answer.Text + "\n\nSession " + held.Session + " at Anthropic reached its cap of " + amount + " " + anthropicCapCurrency + " and is paused: a cap set anew in Node Connectors goes on in a new Session, with this one's Memory.")
 			}
 			if spent, err := s.spentBy(ctx, client, agent, &held); err != nil {
@@ -179,7 +180,7 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 			} else {
 				answer.CostUSD = spent
 			}
-			result := claudecode.Message{Type: "result", Subtype: "success", IsError: answer.IsError, Result: answer.Text}
+			result := claudecode.Message{Type: "result", Subtype: answer.Subtype, IsError: answer.IsError, Result: answer.Text}
 			print(result)
 			each(result)
 			return answer, nil

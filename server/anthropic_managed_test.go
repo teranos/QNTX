@@ -348,9 +348,14 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	console.mu.Lock()
 	console.stop = "budget_reached"
 	console.mu.Unlock()
-	capped, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
+	var ended []claudecode.Message
+	capped, err := s.spend(agent, said, shaken{}, func(m claudecode.Message) { ended = append(ended, m) })
 	require.NoError(t, err)
 	assert.True(t, capped.IsError)
+	// Qodo's review of #1519: the result said success, so live showed a failed turn as "success: …".
+	assert.Equal(t, "budget_reached", capped.Subtype)
+	require.NotEmpty(t, ended)
+	assert.Equal(t, "budget_reached", ended[len(ended)-1].Subtype)
 	assert.Contains(t, capped.Text, "the element answered at Anthropic", "what it said before the cap is kept")
 	assert.Contains(t, capped.Text, "reached its cap of 30 "+anthropicCapCurrency)
 	assert.Contains(t, capped.Text, "Node Connectors")
