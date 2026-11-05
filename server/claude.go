@@ -214,6 +214,7 @@ func (s *QNTXServer) claudeHarness() *harness {
 			// "the hardcoded list is BS": the node keeps no list of models. The name
 			// goes to Claude Code, which runs the model and refuses a name it does not know.
 			{Name: "model", Says: "The model it answers with, by Claude Code's name for it. Not sent, it is the one am.toml gives."},
+			{Name: "in", Says: "The repository of its work it is said in, as owner/repo: the turn runs in that checkout, in the same session, so it stands where that repository's rituals are switched on. Not sent, it is said in its work."},
 		},
 		// "Let's say that I don't like how it's putting Claude on a pedestal."
 		named:    func() bool { return named().Named() },
@@ -339,7 +340,7 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			said := claudecode.Said{
 				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
 				Says: t.says, Model: model, Effort: named.Effort, Token: plan,
-				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
+				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env, In: sent["in"],
 				// "on a redeploy NODE agent would still be alive, which is the
 				// intended state, rather than being killed mid-turn" (#1256).
 				Apart:   s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,

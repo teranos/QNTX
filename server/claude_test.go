@@ -52,6 +52,7 @@ func claudeStandIn(t *testing.T, stream string) (binary, ran string) {
 		"mkdir '" + ran + "'/$n\n" +
 		"for arg in \"$@\"; do printf '%s\\n' \"$arg\"; done > '" + ran + "'/$n/args\n" +
 		"env > '" + ran + "'/$n/env\n" +
+		"pwd > '" + ran + "'/$n/cwd\n" +
 		// Signing in, as Claude Code does it headless: the URL, then the code
 		// read on stdin and kept in the config dir. Status reads what is kept.
 		"if [ \"$1\" = auth ]; then\n" +
