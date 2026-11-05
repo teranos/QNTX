@@ -62,7 +62,7 @@ let
     }
 
     # "can't we build the client into libACP and make QNTX use it as an optional subsystem?"
-    # libACP's C, the subtree in libacp/, which an ACP harness runs through.
+    # 「[Opus 5.5] libACP's C, the subtree in libacp/, which an ACP harness runs through.」
     {
       name = "Build libACP";
       run = ''
