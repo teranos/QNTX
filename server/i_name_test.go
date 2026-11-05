@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/storage"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -375,4 +377,165 @@ func TestARenameAndATakeReadBackInTheOrderTheyWereWritten(t *testing.T) {
 		holds[held.did] = held.name
 	}
 	assert.Equal(t, map[string]string{"did:key:z6Mkwalnut": "deploy agent", "did:key:z6Mkhazel": "room agent"}, holds)
+}
+
+// recordStore is a test store as storage.TakeIn asks of one: it counts what it
+// holds and is asked for one line by its id.
+type recordStore struct{ ats.AttestationStore }
+
+func (r recordStore) every() ([]*types.As, error) {
+	return r.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: ats.EveryRow})
+}
+
+func (r recordStore) CountAttestations() (int, error) {
+	all, err := r.every()
+	return len(all), err
+}
+
+func (r recordStore) GetAttestation(id string) (*types.As, error) {
+	all, err := r.every()
+	for _, as := range all {
+		if as.ID == id {
+			return as, err
+		}
+	}
+	return nil, err
+}
+
+// takeInMark is a take-in mark held in memory.
+type takeInMark struct {
+	at     time.Time
+	marked bool
+}
+
+func (m *takeInMark) Read() (time.Time, bool, error) { return m.at, m.marked, nil }
+func (m *takeInMark) Write(at time.Time) error       { m.at, m.marked = at, true; return nil }
+
+// nameLinesHeld is every agent:named line the node keeps.
+func nameLinesHeld(t *testing.T, s *QNTXServer) []*types.As {
+	t.Helper()
+	reading, err := s.held.Read(auth.NamespaceSystem)
+	require.NoError(t, err)
+	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicateAgentNamed}, Limit: ats.EveryRow})
+	require.NoError(t, err)
+	return found
+}
+
+// Qodo's review of #1538, which holds for name lines as for ANTHROPIC lines:
+// storage.TakeIn writes the record's newest timestamp as its take-in mark and
+// reads the record from it on, so a name line stamped ahead of the clock, once
+// it was the mark, kept a row stamped by the clock that reached the record
+// later from ever being taken in. A line is stamped when it is written, and
+// read back in the order of the sequence it carries.
+func TestANameLineIsStampedWhenItIsWrittenAndReadInTheOrderOfItsSequence(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s := rootKnowingServer(t)
+
+	// A name taken, left and taken by another in one millisecond reads back as answered.
+	instant := time.Now().Truncate(time.Millisecond)
+	namingNow = func() time.Time { return instant }
+	t.Cleanup(func() { namingNow = time.Now })
+	for _, asked := range []struct{ did, name string }{
+		{"did:key:z6Mkwalnut", "room agent"}, {"did:key:z6Mkwalnut", "deploy agent"}, {"did:key:z6Mkhazel", "room agent"},
+	} {
+		_, refusal := s.iName(asAgent(asked.did), sigil.Sent{"name": asked.name})
+		require.Nil(t, refusal, refusal.GetSays())
+	}
+	names, err := s.agentNames()
+	require.NoError(t, err)
+	holds := map[string]string{}
+	for _, held := range names {
+		holds[held.did] = held.name
+	}
+	assert.Equal(t, map[string]string{"did:key:z6Mkwalnut": "deploy agent", "did:key:z6Mkhazel": "room agent"}, holds)
+	for _, line := range nameLinesHeld(t, s) {
+		assert.Equal(t, instant.UnixMilli(), line.Timestamp.UnixMilli(), "a line is stamped when it was written, not after the one before")
+	}
+
+	// A line already stamped ahead of the clock does not make the next one stamp ahead.
+	namingNow = time.Now
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	ahead := time.Now().Add(time.Hour)
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-named-stamped-ahead", Subjects: []string{"did:key:z6Mkoak"}, Predicates: []string{predicateAgentNamed},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkoak"}, Timestamp: ahead, CreatedAt: ahead,
+		Source: "did:key:z6Mkoak", Attributes: map[string]any{"name": "oak", "sequence": 3},
+	}))
+	before := time.Now()
+	_, refusal := s.iName(asAgent("did:key:z6Mkelm"), sigil.Sent{"name": "elm"})
+	require.Nil(t, refusal, refusal.GetSays())
+	after := time.Now()
+	var elm *types.As
+	for _, line := range nameLinesHeld(t, s) {
+		if line.Subjects[0] == "did:key:z6Mkelm" {
+			elm = line
+		}
+	}
+	require.NotNil(t, elm)
+	assert.False(t, elm.Timestamp.Before(before.Truncate(time.Millisecond)) || elm.Timestamp.After(after), "stamped %s, written between %s and %s", elm.Timestamp, before, after)
+
+	// Qodo's case: the record took in a name line, then a row stamped by the clock reached it; the next take-in takes that row in.
+	record, _ := createTestStore(t)
+	first, _ := createTestStore(t)
+	require.NoError(t, record.CreateAttestation(elm))
+	mark := &takeInMark{}
+	_, err = storage.TakeIn(recordStore{first}, recordStore{record}, mark)
+	require.NoError(t, err)
+	later := time.Now()
+	require.NoError(t, record.CreateAttestation(&types.As{
+		ID: "AS-written-after", Subjects: []string{"SOMETHING"}, Predicates: []string{"happened"}, Contexts: []string{auth.NamespaceSystem},
+		Actors: []string{"https://example.org/root"}, Timestamp: later, CreatedAt: later, Source: "test",
+	}))
+	_, err = storage.TakeIn(recordStore{first}, recordStore{record}, mark)
+	require.NoError(t, err)
+	assert.True(t, first.AttestationExists("AS-written-after"), "a row written after the name line is taken in")
+}
+
+// Qodo's review of #1540: a name line whose sequence is no whole number above
+// zero failed every name read and every i name after it. It is no name, as a
+// line some other actor wrote is no name, and the rest read as before.
+func TestANameLineWithNoSequenceToReadIsNoName(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s := rootKnowingServer(t)
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	at := time.Now()
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-named-bad-sequence", Subjects: []string{"did:key:z6Mkbirch"}, Predicates: []string{predicateAgentNamed},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkbirch"}, Timestamp: at, CreatedAt: at,
+		Source: "did:key:z6Mkbirch", Attributes: map[string]any{"name": "birch", "sequence": "first"},
+	}))
+
+	named, refusal := s.iName(asAgent("did:key:z6Mkash"), sigil.Sent{"name": "birch"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "birch", named.(*protocol.Named).GetName(), "the line that reads as no name holds no name")
+	names, err := s.agentNames()
+	require.NoError(t, err)
+	require.Len(t, names, 1)
+	assert.Equal(t, "did:key:z6Mkash", names[0].did)
+}
+
+// Qodo's review of #1540: a build from before sequences, run after one that
+// writes them (a node flipped to an older branch), writes a rename with no
+// sequence. Read as older than every sequenced line, it was undone by the
+// rename it came after. A line with no sequence is read where its stamp puts
+// it among the sequenced lines.
+func TestARenameWithNoSequenceAfterASequencedOneStands(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s := rootKnowingServer(t)
+	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "deploy agent"})
+	require.Nil(t, refusal, refusal.GetSays())
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	later := time.Now().Add(time.Hour)
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-named-by-an-older-build", Subjects: []string{"did:key:z6Mkwalnut"}, Predicates: []string{predicateAgentNamed},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkwalnut"}, Timestamp: later, CreatedAt: later,
+		Source: "did:key:z6Mkwalnut", Attributes: map[string]any{"name": "late agent"},
+	}))
+	names, err := s.agentNames()
+	require.NoError(t, err)
+	require.Len(t, names, 1)
+	assert.Equal(t, "late agent", names[0].name)
 }
