@@ -8,7 +8,7 @@ Date: 2026-03-15
 
 ## Context
 
-The browser should not be a lite client that talks to a server. It should run the same engine — same parser, same execution. This means both kern (OCaml) and the Rust engine need to compile to WASM and run in the browser.
+The browser should not be a lite client that talks to a server. It should run the same engine — same parser, same execution. This means the Rust engine need to compile to WASM and run in the browser.
 
 ## The problem
 
