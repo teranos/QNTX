@@ -450,6 +450,11 @@ func (h *Handler) answerFor(info TokenInfo) tokenAnswer {
 		if !stands {
 			namespaces = nil
 		}
+		// Shown acting where it acts now, beside the roles it holds there.
+		answer.Namespaces = namespaces
+		if answer.Namespaces == nil {
+			answer.Namespaces = []string{}
+		}
 	}
 	var held []string
 	for _, namespace := range namespaces {

@@ -335,3 +335,23 @@ func listed(t *testing.T, store *memTokenStore, did string) TokenInfo {
 	t.Fatalf("%s is not listed", did)
 	return TokenInfo{}
 }
+
+// Where an agent's token is shown acting is where the token it runs under acts
+// now, beside the roles it holds there; nowhere once that token is off.
+func TestAnAgentsTokenIsShownWhereItActsNow(t *testing.T) {
+	h, store, raw, asking := agentsNode(t)
+	h.SetRoleReader(&memRoles{lines: map[string][]RoleLine{"orchard": {
+		{Routes: []string{"ground-token"}, Roles: []string{"PICKER"}, Granted: true, Actor: mastodonAccount, At: time.Now()},
+	}}})
+	otari := handedTo(t, h, raw, "otari")
+	require.NoError(t, store.SetNamespaces(asking.ID, []string{"orchard"}))
+	info := listed(t, store, otari.DID)
+	require.Equal(t, []string{"ground"}, info.Namespaces, "the record keeps where it was handed")
+
+	shown := h.answerFor(info)
+	assert.Equal(t, []string{"orchard"}, shown.Namespaces)
+	assert.Equal(t, map[string][]string{"orchard": {"PICKER"}}, shown.Roles)
+
+	require.NoError(t, store.Revoke(asking.ID))
+	assert.Empty(t, h.answerFor(info).Namespaces, "an agent whose token is off was shown acting somewhere")
+}
