@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -144,42 +145,39 @@ func (s *QNTXServer) scrubJSON(ctx context.Context, raw []byte) ([]byte, string,
 	}
 	// The unit separator is only ever the middle of jsonBetween: a string that
 	// holds it anywhere could meet a separator beside it and move the split.
-	// Such a string is handed to the scanner on its own, and the rest together.
+	// Such strings are handed to the scanner together apart from the rest,
+	// between a separator whose middle byte none of them holds: two scans for
+	// an answer, however many strings hold the byte.
 	back := make([]string, len(words))
-	var together []int
-	var founds []string
+	var plain, holding []int
 	for i, word := range words {
-		if !strings.Contains(word, "\x1f") {
-			together = append(together, i)
-			continue
+		if strings.Contains(word, "\x1f") {
+			holding = append(holding, i)
+		} else {
+			plain = append(plain, i)
 		}
-		scrubbed, found, err := s.scrub(ctx, word)
+	}
+	var founds []string
+	if len(plain) > 0 {
+		found, err := s.scrubBetween(ctx, words, plain, jsonBetween, back)
 		if err != nil {
 			return nil, "", err
 		}
-		back[i] = scrubbed
 		if found != "" {
 			founds = append(founds, found)
 		}
 	}
-	if len(together) > 0 {
-		joined := make([]string, len(together))
-		for j, i := range together {
-			joined[j] = words[i]
+	if len(holding) > 0 {
+		between, ok := jsonBetweenFor(words, holding)
+		if !ok {
+			return nil, "", errors.Newf("%d strings of the answer hold \\x1f, and between them they hold every other byte there is to stand between them for the scanner (%q)", len(holding), jsonOtherBetween)
 		}
-		scrubbed, found, err := s.scrub(ctx, strings.Join(joined, jsonBetween))
+		found, err := s.scrubBetween(ctx, words, holding, between, back)
 		if err != nil {
 			return nil, "", err
 		}
-		split := strings.Split(scrubbed, jsonBetween)
-		if len(split) != len(joined) {
-			return nil, "", errors.Newf("the scanner was handed %d strings of the answer and gave %d back", len(joined), len(split))
-		}
-		for j, i := range together {
-			back[i] = split[j]
-		}
 		if found != "" {
-			founds = append([]string{found}, founds...)
+			founds = append(founds, found)
 		}
 	}
 	found := strings.Join(founds, "; ")
@@ -192,6 +190,46 @@ func (s *QNTXServer) scrubJSON(ctx context.Context, raw []byte) ([]byte, string,
 		return nil, "", errors.Wrap(err, "the answer with its fixtures did not marshal")
 	}
 	return written, found, nil
+}
+
+// jsonOtherBetween are the bytes that stand in the middle of a separator for
+// strings that hold \x1f: the other ASCII separators. ground's scanner
+// (source/pii.d) reads none of them as part of a mail address, an IPv4
+// address, a postal code or a street, as it reads none of \x1f.
+const jsonOtherBetween = "\x1e\x1d\x1c"
+
+// jsonBetweenFor is a separator for the words at which, its middle byte one
+// that none of them holds, and false when they hold every one of
+// jsonOtherBetween.
+func jsonBetweenFor(words []string, which []int) (string, bool) {
+	for _, middle := range jsonOtherBetween {
+		held := slices.ContainsFunc(which, func(i int) bool { return strings.ContainsRune(words[i], middle) })
+		if !held {
+			return "\n" + string(middle) + "\n", true
+		}
+	}
+	return "", false
+}
+
+// scrubBetween hands the words at which to the scanner in one text, between,
+// whose middle byte none of them holds, and writes what came back into back.
+func (s *QNTXServer) scrubBetween(ctx context.Context, words []string, which []int, between string, back []string) (string, error) {
+	joined := make([]string, len(which))
+	for j, i := range which {
+		joined[j] = words[i]
+	}
+	scrubbed, found, err := s.scrub(ctx, strings.Join(joined, between))
+	if err != nil {
+		return "", err
+	}
+	split := strings.Split(scrubbed, between)
+	if len(split) != len(joined) {
+		return "", errors.Newf("the scanner was handed %d strings of the answer and gave %d back", len(joined), len(split))
+	}
+	for j, i := range which {
+		back[i] = split[j]
+	}
+	return found, nil
 }
 
 // jsonKeys are an object's keys in the one order its strings are read and

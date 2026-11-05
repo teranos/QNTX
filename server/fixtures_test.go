@@ -16,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -135,8 +136,8 @@ func TestTimAnAnswerIsStillJSONWithItsFixtures(t *testing.T) {
 //
 // Qodo's review of #1510 again: refusing such a string refused the whole
 // answer, an issue body holding one stray byte included. A string holding
-// the separator's middle byte is handed to the scanner on its own, so it is
-// scrubbed and handed on, and the strings beside it are as they were.
+// the separator's middle byte is handed to the scanner apart from the rest, so
+// it is scrubbed and handed on, and the strings beside it are as they were.
 func TestSpikeAStringHoldingPartOfTheSeparatorIsScrubbedOnItsOwn(t *testing.T) {
 	s, _ := fixturesServer(t)
 	real := "someone" + "@" + "gmail.com"
@@ -145,6 +146,51 @@ func TestSpikeAStringHoldingPartOfTheSeparatorIsScrubbedOnItsOwn(t *testing.T) {
 		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: body}}})
 	require.False(t, answered.IsError, spoken(answered))
 	assert.JSONEq(t, `{"a":"x\n\u001f","b":"tim@example.com","c":"tim@example.com\u001f"}`, spoken(answered))
+	assert.NotContains(t, spoken(answered), real)
+}
+
+// Qodo's review of #1510, a third time: each string holding \x1f started a
+// scanner of its own, as many as a hostile answer held. They are handed to it
+// together, between a separator whose middle byte none of them holds: one
+// scan for the rest, and one for them, however many there are.
+func TestSpikeStringsHoldingTheSeparatorsByteAreScannedTogether(t *testing.T) {
+	s, _ := fixturesServer(t)
+	scans := 0
+	s.scrubWith = func(ctx context.Context, text string) (string, string, error) {
+		scans++
+		return standInScanner(ctx, text)
+	}
+	real := "someone" + "@" + "gmail.com"
+	held := map[string]any{"plain": real}
+	want := map[string]any{"plain": "tim@example.com"}
+	for i := range 50 {
+		key := "k" + strconv.Itoa(i)
+		held[key] = real + "\x1f" + strconv.Itoa(i)
+		want[key] = "tim@example.com\x1f" + strconv.Itoa(i)
+	}
+	body, err := json.Marshal(held)
+	require.NoError(t, err)
+	wanted, err := json.Marshal(want)
+	require.NoError(t, err)
+
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}})
+	require.False(t, answered.IsError, spoken(answered))
+	assert.JSONEq(t, string(wanted), spoken(answered))
+	assert.Equal(t, 2, scans)
+}
+
+// When the strings holding \x1f hold every separator byte there is between
+// them, there is no separator left to hand them over together: the answer is
+// refused, saying how many held \x1f, and nothing unscrubbed is handed on.
+func TestSpikeStringsHoldingEverySeparatorByteAreNotHandedOn(t *testing.T) {
+	s, _ := fixturesServer(t)
+	real := "someone" + "@" + "gmail.com"
+	body := `{"a":"` + real + `\u001f\u001e","b":"\u001f\u001d","c":"\u001f\u001c"}`
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: body}}})
+	assert.True(t, answered.IsError, spoken(answered))
+	assert.Contains(t, spoken(answered), "3 strings of the answer hold")
 	assert.NotContains(t, spoken(answered), real)
 }
 

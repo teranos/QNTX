@@ -19,6 +19,27 @@ type ChatResponse struct {
 	Content string
 	Model   string
 	Usage   Usage
+	// Served is how the call was served, when its provider reports it
+	// (llm.proto LLMServed); nil when the provider reports nothing past Model.
+	Served *Served
+}
+
+// Served is what a call asked for beside what served it, as the provider that
+// served it reports it (llm.proto LLMServed). An empty field was not reported:
+// it never means "the same as asked".
+type Served struct {
+	RequestedProvider string `json:"requested_provider,omitempty"`
+	RequestedModel    string `json:"requested_model,omitempty"`
+	UpstreamProvider  string `json:"upstream_provider,omitempty"`
+	ExecutedModel     string `json:"executed_model,omitempty"`
+	ResponseModel     string `json:"response_model,omitempty"`
+	RequestID         string `json:"request_id,omitempty"`
+	// CostUSD is the decimal text the provider reported, unparsed; nil when it
+	// reported no cost.
+	CostUSD       *string `json:"cost_usd,omitempty"`
+	PricingSource string  `json:"pricing_source,omitempty"`
+	AttemptCount  int     `json:"attempt_count,omitempty"`
+	Fallback      bool    `json:"fallback,omitempty"`
 }
 
 // Usage represents token usage information from an LLM call.

@@ -260,8 +260,12 @@ type LLMChatResponse struct {
 	PromptTokens     int32                  `protobuf:"varint,3,opt,name=prompt_tokens,json=promptTokens,proto3" json:"prompt_tokens,omitempty"`
 	CompletionTokens int32                  `protobuf:"varint,4,opt,name=completion_tokens,json=completionTokens,proto3" json:"completion_tokens,omitempty"`
 	TotalTokens      int32                  `protobuf:"varint,5,opt,name=total_tokens,json=totalTokens,proto3" json:"total_tokens,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// How the call was served, when the provider reports more than its own
+	// name: a gateway provider says where it sent the call. Absent when the
+	// provider reports nothing past `model` and the token counts.
+	Served        *LLMServed `protobuf:"bytes,6,opt,name=served,proto3" json:"served,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LLMChatResponse) Reset() {
@@ -329,6 +333,150 @@ func (x *LLMChatResponse) GetTotalTokens() int32 {
 	return 0
 }
 
+func (x *LLMChatResponse) GetServed() *LLMServed {
+	if x != nil {
+		return x.Served
+	}
+	return nil
+}
+
+// What a call asked for beside what served it, as the provider that served it
+// reports it. Each field is the provider's report, never a guess: one it cannot
+// tell is left empty, and empty means "not reported", not "the same as asked".
+type LLMServed struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The QNTX provider the call named: LLMChatRequest.provider, as received.
+	RequestedProvider string `protobuf:"bytes,1,opt,name=requested_provider,json=requestedProvider,proto3" json:"requested_provider,omitempty"`
+	// The model or routing policy the call named: LLMChatRequest.model, as received.
+	RequestedModel string `protobuf:"bytes,2,opt,name=requested_model,json=requestedModel,proto3" json:"requested_model,omitempty"`
+	// The upstream provider that served the call, by the name the provider
+	// gives it (for otari, its Otari-Provider header: a configured instance name).
+	UpstreamProvider string `protobuf:"bytes,3,opt,name=upstream_provider,json=upstreamProvider,proto3" json:"upstream_provider,omitempty"`
+	// The model the upstream provider was sent (for otari, its Otari-Model header).
+	ExecutedModel string `protobuf:"bytes,4,opt,name=executed_model,json=executedModel,proto3" json:"executed_model,omitempty"`
+	// The model the provider's own response named, unaltered (for otari, the
+	// body's `model`: the upstream's name for a model asked for directly, the
+	// policy or alias name for one that was routed).
+	ResponseModel string `protobuf:"bytes,5,opt,name=response_model,json=responseModel,proto3" json:"response_model,omitempty"`
+	// The provider's id for the call, by which its usage record is found
+	// (for otari, Otari-Request-ID).
+	RequestId string `protobuf:"bytes,6,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// The cost the provider settled for the call, in US dollars, as the decimal
+	// text it reported (for otari, usage.cost_usd). Absent when none was reported.
+	CostUsd *string `protobuf:"bytes,7,opt,name=cost_usd,json=costUsd,proto3,oneof" json:"cost_usd,omitempty"`
+	// Where that cost's price came from, as the provider names it
+	// (for otari, usage.pricing_source).
+	PricingSource string `protobuf:"bytes,8,opt,name=pricing_source,json=pricingSource,proto3" json:"pricing_source,omitempty"`
+	// How many candidates the call was sent to, the serving one included
+	// (for otari, Otari-Attempt-Count). 0 when not reported.
+	AttemptCount int32 `protobuf:"varint,9,opt,name=attempt_count,json=attemptCount,proto3" json:"attempt_count,omitempty"`
+	// Whether a candidate other than the first planned one served the call
+	// (for otari, Otari-Fallback).
+	Fallback      bool `protobuf:"varint,10,opt,name=fallback,proto3" json:"fallback,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LLMServed) Reset() {
+	*x = LLMServed{}
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LLMServed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LLMServed) ProtoMessage() {}
+
+func (x *LLMServed) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LLMServed.ProtoReflect.Descriptor instead.
+func (*LLMServed) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *LLMServed) GetRequestedProvider() string {
+	if x != nil {
+		return x.RequestedProvider
+	}
+	return ""
+}
+
+func (x *LLMServed) GetRequestedModel() string {
+	if x != nil {
+		return x.RequestedModel
+	}
+	return ""
+}
+
+func (x *LLMServed) GetUpstreamProvider() string {
+	if x != nil {
+		return x.UpstreamProvider
+	}
+	return ""
+}
+
+func (x *LLMServed) GetExecutedModel() string {
+	if x != nil {
+		return x.ExecutedModel
+	}
+	return ""
+}
+
+func (x *LLMServed) GetResponseModel() string {
+	if x != nil {
+		return x.ResponseModel
+	}
+	return ""
+}
+
+func (x *LLMServed) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *LLMServed) GetCostUsd() string {
+	if x != nil && x.CostUsd != nil {
+		return *x.CostUsd
+	}
+	return ""
+}
+
+func (x *LLMServed) GetPricingSource() string {
+	if x != nil {
+		return x.PricingSource
+	}
+	return ""
+}
+
+func (x *LLMServed) GetAttemptCount() int32 {
+	if x != nil {
+		return x.AttemptCount
+	}
+	return 0
+}
+
+func (x *LLMServed) GetFallback() bool {
+	if x != nil {
+		return x.Fallback
+	}
+	return false
+}
+
 // Streaming: one chunk per generated token
 type LLMChatChunk struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
@@ -345,14 +493,17 @@ type LLMChatChunk struct {
 	//
 	//	*LLMChatChunk_Signal
 	//	*LLMChatChunk_NoSignal
-	SignalOf      isLLMChatChunk_SignalOf `protobuf_oneof:"signal_of"`
+	SignalOf isLLMChatChunk_SignalOf `protobuf_oneof:"signal_of"`
+	// How the call was served (see LLMChatResponse.served). Sent on the final
+	// chunk, by a provider that reports it.
+	Served        *LLMServed `protobuf:"bytes,9,opt,name=served,proto3" json:"served,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LLMChatChunk) Reset() {
 	*x = LLMChatChunk{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -364,7 +515,7 @@ func (x *LLMChatChunk) String() string {
 func (*LLMChatChunk) ProtoMessage() {}
 
 func (x *LLMChatChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -377,7 +528,7 @@ func (x *LLMChatChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LLMChatChunk.ProtoReflect.Descriptor instead.
 func (*LLMChatChunk) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *LLMChatChunk) GetToken() string {
@@ -447,6 +598,13 @@ func (x *LLMChatChunk) GetNoSignal() bool {
 	return false
 }
 
+func (x *LLMChatChunk) GetServed() *LLMServed {
+	if x != nil {
+		return x.Served
+	}
+	return nil
+}
+
 type isLLMChatChunk_SignalOf interface {
 	isLLMChatChunk_SignalOf()
 }
@@ -477,7 +635,7 @@ type TokenSignalProto struct {
 
 func (x *TokenSignalProto) Reset() {
 	*x = TokenSignalProto{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -489,7 +647,7 @@ func (x *TokenSignalProto) String() string {
 func (*TokenSignalProto) ProtoMessage() {}
 
 func (x *TokenSignalProto) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -502,7 +660,7 @@ func (x *TokenSignalProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenSignalProto.ProtoReflect.Descriptor instead.
 func (*TokenSignalProto) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TokenSignalProto) GetConfidence() float32 {
@@ -558,7 +716,7 @@ type TokenCandidateProto struct {
 
 func (x *TokenCandidateProto) Reset() {
 	*x = TokenCandidateProto{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +728,7 @@ func (x *TokenCandidateProto) String() string {
 func (*TokenCandidateProto) ProtoMessage() {}
 
 func (x *TokenCandidateProto) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +741,7 @@ func (x *TokenCandidateProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenCandidateProto.ProtoReflect.Descriptor instead.
 func (*TokenCandidateProto) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{6}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TokenCandidateProto) GetId() int32 {
@@ -621,7 +779,7 @@ type SamplerStageProto struct {
 
 func (x *SamplerStageProto) Reset() {
 	*x = SamplerStageProto{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -633,7 +791,7 @@ func (x *SamplerStageProto) String() string {
 func (*SamplerStageProto) ProtoMessage() {}
 
 func (x *SamplerStageProto) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -646,7 +804,7 @@ func (x *SamplerStageProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SamplerStageProto.ProtoReflect.Descriptor instead.
 func (*SamplerStageProto) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{7}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SamplerStageProto) GetName() string {
@@ -708,13 +866,28 @@ const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
 	"Attachment\x12\x1b\n" +
 	"\tmime_type\x18\x01 \x01(\tR\bmimeType\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\tR\x04data\x12\x1a\n" +
-	"\bfilename\x18\x03 \x01(\tR\bfilename\"\xb6\x01\n" +
+	"\bfilename\x18\x03 \x01(\tR\bfilename\"\xe3\x01\n" +
 	"\x0fLLMChatResponse\x12\x18\n" +
 	"\acontent\x18\x01 \x01(\tR\acontent\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12#\n" +
 	"\rprompt_tokens\x18\x03 \x01(\x05R\fpromptTokens\x12+\n" +
 	"\x11completion_tokens\x18\x04 \x01(\x05R\x10completionTokens\x12!\n" +
-	"\ftotal_tokens\x18\x05 \x01(\x05R\vtotalTokens\"\xa5\x02\n" +
+	"\ftotal_tokens\x18\x05 \x01(\x05R\vtotalTokens\x12+\n" +
+	"\x06served\x18\x06 \x01(\v2\x13.protocol.LLMServedR\x06served\"\x92\x03\n" +
+	"\tLLMServed\x12-\n" +
+	"\x12requested_provider\x18\x01 \x01(\tR\x11requestedProvider\x12'\n" +
+	"\x0frequested_model\x18\x02 \x01(\tR\x0erequestedModel\x12+\n" +
+	"\x11upstream_provider\x18\x03 \x01(\tR\x10upstreamProvider\x12%\n" +
+	"\x0eexecuted_model\x18\x04 \x01(\tR\rexecutedModel\x12%\n" +
+	"\x0eresponse_model\x18\x05 \x01(\tR\rresponseModel\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x06 \x01(\tR\trequestId\x12\x1e\n" +
+	"\bcost_usd\x18\a \x01(\tH\x00R\acostUsd\x88\x01\x01\x12%\n" +
+	"\x0epricing_source\x18\b \x01(\tR\rpricingSource\x12#\n" +
+	"\rattempt_count\x18\t \x01(\x05R\fattemptCount\x12\x1a\n" +
+	"\bfallback\x18\n" +
+	" \x01(\bR\bfallbackB\v\n" +
+	"\t_cost_usd\"\xd2\x02\n" +
 	"\fLLMChatChunk\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x12\n" +
 	"\x04done\x18\x02 \x01(\bR\x04done\x12\x14\n" +
@@ -723,7 +896,8 @@ const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
 	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\x12!\n" +
 	"\ftotal_tokens\x18\x06 \x01(\x05R\vtotalTokens\x124\n" +
 	"\x06signal\x18\a \x01(\v2\x1a.protocol.TokenSignalProtoH\x00R\x06signal\x12\x1d\n" +
-	"\tno_signal\x18\b \x01(\bH\x00R\bnoSignalB\v\n" +
+	"\tno_signal\x18\b \x01(\bH\x00R\bnoSignal\x12+\n" +
+	"\x06served\x18\t \x01(\v2\x13.protocol.LLMServedR\x06servedB\v\n" +
 	"\tsignal_of\"\x8a\x02\n" +
 	"\x10TokenSignalProto\x12\x1e\n" +
 	"\n" +
@@ -762,33 +936,36 @@ func file_plugin_grpc_protocol_llm_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_llm_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_llm_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_plugin_grpc_protocol_llm_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_plugin_grpc_protocol_llm_proto_goTypes = []any{
 	(*ChatMessage)(nil),         // 0: protocol.ChatMessage
 	(*LLMChatRequest)(nil),      // 1: protocol.LLMChatRequest
 	(*Attachment)(nil),          // 2: protocol.Attachment
 	(*LLMChatResponse)(nil),     // 3: protocol.LLMChatResponse
-	(*LLMChatChunk)(nil),        // 4: protocol.LLMChatChunk
-	(*TokenSignalProto)(nil),    // 5: protocol.TokenSignalProto
-	(*TokenCandidateProto)(nil), // 6: protocol.TokenCandidateProto
-	(*SamplerStageProto)(nil),   // 7: protocol.SamplerStageProto
+	(*LLMServed)(nil),           // 4: protocol.LLMServed
+	(*LLMChatChunk)(nil),        // 5: protocol.LLMChatChunk
+	(*TokenSignalProto)(nil),    // 6: protocol.TokenSignalProto
+	(*TokenCandidateProto)(nil), // 7: protocol.TokenCandidateProto
+	(*SamplerStageProto)(nil),   // 8: protocol.SamplerStageProto
 }
 var file_plugin_grpc_protocol_llm_proto_depIdxs = []int32{
-	2, // 0: protocol.LLMChatRequest.attachments:type_name -> protocol.Attachment
-	0, // 1: protocol.LLMChatRequest.messages:type_name -> protocol.ChatMessage
-	5, // 2: protocol.LLMChatChunk.signal:type_name -> protocol.TokenSignalProto
-	6, // 3: protocol.TokenSignalProto.top_k:type_name -> protocol.TokenCandidateProto
-	7, // 4: protocol.TokenSignalProto.sampler_stages:type_name -> protocol.SamplerStageProto
-	6, // 5: protocol.SamplerStageProto.top_k:type_name -> protocol.TokenCandidateProto
-	1, // 6: protocol.LLMService.Chat:input_type -> protocol.LLMChatRequest
-	1, // 7: protocol.LLMService.StreamChat:input_type -> protocol.LLMChatRequest
-	3, // 8: protocol.LLMService.Chat:output_type -> protocol.LLMChatResponse
-	4, // 9: protocol.LLMService.StreamChat:output_type -> protocol.LLMChatChunk
-	8, // [8:10] is the sub-list for method output_type
-	6, // [6:8] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	2,  // 0: protocol.LLMChatRequest.attachments:type_name -> protocol.Attachment
+	0,  // 1: protocol.LLMChatRequest.messages:type_name -> protocol.ChatMessage
+	4,  // 2: protocol.LLMChatResponse.served:type_name -> protocol.LLMServed
+	6,  // 3: protocol.LLMChatChunk.signal:type_name -> protocol.TokenSignalProto
+	4,  // 4: protocol.LLMChatChunk.served:type_name -> protocol.LLMServed
+	7,  // 5: protocol.TokenSignalProto.top_k:type_name -> protocol.TokenCandidateProto
+	8,  // 6: protocol.TokenSignalProto.sampler_stages:type_name -> protocol.SamplerStageProto
+	7,  // 7: protocol.SamplerStageProto.top_k:type_name -> protocol.TokenCandidateProto
+	1,  // 8: protocol.LLMService.Chat:input_type -> protocol.LLMChatRequest
+	1,  // 9: protocol.LLMService.StreamChat:input_type -> protocol.LLMChatRequest
+	3,  // 10: protocol.LLMService.Chat:output_type -> protocol.LLMChatResponse
+	5,  // 11: protocol.LLMService.StreamChat:output_type -> protocol.LLMChatChunk
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_llm_proto_init() }
@@ -796,7 +973,8 @@ func file_plugin_grpc_protocol_llm_proto_init() {
 	if File_plugin_grpc_protocol_llm_proto != nil {
 		return
 	}
-	file_plugin_grpc_protocol_llm_proto_msgTypes[4].OneofWrappers = []any{
+	file_plugin_grpc_protocol_llm_proto_msgTypes[4].OneofWrappers = []any{}
+	file_plugin_grpc_protocol_llm_proto_msgTypes[5].OneofWrappers = []any{
 		(*LLMChatChunk_Signal)(nil),
 		(*LLMChatChunk_NoSignal)(nil),
 	}
@@ -806,7 +984,7 @@ func file_plugin_grpc_protocol_llm_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_llm_proto_rawDesc), len(file_plugin_grpc_protocol_llm_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
