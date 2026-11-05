@@ -92,6 +92,11 @@ REACH is '/i/picture'                                                     of ROO
 # Which of the paths asked the caller reaches, so the tray offers no element
 # its viewer cannot use: "a caller learns its paths and not its grants".
 REACH is '/i/reaches'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
+# "assign yourself a name using signa:i sigil:name if available otherwise retry"
+# Who reaches '/mcp' reaches it, and the handler names a token asking as
+# itself, by its own DID, and nobody else.
+# "add it to it, ATTESTOR can set their own name if available"
+REACH is '/i/name'                                                        of ROOT SUPER TOKEN ATTESTOR
 
 # First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
