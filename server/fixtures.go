@@ -144,19 +144,45 @@ func (s *QNTXServer) scrubJSON(ctx context.Context, raw []byte) ([]byte, string,
 	}
 	// The unit separator is only ever the middle of jsonBetween: a string that
 	// holds it anywhere could meet a separator beside it and move the split.
-	for _, word := range words {
-		if strings.Contains(word, "\x1f") {
-			return nil, "", errors.New("a string of the answer holds what stands between its strings for the scanner")
+	// Such a string is handed to the scanner on its own, and the rest together.
+	back := make([]string, len(words))
+	var together []int
+	var founds []string
+	for i, word := range words {
+		if !strings.Contains(word, "\x1f") {
+			together = append(together, i)
+			continue
+		}
+		scrubbed, found, err := s.scrub(ctx, word)
+		if err != nil {
+			return nil, "", err
+		}
+		back[i] = scrubbed
+		if found != "" {
+			founds = append(founds, found)
 		}
 	}
-	scrubbed, found, err := s.scrub(ctx, strings.Join(words, jsonBetween))
-	if err != nil {
-		return nil, "", err
+	if len(together) > 0 {
+		joined := make([]string, len(together))
+		for j, i := range together {
+			joined[j] = words[i]
+		}
+		scrubbed, found, err := s.scrub(ctx, strings.Join(joined, jsonBetween))
+		if err != nil {
+			return nil, "", err
+		}
+		split := strings.Split(scrubbed, jsonBetween)
+		if len(split) != len(joined) {
+			return nil, "", errors.Newf("the scanner was handed %d strings of the answer and gave %d back", len(joined), len(split))
+		}
+		for j, i := range together {
+			back[i] = split[j]
+		}
+		if found != "" {
+			founds = append([]string{found}, founds...)
+		}
 	}
-	back := strings.Split(scrubbed, jsonBetween)
-	if len(back) != len(words) {
-		return nil, "", errors.Newf("the scanner was handed %d strings of the answer and gave %d back", len(words), len(back))
-	}
+	found := strings.Join(founds, "; ")
 	with, err := jsonWith(held, &back)
 	if err != nil {
 		return nil, "", err

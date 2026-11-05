@@ -132,13 +132,20 @@ func TestTimAnAnswerIsStillJSONWithItsFixtures(t *testing.T) {
 // Qodo's review of #1510: a string ending in "\n\x1f" meets the separator
 // after it as "\n\x1f\n\x1f\n", and the split cuts at the first one. The
 // count still matches, and the strings beside it come back changed.
-func TestSpikeAStringHoldingPartOfTheSeparatorIsNotHandedOn(t *testing.T) {
+//
+// Qodo's review of #1510 again: refusing such a string refused the whole
+// answer, an issue body holding one stray byte included. A string holding
+// the separator's middle byte is handed to the scanner on its own, so it is
+// scrubbed and handed on, and the strings beside it are as they were.
+func TestSpikeAStringHoldingPartOfTheSeparatorIsScrubbedOnItsOwn(t *testing.T) {
 	s, _ := fixturesServer(t)
-	body := `{"a":"x\n\u001f","b":"y"}`
+	real := "someone" + "@" + "gmail.com"
+	body := `{"a":"x\n\u001f","b":"` + real + `","c":"` + real + `\u001f"}`
 	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
 		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: body}}})
-	assert.True(t, answered.IsError, spoken(answered))
-	assert.Contains(t, spoken(answered), "could not be made into fixtures")
+	require.False(t, answered.IsError, spoken(answered))
+	assert.JSONEq(t, `{"a":"x\n\u001f","b":"tim@example.com","c":"tim@example.com\u001f"}`, spoken(answered))
+	assert.NotContains(t, spoken(answered), real)
 }
 
 // Qodo's review of #1510: an address as a key becomes the fixture, and an
