@@ -149,7 +149,7 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	if as.Subjects[0] != "/deep-clean" {
 		t.Fatalf("the subject is %v, not the page the hit is about", as.Subjects)
 	}
-	if as.Predicates[0] != "datapunt:contact_click" || as.Source != "datapunt" {
+	if as.Predicates[0] != "datapunt:contact_click" || as.Source != "datapixel" {
 		t.Fatalf("stored %v from %q", as.Predicates, as.Source)
 	}
 	if len(as.Actors) != 1 || as.Actors[0] != "datapunt:boutique" {

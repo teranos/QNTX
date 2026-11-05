@@ -149,7 +149,7 @@ func TestASigilIsATool(t *testing.T) {
 	}
 
 	metrics := named["datapunts_metrics"]
-	require.Equal(t, "One stand's arrivals grouped by one dimension, most first.", metrics.Description)
+	require.Equal(t, "One datapunt's arrivals grouped by one dimension, most first.", metrics.Description)
 
 	raw, err := json.Marshal(metrics.InputSchema)
 	require.NoError(t, err)
