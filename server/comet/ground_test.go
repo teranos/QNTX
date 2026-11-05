@@ -14,5 +14,12 @@ func TestAnAgentsGroundIsBuiltFromGroundsMain(t *testing.T) {
 	node := engineNode{builds: t.TempDir(), asked: make(chan Source, 1)}
 	err := Builder{Node: node, NixBin: "/nix/bin"}.BuildAgent(context.Background(), t.TempDir(), "http://127.0.0.1:8772")
 	require.Error(t, err)
-	assert.Equal(t, Source{Owner: "teranos", Repo: "ground", Branch: "main"}, <-node.asked)
+	// A build that ends before it asks for ground's source sends nothing: the
+	// test says so, where it would have waited for ever.
+	select {
+	case asked := <-node.asked:
+		assert.Equal(t, Source{Owner: "teranos", Repo: "ground", Branch: "main"}, asked)
+	default:
+		t.Fatalf("the build ended without asking for ground's source: %v", err)
+	}
 }
