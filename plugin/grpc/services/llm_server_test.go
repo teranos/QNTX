@@ -160,3 +160,21 @@ func TestLLMServer_NoServedReportWeavesNoServedFields(t *testing.T) {
 		assert.NotContains(t, woven.Attributes, key)
 	}
 }
+
+// Qodo's review of #1511: a fallback the provider reports is woven when it
+// reports no attempt count. Written only beside a count above zero, it was
+// left out of the weave while the HTTP report still said it.
+func TestLLMServer_AFallbackWithNoAttemptCountIsWoven(t *testing.T) {
+	srv, store := newTestLLMServer(zap.NewNop().Sugar())
+	srv.RegisterProvider("otari", &stubLLMClient{chatResp: &protocol.LLMChatResponse{
+		Content: "hello", Model: "good-model",
+		Served: &protocol.LLMServed{UpstreamProvider: "secondary", Fallback: true},
+	}})
+
+	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{UserPrompt: "hi", Provider: "otari", Model: "fast"})
+	require.NoError(t, err)
+
+	woven := <-store.woven
+	assert.Equal(t, true, woven.Attributes["fallback"])
+	assert.NotContains(t, woven.Attributes, "attempt_count")
+}

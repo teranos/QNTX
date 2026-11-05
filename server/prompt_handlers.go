@@ -626,8 +626,12 @@ func servedAttributes(served *provider.Served) map[string]any {
 	if served.CostUSD != nil {
 		attrs["cost_usd"] = *served.CostUSD
 	}
+	// A count reported says whether it fell back too; a fallback is reported
+	// with no count as well.
 	if served.AttemptCount > 0 {
 		attrs["attempt_count"] = served.AttemptCount
+	}
+	if served.AttemptCount > 0 || served.Fallback {
 		attrs["fallback"] = served.Fallback
 	}
 	return attrs

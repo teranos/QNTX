@@ -338,8 +338,12 @@ func servedAttributes(served *protocol.LLMServed) map[string]any {
 	if served.CostUsd != nil {
 		attrs["cost_usd"] = served.GetCostUsd()
 	}
+	// A count reported says whether it fell back too; a fallback is reported
+	// with no count as well.
 	if served.GetAttemptCount() > 0 {
 		attrs["attempt_count"] = int(served.GetAttemptCount())
+	}
+	if served.GetAttemptCount() > 0 || served.GetFallback() {
 		attrs["fallback"] = served.GetFallback()
 	}
 	return attrs
