@@ -2,6 +2,7 @@ package forge
 
 import (
 	"context"
+	"strings"
 
 	errors "github.com/teranos/sacred-error"
 )
@@ -66,26 +67,136 @@ type Committed struct {
 // HoldBranch makes sure the proposal's branch is on the forge, made from the
 // branch it is proposed into when it is not there yet.
 func (p Proposal) HoldBranch(ctx context.Context, on Forge, as Acting) error {
-	_, err := on.Branch(ctx, as, p.Repo, p.Branch)
-	var absent Refused
-	if !errors.As(err, &absent) {
+	_, from, err := p.Reading(ctx, on, as)
+	if err != nil || from == "" {
 		return err
 	}
-	from, err := on.Branch(ctx, as, p.Repo, p.Into)
+	return p.MakeBranch(ctx, on, as, from)
+}
+
+// 「[Opus 5.5] Reading is the ref the proposal's branch is read at before anything reaches it: the」
+// 「[Opus 5.5] branch itself, or, when the forge has none yet, the commit of Into it is to be made」
+// 「[Opus 5.5] from, which from then names. Nothing is made: what the branch would hold is known first.」
+func (p Proposal) Reading(ctx context.Context, on Forge, as Acting) (ref, from string, err error) {
+	_, err = on.Branch(ctx, as, p.Repo, p.Branch)
+	var absent Refused
+	if !errors.As(err, &absent) {
+		return p.Branch, "", err
+	}
+	from, err = on.Branch(ctx, as, p.Repo, p.Into)
 	var fromAbsent Refused
 	if errors.As(err, &fromAbsent) {
-		return errors.Newf("%s is not on %s (%s), and %s, which it would be made from, is not either: %s",
+		return "", "", errors.Newf("%s is not on %s (%s), and %s, which it would be made from, is not either: %s",
 			p.Branch, p.Repo, absent.Says, p.Into, fromAbsent.Says)
 	}
 	if err != nil {
-		return err
+		return "", "", err
 	}
-	err = on.CreateBranch(ctx, as, p.Repo, p.Branch, from)
+	return from, from, nil
+}
+
+// 「[Opus 5.5] MakeBranch makes the proposal's branch at from, the commit Reading named.」
+func (p Proposal) MakeBranch(ctx context.Context, on Forge, as Acting, from string) error {
+	err := on.CreateBranch(ctx, as, p.Repo, p.Branch, from)
 	var refused Refused
 	if errors.As(err, &refused) {
-		return errors.Newf("%s is not on %s (%s), and was not made from %s: %s", p.Branch, p.Repo, absent.Says, p.Into, refused.Says)
+		return errors.Newf("%s is not on %s, and was not made from %s: %s", p.Branch, p.Repo, p.Into, refused.Says)
 	}
 	return err
+}
+
+// Holds is the blob the proposal's branch holds at each of paths, for the
+// ones it holds a file at: what an edit of that file replaces or removes. A
+// directory the forge says it has none of holds nothing; a listing it refuses
+// for any other reason is said, before any edit. A path its folder's listing
+// does not name is asked of the forge by itself, since a forge may list only
+// part of a folder.
+func (p Proposal) Holds(ctx context.Context, on Forge, as Acting, paths []string) (map[string]string, error) {
+	return p.HoldsAt(ctx, on, as, p.Branch, paths)
+}
+
+// 「[Opus 5.5] HoldsAt is Holds read at ref: the branch, or the commit Reading says it is to be made from.」
+func (p Proposal) HoldsAt(ctx context.Context, on Forge, as Acting, ref string, paths []string) (map[string]string, error) {
+	asked := map[string]bool{}
+	for _, file := range paths {
+		asked[file] = true
+	}
+	held := map[string]string{}
+	listed := map[string]bool{}
+	// 「[Opus 5.5] seen is each path a listing named; absent each folder the forge has none of.」
+	seen, absent := map[string]bool{}, map[string]bool{}
+	// What is there and no file is neither added over nor replaced: said now,
+	// before any edit reaches the branch.
+	hold := func(entry Entry) error {
+		switch entry.Kind {
+		case File:
+			held[entry.Path] = entry.SHA
+			return nil
+		case Dir:
+			return errors.Newf("%s is a folder of %s on %s, not a file", entry.Path, p.Repo, ref)
+		}
+		return errors.Newf("%s is held by %s on %s as no file and no folder", entry.Path, p.Repo, ref)
+	}
+	dirOf := func(file string) string {
+		if cut := strings.LastIndex(file, "/"); cut >= 0 {
+			return file[:cut]
+		}
+		return Root
+	}
+	for _, file := range paths {
+		dir := dirOf(file)
+		if listed[dir] {
+			continue
+		}
+		listed[dir] = true
+		entries, err := on.Entries(ctx, as, p.Repo, ref, dir)
+		var refused Refused
+		if errors.As(err, &refused) && refused.Absent {
+			absent[dir] = true
+			continue
+		}
+		if errors.As(err, &refused) {
+			return nil, errors.Newf("what %s of %s holds on %s was not listed, so whether it holds %s is not known: %s", dir, p.Repo, ref, file, refused.Says)
+		}
+		var notADirectory NotADirectory
+		if errors.As(err, &notADirectory) {
+			return nil, errors.Newf("%s is a %s of %s on %s, not a folder, so no file is held in it", dir, notADirectory.Kind, p.Repo, ref)
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			if !asked[entry.Path] {
+				continue
+			}
+			seen[entry.Path] = true
+			if err := hold(entry); err != nil {
+				return nil, err
+			}
+		}
+	}
+	// 「[Opus 5.5] A path in a folder that is there and that its listing did not name is asked by itself.」
+	for _, file := range paths {
+		if seen[file] || absent[dirOf(file)] {
+			continue
+		}
+		seen[file] = true
+		entry, err := on.EntryAt(ctx, as, p.Repo, ref, file)
+		var refused Refused
+		if errors.As(err, &refused) && refused.Absent {
+			continue
+		}
+		if errors.As(err, &refused) {
+			return nil, errors.Newf("%s of %s on %s was not asked, so whether the branch holds it is not known: %s", file, p.Repo, ref, refused.Says)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if err := hold(entry); err != nil {
+			return nil, err
+		}
+	}
+	return held, nil
 }
 
 // Commit puts each edit on the proposal's branch, in the order given, a commit

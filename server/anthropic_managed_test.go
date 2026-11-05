@@ -238,3 +238,17 @@ func TestAStorysAgentHasItsOneStoryAsItsContract(t *testing.T) {
 	element := managedIsSaidToBe(&rootAgent{element: "approvals-element", did: "did:key:approvals"})
 	assert.Contains(t, element, "The user stories in stories/ of github.com/teranos/QNTX-Web that name you are your contract")
 }
+
+// "it should have it otherwise its no use to run a managed agent"
+// "3. yes"
+// 「[Opus 5.5] An agent at Anthropic holds no git credential, and is told to propose through codeforge.」
+func TestAnAgentAtAnthropicIsToldToProposeThroughCodeforge(t *testing.T) {
+	for _, element := range []string{"llm-provider-element", "story-27-root-registers-the-node-with-anthropic"} {
+		said := managedIsSaidToBe(&rootAgent{element: element, did: "did:key:element"})
+		assert.Contains(t, said, "You hold no git credential", element)
+		assert.Contains(t, said, "codeforge_propose", element)
+	}
+	s := &QNTXServer{}
+	proposes := s.codeForgeSignum()
+	assert.Equal(t, "codeforge_propose", toolNameOf(proposes.GetName(), proposes.GetSigils()[0]), "the tool it is told of is the one the node serves")
+}

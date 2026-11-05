@@ -16,6 +16,18 @@ func TestARepoOnAForgeTheNodeDoesNotReachIsRefusedNamingIt(t *testing.T) {
 	assert.Contains(t, err.Error(), "gitlab.com/group/sub/project")
 }
 
+// Qodo's review of #1515: a host is a name case does not tell apart, as the
+// GitHub adapter reads it. GitHub.com/owner/repo parsed, and the forge on
+// github.com was not found for it.
+func TestAHostIsFoundWhateverItsCase(t *testing.T) {
+	on := &shelf{}
+	repo, err := ParseRepo("GitHub.com/teranos/QNTX")
+	require.NoError(t, err)
+	found, err := ForgesOf(map[string]Forge{GitHub: on}).For(repo)
+	require.NoError(t, err)
+	assert.Same(t, on, found)
+}
+
 func TestActingStartsAboveZero(t *testing.T) {
 	var nobody Acting
 	assert.NotEqual(t, AsNode, nobody)
