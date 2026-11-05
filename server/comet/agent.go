@@ -23,6 +23,39 @@ func AgentDeclaration(work, url string) string {
 	return "project {\n  path: \"" + work + "\"\n}\n\nqntx {\n  url: \"" + url + "\"\n}\n"
 }
 
+// AgentGrove is the agent's checkout of sbvh-nl/grove, where its work keeps each repository as
+// work/<owner>/<repo> (AgentTrust): what a grove ritual needs stands there (ADR-050, Not done).
+func AgentGrove(home string) string { return filepath.Join(home, "work", "sbvh-nl", "grove") }
+
+// AgentSand is the agent's sand besides ground's own controls: its declaration, and each pbt of its
+// grove checkout's controls/, which declare grove's rituals. An agent with no grove checkout has none.
+func AgentSand(home, url string) (map[string]string, error) {
+	sand := map[string]string{"comet.pbt": AgentDeclaration(filepath.Join(home, "work"), url)}
+	controls := filepath.Join(AgentGrove(home), "controls")
+	found, err := filepath.Glob(filepath.Join(controls, "*.pbt"))
+	if err != nil {
+		return nil, errors.Wrapf(err, "the controls of the agent's grove checkout in %s were not listed", controls)
+	}
+	for _, path := range found {
+		pbt, err := os.ReadFile(path)
+		if err != nil {
+			return nil, errors.Wrapf(err, "the control %s of the agent's grove checkout was not read", path)
+		}
+		sand["grove-"+filepath.Base(path)] = string(pbt)
+	}
+	return sand, nil
+}
+
+// AgentLocalSand is where the agent's ground holds a local sand: under the HOME its turn carries,
+// which is the node's (internal/claudecode run.go, agentenv), as ground's localSandPathInto names it.
+func AgentLocalSand(platform string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", errors.Wrap(err, "the HOME the agent's turn carries was not found, so its sand has nowhere to be held from")
+	}
+	return filepath.Join(home, ".local", "share", "ground", "sand", SandFile(platform)), nil
+}
+
 // AgentGround is where an agent's ground is kept: in its home, beside its Claude Code configuration.
 func AgentGround(home string) string { return filepath.Join(home, "bin", "ground") }
 
@@ -41,7 +74,12 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	building.Lock()
 	defer building.Unlock()
 	// An agent's ground runs on the node that builds it: natively.
-	if _, err := Native(); err != nil {
+	native, err := Native()
+	if err != nil {
+		return err
+	}
+	sand, err := AgentSand(home, url)
+	if err != nil {
 		return err
 	}
 	builds, err := b.Node.BuildsDir()
@@ -55,10 +93,22 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s to build the agent's ground in", work)
 	}
-	sand := map[string]string{"comet.pbt": AgentDeclaration(filepath.Join(home, "work"), url)}
 	kept := map[string]string{"ground": AgentGround(home), "ground_hook": AgentHook(home),
 		"ground_sky": AgentSky(home), "ground_drive": AgentDrive(home)}
-	return b.ground(ctx, work, sand, "agent:"+filepath.Base(home), kept)
+	src, env, err := b.ground(ctx, work, sand, "agent:"+filepath.Base(home), kept)
+	if err != nil || len(sand) == 1 {
+		return err
+	}
+	// The engine is built from ground's floor alone (ground dub.json -d-version=Floor): the rituals
+	// reach it as the sand it holds beside it (ground source/sand/load.d holdLanded).
+	if _, err := b.sandIn(ctx, src, env, native); err != nil {
+		return errors.Wrap(err, "the sand that declares the agent's rituals did not build")
+	}
+	held, err := AgentLocalSand(native)
+	if err != nil {
+		return err
+	}
+	return keepBuilt(src, filepath.Join("build", SandFile(native)), held)
 }
 
 // AgentPath is the PATH an agent's turn runs with: its own ground first, which its hooks and a
