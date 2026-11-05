@@ -672,7 +672,7 @@ func (h *Handler) publicOrigin() string {
 }
 
 // 「[Opus 5.5] RenderCeremonyPage is renderCeremonyPage, for a yes the node asks for outside this package: an」
-// 「[Opus 5.5] MCP server a namespace consumes (server/mcp_consumed.go).」
+// 「[Opus 5.5] MCP server the node consumes (server/mcp_consumed.go).」
 func (h *Handler) RenderCeremonyPage(w http.ResponseWriter, status int, ok bool, message string) {
 	h.renderCeremonyPage(w, status, ok, message)
 }

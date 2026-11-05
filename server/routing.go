@@ -149,7 +149,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// redirects the bare one, and a client follows that as a GET.
 	s.answer("/mcp", s.HandleMCP)
 	s.answer("/mcp/", s.HandleMCP)
-	// 「[Opus 5.5] An MCP server a namespace consumes sends the person back here with the code (mcp_consumed.go).」
+	// 「[Opus 5.5] An MCP server the node consumes sends the person back here with the code (mcp_consumed.go).」
 	s.answer(ConsumedCallbackPath, s.handleConsumedCallback)
 
 	s.answer("/api/search/semantic", s.embeddingsHandler.HandleSemanticSearch)                     // Semantic search (GET)

@@ -1,12 +1,14 @@
 package server
 
-// 「[Opus 5.5] A namespace as a client of another system's MCP server (ADR-038).」
+// 「[Opus 5.5] The node as a client of another system's MCP server (ADR-038).」
 //
 // "Think QNTX being a client of MCP in addition to just being the server."
 //
-// "So, I guess that means the Node itself, and each individual Namespace becomes a consumer of other systems MCP"
+// "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
 //
-// "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS"
+// "THE NODE'S MCP NEEDS"
+//
+// "The thing you built, can we have it root only"
 //
 // 「[Opus 5.5] The OAuth is the SDK's (go-sdk auth). What is the node's: where the code comes back to,」
 // 「[Opus 5.5] where the grant is kept, and what the node lets itself be pointed at.」
@@ -40,13 +42,16 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// 「[Opus 5.5] consumedLineSubject is what a line about an MCP server the namespace consumes is about.」
+// 「[Opus 5.5] consumedLineSubject is what a line about an MCP server the node consumes is about.」
 const consumedLineSubject = "MCP"
+
+// 「[Opus 5.5] consumedIn is where the node keeps its lines about what it consumes: system, its own.」
+const consumedIn = auth.NamespaceSystem
 
 // 「[Opus 5.5] consumedCallSubject is what a line about one call of a server's tool is about.」
 const consumedCallSubject = "MCP_CALL"
 
-// 「[Opus 5.5] consumedContext is what the lines about one server's calls are in, beside the namespace.」
+// 「[Opus 5.5] consumedContext is what the lines about one server's calls are in, beside system.」
 func consumedContext(name string) string { return "mcp:" + name }
 
 // 「[Opus 5.5] A line holds the server's URL and its grant sealed, or says the server was dropped.」
@@ -56,7 +61,7 @@ const (
 	consumedDropped = "dropped"
 )
 
-// 「[Opus 5.5] consumedPurpose is what a grant is sealed for, beside a namespace's keys and push credentials.」
+// 「[Opus 5.5] consumedPurpose is what a grant is sealed for, beside keys and push credentials.」
 const consumedPurpose = "mcp"
 
 // 「[Opus 5.5] ConsumedCallbackPath is where the server's authorization sends the person back with the code.」
@@ -117,7 +122,6 @@ func (g consumedGrant) config(redirect string) *oauth2.Config {
 // 「[Opus 5.5] consumedFlow is one yes being waited on: who asked for it, and where the code goes.」
 type consumedFlow struct {
 	by        string
-	namespace string
 	name      string
 	code      chan consumedReturn
 	attempt   *consumedAttempt
@@ -144,85 +148,52 @@ type consumedAttempt struct {
 	err       error
 }
 
-// 「[Opus 5.5] consumedAsking is the namespace a call on the mcp signum names, when a person asks it. The yes」
-// 「[Opus 5.5] at the server is a person's, and the code comes back to the browser of whoever asked, so a token」
-// 「[Opus 5.5] and a connector are refused, as for keys.」
-//
-// "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
-//
-// 「[Opus 5.5] The node consumes in system, where it keeps its own lines, and only ROOT handles what it consumes.」
-func (s *QNTXServer) consumedAsking(ctx context.Context, sent sigil.Sent) (anAsking, *protocol.Refusal) {
-	if sent["namespace"] == auth.NamespaceSystem {
-		admitted, gated := auth.AdmissionFrom(ctx)
-		if !gated {
-			return anAsking{}, &protocol.Refusal{Why: sigil.Failed, Says: "the MCP servers the node consumes are asked for through the gate, and this asking came through none"}
-		}
-		if refused := consumedByAPerson(admitted, "the node consumes"); refused != nil {
-			return anAsking{}, refused
-		}
-		if !admitted.IsRoot() {
-			return anAsking{}, &protocol.Refusal{Why: sigil.NotAllowed, Param: "namespace", Says: "the MCP servers the node consumes are ROOT's to handle"}
-		}
-		return anAsking{admitted: admitted, namespace: auth.NamespaceSystem}, nil
+// 「[Opus 5.5] consumedHandling is who connects or drops a server the node consumes: ROOT, as a person. The」
+// 「[Opus 5.5] yes at the server is a person's, and the code comes back to the browser of whoever asked, so a」
+// 「[Opus 5.5] token and a connector are refused, ROOT's included.」
+func consumedHandling(ctx context.Context) (auth.Admission, *protocol.Refusal) {
+	admitted, refused := consumedUsing(ctx)
+	if refused != nil {
+		return auth.Admission{}, refused
 	}
-	asked, refused := agentNamespaceOf(ctx, sent)
-	return then(asked, refused, func(asked anAsking) (anAsking, *protocol.Refusal) {
-		if refused := consumedByAPerson(asked.admitted, "a namespace consumes"); refused != nil {
-			return anAsking{}, refused
-		}
-		return asked, s.mayHandle(asked.admitted, asked.namespace, "the MCP servers "+asked.namespace+" consumes are handled")
-	})
-}
-
-// "Node Agent uses them (B)"
-//
-// 「[Opus 5.5] consumedUsing is the namespace a call that uses a server names, rather than handles one: listing」
-// 「[Opus 5.5] them, their tools, and calling one. The node's are used by whoever stands at ROOT, its agents'」
-// 「[Opus 5.5] tokens and ROOT's client included, since "as ROOT, everything ROOT reaches". A namespace's are」
-// 「[Opus 5.5] handled and used alike.」
-func (s *QNTXServer) consumedUsing(ctx context.Context, sent sigil.Sent) (anAsking, *protocol.Refusal) {
-	if sent["namespace"] != auth.NamespaceSystem {
-		return s.consumedAsking(ctx, sent)
-	}
-	admitted, gated := auth.AdmissionFrom(ctx)
-	if !gated {
-		return anAsking{}, &protocol.Refusal{Why: sigil.Failed, Says: "the MCP servers the node consumes are asked for through the gate, and this asking came through none"}
-	}
-	if !admitted.IsRoot() {
-		return anAsking{}, &protocol.Refusal{Why: sigil.NotAllowed, Param: "namespace", Says: "the MCP servers the node consumes are ROOT's to use"}
-	}
-	return anAsking{admitted: admitted, namespace: auth.NamespaceSystem}, nil
-}
-
-// 「[Opus 5.5] consumedByAPerson refuses a token and a connector: the MCP servers whoever consumes are a person's to handle.」
-func consumedByAPerson(admitted auth.Admission, whose string) *protocol.Refusal {
 	switch admitted.Asker().(type) {
 	case admission.TokenAsked:
-		return &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers " + whose + " are a person's to handle, and a token asked"}
+		return auth.Admission{}, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers the node consumes are connected by a person, and a token asked"}
 	}
 	if client, err := named.TextOf("the connector's client", admitted.ClientDID); err == nil {
-		return &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers " + whose + " are a person's to handle, and the connector " + client.String() + " asked"}
+		return auth.Admission{}, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers the node consumes are connected by a person, and the connector " + client.String() + " asked"}
 	}
-	return nil
+	return admitted, nil
 }
 
-// 「[Opus 5.5] consumedSignum is the MCP servers a namespace consumes, at the namespace's path.」
+// 「[Opus 5.5] consumedUsing is who uses a server the node consumes: whoever stands at ROOT, its agents'」
+// 「[Opus 5.5] tokens included, "as ROOT, everything ROOT reaches".」
+func consumedUsing(ctx context.Context) (auth.Admission, *protocol.Refusal) {
+	admitted, gated := auth.AdmissionFrom(ctx)
+	if !gated {
+		return auth.Admission{}, &protocol.Refusal{Why: sigil.Failed, Says: "the MCP servers the node consumes are asked for through the gate, and this asking came through none"}
+	}
+	if !admitted.IsRoot() {
+		return auth.Admission{}, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers the node consumes are ROOT's"}
+	}
+	return admitted, nil
+}
+
+// 「[Opus 5.5] consumedSignum is the MCP servers the node consumes.」
 func (s *QNTXServer) consumedSignum() sigil.Signum {
-	at := "/api/mcp/{namespace}"
-	namespace := &protocol.Param{Name: "namespace", Required: true, Says: "The namespace that consumes the server. system is the node, ROOT's alone."}
-	name := &protocol.Param{Name: "name", Required: true, Says: "What the namespace calls the server, e.g. linear."}
+	at := "/api/mcp"
+	name := &protocol.Param{Name: "name", Required: true, Says: "What the node calls the server, e.g. linear."}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "mcp",
-			Description: "The MCP servers of other systems a namespace consumes, or the node in system: connected by the namespace's owner, ROOT or SUPER, and the node's by ROOT alone, saying yes at the server, the grant kept sealed and never answered back.",
-			Tags:        []string{"mcp", "namespaces"},
+			Description: "The MCP servers of other systems the node consumes: ROOT's alone, connected by ROOT saying yes at the server, the grant kept sealed and never answered back, and used by whoever stands at ROOT, the node's agents included.",
+			Tags:        []string{"mcp"},
 			Sigils: []*protocol.Sigil{
 				{
-					Name:  "list",
-					Does:  "The MCP servers the namespace consumes: each one's name, URL, who connected it and when. A grant is never answered.",
-					Takes: []*protocol.Param{namespace},
+					Name: "list",
+					Does: "The MCP servers the node consumes: each one's name, URL, who connected it and when. A grant is never answered.",
 					Gives: []*protocol.Field{
-						{Name: "name", Says: "What the namespace calls the server."},
+						{Name: "name", Says: "What the node calls the server."},
 						{Name: "url", Says: "Where the server answers."},
 						{Name: "by", Says: "Who connected it, or whose call last refreshed its token."},
 						{Name: "at", Says: "When, as RFC 3339."},
@@ -231,11 +202,11 @@ func (s *QNTXServer) consumedSignum() sigil.Signum {
 				},
 				{
 					Name: "connect",
-					Does: "Connects the namespace to an MCP server at a URL. A server that asks for authorization answers with where to say yes; once the yes comes back, the grant is kept sealed under the name. A server that asks for none answers with its tools.",
-					Takes: []*protocol.Param{namespace, name,
+					Does: "Connects the node to an MCP server at a URL. A server that asks for authorization answers with where to say yes; once the yes comes back, the grant is kept sealed under the name. A server that asks for none answers with its tools.",
+					Takes: []*protocol.Param{name,
 						{Name: "url", Required: true, Says: "Where the server answers, over https."}},
 					Gives: []*protocol.Field{
-						{Name: "name", Says: "What the namespace calls the server."},
+						{Name: "name", Says: "What the node calls the server."},
 						{Name: "url", Says: "Where the server answers."},
 						{Name: "authorize", Says: "Where to say yes, in the browser logged in here. Empty when the server asked for none."},
 						{Name: "tools", Says: "The names of the server's tools, when it answered without a yes. Empty while a yes is waited on."},
@@ -244,8 +215,8 @@ func (s *QNTXServer) consumedSignum() sigil.Signum {
 				},
 				{
 					Name:  "tools",
-					Does:  "The tools an MCP server the namespace consumes lists, asked of it on the grant kept for it. A token that expired is refreshed, and what the refresh issued is kept.",
-					Takes: []*protocol.Param{namespace, name},
+					Does:  "The tools an MCP server the node consumes lists, asked of it on the grant kept for it. A token that expired is refreshed, and what the refresh issued is kept.",
+					Takes: []*protocol.Param{name},
 					Gives: []*protocol.Field{
 						{Name: "name", Says: "The tool's name, as the server lists it."},
 						{Name: "description", Says: "What the server says the tool does."},
@@ -254,8 +225,8 @@ func (s *QNTXServer) consumedSignum() sigil.Signum {
 				},
 				{
 					Name: "call",
-					Does: "Calls one tool of an MCP server the namespace consumes, on the grant kept for it, and writes the call down: who called which tool, with what, and whether it said it failed. The node's servers, in system, are called by whoever stands at ROOT, its agents included.",
-					Takes: []*protocol.Param{namespace, name,
+					Does: "Calls one tool of an MCP server the node consumes, on the grant kept for it, and writes the call down: who called which tool, with what, and whether it said it failed.",
+					Takes: []*protocol.Param{name,
 						{Name: "tool", Required: true, Says: "The tool, by the name mcp tools gives it."},
 						{Name: "arguments", Says: "The tool's arguments, as a JSON object in text. Naming none sends none."}},
 					Gives: []*protocol.Field{
@@ -266,10 +237,10 @@ func (s *QNTXServer) consumedSignum() sigil.Signum {
 				},
 				{
 					Name:  "drop",
-					Does:  "Drops an MCP server the namespace consumes, and the grant kept for it.",
-					Takes: []*protocol.Param{namespace, name},
+					Does:  "Drops an MCP server the node consumes, and the grant kept for it.",
+					Takes: []*protocol.Param{name},
 					Gives: []*protocol.Field{
-						{Name: "name", Says: "What the namespace calls the server."},
+						{Name: "name", Says: "What the node calls the server."},
 						{Name: "url", Says: "Where the server answers."},
 						{Name: "by", Says: "Who connected it, or whose call last refreshed its token."},
 						{Name: "at", Says: "When, as RFC 3339."},
@@ -310,33 +281,33 @@ type consumedTool struct {
 	Description string `json:"description"`
 }
 
-func (s *QNTXServer) consumedList(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	asked, refused := s.consumedUsing(ctx, sent)
-	return then(asked, refused, func(asked anAsking) (any, *protocol.Refusal) {
-		return s.consumedOf(asked.namespace)
-	})
+func (s *QNTXServer) consumedList(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+	if _, refused := consumedUsing(ctx); refused != nil {
+		return nil, refused
+	}
+	return s.consumedOf()
 }
 
 func (s *QNTXServer) consumedDrop(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	asked, refused := s.consumedAsking(ctx, sent)
-	return then(asked, refused, func(asked anAsking) (any, *protocol.Refusal) {
+	admitted, refused := consumedHandling(ctx)
+	return then(admitted, refused, func(admitted auth.Admission) (any, *protocol.Refusal) {
 		name, err := named.TextOf("name", strings.TrimSpace(sent["name"]))
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: err.Error()}
 		}
-		if err := s.writeConsumedLine(asked.admitted, consumedLineSubject, asked.namespace, name.String(), map[string]any{consumedDropped: true}); err != nil {
+		if err := s.writeConsumedLine(admitted, consumedLineSubject, name.String(), map[string]any{consumedDropped: true}); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
-		s.logger.Infow("an MCP server a namespace consumes was dropped", "namespace", asked.namespace, "server", name.String(), "by", asked.admitted.Identity)
-		return s.consumedOf(asked.namespace)
+		s.logger.Infow("an MCP server the node consumes was dropped", "server", name.String(), "by", admitted.Identity)
+		return s.consumedOf()
 	})
 }
 
 // 「[Opus 5.5] consumedConnect starts connecting and waits until the server says where to say yes, or that」
 // 「[Opus 5.5] it needed none, or consumedWait passes.」
 func (s *QNTXServer) consumedConnect(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	asked, refused := s.consumedAsking(ctx, sent)
-	return then(asked, refused, func(asked anAsking) (any, *protocol.Refusal) {
+	admitted, refused := consumedHandling(ctx)
+	return then(admitted, refused, func(admitted auth.Admission) (any, *protocol.Refusal) {
 		name, err := named.TextOf("name", strings.TrimSpace(sent["name"]))
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: err.Error()}
@@ -348,7 +319,7 @@ func (s *QNTXServer) consumedConnect(ctx context.Context, sent sigil.Sent) (any,
 		if s.authHandler == nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node serves no auth, so no authorization can come back to it"}
 		}
-		attempt := s.consume(asked, name.String(), at)
+		attempt := s.consume(admitted, name.String(), at)
 		answered := consumedConnecting{Name: name.String(), URL: at, Tools: []string{}}
 		select {
 		case answered.Authorize = <-attempt.authorize:
@@ -379,30 +350,30 @@ func consumedURLOf(raw string) (string, *protocol.Refusal) {
 
 // 「[Opus 5.5] consume connects to the server apart from the call that asked, since the yes outlives it: the」
 // 「[Opus 5.5] SDK's authorization waits in the fetcher until the callback hands it the code.」
-func (s *QNTXServer) consume(asked anAsking, name, at string) *consumedAttempt {
+func (s *QNTXServer) consume(admitted auth.Admission, name, at string) *consumedAttempt {
 	attempt := &consumedAttempt{authorize: make(chan string, 1), over: make(chan struct{})}
-	sacred.Go("connecting a namespace to an MCP server", func() {
+	sacred.Go("connecting the node to an MCP server", func() {
 		defer close(attempt.over)
 		ctx, cancel := context.WithTimeout(context.Background(), consumedFlowLife)
 		defer cancel()
 		fetch := func(ctx context.Context, args *mcpauth.AuthorizationArgs) (*mcpauth.AuthorizationResult, error) {
-			return s.awaitYes(ctx, attempt, asked, name, args.URL)
+			return s.awaitYes(ctx, attempt, admitted, name, args.URL)
 		}
-		handler, err := s.consumedOAuth(asked.admitted, asked.namespace, name, at, nil, fetch)
+		handler, err := s.consumedOAuth(admitted, name, at, nil, fetch)
 		if err != nil {
 			attempt.err = err
 			return
 		}
 		attempt.tools, attempt.err = s.toolNamesAt(ctx, at, handler)
 		if attempt.err == nil {
-			s.logger.Infow("a namespace is connected to an MCP server", "namespace", asked.namespace, "server", name, "url", at, "tools", len(attempt.tools), "by", asked.admitted.Identity)
+			s.logger.Infow("the node is connected to an MCP server", "server", name, "url", at, "tools", len(attempt.tools), "by", admitted.Identity)
 		}
 	})
 	return attempt
 }
 
 // 「[Opus 5.5] awaitYes hands the URL to say yes at to whoever asked, and waits for the callback's code.」
-func (s *QNTXServer) awaitYes(ctx context.Context, attempt *consumedAttempt, asked anAsking, name, authorizeURL string) (*mcpauth.AuthorizationResult, error) {
+func (s *QNTXServer) awaitYes(ctx context.Context, attempt *consumedAttempt, admitted auth.Admission, name, authorizeURL string) (*mcpauth.AuthorizationResult, error) {
 	at, err := url.Parse(authorizeURL)
 	if err != nil {
 		return nil, errors.Wrapf(err, "the URL to say yes at for %s did not parse", name)
@@ -411,7 +382,7 @@ func (s *QNTXServer) awaitYes(ctx context.Context, attempt *consumedAttempt, ask
 	if state == "" {
 		return nil, errors.Newf("the URL to say yes at for %s names no state", name)
 	}
-	flow := &consumedFlow{by: asked.admitted.Identity, namespace: asked.namespace, name: name,
+	flow := &consumedFlow{by: admitted.Identity, name: name,
 		code: make(chan consumedReturn, 1), attempt: attempt, startedAt: time.Now()}
 	s.consuming.pending.Store(state, flow)
 	defer s.consuming.pending.Delete(state)
@@ -430,11 +401,11 @@ func (s *QNTXServer) awaitYes(ctx context.Context, attempt *consumedAttempt, ask
 
 // 「[Opus 5.5] consumedOAuth is the SDK's authorization code flow, as the node's: registering itself by」
 // 「[Opus 5.5] dynamic client registration with its own callback, reaching out only through consumedClient,」
-// 「[Opus 5.5] and keeping each token it is issued, sealed, in the namespace.」
-func (s *QNTXServer) consumedOAuth(admitted auth.Admission, namespace, name, at string, kept *consumedGrant, fetch mcpauth.AuthorizationCodeFetcher) (*mcpauth.AuthorizationCodeHandler, error) {
+// 「[Opus 5.5] and keeping each token it is issued, sealed, in system.」
+func (s *QNTXServer) consumedOAuth(admitted auth.Admission, name, at string, kept *consumedGrant, fetch mcpauth.AuthorizationCodeFetcher) (*mcpauth.AuthorizationCodeHandler, error) {
 	redirect := s.authHandler.PublicOrigin() + ConsumedCallbackPath
 	keep := func(cfg *oauth2.Config, token *oauth2.Token) error {
-		return s.keepGrant(admitted, namespace, name, at, consumedGrant{
+		return s.keepGrant(admitted, name, at, consumedGrant{
 			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret, AuthURL: cfg.Endpoint.AuthURL, TokenURL: cfg.Endpoint.TokenURL,
 			AuthStyle: cfg.Endpoint.AuthStyle, Scopes: cfg.Scopes, Token: token,
 		})
@@ -522,8 +493,8 @@ func (s *QNTXServer) toolsAt(ctx context.Context, at string, handler mcpauth.OAu
 
 // 「[Opus 5.5] consumedConn opens the session with the server on the grant kept for it. A grant the server no」
 // 「[Opus 5.5] longer takes is not said yes to again here: that is mcp connect, in a browser.」
-func (s *QNTXServer) consumedConn(ctx context.Context, asked anAsking, name string) (*mcpclient.Conn, *protocol.Refusal) {
-	at, grant, err := s.grantOf(asked.namespace, name)
+func (s *QNTXServer) consumedConn(ctx context.Context, admitted auth.Admission, name string) (*mcpclient.Conn, *protocol.Refusal) {
+	at, grant, err := s.grantOf(name)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: err.Error()}
 	}
@@ -531,9 +502,9 @@ func (s *QNTXServer) consumedConn(ctx context.Context, asked anAsking, name stri
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node serves no auth, so no authorization can come back to it"}
 	}
 	again := func(context.Context, *mcpauth.AuthorizationArgs) (*mcpauth.AuthorizationResult, error) {
-		return nil, errors.Newf("%s no longer takes the grant %s keeps for it: say yes again with mcp connect", at, asked.namespace)
+		return nil, errors.Newf("%s no longer takes the grant the node keeps for it: say yes again with mcp connect", at)
 	}
-	handler, err := s.consumedOAuth(asked.admitted, asked.namespace, name, at, &grant, again)
+	handler, err := s.consumedOAuth(admitted, name, at, &grant, again)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
@@ -546,13 +517,13 @@ func (s *QNTXServer) consumedConn(ctx context.Context, asked anAsking, name stri
 }
 
 func (s *QNTXServer) consumedTools(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	asked, refused := s.consumedUsing(ctx, sent)
-	return then(asked, refused, func(asked anAsking) (any, *protocol.Refusal) {
+	admitted, refused := consumedUsing(ctx)
+	return then(admitted, refused, func(admitted auth.Admission) (any, *protocol.Refusal) {
 		name, err := named.TextOf("name", strings.TrimSpace(sent["name"]))
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: err.Error()}
 		}
-		conn, refused := s.consumedConn(ctx, asked, name.String())
+		conn, refused := s.consumedConn(ctx, admitted, name.String())
 		if refused != nil {
 			return nil, refused
 		}
@@ -577,8 +548,8 @@ type consumedCalled struct {
 // 「[Opus 5.5] consumedCall calls one tool of the server on the grant kept for it, and writes the call down:」
 // 「[Opus 5.5] who called which tool of which server, with what, and whether the tool said it failed.」
 func (s *QNTXServer) consumedCall(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	asked, refused := s.consumedUsing(ctx, sent)
-	return then(asked, refused, func(asked anAsking) (any, *protocol.Refusal) {
+	admitted, refused := consumedUsing(ctx)
+	return then(admitted, refused, func(admitted auth.Admission) (any, *protocol.Refusal) {
 		name, err := named.TextOf("name", strings.TrimSpace(sent["name"]))
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: err.Error()}
@@ -593,7 +564,7 @@ func (s *QNTXServer) consumedCall(ctx context.Context, sent sigil.Sent) (any, *p
 				return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "arguments", Says: "arguments is the tool's arguments as a JSON object, and " + err.Error()}
 			}
 		}
-		conn, refused := s.consumedConn(ctx, asked, name.String())
+		conn, refused := s.consumedConn(ctx, admitted, name.String())
 		if refused != nil {
 			return nil, refused
 		}
@@ -609,7 +580,7 @@ func (s *QNTXServer) consumedCall(ctx context.Context, sent sigil.Sent) (any, *p
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "the arguments to %s of %s did not marshal", tool.String(), name.String()).Error()}
 		}
-		if err := s.writeConsumedLine(asked.admitted, consumedCallSubject, asked.namespace, tool.String(),
+		if err := s.writeConsumedLine(admitted, consumedCallSubject, tool.String(),
 			map[string]any{"server": name.String(), "arguments": string(said), "is_error": result.IsError}, consumedContext(name.String())); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
@@ -618,45 +589,45 @@ func (s *QNTXServer) consumedCall(ctx context.Context, sent sigil.Sent) (any, *p
 }
 
 // 「[Opus 5.5] keepGrant writes the grant down for the server, sealed, as whoever's call it was issued on.」
-func (s *QNTXServer) keepGrant(admitted auth.Admission, namespace, name, at string, grant consumedGrant) error {
+func (s *QNTXServer) keepGrant(admitted auth.Admission, name, at string, grant consumedGrant) error {
 	body, err := json.Marshal(grant)
 	if err != nil {
-		return errors.Wrapf(err, "the grant for %s of %s did not marshal", name, namespace)
+		return errors.Wrapf(err, "the grant for %s did not marshal", name)
 	}
-	sealed, err := s.sealFor(consumedPurpose, namespace, string(body))
+	sealed, err := s.sealFor(consumedPurpose, consumedIn, string(body))
 	if err != nil {
 		return err
 	}
-	return s.writeConsumedLine(admitted, consumedLineSubject, namespace, name, map[string]any{consumedURL: at, consumedSealed: sealed})
+	return s.writeConsumedLine(admitted, consumedLineSubject, name, map[string]any{consumedURL: at, consumedSealed: sealed})
 }
 
-// 「[Opus 5.5] writeConsumedLine writes one line about a server the namespace consumes, as whoever's call it was.」
-func (s *QNTXServer) writeConsumedLine(admitted auth.Admission, subject, namespace, name string, attributes map[string]any, contexts ...string) error {
-	store, err := s.held.Write(admitted, namespace)
+// 「[Opus 5.5] writeConsumedLine writes one line about a server the node consumes, in system, as whoever's call it was.」
+func (s *QNTXServer) writeConsumedLine(admitted auth.Admission, subject, name string, attributes map[string]any, contexts ...string) error {
+	store, err := s.held.Write(admitted, consumedIn)
 	if err != nil {
-		return errors.Wrapf(err, "no store to write the %s line %s of %s in", subject, name, namespace)
+		return errors.Wrapf(err, "no store to write the %s line %s in", subject, name)
 	}
-	id, err := identity.GenerateASUIDWithRetry("AS", subject, name, namespace, store.AttestationExists)
+	id, err := identity.GenerateASUIDWithRetry("AS", subject, name, consumedIn, store.AttestationExists)
 	if err != nil {
-		return errors.Wrapf(err, "failed to name the %s line %s of %s", subject, name, namespace)
+		return errors.Wrapf(err, "failed to name the %s line %s", subject, name)
 	}
 	at := time.Now()
 	return errors.Wrapf(store.CreateAttestation(&types.As{
-		ID: id, Subjects: []string{subject}, Predicates: []string{name}, Contexts: append([]string{namespace}, contexts...),
+		ID: id, Subjects: []string{subject}, Predicates: []string{name}, Contexts: append([]string{consumedIn}, contexts...),
 		Actors: []string{admitted.Identity}, Timestamp: at, CreatedAt: at, Source: "mcp",
 		Attributes: attributes,
-	}), "the %s line %s of %s was not written", subject, name, namespace)
+	}), "the %s line %s was not written", subject, name)
 }
 
-// 「[Opus 5.5] newestConsumed is the newest line of the namespace for each server it names.」
-func (s *QNTXServer) newestConsumed(namespace string) (map[string]*types.As, error) {
-	reading, err := s.held.Read(namespace)
+// 「[Opus 5.5] newestConsumed is the newest line in system for each server the node consumes.」
+func (s *QNTXServer) newestConsumed() (map[string]*types.As, error) {
+	reading, err := s.held.Read(consumedIn)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read the %s lines of %s", consumedLineSubject, namespace)
+		return nil, errors.Wrapf(err, "failed to read the %s lines", consumedLineSubject)
 	}
 	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{consumedLineSubject}, Limit: ats.EveryRow})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read the %s lines of %s", consumedLineSubject, namespace)
+		return nil, errors.Wrapf(err, "failed to read the %s lines", consumedLineSubject)
 	}
 	newest := map[string]*types.As{}
 	for _, as := range found {
@@ -669,9 +640,9 @@ func (s *QNTXServer) newestConsumed(namespace string) (map[string]*types.As, err
 	return newest, nil
 }
 
-// 「[Opus 5.5] consumedOf is the servers the namespace consumes: each one whose newest line holds a grant.」
-func (s *QNTXServer) consumedOf(namespace string) ([]consumedServer, *protocol.Refusal) {
-	newest, err := s.newestConsumed(namespace)
+// 「[Opus 5.5] consumedOf is the servers the node consumes: each one whose newest line holds a grant.」
+func (s *QNTXServer) consumedOf() ([]consumedServer, *protocol.Refusal) {
+	newest, err := s.newestConsumed()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
@@ -681,7 +652,7 @@ func (s *QNTXServer) consumedOf(namespace string) ([]consumedServer, *protocol.R
 			continue
 		}
 		at, _ := as.Attributes[consumedURL].(string)
-		by, err := named.ItemsOf(consumedLineSubject+" line "+as.ID+" of "+namespace+", who connected it,", as.Actors)
+		by, err := named.ItemsOf(consumedLineSubject+" line "+as.ID+", who connected it,", as.Actors)
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
@@ -692,34 +663,34 @@ func (s *QNTXServer) consumedOf(namespace string) ([]consumedServer, *protocol.R
 }
 
 // 「[Opus 5.5] grantOf is the server's URL and its grant, unsealed.」
-func (s *QNTXServer) grantOf(namespace, name string) (string, consumedGrant, error) {
-	newest, err := s.newestConsumed(namespace)
+func (s *QNTXServer) grantOf(name string) (string, consumedGrant, error) {
+	newest, err := s.newestConsumed()
 	if err != nil {
 		return "", consumedGrant{}, err
 	}
 	as, set := newest[name]
 	if !set {
-		return "", consumedGrant{}, errors.Newf("%s consumes no MCP server %s: connect one with mcp connect", namespace, name)
+		return "", consumedGrant{}, errors.Newf("the node consumes no MCP server %s: connect one with mcp connect", name)
 	}
 	sealed, holds := as.Attributes[consumedSealed].(string)
 	if !holds {
-		return "", consumedGrant{}, errors.Newf("the MCP server %s of %s was dropped: connect it again with mcp connect", name, namespace)
+		return "", consumedGrant{}, errors.Newf("the MCP server %s was dropped: connect it again with mcp connect", name)
 	}
 	where, _ := as.Attributes[consumedURL].(string)
-	at, err := named.TextOf(consumedLineSubject+" line "+as.ID+" of "+namespace+", its url,", where)
+	at, err := named.TextOf(consumedLineSubject+" line "+as.ID+", its url,", where)
 	if err != nil {
 		return "", consumedGrant{}, err
 	}
-	opened, err := s.unsealFor(consumedPurpose, namespace, sealed)
+	opened, err := s.unsealFor(consumedPurpose, consumedIn, sealed)
 	if err != nil {
 		return "", consumedGrant{}, err
 	}
 	var grant consumedGrant
 	if err := json.Unmarshal([]byte(opened), &grant); err != nil {
-		return "", consumedGrant{}, errors.Wrapf(err, "the grant for %s of %s did not read", name, namespace)
+		return "", consumedGrant{}, errors.Wrapf(err, "the grant for %s did not read", name)
 	}
 	if grant.Token == nil {
-		return "", consumedGrant{}, errors.Newf("the grant for %s of %s holds no token", name, namespace)
+		return "", consumedGrant{}, errors.Newf("the grant for %s holds no token", name)
 	}
 	return at.String(), grant, nil
 }
@@ -750,7 +721,7 @@ func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Reque
 	}
 	admitted, gated := auth.AdmissionFrom(r.Context())
 	if !gated || admitted.Identity != flow.by {
-		s.logger.Infow("an MCP server's yes refused: finished by somebody who did not ask for it", "namespace", flow.namespace, "server", flow.name)
+		s.logger.Infow("an MCP server's yes refused: finished by somebody who did not ask for it", "server", flow.name)
 		say(w, http.StatusForbidden, false, "This yes was asked for by somebody else. Connect from your own window, logged in here.")
 		return
 	}
@@ -773,12 +744,12 @@ func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Reque
 	select {
 	case <-flow.attempt.over:
 	case <-time.After(consumedWait):
-		say(w, http.StatusAccepted, true, flow.namespace+" is still connecting to "+flow.name+": mcp list says when it is")
+		say(w, http.StatusAccepted, true, "The node is still connecting to "+flow.name+": mcp list says when it is")
 		return
 	}
 	if flow.attempt.err != nil {
-		say(w, http.StatusBadGateway, false, flow.namespace+" is not connected to "+flow.name+": "+flow.attempt.err.Error())
+		say(w, http.StatusBadGateway, false, "The node is not connected to "+flow.name+": "+flow.attempt.err.Error())
 		return
 	}
-	say(w, http.StatusOK, true, flow.namespace+" is connected to "+flow.name+", which lists "+strings.Join(flow.attempt.tools, ", "))
+	say(w, http.StatusOK, true, "The node is connected to "+flow.name+", which lists "+strings.Join(flow.attempt.tools, ", "))
 }

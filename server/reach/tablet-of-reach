@@ -203,13 +203,11 @@ REACH is '/api/agents/{namespace}' '/api/agents/{namespace}/say' '/api/agents/{n
 # handles them is the namespace's owner, ROOT or SUPER, asked there too.
 REACH is '/api/keys/{namespace}' '/api/keys/{namespace}/drop'              of ROOT SUPER USER
 
-# 「[Opus 5.5] The MCP servers a namespace consumes (ADR-038): the yes at the server is a person's, so no」
-# 「[Opus 5.5] TOKEN, and the handler refuses a token or a connector at any level, as for keys. The callback」
-# 「[Opus 5.5] is reached logged in: the code goes only to the yes the person logged in asked for. The node's」
-# 「[Opus 5.5] servers, in system, are used by whoever stands at ROOT, its agents' tokens included, asked there.」
-REACH is '/api/mcp/{namespace}' '/api/mcp/{namespace}/tools' '/api/mcp/{namespace}/drop' of ROOT SUPER USER
-REACH is '/api/mcp/{namespace}/call'                                      of ROOT SUPER USER
-REACH is '/auth/mcp/callback'                                             of ROOT SUPER USER
+# 「[Opus 5.5] The MCP servers the node consumes (ADR-038): ROOT's. "The thing you built, can we have it root」
+# 「[Opus 5.5] only". The yes at the server is a person's, so the handler refuses a token or a connector the」
+# 「[Opus 5.5] connecting, and the callback is reached logged in: the code goes only to who asked for the yes.」
+REACH is '/api/mcp' '/api/mcp/tools' '/api/mcp/call' '/api/mcp/drop'      of ROOT
+REACH is '/auth/mcp/callback'                                             of ROOT
 
 # Approvals (ADR-052): "approvals is ROOT only for now". The list is a sigil;
 # the answer is a route and no sigil, "human only" and "only through it's

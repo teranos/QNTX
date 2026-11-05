@@ -437,32 +437,24 @@
         "ROOT"
       ]
     },
-    "/api/mcp/{namespace}": {
+    "/api/mcp": {
       "x-qntx-reach": [
-        "ROOT",
-        "SUPER",
-        "USER"
+        "ROOT"
       ]
     },
-    "/api/mcp/{namespace}/call": {
+    "/api/mcp/call": {
       "x-qntx-reach": [
-        "ROOT",
-        "SUPER",
-        "USER"
+        "ROOT"
       ]
     },
-    "/api/mcp/{namespace}/drop": {
+    "/api/mcp/drop": {
       "x-qntx-reach": [
-        "ROOT",
-        "SUPER",
-        "USER"
+        "ROOT"
       ]
     },
-    "/api/mcp/{namespace}/tools": {
+    "/api/mcp/tools": {
       "x-qntx-reach": [
-        "ROOT",
-        "SUPER",
-        "USER"
+        "ROOT"
       ]
     },
     "/api/namespaces": {
@@ -877,9 +869,7 @@
     },
     "/auth/mcp/callback": {
       "x-qntx-reach": [
-        "ROOT",
-        "SUPER",
-        "USER"
+        "ROOT"
       ]
     },
     "/auth/register/begin": {
