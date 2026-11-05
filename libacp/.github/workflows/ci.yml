@@ -1,5 +1,5 @@
-# Both systems ground links libacp on. nix build runs the flake's checkPhase,
-# which is make test; the dev shell run is the same tests outside the sandbox.
+# 「[Opus 5.5] Both systems ground links libacp on. nix build runs the flake's checkPhase,」
+# 「[Opus 5.5] which is make test; the dev shell run is the same tests outside the sandbox.」
 name: CI
 on:
   push:

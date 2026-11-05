@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Strings passed to Ground's C ABI must not silently stop at an embedded NUL.
+// 「[Opus 5.5] Strings passed to Ground's C ABI must not silently stop at an embedded NUL.」
 static int new_string(json_object *value) {
     return json_object_is_type(value, json_type_string)
         && strlen(json_object_get_string(value)) == (size_t) json_object_get_string_len(value);
@@ -19,7 +19,7 @@ static int new_pairs(json_object *list) {
     return 1;
 }
 
-// v1's three MCP shapes. SSE may be well formed even when the agent does not offer it.
+// 「[Opus 5.5] v1's three MCP shapes. SSE may be well formed even when the agent does not offer it.」
 static int new_server(json_object *server) {
     if (!new_string(acp_field(server, "name"))) return 0;
     json_object *type = acp_field(server, "type");
@@ -106,7 +106,7 @@ acp_status acp_session_new_result(const char *session_id, const char *modes_json
     return acp_finish(result, out_json);
 }
 
-// The session and its absolute cwd, as method's request names them; load names its servers too.
+// 「[Opus 5.5] The session and its absolute cwd, as method's request names them; load names its servers too.」
 static acp_status resume_read(const char *method, int servers, const char *params_json, size_t length,
                               acp_session_resume *out, acp_buffer *error_json) {
     if (params_json == NULL || out == NULL || error_json == NULL) return ACP_INVALID_ARGUMENT;
@@ -218,7 +218,7 @@ void acp_session_resume_free(acp_session_resume *resume) {
     resume->cwd = NULL;
 }
 
-// A field's string, copied, or NULL when absent or null; anything else is refused as not a string.
+// 「[Opus 5.5] A field's string, copied, or NULL when absent or null; anything else is refused as not a string.」
 static acp_status optional_string(json_object *value, const char *key, char **out, acp_buffer *error_json) {
     if (value == NULL || json_object_is_type(value, json_type_null)) return ACP_OK;
     if (json_object_is_type(value, json_type_string)) {

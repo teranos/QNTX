@@ -1,5 +1,5 @@
-// Package acptest stands in for an ACP agent in a test: a shell script that answers what a client asks
-// by its method, and keeps each run's arguments, environment and every line it was sent.
+// 「[Opus 5.5] Package acptest stands in for an ACP agent in a test: a shell script that answers what a client asks」
+// 「[Opus 5.5] by its method, and keeps each run's arguments, environment and every line it was sent.」
 package acptest
 
 import (
@@ -9,8 +9,8 @@ import (
 	"testing"
 )
 
-// Script is what the stand-in answers. Updates are SessionUpdate objects, told before the prompt's
-// answer; Log is written to the file --log-file names, when it names one.
+// 「[Opus 5.5] Script is what the stand-in answers. Updates are SessionUpdate objects, told before the prompt's」
+// 「[Opus 5.5] answer; Log is written to the file --log-file names, when it names one.」
 type Script struct {
 	Session string
 	Updates []string
@@ -18,7 +18,7 @@ type Script struct {
 	Log     string
 }
 
-// StandIn writes the stand-in. Run n keeps its args, env and input under ran/n.
+// 「[Opus 5.5] StandIn writes the stand-in. Run n keeps its args, env and input under ran/n.」
 func StandIn(t testing.TB, s Script) (binary, ran string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -75,7 +75,7 @@ done
 	return binary, ran
 }
 
-// Read is one file a run kept, by its lines.
+// 「[Opus 5.5] Read is one file a run kept, by its lines.」
 func Read(t testing.TB, ran, run, what string) []string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(ran, run, what))
