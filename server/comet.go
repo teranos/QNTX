@@ -82,6 +82,12 @@ func (s *QNTXServer) groundAgent(home string) {
 		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
 		return
 	}
+	// A ground that stands holds the sand its grove checkout's rituals make now, or is built again.
+	if err := comet.SandStands(home, s.ownURL); err != nil {
+		s.logger.Named("comet").Infow("An agent's ground is built again: its sand does not stand", "home", home, "because", err.Error())
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
+		return
+	}
 	// A ground that stands loads from the store a deploy collects (plugin_roots.go): kept, or built again.
 	if err := s.keepAgentGround(home); err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built again: what it loads from was not kept", "home", home, "because", err.Error())

@@ -122,3 +122,69 @@ func TestAnAgentWithoutRitualsKeepsNoSand(t *testing.T) {
 	require.NoError(t, err)
 	assert.NoFileExists(t, filepath.Join(carried, ".local", "share", "ground", "sand", SandFile(platform)))
 }
+
+// buildAgent builds the agent in home on a node where every build succeeds.
+func buildAgent(t *testing.T, home string) {
+	t.Helper()
+	require.NoError(t, Builder{Node: agentNode{builds: t.TempDir()}, NixBin: "/nix/bin"}.BuildAgent(context.Background(), home, "http://127.0.0.1:8772"))
+}
+
+// Qodo on #1535: an agent whose ground stands was never built again, so its rituals never came.
+// Its sand stands only as the controls of its grove checkout are now: one that arrived, changed or
+// grew since the last build does not stand, and is built again.
+func TestAnAgentsSandStandsOnlyForTheControlsItWasBuiltFrom(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	const url = "http://127.0.0.1:8772"
+	require.NoError(t, SandStands(home, url), "an agent with no grove checkout needs no sand")
+
+	groveCheckout(t, home, map[string]string{"grove.pbt": willow})
+	require.Error(t, SandStands(home, url), "a grove checkout that arrived after the build")
+
+	buildAgent(t, home)
+	require.NoError(t, SandStands(home, url))
+
+	groveCheckout(t, home, map[string]string{"grove.pbt": willow + "\n# changed\n"})
+	require.Error(t, SandStands(home, url), "a control that changed")
+	buildAgent(t, home)
+	require.NoError(t, SandStands(home, url))
+
+	groveCheckout(t, home, map[string]string{"moon.pbt": "project {\n  path: \"/sbvh-nl/grove\"\n}\n"})
+	require.Error(t, SandStands(home, url), "a control that was added")
+}
+
+// Qodo on #1535: a build with no rituals left removes the sand this agent's build kept, and only that.
+func TestRemovedRitualsLeaveNoSandTheAgentKept(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	groveCheckout(t, home, map[string]string{"grove.pbt": willow})
+	buildAgent(t, home)
+	platform, err := Native()
+	require.NoError(t, err)
+	held, err := AgentLocalSand(platform)
+	require.NoError(t, err)
+	require.FileExists(t, held)
+
+	require.NoError(t, os.RemoveAll(AgentGrove(home)))
+	require.Error(t, SandStands(home, "http://127.0.0.1:8772"), "a sand still held for rituals that are gone")
+	buildAgent(t, home)
+	assert.NoFileExists(t, held)
+	require.NoError(t, SandStands(home, "http://127.0.0.1:8772"))
+}
+
+// Another agent's build, with no rituals of its own, leaves the sand it did not build.
+func TestAnotherAgentsBuildLeavesTheSandItDidNotKeep(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	node, other := t.TempDir(), t.TempDir()
+	groveCheckout(t, node, map[string]string{"grove.pbt": willow})
+	buildAgent(t, node)
+	buildAgent(t, other)
+
+	platform, err := Native()
+	require.NoError(t, err)
+	held, err := AgentLocalSand(platform)
+	require.NoError(t, err)
+	assert.FileExists(t, held)
+	require.NoError(t, SandStands(node, "http://127.0.0.1:8772"))
+	require.NoError(t, SandStands(other, "http://127.0.0.1:8772"))
+}

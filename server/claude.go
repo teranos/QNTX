@@ -299,6 +299,12 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			if err := comet.AgentTrust(agent.home); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + "'s work was not trusted for the rituals it starts: " + err.Error()}
 			}
+			// A grove checkout that arrived or changed since its ground was built is built into its
+			// sand apart from this turn, which is said on what it holds now.
+			if err := comet.SandStands(agent.home, s.ownURL); err != nil && !comet.Building(agent.home) {
+				s.logger.Named("comet").Infow("An agent's ground is built again: its sand does not stand", "home", agent.home, "because", err.Error())
+				s.cometHandler().Builder.GroundAgent(s.ctx, agent.home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
+			}
 			if plan, err = secretref.Resolve(ctx, named.TokenRef); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "the Claude plan token am.toml names did not resolve: " + err.Error()}
 			}
