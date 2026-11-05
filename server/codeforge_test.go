@@ -134,3 +134,18 @@ func TestAFolderGitHubRefusesToListIsSaidBeforeAnyCommit(t *testing.T) {
 	assert.Empty(t, stand.commits, "nothing is committed")
 	assert.Empty(t, stand.pulls)
 }
+
+// Qodo's review of #1515: GitHub lists a folder to its first 1,000 files. A
+// file past them was read as absent, added without its blob, and GitHub
+// refused it as a file that is there.
+func TestAFileGitHubListsItsFolderShortOfIsReplaced(t *testing.T) {
+	s, _ := vaultBindingServer(t)
+	stand.listsAtMost = 1
+	got, refused := askCodeForge(t, s, sigil.Sent{
+		"repo": "github.com/abcd-nl/clean", "branch": "agent-picture", "title": "x",
+		"files": `{"docs/adr/diagram.png": "another picture"}`,
+	})
+	require.Nil(t, refused, "%v", refused)
+	assert.Equal(t, []string{"docs/adr/diagram.png"}, got.(map[string]any)["committed"])
+	assert.Equal(t, "another picture", stand.branches["agent-picture"]["docs/adr/diagram.png"])
+}

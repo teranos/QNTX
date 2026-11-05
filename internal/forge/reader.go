@@ -95,8 +95,13 @@ type Reader interface {
 	File(ctx context.Context, as Acting, repo Repo, ref, path string) ([]byte, error)
 	// KindAt is what is at path on ref.
 	KindAt(ctx context.Context, as Acting, repo Repo, ref, path string) (EntryKind, error)
-	// Entries is what the directory dir holds on ref. Root is the top.
+	// Entries is what the directory dir holds on ref. Root is the top. A forge
+	// may list only part of a large directory: what it leaves out is not
+	// absent for it.
 	Entries(ctx context.Context, as Acting, repo Repo, ref, dir string) ([]Entry, error)
+	// 「[Opus 5.5] EntryAt is what is at path on ref, a file with its blob, asked of that path alone.」
+	// 「[Opus 5.5] Nothing there is a Refused that is Absent.」
+	EntryAt(ctx context.Context, as Acting, repo Repo, ref, path string) (Entry, error)
 	// Readme is the README of dir on ref; Root is the repository's own.
 	Readme(ctx context.Context, as Acting, repo Repo, ref, dir string) (Readme, error)
 	// Branch is the commit a branch is at. A branch the forge has none of is a

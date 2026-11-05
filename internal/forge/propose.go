@@ -92,7 +92,9 @@ func (p Proposal) HoldBranch(ctx context.Context, on Forge, as Acting) error {
 // Holds is the blob the proposal's branch holds at each of paths, for the
 // ones it holds a file at: what an edit of that file replaces or removes. A
 // directory the forge says it has none of holds nothing; a listing it refuses
-// for any other reason is said, before any edit.
+// for any other reason is said, before any edit. A path its folder's listing
+// does not name is asked of the forge by itself, since a forge may list only
+// part of a folder.
 func (p Proposal) Holds(ctx context.Context, on Forge, as Acting, paths []string) (map[string]string, error) {
 	asked := map[string]bool{}
 	for _, file := range paths {
@@ -100,11 +102,28 @@ func (p Proposal) Holds(ctx context.Context, on Forge, as Acting, paths []string
 	}
 	held := map[string]string{}
 	listed := map[string]bool{}
-	for _, file := range paths {
-		dir := Root
-		if cut := strings.LastIndex(file, "/"); cut >= 0 {
-			dir = file[:cut]
+	// 「[Opus 5.5] seen is each path a listing named; absent each folder the forge has none of.」
+	seen, absent := map[string]bool{}, map[string]bool{}
+	// What is there and no file is neither added over nor replaced: said now,
+	// before any edit reaches the branch.
+	hold := func(entry Entry) error {
+		switch entry.Kind {
+		case File:
+			held[entry.Path] = entry.SHA
+			return nil
+		case Dir:
+			return errors.Newf("%s is a folder of %s on %s, not a file", entry.Path, p.Repo, p.Branch)
 		}
+		return errors.Newf("%s is held by %s on %s as no file and no folder", entry.Path, p.Repo, p.Branch)
+	}
+	dirOf := func(file string) string {
+		if cut := strings.LastIndex(file, "/"); cut >= 0 {
+			return file[:cut]
+		}
+		return Root
+	}
+	for _, file := range paths {
+		dir := dirOf(file)
 		if listed[dir] {
 			continue
 		}
@@ -112,6 +131,7 @@ func (p Proposal) Holds(ctx context.Context, on Forge, as Acting, paths []string
 		entries, err := on.Entries(ctx, as, p.Repo, p.Branch, dir)
 		var refused Refused
 		if errors.As(err, &refused) && refused.Absent {
+			absent[dir] = true
 			continue
 		}
 		if errors.As(err, &refused) {
@@ -128,16 +148,31 @@ func (p Proposal) Holds(ctx context.Context, on Forge, as Acting, paths []string
 			if !asked[entry.Path] {
 				continue
 			}
-			// What is there and no file is neither added over nor replaced:
-			// said now, before any edit reaches the branch.
-			switch entry.Kind {
-			case File:
-				held[entry.Path] = entry.SHA
-			case Dir:
-				return nil, errors.Newf("%s is a folder of %s on %s, not a file", entry.Path, p.Repo, p.Branch)
-			default:
-				return nil, errors.Newf("%s is held by %s on %s as no file and no folder", entry.Path, p.Repo, p.Branch)
+			seen[entry.Path] = true
+			if err := hold(entry); err != nil {
+				return nil, err
 			}
+		}
+	}
+	// 「[Opus 5.5] A path in a folder that is there and that its listing did not name is asked by itself.」
+	for _, file := range paths {
+		if seen[file] || absent[dirOf(file)] {
+			continue
+		}
+		seen[file] = true
+		entry, err := on.EntryAt(ctx, as, p.Repo, p.Branch, file)
+		var refused Refused
+		if errors.As(err, &refused) && refused.Absent {
+			continue
+		}
+		if errors.As(err, &refused) {
+			return nil, errors.Newf("%s of %s on %s was not asked, so whether the branch holds it is not known: %s", file, p.Repo, p.Branch, refused.Says)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if err := hold(entry); err != nil {
+			return nil, err
 		}
 	}
 	return held, nil

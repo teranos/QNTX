@@ -24,6 +24,8 @@ type standInRepo struct {
 	refuseRef string
 	// refuseList is a folder GitHub will not list for the App, though the branch holds it.
 	refuseList string
+	// listsAtMost is how many entries of a folder GitHub lists, as it lists 1,000; zero is all.
+	listsAtMost int
 }
 
 // stand is the repository the stand-in GitHub of vaultBindingServer holds.
@@ -163,6 +165,12 @@ func (repo *standInRepo) contents(asked, ref string, give func(int, any)) {
 	if len(entries) == 0 {
 		give(http.StatusNotFound, map[string]string{"message": "Not Found"})
 		return
+	}
+	slices.SortFunc(entries, func(a, b any) int {
+		return strings.Compare(a.(map[string]any)["path"].(string), b.(map[string]any)["path"].(string))
+	})
+	if repo.listsAtMost > 0 && len(entries) > repo.listsAtMost {
+		entries = entries[:repo.listsAtMost]
 	}
 	give(http.StatusOK, entries)
 }

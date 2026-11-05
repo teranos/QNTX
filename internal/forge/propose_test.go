@@ -3,6 +3,7 @@ package forge
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,7 +23,9 @@ type shelf struct {
 	refuses string
 	// unlisted is a folder the shelf holds and refuses to list.
 	unlisted string
-	asked    []string
+	// listsAtMost is how many entries of a folder the shelf lists, as GitHub lists 1,000; zero is all.
+	listsAtMost int
+	asked       []string
 }
 
 // proposed is a change open on the shelf, with the branches it is between.
@@ -118,7 +121,24 @@ func (s *shelf) Entries(_ context.Context, _ Acting, _ Repo, ref, dir string) ([
 	if dir == s.unlisted {
 		return nil, Refused{Says: "the shelf does not list " + dir + " for you"}
 	}
+	slices.SortFunc(entries, func(a, b Entry) int { return strings.Compare(a.Path, b.Path) })
+	if s.listsAtMost > 0 && len(entries) > s.listsAtMost {
+		entries = entries[:s.listsAtMost]
+	}
 	return entries, nil
+}
+
+func (s *shelf) EntryAt(_ context.Context, _ Acting, _ Repo, ref, path string) (Entry, error) {
+	s.asked = append(s.asked, "at "+path)
+	if content, isFile := s.branches[ref][path]; isFile {
+		return Entry{Path: path, SHA: shelfBlob(content), Kind: File}, nil
+	}
+	for held := range s.branches[ref] {
+		if strings.HasPrefix(held, path+"/") {
+			return Entry{Path: path, Kind: Dir}, nil
+		}
+	}
+	return Entry{}, Refused{Says: "the shelf has no " + path, Absent: true}
 }
 
 func (s *shelf) ChangeFrom(_ context.Context, _ Acting, _ Repo, head, base string) (Change, bool, error) {
@@ -253,4 +273,20 @@ func TestAFolderTheForgeRefusesToListIsSaidBeforeAnyCommit(t *testing.T) {
 	assert.Contains(t, err.Error(), "whether it holds notes/kept.md is not known")
 	assert.Contains(t, err.Error(), "the shelf does not list notes for you")
 	assert.Equal(t, []string{"branch agent/notes"}, on.asked, "nothing is committed")
+}
+
+// Qodo's review of #1515: GitHub lists a folder to its first 1,000 files. A
+// file past them was read as absent and added over what the branch holds.
+func TestAFileItsFolderIsListedShortOfIsAskedByItself(t *testing.T) {
+	on, proposal := shelved(t)
+	on.branches["trunk"]["notes/a.md"] = "a"
+	on.branches["trunk"]["notes/b.md"] = "b"
+	on.listsAtMost = 1
+	require.NoError(t, proposal.HoldBranch(t.Context(), on, AsApp))
+
+	held, err := proposal.Holds(t.Context(), on, AsApp, []string{"notes/a.md", "notes/b.md", "notes/new.md"})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"notes/a.md": shelfBlob("a"), "notes/b.md": shelfBlob("b")}, held)
+	assert.Contains(t, on.asked, "at notes/b.md", "the file past the listing is asked by itself")
+	assert.NotContains(t, on.asked, "at notes/a.md", "a file the listing named is not asked again")
 }
