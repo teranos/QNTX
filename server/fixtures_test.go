@@ -129,6 +129,30 @@ func TestTimAnAnswerIsStillJSONWithItsFixtures(t *testing.T) {
 	require.NoError(t, err, "an answer that does not marshal is answered to nobody")
 }
 
+// Qodo's review of #1510: a string ending in "\n\x1f" meets the separator
+// after it as "\n\x1f\n\x1f\n", and the split cuts at the first one. The
+// count still matches, and the strings beside it come back changed.
+func TestSpikeAStringHoldingPartOfTheSeparatorIsNotHandedOn(t *testing.T) {
+	s, _ := fixturesServer(t)
+	body := `{"a":"x\n\u001f","b":"y"}`
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: body}}})
+	assert.True(t, answered.IsError, spoken(answered))
+	assert.Contains(t, spoken(answered), "could not be made into fixtures")
+}
+
+// Qodo's review of #1510: an address as a key becomes the fixture, and an
+// object that already holds the fixture as a key would keep one of the two.
+func TestSpikeTwoKeysThatBecomeOneFixtureAreNotHandedOn(t *testing.T) {
+	s, _ := fixturesServer(t)
+	real := "someone" + "@" + "gmail.com"
+	body := `{"` + real + `":"first","tim@example.com":"second"}`
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: body}}})
+	assert.True(t, answered.IsError, spoken(answered))
+	assert.Contains(t, spoken(answered), "tim@example.com")
+}
+
 func TestSpikeAUserReadsTheAnswerAsItIs(t *testing.T) {
 	s, _ := fixturesServer(t)
 	real := "someone" + "@" + "gmail.com"
