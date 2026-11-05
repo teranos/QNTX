@@ -118,7 +118,7 @@ func (s *QNTXServer) anthropicSignum() sigil.Signum {
 					Name: "cap",
 					Does: "The most each Session an element's agent runs in at Anthropic may spend: it pauses there, and goes on once the cap is raised past what it spent. Set none, the node's default.",
 					Takes: []*protocol.Param{
-						{Name: "amount", Required: true, Says: "A number above zero in " + anthropicCapCurrency + ", with at most two places after the point: 200 or 12.50."},
+						{Name: "amount", Says: "A number above zero in " + anthropicCapCurrency + ", with at most two places after the point: 200 or 12.50. Left out, the cap is the node's default again."},
 					},
 					Answer: "protocol.NodeAnthropic",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/cap"},
