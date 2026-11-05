@@ -99,12 +99,22 @@ func (s *QNTXServer) vaultSend(ctx context.Context, sent sigil.Sent) (any, *prot
 // A folder inside root is not the binding's, nor is a note in one.
 func vaultNotesAt(root string) (map[string][]byte, error) {
 	notes := map[string][]byte{}
+	// A place that is a link is not a folder of the vault: what it points at
+	// is somewhere else's, and none of it is sent.
+	placed, err := os.Lstat(root)
+	if err != nil {
+		return notes, errors.Wrapf(err, "the notes in %s were not read", root)
+	}
+	if placed.Mode()&os.ModeSymlink != 0 {
+		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", root)
+	}
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return notes, errors.Wrapf(err, "the notes in %s were not read", root)
 	}
 	for _, entry := range entries {
-		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || !strings.HasSuffix(entry.Name(), noteSuffix) {
+		// A note is a file of the vault's own: a link to one is not.
+		if !entry.Type().IsRegular() || strings.HasPrefix(entry.Name(), ".") || !strings.HasSuffix(entry.Name(), noteSuffix) {
 			continue
 		}
 		content, err := os.ReadFile(filepath.Join(root, entry.Name()))

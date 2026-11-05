@@ -79,6 +79,36 @@ func TestAFolderStopsSending(t *testing.T) {
 	assert.Equal(t, vaultActive, got.(*protocol.VaultStates).GetFolders()[0].State)
 }
 
+// A place that is a link sends nothing, and neither does a note that is one:
+// what a link points at is not the vault's.
+func TestALinkSendsNothingOfWhatItPointsAt(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
+	require.Nil(t, refused, "%v", refused)
+	_, refused = askVault(t, s, "send", sigil.Sent{"name": "abcd", "place": "Course Material", "branch": "obsidian-abcd"})
+	require.Nil(t, refused, "%v", refused)
+
+	elsewhere := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(elsewhere, "elsewhere.md"), []byte("not the vault's\n"), 0o644))
+	at := filepath.Join(vault.Path, "Course Material")
+
+	// A note that is a link is not sent.
+	require.NoError(t, os.Symlink(filepath.Join(elsewhere, "elsewhere.md"), filepath.Join(at, "linked.md")))
+	assert.Empty(t, s.sendVault(t.Context(), "abcd", everyPlace))
+	assert.Empty(t, stand.commits)
+
+	// A place that is a link is not read at all, so nothing on the branch is removed either.
+	require.NoError(t, os.RemoveAll(at))
+	require.NoError(t, os.Symlink(elsewhere, at))
+	_, err := vaultNotesAt(at)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is a link")
+	assert.Empty(t, s.sendVault(t.Context(), "abcd", everyPlace))
+	assert.Empty(t, stand.commits)
+	assert.Equal(t, mainNotes["docs/adr/ADR-001.md"], stand.branches["obsidian-abcd"]["docs/adr/ADR-001.md"])
+	assert.NotContains(t, stand.branches["obsidian-abcd"], "docs/adr/elsewhere.md")
+}
+
 // "i dont want that to be automatically opted in,"
 func TestABoundFolderSendsNothingUntilToldTo(t *testing.T) {
 	s, vault := vaultBindingServer(t)
