@@ -1,7 +1,7 @@
 package server
 
-// The cap on each Session an element's agent runs in at Anthropic, ROOT's in
-// Node Connectors (platform.claude.com/docs/en/managed-agents/budgets).
+// 「[Opus 5.5] The cap on each Session an element's agent runs in at Anthropic, ROOT's in」
+// 「[Opus 5.5] Node Connectors (platform.claude.com/docs/en/managed-agents/budgets).」
 // "make 6SION set one, prep a pr"
 // "what  is max cap? like set it in the ui and make default of 200"
 
@@ -55,7 +55,7 @@ func capOf(kept anthropicKept) (amount string, isDefault bool) {
 	return kept.cap, false
 }
 
-// anthropicCapSet keeps the cap ROOT gave on the node's ANTHROPIC line.
+// 「[Opus 5.5] anthropicCapSet keeps the cap ROOT gave on the node's ANTHROPIC line.」
 func (s *QNTXServer) anthropicCapSet(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	admitted, gated := auth.AdmissionFrom(ctx)
 	if !gated {
