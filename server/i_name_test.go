@@ -153,7 +153,8 @@ func TestINameIsReachedByWhoReachesMCP(t *testing.T) {
 
 	for level, reaches := range map[auth.Level]bool{
 		auth.LevelRoot: true, auth.LevelSuper: true, auth.LevelToken: true,
-		auth.LevelAttestor: false, auth.LevelUser: false,
+		// "add it to it, ATTESTOR can set their own name if available"
+		auth.LevelAttestor: true, auth.LevelUser: false,
 	} {
 		ctx := auth.WithAdmission(context.Background(), auth.Admitted(level, "garden"))
 		answered, refusal := s.iReaches(ctx, sigil.Sent{"paths": iNamePath})

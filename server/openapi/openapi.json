@@ -941,7 +941,8 @@
       "x-qntx-reach": [
         "ROOT",
         "SUPER",
-        "TOKEN"
+        "TOKEN",
+        "ATTESTOR"
       ]
     },
     "/i/picture": {
