@@ -1,6 +1,8 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"net/http"
 	"net/http/httptest"
@@ -140,4 +142,103 @@ func TestAnOrderAndACapStandAfterALineStampedAheadOfTheClock(t *testing.T) {
 	assert.Equal(t, anthropicConsole, am.GetFirst(), "the order stands")
 	assert.True(t, am.GetThen())
 	assert.Equal(t, "75", am.GetCap(), "the cap stands")
+}
+
+// anthropicLinesHeld is every ANTHROPIC line the node keeps, as the store answers them.
+func anthropicLinesHeld(t *testing.T, s *QNTXServer) []*types.As {
+	t.Helper()
+	reading, err := s.held.Read(auth.NamespaceSystem)
+	require.NoError(t, err)
+	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{anthropicLineSubject}, Limit: ats.EveryRow})
+	require.NoError(t, err)
+	return found
+}
+
+// countedStore is a test store as storage.TakeIn asks of one: it counts what it holds.
+type countedStore struct{ ats.AttestationStore }
+
+func (c countedStore) CountAttestations() (int, error) {
+	all, err := c.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: ats.EveryRow})
+	return len(all), err
+}
+
+func (c countedStore) GetAttestation(id string) (*types.As, error) {
+	all, err := c.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: ats.EveryRow})
+	for _, as := range all {
+		if as.ID == id {
+			return as, err
+		}
+	}
+	return nil, err
+}
+
+// heldMark is a take-in mark held in memory.
+type heldMark struct {
+	at     time.Time
+	marked bool
+}
+
+func (m *heldMark) Read() (time.Time, bool, error) { return m.at, m.marked, nil }
+func (m *heldMark) Write(at time.Time) error       { m.at, m.marked = at, true; return nil }
+
+// Qodo's review of #1538: a line stamped ahead of the clock became the take-in
+// mark (storage.TakeIn reads the record from its newest timestamp on), so a row
+// stamped by the clock that reached the record after was never taken in. A
+// line's timestamp is when it was written; its place among the node's lines is
+// the revision it carries.
+func TestAnAnthropicLineIsStampedWhenItIsWrittenAndOrderedByItsRevision(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _, _ := runningNamespaceAgents(t)
+
+	// Two changes in one millisecond both stand.
+	instant := time.Now().Truncate(time.Millisecond)
+	anthropicNow = func() time.Time { return instant }
+	t.Cleanup(func() { anthropicNow = time.Now })
+	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole, "then": "true"})
+	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "75"})
+	am := rootAsksAnthropic(t, s, "am", sigil.Sent{})
+	assert.Equal(t, anthropicConsole, am.GetFirst(), "the order stands")
+	assert.Equal(t, "75", am.GetCap(), "the cap stands")
+	for _, line := range anthropicLinesHeld(t, s) {
+		assert.Equal(t, instant.UnixMilli(), line.Timestamp.UnixMilli(), "a line is stamped when it was written, not after the one before")
+	}
+
+	// A line already stamped ahead of the clock does not make the next one stamp ahead.
+	anthropicNow = time.Now
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	ahead := time.Now().Add(time.Hour)
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-anthropic-stamped-ahead", Subjects: []string{anthropicLineSubject}, Predicates: []string{anthropicLinePredicate},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"https://example.org/root"}, Timestamp: ahead, CreatedAt: ahead,
+		Source: "anthropic", Attributes: map[string]any{"first": anthropicConsole, "then": true, "cap": "75", "revision": 2},
+	}))
+	before := time.Now()
+	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "80"})
+	after := time.Now()
+	assert.Equal(t, "80", rootAsksAnthropic(t, s, "am", sigil.Sent{}).GetCap())
+	var newest *types.As
+	for _, line := range anthropicLinesHeld(t, s) {
+		if line.ID != "AS-anthropic-stamped-ahead" && line.Timestamp.After(instant.Add(time.Millisecond)) {
+			newest = line
+		}
+	}
+	require.NotNil(t, newest)
+	assert.False(t, newest.Timestamp.Before(before.Truncate(time.Millisecond)) || newest.Timestamp.After(after), "stamped %s, written between %s and %s", newest.Timestamp, before, after)
+
+	// Qodo's case: the record took in a revision, then a row stamped by the clock reached it; the next take-in takes that row in.
+	record, _ := createTestStore(t)
+	first, _ := createTestStore(t)
+	require.NoError(t, record.CreateAttestation(newest))
+	mark := &heldMark{}
+	_, err = storage.TakeIn(countedStore{first}, countedStore{record}, mark)
+	require.NoError(t, err)
+	later := time.Now()
+	require.NoError(t, record.CreateAttestation(&types.As{
+		ID: "AS-written-after", Subjects: []string{"SOMETHING"}, Predicates: []string{"happened"}, Contexts: []string{auth.NamespaceSystem},
+		Actors: []string{"https://example.org/root"}, Timestamp: later, CreatedAt: later, Source: "test",
+	}))
+	_, err = storage.TakeIn(countedStore{first}, countedStore{record}, mark)
+	require.NoError(t, err)
+	assert.True(t, first.AttestationExists("AS-written-after"), "a row written after the revision is taken in")
 }
