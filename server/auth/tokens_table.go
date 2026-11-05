@@ -420,9 +420,9 @@ func (t *TokenTable) load() (err error) {
 	return nil
 }
 
-// ByDID is the token whose DID this is, revoked and expired ones included, and
-// whether the table holds one: an agent's token asks after the token it runs
-// under on every request, and a DID names one token.
+// 「[Opus 5.5] ByDID is the token whose DID this is, revoked and expired ones included, and」
+// 「[Opus 5.5] whether the table holds one: an agent's token asks after the token it runs」
+// 「[Opus 5.5] under on every request, and a DID names one token.」
 func (t *TokenTable) ByDID(did string) (TokenInfo, bool) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()

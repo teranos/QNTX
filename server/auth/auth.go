@@ -44,8 +44,8 @@ type Handler struct {
 	// Held across the read-then-write that creates a User. One process only:
 	// two nodes on one location still race, and nothing arbitrates that.
 	creating sync.Mutex
-	// Held across the look-then-write that hands an agent its token, for the
-	// same reason and with the same reach.
+	// 「[Opus 5.5] Held across the look-then-write that hands an agent its token, for the」
+	// 「[Opus 5.5] same reason and with the same reach.」
 	handingAgents  sync.Mutex
 	sessions       *sessionStore
 	becomings      becomings
@@ -397,11 +397,11 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			}
 			return h.admittedAsThePerson(*grant), true
 		}
-		// A token holds roles by its label, its name.
+		// 「[Opus 5.5] A token holds roles by its label, its name.」
 		holder := grant.Label
-		// An agent's token is the token it runs under, under a DID of its own
-		// (ADR-025): its level, its namespaces and its roles are that token's,
-		// read now, and it stands while that token does.
+		// 「[Opus 5.5] An agent's token is the token it runs under, under a DID of its own」
+		// 「[Opus 5.5] (ADR-025): its level, its namespaces and its roles are that token's,」
+		// 「[Opus 5.5] read now, and it stands while that token does.」
 		if asking, isAgents, stands := h.runsUnder(grant.Label, grant.DID); isAgents {
 			if !stands {
 				h.logger.Infow("Bearer token refused",
@@ -616,7 +616,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
 	mux.answer(deviceApprovePath, h.handleDeviceApprove)
 	mux.answer(deviceDonePath, h.handleDeviceDone)
-	// An agent a token starts is handed a token of its own (ADR-025).
+	// 「[Opus 5.5] An agent a token starts is handed a token of its own (ADR-025).」
 	mux.answer(agentTokenPath, h.handleAgentToken)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
