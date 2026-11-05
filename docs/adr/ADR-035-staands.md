@@ -31,4 +31,5 @@ Wants:
 - One Web analytics pixel is one datapunt 
 - A visit is for datapunt to observe, as it’s doing now
 - CUE allows even web Analytics Pixels to be dynamically defined 
-- CUE schema changes nee
+- CUE schema changes need approvals from User
+- 
