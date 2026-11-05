@@ -3,20 +3,24 @@ package comet
 // "the feature i am imagining is called comet"
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "A comet is one sand for one user, one project and one platform."
@@ -180,7 +184,7 @@ func TestEachOfGroundsBinariesIsBuiltByItsGoal(t *testing.T) {
 func TestASandForAnotherPlatformIsCompiledAloneAndLinkedWithNothing(t *testing.T) {
 	assert.Equal(t, []string{"ldc2", "-betterC", "--lowmem", "-mtriple=arm64-apple-macos14.0", "-O", "-release",
 		"-fvisibility=hidden", "--function-sections", "--data-sections",
-		"-I=source", "-J=.", "-i=builtin_sand", "-i=sandview", "-c", "--singleobj", "-of=build/sand.o", "bin/sand.d"},
+		"-I=source", "-J=.", "-i=sand.builtin", "-i=sand.view", "-c", "--singleobj", "-of=build/sand.o", "bin/sand.d"},
 		sandCompiled("aarch64-darwin"))
 	assert.Contains(t, sandCompiled("x86_64-linux"), "-relocation-model=pic")
 	assert.NotContains(t, sandCompiled("aarch64-darwin"), "-relocation-model=pic")
@@ -365,4 +369,178 @@ func TestCometSandIsGroundsControlsAndTheProjectsAlone(t *testing.T) {
 	// One project block naming the checkout: wind folds that project's controls and nothing of anyone's.
 	// Its origin is the repository wherever it is checked out on the machine the comet lands on.
 	assert.Equal(t, "project {\n  path: \"/b/grove\"\n  origin: \"abcd-nl/grove\"\n}\n", Declaration("/b/grove", "abcd-nl", "grove"))
+}
+
+// engineNode is a node whose GitHub knows the project and machine and not the ground asked for:
+// a build gets as far as ground's revision, which is what is asked of it here.
+type engineNode struct {
+	builds string
+	asked  chan Source
+}
+
+func (e engineNode) Latest(_ context.Context, source Source) (string, error) {
+	if source.Repo == "ground" {
+		e.asked <- source
+		return "", errors.New("no GitHub in a test")
+	}
+	return "0123456789abcdef", nil
+}
+
+func (engineNode) Fetch(context.Context, Source, string, string) error { return nil }
+
+func (e engineNode) BuildsDir() (string, error) { return e.builds, nil }
+
+// tar unpacks nothing but the machine's node, which a machine's controls must hold.
+func (engineNode) Run(_ context.Context, _ string, _ []string, name string, args ...string) error {
+	if name == "tar" && filepath.Base(args[len(args)-1]) == "machine" {
+		controls := filepath.Join(args[len(args)-1], "controls")
+		if err := os.MkdirAll(controls, 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(controls, "qntx.pbt"), []byte("qntx {\n  url: \"https://n\"\n}\n"), 0o644)
+	}
+	return nil
+}
+
+// "1. the 2nd"
+// An engine whose ABI no comet is kept for names the ground it was built from, and the node
+// builds the comet from that ground, for the machine a person named for the comet kept.
+// One build is started for an ABI and a revision, however often sky asks.
+func TestAnEngineWhoseABIIsNotKeptHasItsCometBuiltFromItsOwnGround(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	kept := filepath.Join(home, ".qntx", "comets", "abcd-nl", "grove", "x86_64-linux", "7", "libground_sand.so")
+	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o644))
+	require.NoError(t, os.WriteFile(kept+".machine", []byte("abcd-nl/l"), 0o644))
+
+	node := engineNode{builds: t.TempDir(), asked: make(chan Source, 4)}
+	h := handler()
+	h.Builder = Builder{Node: node, NixBin: "/nix/bin"}
+	h.Ctx = context.Background()
+
+	first := httptest.NewRecorder()
+	h.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux/8?digest&ground=23a58f7", nil))
+	assert.Equal(t, http.StatusNotFound, first.Code)
+	assert.Contains(t, first.Body.String(), "building it from ground 23a58f7")
+
+	select {
+	case asked := <-node.asked:
+		assert.Equal(t, Source{Owner: "teranos", Repo: "ground", Branch: "23a58f7"}, asked)
+	case <-time.After(10 * time.Second):
+		t.Fatal("no build asked for ground 23a58f7")
+	}
+
+	// What the build came to is said to every ask after it, and no second build starts.
+	var said string
+	for range 100 {
+		again := httptest.NewRecorder()
+		h.ServeHTTP(again, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux/8?digest&ground=23a58f7", nil))
+		assert.Equal(t, http.StatusNotFound, again.Code)
+		said = again.Body.String()
+		if strings.Contains(said, "did not build") {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	assert.Contains(t, said, "ground 23a58f7 did not build")
+	assert.Contains(t, said, "no GitHub in a test")
+	select {
+	case asked := <-node.asked:
+		t.Fatalf("a second build asked for %v", asked)
+	default:
+	}
+}
+
+// A repository no person named a machine for has no comet built for an engine, and a revision
+// that is no revision builds nothing.
+func TestAnEngineIsBuiltNoCometWhereNoneIsKept(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	node := engineNode{builds: t.TempDir(), asked: make(chan Source, 4)}
+	h := handler()
+	h.Builder = Builder{Node: node, NixBin: "/nix/bin"}
+	h.Ctx = context.Background()
+
+	none := httptest.NewRecorder()
+	h.ServeHTTP(none, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/other/x86_64-linux/8?digest&ground=23a58f7", nil))
+	assert.Equal(t, http.StatusNotFound, none.Code)
+	assert.Contains(t, none.Body.String(), "POST /comet/abcd-nl/other/x86_64-linux builds it")
+
+	for _, rev := range []string{"-x", "a b", "../main", strings.Repeat("a", 65)} {
+		bad := httptest.NewRecorder()
+		h.ServeHTTP(bad, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/other/x86_64-linux/8?digest&ground="+url.QueryEscape(rev), nil))
+		assert.Equal(t, http.StatusNotFound, bad.Code, rev)
+		assert.Contains(t, bad.Body.String(), "which is no revision", rev)
+	}
+	select {
+	case asked := <-node.asked:
+		t.Fatalf("a build asked for %v", asked)
+	default:
+	}
+}
+
+// builtNode is a node on which every build of ground's sand succeeds, for the engine ABI abi.
+type builtNode struct {
+	builds, abi string
+}
+
+func (builtNode) Latest(context.Context, Source) (string, error) { return "0123456789abcdef", nil }
+
+func (builtNode) Fetch(context.Context, Source, string, string) error { return nil }
+
+func (b builtNode) BuildsDir() (string, error) { return b.builds, nil }
+
+func (b builtNode) Run(_ context.Context, dir string, _ []string, name string, args ...string) error {
+	if name == "tar" && filepath.Base(args[len(args)-1]) == "machine" {
+		controls := filepath.Join(args[len(args)-1], "controls")
+		if err := os.MkdirAll(controls, 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(controls, "qntx.pbt"), []byte("qntx {\n  url: \"https://n\"\n}\n"), 0o644)
+	}
+	if slices.Contains(args, "sand") {
+		if err := os.MkdirAll(filepath.Join(dir, "build"), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, "build", "libground_sand.abi"), []byte(b.abi+"\n"), 0o644); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(dir, "build", "libground_sand.so"), []byte("built at "+b.abi), 0o644)
+	}
+	return nil
+}
+
+// A ground an engine names that builds another ABI than the engine's is said, and nothing is
+// kept: the comet kept for that ABI was built for it, and stays.
+func TestAnEnginesGroundOfAnotherABIKeepsNothing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	kept := filepath.Join(home, ".qntx", "comets", "abcd-nl", "grove", "x86_64-linux", "7", "libground_sand.so")
+	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o644))
+	require.NoError(t, os.WriteFile(kept+".machine", []byte("abcd-nl/l"), 0o644))
+	require.NoError(t, KeepDigest(kept))
+
+	h := handler()
+	h.Builder = Builder{Node: builtNode{builds: t.TempDir(), abi: "7"}, NixBin: "/nix/bin"}
+	h.Ctx = context.Background()
+
+	ask := func() string {
+		got := httptest.NewRecorder()
+		h.ServeHTTP(got, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux/9?digest&ground=feedbee", nil))
+		assert.Equal(t, http.StatusNotFound, got.Code)
+		return got.Body.String()
+	}
+	said := ask()
+	for range 200 {
+		if strings.Contains(said, "builds the sand of engine ABI") {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+		said = ask()
+	}
+	assert.Contains(t, said, "ground feedbee builds the sand of engine ABI 7, not 9")
+	held, err := os.ReadFile(kept)
+	require.NoError(t, err)
+	assert.Equal(t, "a comet", string(held))
 }

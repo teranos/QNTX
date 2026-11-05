@@ -255,6 +255,8 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	updated := console.bodies["agent"][len(console.bodies["agent"])-1]
 	assert.Equal(t, "claude-sonnet-5-5", updated["model"].(map[string]any)["id"])
 	assert.Equal(t, sessionsBefore+1, console.made["session"])
+	// The Session it leaves is archived at Anthropic, not only dropped on the node.
+	assert.True(t, console.archived["sesn_2"], "the Session the old version ran in is archived")
 	console.mu.Unlock()
 	assert.NotEqual(t, "sesn_1", moved.Session)
 

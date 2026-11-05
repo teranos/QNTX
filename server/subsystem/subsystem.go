@@ -34,6 +34,7 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
@@ -100,6 +101,24 @@ type Host interface {
 type Delivered interface {
 	Delivered(ctx context.Context, event string, body []byte) (any, error)
 }
+
+// Reported is a subsystem with a part in the weekly report (ADR-042). The node
+// asks it for the week the report stands in and puts the sections it answered
+// in the mail after its own, in html and in text. An error is said in the mail
+// under the subsystem's name, and the rest of the report still goes out.
+type Reported interface {
+	Reported(ctx context.Context, start, end time.Time) ([]ReportSection, error)
+}
+
+// A ReportSection is one titled part of the weekly report: its rows.
+type ReportSection struct {
+	Title string
+	Rows  []ReportRow
+}
+
+// A ReportRow is a label on the left and its value on the right. A row with no
+// label is its value alone.
+type ReportRow struct{ Label, Value string }
 
 var (
 	mu         sync.RWMutex

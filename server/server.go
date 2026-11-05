@@ -283,6 +283,9 @@ func (s *QNTXServer) SetLandingReporter(r LandingReporter) {
 
 // handleClientRegister handles a new client connection
 func (s *QNTXServer) handleClientRegister(client *Client) {
+	if client.registered != nil {
+		defer close(client.registered)
+	}
 	s.mu.Lock()
 
 	// Defensive: Check client limit
