@@ -118,6 +118,35 @@ func TestWhatIsNoNameIsRefused(t *testing.T) {
 	assert.Empty(t, systemHolds(t, s))
 }
 
+// Two lines about one name, each written by its own agent, are one name: the
+// older stands, and the agent of the other holds none and takes another.
+func TestOfTwoLinesAboutOneNameTheOlderStands(t *testing.T) {
+	s := rootKnowingServer(t)
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	first := time.Now().Add(-time.Minute)
+	for at, did := range map[time.Duration]string{0: "did:key:z6Mkwalnut", time.Second: "did:key:z6Mkhazel"} {
+		written := first.Add(at)
+		require.NoError(t, store.CreateAttestation(&types.As{
+			ID: "AS-named-" + did[len(did)-6:], Subjects: []string{did}, Predicates: []string{predicateAgentNamed},
+			Contexts: []string{auth.NamespaceSystem}, Actors: []string{did}, Timestamp: written, CreatedAt: written,
+			Source: did, Attributes: map[string]any{"name": "room agent"},
+		}))
+	}
+
+	named, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "room agent"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "room agent", named.(*protocol.Named).GetName())
+
+	_, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "room agent"})
+	require.NotNil(t, refusal, "the younger line held the name too")
+	assert.Contains(t, refusal.GetSays(), "is taken")
+
+	named, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "deploy agent"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "deploy agent", named.(*protocol.Named).GetName())
+}
+
 // A line about a DID that the DID did not write is not the agent naming
 // itself: it gives the DID no name and takes the name from nobody.
 func TestALineAnotherActorWroteIsNoName(t *testing.T) {
