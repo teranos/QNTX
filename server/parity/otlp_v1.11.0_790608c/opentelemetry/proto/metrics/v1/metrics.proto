@@ -1,16 +1,16 @@
-// Copyright 2019, OpenTelemetry Authors
+// 「[Fable 5.1] Copyright 2019, OpenTelemetry Authors」
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// 「[Fable 5.1] Licensed under the Apache License, Version 2.0 (the "License");」
+// 「[Fable 5.1] you may not use this file except in compliance with the License.」
+// 「[Fable 5.1] You may obtain a copy of the License at」
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//     「[Fable 5.1] http://www.apache.org/licenses/LICENSE-2.0」
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// 「[Fable 5.1] Unless required by applicable law or agreed to in writing, software」
+// 「[Fable 5.1] distributed under the License is distributed on an "AS IS" BASIS,」
+// 「[Fable 5.1] WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.」
+// 「[Fable 5.1] See the License for the specific language governing permissions and」
+// 「[Fable 5.1] limitations under the License.」
 
 syntax = "proto3";
 
@@ -25,182 +25,182 @@ option java_package = "io.opentelemetry.proto.metrics.v1";
 option java_outer_classname = "MetricsProto";
 option go_package = "go.opentelemetry.io/proto/otlp/metrics/v1";
 
-// MetricsData represents the metrics data that can be stored in a persistent
-// storage, OR can be embedded by other protocols that transfer OTLP metrics
-// data but do not implement the OTLP protocol.
+// 「[Fable 5.1] MetricsData represents the metrics data that can be stored in a persistent」
+// 「[Fable 5.1] storage, OR can be embedded by other protocols that transfer OTLP metrics」
+// 「[Fable 5.1] data but do not implement the OTLP protocol.」
 //
-// MetricsData
-// └─── ResourceMetrics
-//   ├── Resource
-//   ├── SchemaURL
-//   └── ScopeMetrics
-//      ├── Scope
-//      ├── SchemaURL
-//      └── Metric
-//         ├── Name
-//         ├── Description
-//         ├── Unit
-//         └── data
-//            ├── Gauge
-//            ├── Sum
-//            ├── Histogram
-//            ├── ExponentialHistogram
-//            └── Summary
+// 「[Fable 5.1] MetricsData」
+// 「[Fable 5.1] └─── ResourceMetrics」
+//   「[Fable 5.1] ├── Resource」
+//   「[Fable 5.1] ├── SchemaURL」
+//   「[Fable 5.1] └── ScopeMetrics」
+//      「[Fable 5.1] ├── Scope」
+//      「[Fable 5.1] ├── SchemaURL」
+//      「[Fable 5.1] └── Metric」
+//         「[Fable 5.1] ├── Name」
+//         「[Fable 5.1] ├── Description」
+//         「[Fable 5.1] ├── Unit」
+//         「[Fable 5.1] └── data」
+//            「[Fable 5.1] ├── Gauge」
+//            「[Fable 5.1] ├── Sum」
+//            「[Fable 5.1] ├── Histogram」
+//            「[Fable 5.1] ├── ExponentialHistogram」
+//            「[Fable 5.1] └── Summary」
 //
-// The main difference between this message and collector protocol is that
-// in this message there will not be any "control" or "metadata" specific to
-// OTLP protocol.
+// 「[Fable 5.1] The main difference between this message and collector protocol is that」
+// 「[Fable 5.1] in this message there will not be any "control" or "metadata" specific to」
+// 「[Fable 5.1] OTLP protocol.」
 //
-// When new fields are added into this message, the OTLP request MUST be updated
-// as well.
+// 「[Fable 5.1] When new fields are added into this message, the OTLP request MUST be updated」
+// 「[Fable 5.1] as well.」
 message MetricsData {
-  // An array of ResourceMetrics.
-  // For data coming from a single resource this array will typically contain
-  // one element. Intermediary nodes that receive data from multiple origins
-  // typically batch the data before forwarding further and in that case this
-  // array will contain multiple elements.
+  // 「[Fable 5.1] An array of ResourceMetrics.」
+  // 「[Fable 5.1] For data coming from a single resource this array will typically contain」
+  // 「[Fable 5.1] one element. Intermediary nodes that receive data from multiple origins」
+  // 「[Fable 5.1] typically batch the data before forwarding further and in that case this」
+  // 「[Fable 5.1] array will contain multiple elements.」
   repeated ResourceMetrics resource_metrics = 1;
 }
 
-// A collection of ScopeMetrics from a Resource.
+// 「[Fable 5.1] A collection of ScopeMetrics from a Resource.」
 message ResourceMetrics {
   reserved 1000;
 
-  // The resource for the metrics in this message.
-  // If this field is not set then no resource info is known.
+  // 「[Fable 5.1] The resource for the metrics in this message.」
+  // 「[Fable 5.1] If this field is not set then no resource info is known.」
   opentelemetry.proto.resource.v1.Resource resource = 1;
 
-  // A list of metrics that originate from a resource.
+  // 「[Fable 5.1] A list of metrics that originate from a resource.」
   repeated ScopeMetrics scope_metrics = 2;
 
-  // The Schema URL, if known. This is the identifier of the Schema that the resource data
-  // is recorded in. Notably, the last part of the URL path is the version number of the
-  // schema: http[s]://server[:port]/path/<version>. To learn more about Schema URL see
-  // https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
-  // This schema_url applies to the data in the "resource" field. It does not apply
-  // to the data in the "scope_metrics" field which have their own schema_url field.
+  // 「[Fable 5.1] The Schema URL, if known. This is the identifier of the Schema that the resource data」
+  // 「[Fable 5.1] is recorded in. Notably, the last part of the URL path is the version number of the」
+  // 「[Fable 5.1] schema: http[s]://server[:port]/path/<version>. To learn more about Schema URL see」
+  // 「[Fable 5.1] https://opentelemetry.io/docs/specs/otel/schemas/#schema-url」
+  // 「[Fable 5.1] This schema_url applies to the data in the "resource" field. It does not apply」
+  // 「[Fable 5.1] to the data in the "scope_metrics" field which have their own schema_url field.」
   string schema_url = 3;
 }
 
-// A collection of Metrics produced by an Scope.
+// 「[Fable 5.1] A collection of Metrics produced by an Scope.」
 message ScopeMetrics {
-  // The instrumentation scope information for the metrics in this message.
-  // Semantically when InstrumentationScope isn't set, it is equivalent with
-  // an empty instrumentation scope name (unknown).
+  // 「[Fable 5.1] The instrumentation scope information for the metrics in this message.」
+  // 「[Fable 5.1] Semantically when InstrumentationScope isn't set, it is equivalent with」
+  // 「[Fable 5.1] an empty instrumentation scope name (unknown).」
   opentelemetry.proto.common.v1.InstrumentationScope scope = 1;
 
-  // A list of metrics that originate from an instrumentation library.
+  // 「[Fable 5.1] A list of metrics that originate from an instrumentation library.」
   repeated Metric metrics = 2;
 
-  // The Schema URL, if known. This is the identifier of the Schema that the metric data
-  // is recorded in. Notably, the last part of the URL path is the version number of the
-  // schema: http[s]://server[:port]/path/<version>. To learn more about Schema URL see
-  // https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
-  // This schema_url applies to the data in the "scope" field and all metrics in the
-  // "metrics" field.
+  // 「[Fable 5.1] The Schema URL, if known. This is the identifier of the Schema that the metric data」
+  // 「[Fable 5.1] is recorded in. Notably, the last part of the URL path is the version number of the」
+  // 「[Fable 5.1] schema: http[s]://server[:port]/path/<version>. To learn more about Schema URL see」
+  // 「[Fable 5.1] https://opentelemetry.io/docs/specs/otel/schemas/#schema-url」
+  // 「[Fable 5.1] This schema_url applies to the data in the "scope" field and all metrics in the」
+  // 「[Fable 5.1] "metrics" field.」
   string schema_url = 3;
 }
 
-// Defines a Metric which has one or more timeseries.  The following is a
-// brief summary of the Metric data model.  For more details, see:
+// 「[Fable 5.1] Defines a Metric which has one or more timeseries.  The following is a」
+// 「[Fable 5.1] brief summary of the Metric data model.  For more details, see:」
 //
-//   https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/data-model.md
+//   「[Fable 5.1] https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/data-model.md」
 //
-// The data model and relation between entities is shown in the
-// diagram below. Here, "DataPoint" is the term used to refer to any
-// one of the specific data point value types, and "points" is the term used
-// to refer to any one of the lists of points contained in the Metric.
+// 「[Fable 5.1] The data model and relation between entities is shown in the」
+// 「[Fable 5.1] diagram below. Here, "DataPoint" is the term used to refer to any」
+// 「[Fable 5.1] one of the specific data point value types, and "points" is the term used」
+// 「[Fable 5.1] to refer to any one of the lists of points contained in the Metric.」
 //
-// - Metric is composed of a metadata and data.
-// - Metadata part contains a name, description, unit.
-// - Data is one of the possible types (Sum, Gauge, Histogram, Summary).
-// - DataPoint contains timestamps, attributes, and one of the possible value type
-//   fields.
+// 「[Fable 5.1] - Metric is composed of a metadata and data.」
+// 「[Fable 5.1] - Metadata part contains a name, description, unit.」
+// 「[Fable 5.1] - Data is one of the possible types (Sum, Gauge, Histogram, Summary).」
+// 「[Fable 5.1] - DataPoint contains timestamps, attributes, and one of the possible value type」
+//   「[Fable 5.1] fields.」
 //
-//    Metric
-//  +------------+
-//  |name        |
-//  |description |
-//  |unit        |     +------------------------------------+
-//  |data        |---> |Gauge, Sum, Histogram, Summary, ... |
-//  +------------+     +------------------------------------+
+//    「[Fable 5.1] Metric」
+//  「[Fable 5.1] +------------+」
+//  「[Fable 5.1] |name        |」
+//  「[Fable 5.1] |description |」
+//  「[Fable 5.1] |unit        |     +------------------------------------+」
+//  「[Fable 5.1] |data        |---> |Gauge, Sum, Histogram, Summary, ... |」
+//  「[Fable 5.1] +------------+     +------------------------------------+」
 //
-//    Data [One of Gauge, Sum, Histogram, Summary, ...]
-//  +-----------+
-//  |...        |  // Metadata about the Data.
-//  |points     |--+
-//  +-----------+  |
-//                 |      +---------------------------+
-//                 |      |DataPoint 1                |
-//                 v      |+------+------+   +------+ |
-//              +-----+   ||label |label |...|label | |
-//              |  1  |-->||value1|value2|...|valueN| |
-//              +-----+   |+------+------+   +------+ |
-//              |  .  |   |+-----+                    |
-//              |  .  |   ||value|                    |
-//              |  .  |   |+-----+                    |
-//              |  .  |   +---------------------------+
-//              |  .  |                   .
-//              |  .  |                   .
-//              |  .  |                   .
-//              |  .  |   +---------------------------+
-//              |  .  |   |DataPoint M                |
-//              +-----+   |+------+------+   +------+ |
-//              |  M  |-->||label |label |...|label | |
-//              +-----+   ||value1|value2|...|valueN| |
-//                        |+------+------+   +------+ |
-//                        |+-----+                    |
-//                        ||value|                    |
-//                        |+-----+                    |
-//                        +---------------------------+
+//    「[Fable 5.1] Data [One of Gauge, Sum, Histogram, Summary, ...]」
+//  「[Fable 5.1] +-----------+」
+//  「[Fable 5.1] |...        |  // Metadata about the Data.」
+//  「[Fable 5.1] |points     |--+」
+//  「[Fable 5.1] +-----------+  |」
+//                 「[Fable 5.1] |      +---------------------------+」
+//                 「[Fable 5.1] |      |DataPoint 1                |」
+//                 「[Fable 5.1] v      |+------+------+   +------+ |」
+//              「[Fable 5.1] +-----+   ||label |label |...|label | |」
+//              「[Fable 5.1] |  1  |-->||value1|value2|...|valueN| |」
+//              「[Fable 5.1] +-----+   |+------+------+   +------+ |」
+//              「[Fable 5.1] |  .  |   |+-----+                    |」
+//              「[Fable 5.1] |  .  |   ||value|                    |」
+//              「[Fable 5.1] |  .  |   |+-----+                    |」
+//              「[Fable 5.1] |  .  |   +---------------------------+」
+//              「[Fable 5.1] |  .  |                   .」
+//              「[Fable 5.1] |  .  |                   .」
+//              「[Fable 5.1] |  .  |                   .」
+//              「[Fable 5.1] |  .  |   +---------------------------+」
+//              「[Fable 5.1] |  .  |   |DataPoint M                |」
+//              「[Fable 5.1] +-----+   |+------+------+   +------+ |」
+//              「[Fable 5.1] |  M  |-->||label |label |...|label | |」
+//              「[Fable 5.1] +-----+   ||value1|value2|...|valueN| |」
+//                        「[Fable 5.1] |+------+------+   +------+ |」
+//                        「[Fable 5.1] |+-----+                    |」
+//                        「[Fable 5.1] ||value|                    |」
+//                        「[Fable 5.1] |+-----+                    |」
+//                        「[Fable 5.1] +---------------------------+」
 //
-// Each distinct type of DataPoint represents the output of a specific
-// aggregation function, the result of applying the DataPoint's
-// associated function of to one or more measurements.
+// 「[Fable 5.1] Each distinct type of DataPoint represents the output of a specific」
+// 「[Fable 5.1] aggregation function, the result of applying the DataPoint's」
+// 「[Fable 5.1] associated function of to one or more measurements.」
 //
-// All DataPoint types have three common fields:
-// - Attributes includes key-value pairs associated with the data point
-// - TimeUnixNano is required, set to the end time of the aggregation
-// - StartTimeUnixNano is optional, but strongly encouraged for DataPoints
-//   having an AggregationTemporality field, as discussed below.
+// 「[Fable 5.1] All DataPoint types have three common fields:」
+// 「[Fable 5.1] - Attributes includes key-value pairs associated with the data point」
+// 「[Fable 5.1] - TimeUnixNano is required, set to the end time of the aggregation」
+// 「[Fable 5.1] - StartTimeUnixNano is optional, but strongly encouraged for DataPoints」
+//   「[Fable 5.1] having an AggregationTemporality field, as discussed below.」
 //
-// Both TimeUnixNano and StartTimeUnixNano values are expressed as
-// UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January 1970.
+// 「[Fable 5.1] Both TimeUnixNano and StartTimeUnixNano values are expressed as」
+// 「[Fable 5.1] UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January 1970.」
 //
-// # TimeUnixNano
+// 「[Fable 5.1] # TimeUnixNano」
 //
-// This field is required, having consistent interpretation across
-// DataPoint types.  TimeUnixNano is the moment corresponding to when
-// the data point's aggregate value was captured.
+// 「[Fable 5.1] This field is required, having consistent interpretation across」
+// 「[Fable 5.1] DataPoint types.  TimeUnixNano is the moment corresponding to when」
+// 「[Fable 5.1] the data point's aggregate value was captured.」
 //
-// Data points with the 0 value for TimeUnixNano SHOULD be rejected
-// by consumers.
+// 「[Fable 5.1] Data points with the 0 value for TimeUnixNano SHOULD be rejected」
+// 「[Fable 5.1] by consumers.」
 //
-// # StartTimeUnixNano
+// 「[Fable 5.1] # StartTimeUnixNano」
 //
-// StartTimeUnixNano in general allows detecting when a sequence of
-// observations is unbroken.  This field indicates to consumers the
-// start time for points with cumulative and delta
-// AggregationTemporality, and it should be included whenever possible
-// to support correct rate calculation.  Although it may be omitted
-// when the start time is truly unknown, setting StartTimeUnixNano is
-// strongly encouraged.
+// 「[Fable 5.1] StartTimeUnixNano in general allows detecting when a sequence of」
+// 「[Fable 5.1] observations is unbroken.  This field indicates to consumers the」
+// 「[Fable 5.1] start time for points with cumulative and delta」
+// 「[Fable 5.1] AggregationTemporality, and it should be included whenever possible」
+// 「[Fable 5.1] to support correct rate calculation.  Although it may be omitted」
+// 「[Fable 5.1] when the start time is truly unknown, setting StartTimeUnixNano is」
+// 「[Fable 5.1] strongly encouraged.」
 message Metric {
   reserved 4, 6, 8;
 
-  // The name of the metric.
+  // 「[Fable 5.1] The name of the metric.」
   string name = 1;
 
-  // A description of the metric, which can be used in documentation.
+  // 「[Fable 5.1] A description of the metric, which can be used in documentation.」
   string description = 2;
 
-  // The unit in which the metric value is reported. Follows the format
-  // described by https://ucum.org/ucum and https://units-of-measurement.org/ 
+  // 「[Fable 5.1] The unit in which the metric value is reported. Follows the format」
+  // 「[Fable 5.1] described by https://ucum.org/ucum and https://units-of-measurement.org/」
   string unit = 3;
 
-  // Data determines the aggregation type (if any) of the metric, what is the
-  // reported value type for the data points, as well as the relatationship to
-  // the time interval over which they are reported.
+  // 「[Fable 5.1] Data determines the aggregation type (if any) of the metric, what is the」
+  // 「[Fable 5.1] reported value type for the data points, as well as the relatationship to」
+  // 「[Fable 5.1] the time interval over which they are reported.」
   oneof data {
     Gauge gauge = 5;
     Sum sum = 7;
@@ -209,527 +209,527 @@ message Metric {
     Summary summary = 11;
   }
 
-  // Additional metadata attributes that describe the metric. [Optional].
-  // Attributes are non-identifying.
-  // Consumers SHOULD NOT need to be aware of these attributes.
-  // These attributes MAY be used to encode information allowing
-  // for lossless roundtrip translation to / from another data model.
-  // Attribute keys MUST be unique (it is not allowed to have more than one
-  // attribute with the same key).
-  // The behavior of software that receives duplicated keys can be unpredictable.
+  // 「[Fable 5.1] Additional metadata attributes that describe the metric. [Optional].」
+  // 「[Fable 5.1] Attributes are non-identifying.」
+  // 「[Fable 5.1] Consumers SHOULD NOT need to be aware of these attributes.」
+  // 「[Fable 5.1] These attributes MAY be used to encode information allowing」
+  // 「[Fable 5.1] for lossless roundtrip translation to / from another data model.」
+  // 「[Fable 5.1] Attribute keys MUST be unique (it is not allowed to have more than one」
+  // 「[Fable 5.1] attribute with the same key).」
+  // 「[Fable 5.1] The behavior of software that receives duplicated keys can be unpredictable.」
   repeated opentelemetry.proto.common.v1.KeyValue metadata = 12;
 }
 
-// Gauge represents the type of a scalar metric that always exports the
-// "current value" for every data point. It should be used for an "unknown"
-// aggregation.
+// 「[Fable 5.1] Gauge represents the type of a scalar metric that always exports the」
+// 「[Fable 5.1] "current value" for every data point. It should be used for an "unknown"」
+// 「[Fable 5.1] aggregation.」
 //
-// A Gauge does not support different aggregation temporalities. Given the
-// aggregation is unknown, points cannot be combined using the same
-// aggregation, regardless of aggregation temporalities. Therefore,
-// AggregationTemporality is not included. Consequently, this also means
-// "StartTimeUnixNano" is ignored for all data points.
+// 「[Fable 5.1] A Gauge does not support different aggregation temporalities. Given the」
+// 「[Fable 5.1] aggregation is unknown, points cannot be combined using the same」
+// 「[Fable 5.1] aggregation, regardless of aggregation temporalities. Therefore,」
+// 「[Fable 5.1] AggregationTemporality is not included. Consequently, this also means」
+// 「[Fable 5.1] "StartTimeUnixNano" is ignored for all data points.」
 message Gauge {
-  // The time series data points.
-  // Note: Multiple time series may be included (same timestamp, different attributes).
+  // 「[Fable 5.1] The time series data points.」
+  // 「[Fable 5.1] Note: Multiple time series may be included (same timestamp, different attributes).」
   repeated NumberDataPoint data_points = 1;
 }
 
-// Sum represents the type of a scalar metric that is calculated as a sum of all
-// reported measurements over a time interval.
+// 「[Fable 5.1] Sum represents the type of a scalar metric that is calculated as a sum of all」
+// 「[Fable 5.1] reported measurements over a time interval.」
 message Sum {
-  // The time series data points.
-  // Note: Multiple time series may be included (same timestamp, different attributes).
+  // 「[Fable 5.1] The time series data points.」
+  // 「[Fable 5.1] Note: Multiple time series may be included (same timestamp, different attributes).」
   repeated NumberDataPoint data_points = 1;
 
-  // aggregation_temporality describes if the aggregator reports delta changes
-  // since last report time, or cumulative changes since a fixed start time.
+  // 「[Fable 5.1] aggregation_temporality describes if the aggregator reports delta changes」
+  // 「[Fable 5.1] since last report time, or cumulative changes since a fixed start time.」
   AggregationTemporality aggregation_temporality = 2;
 
-  // Represents whether the sum is monotonic.
+  // 「[Fable 5.1] Represents whether the sum is monotonic.」
   bool is_monotonic = 3;
 }
 
-// Histogram represents the type of a metric that is calculated by aggregating
-// as a Histogram of all reported measurements over a time interval.
+// 「[Fable 5.1] Histogram represents the type of a metric that is calculated by aggregating」
+// 「[Fable 5.1] as a Histogram of all reported measurements over a time interval.」
 message Histogram {
-  // The time series data points.
-  // Note: Multiple time series may be included (same timestamp, different attributes).
+  // 「[Fable 5.1] The time series data points.」
+  // 「[Fable 5.1] Note: Multiple time series may be included (same timestamp, different attributes).」
   repeated HistogramDataPoint data_points = 1;
 
-  // aggregation_temporality describes if the aggregator reports delta changes
-  // since last report time, or cumulative changes since a fixed start time.
+  // 「[Fable 5.1] aggregation_temporality describes if the aggregator reports delta changes」
+  // 「[Fable 5.1] since last report time, or cumulative changes since a fixed start time.」
   AggregationTemporality aggregation_temporality = 2;
 }
 
-// ExponentialHistogram represents the type of a metric that is calculated by aggregating
-// as a ExponentialHistogram of all reported double measurements over a time interval.
+// 「[Fable 5.1] ExponentialHistogram represents the type of a metric that is calculated by aggregating」
+// 「[Fable 5.1] as a ExponentialHistogram of all reported double measurements over a time interval.」
 message ExponentialHistogram {
-  // The time series data points.
-  // Note: Multiple time series may be included (same timestamp, different attributes).
+  // 「[Fable 5.1] The time series data points.」
+  // 「[Fable 5.1] Note: Multiple time series may be included (same timestamp, different attributes).」
   repeated ExponentialHistogramDataPoint data_points = 1;
 
-  // aggregation_temporality describes if the aggregator reports delta changes
-  // since last report time, or cumulative changes since a fixed start time.
+  // 「[Fable 5.1] aggregation_temporality describes if the aggregator reports delta changes」
+  // 「[Fable 5.1] since last report time, or cumulative changes since a fixed start time.」
   AggregationTemporality aggregation_temporality = 2;
 }
 
-// Summary metric data are used to convey quantile summaries,
-// a Prometheus (see: https://prometheus.io/docs/concepts/metric_types/#summary)
-// and OpenMetrics (see: https://github.com/prometheus/OpenMetrics/blob/4dbf6075567ab43296eed941037c12951faafb92/protos/prometheus.proto#L45)
-// data type. These data points cannot always be merged in a meaningful way.
-// While they can be useful in some applications, histogram data points are
-// recommended for new applications.
-// Summary metrics do not have an aggregation temporality field. This is
-// because the count and sum fields of a SummaryDataPoint are assumed to be
-// cumulative values.
+// 「[Fable 5.1] Summary metric data are used to convey quantile summaries,」
+// 「[Fable 5.1] a Prometheus (see: https://prometheus.io/docs/concepts/metric_types/#summary)」
+// 「[Fable 5.1] and OpenMetrics (see: https://github.com/prometheus/OpenMetrics/blob/4dbf6075567ab43296eed941037c12951faafb92/protos/prometheus.proto#L45)」
+// 「[Fable 5.1] data type. These data points cannot always be merged in a meaningful way.」
+// 「[Fable 5.1] While they can be useful in some applications, histogram data points are」
+// 「[Fable 5.1] recommended for new applications.」
+// 「[Fable 5.1] Summary metrics do not have an aggregation temporality field. This is」
+// 「[Fable 5.1] because the count and sum fields of a SummaryDataPoint are assumed to be」
+// 「[Fable 5.1] cumulative values.」
 message Summary {
-  // The time series data points.
-  // Note: Multiple time series may be included (same timestamp, different attributes).
+  // 「[Fable 5.1] The time series data points.」
+  // 「[Fable 5.1] Note: Multiple time series may be included (same timestamp, different attributes).」
   repeated SummaryDataPoint data_points = 1;
 }
 
-// AggregationTemporality defines how a metric aggregator reports aggregated
-// values. It describes how those values relate to the time interval over
-// which they are aggregated.
+// 「[Fable 5.1] AggregationTemporality defines how a metric aggregator reports aggregated」
+// 「[Fable 5.1] values. It describes how those values relate to the time interval over」
+// 「[Fable 5.1] which they are aggregated.」
 enum AggregationTemporality {
-  // UNSPECIFIED is the default AggregationTemporality, it MUST not be used.
+  // 「[Fable 5.1] UNSPECIFIED is the default AggregationTemporality, it MUST not be used.」
   AGGREGATION_TEMPORALITY_UNSPECIFIED = 0;
 
-  // DELTA is an AggregationTemporality for a metric aggregator which reports
-  // changes since last report time. Successive metrics contain aggregation of
-  // values from continuous and non-overlapping intervals.
+  // 「[Fable 5.1] DELTA is an AggregationTemporality for a metric aggregator which reports」
+  // 「[Fable 5.1] changes since last report time. Successive metrics contain aggregation of」
+  // 「[Fable 5.1] values from continuous and non-overlapping intervals.」
   //
-  // The values for a DELTA metric are based only on the time interval
-  // associated with one measurement cycle. There is no dependency on
-  // previous measurements like is the case for CUMULATIVE metrics.
+  // 「[Fable 5.1] The values for a DELTA metric are based only on the time interval」
+  // 「[Fable 5.1] associated with one measurement cycle. There is no dependency on」
+  // 「[Fable 5.1] previous measurements like is the case for CUMULATIVE metrics.」
   //
-  // For example, consider a system measuring the number of requests that
-  // it receives and reports the sum of these requests every second as a
-  // DELTA metric:
+  // 「[Fable 5.1] For example, consider a system measuring the number of requests that」
+  // 「[Fable 5.1] it receives and reports the sum of these requests every second as a」
+  // 「[Fable 5.1] DELTA metric:」
   //
-  //   1. The system starts receiving at time=t_0.
-  //   2. A request is received, the system measures 1 request.
-  //   3. A request is received, the system measures 1 request.
-  //   4. A request is received, the system measures 1 request.
-  //   5. The 1 second collection cycle ends. A metric is exported for the
-  //      number of requests received over the interval of time t_0 to
-  //      t_0+1 with a value of 3.
-  //   6. A request is received, the system measures 1 request.
-  //   7. A request is received, the system measures 1 request.
-  //   8. The 1 second collection cycle ends. A metric is exported for the
-  //      number of requests received over the interval of time t_0+1 to
-  //      t_0+2 with a value of 2.
+  //   「[Fable 5.1] 1. The system starts receiving at time=t_0.」
+  //   「[Fable 5.1] 2. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 3. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 4. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 5. The 1 second collection cycle ends. A metric is exported for the」
+  //      「[Fable 5.1] number of requests received over the interval of time t_0 to」
+  //      「[Fable 5.1] t_0+1 with a value of 3.」
+  //   「[Fable 5.1] 6. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 7. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 8. The 1 second collection cycle ends. A metric is exported for the」
+  //      「[Fable 5.1] number of requests received over the interval of time t_0+1 to」
+  //      「[Fable 5.1] t_0+2 with a value of 2.」
   AGGREGATION_TEMPORALITY_DELTA = 1;
 
-  // CUMULATIVE is an AggregationTemporality for a metric aggregator which
-  // reports changes since a fixed start time. This means that current values
-  // of a CUMULATIVE metric depend on all previous measurements since the
-  // start time. Because of this, the sender is required to retain this state
-  // in some form. If this state is lost or invalidated, the CUMULATIVE metric
-  // values MUST be reset and a new fixed start time following the last
-  // reported measurement time sent MUST be used.
+  // 「[Fable 5.1] CUMULATIVE is an AggregationTemporality for a metric aggregator which」
+  // 「[Fable 5.1] reports changes since a fixed start time. This means that current values」
+  // 「[Fable 5.1] of a CUMULATIVE metric depend on all previous measurements since the」
+  // 「[Fable 5.1] start time. Because of this, the sender is required to retain this state」
+  // 「[Fable 5.1] in some form. If this state is lost or invalidated, the CUMULATIVE metric」
+  // 「[Fable 5.1] values MUST be reset and a new fixed start time following the last」
+  // 「[Fable 5.1] reported measurement time sent MUST be used.」
   //
-  // For example, consider a system measuring the number of requests that
-  // it receives and reports the sum of these requests every second as a
-  // CUMULATIVE metric:
+  // 「[Fable 5.1] For example, consider a system measuring the number of requests that」
+  // 「[Fable 5.1] it receives and reports the sum of these requests every second as a」
+  // 「[Fable 5.1] CUMULATIVE metric:」
   //
-  //   1. The system starts receiving at time=t_0.
-  //   2. A request is received, the system measures 1 request.
-  //   3. A request is received, the system measures 1 request.
-  //   4. A request is received, the system measures 1 request.
-  //   5. The 1 second collection cycle ends. A metric is exported for the
-  //      number of requests received over the interval of time t_0 to
-  //      t_0+1 with a value of 3.
-  //   6. A request is received, the system measures 1 request.
-  //   7. A request is received, the system measures 1 request.
-  //   8. The 1 second collection cycle ends. A metric is exported for the
-  //      number of requests received over the interval of time t_0 to
-  //      t_0+2 with a value of 5.
-  //   9. The system experiences a fault and loses state.
-  //   10. The system recovers and resumes receiving at time=t_1.
-  //   11. A request is received, the system measures 1 request.
-  //   12. The 1 second collection cycle ends. A metric is exported for the
-  //      number of requests received over the interval of time t_1 to
-  //      t_0+1 with a value of 1.
+  //   「[Fable 5.1] 1. The system starts receiving at time=t_0.」
+  //   「[Fable 5.1] 2. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 3. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 4. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 5. The 1 second collection cycle ends. A metric is exported for the」
+  //      「[Fable 5.1] number of requests received over the interval of time t_0 to」
+  //      「[Fable 5.1] t_0+1 with a value of 3.」
+  //   「[Fable 5.1] 6. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 7. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 8. The 1 second collection cycle ends. A metric is exported for the」
+  //      「[Fable 5.1] number of requests received over the interval of time t_0 to」
+  //      「[Fable 5.1] t_0+2 with a value of 5.」
+  //   「[Fable 5.1] 9. The system experiences a fault and loses state.」
+  //   「[Fable 5.1] 10. The system recovers and resumes receiving at time=t_1.」
+  //   「[Fable 5.1] 11. A request is received, the system measures 1 request.」
+  //   「[Fable 5.1] 12. The 1 second collection cycle ends. A metric is exported for the」
+  //      「[Fable 5.1] number of requests received over the interval of time t_1 to」
+  //      「[Fable 5.1] t_0+1 with a value of 1.」
   //
-  // Note: Even though, when reporting changes since last report time, using
-  // CUMULATIVE is valid, it is not recommended. This may cause problems for
-  // systems that do not use start_time to determine when the aggregation
-  // value was reset (e.g. Prometheus).
+  // 「[Fable 5.1] Note: Even though, when reporting changes since last report time, using」
+  // 「[Fable 5.1] CUMULATIVE is valid, it is not recommended. This may cause problems for」
+  // 「[Fable 5.1] systems that do not use start_time to determine when the aggregation」
+  // 「[Fable 5.1] value was reset (e.g. Prometheus).」
   AGGREGATION_TEMPORALITY_CUMULATIVE = 2;
 }
 
-// DataPointFlags is defined as a protobuf 'uint32' type and is to be used as a
-// bit-field representing 32 distinct boolean flags.  Each flag defined in this
-// enum is a bit-mask.  To test the presence of a single flag in the flags of
-// a data point, for example, use an expression like:
+// 「[Fable 5.1] DataPointFlags is defined as a protobuf 'uint32' type and is to be used as a」
+// 「[Fable 5.1] bit-field representing 32 distinct boolean flags.  Each flag defined in this」
+// 「[Fable 5.1] enum is a bit-mask.  To test the presence of a single flag in the flags of」
+// 「[Fable 5.1] a data point, for example, use an expression like:」
 //
-//   (point.flags & DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK) == DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK
+//   「[Fable 5.1] (point.flags & DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK) == DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK」
 //
 enum DataPointFlags {
-  // The zero value for the enum. Should not be used for comparisons.
-  // Instead use bitwise "and" with the appropriate mask as shown above.
+  // 「[Fable 5.1] The zero value for the enum. Should not be used for comparisons.」
+  // 「[Fable 5.1] Instead use bitwise "and" with the appropriate mask as shown above.」
   DATA_POINT_FLAGS_DO_NOT_USE = 0;
 
-  // This DataPoint is valid but has no recorded value.  This value
-  // SHOULD be used to reflect explicitly missing data in a series, as
-  // for an equivalent to the Prometheus "staleness marker".
+  // 「[Fable 5.1] This DataPoint is valid but has no recorded value.  This value」
+  // 「[Fable 5.1] SHOULD be used to reflect explicitly missing data in a series, as」
+  // 「[Fable 5.1] for an equivalent to the Prometheus "staleness marker".」
   DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK = 1;
 
-  // Bits 2-31 are reserved for future use.
+  // 「[Fable 5.1] Bits 2-31 are reserved for future use.」
 }
 
-// NumberDataPoint is a single data point in a timeseries that describes the
-// time-varying scalar value of a metric.
+// 「[Fable 5.1] NumberDataPoint is a single data point in a timeseries that describes the」
+// 「[Fable 5.1] time-varying scalar value of a metric.」
 message NumberDataPoint {
   reserved 1;
 
-  // The set of key/value pairs that uniquely identify the timeseries from
-  // where this point belongs. The list may be empty (may contain 0 elements).
-  // Attribute keys MUST be unique (it is not allowed to have more than one
-  // attribute with the same key).
-  // The behavior of software that receives duplicated keys can be unpredictable.
+  // 「[Fable 5.1] The set of key/value pairs that uniquely identify the timeseries from」
+  // 「[Fable 5.1] where this point belongs. The list may be empty (may contain 0 elements).」
+  // 「[Fable 5.1] Attribute keys MUST be unique (it is not allowed to have more than one」
+  // 「[Fable 5.1] attribute with the same key).」
+  // 「[Fable 5.1] The behavior of software that receives duplicated keys can be unpredictable.」
   repeated opentelemetry.proto.common.v1.KeyValue attributes = 7;
 
-  // StartTimeUnixNano is optional but strongly encouraged, see the
-  // the detailed comments above Metric.
+  // 「[Fable 5.1] StartTimeUnixNano is optional but strongly encouraged, see the」
+  // 「[Fable 5.1] the detailed comments above Metric.」
   //
-  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
-  // 1970.
+  // 「[Fable 5.1] Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January」
+  // 「[Fable 5.1] 1970.」
   fixed64 start_time_unix_nano = 2;
 
-  // TimeUnixNano is required, see the detailed comments above Metric.
+  // 「[Fable 5.1] TimeUnixNano is required, see the detailed comments above Metric.」
   //
-  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
-  // 1970.
+  // 「[Fable 5.1] Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January」
+  // 「[Fable 5.1] 1970.」
   fixed64 time_unix_nano = 3;
 
-  // The value itself.  A point is considered invalid when one of the recognized
-  // value fields is not present inside this oneof.
+  // 「[Fable 5.1] The value itself.  A point is considered invalid when one of the recognized」
+  // 「[Fable 5.1] value fields is not present inside this oneof.」
   oneof value {
     double as_double = 4;
     sfixed64 as_int = 6;
   }
 
-  // (Optional) List of exemplars collected from
-  // measurements that were used to form the data point
+  // 「[Fable 5.1] (Optional) List of exemplars collected from」
+  // 「[Fable 5.1] measurements that were used to form the data point」
   repeated Exemplar exemplars = 5;
 
-  // Flags that apply to this specific data point.  See DataPointFlags
-  // for the available flags and their meaning.
+  // 「[Fable 5.1] Flags that apply to this specific data point.  See DataPointFlags」
+  // 「[Fable 5.1] for the available flags and their meaning.」
   uint32 flags = 8;
 }
 
-// HistogramDataPoint is a single data point in a timeseries that describes the
-// time-varying values of a Histogram. A Histogram contains summary statistics
-// for a population of values, it may optionally contain the distribution of
-// those values across a set of buckets.
+// 「[Fable 5.1] HistogramDataPoint is a single data point in a timeseries that describes the」
+// 「[Fable 5.1] time-varying values of a Histogram. A Histogram contains summary statistics」
+// 「[Fable 5.1] for a population of values, it may optionally contain the distribution of」
+// 「[Fable 5.1] those values across a set of buckets.」
 //
-// If the histogram contains the distribution of values, then both
-// "explicit_bounds" and "bucket counts" fields must be defined.
-// If the histogram does not contain the distribution of values, then both
-// "explicit_bounds" and "bucket_counts" must be omitted and only "count" and
-// "sum" are known.
+// 「[Fable 5.1] If the histogram contains the distribution of values, then both」
+// 「[Fable 5.1] "explicit_bounds" and "bucket counts" fields must be defined.」
+// 「[Fable 5.1] If the histogram does not contain the distribution of values, then both」
+// 「[Fable 5.1] "explicit_bounds" and "bucket_counts" must be omitted and only "count" and」
+// 「[Fable 5.1] "sum" are known.」
 message HistogramDataPoint {
   reserved 1;
 
-  // The set of key/value pairs that uniquely identify the timeseries from
-  // where this point belongs. The list may be empty (may contain 0 elements).
-  // Attribute keys MUST be unique (it is not allowed to have more than one
-  // attribute with the same key).
-  // The behavior of software that receives duplicated keys can be unpredictable.
+  // 「[Fable 5.1] The set of key/value pairs that uniquely identify the timeseries from」
+  // 「[Fable 5.1] where this point belongs. The list may be empty (may contain 0 elements).」
+  // 「[Fable 5.1] Attribute keys MUST be unique (it is not allowed to have more than one」
+  // 「[Fable 5.1] attribute with the same key).」
+  // 「[Fable 5.1] The behavior of software that receives duplicated keys can be unpredictable.」
   repeated opentelemetry.proto.common.v1.KeyValue attributes = 9;
 
-  // StartTimeUnixNano is optional but strongly encouraged, see the
-  // the detailed comments above Metric.
+  // 「[Fable 5.1] StartTimeUnixNano is optional but strongly encouraged, see the」
+  // 「[Fable 5.1] the detailed comments above Metric.」
   //
-  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
-  // 1970.
+  // 「[Fable 5.1] Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January」
+  // 「[Fable 5.1] 1970.」
   fixed64 start_time_unix_nano = 2;
 
-  // TimeUnixNano is required, see the detailed comments above Metric.
+  // 「[Fable 5.1] TimeUnixNano is required, see the detailed comments above Metric.」
   //
-  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
-  // 1970.
+  // 「[Fable 5.1] Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January」
+  // 「[Fable 5.1] 1970.」
   fixed64 time_unix_nano = 3;
 
-  // count is the number of values in the population. Must be non-negative. This
-  // value must be equal to the sum of the "count" fields in buckets if a
-  // histogram is provided.
+  // 「[Fable 5.1] count is the number of values in the population. Must be non-negative. This」
+  // 「[Fable 5.1] value must be equal to the sum of the "count" fields in buckets if a」
+  // 「[Fable 5.1] histogram is provided.」
   fixed64 count = 4;
 
-  // sum of the values in the population. If count is zero then this field
-  // must be zero.
+  // 「[Fable 5.1] sum of the values in the population. If count is zero then this field」
+  // 「[Fable 5.1] must be zero.」
   //
-  // Note: Sum should only be filled out when measuring non-negative discrete
-  // events, and is assumed to be monotonic over the values of these events.
-  // Negative events *can* be recorded, but sum should not be filled out when
-  // doing so.  This is specifically to enforce compatibility w/ OpenMetrics,
-  // see: https://github.com/prometheus/OpenMetrics/blob/v1.0.0/specification/OpenMetrics.md#histogram
+  // 「[Fable 5.1] Note: Sum should only be filled out when measuring non-negative discrete」
+  // 「[Fable 5.1] events, and is assumed to be monotonic over the values of these events.」
+  // 「[Fable 5.1] Negative events *can* be recorded, but sum should not be filled out when」
+  // 「[Fable 5.1] doing so.  This is specifically to enforce compatibility w/ OpenMetrics,」
+  // 「[Fable 5.1] see: https://github.com/prometheus/OpenMetrics/blob/v1.0.0/specification/OpenMetrics.md#histogram」
   optional double sum = 5;
 
-  // bucket_counts is an optional field contains the count values of histogram
-  // for each bucket.
+  // 「[Fable 5.1] bucket_counts is an optional field contains the count values of histogram」
+  // 「[Fable 5.1] for each bucket.」
   //
-  // The sum of the bucket_counts must equal the value in the count field.
+  // 「[Fable 5.1] The sum of the bucket_counts must equal the value in the count field.」
   //
-  // The number of elements in bucket_counts array must be by one greater than
-  // the number of elements in explicit_bounds array. The exception to this rule
-  // is when the length of bucket_counts is 0, then the length of explicit_bounds
-  // must also be 0.
+  // 「[Fable 5.1] The number of elements in bucket_counts array must be by one greater than」
+  // 「[Fable 5.1] the number of elements in explicit_bounds array. The exception to this rule」
+  // 「[Fable 5.1] is when the length of bucket_counts is 0, then the length of explicit_bounds」
+  // 「[Fable 5.1] must also be 0.」
   repeated fixed64 bucket_counts = 6;
 
-  // explicit_bounds specifies buckets with explicitly defined bounds for values.
+  // 「[Fable 5.1] explicit_bounds specifies buckets with explicitly defined bounds for values.」
   //
-  // The boundaries for bucket at index i are:
+  // 「[Fable 5.1] The boundaries for bucket at index i are:」
   //
-  // (-infinity, explicit_bounds[i]] for i == 0
-  // (explicit_bounds[i-1], explicit_bounds[i]] for 0 < i < size(explicit_bounds)
-  // (explicit_bounds[i-1], +infinity) for i == size(explicit_bounds)
+  // 「[Fable 5.1] (-infinity, explicit_bounds[i]] for i == 0」
+  // 「[Fable 5.1] (explicit_bounds[i-1], explicit_bounds[i]] for 0 < i < size(explicit_bounds)」
+  // 「[Fable 5.1] (explicit_bounds[i-1], +infinity) for i == size(explicit_bounds)」
   //
-  // The values in the explicit_bounds array must be strictly increasing.
+  // 「[Fable 5.1] The values in the explicit_bounds array must be strictly increasing.」
   //
-  // Histogram buckets are inclusive of their upper boundary, except the last
-  // bucket where the boundary is at infinity. This format is intentionally
-  // compatible with the OpenMetrics histogram definition.
+  // 「[Fable 5.1] Histogram buckets are inclusive of their upper boundary, except the last」
+  // 「[Fable 5.1] bucket where the boundary is at infinity. This format is intentionally」
+  // 「[Fable 5.1] compatible with the OpenMetrics histogram definition.」
   //
-  // If bucket_counts length is 0 then explicit_bounds length must also be 0,
-  // otherwise the data point is invalid.
+  // 「[Fable 5.1] If bucket_counts length is 0 then explicit_bounds length must also be 0,」
+  // 「[Fable 5.1] otherwise the data point is invalid.」
   repeated double explicit_bounds = 7;
 
-  // (Optional) List of exemplars collected from
-  // measurements that were used to form the data point
+  // 「[Fable 5.1] (Optional) List of exemplars collected from」
+  // 「[Fable 5.1] measurements that were used to form the data point」
   repeated Exemplar exemplars = 8;
 
-  // Flags that apply to this specific data point.  See DataPointFlags
-  // for the available flags and their meaning.
+  // 「[Fable 5.1] Flags that apply to this specific data point.  See DataPointFlags」
+  // 「[Fable 5.1] for the available flags and their meaning.」
   uint32 flags = 10;
 
-  // min is the minimum value over (start_time, end_time].
+  // 「[Fable 5.1] min is the minimum value over (start_time, end_time].」
   optional double min = 11;
 
-  // max is the maximum value over (start_time, end_time].
+  // 「[Fable 5.1] max is the maximum value over (start_time, end_time].」
   optional double max = 12;
 }
 
-// ExponentialHistogramDataPoint is a single data point in a timeseries that describes the
-// time-varying values of a ExponentialHistogram of double values. A ExponentialHistogram contains
-// summary statistics for a population of values, it may optionally contain the
-// distribution of those values across a set of buckets.
+// 「[Fable 5.1] ExponentialHistogramDataPoint is a single data point in a timeseries that describes the」
+// 「[Fable 5.1] time-varying values of a ExponentialHistogram of double values. A ExponentialHistogram contains」
+// 「[Fable 5.1] summary statistics for a population of values, it may optionally contain the」
+// 「[Fable 5.1] distribution of those values across a set of buckets.」
 //
 message ExponentialHistogramDataPoint {
-  // The set of key/value pairs that uniquely identify the timeseries from
-  // where this point belongs. The list may be empty (may contain 0 elements).
-  // Attribute keys MUST be unique (it is not allowed to have more than one
-  // attribute with the same key).
-  // The behavior of software that receives duplicated keys can be unpredictable.
+  // 「[Fable 5.1] The set of key/value pairs that uniquely identify the timeseries from」
+  // 「[Fable 5.1] where this point belongs. The list may be empty (may contain 0 elements).」
+  // 「[Fable 5.1] Attribute keys MUST be unique (it is not allowed to have more than one」
+  // 「[Fable 5.1] attribute with the same key).」
+  // 「[Fable 5.1] The behavior of software that receives duplicated keys can be unpredictable.」
   repeated opentelemetry.proto.common.v1.KeyValue attributes = 1;
 
-  // StartTimeUnixNano is optional but strongly encouraged, see the
-  // the detailed comments above Metric.
+  // 「[Fable 5.1] StartTimeUnixNano is optional but strongly encouraged, see the」
+  // 「[Fable 5.1] the detailed comments above Metric.」
   //
-  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
-  // 1970.
+  // 「[Fable 5.1] Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January」
+  // 「[Fable 5.1] 1970.」
   fixed64 start_time_unix_nano = 2;
 
-  // TimeUnixNano is required, see the detailed comments above Metric.
+  // 「[Fable 5.1] TimeUnixNano is required, see the detailed comments above Metric.」
   //
-  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
-  // 1970.
+  // 「[Fable 5.1] Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January」
+  // 「[Fable 5.1] 1970.」
   fixed64 time_unix_nano = 3;
 
-  // The number of values in the population. Must be
-  // non-negative. This value must be equal to the sum of the "bucket_counts"
-  // values in the positive and negative Buckets plus the "zero_count" field.
+  // 「[Fable 5.1] The number of values in the population. Must be」
+  // 「[Fable 5.1] non-negative. This value must be equal to the sum of the "bucket_counts"」
+  // 「[Fable 5.1] values in the positive and negative Buckets plus the "zero_count" field.」
   fixed64 count = 4;
 
-  // The sum of the values in the population. If count is zero then this field
-  // must be zero.
+  // 「[Fable 5.1] The sum of the values in the population. If count is zero then this field」
+  // 「[Fable 5.1] must be zero.」
   //
-  // Note: Sum should only be filled out when measuring non-negative discrete
-  // events, and is assumed to be monotonic over the values of these events.
-  // Negative events *can* be recorded, but sum should not be filled out when
-  // doing so.  This is specifically to enforce compatibility w/ OpenMetrics,
-  // see: https://github.com/prometheus/OpenMetrics/blob/v1.0.0/specification/OpenMetrics.md#histogram
+  // 「[Fable 5.1] Note: Sum should only be filled out when measuring non-negative discrete」
+  // 「[Fable 5.1] events, and is assumed to be monotonic over the values of these events.」
+  // 「[Fable 5.1] Negative events *can* be recorded, but sum should not be filled out when」
+  // 「[Fable 5.1] doing so.  This is specifically to enforce compatibility w/ OpenMetrics,」
+  // 「[Fable 5.1] see: https://github.com/prometheus/OpenMetrics/blob/v1.0.0/specification/OpenMetrics.md#histogram」
   optional double sum = 5;
 
-  // scale describes the resolution of the histogram.  Boundaries are
-  // located at powers of the base, where:
+  // 「[Fable 5.1] scale describes the resolution of the histogram.  Boundaries are」
+  // 「[Fable 5.1] located at powers of the base, where:」
   //
-  //   base = (2^(2^-scale))
+  //   「[Fable 5.1] base = (2^(2^-scale))」
   //
-  // The histogram bucket identified by `index`, a signed integer,
-  // contains values that are greater than (base^index) and
-  // less than or equal to (base^(index+1)).
+  // 「[Fable 5.1] The histogram bucket identified by `index`, a signed integer,」
+  // 「[Fable 5.1] contains values that are greater than (base^index) and」
+  // 「[Fable 5.1] less than or equal to (base^(index+1)).」
   //
-  // The positive and negative ranges of the histogram are expressed
-  // separately.  Negative values are mapped by their absolute value
-  // into the negative range using the same scale as the positive range.
+  // 「[Fable 5.1] The positive and negative ranges of the histogram are expressed」
+  // 「[Fable 5.1] separately.  Negative values are mapped by their absolute value」
+  // 「[Fable 5.1] into the negative range using the same scale as the positive range.」
   //
-  // scale is not restricted by the protocol, as the permissible
-  // values depend on the range of the data.
+  // 「[Fable 5.1] scale is not restricted by the protocol, as the permissible」
+  // 「[Fable 5.1] values depend on the range of the data.」
   sint32 scale = 6;
 
-  // The count of values that are either exactly zero or
-  // within the region considered zero by the instrumentation at the
-  // tolerated degree of precision.  This bucket stores values that
-  // cannot be expressed using the standard exponential formula as
-  // well as values that have been rounded to zero.
+  // 「[Fable 5.1] The count of values that are either exactly zero or」
+  // 「[Fable 5.1] within the region considered zero by the instrumentation at the」
+  // 「[Fable 5.1] tolerated degree of precision.  This bucket stores values that」
+  // 「[Fable 5.1] cannot be expressed using the standard exponential formula as」
+  // 「[Fable 5.1] well as values that have been rounded to zero.」
   //
-  // Implementations MAY consider the zero bucket to have probability
-  // mass equal to (zero_count / count).
+  // 「[Fable 5.1] Implementations MAY consider the zero bucket to have probability」
+  // 「[Fable 5.1] mass equal to (zero_count / count).」
   fixed64 zero_count = 7;
 
-  // positive carries the positive range of exponential bucket counts.
+  // 「[Fable 5.1] positive carries the positive range of exponential bucket counts.」
   Buckets positive = 8;
 
-  // negative carries the negative range of exponential bucket counts.
+  // 「[Fable 5.1] negative carries the negative range of exponential bucket counts.」
   Buckets negative = 9;
 
-  // Buckets are a set of bucket counts, encoded in a contiguous array
-  // of counts.
+  // 「[Fable 5.1] Buckets are a set of bucket counts, encoded in a contiguous array」
+  // 「[Fable 5.1] of counts.」
   message Buckets {
-    // The bucket index of the first entry in the bucket_counts array.
+    // 「[Fable 5.1] The bucket index of the first entry in the bucket_counts array.」
     //
-    // Note: This uses a varint encoding as a simple form of compression.
+    // 「[Fable 5.1] Note: This uses a varint encoding as a simple form of compression.」
     sint32 offset = 1;
 
-    // An array of count values, where bucket_counts[i] carries
-    // the count of the bucket at index (offset+i). bucket_counts[i] is the count
-    // of values greater than base^(offset+i) and less than or equal to
-    // base^(offset+i+1).
+    // 「[Fable 5.1] An array of count values, where bucket_counts[i] carries」
+    // 「[Fable 5.1] the count of the bucket at index (offset+i). bucket_counts[i] is the count」
+    // 「[Fable 5.1] of values greater than base^(offset+i) and less than or equal to」
+    // 「[Fable 5.1] base^(offset+i+1).」
     //
-    // Note: By contrast, the explicit HistogramDataPoint uses
-    // fixed64.  This field is expected to have many buckets,
-    // especially zeros, so uint64 has been selected to ensure
-    // varint encoding.
+    // 「[Fable 5.1] Note: By contrast, the explicit HistogramDataPoint uses」
+    // 「[Fable 5.1] fixed64.  This field is expected to have many buckets,」
+    // 「[Fable 5.1] especially zeros, so uint64 has been selected to ensure」
+    // 「[Fable 5.1] varint encoding.」
     repeated uint64 bucket_counts = 2;
   }
 
-  // Flags that apply to this specific data point.  See DataPointFlags
-  // for the available flags and their meaning.
+  // 「[Fable 5.1] Flags that apply to this specific data point.  See DataPointFlags」
+  // 「[Fable 5.1] for the available flags and their meaning.」
   uint32 flags = 10;
 
-  // (Optional) List of exemplars collected from
-  // measurements that were used to form the data point
+  // 「[Fable 5.1] (Optional) List of exemplars collected from」
+  // 「[Fable 5.1] measurements that were used to form the data point」
   repeated Exemplar exemplars = 11;
 
-  // The minimum value over (start_time, end_time].
+  // 「[Fable 5.1] The minimum value over (start_time, end_time].」
   optional double min = 12;
 
-  // The maximum value over (start_time, end_time].
+  // 「[Fable 5.1] The maximum value over (start_time, end_time].」
   optional double max = 13;
 
-  // ZeroThreshold may be optionally set to convey the width of the zero
-  // region. Where the zero region is defined as the closed interval
-  // [-ZeroThreshold, ZeroThreshold].
-  // When ZeroThreshold is 0, zero count bucket stores values that cannot be
-  // expressed using the standard exponential formula as well as values that
-  // have been rounded to zero.
+  // 「[Fable 5.1] ZeroThreshold may be optionally set to convey the width of the zero」
+  // 「[Fable 5.1] region. Where the zero region is defined as the closed interval」
+  // 「[Fable 5.1] [-ZeroThreshold, ZeroThreshold].」
+  // 「[Fable 5.1] When ZeroThreshold is 0, zero count bucket stores values that cannot be」
+  // 「[Fable 5.1] expressed using the standard exponential formula as well as values that」
+  // 「[Fable 5.1] have been rounded to zero.」
   double zero_threshold = 14;
 }
 
-// SummaryDataPoint is a single data point in a timeseries that describes the
-// time-varying values of a Summary metric. The count and sum fields represent
-// cumulative values.
+// 「[Fable 5.1] SummaryDataPoint is a single data point in a timeseries that describes the」
+// 「[Fable 5.1] time-varying values of a Summary metric. The count and sum fields represent」
+// 「[Fable 5.1] cumulative values.」
 message SummaryDataPoint {
   reserved 1;
 
-  // The set of key/value pairs that uniquely identify the timeseries from
-  // where this point belongs. The list may be empty (may contain 0 elements).
-  // Attribute keys MUST be unique (it is not allowed to have more than one
-  // attribute with the same key).
-  // The behavior of software that receives duplicated keys can be unpredictable.
+  // 「[Fable 5.1] The set of key/value pairs that uniquely identify the timeseries from」
+  // 「[Fable 5.1] where this point belongs. The list may be empty (may contain 0 elements).」
+  // 「[Fable 5.1] Attribute keys MUST be unique (it is not allowed to have more than one」
+  // 「[Fable 5.1] attribute with the same key).」
+  // 「[Fable 5.1] The behavior of software that receives duplicated keys can be unpredictable.」
   repeated opentelemetry.proto.common.v1.KeyValue attributes = 7;
 
-  // StartTimeUnixNano is optional but strongly encouraged, see the
-  // the detailed comments above Metric.
+  // 「[Fable 5.1] StartTimeUnixNano is optional but strongly encouraged, see the」
+  // 「[Fable 5.1] the detailed comments above Metric.」
   //
-  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
-  // 1970.
+  // 「[Fable 5.1] Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January」
+  // 「[Fable 5.1] 1970.」
   fixed64 start_time_unix_nano = 2;
 
-  // TimeUnixNano is required, see the detailed comments above Metric.
+  // 「[Fable 5.1] TimeUnixNano is required, see the detailed comments above Metric.」
   //
-  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
-  // 1970.
+  // 「[Fable 5.1] Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January」
+  // 「[Fable 5.1] 1970.」
   fixed64 time_unix_nano = 3;
 
-  // count is the number of values in the population. Must be non-negative.
+  // 「[Fable 5.1] count is the number of values in the population. Must be non-negative.」
   fixed64 count = 4;
 
-  // sum of the values in the population. If count is zero then this field
-  // must be zero.
+  // 「[Fable 5.1] sum of the values in the population. If count is zero then this field」
+  // 「[Fable 5.1] must be zero.」
   //
-  // Note: Sum should only be filled out when measuring non-negative discrete
-  // events, and is assumed to be monotonic over the values of these events.
-  // Negative events *can* be recorded, but sum should not be filled out when
-  // doing so.  This is specifically to enforce compatibility w/ OpenMetrics,
-  // see: https://github.com/prometheus/OpenMetrics/blob/v1.0.0/specification/OpenMetrics.md#summary
+  // 「[Fable 5.1] Note: Sum should only be filled out when measuring non-negative discrete」
+  // 「[Fable 5.1] events, and is assumed to be monotonic over the values of these events.」
+  // 「[Fable 5.1] Negative events *can* be recorded, but sum should not be filled out when」
+  // 「[Fable 5.1] doing so.  This is specifically to enforce compatibility w/ OpenMetrics,」
+  // 「[Fable 5.1] see: https://github.com/prometheus/OpenMetrics/blob/v1.0.0/specification/OpenMetrics.md#summary」
   double sum = 5;
 
-  // Represents the value at a given quantile of a distribution.
+  // 「[Fable 5.1] Represents the value at a given quantile of a distribution.」
   //
-  // To record Min and Max values following conventions are used:
-  // - The 1.0 quantile is equivalent to the maximum value observed.
-  // - The 0.0 quantile is equivalent to the minimum value observed.
+  // 「[Fable 5.1] To record Min and Max values following conventions are used:」
+  // 「[Fable 5.1] - The 1.0 quantile is equivalent to the maximum value observed.」
+  // 「[Fable 5.1] - The 0.0 quantile is equivalent to the minimum value observed.」
   //
-  // See the following issue for more context:
-  // https://github.com/open-telemetry/opentelemetry-proto/issues/125
+  // 「[Fable 5.1] See the following issue for more context:」
+  // 「[Fable 5.1] https://github.com/open-telemetry/opentelemetry-proto/issues/125」
   message ValueAtQuantile {
-    // The quantile of a distribution. Must be in the interval
-    // [0.0, 1.0].
+    // 「[Fable 5.1] The quantile of a distribution. Must be in the interval」
+    // 「[Fable 5.1] [0.0, 1.0].」
     double quantile = 1;
 
-    // The value at the given quantile of a distribution.
+    // 「[Fable 5.1] The value at the given quantile of a distribution.」
     //
-    // Quantile values must NOT be negative.
+    // 「[Fable 5.1] Quantile values must NOT be negative.」
     double value = 2;
   }
 
-  // (Optional) list of values at different quantiles of the distribution calculated
-  // from the current snapshot. The quantiles must be strictly increasing.
+  // 「[Fable 5.1] (Optional) list of values at different quantiles of the distribution calculated」
+  // 「[Fable 5.1] from the current snapshot. The quantiles must be strictly increasing.」
   repeated ValueAtQuantile quantile_values = 6;
 
-  // Flags that apply to this specific data point.  See DataPointFlags
-  // for the available flags and their meaning.
+  // 「[Fable 5.1] Flags that apply to this specific data point.  See DataPointFlags」
+  // 「[Fable 5.1] for the available flags and their meaning.」
   uint32 flags = 8;
 }
 
-// A representation of an exemplar, which is a sample input measurement.
-// Exemplars also hold information about the environment when the measurement
-// was recorded, for example the span and trace ID of the active span when the
-// exemplar was recorded.
+// 「[Fable 5.1] A representation of an exemplar, which is a sample input measurement.」
+// 「[Fable 5.1] Exemplars also hold information about the environment when the measurement」
+// 「[Fable 5.1] was recorded, for example the span and trace ID of the active span when the」
+// 「[Fable 5.1] exemplar was recorded.」
 message Exemplar {
   reserved 1;
 
-  // The set of key/value pairs that were filtered out by the aggregator, but
-  // recorded alongside the original measurement. Only key/value pairs that were
-  // filtered out by the aggregator should be included
+  // 「[Fable 5.1] The set of key/value pairs that were filtered out by the aggregator, but」
+  // 「[Fable 5.1] recorded alongside the original measurement. Only key/value pairs that were」
+  // 「[Fable 5.1] filtered out by the aggregator should be included」
   repeated opentelemetry.proto.common.v1.KeyValue filtered_attributes = 7;
 
-  // time_unix_nano is the exact time when this exemplar was recorded
+  // 「[Fable 5.1] time_unix_nano is the exact time when this exemplar was recorded」
   //
-  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
-  // 1970.
+  // 「[Fable 5.1] Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January」
+  // 「[Fable 5.1] 1970.」
   fixed64 time_unix_nano = 2;
 
-  // The value of the measurement that was recorded. An exemplar is
-  // considered invalid when one of the recognized value fields is not present
-  // inside this oneof.
+  // 「[Fable 5.1] The value of the measurement that was recorded. An exemplar is」
+  // 「[Fable 5.1] considered invalid when one of the recognized value fields is not present」
+  // 「[Fable 5.1] inside this oneof.」
   oneof value {
     double as_double = 3;
     sfixed64 as_int = 6;
   }
 
-  // (Optional) Span ID of the exemplar trace.
-  // span_id may be missing if the measurement is not recorded inside a trace
-  // or if the trace is not sampled.
+  // 「[Fable 5.1] (Optional) Span ID of the exemplar trace.」
+  // 「[Fable 5.1] span_id may be missing if the measurement is not recorded inside a trace」
+  // 「[Fable 5.1] or if the trace is not sampled.」
   bytes span_id = 4;
 
-  // (Optional) Trace ID of the exemplar trace.
-  // trace_id may be missing if the measurement is not recorded inside a trace
-  // or if the trace is not sampled.
+  // 「[Fable 5.1] (Optional) Trace ID of the exemplar trace.」
+  // 「[Fable 5.1] trace_id may be missing if the measurement is not recorded inside a trace」
+  // 「[Fable 5.1] or if the trace is not sampled.」
   bytes trace_id = 5;
 }
