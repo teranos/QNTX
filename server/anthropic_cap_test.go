@@ -55,3 +55,19 @@ func TestRootSetsTheCapOnASessionAtAnthropicAndTheDefaultIs200(t *testing.T) {
 	}
 	assert.Equal(t, "150", rootAsksAnthropic(t, s, "am", sigil.Sent{}).GetCap(), "a refused cap changes nothing")
 }
+
+// Qodo's review of #1519: once ROOT had set a cap, nothing took the node back
+// to its default. An amount left out does.
+func TestRootTakesTheCapBackToTheDefault(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole, "then": "true"})
+	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "150"})
+
+	back := rootAsksAnthropic(t, s, "cap", sigil.Sent{})
+	assert.Equal(t, anthropicDefaultCap, back.GetCap())
+	assert.True(t, back.GetCapDefault())
+	assert.Equal(t, anthropicConsole, back.GetFirst(), "the order is kept")
+	assert.True(t, back.GetThen())
+	again := rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "  "})
+	assert.True(t, again.GetCapDefault(), "an amount of nothing but spaces is left out too")
+}
