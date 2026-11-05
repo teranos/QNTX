@@ -242,3 +242,31 @@ func TestAnAnthropicLineIsStampedWhenItIsWrittenAndOrderedByItsRevision(t *testi
 	require.NoError(t, err)
 	assert.True(t, first.AttestationExists("AS-written-after"), "a row written after the revision is taken in")
 }
+
+// As Qodo found for name lines on #1540: a build from before revisions, run
+// after one that writes them (a node flipped to an older branch), writes a
+// line with no revision. Read as older than every line with one, the change
+// it made was written away. It is the newest when it was written after the
+// newest line with a revision.
+func TestAnAnthropicLineWithNoRevisionAfterARevisionedOneIsTheNewest(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _, _ := runningNamespaceAgents(t)
+	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "75"})
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	later := time.Now().Add(time.Hour)
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-anthropic-by-an-older-build", Subjects: []string{anthropicLineSubject}, Predicates: []string{anthropicLinePredicate},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"https://example.org/root"}, Timestamp: later, CreatedAt: later,
+		Source: "anthropic", Attributes: map[string]any{"first": anthropicConsole, "then": true, "cap": "90"},
+	}))
+	am := rootAsksAnthropic(t, s, "am", sigil.Sent{})
+	assert.Equal(t, "90", am.GetCap())
+	assert.Equal(t, anthropicConsole, am.GetFirst())
+
+	// The next change comes after both.
+	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "95"})
+	am = rootAsksAnthropic(t, s, "am", sigil.Sent{})
+	assert.Equal(t, "95", am.GetCap())
+	assert.Equal(t, anthropicConsole, am.GetFirst(), "carried from the line the older build wrote")
+}

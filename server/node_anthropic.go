@@ -238,6 +238,7 @@ func (s *QNTXServer) keepAnthropicLine(by string, kept anthropicKept) *protocol.
 	// 「[Opus 5.5] A line is stamped when it is written, and comes after the line it changes by its」
 	// 「[Opus 5.5] revision, one more, set under anthropicLining (changeAnthropicLine).」
 	attributes[anthropicRevisionAttribute] = kept.revision + 1
+	attributes[anthropicAfterAttribute] = kept.newestStamp.UnixMilli()
 	now := anthropicNow()
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{anthropicLineSubject}, Predicates: []string{anthropicLinePredicate}, Contexts: []string{auth.NamespaceSystem},
@@ -261,10 +262,35 @@ type anthropicKept struct {
 	// 「[Opus 5.5] revision is the line's place among the node's ANTHROPIC lines; 0 is a line written before」
 	// 「[Opus 5.5] lines carried one, older than any that does.」
 	revision int64
+	// 「[Opus 5.5] newestStamp is the latest stamp among every ANTHROPIC line: the after of the next line.」
+	newestStamp time.Time
 }
+
+// 「[Opus 5.5] anthropicAfterAttribute is the attribute a line keeps, in Unix milliseconds, the newest」
+// 「[Opus 5.5] stamp among the lines it was written after.」
+const anthropicAfterAttribute = "after"
 
 // 「[Opus 5.5] anthropicRevisionAttribute is the attribute a line's revision is kept under.」
 const anthropicRevisionAttribute = "revision"
+
+// 「[Opus 5.5] afterOf is the after a line with a revision keeps, in Unix milliseconds: its own stamp when」
+// 「[Opus 5.5] it keeps none.」
+func afterOf(as *types.As) (int64, error) {
+	held, carried := as.Attributes[anthropicAfterAttribute]
+	if !carried {
+		return as.Timestamp.UnixMilli(), nil
+	}
+	if after, isNumber := held.(float64); isNumber && after == float64(int64(after)) {
+		return int64(after), nil
+	}
+	if after, isNumber := held.(int64); isNumber {
+		return after, nil
+	}
+	if after, isNumber := held.(int); isNumber {
+		return int64(after), nil
+	}
+	return 0, errors.Newf("the node's %s line %s keeps %s as %v (%T), not a whole number", anthropicLineSubject, as.ID, anthropicAfterAttribute, held, held)
+}
 
 // 「[Opus 5.5] revisionOf is the revision a line carries, 0 for one that carries none. A line's」
 // 「[Opus 5.5] timestamp is when it was written and does not order it: two kept in one millisecond tie,」
@@ -301,22 +327,41 @@ func (s *QNTXServer) anthropicLine() (anthropicKept, bool, error) {
 	if err != nil {
 		return anthropicKept{}, false, errors.Wrapf(err, "failed to read the node's %s line", anthropicLineSubject)
 	}
-	// 「[Opus 5.5] The newest is the line with the greatest revision; among lines that carry none, the latest.」
-	var newest *types.As
+	// 「[Opus 5.5] The newest is the line with the greatest revision, unless a line with none (written before」
+	// 「[Opus 5.5] revisions, or by a build from before them run after) is stamped past that line's after:」
+	// 「[Opus 5.5] then it was written after it. A line with a revision and no after is after its own stamp.」
+	var revised, unrevised *types.As
 	var newestRevision int64
+	var newestStamp time.Time
 	for _, as := range found {
 		revision, err := revisionOf(as)
 		if err != nil {
 			return anthropicKept{}, false, err
 		}
-		if newest == nil || revision > newestRevision || (revision == newestRevision && revision == 0 && as.Timestamp.After(newest.Timestamp)) {
-			newest, newestRevision = as, revision
+		if as.Timestamp.After(newestStamp) {
+			newestStamp = as.Timestamp
+		}
+		switch {
+		case revision > 0 && (revised == nil || revision > newestRevision):
+			revised, newestRevision = as, revision
+		case revision == 0 && (unrevised == nil || as.Timestamp.After(unrevised.Timestamp)):
+			unrevised = as
+		}
+	}
+	newest := revised
+	if unrevised != nil {
+		if newest == nil {
+			newest = unrevised
+		} else if after, err := afterOf(revised); err != nil {
+			return anthropicKept{}, false, err
+		} else if unrevised.Timestamp.UnixMilli() > after {
+			newest = unrevised
 		}
 	}
 	if newest == nil {
 		return anthropicKept{ids: map[string]string{}, first: anthropicSession}, false, nil
 	}
-	kept := anthropicKept{ids: map[string]string{}, first: anthropicSession, at: newest.Timestamp, revision: newestRevision}
+	kept := anthropicKept{ids: map[string]string{}, first: anthropicSession, at: newest.Timestamp, revision: newestRevision, newestStamp: newestStamp}
 	// A line kept before ROOT ordered anything spends the session first, and nothing follows.
 	if _, ordered := newest.Attributes["first"]; ordered {
 		if kept.first, err = oneText(newest.Attributes, "first", anthropicLineSubject, newest.ID, auth.NamespaceSystem); err != nil {
