@@ -65,10 +65,11 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 	s.naming.Lock()
 	defer s.naming.Unlock()
 
-	names, err := s.agentNames()
+	lines, err := s.agentLines()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	names := standing(lines)
 	left := ""
 	if at := slices.IndexFunc(names, func(kept agentName) bool { return kept.did == did }); at >= 0 {
 		left = names[at].name
@@ -80,7 +81,11 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
 			Says: strconv.Quote(name) + " is taken: another agent holds it. Ask again with another name."}
 	}
-	if err := s.keepAgentName(did, name); err != nil {
+	var newest time.Time
+	if len(lines) > 0 {
+		newest = lines[len(lines)-1].at
+	}
+	if err := s.keepAgentName(did, name, newest); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	if left != "" {
@@ -142,6 +147,17 @@ type agentName struct {
 // held before is free from then on. A line some other actor wrote about a DID
 // is not the agent naming itself, and is no name.
 func (s *QNTXServer) agentNames() ([]agentName, error) {
+	lines, err := s.agentLines()
+	if err != nil {
+		return nil, err
+	}
+	return standing(lines), nil
+}
+
+// agentLines is every line an agent wrote naming itself, in the order they
+// were written: by when each is stamped, which keepAgentName makes later than
+// every one before it.
+func (s *QNTXServer) agentLines() ([]agentName, error) {
 	reading, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		return nil, errors.Wrapf(err, "the names agents hold are kept in %s, which is not open", auth.NamespaceSystem)
@@ -163,6 +179,11 @@ func (s *QNTXServer) agentNames() ([]agentName, error) {
 		names = append(names, agentName{did: as.Subjects[0], name: name, at: as.Timestamp})
 	}
 	slices.SortStableFunc(names, func(a, b agentName) int { return a.at.Compare(b.at) })
+	return names, nil
+}
+
+// standing is the name each agent holds after these lines, read in order.
+func standing(names []agentName) []agentName {
 	// One name is one agent's at a time and an agent holds one name. A line for
 	// a name another agent held when it was written is no name, however it came
 	// to be written; any other line is the agent's name from then on.
@@ -176,11 +197,18 @@ func (s *QNTXServer) agentNames() ([]agentName, error) {
 		stands = slices.DeleteFunc(stands, func(held agentName) bool { return held.did == line.did })
 		stands = append(stands, line)
 	}
-	return stands, nil
+	return stands
 }
 
-// keepAgentName writes the line down, by the agent itself.
-func (s *QNTXServer) keepAgentName(did, name string) error {
+// stampPrecision is how finely a line's timestamp is kept: to the millisecond.
+const stampPrecision = time.Millisecond
+
+// keepAgentName writes the line down, by the agent itself, stamped later than
+// newest, the newest name line already written, at the precision it is kept.
+// Lines stamped alike read back in no order, and a rename and another agent
+// taking the name it left, read back the other way round, would undo what
+// was answered. Asked under naming, so on this node no line comes between.
+func (s *QNTXServer) keepAgentName(did, name string, newest time.Time) error {
 	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
 		return errors.Wrapf(err, "no store to keep the name of %s in", did)
@@ -190,9 +218,13 @@ func (s *QNTXServer) keepAgentName(did, name string) error {
 		return errors.Wrapf(err, "failed to name the %s line of %s", predicateAgentNamed, did)
 	}
 	now := time.Now()
+	stamped := now.Truncate(stampPrecision)
+	if newest = newest.Truncate(stampPrecision); !stamped.After(newest) {
+		stamped = newest.Add(stampPrecision)
+	}
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{did}, Predicates: []string{predicateAgentNamed}, Contexts: []string{auth.NamespaceSystem},
-		Actors: []string{did}, Timestamp: now, CreatedAt: now, Source: did,
+		Actors: []string{did}, Timestamp: stamped, CreatedAt: now, Source: did,
 		Attributes: map[string]any{"name": name},
 	}); err != nil {
 		return errors.Wrapf(err, "the name of %s was not kept", did)
