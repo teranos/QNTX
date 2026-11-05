@@ -157,7 +157,11 @@ func (s *QNTXServer) scrubJSON(ctx context.Context, raw []byte) ([]byte, string,
 	if len(back) != len(words) {
 		return nil, "", errors.Newf("the scanner was handed %d strings of the answer and gave %d back", len(words), len(back))
 	}
-	written, err := json.Marshal(jsonWith(held, &back))
+	with, err := jsonWith(held, &back)
+	if err != nil {
+		return nil, "", err
+	}
+	written, err := json.Marshal(with)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "the answer with its fixtures did not marshal")
 	}
@@ -194,8 +198,9 @@ func jsonWords(value any, into []string) []string {
 }
 
 // jsonWith is a JSON value with words in place of its strings, taken from the
-// front of words in the order jsonWords read them.
-func jsonWith(value any, words *[]string) any {
+// front of words in the order jsonWords read them. Two keys of one object that
+// are one key with their fixtures are an error: one of them would be lost.
+func jsonWith(value any, words *[]string) (any, error) {
 	next := func() string {
 		word := (*words)[0]
 		*words = (*words)[1:]
@@ -203,22 +208,33 @@ func jsonWith(value any, words *[]string) any {
 	}
 	switch held := value.(type) {
 	case string:
-		return next()
+		return next(), nil
 	case []any:
 		with := make([]any, len(held))
 		for i, each := range held {
-			with[i] = jsonWith(each, words)
+			each, err := jsonWith(each, words)
+			if err != nil {
+				return nil, err
+			}
+			with[i] = each
 		}
-		return with
+		return with, nil
 	case map[string]any:
 		with := make(map[string]any, len(held))
 		for _, key := range jsonKeys(held) {
 			named := next()
-			with[named] = jsonWith(held[key], words)
+			if _, taken := with[named]; taken {
+				return nil, errors.Newf("two keys of an object are both %q with their fixtures", named)
+			}
+			each, err := jsonWith(held[key], words)
+			if err != nil {
+				return nil, err
+			}
+			with[named] = each
 		}
-		return with
+		return with, nil
 	}
-	return value
+	return value, nil
 }
 
 // The parts of GitHub's deliveries that are words somebody wrote.
