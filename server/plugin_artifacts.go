@@ -138,6 +138,10 @@ func (s *QNTXServer) takeRun(ctx context.Context, name string, source gitHubSour
 	return nil
 }
 
+// removeDownload removes an artifact's download when its take is done; a test
+// stands in a removal that fails.
+var removeDownload = os.Remove
+
 // takeArtifact downloads one artifact of run to the node's builds directory,
 // reads name's build out of it there, and installs it unless the installed
 // build is of a newer run. The download is removed when the take is done.
@@ -153,9 +157,30 @@ func (s *QNTXServer) takeArtifact(ctx context.Context, name string, source gitHu
 	if err != nil {
 		return grpcplugin.TakenBuild{}, errors.Wrapf(err, "there is nowhere in %s to download artifact %s to", builds, artifact.Name)
 	}
+	// A download left behind is not a build that failed: it is said in the
+	// node's log and kept with the artifact faults, and an install that
+	// succeeded stands, to be rooted and started. A take that failed says it
+	// beside its own error.
 	defer func() {
-		err = sqlclose.With(err, zipped.Close(), "the download "+zipped.Name())
-		err = sqlclose.With(err, os.Remove(zipped.Name()), "the download "+zipped.Name())
+		path := zipped.Name()
+		unkept := sqlclose.With(nil, zipped.Close(), "the download "+path)
+		if removeErr := removeDownload(path); removeErr != nil {
+			removeErr = errors.Wrapf(removeErr, "the download %s was not removed", path)
+			if unkept == nil {
+				unkept = removeErr
+			} else {
+				unkept = errors.WithSecondaryError(unkept, removeErr)
+			}
+		}
+		if unkept == nil {
+			return
+		}
+		logger.Errorw("A workflow run's artifact download was not removed",
+			"plugin", name, "run", run.WorkflowRun.HTMLURL, "path", path, "error", unkept)
+		s.artifacts.fault(name + " from " + run.WorkflowRun.HTMLURL + ": " + unkept.Error())
+		if err != nil {
+			err = errors.WithSecondaryError(err, unkept)
+		}
 	}()
 	size, err := s.downloadArtifact(ctx, source, artifact, zipped)
 	if err != nil {

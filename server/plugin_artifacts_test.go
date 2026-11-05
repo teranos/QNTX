@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -201,6 +203,49 @@ func TestARunsArtifactIsDownloadedToDiskAndGoneAfter(t *testing.T) {
 	left, err := os.ReadDir(builds)
 	require.NoError(t, err)
 	assert.Empty(t, left, "an artifact's download was left in %s", builds)
+}
+
+// Qodo's review of #1529: a download that was not removed turned an install
+// that succeeded into an error, and the new build was neither rooted nor
+// started. It is said in the node's log and kept with the artifact faults, and
+// the install stands. An install that failed still says why, with it.
+func TestADownloadNotRemovedIsSaidAndTheInstallStands(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _ := artifactServingServer(t, map[int64][]map[string]any{
+		9:  {{"id": 3, "name": pyreBuild("1.0.0"), "expired": false}},
+		10: {{"id": 5, "name": pyreBuild("1.0.1"), "expired": false}},
+	}, map[int64][]byte{3: pyreArtifact(t, "1.0.0", []byte("\x7fELF pyre 1.0.0")), 5: []byte("not a zip")})
+	core, logs := observer.New(zapcore.WarnLevel)
+	s.logger = zap.New(core).Sugar()
+	var kept []string
+	removeDownload = func(path string) error {
+		kept = append(kept, path)
+		return errors.New("the disk said no")
+	}
+	t.Cleanup(func() { removeDownload = os.Remove })
+	pyre := gitHubSource{Owner: "teranos", Repo: "pyre"}
+
+	require.NoError(t, s.takeRun(context.Background(), "pyre", pyre, workflowRun(t, "teranos/pyre", 9, "completed", "success", "2026-10-12T10:00:00Z")))
+	assert.Equal(t, "\x7fELF pyre 1.0.0", installedPyre(t))
+	shown := artifactsShown(t, s)
+	require.Len(t, shown, 1)
+	assert.True(t, shown[0].Changed)
+
+	require.Len(t, kept, 1)
+	unkept := logs.FilterMessage("A workflow run's artifact download was not removed").All()
+	require.Len(t, unkept, 1)
+	assert.Equal(t, "pyre", unkept[0].ContextMap()["plugin"])
+	assert.Equal(t, "https://github.com/teranos/pyre/actions/runs/9", unkept[0].ContextMap()["run"])
+	assert.Equal(t, kept[0], unkept[0].ContextMap()["path"])
+	faults := s.artifacts.faulted()
+	require.Len(t, faults, 1)
+	assert.Contains(t, faults[0], kept[0])
+	assert.Contains(t, faults[0], "the disk said no")
+
+	err := s.takeRun(context.Background(), "pyre", pyre, workflowRun(t, "teranos/pyre", 10, "completed", "success", "2026-10-12T11:00:00Z"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not a zip")
+	assert.Contains(t, fmt.Sprintf("%+v", err), "the disk said no", "the cleanup failure is beside the install error")
 }
 
 // The newest run's build is the one that runs: a delivery of an older run,
