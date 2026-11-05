@@ -183,7 +183,7 @@ message ElementSessions {
 
 // ClaudeSaid is what claude say answers.
 message ClaudeSaid {
-  // What it answered.
+  // 「[Opus 5.5] What it answered.」
   string answer = 1;
   // Whether Claude Code reports the turn as failed, in the answer's words.
   bool is_error = 2;
@@ -191,7 +191,7 @@ message ClaudeSaid {
   string subtype = 3;
   // The session it was said in.
   string session = 4;
-  // The model that answered.
+  // 「[Opus 5.5] The model that answered.」
   string model = 5;
   // The Claude Code that ran.
   string claude_code = 6;
@@ -201,15 +201,15 @@ message ClaudeSaid {
   repeated string denied = 8;
   // What Claude Code says the turn cost.
   double cost_usd = 9;
-  // How long the turn took.
+  // 「[Opus 5.5] How long the turn took.」
   double took_ms = 10;
-  // Why a row of the session was not written down, when one was not.
+  // 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
   string unwritten = 11;
 }
 
 // PiSaid is what pi say answers.
 message PiSaid {
-  // What it answered.
+  // 「[Opus 5.5] What it answered.」
   string answer = 1;
   // Whether the turn ended in error, in the answer's words.
   bool is_error = 2;
@@ -217,21 +217,21 @@ message PiSaid {
   string stop = 3;
   // The session it was said in.
   string session = 4;
-  // The model that answered.
+  // 「[Opus 5.5] The model that answered.」
   string model = 5;
   // The Pi that ran.
   string pi_version = 6;
   // What Pi says the turn's model calls cost.
   double cost_usd = 7;
-  // How long the turn took.
+  // 「[Opus 5.5] How long the turn took.」
   double took_ms = 8;
-  // Why a row of the session was not written down, when one was not.
+  // 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
   string unwritten = 9;
 }
 
 // ClaudeAm is what claude am answers.
 message ClaudeAm {
-  // Its own DID, which signs what it writes down.
+  // 「[Opus 5.5] Its own DID, which signs what it writes down.」
   string did = 1;
   // The model am.toml names.
   string model = 2;
@@ -279,6 +279,8 @@ message NodeAgentSaid {
   PiSaid pi = 2;
   // What it answered in codex.
   CodexSaid codex = 3;
+  // 「[Opus 5.5] What it answered in agy.」
+  AgySaid agy = 4;
 }
 
 // NodeAgentAm is what agent am answers: who the Node Agent is and how the node
@@ -290,24 +292,26 @@ message NodeAgentAm {
   PiAm pi = 2;
   // In codex.
   CodexAm codex = 3;
+  // 「[Opus 5.5] In agy.」
+  AgyAm agy = 4;
 }
 
 // CodexSaid is what an agent answered in codex.
 message CodexSaid {
-  // What it answered.
+  // 「[Opus 5.5] What it answered.」
   string answer = 1;
   // The session it was said in: the node's, apart from codex's own thread.
   string session = 2;
-  // The model that answered.
+  // 「[Opus 5.5] The model that answered.」
   string model = 3;
   // The codex that ran.
   string codex_version = 4;
   // What codex says the turn used, in tokens.
   int64 input_tokens = 5;
   int64 output_tokens = 6;
-  // How long the turn took.
+  // 「[Opus 5.5] How long the turn took.」
   double took_ms = 7;
-  // Why a row of the session was not written down, when one was not.
+  // 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
   string unwritten = 8;
   // The CLI thread used to resume, distinct from the transcript session.
   string thread = 9;
@@ -315,7 +319,7 @@ message CodexSaid {
 
 // CodexAm is who an agent is in codex and how the node runs it.
 message CodexAm {
-  // Its own DID, which signs what it writes down.
+  // 「[Opus 5.5] Its own DID, which signs what it writes down.」
   string did = 1;
   // The model am.toml names.
   string model = 2;
@@ -333,6 +337,47 @@ message CodexAm {
   string codex_version = 8;
   // Why it cannot be spoken to in codex, when it cannot.
   string not_ready = 9;
+}
+
+// "making a start on agy as another harness"
+
+// 「[Opus 5.5] AgySaid is what an agent answered in agy.」
+message AgySaid {
+  // 「[Opus 5.5] What it answered.」
+  string answer = 1;
+  // 「[Opus 5.5] The session it was said in: the node's, apart from agy's own conversation.」
+  string session = 2;
+  // 「[Opus 5.5] The model that answered.」
+  string model = 3;
+  // 「[Opus 5.5] The agy that ran.」
+  string agy_version = 4;
+  // 「[Opus 5.5] The context agy last reported over ACP: the tokens in it, and its window.」
+  int64 context_used = 5;
+  int64 context_size = 6;
+  // 「[Opus 5.5] How long the turn took.」
+  double took_ms = 7;
+  // 「[Opus 5.5] Why a row of the session was not written down, when one was not.」
+  string unwritten = 8;
+  // 「[Opus 5.5] agy's own ACP session, which it resumes, distinct from the transcript session.」
+  string conversation = 9;
+}
+
+// 「[Opus 5.5] AgyAm is who an agent is in agy and how the node runs it.」
+message AgyAm {
+  // 「[Opus 5.5] Its own DID, which signs what it writes down.」
+  string did = 1;
+  // 「[Opus 5.5] The model it runs: the value of its session's model option, as agy offers it.」
+  string model = 2;
+  // 「[Opus 5.5] The session it continues in agy, or empty before anything was said to it there.」
+  string session = 3;
+  // 「[Opus 5.5] Whether it is in a turn in agy now.」
+  bool answering = 4;
+  // 「[Opus 5.5] Where the agy it runs is, or empty when the node has none yet.」
+  string agy = 5;
+  // 「[Opus 5.5] The agy this build pins.」
+  string agy_version = 6;
+  // 「[Opus 5.5] Why it cannot be spoken to in agy, when it cannot.」
+  string not_ready = 7;
 }
 
 // NodeGoogle is what google am answers: the node at Google Cloud, set up on
@@ -369,6 +414,10 @@ message NodeGoogle {
   bool costs_wired = 14;
   // Where ROOT goes to connect them, by saying yes at Google once.
   string costs_connect = 15;
+  // 「[Opus 5.5] Whether ROOT let the node call Vertex AI, which agy runs on.」
+  bool agy_wired = 20;
+  // 「[Opus 5.5] Where ROOT goes to let it, by saying yes at Google once.」
+  string agy_connect = 21;
   // What each budget last reported.
   repeated GoogleBudget budgets = 16;
   // The limit ROOT set on this node; zero is none.
@@ -381,6 +430,38 @@ message NodeGoogle {
   double day_limit = 22;
   // What it has spent today, as far as Google has reported.
   double spent_today = 23;
+  // "one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item."
+  // 「[Opus 5.5] Each thing that spends at Google, in a project of its own: the node's identity, and each namespace's key.」
+  repeated GoogleSpendItem items = 24;
+  // 「[Opus 5.5] Where ROOT goes to make a namespace's key, by saying yes at Google once: namespace appended.」
+  string key_connect = 25;
+}
+
+// 「[Opus 5.5] GoogleSpendItem is one thing that spends at Google, in its own project, halted on its own.」
+// "daily spend does need to be per spend-item"
+message GoogleSpendItem {
+  // 「[Opus 5.5] node, for the node's own identity; otherwise the namespace whose key it is.」
+  string name = 1;
+  // 「[Opus 5.5] oidc, the node's identity, or key, a namespace's API key.」
+  string kind = 2;
+  // 「[Opus 5.5] The project it spends in, alone, by its id.」
+  string project_id = 3;
+  // 「[Opus 5.5] The same project by its number, which budgets name it by.」
+  string project_number = 4;
+  // 「[Opus 5.5] The budget the node made to meter that project, by its name at Google.」
+  string budget = 5;
+  // 「[Opus 5.5] What the project has cost this period, as far as Google has reported.」
+  double cost = 6;
+  // 「[Opus 5.5] What it has spent today, as far as Google has reported.」
+  double spent_today = 7;
+  // 「[Opus 5.5] The limit ROOT set on it for the budget's period; zero is none.」
+  double limit = 8;
+  // 「[Opus 5.5] The most ROOT lets it spend in a day; zero is none.」
+  double day_limit = 9;
+  // 「[Opus 5.5] Whether what it spends is halted; nothing else halts for it.」
+  bool halted = 10;
+  // 「[Opus 5.5] Why it is.」
+  string halted_why = 11;
 }
 
 // GoogleBudget is what a budget at Google Cloud last reported.
@@ -479,7 +560,7 @@ message NamespaceKey {
 
 // PiAm is what pi am answers.
 message PiAm {
-  // Its own DID, which signs what it writes down.
+  // 「[Opus 5.5] Its own DID, which signs what it writes down.」
   string did = 1;
   // The model it runs in Pi: am.toml's for the Node Agent, the AGENT line's for
   // a namespace's agent.

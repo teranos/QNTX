@@ -1,7 +1,7 @@
 # ADR-021: Graph Database as a Plugin-Provided Service
 
 ## Status
-Proposed
+Proposed, not seen in action,
 
 ## Context
 

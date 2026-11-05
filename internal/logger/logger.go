@@ -26,7 +26,7 @@ var (
 	// to prevent accidentally replacing the file-enabled logger with a console-only one.
 	fileOutputAdded bool
 	// fileWriter is the raw file writer, set by AddFileOutput.
-	fileWriter *os.File
+	fileWriter *rotatingFile
 )
 
 func init() {
@@ -171,9 +171,9 @@ func AddFileOutput(logPath string) error {
 		return errors.Wrapf(err, "failed to create log directory %s", dir)
 	}
 
-	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	file, err := openRotating(logPath, fileLogMost)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open log file %s", logPath)
+		return err
 	}
 
 	encoderConfig := zap.NewDevelopmentEncoderConfig()

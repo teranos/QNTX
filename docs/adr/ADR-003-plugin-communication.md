@@ -160,27 +160,6 @@ type ServiceRegistry interface {
 
 Services like `LLM()`, `Search()`, and `VectorSearch()` return nil when no provider plugin is registered. Plugins that provide these services register via optional interfaces on `DomainPlugin` ([ADR-001](./ADR-001-domain-plugin-architecture.md)).
 
-## Consequences
-
-### Positive
-
-✅ **Decoupling**: Plugins can be added/removed without affecting others
-✅ **Async by default**: Database acts as durable message queue
-✅ **Consistency**: Database transactions provide ACID guarantees
-✅ **Queryable**: Ax query language works across all plugin data
-✅ **Audit trail**: All plugin interactions are attestations (queryable history)
-
-### Negative
-
-⚠️ **Latency**: Database round-trip slower than direct method calls
-⚠️ **Complexity**: Developers must think in events/attestations, not procedure calls
-⚠️ **Polling**: Plugins may need to poll for new attestations (mitigated by Pulse jobs)
-
-### Neutral
-
-- Attestation schema is flexible (JSON payload) but requires documentation
-- Database is single point of contention (mitigated by SQLite write-ahead log)
-
 ## Examples
 
 ### Example 1: Git Ingestion → Code Analysis

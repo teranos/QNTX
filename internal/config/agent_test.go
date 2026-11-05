@@ -188,3 +188,28 @@ func TestNodeAgentOtherThanOpusOrFableIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// 「[Opus 5.5] "wiring it into node and namespace config as an actual harness": agy runs」
+// 「[Opus 5.5] the model am.toml names. Asked whether the Node Agent in agy is held to Opus」
+// 「[Opus 5.5] or Fable, which agy never serves: "Exempt agy".」
+func TestNodeAgentAgyLoads(t *testing.T) {
+	path := writeConfig(t, `
+[agent.root]
+model  = "claude-opus-5-5"
+effort = "low"
+
+[agent.root.agy]
+model = "gemini-3.8-flash-low"
+`)
+	cfg, err := LoadFromFile(path)
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	agy := cfg.Agent.Root.Agy
+	if !agy.Named() || agy.Model != "gemini-3.8-flash-low" {
+		t.Errorf("agy loaded as %+v", agy)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate = %v, want nil", err)
+	}
+}

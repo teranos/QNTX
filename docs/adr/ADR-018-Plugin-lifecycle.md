@@ -1,0 +1,184 @@
+# ADR-018: Plugin Lifecycle, Watchers, and DX
+
+**Status:** Accepted
+**Date:** Question 2026-11-03
+**Deciders:** Brandon
+**Related:** [[ADR-001-domain-plugin-architecture]], [[ADR-003-plugin-communication]] , [[ADR-004-plugin-pulse-integration]] 
+
+
+Is this more about Plugin lifecycle ?
+
+Then this must be the right place to discuss dynamically shutting down and starting plugins based on how much they are used and system stress. So the system always keeps serving, but degrades partially based on org specific characteristics 
+## Context
+
+Plugins are separate processes that communicate with QNTX over gRPC. The lifecycle — boot, initialisation, health monitoring, restart, shutdown (cooldown ?) — has implicit contracts that caused real bugs: double initialisation, stale connections, silent watcher failures. 
+
+This ADR documents the full plugin lifecycle and the watcher subsystem as canonical references.
+
+### Problems observed
+
+1. **Double initialization.** `ForceInitialize` bypassed `initOnce` without consuming it. The HTTP routing lazy-init then called `Initialize` again, causing plugins to start their work twice and tear down what they just built.
+
+2. **WebSocket ping-pong is undocumented.** Plugins implementing `HandleWebSocket` must read the incoming gRPC stream and respond to PING messages with PONG. If they ignore the stream (natural first instinct), QNTX logs "WebSocket pong timeout" and the connection dies.
+
+3. **Watcher lifecycle is implicit.** The full path — `InitializeResponse.watchers` → DB → engine → `ExecuteJob` — is spread across four files. A plugin developer sees only the proto field and `ExecuteJob`.
+
+4. **Predicate matching rules are undocumented.** Matching semantics (exact, OR, rate limiting) are only discoverable by reading `engine.go`.
+
+## Decision
+
+Document the plugin lifecycle and watcher system as first-class concepts.
+
+### Plugin Lifecycle
+
+```
+Binary launch          gRPC connect          Initialize RPC         Health poll (10s)
+     |                      |                      |                      |
+  process starts        Metadata()           Initialize()            Health()
+  binds port            validates name       plugin starts work      monitors liveness
+  prints QNTX_PLUGIN_PORT                    returns watchers,       restarts on 2
+                                             routes, handlers        consecutive failures
+```
+
+#### Boot sequence
+
+1. QNTX launches the plugin binary and waits for it to bind a port
+2. gRPC connection established, `Metadata()` called to validate plugin identity
+3. `Initialize(InitializeRequest)` sent with config, ATS endpoint, auth token
+4. Plugin returns `InitializeResponse` with watchers, routes, handlers, schedules
+5. QNTX registers watchers in DB, sets up HTTP proxy routes, registers async handlers
+6. Health polling begins (every 10s)
+
+#### Initialize contract
+
+- **Called once per proxy lifetime.** A fresh process gets one `Initialize` call. The `initOnce` guard ensures HTTP routing lazy-init doesn't trigger a second call.
+- **Re-initialization** (`ReinitializePlugin` / `ForceInitialize`) is only for config updates on an existing proxy — not for new processes after restart.
+- **Plugins must handle re-init gracefully.** Stop previous state (nodes, connections, goroutines) before starting new ones. The `Initialize` handler may be called on a proxy that already has running state from a previous call.
+- **Config comes from the plugin's record.** The `config` map in `InitializeRequest` contains the key-value pairs set in the plugin element.
+
+#### Restart
+
+`POST /api/plugins/{name}/restart` or `make install` from a plugin directory.
+
+1. QNTX unregisters the plugin from the registry (state → `Restarting`). Browser requests get `503 Plugin still loading` during restart.
+2. Mux cache invalidated so the next request after restart builds a fresh HTTP proxy.
+3. Active ATS streams cancelled to release the database mutex.
+4. Old process killed (`SIGKILL` to process group), old gRPC connection closed.
+5. New binary discovered, launched, gRPC connected — new proxy with fresh `initOnce`.
+6. `registerRestarted`: re-registers in registry, calls `Initialize`, re-registers handlers/schedules/providers, marks ready.
+7. Banner emitted with health status after async health check.
+
+A restart always produces a new process, new gRPC connection, new proxy. The single `PluginManager` is reused — `LoadPluginsFromConfig` receives the existing manager, no second manager is created.
+
+#### Health polling
+
+- Every 10 seconds, QNTX calls `Health()` on each running plugin
+- 2 consecutive failures trigger automatic restart with exponential backoff (10s, 20s, 40s, ... capped at 640s)
+- A single transient failure is tolerated
+- Health resets on success
+
+#### Shutdown
+
+- QNTX sends `Shutdown()` RPC (best-effort, 5s timeout)
+- Plugin process is killed
+- Watchers pruned from DB, handlers unregistered
+
+### Watcher Lifecycle
+
+```
+Plugin                          QNTX Core                        Watcher Engine
+  |                                |                                  |
+  |-- InitializeResponse -------->|                                  |
+  |   (watchers: [...])           |                                  |
+  |                               |-- SetupPluginWatchers() -------->|
+  |                               |   (write to DB, idempotent)      |
+  |                               |                                  |
+  |                               |-- ReloadWatchers() ------------>|
+  |                               |   (load from DB into memory)     |
+  |                               |                                  |
+  |                               |   attestation arrives            |
+  |                               |                                  |
+  |                               |   <-- predicate match --------  |
+  |                               |                                  |
+  |<-- ExecuteJob(attestation) ---|                                  |
+  |   (handler_name routes it)    |                                  |
+  |                                                                  |
+```
+
+### WatcherRegistration fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | yes | Unique suffix. Core prefixes with plugin name: `{plugin}-{id}` |
+| `handler_name` | yes | Which `ExecuteJob` handler receives the match |
+| `predicates` | yes | Attestation predicates to match (exact match) |
+| `contexts` | no | Additional context filters |
+| `max_fires_per_second` | no | Rate limit. 0 = zero fires allowed (QNTX LAW: zero means zero). Default: 0 |
+
+### Validation
+
+A watcher must declare at least one filter dimension. The storage layer (`validateWatcher`) rejects watchers with no structural filters (subjects, predicates, contexts, actors), no temporal filters (time_start, time_end), no attribute filters, no ax_query, and no semantic_query. Empty-filter watchers — which would match every attestation — cannot be created.
+
+### Predicate matching
+
+- A watcher fires when an attestation's predicates contain **any** of the watcher's predicates (OR semantics)
+- Match is exact string equality, not prefix
+- Multiple filter dimensions are ANDed: if a watcher sets both predicates and subjects, both must match
+- Structural matching runs through Rust WASM (batch, one call per attestation for all watchers), and only there: a build without `qntxwasm` matches no watcher and says so
+- Rate limiting is per-watcher, not per-predicate
+
+### UI signal: ⏿
+
+The watcher symbol ⏿ appears inline next to predicates that have active watchers. One eye per watcher. Hover shows watcher names. Eye color follows dilation — bright spice-blue when strained, deep sea blue when relaxed, faded white when the watcher has never fired.
+
+### Hot-swap behavior
+
+Watchers survive plugin restart. On every `Initialize`:
+- `SetupPluginWatchers` calls `CreateOrReplace` for each declared watcher
+- Stale watchers (previously declared, no longer in the list) are pruned
+- `ReloadWatchers` refreshes the engine's in-memory state
+- This works identically on cold start, hot-swap enable, and crash recovery
+
+### WebSocket keepalive contract
+
+QNTX sends PING messages on the gRPC stream and expects PONG responses. This tells the plugin whether a browser client is still connected.
+
+Plugins must read the incoming gRPC stream and reply to PING with PONG (echo the timestamp). Spawn a reader task or thread that checks the message type and responds accordingly.
+
+Failure to respond causes QNTX to log `WebSocket pong timeout`. Keepalive runs when `am.toml` enables it under `[plugin.websocket.keepalive]`; enabled, it names its interval and timeout or the config is refused at load:
+
+```toml
+[plugin.websocket.keepalive]
+enabled = true
+ping_interval_secs = 30
+pong_timeout_secs = 60
+```
+
+### Error flow
+
+When things go wrong, QNTX emits:
+
+| Log message | Meaning | Plugin action |
+|-------------|---------|---------------|
+| `Failed to parse AX query for watcher` | Watcher predicate is malformed | Fix the predicate string in `WatcherRegistration` |
+| `gRPC ExecuteJob failed` | Plugin returned an error from `ExecuteJob` | Check plugin-side handler logic |
+| `Max retries exceeded, giving up` | `ExecuteJob` failed repeatedly | Check plugin health, logs |
+| `WebSocket pong timeout` | Plugin ignores incoming WebSocket stream | Read the incoming stream and reply to PING with PONG |
+| `Failed to setup plugin watchers` | DB write failed during `Initialize` | Check DB connectivity |
+
+## Consequences
+
+### Positive
+
+- Plugin developers have a single reference for watcher behavior
+- WebSocket keepalive requirement is discoverable before hitting the error
+- Error messages can be cross-referenced against this document
+
+
+## Related
+
+- [ADR-003: Plugin Communication](ADR-003-plugin-communication.md) 
+- [ADR-004: Plugin-Pulse Integration](ADR-004-plugin-pulse-integration.md) 
+- [ADR-002: Plugin Configuration Management](ADR-002-plugin-configuration.md) 
+- [gRPC Plugin API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto) --> pin it automatically
+- [WebSocket API](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/server.proto) --> pin it automatically

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -104,11 +105,14 @@ func after(args []string, name string) string {
 // underneath keeps no signature (qntxtest.CreateTestStore).
 type handed struct {
 	ats.AttestationStore
+	mu   sync.Mutex
 	rows []*types.As
 }
 
 func (h *handed) CreateAttestation(as *types.As) error {
+	h.mu.Lock()
 	h.rows = append(h.rows, as)
+	h.mu.Unlock()
 	return h.AttestationStore.CreateAttestation(as)
 }
 

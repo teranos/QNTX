@@ -131,13 +131,18 @@ type googleOperation struct {
 
 // waitFor waits until Google finishes op, asking base for it.
 func waitFor(ctx context.Context, token, base string, op googleOperation) error {
+	return waitAt(ctx, token, base+"/v1/", op)
+}
+
+// 「[Opus 5.5] waitAt waits until Google finishes op, asking at, the API's versioned root, for it.」
+func waitAt(ctx context.Context, token, at string, op googleOperation) error {
 	for !op.Done {
 		select {
 		case <-ctx.Done():
 			return errors.Wrapf(ctx.Err(), "Google did not finish %s in time", op.Name)
 		case <-time.After(googleAsksAgain):
 		}
-		if err := googleCall(ctx, token, http.MethodGet, base+"/v1/"+op.Name, nil, &op); err != nil {
+		if err := googleCall(ctx, token, http.MethodGet, at+op.Name, nil, &op); err != nil {
 			return err
 		}
 	}
@@ -501,9 +506,10 @@ func (s *QNTXServer) googleSignum() sigil.Signum {
 				},
 				{
 					Name: "limit",
-					Does: "Set the limit ROOT holds on this node: what costs at Google halts at 80% of the lower of it and the budget. Zero takes it off.",
+					Does: "Set a limit ROOT holds on one thing that spends at Google: it halts at 80% of what its own project spent against it, and nothing else halts for it. Zero takes it off.",
 					Takes: []*protocol.Param{
 						{Name: "amount", Required: true, Says: "A number, in the budget's currency. Zero takes the limit off."},
+						{Name: "item", Says: "What it limits: node, the node's own identity, or a namespace whose key was made at Google. Named none, node."},
 						{Name: "per", OneOf: []string{"period", "day"}, Says: "What the limit is per: the budget's period, or a day. Named none, the period."},
 					},
 					Answer: "protocol.NodeGoogle",

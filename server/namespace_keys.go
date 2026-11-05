@@ -237,6 +237,16 @@ func (s *QNTXServer) keyValue(namespace, name string) (string, error) {
 	if !holds {
 		return "", errors.Newf("the key %s of %s was dropped: set it again with keys set", name, namespace)
 	}
+	// 「[Opus 5.5] A key the node made at Google is not handed out while what it spends is halted.」
+	if name == googleKeyName {
+		if _, made, err := s.googleSpendItemNamed(namespace); err != nil {
+			return "", err
+		} else if made {
+			if halted, why := s.googleItemHalted(namespace); halted {
+				return "", errors.Newf("the key %s of %s is halted: %s", name, namespace, why)
+			}
+		}
+	}
 	return s.unsealKey(namespace, sealed)
 }
 

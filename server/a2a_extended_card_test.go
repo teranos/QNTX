@@ -116,7 +116,7 @@ func TestTheExtendedCardRequiresAnAdmittedCaller(t *testing.T) {
 
 	_, refused := srv.extendedCard(httptest.NewRequest(http.MethodGet, "/a2a/extendedAgentCard", nil))
 	require.NotNil(t, refused)
-	assert.Contains(t, refused.Message, "no gate")
+	assert.Contains(t, refused.Error(), "no gate")
 }
 
 // "Agents SHOULD implement appropriate caching headers to control client-side

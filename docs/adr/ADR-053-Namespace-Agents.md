@@ -2,6 +2,7 @@
 
 Date: 2026-10-18
 Status: Proposed
+pre-0.999.0-polish-blocker 
 
 "an agent session for a particular namespace, different concept from the ROOT host agent (see: [[ADR-048-Node-Agent]])"
 

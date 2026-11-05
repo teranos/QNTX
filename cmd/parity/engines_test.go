@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,9 +36,24 @@ func TestTheDuckDBCrateIsHeldToItsPin(t *testing.T) {
 	if !ok {
 		t.Fatalf("the duckdb crate version in %s does not close", path)
 	}
-	if crate != pinned {
-		t.Errorf("%s asks for the duckdb crate at %s, the pin is %s", path, crate, pinned)
+	if want := duckdbCrateOf(t, pinned); crate != want {
+		t.Errorf("%s asks for the duckdb crate at %s, and DuckDB %s is the crate at %s", path, crate, pinned, want)
 	}
+}
+
+// duckdbCrateOf is the duckdb crate version of a DuckDB release: the same
+// number through 1.4.x, and from 1.5.0 the encoded scheme, where 1.10500.0 is
+// DuckDB 1.5.0.
+func duckdbCrateOf(t *testing.T, release string) string {
+	t.Helper()
+	var major, minor, patch int
+	if _, err := fmt.Sscanf(release, "%d.%d.%d", &major, &minor, &patch); err != nil {
+		t.Fatalf("DuckDB %s is no major.minor.patch: %v", release, err)
+	}
+	if major == 1 && minor < 5 {
+		return release
+	}
+	return fmt.Sprintf("%d.%d.0", major, 10000+minor*100+patch)
 }
 
 // TestTheSupabasePostgresInputIsHeldToItsPin: a flake input cannot read the

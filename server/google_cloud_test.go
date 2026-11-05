@@ -38,16 +38,17 @@ type standInGoogle struct {
 	managerOff bool
 	// actingOff is how many more asks to act as the account Google refuses,
 	// after the binding: the first real press read 403 a minute after it.
-	actingOff int
-	usageOff  bool
-	settling  int
-	listed    bool
-	pool      bool
-	provider  map[string]any
-	account   bool
-	policy    map[string]any
-	revoked   []string
-	jwks      jose.JSONWebKeySet
+	actingOff       int
+	usageOff        bool
+	settling        int
+	listed          bool
+	pool            bool
+	provider        map[string]any
+	account         bool
+	policy          map[string]any
+	projectBindings []any
+	revoked         []string
+	jwks            jose.JSONWebKeySet
 }
 
 func googleStandingIn(t *testing.T, s *QNTXServer, projects ...googleProject) *standInGoogle {
@@ -180,6 +181,24 @@ func (g *standInGoogle) answer(w http.ResponseWriter, r *http.Request) {
 		require.NoError(g.t, json.NewDecoder(r.Body).Decode(&set))
 		g.policy = set.Policy
 		write(g.policy)
+	case path == "/v1/projects/the-project:getIamPolicy":
+		if rootOnly() {
+			write(map[string]any{"bindings": g.projectBindings, "etag": "the-etag"})
+		}
+	case path == "/v1/projects/the-project:setIamPolicy":
+		if !rootOnly() {
+			return
+		}
+		var set struct {
+			Policy struct {
+				Bindings []any  `json:"bindings"`
+				Etag     string `json:"etag"`
+			} `json:"policy"`
+		}
+		require.NoError(g.t, json.NewDecoder(r.Body).Decode(&set))
+		assert.Equal(g.t, "the-etag", set.Policy.Etag, "what the project held is written back on the policy it was read from")
+		g.projectBindings = set.Policy.Bindings
+		write(map[string]any{"bindings": g.projectBindings})
 	case path == "/revoke":
 		g.revoked = append(g.revoked, r.URL.Query().Get("token"))
 	case path == "/v1/token":
@@ -271,6 +290,7 @@ func TestROOTsYesSetsTheNodeUpAtGoogleCloud(t *testing.T) {
 	assert.Equal(t, map[string]any{"google.subject": "assertion.sub"}, g.provider["attributeMapping"])
 	assert.True(t, g.bound(s.nodeDID.DID), "the node's DID acts as its service account")
 	assert.Equal(t, []string{"root-token"}, g.revoked, "the node keeps no credential of ROOT's")
+	assert.Empty(t, g.projectBindings, "connecting asks for nothing that spends")
 
 	am := rootAsksGoogle(t, s)
 	assert.True(t, am.GetAsked())

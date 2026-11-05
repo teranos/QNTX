@@ -30,8 +30,11 @@ import (
 // oasf's are under agntcy/, its taxonomies under schema/, and the JSON Schema
 // 「[Fable 5.1] its server gives a Record is record.schema.json. TEI's ODD is pinned under」
 // 「[Fable 5.1] Specs/ as the Guidelines keep it: tei is tei_4.12.0_113e933 (odd.go).」
+// 「[Fable 5.1] OTLP's .proto files are under opentelemetry/, the path they import each」
+// 「[Fable 5.1] other by: otlp is otlp_v1.11.0_790608c, the commit go.mod's」
+// 「[Fable 5.1] go.opentelemetry.io/proto/otlp v1.11.0 is generated from.」
 //
-//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema */record.schema.json */Specs
+//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema */record.schema.json */Specs */opentelemetry
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory
@@ -100,6 +103,44 @@ func Descriptors(name string) ([]protoreflect.FileDescriptor, *protocol.Refusal)
 		return nil, failed("%s holds no .proto", dir)
 	}
 	return compileAt(dir, protos)
+}
+
+// Says is what each message, field, service and method of the .proto files pinned for
+// the reference named says of itself, by full name, in the reference's own
+// comments. One that says nothing is left out.
+func Says(name string) (map[string]string, *protocol.Refusal) {
+	files, refused := Descriptors(name)
+	if refused != nil {
+		return nil, refused
+	}
+	says := map[string]string{}
+	keep := func(d protoreflect.Descriptor) {
+		if said := saysOf(d); said != "" {
+			says[string(d.FullName())] = said
+		}
+	}
+	var messagesSay func(protoreflect.MessageDescriptors)
+	messagesSay = func(messages protoreflect.MessageDescriptors) {
+		for i := 0; i < messages.Len(); i++ {
+			message := messages.Get(i)
+			keep(message)
+			for j := 0; j < message.Fields().Len(); j++ {
+				keep(message.Fields().Get(j))
+			}
+			messagesSay(message.Messages())
+		}
+	}
+	for _, file := range files {
+		messagesSay(file.Messages())
+		for i := 0; i < file.Services().Len(); i++ {
+			keep(file.Services().Get(i))
+			methods := file.Services().Get(i).Methods()
+			for j := 0; j < methods.Len(); j++ {
+				keep(methods.Get(j))
+			}
+		}
+	}
+	return says, nil
 }
 
 // pinnedAt is the one directory pinned for the reference named, and its files.

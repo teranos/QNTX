@@ -52,7 +52,8 @@ type QNTXServer struct {
 	harnessBinaries       harnessesHeld                 // Each harness the Node Agent runs in, as this node holds its binary, by the harness's name (ADR-048)
 	nodeAgent             *rootAgent                    // The Node Agent this node runs; nil when am.toml names none (ADR-048)
 	taskEnds              sync.Mutex                    // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
-	taskStops             sync.Map                      // Each Task of the Node Agent this process runs, by id, to the context.CancelFunc that keeps its turn from starting
+	taskStreams           sync.Map                      // Each Task whose turn this process runs, by id, to the stream the turn prints to
+	taskCancels           sync.Map                      // Each Task canceled in this process, by id, to who canceled it
 	pushing               sync.Map                      // Each Task with push notifications, by id, to the *sync.Mutex its notifications go out under one after another
 	noNodeAgent           error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents       agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
@@ -104,8 +105,8 @@ type QNTXServer struct {
 	nodeMailer nodeMailer
 	// googleOutcome stands in for mailing ROOT how connecting to Google Cloud ended.
 	googleOutcome func(services.NodeMail)
-	// googleHalted is whether ROOT was last told what costs at Google is halted.
-	googleHalted bool
+	// 「[Opus 5.5] googleHalted is, for each spend item, whether ROOT was last told it is halted.」
+	googleHalted map[string]bool
 	googleHaltMu sync.Mutex
 	// googleBudgetsSet is the budgets as they are set at Google, as last read.
 	googleBudgetsSet []googleBudgetSet
@@ -146,6 +147,9 @@ type QNTXServer struct {
 	// opening is held while answering changes and what is served is rebuilt
 	// from it. Plugins arrive on their own goroutines.
 	opening sync.Mutex
+	// naming is held from reading who holds a name to writing down who now
+	// does (i name), so two agents asking for one name at once do not both get it.
+	naming sync.Mutex
 
 	// The MCP endpoint (ADR-038). The HTTP handler is built once; the server
 	// behind it is built per request, so a tool acts as the caller in front of

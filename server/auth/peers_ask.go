@@ -96,3 +96,15 @@ func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, 
 	answer.Status, answer.Body = resp.StatusCode, body
 	return answer
 }
+
+// BearerFor is the token that carries the person admitted here to peer, for a
+// client that speaks to the peer itself.
+func (h *Handler) BearerFor(admitted Admission, peer Client) (string, error) {
+	person, err := named.TextOf("the person asking", admitted.Identity)
+	if err != nil {
+		return "", errors.Wrapf(err, "nobody to carry to %s", peer.Label)
+	}
+	presented := Presented{UserID: admitted.UserID, DisplayName: admitted.DisplayName}
+	bearer, err := h.carriedFor(person.String(), presented, peer, time.Now())
+	return bearer, errors.Wrapf(err, "no token was written to carry you to %s", peer.Label)
+}

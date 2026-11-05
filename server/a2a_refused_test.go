@@ -12,7 +12,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -156,7 +155,7 @@ func TestAnA2ADefectIsASentryIssue(t *testing.T) {
 	sent := toSentry(t)
 
 	r := httptest.NewRequest(http.MethodPost, "/message:send", nil)
-	srv.a2aRefused(r, a2a.Refusal{Operation: "SendMessage", Err: &a2a.Error{Name: "InvalidAgentResponseError", Message: "the store did not answer"}})
+	srv.a2aRefused(r, a2aRefusalSaid{Operation: "SendMessage", Status: http.StatusInternalServerError, Reason: "INVALID_AGENT_RESPONSE", Message: "the store did not answer"})
 
 	logs, issues := sent.said()
 	require.Len(t, issues, 1)
@@ -174,7 +173,7 @@ func TestRefusalsWrittenAreBounded(t *testing.T) {
 	sent := toSentry(t)
 	r := asBearer(http.MethodGet, "/a2a/nothing", tokens[auth.LevelRoot])
 	for range 200 {
-		srv.a2aRefused(r, a2a.Refusal{Err: &a2a.Error{Name: "TaskNotFoundError", Message: "no task"}})
+		srv.a2aRefused(r, a2aRefusalSaid{Status: http.StatusNotFound, Reason: "TASK_NOT_FOUND", Message: "no task"})
 	}
 	logs, _ := sent.said()
 	assert.GreaterOrEqual(t, len(logs), 20)
@@ -214,4 +213,23 @@ func TestVersionsAndMethodsAreTheNodesWords(t *testing.T) {
 	assert.Equal(t, "GET", methodOf("GET"))
 	assert.Equal(t, "ab…", bounded("abc", 2))
 	assert.Equal(t, "a?b", bounded("a\x00b", 10))
+}
+
+// A refusal tells the A2A-Version the client said, whatever Major.Minor the
+// SDK is handed (§3.6).
+func TestARefusalTellsTheVersionTheClientSaid(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	sent := toSentry(t)
+
+	r := asBearer(http.MethodGet, "/a2a/tasks/nothing", tokens[auth.LevelRoot])
+	r.Header.Set("A2A-Version", "1.0.1")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+
+	logs, _ := sent.said()
+	require.Len(t, logs, 1)
+	said, held := logAttr(logs[0], "a2a.version")
+	assert.True(t, held)
+	assert.Equal(t, "1.0.1", said)
 }

@@ -234,6 +234,47 @@ func TestROOTsYesForCostsWiresTheCosts(t *testing.T) {
 	assert.Empty(t, *handed, "the node is not connected again")
 }
 
+// 「[Opus 5.5] ROOT's yes for agy goes to what lets the node call Vertex AI.」
+func TestROOTsYesForAgyLetsTheNodeRunIt(t *testing.T) {
+	h, handed := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	var let []connected
+	h.SetGoogleAgy(func(_ context.Context, token, by string) (string, error) {
+		let = append(let, connected{token, "", by})
+		return "let", nil
+	})
+	done := consenting(t, h, "?project=the-project&thing=agy")
+	assert.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	assert.Equal(t, []connected{{"cloud-token", "", "google:root-sub"}}, let)
+	assert.Empty(t, *handed, "the node is not connected again")
+}
+
+// 「[Opus 5.5] ROOT's yes for a namespace's key goes to what makes it, naming the namespace,」
+// 「[Opus 5.5] and Try again asks for that namespace's key again.」
+// "one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item."
+func TestROOTsYesForAKeyNamesItsNamespace(t *testing.T) {
+	h, handed := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	var made []string
+	h.SetGoogleKey(func(_ context.Context, token, by, namespace string) (string, error) {
+		made = append(made, token+" "+by+" "+namespace)
+		return "made", nil
+	})
+	done := consenting(t, h, "?project=the-project&thing=key&namespace=garden")
+	assert.Equal(t, http.StatusOK, done.Code, done.Body.String())
+	assert.Equal(t, []string{"cloud-token google:root-sub garden"}, made)
+	assert.Empty(t, *handed, "the node is not connected again")
+
+	h.SetGoogleKey(func(context.Context, string, string, string) (string, error) {
+		return "", errors.New("no project was made")
+	})
+	page := consenting(t, h, "?project=the-project&thing=key&namespace=garden").Body.String()
+	again, err := url.Parse(hrefOf(t, page, "Try again"))
+	require.NoError(t, err)
+	assert.Equal(t, "key", again.Query().Get("thing"))
+	assert.Equal(t, "garden", again.Query().Get("namespace"))
+}
+
 // Try again asks for the same thing: pressed for real, the thing went into the
 // project's name, and the node asked Google for a project called that.
 func TestTryingAgainAsksForTheSameThing(t *testing.T) {

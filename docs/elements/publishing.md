@@ -116,6 +116,6 @@ parse error naming nothing.
 
 ## Related
 
-- [ADR-026](../adr/ADR-026-namespaces.md) — namespaces are their own universes
+- [ADR-026](../adr/ADR-026-Namespaces.md) — namespaces are their own universes
 - `server/element_module_handlers.go` — what `/g/` serves
 - `ats/watcher/standing.go` — the watcher every node is born with

@@ -64,6 +64,12 @@ var storeWriters = map[string]string{
 	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
 		"Reached from the github sigils, which the reach table gives to ROOT",
 
+	"keepAgentName": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
+		"a name is one agent's on the whole node, and an agent acting in one namespace does not see system. " +
+		"Reached from i name, which the reach table gives to ROOT, SUPER and TOKEN, after itsOwnDID says the " +
+		"caller is a token asking as itself and iName says no other DID holds the name; the line's subject and " +
+		"actor are that DID and its predicate is agent:named, whatever was sent",
+
 	"sessionStoreOf": "where an agent's session lands (ADR-048): the Node Agent's in system, which is " +
 		"the node's own record whoever spoke to it, reached from the claude and pi sigils, which the " +
 		"reach table gives to ROOT; a namespace agent's in its namespace, through Write as the caller " +
@@ -78,7 +84,7 @@ var storeWriters = map[string]string{
 	"keepAnthropicLine": "the node's ANTHROPIC line, the ids of the rule its identity token is traded at " +
 		"and what ROOT's agents spend first, in system through WriteWhatTheNodeKnowsOfItself: a line about " +
 		"the node, and the reach table names /api/anthropic and /api/anthropic/order of ROOT alone",
-	"keepGoogleCostLine": "the node's GOOGLE-COSTS, GOOGLE-BUDGET, GOOGLE-LIMIT and GOOGLE-DAY-LIMIT lines, in system through " +
+	"keepGoogleCostLine": "the node's GOOGLE-COSTS, GOOGLE-BUDGET, GOOGLE-LIMIT, GOOGLE-DAY-LIMIT, GOOGLE-AGY and GOOGLE-SPEND lines, in system through " +
 		"WriteWhatTheNodeKnowsOfItself: ROOT's yes at Google or ROOT's limit, and what Google's budgets reported to the node",
 	"keepGoogleLine": "the node's GOOGLE line, what it was set up as at Google Cloud, in system through " +
 		"WriteWhatTheNodeKnowsOfItself: a line about the node. Reached from the Google ceremony's callback, " +

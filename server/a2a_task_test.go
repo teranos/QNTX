@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/server/auth"
@@ -528,11 +529,11 @@ func TestATaskCanceledBeforeItsTurnStartsNeverStartsIt(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_CANCELED", at(canceled, "status.state"))
 
 	<-in.turn
-	_, stops := srv.taskStops.Load(id)
-	require.Eventually(t, func() bool { _, stops = srv.taskStops.Load(id); return !stops }, 10*time.Second, 20*time.Millisecond)
-	entries, err := os.ReadDir(ran)
-	require.NoError(t, err)
-	assert.Empty(t, entries, "the turn of a canceled task was run")
+	assert.Never(t, func() bool {
+		entries, err := os.ReadDir(ran)
+		require.NoError(t, err)
+		return len(entries) > 0
+	}, time.Second, 20*time.Millisecond, "the turn of a canceled task was run")
 	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
 	assert.Equal(t, "TASK_STATE_CANCELED", at(got, "status.state"))
 }
@@ -576,4 +577,22 @@ func TestANegativeHistoryLengthIsRefused(t *testing.T) {
 	entries, err := os.ReadDir(ran)
 	require.NoError(t, err)
 	assert.Len(t, entries, 1, "a refused message was said to the Node Agent")
+}
+
+// writeTaskLine writes a Task line as the node wrote them before it served A2A
+// through the SDK: what changed, not the Task whole. The node reads them still.
+func (s *QNTXServer) writeTaskLine(lines taskLines, id, state, by string, at time.Time, attributes map[string]any, also ...string) error {
+	store, err := lines.write()
+	if err != nil {
+		return err
+	}
+	line, err := identity.GenerateASUIDWithRetry("AS", taskLineSubject, state, id, store.AttestationExists)
+	if err != nil {
+		return err
+	}
+	return store.CreateAttestation(&types.As{
+		ID: line, Subjects: []string{taskLineSubject}, Predicates: []string{state},
+		Contexts: append([]string{taskContext(id), agentContext(lines.did)}, also...),
+		Actors:   []string{by}, Timestamp: at, CreatedAt: at, Source: "a2a", Attributes: attributes,
+	})
 }
