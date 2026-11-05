@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/ai/provider"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -43,6 +44,11 @@ type PromptDirectRequest struct {
 	ParentElementID     string    `json:"parent_element_id,omitempty"`    // Parent element ID for conversation history assembly (stream elements send their parent)
 	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
 	FileIDs             []string  `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
+	// Socket is the caller's websocket, as the node named it in its first
+	// message there: the stream is sent to it and no other. A request naming
+	// none, or a socket that is not the caller's, is answered whole in the
+	// response and streamed to nobody.
+	Socket string `json:"socket,omitempty"`
 }
 
 // PromptDirectResponse represents the direct execution response
@@ -276,8 +282,15 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	// Execute prompt — use streaming if available, fall back to unary
 	var resp *provider.ChatResponse
 
-	if streamClient, ok := client.(provider.StreamingAIClient); ok && req.ElementID != "" {
-		resp = s.executeStreamingPrompt(r.Context(), streamClient, chatReq, req.ElementID, req.Provider)
+	// "3. who? the receiver?": a stream is sent to the socket that asked for it.
+	caller, _ := auth.AdmissionFrom(r.Context())
+	receiver, received := s.receiverOf(req.Socket, caller)
+	if req.Socket != "" && !received {
+		s.logger.Warnw("A prompt named a socket that is not the caller's, and is answered whole and streamed to nobody",
+			"socket", req.Socket, "identity", caller.Identity, "element_id", req.ElementID)
+	}
+	if streamClient, ok := client.(provider.StreamingAIClient); ok && req.ElementID != "" && received {
+		resp = s.executeStreamingPrompt(r.Context(), streamClient, chatReq, req.ElementID, req.Provider, receiver)
 	} else {
 		resp, err = client.Chat(r.Context(), chatReq)
 		if err != nil {
@@ -497,9 +510,26 @@ func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, r
 	return asid, createdAttestation
 }
 
-// executeStreamingPrompt runs the LLM call in streaming mode, broadcasting chunks
-// over WebSocket as they arrive. Returns the assembled full response.
-func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient provider.StreamingAIClient, chatReq provider.ChatRequest, elementID, providerName string) *provider.ChatResponse {
+// receiverOf is the socket a stream is sent to: the one named, when the node
+// holds it and it was admitted as the caller was. None is no receiver, and
+// nothing is sent to everyone instead.
+func (s *QNTXServer) receiverOf(socket string, caller auth.Admission) (audience, bool) {
+	if socket == "" {
+		return audience{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for client := range s.clients {
+		if client.id == socket && client.admitted.Identity == caller.Identity {
+			return toClient(socket), true
+		}
+	}
+	return audience{}, false
+}
+
+// executeStreamingPrompt runs the LLM call in streaming mode, sending chunks
+// over WebSocket to the receiver as they arrive. Returns the assembled full response.
+func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient provider.StreamingAIClient, chatReq provider.ChatRequest, elementID, providerName string, to audience) *provider.ChatResponse {
 	streamChan := make(chan provider.StreamChunk, 32)
 
 	go func() {
@@ -566,7 +596,7 @@ func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient pr
 			}
 		}
 
-		s.broadcastLLMStream(msg)
+		s.sendLLMStream(to, msg)
 
 		if chunk.Done {
 			streamModel = chunk.Model

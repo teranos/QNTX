@@ -72,6 +72,10 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		"commit":     versionInfo.Short(),
 		"build_time": versionInfo.BuildTime,
 		"owner":      "SBVH",
+		// Which socket this is, told to it alone: what it asks for over HTTP
+		// names it, and a stream it asked for is sent to it and no other.
+		// "3. who? the receiver?"
+		"socket": client.id,
 	}
 	if err := conn.WriteJSON(versionMsg); err != nil {
 		s.logger.Debugw("Failed to send version info",
