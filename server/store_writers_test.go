@@ -93,6 +93,10 @@ var storeWriters = map[string]string{
 	"setKeyLine": "a KEY line of a namespace (ADR-051), in the namespace's own store through Write as " +
 		"the setter is admitted, after keysAsking refuses a token or a connector and mayHandleKeys says " +
 		"they own the namespace, or are ROOT or SUPER",
+	// 「[Opus 5.5] An MCP server a namespace consumes (ADR-038).」
+	"writeConsumedLine": "an MCP line of a namespace, in the namespace's own store through Write as the caller " +
+		"is admitted, after consumedAsking refuses a token or a connector and mayHandle says they own the " +
+		"namespace, or are ROOT or SUPER; a refreshed token is kept as whoever's call refreshed it",
 
 	"systemTasks": "a Task of the Node Agent or of an element's agent (A2A §3.4.2) lands in system, where " +
 		"their sessions are written, what the node knows of itself. Reached from the Task operations at no tenant " +
