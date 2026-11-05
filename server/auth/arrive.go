@@ -18,6 +18,10 @@ const (
 	minPhoneDigits = 3
 )
 
+// MaxName is how long a name may be: a person's display_name, and the name an
+// agent gives itself (i name).
+const MaxName = maxDisplayName
+
 // arrival is what a User chose to say about themselves. Every field is
 // optional (ADR-033).
 type arrival struct {

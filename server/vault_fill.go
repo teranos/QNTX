@@ -53,39 +53,29 @@ func gitBlobSHA(content []byte) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// repoNotes is every note under folder of repo on branch, its folders'
-// own included.
+// "i DONT want the binding to include subdirs"
+
+// repoNotes is every note directly in folder of repo on branch. A folder
+// inside it is not the binding's, nor is a note in one.
 func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, folder string) ([]repoNote, error) {
 	reader, err := s.forges().For(repo)
 	if err != nil {
 		return nil, err
 	}
-	var notes []repoNote
-	var walk func(dir string) error
-	walk = func(dir string) error {
-		entries, err := reader.Entries(ctx, forge.AsApp, repo, branch, dir)
-		var notADirectory forge.NotADirectory
-		if errors.As(err, &notADirectory) {
-			return errors.Newf("%s is a %s of %s on %s, not a folder", dir, notADirectory.Kind, repo, branch)
-		}
-		if err != nil {
-			return err
-		}
-		for _, entry := range entries {
-			switch {
-			case entry.Kind == forge.Dir:
-				if err := walk(entry.Path); err != nil {
-					return err
-				}
-			case entry.Kind == forge.File && strings.HasSuffix(entry.Name, noteSuffix):
-				under := strings.TrimPrefix(entry.Path, folder+"/")
-				notes = append(notes, repoNote{under: under, path: entry.Path, sha: entry.SHA})
-			}
-		}
-		return nil
+	entries, err := reader.Entries(ctx, forge.AsApp, repo, branch, folder)
+	var notADirectory forge.NotADirectory
+	if errors.As(err, &notADirectory) {
+		return nil, errors.Newf("%s is a %s of %s on %s, not a folder", folder, notADirectory.Kind, repo, branch)
 	}
-	if err := walk(folder); err != nil {
+	if err != nil {
 		return nil, err
+	}
+	var notes []repoNote
+	for _, entry := range entries {
+		if entry.Kind == forge.File && strings.HasSuffix(entry.Name, noteSuffix) {
+			under := strings.TrimPrefix(entry.Path, folder+"/")
+			notes = append(notes, repoNote{under: under, path: entry.Path, sha: entry.SHA})
+		}
 	}
 	return notes, nil
 }
@@ -292,28 +282,27 @@ func vaultBases(name, place string) (string, error) {
 }
 
 // basesNotIn is every note a base is kept for that main does not have now.
+// A base kept in a folder inside bases is from when a binding held its
+// folders' notes: it is no note of the binding, and the vault's note it was
+// kept for stays the vault's own.
 func basesNotIn(bases string, now map[string]bool) ([]string, error) {
+	entries, err := os.ReadDir(bases)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "the bases in %s did not read", bases)
+	}
 	var gone []string
-	err := filepath.WalkDir(bases, func(at string, entry os.DirEntry, err error) error {
-		if os.IsNotExist(err) {
-			return filepath.SkipAll
-		}
-		if err != nil {
-			return err
-		}
+	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), noteSuffix) {
-			return nil
+			continue
 		}
-		under, err := filepath.Rel(bases, at)
-		if err != nil {
-			return err
+		if !now[entry.Name()] {
+			gone = append(gone, entry.Name())
 		}
-		if under = filepath.ToSlash(under); !now[under] {
-			gone = append(gone, under)
-		}
-		return nil
-	})
-	return gone, errors.Wrapf(err, "the bases in %s did not read", bases)
+	}
+	return gone, nil
 }
 
 // folderMoved says whether a bound folder is to be filled now.
@@ -372,10 +361,10 @@ func (s *QNTXServer) fillPlaceSoon(name, place string) {
 	})
 }
 
-// movedBy is whether push changed a note under source's folder on its branch.
+// movedBy is whether push changed a file directly in source's folder on its branch.
 func movedBy(push forge.Push) folderMoved {
 	return func(source buildSource, _ string) bool {
-		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && push.TouchedUnder(source.Path)
+		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && push.TouchedIn(source.Path)
 	}
 }
 

@@ -1,8 +1,8 @@
-# What libacp reads and writes, per method
+# 「[Opus 5.5] What libacp reads and writes, per method」
 
-ground code's ACP moves into libacp one part at a time; each part ports the PR that first gave
-ground code the method. A row is what libacp reads or writes of it in v1 (schema-v1.26.0), and
-what v2 (schema-v2.0.0-alpha.9) says of the same method, so v2 needs no second pass.
+「[Opus 5.5] ground code's ACP moves into libacp one part at a time; each part ports the PR that first gave」
+「[Opus 5.5] ground code the method. A row is what libacp reads or writes of it in v1 (schema-v1.26.0), and」
+「[Opus 5.5] what v2 (schema-v2.0.0-alpha.9) says of the same method, so v2 needs no second pass.」
 
 | Method | Part | Ported from | libacp, v1 | v2 alpha.9 |
 |---|---|---|---|---|
@@ -33,12 +33,12 @@ what v2 (schema-v2.0.0-alpha.9) says of the same method, so v2 needs no second p
 | `image` in `session/prompt`, and `promptCapabilities.image` | image | new | reads an image block's `mimeType` and `data`, both required, as `ACP_BLOCK_IMAGE`; writes a `user_message_chunk` holding an image when a session is loaded | the same `ImageContent` and `promptCapabilities.image` |
 | `audio` in `session/prompt`, and `promptCapabilities.audio` | audio | new | reads an audio block's `mimeType` and `data`, both required, as `ACP_BLOCK_AUDIO`; writes a `user_message_chunk` holding audio when a session is loaded | the same `AudioContent` and `promptCapabilities.audio` |
 
-## The client side
+## 「[Opus 5.5] The client side」
 
-What a client writes to an agent and reads of what it sends, v1 (schema-v1.26.0). `tests/client.c` checks
-each against the agent side's own reader or writer of the same method.
-`acp_client_<method>_write` writes what the client sends for a method, `acp_client_<method>_read` reads
-what the agent sends for it, and `ground_parity` scores each method's client side through them.
+「[Opus 5.5] What a client writes to an agent and reads of what it sends, v1 (schema-v1.26.0). `tests/client.c` checks」
+「[Opus 5.5] each against the agent side's own reader or writer of the same method.」
+「[Opus 5.5] `acp_client_<method>_write` writes what the client sends for a method, `acp_client_<method>_read` reads」
+「[Opus 5.5] what the agent sends for it, and `ground_parity` scores each method's client side through them.」
 
 | Method | libacp, client side, v1 |
 |---|---|

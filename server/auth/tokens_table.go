@@ -34,6 +34,7 @@ type TokenTable struct {
 	writing sync.Mutex // One write at a time, so the table and memory agree on the last.
 	mu      sync.RWMutex
 	rows    map[string]tokenRow // hash → the row, as the table holds it
+	dids    map[string]string   // did → the hash of the token it names
 	used    map[string]int64    // hash → when it was last presented, not yet in the table
 }
 
@@ -372,6 +373,9 @@ func (t *TokenTable) write(held TokenRecord) error {
 	row := t.rows[held.Hash] // created_at is the table's, and a write leaves it
 	row.id, row.record = held.ID, body
 	t.rows[held.Hash] = row
+	if held.DID != "" {
+		t.dids[held.DID] = held.Hash
+	}
 	if written := held.LastUsedAt; written != nil && t.used[held.Hash] <= *written {
 		delete(t.used, held.Hash)
 	}
@@ -398,10 +402,39 @@ func (t *TokenTable) load() (err error) {
 	if err := rows.Err(); err != nil {
 		return errors.Wrap(err, "the access_tokens table stopped answering")
 	}
+	dids := make(map[string]string, len(held))
+	for hash, row := range held {
+		var named struct {
+			DID string `json:"did"`
+		}
+		if err := json.Unmarshal(row.record, &named); err != nil {
+			return errors.Wrapf(err, "access token %s in the access_tokens table is not a token", row.id)
+		}
+		if named.DID != "" {
+			dids[named.DID] = hash
+		}
+	}
 	t.mu.Lock()
-	t.rows = held
+	t.rows, t.dids = held, dids
 	t.mu.Unlock()
 	return nil
+}
+
+// ByDID is the token whose DID this is, revoked and expired ones included, and
+// whether the table holds one: an agent's token asks after the token it runs
+// under on every request, and a DID names one token.
+func (t *TokenTable) ByDID(did string) (TokenInfo, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	hash, named := t.dids[did]
+	if !named {
+		return TokenInfo{}, false
+	}
+	held, err := t.token(hash, t.rows[hash])
+	if err != nil {
+		return TokenInfo{}, false
+	}
+	return held.Info(), true
 }
 
 // byHash is the one read a gated request makes.

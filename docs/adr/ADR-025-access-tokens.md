@@ -24,7 +24,7 @@ Add a second auth path: **access tokens**, presented as `Authorization: Bearer <
 
 - Persisted per backend: on SQLite via a new `access_tokens` table (`internal/db/sqlite/migrations/`); on parquet as one object per token under `<location>/system/access_tokens/`, matching the "small config" shape in ADR-024. Only the SHA-256 hash is stored.
 
-- Issued from a passkey-authenticated session via `/auth/tokens` (POST create / GET list / DELETE revoke / POST enable). Bearer tokens cannot mint new tokens.
+- Issued from a passkey-authenticated session via `/auth/tokens` (POST create / GET list / DELETE revoke / POST enable). A bearer token mints nothing there; the one token a bearer is handed is its agent's, below.
 
 - Issued to a machine with no browser 
 	- Through the device flow (RFC 8628): `POST /auth/device` 
@@ -70,6 +70,27 @@ which is why the middleware could only ever say "someone authenticated".
 "and removing this will be a 1.0.0 blocker"
 
 A ROOT session mints a ROOT token at `/auth/tokens`. It names no namespace.
+
+## An agent a token starts
+
+"2. fine change it, fix it"
+
+An agent has its own DID and its own credential ([[ADR-048-Node-Agent]]), and
+an agent started under a token is handed one without anybody minting it.
+
+- A TOKEN or ATTESTOR token asks `POST /auth/agent`, naming the agent. The node
+  derives the agent's token from its own key for `agent-of:<the asking token's
+  DID>:<agent>`, the way it derives its own agents'. Asked again for the same
+  agent, it is the same token and the same DID.
+- The derived token is the asking token under a DID of its own. Its level, its
+  namespaces and the roles it holds are the asking token's, read on every
+  request, so it reaches no more than that token does, and it is never ROOT.
+- It speaks for whoever minted the asking token. It stops when the asking token
+  is revoked or expires, or when that person is switched off.
+- ROOT's kind, SUPER, a token issued through a client, a derived token and a
+  session are handed nothing here.
+- `token:minted` records it, naming the asking token's DID as `derived_by`
+  and the agent.
 
 ## CI by OIDC
 

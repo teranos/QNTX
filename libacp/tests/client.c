@@ -1,5 +1,5 @@
-// The client side: what a client writes to an agent and reads of what the agent sends, each
-// checked against the agent side's own reader or writer, so the two halves agree.
+// 「[Opus 5.5] The client side: what a client writes to an agent and reads of what the agent sends, each」
+// 「[Opus 5.5] checked against the agent side's own reader or writer, so the two halves agree.」
 #include "acp.h"
 
 #include <json-c/json.h>
@@ -12,7 +12,7 @@ static int failures;
 
 #define CHECK(cond) do { if (!(cond)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond); failures++; } } while (0)
 
-// A message's params as JSON text, for the agent side's readers, which read params alone.
+// 「[Opus 5.5] A message's params as JSON text, for the agent side's readers, which read params alone.」
 static char *params_of(const char *message) {
     json_object *root = json_tokener_parse(message);
     json_object *params = NULL;
@@ -30,8 +30,8 @@ static int has(const acp_buffer *b, const char *text) {
     return b->data != NULL && strstr(b->data, text) != NULL;
 }
 
-// "Sent by the client to establish connection and negotiate capabilities." What it offers is read
-// back by the agent side as offered.
+// 「[Opus 5.5] "Sent by the client to establish connection and negotiate capabilities." What it offers is read」
+// 「[Opus 5.5] back by the agent side as offered.」
 static void initialize_request(void) {
     acp_client_capabilities offer = {0};
     offer.fs_read_text_file = 1;
@@ -51,7 +51,7 @@ static void initialize_request(void) {
     free(params);
     acp_buffer_free(&m);
 
-    // v2's request carries info and capabilities, and offers no fs or terminal.
+    // 「[Opus 5.5] v2's request carries info and capabilities, and offers no fs or terminal.」
     CHECK(acp_client_initialize_write("0", 2, &offer, "qntx", "1", &m) == ACP_OK);
     CHECK(has(&m, "\"capabilities\":{}") && has(&m, "\"info\":{\"name\":\"qntx\",\"version\":\"1\"}"));
     CHECK(!has(&m, "clientCapabilities") && !has(&m, "terminal"));
@@ -61,7 +61,7 @@ static void initialize_request(void) {
     CHECK(acp_client_initialize_write("not json", 1, &offer, "qntx", "1", &m) == ACP_INVALID_ARGUMENT);
 }
 
-// The agent's answer, as the agent side writes it: the version it speaks and what it offers.
+// 「[Opus 5.5] The agent's answer, as the agent side writes it: the version it speaks and what it offers.」
 static void initialize_response(void) {
     acp_buffer result = {0};
     CHECK(acp_initialize_result(1, "ground", "2", "{\"loadSession\":true,\"mcpCapabilities\":{\"http\":true},"
@@ -77,15 +77,15 @@ static void initialize_response(void) {
     CHECK(info.agent_version != NULL && strcmp(info.agent_version, "2") == 0);
     acp_agent_info_free(&info);
 
-    // An error is no agent: version 0, nothing offered.
+    // 「[Opus 5.5] An error is no agent: version 0, nothing offered.」
     const char *refused = "{\"jsonrpc\":\"2.0\",\"id\":0,\"error\":{\"code\":-32022,\"message\":\"no\"}}";
     CHECK(acp_client_initialize_read(refused, strlen(refused), &info) == ACP_OK);
     CHECK(info.protocol_version == 0 && info.load_session == 0 && info.agent_name == NULL);
     acp_agent_info_free(&info);
 }
 
-// session/new, session/load and session/resume, each naming the node's MCP over HTTP with its
-// header, read back by the agent side's readers, which check every server's shape.
+// 「[Opus 5.5] session/new, session/load and session/resume, each naming the node's MCP over HTTP with its」
+// 「[Opus 5.5] header, read back by the agent side's readers, which check every server's shape.」
 static void session_requests(void) {
     const acp_http_header bearer[] = {{"Authorization", "Bearer t"}};
     const acp_mcp_http servers[] = {{"qntx", "https://node/mcp", bearer, 1}};
@@ -103,7 +103,7 @@ static void session_requests(void) {
     free(params);
     acp_buffer_free(&m);
 
-    // No servers is an empty list, which the request requires.
+    // 「[Opus 5.5] No servers is an empty list, which the request requires.」
     CHECK(acp_client_session_new_write("1", "/work", NULL, 0, &m) == ACP_OK);
     CHECK(has(&m, "\"mcpServers\":[]"));
     acp_buffer_free(&m);
@@ -130,7 +130,7 @@ static void session_requests(void) {
     acp_buffer_free(&m);
 }
 
-// The sessionId the agent answers session/new with, as the agent side writes it.
+// 「[Opus 5.5] The sessionId the agent answers session/new with, as the agent side writes it.」
 static void session_new_response(void) {
     acp_buffer result = {0};
     CHECK(acp_session_new_result("s-9", NULL, NULL, &result) == ACP_OK);
@@ -146,7 +146,7 @@ static void session_new_response(void) {
     CHECK(acp_client_session_new_read(refused, strlen(refused), &sid) == ACP_OK && sid == NULL);
 }
 
-// A prompt of text, every byte of it, read back by the agent side as one text block.
+// 「[Opus 5.5] A prompt of text, every byte of it, read back by the agent side as one text block.」
 static void prompt_request(void) {
     const char says[] = "line one\n\"quoted\" \xc3\xa9";
     acp_buffer m = {0};
@@ -163,7 +163,7 @@ static void prompt_request(void) {
     acp_buffer_free(&m);
 }
 
-// Why the turn stopped, as the agent side writes it; an error is no stop.
+// 「[Opus 5.5] Why the turn stopped, as the agent side writes it; an error is no stop.」
 static void prompt_response(void) {
     const acp_stop_reason reasons[] = {ACP_STOP_END_TURN, ACP_STOP_MAX_TOKENS, ACP_STOP_MAX_TURN_REQUESTS, ACP_STOP_REFUSAL, ACP_STOP_CANCELLED};
     for (size_t i = 0; i < sizeof reasons / sizeof reasons[0]; i++) {
@@ -185,7 +185,7 @@ static void prompt_response(void) {
     CHECK(acp_client_session_prompt_read(unknown, strlen(unknown), &stopped, &reason) == ACP_OK && stopped == 0);
 }
 
-// session/cancel, a notification, read back by the agent side as a cancel of the session.
+// 「[Opus 5.5] session/cancel, a notification, read back by the agent side as a cancel of the session.」
 static void cancel(void) {
     acp_buffer m = {0};
     CHECK(acp_client_session_cancel_write("s-1", &m) == ACP_OK);
@@ -197,13 +197,13 @@ static void cancel(void) {
     acp_buffer_free(&m);
 }
 
-// What comes in: a request, a notification, or a response, by id and method.
+// 「[Opus 5.5] What comes in: a request, a notification, or a response, by id and method.」
 static void messages(void) {
     acp_message msg;
     const char *request = "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"session/request_permission\",\"params\":{}}";
     CHECK(acp_client_message_read(request, strlen(request), &msg) == ACP_OK);
     CHECK(msg.kind == ACP_MESSAGE_REQUEST && strcmp(msg.id, "\"a\"") == 0 && strcmp(msg.method, "session/request_permission") == 0);
-    // A request's params, as JSON text, for the reader of its method.
+    // 「[Opus 5.5] A request's params, as JSON text, for the reader of its method.」
     CHECK(msg.params != NULL && strcmp(msg.params, "{}") == 0);
     acp_message_free(&msg);
     const char *note = "{\"jsonrpc\":\"2.0\",\"method\":\"session/update\",\"params\":{}}";
@@ -227,7 +227,7 @@ static void messages(void) {
     acp_message_free(&msg);
 }
 
-// Each update the agent side writes, read back: its kind, and what the client shows of it.
+// 「[Opus 5.5] Each update the agent side writes, read back: its kind, and what the client shows of it.」
 static void updates(void) {
     acp_buffer u = {0}, m = {0};
     acp_update up;
@@ -290,7 +290,7 @@ static void updates(void) {
     acp_buffer_free(&u);
     acp_buffer_free(&m);
 
-    // Any other kind is OTHER, named by its type, and kept whole.
+    // 「[Opus 5.5] Any other kind is OTHER, named by its type, and kept whole.」
     const char *plan = "{\"entries\":[{\"content\":\"x\",\"priority\":\"low\",\"status\":\"pending\"}]}";
     CHECK(acp_plan_write(plan, strlen(plan), &u) == ACP_OK);
     CHECK(acp_session_update_write("s-1", u.data, &m) == ACP_OK);
@@ -305,8 +305,8 @@ static void updates(void) {
     acp_update_free(&up);
 }
 
-// session/request_permission as the agent side writes it, read by the client; the client's
-// answer read back by the agent side as the outcome it is.
+// 「[Opus 5.5] session/request_permission as the agent side writes it, read by the client; the client's」
+// 「[Opus 5.5] answer read back by the agent side as the outcome it is.」
 static void permission(void) {
     const acp_permission_option options[] = {{"allow", "Allow", "allow_once"}, {"reject", "Reject", "reject_once"}};
     acp_permission_request request = {0};
@@ -354,7 +354,7 @@ static void permission(void) {
     CHECK(acp_client_session_request_permission_read(missing, strlen(missing), &asked) == ACP_INVALID_PARAMS);
 }
 
-// A request the client does not answer, answered with the error saying why.
+// 「[Opus 5.5] A request the client does not answer, answered with the error saying why.」
 static void errors(void) {
     acp_buffer m = {0};
     CHECK(acp_client_error_write("\"r\"", -32601, "fs/read_text_file is not offered", &m) == ACP_OK);
@@ -367,7 +367,7 @@ static void errors(void) {
     CHECK(acp_client_error_write("\"r\"", -32601, NULL, &m) == ACP_INVALID_ARGUMENT);
 }
 
-// authenticate with the method the agent offered, read back by the agent side as that method.
+// 「[Opus 5.5] authenticate with the method the agent offered, read back by the agent side as that method.」
 static void authenticate(void) {
     acp_buffer m = {0};
     CHECK(acp_client_authenticate_write("5", "gemini-api-key", &m) == ACP_OK);
@@ -383,7 +383,7 @@ static void authenticate(void) {
     CHECK(acp_client_authenticate_write("5", NULL, &m) == ACP_INVALID_ARGUMENT);
 }
 
-// A config option set to a value id, as the model a session runs, read back by the agent side.
+// 「[Opus 5.5] A config option set to a value id, as the model a session runs, read back by the agent side.」
 static void set_config_option(void) {
     acp_buffer m = {0};
     CHECK(acp_client_session_set_config_option_write("6", "s-1", "model", "gemini-3.8-flash-low", &m) == ACP_OK);

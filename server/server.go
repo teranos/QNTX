@@ -147,6 +147,9 @@ type QNTXServer struct {
 	// opening is held while answering changes and what is served is rebuilt
 	// from it. Plugins arrive on their own goroutines.
 	opening sync.Mutex
+	// naming is held from reading who holds a name to writing down who now
+	// does (i name), so two agents asking for one name at once do not both get it.
+	naming sync.Mutex
 
 	// The MCP endpoint (ADR-038). The HTTP handler is built once; the server
 	// behind it is built per request, so a tool acts as the caller in front of
@@ -280,6 +283,9 @@ func (s *QNTXServer) SetLandingReporter(r LandingReporter) {
 
 // handleClientRegister handles a new client connection
 func (s *QNTXServer) handleClientRegister(client *Client) {
+	if client.registered != nil {
+		defer close(client.registered)
+	}
 	s.mu.Lock()
 
 	// Defensive: Check client limit

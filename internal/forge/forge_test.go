@@ -46,8 +46,11 @@ func TestAPushSaysWhereItWentAndWhatItChanged(t *testing.T) {
 	assert.Equal(t, "", push.Tag())
 	assert.True(t, push.Touched("README.md"))
 	assert.False(t, push.Touched("notes"))
-	assert.True(t, push.TouchedUnder("notes"))
-	assert.False(t, push.TouchedUnder("note"))
+	assert.True(t, push.TouchedIn("notes"))
+	assert.False(t, push.TouchedIn("note"))
+	deeper := Push{Ref: "refs/heads/main", Changed: []string{"notes/old/a.md"}}
+	assert.False(t, deeper.TouchedIn("notes"), "a file in a folder inside notes is not in notes")
+	assert.True(t, deeper.TouchedIn("notes/old"))
 
 	tagged := Push{Ref: "refs/tags/v1.2.3"}
 	assert.Equal(t, "", tagged.Branch())

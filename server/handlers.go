@@ -45,12 +45,13 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &Client{
-		server:   s,
-		conn:     conn,
-		sendMsg:  make(chan interface{}, 256),
-		id:       fmt.Sprintf("%s_%d", r.RemoteAddr, time.Now().UnixNano()),
-		admitted: admitted,
-		gated:    gated,
+		server:     s,
+		conn:       conn,
+		sendMsg:    make(chan interface{}, 256),
+		id:         fmt.Sprintf("%s_%d", r.RemoteAddr, time.Now().UnixNano()),
+		admitted:   admitted,
+		gated:      gated,
+		registered: make(chan struct{}),
 	}
 
 	// Which universe this socket is in, said once at the only point it is
@@ -64,6 +65,16 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	client.in = u.Name()
 
+	// Held before it is named: the version message tells the page which socket
+	// it is, and a prompt naming it at once finds it held.
+	s.register <- client
+	select {
+	case <-client.registered:
+	case <-s.ctx.Done():
+		sqlclose.Log(conn.Close(), s.logger, "the websocket")
+		return
+	}
+
 	// Send version info BEFORE starting writePump (avoid concurrent writes)
 	versionInfo := version.Get()
 	versionMsg := map[string]interface{}{
@@ -72,6 +83,10 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		"commit":     versionInfo.Short(),
 		"build_time": versionInfo.BuildTime,
 		"owner":      "SBVH",
+		// Which socket this is, told to it alone: what it asks for over HTTP
+		// names it, and a stream it asked for is sent to it and no other.
+		// "3. who? the receiver?"
+		"socket": client.id,
 	}
 	if err := conn.WriteJSON(versionMsg); err != nil {
 		s.logger.Debugw("Failed to send version info",
@@ -79,8 +94,6 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			"error", err,
 		)
 	}
-
-	s.register <- client
 
 	// Send system capabilities on connection (inform client of available optimizations)
 	s.wg.Go("ws.sendSystemCapabilities", func() { s.sendSystemCapabilitiesToClient(client) })

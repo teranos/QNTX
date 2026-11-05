@@ -1,5 +1,5 @@
-// initialize: the version a connection speaks, what the client offers, and the
-// result in the selected version's shape, against the migration guide's rules.
+// 「[Opus 5.5] initialize: the version a connection speaks, what the client offers, and the」
+// 「[Opus 5.5] result in the selected version's shape, against the migration guide's rules.」
 #include "acp.h"
 
 #include <stdio.h>
@@ -30,7 +30,7 @@ static void v1_shape(void) {
     CHECK(error.data == NULL);
 }
 
-// A v2 request is read in v2's shape, whichever version is selected:
+// 「[Opus 5.5] A v2 request is read in v2's shape, whichever version is selected:」
 // "a v2 request carries info and capabilities"
 static void v2_shape_to_a_v1_agent(void) {
     const unsigned v1[] = {1};
@@ -44,7 +44,7 @@ static void v2_shape_to_a_v1_agent(void) {
     CHECK(in.capabilities.fs_read_text_file == 0 && in.capabilities.terminal == 0);
 }
 
-// For an agent with both:
+// 「[Opus 5.5] For an agent with both:」
 // "a v1 request selects v1, a v2 request selects v2, and a request for a newer unsupported version selects v2"
 static void dual_stack_selects(void) {
     const unsigned both[] = {2, 1};
@@ -97,7 +97,7 @@ static void results(void) {
     acp_buffer_free(&out);
 }
 
-// authenticate, as #131 answers it: the methodId it names is required, and a string.
+// 「[Opus 5.5] authenticate, as #131 answers it: the methodId it names is required, and a string.」
 static void authenticate(void) {
     char *method_id = NULL;
     acp_buffer error = {0};
@@ -115,8 +115,8 @@ static void authenticate(void) {
     }
 }
 
-// "Whether the client supports terminal authentication methods", in either shape: an agent
-// advertises a terminal method only to a client that said so.
+// 「[Opus 5.5] "Whether the client supports terminal authentication methods", in either shape: an agent」
+// 「[Opus 5.5] advertises a terminal method only to a client that said so.」
 static void auth_terminal(void) {
     const unsigned v1[] = {1};
     acp_initialize in;

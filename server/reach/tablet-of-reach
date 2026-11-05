@@ -44,6 +44,10 @@ REACH is '/auth/token'                                                    of ANY
 # An agent asks to be signed in and holds no session: the person's yes at the
 # passkey, at home, is the credential, checked at the endpoints themselves.
 REACH is '/auth/device' '/auth/device/approve' '/auth/device/done'        of ANYONE
+# An agent a token starts is handed a token of its own (ADR-025): the token
+# asking is the credential, and the handler hands one to a TOKEN or an
+# ATTESTOR minted rather than issued through a client, and to nobody else.
+REACH is '/auth/agent'                                                    of TOKEN ATTESTOR
 # Another node asks whether a token this one issued is live, holding no session:
 # its signed assertion is the credential, checked at the endpoint itself.
 REACH is '/auth/introspect'                                               of ANYONE
@@ -70,6 +74,7 @@ REACH is '/.well-known/openid-configuration' '/.well-known/jwks.json'     of ANY
 # The node at Anthropic: the ids of the rule its identity token is traded at, ROOT's.
 REACH is '/api/anthropic'                                                 of ROOT
 REACH is '/api/anthropic/order'                                           of ROOT
+REACH is '/api/anthropic/cap'                                             of ROOT
 REACH is '/api/google'                                                    of ROOT
 # The A2A agent card (ADR-039): how an agent that has never seen this node
 # finds what it is and what it serves.
@@ -92,6 +97,11 @@ REACH is '/i/picture'                                                     of ROO
 # Which of the paths asked the caller reaches, so the tray offers no element
 # its viewer cannot use: "a caller learns its paths and not its grants".
 REACH is '/i/reaches'                                                     of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
+# "assign yourself a name using signa:i sigil:name if available otherwise retry"
+# Who reaches '/mcp' reaches it, and the handler names a token asking as
+# itself, by its own DID, and nobody else.
+# "add it to it, ATTESTOR can set their own name if available"
+REACH is '/i/name'                                                        of ROOT SUPER TOKEN ATTESTOR
 
 # First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE

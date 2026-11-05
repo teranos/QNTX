@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-// What a block gives: "required" are a link's name and uri, a resource's uri, and every
-// block's type. One missing any is another kind, told by the type it names, or none.
+// 「[Opus 5.5] What a block gives: "required" are a link's name and uri, a resource's uri, and every」
+// 「[Opus 5.5] block's type. One missing any is another kind, told by the type it names, or none.」
 static acp_status block_of(json_object *value, acp_prompt_block *block) {
     memset(block, 0, sizeof *block);
     block->kind = ACP_BLOCK_OTHER;

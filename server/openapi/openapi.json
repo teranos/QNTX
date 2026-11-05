@@ -144,6 +144,11 @@
         "ROOT"
       ]
     },
+    "/api/anthropic/cap": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/anthropic/order": {
       "x-qntx-reach": [
         "ROOT"
@@ -689,6 +694,12 @@
         "SUPER"
       ]
     },
+    "/auth/agent": {
+      "x-qntx-reach": [
+        "TOKEN",
+        "ATTESTOR"
+      ]
+    },
     "/auth/authorize": {
       "x-qntx-reach": [
         "ANYONE"
@@ -935,6 +946,14 @@
     "/i/enable": {
       "x-qntx-reach": [
         "ANYONE"
+      ]
+    },
+    "/i/name": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR"
       ]
     },
     "/i/picture": {

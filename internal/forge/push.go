@@ -39,10 +39,11 @@ func (p Push) Tag() string {
 // Touched is whether the push changed path.
 func (p Push) Touched(path string) bool { return slices.Contains(p.Changed, path) }
 
-// TouchedUnder is whether the push changed anything inside folder.
-func (p Push) TouchedUnder(folder string) bool {
+// TouchedIn is whether the push changed a file directly in folder: one in a
+// folder inside it is not in it.
+func (p Push) TouchedIn(folder string) bool {
 	for _, changed := range p.Changed {
-		if strings.HasPrefix(changed, folder+"/") {
+		if name, in := strings.CutPrefix(changed, folder+"/"); in && !strings.Contains(name, "/") {
 			return true
 		}
 	}
