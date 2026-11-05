@@ -106,6 +106,12 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
+	// An agent's token is the node's to write, named for the token it runs
+	// under: a label naming one would stand on that token's roles.
+	if strings.HasPrefix(strings.TrimSpace(req.Label), agentOfLabel+":") {
+		h.writeError(w, http.StatusBadRequest, "a label starting "+agentOfLabel+": names an agent's token, which the node writes")
+		return
+	}
 	// The label is the token's name, and a grant hangs on it. Revoked ones
 	// count: revocation is a switch, and a switched-off token comes back.
 	held, err := h.tokens.List()

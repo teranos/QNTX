@@ -394,6 +394,23 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			}
 			return h.admittedAsThePerson(*grant), true
 		}
+		// A token holds roles by its label, its name.
+		holder := grant.Label
+		// An agent's token is the token it runs under, under a DID of its own
+		// (ADR-025): its level, its namespaces and its roles are that token's,
+		// read now, and it stands while that token does.
+		if under, isAgents := askedUnder(grant.Label); isAgents {
+			asking, live := h.askingToken(under)
+			if !live || (asking.Level != LevelToken && asking.Level != LevelAttestor) {
+				h.logger.Infow("Bearer token refused",
+					"did", grant.DID,
+					"reason", "the token its agent runs under is not live")
+				return Admission{}, false
+			}
+			agents := *grant
+			agents.Level, agents.Namespaces = asking.Level, asking.Namespaces
+			grant, holder = &agents, asking.Label
+		}
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
 		admitted := Admission{
@@ -414,9 +431,9 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// token names, and in system.
 		var roles []string
 		for _, namespace := range grant.Namespaces {
-			roles = append(roles, h.RolesOfToken(grant.Label, namespace)...)
+			roles = append(roles, h.RolesOfToken(holder, namespace)...)
 		}
-		seesSystem := len(h.RolesOfToken(grant.Label, NamespaceSystem)) > 0
+		seesSystem := len(h.RolesOfToken(holder, NamespaceSystem)) > 0
 		return admission.Granted(admitted, grant.Level, roles, seesSystem, h.WordsOf(roles)), true
 	}
 
@@ -597,6 +614,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
 	mux.answer(deviceApprovePath, h.handleDeviceApprove)
 	mux.answer(deviceDonePath, h.handleDeviceDone)
+	// An agent a token starts is handed a token of its own (ADR-025).
+	mux.answer(agentTokenPath, h.handleAgentToken)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
 	// A peer asks for the lines about the namespaces it serves, signing as itself.

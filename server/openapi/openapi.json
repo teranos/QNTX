@@ -689,6 +689,12 @@
         "SUPER"
       ]
     },
+    "/auth/agent": {
+      "x-qntx-reach": [
+        "TOKEN",
+        "ATTESTOR"
+      ]
+    },
     "/auth/authorize": {
       "x-qntx-reach": [
         "ANYONE"
