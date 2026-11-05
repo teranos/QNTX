@@ -207,9 +207,11 @@ func (s *QNTXServer) agentLines() ([]agentName, error) {
 			s.logger.Warnw("an agent:named line is no agent naming itself, and is no name", "id", as.ID)
 			continue
 		}
+		// 「[Opus 5.5] A line whose sequence does not read is no name, as one another actor wrote is not.」
 		sequence, err := sequenceOf(as)
 		if err != nil {
-			return nil, err
+			s.logger.Warnw("an agent:named line carries a sequence that does not read, and is no name", "id", as.ID, "error", err)
+			continue
 		}
 		names = append(names, agentName{did: as.Subjects[0], name: name, at: as.Timestamp, sequence: sequence})
 	}

@@ -491,3 +491,27 @@ func TestANameLineIsStampedWhenItIsWrittenAndReadInTheOrderOfItsSequence(t *test
 	require.NoError(t, err)
 	assert.True(t, first.AttestationExists("AS-written-after"), "a row written after the name line is taken in")
 }
+
+// Qodo's review of #1540: a name line whose sequence is no whole number above
+// zero failed every name read and every i name after it. It is no name, as a
+// line some other actor wrote is no name, and the rest read as before.
+func TestANameLineWithNoSequenceToReadIsNoName(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s := rootKnowingServer(t)
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	at := time.Now()
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-named-bad-sequence", Subjects: []string{"did:key:z6Mkbirch"}, Predicates: []string{predicateAgentNamed},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkbirch"}, Timestamp: at, CreatedAt: at,
+		Source: "did:key:z6Mkbirch", Attributes: map[string]any{"name": "birch", "sequence": "first"},
+	}))
+
+	named, refusal := s.iName(asAgent("did:key:z6Mkash"), sigil.Sent{"name": "birch"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "birch", named.(*protocol.Named).GetName(), "the line that reads as no name holds no name")
+	names, err := s.agentNames()
+	require.NoError(t, err)
+	require.Len(t, names, 1)
+	assert.Equal(t, "did:key:z6Mkash", names[0].did)
+}
