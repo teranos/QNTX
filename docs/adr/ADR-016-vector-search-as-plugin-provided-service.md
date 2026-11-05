@@ -1,7 +1,7 @@
 # ADR-016: Vector Search as a Plugin-Provided Service
 
 ## Status
-Proposed
+Proposed, not active anywhere today
 
 ## Context
 

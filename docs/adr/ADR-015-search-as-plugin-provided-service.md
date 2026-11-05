@@ -1,7 +1,7 @@
 # ADR-015: Search as a Plugin-Provided Service
 
 ## Status
-Completed
+Completed, but not used at the moment
 
 ## Context
 

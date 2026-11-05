@@ -1,11 +1,11 @@
 # ADR-038: MCP
 
 Date: 2026-09-15
-Status: Proposed
+Status: Active and in use, how observable is this through sentry? Or through telemetry? I was thinking of taking OTel seriously throughout QNTX
 
 Is QNTX's role in MCP to be the host?
 
-"YES, AND THE MCP FOR QNTX ITSELF IS THE FIRST ONE TO OCCUPY, BUT WE COULD EVEN DO OTHER ONES"
+"YES, AND THE MCP FOR QNTX ITSELF IS THE FIRST ONE TO OCCUPY, BUT WE COULD EVEN DO OTHER ONES" -> which we do now, I have yet to confirm it per namespace though.
 
 Does an MCP client require dynamic client registration, or does it accept a client minted by hand?
 
@@ -86,3 +86,10 @@ ROOT's client is minted as one (`"root": true`) and names no namespace: only ROO
 ROOT's client answers at `/mcp`, the node's MCP server.
 
 "all clients can die"
+
+---
+
+> I do actually wonder, how we configure our Agent harnesses MCP today. Think QNTX being a client of MCP in addition to just being the server. 
+> So, I guess that means the Node itself, and each individual Namespace becomes a consumer of other systems MCP
+> Like the Obsidian MCP [[ADR-049-Obsidian]]
+> 

@@ -1,7 +1,8 @@
 # ADR-050: Comet
 
 Date: 2026-10-08
-Status: Accepted 
+Status: 3nov, implemented mostly, what's left is polish, more ui exposure, making it into a nice user feature, actually using it, getting data from own usage, perfecting it. 
+pre-0.9.0-polish-blocker 
 
 "the feature i am imagining is called comet"
 

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
@@ -82,6 +83,13 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 	if s.authHandler == nil {
 		return claudecode.Answer{}, errors.New("this node runs without auth, so it has no public origin an agent at Anthropic could reach its MCP by")
 	}
+	// "6SION00: The bad session needs to not be able to murder us further."
+	// 「[Opus 5.5] Every Session is capped: at what ROOT set in Node Connectors, or the node's default.」
+	amount, _ := capOf(kept)
+	ceiling, err := centsOf(amount)
+	if err != nil {
+		return claudecode.Answer{}, err
+	}
 	client, err := s.anthropicClient(kept)
 	if err != nil {
 		return claudecode.Answer{}, err
@@ -91,7 +99,7 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 	if err != nil {
 		return claudecode.Answer{}, err
 	}
-	held, err := s.managedElement(ctx, client, agent, said.Model, environment)
+	held, err := s.managedElement(ctx, client, agent, said.Model, environment, ceiling)
 	if err != nil {
 		return claudecode.Answer{}, err
 	}
@@ -156,16 +164,23 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 			failed = append(failed, event.RawJSON())
 		case "session.status_idle", "session.status_terminated":
 			// One message comes as blocks cut wherever a citation sits: they are read back to back.
-			answer := claudecode.Answer{Text: strings.Join(text, ""), Session: held.Session, Model: said.Model}
+			answer := claudecode.Answer{Text: strings.Join(text, ""), Session: held.Session, Model: said.Model, Subtype: "success"}
+			// 「[Opus 5.5] A turn that failed says which way, in Claude Code's own words for a result.」
 			if len(text) == 0 && len(failed) > 0 {
-				answer.Text, answer.IsError = strings.Join(failed, "\n"), true
+				answer.Text, answer.IsError, answer.Subtype = strings.Join(failed, "\n"), true, "error_during_execution"
+			}
+			// 「[Opus 5.5] A Session at its cap pauses, idle, and takes nothing new until the cap is raised」
+			// 「[Opus 5.5] (managed-agents/budgets, When a session reaches its budget).」
+			if event.Type == "session.status_idle" && event.StopReason.Type == "budget_reached" {
+				answer.IsError, answer.Subtype = true, "budget_reached"
+				answer.Text = strings.TrimSpace(answer.Text + "\n\nSession " + held.Session + " at Anthropic reached its cap of " + amount + " " + anthropicCapCurrency + " and is paused: a cap set anew in Node Connectors goes on in a new Session, with this one's Memory.")
 			}
 			if spent, err := s.spentBy(ctx, client, agent, &held); err != nil {
 				s.logger.Errorw("what the turn cost at Anthropic was not read", "element", agent.element, "session", held.Session, "error", err)
 			} else {
 				answer.CostUSD = spent
 			}
-			result := claudecode.Message{Type: "result", Subtype: "success", IsError: answer.IsError, Result: answer.Text}
+			result := claudecode.Message{Type: "result", Subtype: answer.Subtype, IsError: answer.IsError, Result: answer.Text}
 			print(result)
 			each(result)
 			return answer, nil
@@ -265,8 +280,51 @@ func (s *QNTXServer) managedEnvironment(ctx context.Context, client anthropic.Cl
 	return made.ID, nil
 }
 
+// 「[Opus 5.5] How long a Session that is interrupted is waited on to go idle, and how often it is asked.」
+var (
+	retireWaits = 2 * time.Minute
+	retireAsks  = time.Second
+)
+
+// 「[Opus 5.5] retireSession ends a Session the element no longer goes on in, before another is made:」
+// 「[Opus 5.5] one still running is interrupted and waited on until it is idle, since a running Session」
+// 「[Opus 5.5] cannot be archived, and archived it takes no new event (managed-agents/session-operations,」
+// 「[Opus 5.5] Archiving a session). Until that is done the element keeps it, and the turn says why.」
+func (s *QNTXServer) retireSession(ctx context.Context, client anthropic.Client, agent *rootAgent, id string, status anthropic.BetaManagedAgentsSessionStatus) error {
+	if status != "idle" {
+		if _, err := client.Beta.Sessions.Events.Send(ctx, id, anthropic.BetaSessionEventSendParams{
+			Events: []anthropic.BetaManagedAgentsEventParamsUnion{{OfUserInterrupt: &anthropic.BetaManagedAgentsUserInterruptEventParams{}}},
+		}); err != nil {
+			return errors.Wrapf(err, "the element %s's Session %s at Anthropic, %s, was not interrupted, so no Session is made beside it", agent.element, id, status)
+		}
+		for waited := time.Duration(0); status != "idle"; waited += retireAsks {
+			if waited >= retireWaits {
+				return errors.Newf("the element %s's Session %s at Anthropic was interrupted and is still %s after %s, so no Session is made beside it", agent.element, id, status, retireWaits)
+			}
+			time.Sleep(retireAsks)
+			now, err := client.Beta.Sessions.Get(ctx, id, anthropic.BetaSessionGetParams{})
+			if err != nil {
+				return errors.Wrapf(err, "the element %s's Session %s at Anthropic did not answer after it was interrupted", agent.element, id)
+			}
+			status = now.Status
+		}
+	}
+	if _, err := client.Beta.Sessions.Archive(ctx, id, anthropic.BetaSessionArchiveParams{}); err != nil {
+		return errors.Wrapf(err, "the element %s's Session %s at Anthropic was not archived, so no Session is made beside it", agent.element, id)
+	}
+	s.logger.Infow("the element's Session at Anthropic is archived", "element", agent.element, "session", id)
+	return nil
+}
+
+// 「[Opus 5.5] budgetOf is a Session's hard spend ceiling at Anthropic: cents, from centsOf.」
+func budgetOf(cents string) anthropic.BetaManagedAgentsBudgetLimitParam {
+	return anthropic.BetaManagedAgentsBudgetLimitParam{
+		MaxListCost: anthropic.BetaMonetaryAmountParam{Amount: cents, Currency: anthropic.BetaCurrency(anthropicCapCurrency)},
+	}
+}
+
 // managedElement is the element's Agent, Vault and Session at Anthropic, each made once and kept.
-func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client, agent *rootAgent, model, environment string) (managedOf, error) {
+func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client, agent *rootAgent, model, environment, ceiling string) (managedOf, error) {
 	file := filepath.Join(agent.home, agent.sessionDir, managedElementFile)
 	var held managedOf
 	if raw, err := os.ReadFile(file); err == nil {
@@ -358,8 +416,25 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		if err != nil {
 			return managedOf{}, errors.Wrapf(err, "the element %s's Session %s at Anthropic did not answer", agent.element, held.Session)
 		}
-		if session.Status == "terminated" {
+		switch was := session.Budget.MaxListCost.Amount; {
+		case session.Status == "terminated":
 			s.logger.Infow("the element's Session at Anthropic had ended, and a new one is made", "element", agent.element, "ended", held.Session)
+			held.Session = ""
+		// 「[Opus 5.5] A Session made without a cap cannot be given one (managed-agents/budgets): it ends here.」
+		case was == "":
+			if err := s.retireSession(ctx, client, agent, held.Session, session.Status); err != nil {
+				return managedOf{}, err
+			}
+			s.logger.Infow("the element's Session at Anthropic has no cap, and goes on in a new one that has it", "element", agent.element, "ended", held.Session, "max_list_cost", ceiling)
+			held.Session = ""
+		// 「[Opus 5.5] Another cap goes on in a new Session, with the same Memory. Changed in place, it would」
+		// 「[Opus 5.5] resume what the old cap paused before this turn's stream is open, beside this turn's」
+		// 「[Opus 5.5] message, and a cap at or below what was spent is refused (managed-agents/budgets).」
+		case was != ceiling:
+			if err := s.retireSession(ctx, client, agent, held.Session, session.Status); err != nil {
+				return managedOf{}, err
+			}
+			s.logger.Infow("the element's Session at Anthropic was capped at another amount, and goes on in a new one", "element", agent.element, "ended", held.Session, "was", was, "max_list_cost", ceiling)
 			held.Session = ""
 		}
 	}
@@ -370,6 +445,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 			Title:         anthropic.String("the element " + agent.element),
 			VaultIDs:      []string{held.Vault},
 			Resources:     []anthropic.BetaSessionNewParamsResourceUnion{{OfMemoryStore: &anthropic.BetaManagedAgentsMemoryStoreResourceParam{MemoryStoreID: held.Memory}}},
+			Budget:        budgetOf(ceiling),
 		})
 		if err != nil {
 			return managedOf{}, errors.Wrapf(err, "no Session was made at Anthropic for the element %s", agent.element)
@@ -379,7 +455,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 			return managedOf{}, err
 		}
 		// The model is said here because nothing a Session's events carry names it (6SION).
-		s.logger.Infow("the element's agent runs at Anthropic", "element", agent.element, "agent", held.Agent, "model", model, "vault", held.Vault, "memory", held.Memory, "session", held.Session)
+		s.logger.Infow("the element's agent runs at Anthropic", "element", agent.element, "agent", held.Agent, "model", model, "vault", held.Vault, "memory", held.Memory, "session", held.Session, "max_list_cost", ceiling)
 	}
 	return held, nil
 }

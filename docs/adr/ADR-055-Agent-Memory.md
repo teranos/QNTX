@@ -1,3 +1,4 @@
+pre-0.999.0-polish-blocker 
 
 > [spec.c2pa.org](https://spec.c2pa.org)
 > With the increasing velocity of digital content and the increasing availability of powerful creation and editing techniques, establishing the provenance of media is critical to ensure transparency, understanding, and ultimately, trust. 
@@ -15,7 +16,7 @@ https://platform.claude.com/dashboard
 - Integrate with Claude Console API's 'Memory store'
 - And later 'dreams' as well
 
-
+- Interesting to think about an [[ADR-049-Obsidian|Obsidian]] linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory.
 
 bidirectional sync between our abstraction of the memory store.
 
@@ -25,11 +26,13 @@ Allow all Agent Harnesses to leverage memories created in Managed Agents.
 
 
 - [ ] View Memory store's in Agents Element
+- [ ] Actually, this should be it's own Memory Element in QNTX
 - [ ] 
 
 make sure this is a thing for
 - [ ] [[ADR-053-Namespace-Agents]]
-- [ ] [[ADR-048-Node-Agent]]
+	- [ ] https://github.com/teranos/QNTX/pull/1491
+- [x] [[ADR-048-Node-Agent]]
 - [ ] [[Elements]] Agents
 
 
@@ -43,7 +46,7 @@ Preserving the words is only the beginning. Preserving the discipline of interpr
 
 An agent should be free to interpret human speech, but it should never inherit the human's authority merely by interpreting it.
 
-## 「[Fable 5.1] Quotes from an agent」
+## 「[Opus 5.5] Quotes from an agent」
 
 "ah, right, it was more about quote provenance than memory per se"
 
@@ -87,7 +90,7 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 - [ ] 「[Fable 5.1] The signum that keeps a Quote, so the node holds it to tei.」
 - [ ] 「[Fable 5.1] C2PA, for the material a quote arrives in, pinned as TEI is.」
 
-## 「[Fable 5.1] The process」
+## 「[Opus 5.5] The process」
 
 "there needs to be a process"
 

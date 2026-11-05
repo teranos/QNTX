@@ -8,11 +8,11 @@ import (
 	"github.com/teranos/QNTX/internal/acp"
 )
 
-// An ACP harness's turn written down as the hook events Claude Code's are written as, whichever agent
-// runs it: the session starting, each tool it reached for, and the turn's end once it answered.
-// "Just like how I would like any harness to be pluggable"
+// 「[Opus 5.5] An ACP harness's turn written down as the hook events Claude Code's are written as, whichever agent」
+// 「[Opus 5.5] runs it: the session starting, each tool it reached for, and the turn's end once it answered.」
+// "「[Sonnet 5.5] Just like how I would like any harness to be pluggable」"
 
-// rowsOfACP is the rows of one update of a turn in the harness source names.
+// 「[Opus 5.5] rowsOfACP is the rows of one update of a turn in the harness source names.」
 func (w sessionWriter) rowsOfACP(u acp.Update, source string, at time.Time) ([]*types.As, error) {
 	switch u.Kind {
 	case acp.Started:
@@ -37,8 +37,8 @@ func (w sessionWriter) rowsOfACP(u acp.Update, source string, at time.Time) ([]*
 	return nil, nil
 }
 
-// toolOfACP names a tool call as Claude Code names its tools, by the kind ACP gives it, so a transcript
-// reads it as it reads theirs; a kind with no such tool keeps the agent's own name for it.
+// 「[Opus 5.5] toolOfACP names a tool call as Claude Code names its tools, by the kind ACP gives it, so a transcript」
+// 「[Opus 5.5] reads it as it reads theirs; a kind with no such tool keeps the agent's own name for it.」
 func toolOfACP(u acp.Update) string {
 	switch u.ToolKind {
 	case "execute":
@@ -54,7 +54,7 @@ func toolOfACP(u acp.Update) string {
 	return u.Title
 }
 
-// firstText is the first of keys whose value is a string.
+// 「[Opus 5.5] firstText is the first of keys whose value is a string.」
 func firstText(m map[string]any, keys ...string) string {
 	for _, k := range keys {
 		if s, ok := m[k].(string); ok && s != "" {
@@ -64,7 +64,7 @@ func firstText(m map[string]any, keys ...string) string {
 	return ""
 }
 
-// acpAnswered is the row of a turn's end: what the agent answered.
+// 「[Opus 5.5] acpAnswered is the row of a turn's end: what the agent answered.」
 func (w sessionWriter) acpAnswered(text string, at time.Time) ([]*types.As, error) {
 	attrs := map[string]any{"last_assistant_message": text}
 	if w.effort != "" {

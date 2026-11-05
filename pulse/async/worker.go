@@ -512,6 +512,9 @@ func (wp *WorkerPool) processNextJob() error {
 	execStart := time.Now()
 	span, execCtx := wp.startJobSpan(job)
 	defer wp.finishJobSpan(span, job)
+	// 「[Fable 5.1] Deferred after, so it runs before: the OpenTelemetry span reads」
+	// 「[Fable 5.1] how the execution ended off the Sentry span while it is open.」
+	defer finishOTelJobSpan(execCtx, span, job)
 	wp.writeTaskLog(job.ID, job.HandlerName, "info", fmt.Sprintf("Starting %s", job.HandlerName))
 
 	if err := wp.executor.Execute(execCtx, job); err != nil {
@@ -610,14 +613,17 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	//
 	// Only when the span is actually sampled: with tracing off there is nothing
 	// worth a write, and every job would pay for an UPDATE nobody reads.
-	if span.Sampled == sentry.SampledTrue {
+	// 「[Fable 5.1] Or when the OpenTelemetry span is recorded: a child then inherits」
+	// 「[Fable 5.1] this trace id whether or not Sentry sampled it.」
+	ctx = startOTelJobSpan(span, job)
+	if span.Sampled == sentry.SampledTrue || recordingOTel(ctx) {
 		if err := wp.queue.store.SetExecutionTrace(job.ID, span.ToSentryTrace(), span.ToBaggage()); err != nil {
 			wp.logger.SugaredLogger.Warnw("Execution trace not recorded; children of this job will start their own traces",
 				"job_id", job.ID, "handler", job.HandlerName, "error", err)
 		}
 	}
 
-	return span, span.Context()
+	return span, ctx
 }
 
 // finishJobSpan closes the span, reading the fields the handler moved while it

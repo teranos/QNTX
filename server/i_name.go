@@ -1,0 +1,189 @@
+package server
+
+import (
+	"context"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+	"unicode"
+
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/sigil"
+	errors "github.com/teranos/sacred-error"
+)
+
+// "assign yourself a name using signa:i sigil:name if available otherwise retry"
+//
+// "why cant i say room agent, and its one thing"
+
+// An agent has its own DID and attests as itself (ADR-048), and the name is
+// held by that DID: `<did> is 'agent:named' of system by <did>`, the name in
+// the line's attributes, as a person's display_name is in identity:named's
+// (ADR-031). A person's name is the User record's and is not unique; an
+// agent's is this line's and is one agent's on the node. Neither reads the
+// other, and root is nobody's to take in either.
+
+const iNamePath = "/i/name"
+
+// predicateAgentNamed is the line an agent's name is: its subject and its
+// actor are the agent's DID.
+const predicateAgentNamed = "agent:named"
+
+// iName assigns the agent asking the name it asked for. The name it already
+// holds is answered again; another is refused, because a name is settled once,
+// as a display_name is. A name another agent holds is refused as taken.
+func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	admitted, refusal := s.iAdmitted(ctx)
+	if refusal != nil {
+		return nil, refusal
+	}
+	did, refusal := itsOwnDID(admitted)
+	if refusal != nil {
+		return nil, refusal
+	}
+	name := strings.TrimSpace(sent["name"])
+	if says, refused := noName(name); refused {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: says}
+	}
+	if s.held == nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no store to keep a name in"}
+	}
+
+	s.naming.Lock()
+	defer s.naming.Unlock()
+
+	names, err := s.agentNames()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	if at := slices.IndexFunc(names, func(kept agentName) bool { return kept.did == did }); at >= 0 {
+		held := names[at].name
+		if strings.EqualFold(held, name) {
+			return &protocol.Named{Name: held, Did: did}, nil
+		}
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
+			Says: did + " is " + strconv.Quote(held) + ": a name is settled once"}
+	}
+	if slices.ContainsFunc(names, func(kept agentName) bool { return strings.EqualFold(kept.name, name) }) {
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
+			Says: strconv.Quote(name) + " is taken: another agent holds it. Ask again with another name."}
+	}
+	if err := s.keepAgentName(did, name); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	s.logger.Infow("an agent named itself", "did", did, "name", name)
+	return &protocol.Named{Name: name, Did: did}, nil
+}
+
+// itsOwnDID is the DID a name is held by: a token asking as itself, by the
+// DID it has for as long as it is that token. An agent the node hosts asks so
+// (ADR-048), and so does a token minted in the element (ADR-025).
+//
+// A session and a connector ask as a person, who is named as they arrive
+// (ADR-031). A client's own token is issued anew under another DID each time
+// (auth.TokenStrategy.GenerateAccessToken), so a name on it would not last.
+func itsOwnDID(admitted auth.Admission) (string, *protocol.Refusal) {
+	if admitted.Grant == nil {
+		return "", &protocol.Refusal{Why: sigil.NotAllowed,
+			Says: "i name names an agent by its own DID, and this asks as a person: a person is named as they arrive"}
+	}
+	if admitted.ClientDID != "" {
+		return "", &protocol.Refusal{Why: sigil.NotAllowed,
+			Says: "this token was issued through the client " + admitted.ClientDID + ", which is issued its next one under another DID: a name on it would not last"}
+	}
+	if admitted.Grant.DID == "" {
+		return "", &protocol.Refusal{Why: sigil.Failed, Says: "this token carries no DID for a name to be held by"}
+	}
+	return admitted.Grant.DID, nil
+}
+
+// noName says why this is no name, and whether it is refused at all: what a
+// display_name is held to (auth's refuseName and nameUser).
+func noName(name string) (string, bool) {
+	switch {
+	case name == "" || strings.ContainsFunc(name, unicode.IsControl):
+		return "a name is one line of text", true
+	case len(name) > auth.MaxName:
+		return "the name is longer than " + strconv.Itoa(auth.MaxName) + " characters", true
+	// "regardless of root_identity setting it or not, root is never an available display name except for the one root identity user, they dont need to set their display name as root"
+	case strings.EqualFold(name, auth.RootName):
+		return auth.RootName + " is not available", true
+	}
+	return "", false
+}
+
+// agentName is one agent:named line: the DID, and the name it took.
+type agentName struct {
+	did  string
+	name string
+	at   time.Time
+}
+
+// agentNames is every name an agent gave itself, oldest first: the first line
+// about a DID is its name, and the first line about a name is who holds it.
+// A line some other actor wrote about a DID is not the agent naming itself,
+// and is no name.
+func (s *QNTXServer) agentNames() ([]agentName, error) {
+	reading, err := s.held.Read(auth.NamespaceSystem)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the names agents hold are kept in %s, which is not open", auth.NamespaceSystem)
+	}
+	found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
+		Predicates: []string{predicateAgentNamed},
+		Limit:      ats.EveryRow,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read the %s lines", predicateAgentNamed)
+	}
+	var names []agentName
+	for _, as := range found {
+		name, _ := as.Attributes["name"].(string)
+		if len(as.Subjects) != 1 || len(as.Actors) == 0 || as.Actors[0] != as.Subjects[0] || name == "" {
+			s.logger.Warnw("an agent:named line is no agent naming itself, and is no name", "id", as.ID)
+			continue
+		}
+		names = append(names, agentName{did: as.Subjects[0], name: name, at: as.Timestamp})
+	}
+	slices.SortStableFunc(names, func(a, b agentName) int { return a.at.Compare(b.at) })
+	// One name is one agent's and an agent holds one name. Of two lines about
+	// the same name or the same DID, the older stands and the other is no
+	// name, however the second came to be written.
+	var stands []agentName
+	for _, line := range names {
+		if slices.ContainsFunc(stands, func(older agentName) bool {
+			return older.did == line.did || strings.EqualFold(older.name, line.name)
+		}) {
+			continue
+		}
+		stands = append(stands, line)
+	}
+	return stands, nil
+}
+
+// keepAgentName writes the line down, by the agent itself.
+func (s *QNTXServer) keepAgentName(did, name string) error {
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	if err != nil {
+		return errors.Wrapf(err, "no store to keep the name of %s in", did)
+	}
+	id, err := identity.GenerateASUIDWithRetry("AS", did, predicateAgentNamed, auth.NamespaceSystem, store.AttestationExists)
+	if err != nil {
+		return errors.Wrapf(err, "failed to name the %s line of %s", predicateAgentNamed, did)
+	}
+	now := time.Now()
+	if err := store.CreateAttestation(&types.As{
+		ID: id, Subjects: []string{did}, Predicates: []string{predicateAgentNamed}, Contexts: []string{auth.NamespaceSystem},
+		Actors: []string{did}, Timestamp: now, CreatedAt: now, Source: did,
+		Attributes: map[string]any{"name": name},
+	}); err != nil {
+		return errors.Wrapf(err, "the name of %s was not kept", did)
+	}
+	measure.Count(measure.AttestationsWritten, 1)
+	return nil
+}
