@@ -25,6 +25,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"slices"
@@ -169,6 +170,29 @@ func (s *QNTXServer) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	if status, why := mcpServerRefuses(r); status != 0 {
 		writeError(w, status, why)
 		return
+	}
+	// "very large requests we should not want to deal with"
+	//
+	// The node's MCP server takes what the Node Agent's A2A agent takes, and a
+	// namespace's what an agent at a tenant's takes: /mcp/<namespace> is that
+	// namespace's server as /a2a/<tenant>/ is its agent.
+	most := nodeBodyMost
+	if _, named := mcpNamespaceOf(r.URL.Path); named {
+		most = tenantBodyMost
+	}
+	if r.Body != nil {
+		body, err := io.ReadAll(io.LimitReader(r.Body, int64(most)+1))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "the MCP request body did not read: "+err.Error())
+			return
+		}
+		if len(body) > most {
+			writeError(w, http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("the MCP request body is more than the %d bytes %s takes", most, r.URL.Path))
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		r.ContentLength = int64(len(body))
 	}
 	s.mcpOnce.Do(func() {
 		s.mcpHTTP = mcp.NewStreamableHTTPHandler(s.mcpServerFor, &mcp.StreamableHTTPOptions{
