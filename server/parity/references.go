@@ -30,8 +30,11 @@ import (
 // oasf's are under agntcy/, its taxonomies under schema/, and the JSON Schema
 // 「[Fable 5.1] its server gives a Record is record.schema.json. TEI's ODD is pinned under」
 // 「[Fable 5.1] Specs/ as the Guidelines keep it: tei is tei_4.12.0_113e933 (odd.go).」
+// 「[Fable 5.1] OTLP's .proto files are under opentelemetry/, the path they import each」
+// 「[Fable 5.1] other by: otlp is otlp_v1.11.0_790608c, the commit go.mod's」
+// 「[Fable 5.1] go.opentelemetry.io/proto/otlp v1.11.0 is generated from.」
 //
-//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema */record.schema.json */Specs
+//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema */record.schema.json */Specs */opentelemetry
 var pinned embed.FS
 
 // Reference is the schema of the reference named, from the one directory
