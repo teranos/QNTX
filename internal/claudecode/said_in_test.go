@@ -77,3 +77,32 @@ func TestATurnIsSaidInNoPlaceOutsideItsWorksCheckouts(t *testing.T) {
 		t.Error("Claude Code ran for a turn said in a place outside its work's checkouts")
 	}
 }
+
+// Qodo on #1536: a name in the work that is a link to a checkout elsewhere is no checkout of its
+// work, whichever part of owner/repo the link is.
+func TestATurnIsNotSaidInACheckoutALinkTakesOutsideItsWork(t *testing.T) {
+	binary, ran := standIn(t, answered, 0, "")
+	home := t.TempDir()
+	elsewhere := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(elsewhere, "repo", ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, "work", "owner"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(elsewhere, filepath.Join(home, "work", "linked")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(elsewhere, "repo"), filepath.Join(home, "work", "owner", "repo")); err != nil {
+		t.Fatal(err)
+	}
+	for _, in := range []string{"linked/repo", "owner/repo"} {
+		said := Said{Started: noted, Binary: binary, Home: home, Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk", In: in}
+		if _, err := said.Run(context.Background(), func(Message) {}); err == nil || !strings.Contains(err.Error(), in) {
+			t.Errorf("a turn said in %q, a link out of its work, was not refused by name: %v", in, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(ran, "args")); err == nil {
+		t.Error("Claude Code ran in a checkout outside its work")
+	}
+}
