@@ -1,6 +1,6 @@
 # ADR-035 — Staands
 
-**Status:** to be folded into D
+**Status:** to be folded into Datapunt
 **Date:** Accepted and Implemented. 2026-09-07 , revised: 2026-11-05
 **Related:** [[ADR-025-access-tokens]] (Access Tokens), [[ADR-026-Namespaces]] (Namespaces), [[ADR-030-identity-providers]] (Identity Providers), ADR-031 (The User), [[ADR-032-Doors]] (Front Doors), [[ADR-034-roles-as-attestations]] (Roles as Attestations)
 
@@ -20,3 +20,10 @@ Wants:
 - QR stand
 - CF+S3 as stand
 - Redirect Stand
+- 
+
+
+
+---
+
+- Staand nee
