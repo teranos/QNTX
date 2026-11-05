@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// "2. fine change it, fix it"
+// "「[Opus 5.5] 2. fine change it, fix it」"
 
-// agentsNode is a node with a key of its own, ROOT listed, and a token ROOT
-// minted at ATTESTOR in ground: the laptop's token, under which agents start.
+// 「[Opus 5.5] agentsNode is a node with a key of its own, ROOT listed, and a token ROOT」
+// 「[Opus 5.5] minted at ATTESTOR in ground: the laptop's token, under which agents start.」
 func agentsNode(t *testing.T) (h *Handler, store *memTokenStore, raw string, asking Grant) {
 	t.Helper()
 	store = newMemTokenStore()
@@ -32,14 +32,14 @@ func agentsNode(t *testing.T) (h *Handler, store *memTokenStore, raw string, ask
 	return h, store, raw, asking
 }
 
-// presentedAs is what the gate makes of a bearer: false when it admits nobody.
+// 「[Opus 5.5] presentedAs is what the gate makes of a bearer: false when it admits nobody.」
 func presentedAs(h *Handler, raw string) (Admission, bool) {
 	req := httptest.NewRequest(http.MethodPost, agentTokenPath, nil)
 	req.Header.Set("Authorization", "Bearer "+raw)
 	return h.admissionOf(h.presented(req))
 }
 
-// asksForAgent is POST /auth/agent as admitted, the way Middleware hands it on.
+// 「[Opus 5.5] asksForAgent is POST /auth/agent as admitted, the way Middleware hands it on.」
 func asksForAgent(h *Handler, admitted Admission, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, agentTokenPath, strings.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -47,7 +47,7 @@ func asksForAgent(h *Handler, admitted Admission, body string) *httptest.Respons
 	return rec
 }
 
-// agentHanded is what the node answered an agent with.
+// 「[Opus 5.5] agentHanded is what the node answered an agent with.」
 type agentHanded struct {
 	Token     string `json:"token"`
 	DID       string `json:"did"`
@@ -67,8 +67,8 @@ func handedTo(t *testing.T, h *Handler, raw, agent string) agentHanded {
 	return handed
 }
 
-// Each agent started under one token is its own DID, and the same agent
-// asking again is the same token: nothing is kept for it but the token record.
+// 「[Opus 5.5] Each agent started under one token is its own DID, and the same agent」
+// 「[Opus 5.5] asking again is the same token: nothing is kept for it but the token record.」
 func TestEachAgentATokenStartsHoldsATokenOfItsOwn(t *testing.T) {
 	h, store, raw, asking := agentsNode(t)
 
@@ -97,8 +97,8 @@ func TestEachAgentATokenStartsHoldsATokenOfItsOwn(t *testing.T) {
 	assert.Empty(t, admitted.ClientDID, "i name refuses a client's token, and this is none")
 }
 
-// It holds what the asking token's label holds, and a grant naming the
-// agent's own label widens nothing: it reaches no more than the token it ran under.
+// 「[Opus 5.5] It holds what the asking token's label holds, and a grant naming the」
+// 「[Opus 5.5] agent's own label widens nothing: it reaches no more than the token it ran under.」
 func TestAnAgentsTokenHoldsWhatTheAskingTokenHolds(t *testing.T) {
 	h, _, raw, _ := agentsNode(t)
 	otari := handedTo(t, h, raw, "otari")
@@ -113,8 +113,8 @@ func TestAnAgentsTokenHoldsWhatTheAskingTokenHolds(t *testing.T) {
 	assert.Equal(t, []string{"GROUND"}, admitted.Roles())
 }
 
-// It ends with the token it ran under: revoked, it is refused; turned back on,
-// it works again; past its end, it is refused.
+// 「[Opus 5.5] It ends with the token it ran under: revoked, it is refused; turned back on,」
+// 「[Opus 5.5] it works again; past its end, it is refused.」
 func TestAnAgentsTokenEndsWithTheAskingToken(t *testing.T) {
 	h, store, raw, asking := agentsNode(t)
 	otari := handedTo(t, h, raw, "otari")
@@ -132,7 +132,7 @@ func TestAnAgentsTokenEndsWithTheAskingToken(t *testing.T) {
 	assert.False(t, ok, "the agent's token outlived the expired token it ran under")
 }
 
-// Its end is the asking token's end, on the record it is listed by.
+// 「[Opus 5.5] Its end is the asking token's end, on the record it is listed by.」
 func TestAnAgentsTokenEndsWhenTheAskingTokenDoes(t *testing.T) {
 	h, store, _, _ := agentsNode(t)
 	ends := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
@@ -156,8 +156,8 @@ func TestAnAgentsTokenEndsWhenTheAskingTokenDoes(t *testing.T) {
 	t.Fatal("the agent's token is not listed")
 }
 
-// Who is handed nothing: ROOT's kind, SUPER, a token issued through a client,
-// an agent's own token, and a session.
+// 「[Opus 5.5] Who is handed nothing: ROOT's kind, SUPER, a token issued through a client,」
+// 「[Opus 5.5] an agent's own token, and a session.」
 func TestWhoIsHandedNoAgentToken(t *testing.T) {
 	h, store, raw, _ := agentsNode(t)
 
@@ -190,7 +190,7 @@ func TestWhoIsHandedNoAgentToken(t *testing.T) {
 	assert.Len(t, after, len(before), "a token was handed to who is handed none")
 }
 
-// An agent is named by one line of text.
+// 「[Opus 5.5] An agent is named by one line of text.」
 func TestAnAgentNamedByNoLineIsRefused(t *testing.T) {
 	h, store, raw, _ := agentsNode(t)
 	admitted, ok := presentedAs(h, raw)
@@ -204,7 +204,7 @@ func TestAnAgentNamedByNoLineIsRefused(t *testing.T) {
 	assert.Len(t, held, 1)
 }
 
-// The record says which token it was derived for, by whom, and for which agent.
+// 「[Opus 5.5] The record says which token it was derived for, by whom, and for which agent.」
 func TestAnAgentsTokenIsAttestedWithWhoDerivedIt(t *testing.T) {
 	h, _, raw, asking := agentsNode(t)
 	kept := &memAttestor{}
@@ -222,7 +222,7 @@ func TestAnAgentsTokenIsAttestedWithWhoDerivedIt(t *testing.T) {
 	assert.Equal(t, otari.DID, line.Attributes["did"])
 }
 
-// A derived token's label is the node's to write: a session mints none.
+// 「[Opus 5.5] A derived token's label is the node's to write: a session mints none.」
 func TestASessionMintsNoAgentsLabel(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
@@ -230,7 +230,7 @@ func TestASessionMintsNoAgentsLabel(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
 
-// expire sets when a token ends, as a store that read it back would hold it.
+// 「[Opus 5.5] expire sets when a token ends, as a store that read it back would hold it.」
 func (m *memTokenStore) expire(id string, at time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -241,14 +241,14 @@ func (m *memTokenStore) expire(id string, at time.Time) {
 	}
 }
 
-// A label is not a derivation. A token named as an agent's that the node's key
-// did not derive under that name stands on nobody's roles: it is refused.
+// 「[Opus 5.5] A label is not a derivation. A token named as an agent's that the node's key」
+// 「[Opus 5.5] did not derive under that name stands on nobody's roles: it is refused.」
 func TestALabelAloneMakesNoAgentsToken(t *testing.T) {
 	h, store, _, asking := agentsNode(t)
 	h.SetRoleReader(&memRoles{lines: map[string][]RoleLine{"ground": {
 		{Routes: []string{"ground-token"}, Roles: []string{"GROUND"}, Granted: true, Actor: mastodonAccount, At: time.Now()},
 	}}})
-	// Minted before a session was refused such a label, the way one already held is.
+	// 「[Opus 5.5] Minted before a session was refused such a label, the way one already held is.」
 	named, _, err := store.Create(NewToken{Label: agentLabel(asking.DID, "otari"), MintedBy: mastodonAccount,
 		Level: LevelAttestor, Namespaces: []string{"ground"}, ExpiresAt: NeverEnds()})
 	require.NoError(t, err)
@@ -257,17 +257,17 @@ func TestALabelAloneMakesNoAgentsToken(t *testing.T) {
 	assert.False(t, ok, "a token the node did not derive stood on the asking token's roles")
 }
 
-// Agents asking at once are handed one token, and it is written down once:
-// two asks that both found it absent would both write it, and the second write
-// would turn back on a token switched off in between.
+// 「[Opus 5.5] Agents asking at once are handed one token, and it is written down once:」
+// 「[Opus 5.5] two asks that both found it absent would both write it, and the second write」
+// 「[Opus 5.5] would turn back on a token switched off in between.」
 func TestAgentsAskingAtOnceAreHandedOneToken(t *testing.T) {
 	h, store, raw, _ := agentsNode(t)
 	kept := &memAttestor{}
 	h.SetAttestor(kept)
 	admitted, ok := presentedAs(h, raw)
 	require.True(t, ok)
-	// Each look holds until the other has looked too, or until it is plain
-	// the other cannot look while this one asks.
+	// 「[Opus 5.5] Each look holds until the other has looked too, or until it is plain」
+	// 「[Opus 5.5] the other cannot look while this one asks.」
 	both := &lookingTogether{memTokenStore: store, looked: make(chan struct{}, 2)}
 	h.tokens = both
 
@@ -285,8 +285,8 @@ func TestAgentsAskingAtOnceAreHandedOneToken(t *testing.T) {
 	assert.Len(t, kept.wrote, 1, "the token was attested as minted more than once")
 }
 
-// lookingTogether is a store whose LookupSpent waits for a second look, so two
-// asks that may look at once do.
+// 「[Opus 5.5] lookingTogether is a store whose LookupSpent waits for a second look, so two」
+// 「[Opus 5.5] asks that may look at once do.」
 type lookingTogether struct {
 	*memTokenStore
 	looked chan struct{}
@@ -306,8 +306,8 @@ func (l *lookingTogether) LookupSpent(hash string) (Grant, bool, bool) {
 	return grant, live, held
 }
 
-// What the tokens element shows of an agent's token is what the gate admits it
-// as: the asking token's namespaces and roles, and none once that token is off.
+// 「[Opus 5.5] What the tokens element shows of an agent's token is what the gate admits it」
+// 「[Opus 5.5] as: the asking token's namespaces and roles, and none once that token is off.」
 func TestAnAgentsTokenIsShownAsTheGateAdmitsIt(t *testing.T) {
 	h, store, raw, asking := agentsNode(t)
 	h.SetRoleReader(&memRoles{lines: map[string][]RoleLine{"ground": {
@@ -322,7 +322,7 @@ func TestAnAgentsTokenIsShownAsTheGateAdmitsIt(t *testing.T) {
 	assert.Empty(t, h.answerFor(info).Roles, "an agent whose token is off was shown holding roles")
 }
 
-// listed is the token whose DID this is, as the store lists it.
+// 「[Opus 5.5] listed is the token whose DID this is, as the store lists it.」
 func listed(t *testing.T, store *memTokenStore, did string) TokenInfo {
 	t.Helper()
 	held, err := store.List()
