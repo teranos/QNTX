@@ -66,7 +66,12 @@ type Readme struct {
 
 // Refused is the forge answering no: it was asked, and said why not. A forge
 // that was not reached is an error of another kind.
-type Refused struct{ Says string }
+type Refused struct {
+	Says string
+	// 「[Opus 5.5] Absent is the forge saying it has none of what was asked, and nothing else:」
+	// 「[Opus 5.5] a refusal for any other reason leaves it false.」
+	Absent bool
+}
 
 func (r Refused) Error() string { return r.Says }
 

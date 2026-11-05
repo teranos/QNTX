@@ -22,6 +22,8 @@ type standInRepo struct {
 	commits       []string
 	// refuseRef is a branch GitHub will not make, as it will not beside one under it.
 	refuseRef string
+	// refuseList is a folder GitHub will not list for the App, though the branch holds it.
+	refuseList string
 }
 
 // stand is the repository the stand-in GitHub of vaultBindingServer holds.
@@ -129,6 +131,10 @@ func (repo *standInRepo) serve(w http.ResponseWriter, r *http.Request) bool {
 
 // contents answers a folder or a note under docs/adr on a branch.
 func (repo *standInRepo) contents(asked, ref string, give func(int, any)) {
+	if asked == repo.refuseList {
+		give(http.StatusForbidden, map[string]string{"message": "Resource not accessible by integration"})
+		return
+	}
 	notes, held := repo.branches[ref]
 	if !held {
 		give(http.StatusNotFound, map[string]string{"message": "No commit found for the ref " + ref})

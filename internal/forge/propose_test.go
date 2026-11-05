@@ -20,7 +20,9 @@ type shelf struct {
 	changes  []proposed
 	// refuses is a path the shelf takes no commit to.
 	refuses string
-	asked   []string
+	// unlisted is a folder the shelf holds and refuses to list.
+	unlisted string
+	asked    []string
 }
 
 // proposed is a change open on the shelf, with the branches it is between.
@@ -111,7 +113,10 @@ func (s *shelf) Entries(_ context.Context, _ Acting, _ Repo, ref, dir string) ([
 		}
 	}
 	if len(entries) == 0 {
-		return nil, Refused{Says: "the shelf has no " + dir}
+		return nil, Refused{Says: "the shelf has no " + dir, Absent: true}
+	}
+	if dir == s.unlisted {
+		return nil, Refused{Says: "the shelf does not list " + dir + " for you"}
 	}
 	return entries, nil
 }
@@ -232,5 +237,20 @@ func TestAPathTheBranchHoldsAFolderAtIsSaidBeforeAnyCommit(t *testing.T) {
 	_, err := proposal.Holds(t.Context(), on, AsApp, []string{"README.md", "notes"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "notes is a folder")
+	assert.Equal(t, []string{"branch agent/notes"}, on.asked, "nothing is committed")
+}
+
+// Qodo's review of #1515: a folder the forge refuses to list is not one it has
+// none of. Read as absent, every file asked in it was added over what is there.
+func TestAFolderTheForgeRefusesToListIsSaidBeforeAnyCommit(t *testing.T) {
+	on, proposal := shelved(t)
+	on.branches["trunk"]["notes/kept.md"] = "kept"
+	on.unlisted = "notes"
+	require.NoError(t, proposal.HoldBranch(t.Context(), on, AsApp))
+
+	_, err := proposal.Holds(t.Context(), on, AsApp, []string{"notes/kept.md"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "whether it holds notes/kept.md is not known")
+	assert.Contains(t, err.Error(), "the shelf does not list notes for you")
 	assert.Equal(t, []string{"branch agent/notes"}, on.asked, "nothing is committed")
 }

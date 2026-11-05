@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/base64"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/teranos/QNTX/internal/forge"
@@ -190,14 +191,16 @@ func (r gitHubForge) Entries(ctx context.Context, as forge.Acting, repo forge.Re
 	if err != nil {
 		return nil, err
 	}
-	answered, err := r.service().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
+	// 「[Opus 5.5] Only GitHub answering 404 is a folder it has none of; any other no is said as it is.」
+	answeredWith := 0
+	answered, err := r.service().GetRepositoryContent(services.AnsweredWith(ctx, &answeredWith), &protocol.GitHubGetRepositoryContentRequest{
 		Namespace: namespace, Owner: on.Owner, Repo: on.Name, Path: dir, Ref: ref,
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "%s of %s on %s was not asked", dir, on, ref)
 	}
 	if !answered.GetSuccess() {
-		return nil, forge.Refused{Says: answered.GetError()}
+		return nil, forge.Refused{Says: answered.GetError(), Absent: answeredWith == http.StatusNotFound}
 	}
 	switch answered.GetAnswered() {
 	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY:

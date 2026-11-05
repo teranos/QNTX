@@ -91,7 +91,8 @@ func (p Proposal) HoldBranch(ctx context.Context, on Forge, as Acting) error {
 
 // Holds is the blob the proposal's branch holds at each of paths, for the
 // ones it holds a file at: what an edit of that file replaces or removes. A
-// directory the forge says it has none of holds nothing.
+// directory the forge says it has none of holds nothing; a listing it refuses
+// for any other reason is said, before any edit.
 func (p Proposal) Holds(ctx context.Context, on Forge, as Acting, paths []string) (map[string]string, error) {
 	asked := map[string]bool{}
 	for _, file := range paths {
@@ -109,9 +110,12 @@ func (p Proposal) Holds(ctx context.Context, on Forge, as Acting, paths []string
 		}
 		listed[dir] = true
 		entries, err := on.Entries(ctx, as, p.Repo, p.Branch, dir)
-		var absent Refused
-		if errors.As(err, &absent) {
+		var refused Refused
+		if errors.As(err, &refused) && refused.Absent {
 			continue
+		}
+		if errors.As(err, &refused) {
+			return nil, errors.Newf("what %s of %s holds on %s was not listed, so whether it holds %s is not known: %s", dir, p.Repo, p.Branch, file, refused.Says)
 		}
 		var notADirectory NotADirectory
 		if errors.As(err, &notADirectory) {

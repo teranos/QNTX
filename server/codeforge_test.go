@@ -117,3 +117,20 @@ func TestAProposalSaysWhatToChange(t *testing.T) {
 	assert.Empty(t, stand.commits)
 	assert.Len(t, stand.branches, 1, "a branch was made for a proposal that was refused")
 }
+
+// Qodo's review of #1515: GitHub refusing to list a folder is not GitHub having
+// none. Read as absent, a file the branch holds there was added over, and
+// GitHub refused it after the files before it were committed.
+func TestAFolderGitHubRefusesToListIsSaidBeforeAnyCommit(t *testing.T) {
+	s, _ := vaultBindingServer(t)
+	stand.refuseList = "docs/adr/old"
+	_, refused := askCodeForge(t, s, sigil.Sent{
+		"repo": "github.com/abcd-nl/clean", "branch": "agent-old", "title": "x",
+		"files": `{"docs/adr/ADR-001.md": "# ADR-001\n", "docs/adr/old/ADR-000.md": "# ADR-000, again\n"}`,
+	})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "whether it holds docs/adr/old/ADR-000.md is not known")
+	assert.Contains(t, refused.GetSays(), "403")
+	assert.Empty(t, stand.commits, "nothing is committed")
+	assert.Empty(t, stand.pulls)
+}
