@@ -150,6 +150,9 @@ type QNTXServer struct {
 	// naming is held from reading who holds a name to writing down who now
 	// does (i name), so two agents asking for one name at once do not both get it.
 	naming sync.Mutex
+	// 「[Opus 5.5] anthropicLining is held from reading the node's ANTHROPIC line to writing it anew」
+	// 「[Opus 5.5] (changeAnthropicLine), so an order, a cap and the ids asked at once each stand.」
+	anthropicLining sync.Mutex
 
 	// The MCP endpoint (ADR-038). The HTTP handler is built once; the server
 	// behind it is built per request, so a tool acts as the caller in front of
