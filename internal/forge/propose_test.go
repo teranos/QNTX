@@ -86,6 +86,7 @@ func (s *shelf) Entries(_ context.Context, _ Acting, _ Repo, ref, dir string) ([
 		return nil, NotADirectory{Kind: "file"}
 	}
 	var entries []Entry
+	folders := map[string]bool{}
 	for path, content := range s.branches[ref] {
 		in, name := Root, path
 		if cut := strings.LastIndex(path, "/"); cut >= 0 {
@@ -93,6 +94,20 @@ func (s *shelf) Entries(_ context.Context, _ Acting, _ Repo, ref, dir string) ([
 		}
 		if in == dir {
 			entries = append(entries, Entry{Name: name, Path: path, SHA: shelfBlob(content), Kind: File})
+			continue
+		}
+		// A file deeper down is a folder of dir's, listed once.
+		below := path
+		if dir != Root {
+			if !strings.HasPrefix(path, dir+"/") {
+				continue
+			}
+			below = path[len(dir)+1:]
+		}
+		folder, _, _ := strings.Cut(below, "/")
+		if at := strings.TrimPrefix(dir+"/"+folder, Root+"/"); !folders[at] {
+			folders[at] = true
+			entries = append(entries, Entry{Name: folder, Path: at, SHA: "tree of " + at, Kind: Dir})
 		}
 	}
 	if len(entries) == 0 {
@@ -204,4 +219,18 @@ func TestAProposalKnowsWhatItsBranchHolds(t *testing.T) {
 	_, err = proposal.Holds(t.Context(), on, AsApp, []string{"README.md/inside.md"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "README.md is a file")
+}
+
+// Qodo's review of #1515: a path the branch holds a folder at is no file to
+// add. Read as absent, it was added after the files sorted before it had
+// been committed, and the forge refused it with the branch half changed.
+func TestAPathTheBranchHoldsAFolderAtIsSaidBeforeAnyCommit(t *testing.T) {
+	on, proposal := shelved(t)
+	on.branches["trunk"]["notes/kept.md"] = "kept"
+	require.NoError(t, proposal.HoldBranch(t.Context(), on, AsApp))
+
+	_, err := proposal.Holds(t.Context(), on, AsApp, []string{"README.md", "notes"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "notes is a folder")
+	assert.Equal(t, []string{"branch agent/notes"}, on.asked, "nothing is committed")
 }

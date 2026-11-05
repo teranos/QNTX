@@ -121,8 +121,18 @@ func (p Proposal) Holds(ctx context.Context, on Forge, as Acting, paths []string
 			return nil, err
 		}
 		for _, entry := range entries {
-			if entry.Kind == File && asked[entry.Path] {
+			if !asked[entry.Path] {
+				continue
+			}
+			// What is there and no file is neither added over nor replaced:
+			// said now, before any edit reaches the branch.
+			switch entry.Kind {
+			case File:
 				held[entry.Path] = entry.SHA
+			case Dir:
+				return nil, errors.Newf("%s is a folder of %s on %s, not a file", entry.Path, p.Repo, p.Branch)
+			default:
+				return nil, errors.Newf("%s is held by %s on %s as no file and no folder", entry.Path, p.Repo, p.Branch)
 			}
 		}
 	}
