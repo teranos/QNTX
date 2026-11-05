@@ -446,9 +446,9 @@ func TestAPluginsOwnSignaAreServedOverItsRoutes(t *testing.T) {
 // would otherwise reach it on another's behalf.
 func TestAPluginsSignumThatIsNotItsOwnIsNotServed(t *testing.T) {
 	for name, handed := range map[string]*protocol.Signum{
-		"named after another": stubSignum("staands"),
+		"named after another": stubSignum("datapunts"),
 		"bound outside its paths": {Name: "stub", Sigils: []*protocol.Sigil{{
-			Name: "list", Does: "Lists.", Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/everything"},
+			Name: "list", Does: "Lists.", Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/datapunts/everything"},
 		}}},
 		"bound to its root": {Name: "stub", Sigils: []*protocol.Sigil{{
 			Name: "list", Does: "Lists.", Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/stub/"},
@@ -460,7 +460,7 @@ func TestAPluginsSignumThatIsNotItsOwnIsNotServed(t *testing.T) {
 			for _, signum := range srv.checkedSigna() {
 				assert.NotSame(t, handed, signum.Signum, "a signum that is not the plugin's own was served")
 			}
-			assert.NotContains(t, srv.answering, "/api/staands/everything")
+			assert.NotContains(t, srv.answering, "/api/datapunts/everything")
 		})
 	}
 }
@@ -495,11 +495,11 @@ func TestThePanelIsToldEachSigilAndWhoReachesIt(t *testing.T) {
 	holds(t, srv.pluginsSignum(), "list", &protocol.PluginsList{
 		Plugins: []*protocol.PluginInfo{{Name: "stub", Sigils: rows}}})
 
-	p.signa = []*protocol.Signum{stubSignum("staands")}
+	p.signa = []*protocol.Signum{stubSignum("datapunts")}
 	rows, refused = srv.pluginSigilRows("stub")
 	assert.Empty(t, rows)
 	require.Len(t, refused, 1)
-	assert.Contains(t, refused[0], "handed a signum named staands")
+	assert.Contains(t, refused[0], "handed a signum named datapunts")
 }
 
 // A plugin that restarts may hand different signa, and a path no sigil is

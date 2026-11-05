@@ -579,25 +579,25 @@
         "ROOT"
       ]
     },
-    "/api/staands": {
+    "/api/datapunts": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
       ]
     },
-    "/api/staands/activity": {
+    "/api/datapunts/activity": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
       ]
     },
-    "/api/staands/metrics": {
+    "/api/datapunts/metrics": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
       ]
     },
-    "/api/staands/visits": {
+    "/api/datapunts/visits": {
       "x-qntx-reach": [
         "ROOT",
         "SUPER"

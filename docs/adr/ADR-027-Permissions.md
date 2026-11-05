@@ -102,14 +102,14 @@ and each door is a different promise about what stands behind the write.
   settled before the door, by the reach table for the route and by
   `mayGrantEvery` and `MayGrantRoles` in the handler.
 - `WriteAsPublic` is the one door for input no admission stands behind — a
-  stand's arrivals off the `ANYONE` route at `/s/` (ADR-035). It refuses
+  datapunt's arrivals off the `ANYONE` route at `/d/` (ADR-035). It refuses
   `system` and `default` before there is a store to write to, so a second
   public writer cannot be added without that refusal.
 
 `server/store_writers_test.go` reads the package and fails on a function that
 asks for a store it can write and is not written down with what stands behind
-it. Five do: `storeFor`, `createAttestation`, `writeStaandDef`,
-`HandleStaand`, and `systemAttestor`.
+it. Five do: `storeFor`, `createAttestation`, `writeDatapuntDef`,
+`HandleDatapunt`, and `systemAttestor`.
 
 That last one is the residue, and no boundary removes it.
 `auth.Handler.attest` writes into `system` on the `/auth/…` routes, which are

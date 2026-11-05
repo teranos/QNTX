@@ -21,7 +21,7 @@ func askedAs(level auth.Level) *http.Request {
 
 // A caller is shown only what they reach over A2A. A line that names no
 // surface is about every surface, so SUPER is shown the signa its lines reach,
-// staands among them, and not parity or reach, which are ROOT's alone. Calling
+// datapunts among them, and not parity or reach, which are ROOT's alone. Calling
 // A2A at all is /a2a/'s line, ROOT's alone (TestA2AIsServedToRootAlone).
 func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 	srv, _ := pluginServingServer(t, "fake")
@@ -37,7 +37,7 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 	for _, skill := range root.Skills {
 		assert.Equal(t, skill.Name, skill.ID, "a skill's id is its signum")
 	}
-	for _, signum := range []string{"staands", "parity", "reach"} {
+	for _, signum := range []string{"datapunts", "parity", "reach"} {
 		assert.Contains(t, names(root), signum, "ROOT's card lacks "+signum)
 	}
 	// "make am the card, not a skill on it"
@@ -48,7 +48,7 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 	assert.Equal(t, mcpProtocolVersion, mcpAt["protocolVersion"])
 
 	super := srv.a2aCard(askedAs(auth.LevelSuper))
-	assert.Contains(t, names(super), "staands", "SUPER's lines reach staands")
+	assert.Contains(t, names(super), "datapunts", "SUPER's lines reach datapunts")
 	for _, signum := range []string{"parity", "reach"} {
 		assert.NotContains(t, names(super), signum, "SUPER was shown "+signum+", which is ROOT's alone")
 	}
@@ -56,7 +56,7 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 
 // The card is an lf.a2a.v1.AgentCard, and what it leaves empty that the spec
 // requires is named: the node's name and description when am.toml says none.
-// The modes are JSON, and staands, first among the signa, says what it is for.
+// The modes are JSON, and datapunts, first among the signa, says what it is for.
 func TestTheCardSaysWhatItLacks(t *testing.T) {
 	srv, _ := pluginServingServer(t, "fake")
 	card, err := srv.a2aCard(askedAs(auth.LevelRoot)).Message()

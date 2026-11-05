@@ -61,7 +61,7 @@ func signingKey() (ed25519.PrivateKey, string) {
 func aCard(t *testing.T) protoreflect.Message {
 	t.Helper()
 	card, err := Card{Name: "QNTX", Description: "A node.", Version: "1.0.0", URL: "https://node.example/a2a",
-		Skills:     []Skill{{ID: "staands", Name: "staands", Description: "Stands.", Tags: []string{"analytics"}}},
+		Skills:     []Skill{{ID: "datapunts", Name: "datapunts", Description: "Stands.", Tags: []string{"analytics"}}},
 		Extensions: []Extension{{URI: "https://example.org/ext", Description: "x", Params: map[string]any{"count": 3, "ratio": 0.5}}},
 	}.Message()
 	require.NoError(t, err)

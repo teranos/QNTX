@@ -86,9 +86,9 @@ func TestPublicRegistrationIsOpenedOnAPluginRouteAndNowhereElse(t *testing.T) {
 	root := auth.Admitted(auth.LevelRoot, "garden")
 	root.Identity = rootAccount
 
-	rec := grants(t, s, root, `{"subjects":["REACH"],"predicates":["/api/staands"],"contexts":["PUBLIC_REGISTRATION"]}`)
+	rec := grants(t, s, root, `{"subjects":["REACH"],"predicates":["/api/datapunts"],"contexts":["PUBLIC_REGISTRATION"]}`)
 	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), "/api/staands")
+	assert.Contains(t, rec.Body.String(), "/api/datapunts")
 	assert.Empty(t, systemHolds(t, s), "a line opening the node's own path was stored")
 
 	rec = grants(t, s, root, `{"subjects":["REACH"],"predicates":["/api/hello-world/{path...}"],"contexts":["PUBLIC_REGISTRATION"]}`)
@@ -105,9 +105,9 @@ func TestAPluginRouteIsOneTheNodeOffersAPlugin(t *testing.T) {
 		"hello-world", "hello-world:greet", "mcp:hello-world", "http:hello-world:greet"} {
 		assert.True(t, s.pluginRoute(path), path)
 	}
-	for _, path := range []string{"/api/staands", "/api/", "/ws/", "/i/standing", "/api/other/{path...}",
+	for _, path := range []string{"/api/datapunts", "/api/", "/ws/", "/i/standing", "/api/other/{path...}",
 		"/api/other/book/new", "/api/hello-world/{id}", "/api/hello-world/a b", "/ws/hello-world/x",
-		"staands", "staands:metrics", "mcp:other:greet", "", "mcp:"} {
+		"datapunts", "datapunts:metrics", "mcp:other:greet", "", "mcp:"} {
 		assert.False(t, s.pluginRoute(path), path)
 	}
 }

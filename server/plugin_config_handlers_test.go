@@ -40,23 +40,23 @@ func TestAConfigNamingNothingIsRefused(t *testing.T) {
 func TestAPutKeepsTheKeysItDoesNotName(t *testing.T) {
 	s := rootKnowingServer(t)
 	records := s.pluginRecords()
-	_, err := records.AddPlugin(rootAccount, "https://github.com/teranos/staands")
+	_, err := records.AddPlugin(rootAccount, "https://github.com/teranos/datapunts")
 	require.NoError(t, err)
-	require.NoError(t, records.ConfigurePlugin(rootAccount, "staands", map[string]string{
-		buildCore:   "github.com/teranos/staands@main",
+	require.NoError(t, records.ConfigurePlugin(rootAccount, "datapunts", map[string]string{
+		buildCore:   "github.com/teranos/datapunts@main",
 		"namespace": "Clean",
 		"bucket":    "media",
 	}))
 
 	put := func(body string) {
-		r := httptest.NewRequest(http.MethodPut, "/api/plugins/staands/config", bytes.NewBufferString(body))
-		r.SetPathValue("name", "staands")
+		r := httptest.NewRequest(http.MethodPut, "/api/plugins/datapunts/config", bytes.NewBufferString(body))
+		r.SetPathValue("name", "datapunts")
 		w := httptest.NewRecorder()
 		s.HandlePluginConfig(w, r)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	}
 	held := func() map[string]string {
-		record, found, err := records.Plugin("staands")
+		record, found, err := records.Plugin("datapunts")
 		require.NoError(t, err)
 		require.True(t, found)
 		return record.Config
@@ -64,7 +64,7 @@ func TestAPutKeepsTheKeysItDoesNotName(t *testing.T) {
 
 	put(`{"config":{"bucket":"media.cleanamsterdam.nl"}}`)
 	assert.Equal(t, map[string]string{
-		buildCore:   "github.com/teranos/staands@main",
+		buildCore:   "github.com/teranos/datapunts@main",
 		"namespace": "Clean",
 		"bucket":    "media.cleanamsterdam.nl",
 	}, held(), "a PUT naming only bucket")

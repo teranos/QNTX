@@ -100,7 +100,7 @@ func (s *Served) Reaching(path string) (reaching auth.Reach, anyone bool) {
 
 // The surfaces a line can be about (ADR-039). A line naming a sigil is about
 // the sigil, the same thing over every surface; one naming a surface is about
-// that surface alone, a2a:staands among them.
+// that surface alone, a2a:datapunts among them.
 const (
 	OverHTTP = "http"
 	OverMCP  = "mcp"
@@ -110,11 +110,11 @@ const (
 // ReachingSigil is who reaches one sigil over one surface. A line names what
 // is reached by path or by name, and every line about the sigil counts:
 //
-//	'/api/staands/metrics'   the path it is bound to, which is the floor
-//	'staands'                its signum, every sigil of it
-//	'staands:metrics'        the sigil
-//	'mcp:staands'            its signum over one surface
-//	'mcp:staands:metrics'    the sigil over one surface
+//	'/api/datapunts/metrics'   the path it is bound to, which is the floor
+//	'datapunts'                its signum, every sigil of it
+//	'datapunts:metrics'        the sigil
+//	'mcp:datapunts'            its signum over one surface
+//	'mcp:datapunts:metrics'    the sigil over one surface
 //
 // Together they admit whoever any of them admits. A line only ever adds, which
 // is what a line in the tablet and a line in the store both do already, so

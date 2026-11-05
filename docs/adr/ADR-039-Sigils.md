@@ -28,7 +28,7 @@ Status: Proposed
   DID. The boundary to other systems is deferred, and it will be runtime lines
   in the attestation DSL.
 - Some routes are not sigils: .well-known, the /auth ceremony, / and /health,
-  /g/, /s/, the sockets, /mcp.
+  /g/, /d/, the sockets, /mcp.
 
 ## The node extension, v1
 

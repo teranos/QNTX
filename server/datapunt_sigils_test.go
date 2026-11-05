@@ -24,15 +24,15 @@ func sigilOf(t *testing.T, signum sigil.Signum, name string) heldBy {
 	return heldBy{}
 }
 
-// Staands is the first signum (ADR-039): six things the node does with a
-// stand, each its own sigil, and all of them said in full.
-func TestStaandsIsASignum(t *testing.T) {
-	s, _, _ := standServer(t, "clean")
-	staands := s.staandsSignum()
-	require.NoError(t, staands.Check())
+// Datapunts is the first signum (ADR-039): six things the node does with a
+// datapunt, each its own sigil, and all of them said in full.
+func TestDatapuntsIsASignum(t *testing.T) {
+	s, _, _ := datapuntServer(t, "clean")
+	datapunts := s.datapuntsSignum()
+	require.NoError(t, datapunts.Check())
 
 	var held []string
-	for _, found := range staands.GetSigils() {
+	for _, found := range datapunts.GetSigils() {
 		held = append(held, found.GetName())
 	}
 	require.Equal(t, []string{"list", "create", "take-down", "metrics", "activity", "visits"}, held)
@@ -43,8 +43,8 @@ func TestStaandsIsASignum(t *testing.T) {
 // values of type without saying type. The sigil says all three, and refuses by
 // naming the one that is wrong.
 func TestABreakdownIsRefusedByNamingType(t *testing.T) {
-	s, _, _ := standServer(t, "clean")
-	metrics := sigilOf(t, s.staandsSignum(), "metrics").sigil
+	s, _, _ := datapuntServer(t, "clean")
+	metrics := sigilOf(t, s.datapuntsSignum(), "metrics").sigil
 
 	missing := sigil.Refuses(metrics, sigil.Sent{"market": "clean", "slug": "boutique"})
 	require.NotNil(t, missing)
@@ -56,8 +56,8 @@ func TestABreakdownIsRefusedByNamingType(t *testing.T) {
 	require.Equal(t, sigil.NotOneOf, wrong.GetWhy())
 	require.Equal(t, "type", wrong.GetParam())
 
-	// What type takes is what a stand answers by, from the one list both read:
-	// a dimension added to a stand is one the sigil says, with nothing to keep
+	// What type takes is what a datapunt answers by, from the one list both read:
+	// a dimension added to a datapunt is one the sigil says, with nothing to keep
 	// in step.
 	var takes []string
 	for _, param := range metrics.GetTakes() {
@@ -65,23 +65,23 @@ func TestABreakdownIsRefusedByNamingType(t *testing.T) {
 			takes = param.GetOneOf()
 		}
 	}
-	require.Equal(t, staandDimensions(), takes)
+	require.Equal(t, datapuntDimensions(), takes)
 	for _, dim := range takes {
-		require.True(t, staandKnownDimension(dim), dim)
+		require.True(t, datapuntKnownDimension(dim), dim)
 	}
-	require.False(t, staandKnownDimension("eyecolour"))
+	require.False(t, datapuntKnownDimension("eyecolour"))
 }
 
 // What a sigil gives is said beside the code that writes the answer, so each
 // real answer is held to it. A field added to an answer and not to its sigil
 // fails here by name.
-func TestAStaandAnswerIsWhatItsSigilGives(t *testing.T) {
-	s, sys, _ := standServer(t, "clean")
+func TestADatapuntAnswerIsWhatItsSigilGives(t *testing.T) {
+	s, sys, _ := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
-	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&s=SIT-000001", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&s=SIT-000001", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=WHO-000001&s=SIT-000001", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/prices&v=WHO-000001&s=SIT-000001", "https://clean.example/")
 
-	staands := s.staandsSignum()
+	datapunts := s.datapuntsSignum()
 	for _, asked := range []struct {
 		sigil string
 		sent  sigil.Sent
@@ -94,19 +94,19 @@ func TestAStaandAnswerIsWhatItsSigilGives(t *testing.T) {
 		{sigil: "take-down", sent: sigil.Sent{"market": "clean", "slug": "second"}},
 	} {
 		t.Run(asked.sigil, func(t *testing.T) {
-			found := sigilOf(t, staands, asked.sigil)
+			found := sigilOf(t, datapunts, asked.sigil)
 			answer, refusal := found.answer(context.Background(), asked.sent)
 			require.Nil(t, refusal)
-			holds(t, staands, asked.sigil, answer)
+			holds(t, datapunts, asked.sigil, answer)
 		})
 	}
 }
 
 // What is wrong with what was sent is refused by naming it, and a market the
 // node does not serve is not found rather than a breakdown of nothing.
-func TestAStaandRefusesInItsOwnTerms(t *testing.T) {
-	s, _, _ := standServer(t, "clean")
-	metrics := sigilOf(t, s.staandsSignum(), "metrics")
+func TestADatapuntRefusesInItsOwnTerms(t *testing.T) {
+	s, _, _ := datapuntServer(t, "clean")
+	metrics := sigilOf(t, s.datapuntsSignum(), "metrics")
 
 	for _, tc := range []struct {
 		name    string
@@ -120,14 +120,14 @@ func TestAStaandRefusesInItsOwnTerms(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			asked := sigil.Asking{Sigil: metrics.sigil, Answer: metrics.answer, Anyone: true,
-				Caller: httptest.NewRequest(http.MethodGet, "/api/staands/metrics", nil)}.Ask(context.Background(), tc.arrived)
+				Caller: httptest.NewRequest(http.MethodGet, "/api/datapunts/metrics", nil)}.Ask(context.Background(), tc.arrived)
 			require.NotNil(t, asked.Refusal)
 			require.Equal(t, tc.why, asked.Refusal.GetWhy())
 			require.Equal(t, tc.param, asked.Refusal.GetParam())
 		})
 	}
 
-	create := sigilOf(t, s.staandsSignum(), "create")
+	create := sigilOf(t, s.datapuntsSignum(), "create")
 	_, refusal := create.answer(context.Background(), sigil.Sent{"market": "system", "slug": "home"})
 	require.NotNil(t, refusal)
 	require.Equal(t, "market", refusal.GetParam())

@@ -22,7 +22,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// A stand's definition is a system attestation (ADR-035); arrivals land in the
+// A datapunt's definition is a system attestation (ADR-035); arrivals land in the
 // market it feeds. The tests keep the two apart: sys is the system store,
 // markets maps each market name to its own store.
 type markets struct {
@@ -48,9 +48,9 @@ func (m markets) OpenNamespace(name string, _ storage.NamespaceRecord) (*namespa
 	return nil, fmt.Errorf("no market %q served in test", name)
 }
 
-// standServer wires a server whose system store holds definitions and whose
+// datapuntServer wires a server whose system store holds definitions and whose
 // named markets each hold their own arrivals.
-func standServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.AttestationStore, map[string]ats.AttestationStore) {
+func datapuntServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.AttestationStore, map[string]ats.AttestationStore) {
 	t.Helper()
 	sys, db := createTestStore(t)
 	stores := map[string]ats.AttestationStore{}
@@ -62,20 +62,20 @@ func standServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.Attestat
 	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), nodeDB: db, logger: zap.NewNop().Sugar()}
 	s.held = servingOne(db, sys)
 	s.held.SetSystem(oneNamespace("system", sys))
-	// A stand's market is never default, so the default store standing in for
+	// A datapunt's market is never default, so the default store standing in for
 	// system here is not one an arrival can reach.
 	s.held.SetKnown(m)
 	s.held.SetOpener(m)
 	return s, sys, stores
 }
 
-// define writes a stand's created line into system directly (ADR-035): the
-// subject is the stand's key market/slug. The definition carries no attributes.
+// define writes a datapunt's created line into system directly (ADR-035): the
+// subject is the datapunt's key market/slug. The definition carries no attributes.
 func define(t *testing.T, sys ats.AttestationStore, market, slug string, at time.Time) {
 	t.Helper()
 	_, err := sys.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
 		Subjects:   []string{market + "/" + slug},
-		Predicates: []string{staandCreated},
+		Predicates: []string{datapuntCreated},
 		Contexts:   []string{"system"},
 		By:         types.ActorsNamed{Actors: named.ItemOf("root")},
 		Source:     "cli",
@@ -90,7 +90,7 @@ func undefine(t *testing.T, sys ats.AttestationStore, market, slug string, at ti
 	t.Helper()
 	_, err := sys.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
 		Subjects:   []string{market + "/" + slug},
-		Predicates: []string{staandDeleted},
+		Predicates: []string{datapuntDeleted},
 		Contexts:   []string{"system"},
 		By:         types.ActorsNamed{Actors: named.ItemOf("root")},
 		Source:     "cli",
@@ -101,7 +101,7 @@ func undefine(t *testing.T, sys ats.AttestationStore, market, slug string, at ti
 	}
 }
 
-// withDoor gives a namespace a front door with these origins, so a stand in it
+// withDoor gives a namespace a front door with these origins, so a datapunt in it
 // inherits that write-origin (ADR-032, ADR-035).
 func withDoor(s *QNTXServer, namespace string, origins ...string) {
 	s.deps = &serverDependencies{cfg: &config.Config{Auth: config.AuthConfig{
@@ -115,7 +115,7 @@ func fire(s *QNTXServer, path, referer string) *httptest.ResponseRecorder {
 	if referer != "" {
 		req.Header.Set("Referer", referer)
 	}
-	s.HandleStaand(rec, req)
+	s.HandleDatapunt(rec, req)
 	return rec
 }
 
@@ -128,15 +128,15 @@ func arrivalsFor(t *testing.T, store ats.AttestationStore, subject string) []*ty
 	return found
 }
 
-// A call to a defined stand lands one arrival in its market: the subject is the
-// page the hit is about (reads aloud, CDR-010), the predicate the stand
-// vocabulary plus the pixel side's event, the actor the stand, and the visitor
+// A call to a defined datapunt lands one arrival in its market: the subject is the
+// page the hit is about (reads aloud, CDR-010), the predicate the datapunt
+// vocabulary plus the pixel side's event, the actor the datapunt, and the visitor
 // id an attribute (v), never the subject.
 func TestAnArrivalIsRecorded(t *testing.T) {
-	s, sys, stores := standServer(t, "clean")
+	s, sys, stores := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	rec := fire(s, "/s/clean/boutique?e=contact_click&page=/deep-clean&v=VISITOR-01&method=whatsapp", "https://example.com/deep-clean")
+	rec := fire(s, "/d/clean/boutique?e=contact_click&page=/deep-clean&v=VISITOR-01&method=whatsapp", "https://example.com/deep-clean")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("the pixel did not come back: %d %s", rec.Code, rec.Header().Get("Content-Type"))
@@ -149,11 +149,11 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	if as.Subjects[0] != "/deep-clean" {
 		t.Fatalf("the subject is %v, not the page the hit is about", as.Subjects)
 	}
-	if as.Predicates[0] != "staand:contact_click" || as.Source != "staand" {
+	if as.Predicates[0] != "datapunt:contact_click" || as.Source != "datapunt" {
 		t.Fatalf("stored %v from %q", as.Predicates, as.Source)
 	}
-	if len(as.Actors) != 1 || as.Actors[0] != "staand:boutique" {
-		t.Fatalf("the actor is %v, not the stand", as.Actors)
+	if len(as.Actors) != 1 || as.Actors[0] != "datapunt:boutique" {
+		t.Fatalf("the actor is %v, not the datapunt", as.Actors)
 	}
 	if as.Contexts[0] != "https://example.com/deep-clean" {
 		t.Fatalf("the context is %v, not the page it fired from", as.Contexts)
@@ -164,7 +164,7 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 	if as.Attributes["v"] != "VISITOR-01" {
 		t.Fatalf("the visitor id is not carried as v: %v", as.Attributes)
 	}
-	if as.Attributes[staandSlugAttr] != "boutique" {
+	if as.Attributes[datapuntSlugAttr] != "boutique" {
 		t.Fatalf("the arrival does not carry its slug: %v", as.Attributes)
 	}
 	if _, leaked := as.Attributes["e"]; leaked {
@@ -178,95 +178,95 @@ func TestAnArrivalIsRecorded(t *testing.T) {
 // The pixel side names the event; a bare hit is a page view. page_view is
 // Google's word for it, so a site already firing gtag needs no translation.
 func TestNoEventIsAPageView(t *testing.T) {
-	s, sys, stores := standServer(t, "clean")
+	s, sys, stores := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/x&v=VISITOR-01", "https://example.com/")
+	fire(s, "/d/clean/boutique?page=/x&v=VISITOR-01", "https://example.com/")
 
 	got := arrivalsFor(t, stores["clean"], "/x")
-	if len(got) != 1 || got[0].Predicates[0] != "staand:page_view" {
-		t.Fatalf("a bare arrival recorded %v, want staand:page_view", got)
+	if len(got) != 1 || got[0].Predicates[0] != "datapunt:page_view" {
+		t.Fatalf("a bare arrival recorded %v, want datapunt:page_view", got)
 	}
 }
 
 // The definition is a system attestation, and the market holds only arrivals:
 // after a create, system carries the created line and the market carries none.
 func TestDefinitionLivesInSystemNotMarket(t *testing.T) {
-	s, sys, stores := standServer(t, "clean")
+	s, sys, stores := datapuntServer(t, "clean")
 
 	rec := httptest.NewRecorder()
 	body := `{"market":"clean","slug":"home"}`
-	sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
+	sigilHTTP(t, s, "/api/datapunts")(rec, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
 	}
 
 	inSystem := arrivalsFor(t, sys, "clean/home")
-	if len(inSystem) != 1 || inSystem[0].Predicates[0] != staandCreated {
-		t.Fatalf("system holds %v, want one staand:created", inSystem)
+	if len(inSystem) != 1 || inSystem[0].Predicates[0] != datapuntCreated {
+		t.Fatalf("system holds %v, want one datapunt:created", inSystem)
 	}
 	if inMarket := arrivalsFor(t, stores["clean"], "clean/home"); len(inMarket) != 0 {
 		t.Fatalf("the market holds the definition, it should not: %v", inMarket)
 	}
 }
 
-// A slug no stand stands under records nothing, and still answers with the
+// A slug no datapunt datapunts under records nothing, and still answers with the
 // pixel — probing teaches nothing.
-func TestAnUndefinedStandRecordsNothing(t *testing.T) {
-	s, _, stores := standServer(t, "clean")
+func TestAnUndefinedDatapuntRecordsNothing(t *testing.T) {
+	s, _, stores := datapuntServer(t, "clean")
 
-	rec := fire(s, "/s/clean/nostall?page=/x&v=VISITOR-01", "")
+	rec := fire(s, "/d/clean/nostall?page=/x&v=VISITOR-01", "")
 
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/gif" {
 		t.Fatalf("answered %d %s rather than the pixel", rec.Code, rec.Header().Get("Content-Type"))
 	}
 	if got := arrivalsFor(t, stores["clean"], "/x"); len(got) != 0 {
-		t.Fatalf("an undefined stand recorded: %v", got)
+		t.Fatalf("an undefined datapunt recorded: %v", got)
 	}
 }
 
-// A deleted stand supersedes its definition, so arrivals stop.
-func TestADeletedStandRecordsNothing(t *testing.T) {
-	s, sys, stores := standServer(t, "clean")
+// A deleted datapunt supersedes its definition, so arrivals stop.
+func TestADeletedDatapuntRecordsNothing(t *testing.T) {
+	s, sys, stores := datapuntServer(t, "clean")
 	now := time.Now()
 	define(t, sys, "clean", "boutique", now)
 	undefine(t, sys, "clean", "boutique", now.Add(time.Second))
 
-	fire(s, "/s/clean/boutique?page=/x&v=VISITOR-01", "https://example.com/")
+	fire(s, "/d/clean/boutique?page=/x&v=VISITOR-01", "https://example.com/")
 
 	if got := arrivalsFor(t, stores["clean"], "/x"); len(got) != 0 {
-		t.Fatalf("a deleted stand recorded: %v", got)
+		t.Fatalf("a deleted datapunt recorded: %v", got)
 	}
 }
 
-// A stand never records into system or default: an arrival is an untrusted
+// A datapunt never records into system or default: an arrival is an untrusted
 // public write, and those namespaces hold the node's own records.
-func TestAStandNeverWritesSystemOrDefault(t *testing.T) {
-	s, sys, _ := standServer(t, "clean")
+func TestADatapuntNeverWritesSystemOrDefault(t *testing.T) {
+	s, sys, _ := datapuntServer(t, "clean")
 	// Even with a definition keyed under system/default, the guard refuses.
 	define(t, sys, "system", "x", time.Now())
 	define(t, sys, "default", "y", time.Now())
 
-	fire(s, "/s/system/x?page=/p&v=V", "https://example.com/")
-	fire(s, "/s/default/y?page=/p&v=V", "https://example.com/")
+	fire(s, "/d/system/x?page=/p&v=V", "https://example.com/")
+	fire(s, "/d/default/y?page=/p&v=V", "https://example.com/")
 
 	if got := arrivalsFor(t, sys, "/p"); len(got) != 0 {
-		t.Fatalf("a stand wrote into system/default: %v", got)
+		t.Fatalf("a datapunt wrote into system/default: %v", got)
 	}
 }
 
-// The door: a stand inherits its namespace's front door as its write-origin
+// The door: a datapunt inherits its namespace's front door as its write-origin
 // (ADR-032). A present host must match the door (or be a subdomain); a host from
 // anywhere else is refused; a missing Referer is allowed, so PDFs and other
 // no-origin clients still record (ADR-035).
 func TestOnlyTheNamespaceDoorWrites(t *testing.T) {
-	s, sys, stores := standServer(t, "clean")
+	s, sys, stores := datapuntServer(t, "clean")
 	withDoor(s, "clean", "https://example.com")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/ok", "https://www.example.com/x") // subdomain of the door
-	fire(s, "/s/clean/boutique?page=/no", "https://elsewhere.test/x")  // another origin
-	fire(s, "/s/clean/boutique?page=/bare", "")                        // no Referer — allowed
+	fire(s, "/d/clean/boutique?page=/ok", "https://www.example.com/x") // subdomain of the door
+	fire(s, "/d/clean/boutique?page=/no", "https://elsewhere.test/x")  // another origin
+	fire(s, "/d/clean/boutique?page=/bare", "")                        // no Referer — allowed
 
 	if got := arrivalsFor(t, stores["clean"], "/ok"); len(got) != 1 {
 		t.Fatalf("the bound door did not write: %v", got)
@@ -279,44 +279,44 @@ func TestOnlyTheNamespaceDoorWrites(t *testing.T) {
 	}
 }
 
-// A stand spends only its own budget: past the burst, arrivals are dropped and
+// A datapunt spends only its own budget: past the burst, arrivals are dropped and
 // the drop is counted for the market view.
-func TestAStandSpendsOnlyItsOwnBudget(t *testing.T) {
-	s, sys, stores := standServer(t, "clean")
+func TestADatapuntSpendsOnlyItsOwnBudget(t *testing.T) {
+	s, sys, stores := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
-	s.rlStaand = newRateLimitGroup(0, 2) // two tokens, no refill
+	s.rlDatapunt = newRateLimitGroup(0, 2) // two tokens, no refill
 
-	fire(s, "/s/clean/boutique?page=/a", "https://example.com/")
-	fire(s, "/s/clean/boutique?page=/b", "https://example.com/")
-	fire(s, "/s/clean/boutique?page=/c", "https://example.com/") // over budget
+	fire(s, "/d/clean/boutique?page=/a", "https://example.com/")
+	fire(s, "/d/clean/boutique?page=/b", "https://example.com/")
+	fire(s, "/d/clean/boutique?page=/c", "https://example.com/") // over budget
 
 	recorded := len(arrivalsFor(t, stores["clean"], "/a")) + len(arrivalsFor(t, stores["clean"], "/b")) + len(arrivalsFor(t, stores["clean"], "/c"))
 	if recorded != 2 {
 		t.Fatalf("recorded %d arrivals, want 2 with the third dropped", recorded)
 	}
-	if dropped := s.staandDropCount("clean/boutique"); dropped != 1 {
+	if dropped := s.datapuntDropCount("clean/boutique"); dropped != 1 {
 		t.Fatalf("counted %d drops, want 1", dropped)
 	}
 }
 
-func listStands(t *testing.T, s *QNTXServer) []*protocol.Staand {
+func listDatapunts(t *testing.T, s *QNTXServer) []*protocol.Datapunt {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodGet, "/api/staands", nil))
+	sigilHTTP(t, s, "/api/datapunts")(rec, httptest.NewRequest(http.MethodGet, "/api/datapunts", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list: %d %s", rec.Code, rec.Body.String())
 	}
-	var body protocol.Staands
+	var body protocol.Datapunts
 	if err := protojson.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}
-	return body.GetStaands()
+	return body.GetDatapunts()
 }
 
-// Listing shows every stand across all markets, each naming its market, with
-// its door, creator, defining ASID, and activity; a deleted stand drops out.
+// Listing shows every datapunt across all markets, each naming its market, with
+// its door, creator, defining ASID, and activity; a deleted datapunt drops out.
 func TestListingAcrossMarkets(t *testing.T) {
-	s, sys, stores := standServer(t, "clean", "haarlem")
+	s, sys, stores := datapuntServer(t, "clean", "haarlem")
 	withDoor(s, "clean", "https://example.com")
 	now := time.Now()
 	define(t, sys, "clean", "boutique", now)
@@ -324,15 +324,15 @@ func TestListingAcrossMarkets(t *testing.T) {
 	define(t, sys, "clean", "gone", now)
 	undefine(t, sys, "clean", "gone", now.Add(time.Second))
 
-	// One arrival to the clean stand, so its activity shows.
-	fire(s, "/s/clean/boutique?page=/deep&v=V1", "https://example.com/deep")
+	// One arrival to the clean datapunt, so its activity shows.
+	fire(s, "/d/clean/boutique?page=/deep&v=V1", "https://example.com/deep")
 
-	list := listStands(t, s)
+	list := listDatapunts(t, s)
 	if len(list) != 2 {
-		t.Fatalf("listed %d stands, want 2 (gone is deleted): %+v", len(list), list)
+		t.Fatalf("listed %d datapunts, want 2 (gone is deleted): %+v", len(list), list)
 	}
 
-	byKey := map[string]*protocol.Staand{}
+	byKey := map[string]*protocol.Datapunt{}
 	for _, st := range list {
 		byKey[st.Market+"/"+st.Slug] = st
 	}
@@ -340,8 +340,8 @@ func TestListingAcrossMarkets(t *testing.T) {
 	if !ok {
 		t.Fatalf("clean/boutique not listed: %+v", list)
 	}
-	if clean.Market != "clean" || clean.Url != "/s/clean/boutique" || clean.Origin != "example.com" {
-		t.Fatalf("clean stand listed wrong: %+v", clean)
+	if clean.Market != "clean" || clean.Url != "/d/clean/boutique" || clean.Origin != "example.com" {
+		t.Fatalf("clean datapunt listed wrong: %+v", clean)
 	}
 	if clean.DefId == "" || clean.Created == "" || clean.Creator == "" {
 		t.Fatalf("the defining attestation is not surfaced: %+v", clean)
@@ -350,70 +350,70 @@ func TestListingAcrossMarkets(t *testing.T) {
 		t.Fatalf("clean activity wrong: arrivals=%d sites=%v", clean.Arrivals, clean.Sites)
 	}
 	if _, ok := byKey["haarlem/market"]; !ok {
-		t.Fatalf("the haarlem stand is not listed across markets: %+v", list)
+		t.Fatalf("the haarlem datapunt is not listed across markets: %+v", list)
 	}
 	_ = stores
 }
 
-// Creating a stand then removing it: it lists, then it does not.
-func TestCreatingAndRemovingAStand(t *testing.T) {
-	s, _, _ := standServer(t, "clean")
+// Creating a datapunt then removing it: it lists, then it does not.
+func TestCreatingAndRemovingADatapunt(t *testing.T) {
+	s, _, _ := datapuntServer(t, "clean")
 
 	rec := httptest.NewRecorder()
 	body := `{"market":"clean","slug":"home"}`
-	sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
+	sigilHTTP(t, s, "/api/datapunts")(rec, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
 	}
-	if got := listStands(t, s); len(got) != 1 || got[0].Slug != "home" || got[0].Url != "/s/clean/home" {
+	if got := listDatapunts(t, s); len(got) != 1 || got[0].Slug != "home" || got[0].Url != "/d/clean/home" {
 		t.Fatalf("after create, listed %+v", got)
 	}
 
 	rec = httptest.NewRecorder()
-	sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodDelete, "/api/staands?market=clean&slug=home", nil))
+	sigilHTTP(t, s, "/api/datapunts")(rec, httptest.NewRequest(http.MethodDelete, "/api/datapunts?market=clean&slug=home", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("remove: %d %s", rec.Code, rec.Body.String())
 	}
-	if got := listStands(t, s); len(got) != 0 {
+	if got := listDatapunts(t, s); len(got) != 0 {
 		t.Fatalf("after remove, still listed %+v", got)
 	}
 }
 
-// The Sentry event dimension is bounded: a stand's first staandEventCap distinct
+// The Sentry event dimension is bounded: a datapunt's first datapuntEventCap distinct
 // events keep their name, and the rest fold to "other" so a caller cannot explode
 // the metric's cardinality (ADR-035).
-func TestStaandEventDimCapsCardinality(t *testing.T) {
+func TestDatapuntEventDimCapsCardinality(t *testing.T) {
 	s := bareNode()
 	key := "clean/boutique"
-	for i := 0; i < staandEventCap; i++ {
-		e := fmt.Sprintf("staand:e%d", i)
-		if got := s.staandEventDim(key, e); got != e {
+	for i := 0; i < datapuntEventCap; i++ {
+		e := fmt.Sprintf("datapunt:e%d", i)
+		if got := s.datapuntEventDim(key, e); got != e {
 			t.Fatalf("event %q folded before the cap: %q", e, got)
 		}
 	}
-	if got := s.staandEventDim(key, "staand:e0"); got != "staand:e0" {
+	if got := s.datapuntEventDim(key, "datapunt:e0"); got != "datapunt:e0" {
 		t.Fatalf("a seen event folded: %q", got)
 	}
-	if got := s.staandEventDim(key, "staand:overflow"); got != "other" {
+	if got := s.datapuntEventDim(key, "datapunt:overflow"); got != "other" {
 		t.Fatalf("past the cap should fold to other, got %q", got)
 	}
 }
 
 // The hit is read once, into the shape ADR-036 fixed. What it says is filled in;
 // what nothing on the request sources stays empty, and that emptiness is the
-// distance between the stand as it stands and the arrival as it is specified.
+// distance between the datapunt as it stands and the arrival as it is specified.
 func TestAHitIsReadOnceIntoAnArrival(t *testing.T) {
 	at := time.Date(2026, 9, 8, 14, 30, 0, 0, time.UTC)
 	req := httptest.NewRequest(http.MethodGet,
-		"/s/clean/boutique?page=/deep-clean&v=WHO-000001&visit=SITTING-01&e=contact_click"+
+		"/d/clean/boutique?page=/deep-clean&v=WHO-000001&visit=SITTING-01&e=contact_click"+
 			"&ref=https%3A%2F%2Fnews.example%2Fposts%2F7"+
 			"&utm_source=newsletter&utm_medium=email&utm_campaign=autumn"+
 			"&utm_content=header&utm_term=schoonmaak&flyer=blue", nil)
 
-	a := staandArrival(req, "clean", "boutique", at)
+	a := datapuntArrival(req, "clean", "boutique", at)
 
 	if a.Market != "clean" || a.Slug != "boutique" {
-		t.Fatalf("the stand read as %s/%s, want clean/boutique", a.Market, a.Slug)
+		t.Fatalf("the datapunt read as %s/%s, want clean/boutique", a.Market, a.Slug)
 	}
 	if a.Path != "/deep-clean" || a.Event != "contact_click" {
 		t.Fatalf("the hit read as %q %q", a.Path, a.Event)
@@ -446,14 +446,14 @@ func TestAHitIsReadOnceIntoAnArrival(t *testing.T) {
 // A shared fallback is not an id. A site that wanted one and had none ships the
 // same word to everybody, and the node cannot tell that from a person later.
 func TestASharedFallbackIsNotAVisitor(t *testing.T) {
-	s, sys, stores := standServer(t, "clean")
+	s, sys, stores := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/&v=anon", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/&v=ANON", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/&v=none", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/&v=short", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/&v=REAL-VISITOR-01", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=anon", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=ANON", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=none", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=short", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=REAL-VISITOR-01", "https://clean.example/")
 
 	found := arrivalsFor(t, stores["clean"], "/")
 	if len(found) != 5 {
@@ -461,7 +461,7 @@ func TestASharedFallbackIsNotAVisitor(t *testing.T) {
 	}
 	kept := map[string]int{}
 	for _, as := range found {
-		if v := attrString(as.Attributes, staandVisitor); v != "" {
+		if v := attrString(as.Attributes, datapuntVisitor); v != "" {
 			kept[v]++
 		}
 	}
@@ -473,20 +473,20 @@ func TestASharedFallbackIsNotAVisitor(t *testing.T) {
 // A walk is one sitting. Keyed by the visitor it is a lifetime, and a person
 // who came back on two days drew one line spanning both.
 func TestAWalkIsOneSittingWhenTheHitSaysWhich(t *testing.T) {
-	s, sys, stores := standServer(t, "clean")
+	s, sys, stores := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-02", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=WHO-000001&visit=SITTING-02", "https://clean.example/")
 
-	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Source: staandSource, Limit: 100})
+	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Source: datapuntSource, Limit: 100})
 	if err != nil {
 		t.Fatalf("GetAttestations: %v", err)
 	}
 	keys := map[string]int{}
 	for _, as := range arrivals {
-		keys[walkKey(as, attrString(as.Attributes, staandVisitor))]++
+		keys[walkKey(as, attrString(as.Attributes, datapuntVisitor))]++
 	}
 	// One person, two sittings, so two walks rather than one.
 	if len(keys) != 2 || keys["SITTING-01"] != 2 || keys["SITTING-02"] != 1 {
@@ -497,7 +497,7 @@ func TestAWalkIsOneSittingWhenTheHitSaysWhich(t *testing.T) {
 // An arrival recorded before anything sent a visit id still draws one walk for
 // that browser: it is all the record supports, and inventing more would lie.
 func TestAWalkWithNoVisitIdFallsBackToTheVisitor(t *testing.T) {
-	as := &types.As{Attributes: map[string]any{staandVisitor: "WHO-000001"}}
+	as := &types.As{Attributes: map[string]any{datapuntVisitor: "WHO-000001"}}
 	if got := walkKey(as, "WHO-000001"); got != "WHO-000001" {
 		t.Fatalf("with no visit id the walk is the visitor's, got %q", got)
 	}
@@ -509,18 +509,18 @@ func TestAWalkWithNoVisitIdFallsBackToTheVisitor(t *testing.T) {
 // A sitting is derived, never written. Entry and exit are the first and last
 // arrival of a visit, and one page view alone is the bounce convention.
 func TestAVisitIsDerivedFromItsArrivals(t *testing.T) {
-	s, sys, stores := standServer(t, "clean")
+	s, sys, stores := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01&e=hover", "https://clean.example/prices")
-	fire(s, "/s/clean/boutique?page=/only&v=WHO-000002&visit=SITTING-02", "https://clean.example/only")
+	fire(s, "/d/clean/boutique?page=/&v=WHO-000001&visit=SITTING-01", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/prices&v=WHO-000001&visit=SITTING-01&e=hover", "https://clean.example/prices")
+	fire(s, "/d/clean/boutique?page=/only&v=WHO-000002&visit=SITTING-02", "https://clean.example/only")
 
-	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Source: staandSource, Limit: 100})
+	arrivals, err := stores["clean"].GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Source: datapuntSource, Limit: 100})
 	if err != nil {
 		t.Fatalf("GetAttestations: %v", err)
 	}
-	visits := staandVisits(arrivals, "clean", "boutique")
+	visits := datapuntVisits(arrivals, "clean", "boutique")
 	if len(visits) != 2 {
 		t.Fatalf("derived %d visits from two sittings: %+v", len(visits), visits)
 	}
@@ -553,14 +553,14 @@ func TestAVisitIsDerivedFromItsArrivals(t *testing.T) {
 // A breakdown is one endpoint with a dimension parameter, and the dimension is
 // a field of an arrival. An unknown one is refused, not answered with nothing.
 func TestABreakdownGroupsByOneDimension(t *testing.T) {
-	s, sys, _ := standServer(t, "clean")
+	s, sys, _ := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
 
-	fire(s, "/s/clean/boutique?page=/&v=WHO-000001&utm_source=newsletter", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/&v=WHO-000002&utm_source=newsletter", "https://clean.example/")
-	fire(s, "/s/clean/boutique?page=/prices&v=WHO-000001", "https://clean.example/prices")
+	fire(s, "/d/clean/boutique?page=/&v=WHO-000001&utm_source=newsletter", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=WHO-000002&utm_source=newsletter", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/prices&v=WHO-000001", "https://clean.example/prices")
 	// A click on the page a campaign brought is not another page it brought.
-	fire(s, "/s/clean/boutique?e=contact_click&page=/&v=WHO-000001&utm_source=newsletter", "https://clean.example/")
+	fire(s, "/d/clean/boutique?e=contact_click&page=/&v=WHO-000001&utm_source=newsletter", "https://clean.example/")
 
 	pages := breakdown(t, s, "page")
 	if len(pages) != 2 || pages[0].Name != "/" || pages[0].Count != 3 {
@@ -576,23 +576,23 @@ func TestABreakdownGroupsByOneDimension(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	sigilHTTP(t, s, "/api/staands/metrics")(rec, httptest.NewRequest(http.MethodGet,
-		"/api/staands/metrics?market=clean&slug=boutique&type=eyecolour", nil))
+	sigilHTTP(t, s, "/api/datapunts/metrics")(rec, httptest.NewRequest(http.MethodGet,
+		"/api/datapunts/metrics?market=clean&slug=boutique&type=eyecolour", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("an unknown dimension returned %d, want 400", rec.Code)
 	}
 }
 
-// breakdown asks one stand's metrics endpoint for one dimension.
-func breakdown(t *testing.T, s *QNTXServer, dim string) []*protocol.StaandCount {
+// breakdown asks one datapunt's metrics endpoint for one dimension.
+func breakdown(t *testing.T, s *QNTXServer, dim string) []*protocol.DatapuntCount {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	sigilHTTP(t, s, "/api/staands/metrics")(rec, httptest.NewRequest(http.MethodGet,
-		"/api/staands/metrics?market=clean&slug=boutique&type="+dim, nil))
+	sigilHTTP(t, s, "/api/datapunts/metrics")(rec, httptest.NewRequest(http.MethodGet,
+		"/api/datapunts/metrics?market=clean&slug=boutique&type="+dim, nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("%s: %d %s", dim, rec.Code, rec.Body.String())
 	}
-	var got protocol.StaandMetrics
+	var got protocol.DatapuntMetrics
 	if err := protojson.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("%s: %v", dim, err)
 	}
@@ -602,39 +602,39 @@ func breakdown(t *testing.T, s *QNTXServer, dim string) []*protocol.StaandCount 
 // The window a read covers is named in AX's own words, and a word that is not a
 // time is refused rather than read as no window at all.
 func TestAReadTakesAWindowInWords(t *testing.T) {
-	s, sys, _ := standServer(t, "clean")
+	s, sys, _ := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
-	fire(s, "/s/clean/boutique?page=/&v=WHO-000001", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=WHO-000001", "https://clean.example/")
 
 	rec := httptest.NewRecorder()
-	sigilHTTP(t, s, "/api/staands/metrics")(rec, httptest.NewRequest(http.MethodGet,
-		"/api/staands/metrics?market=clean&slug=boutique&type=page&since=yesterday", nil))
+	sigilHTTP(t, s, "/api/datapunts/metrics")(rec, httptest.NewRequest(http.MethodGet,
+		"/api/datapunts/metrics?market=clean&slug=boutique&type=page&since=yesterday", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("since yesterday: %d %s", rec.Code, rec.Body.String())
 	}
 
 	rec = httptest.NewRecorder()
-	sigilHTTP(t, s, "/api/staands/metrics")(rec, httptest.NewRequest(http.MethodGet,
-		"/api/staands/metrics?market=clean&slug=boutique&type=page&since=whenever", nil))
+	sigilHTTP(t, s, "/api/datapunts/metrics")(rec, httptest.NewRequest(http.MethodGet,
+		"/api/datapunts/metrics?market=clean&slug=boutique&type=page&since=whenever", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("since whenever returned %d, want 400", rec.Code)
 	}
 }
 
-// Creating a stand into system or default is refused.
-func TestCreatingAStandInSystemOrDefaultIsRefused(t *testing.T) {
-	s, _, _ := standServer(t, "clean")
+// Creating a datapunt into system or default is refused.
+func TestCreatingADatapuntInSystemOrDefaultIsRefused(t *testing.T) {
+	s, _, _ := datapuntServer(t, "clean")
 	for _, market := range []string{"system", "default"} {
 		rec := httptest.NewRecorder()
 		body := `{"market":"` + market + `","slug":"x"}`
-		sigilHTTP(t, s, "/api/staands")(rec, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(body)))
+		sigilHTTP(t, s, "/api/datapunts")(rec, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(body)))
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("%s: create returned %d, want 400", market, rec.Code)
 		}
 	}
 }
 
-// A stand's events and pages are named with when they were seen, the most
+// A datapunt's events and pages are named with when they were seen, the most
 // recently seen first however often another was seen, and no count.
 func TestSeenOfLeadsWithTheMostRecent(t *testing.T) {
 	base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)

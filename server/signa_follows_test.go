@@ -81,13 +81,13 @@ func TestWhatASignumFollowsIsItsOwnFields(t *testing.T) {
 	}
 }
 
-// Staands follows Umami and nothing else.
-func TestStaandsFollowsUmami(t *testing.T) {
-	follows := bareNode().staandsSignum().GetFollows()
+// Datapunts follows Umami and nothing else.
+func TestDatapuntsFollowsUmami(t *testing.T) {
+	follows := bareNode().datapuntsSignum().GetFollows()
 	require.Len(t, follows, 1)
 	assert.Equal(t, "umami", follows[0].GetReference())
 
-	answered, err := answeredOf(bareNode().staandsSignum())
+	answered, err := answeredOf(bareNode().datapuntsSignum())
 	require.NoError(t, err)
 	visits := sigilOf(t, answered, "visits").sigil
 	carried := map[string]string{}

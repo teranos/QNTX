@@ -175,16 +175,16 @@ type QNTXServer struct {
 	rlWrite  *rateLimitGroup
 	rlRead   *rateLimitGroup
 	rlPublic *rateLimitGroup
-	rlStaand *rateLimitGroup // keyed per stand (market/slug), not per IP
+	rlDatapunt *rateLimitGroup // keyed per stand (market/slug), not per IP
 	rlOpened *rateLimitGroup // keyed per caller and path, on plugin paths a line opened to strangers
 
-	// staandDrops counts arrivals each stand's rate limit refused, keyed
+	// datapuntDrops counts arrivals each stand's rate limit refused, keyed
 	// market/slug, so the market view shows recorded against rate-limited.
-	staandDrops sync.Map
+	datapuntDrops sync.Map
 
-	// staandEvents remembers, per stand, which events have been seen, so the
+	// datapuntEvents remembers, per stand, which events have been seen, so the
 	// Sentry event dimension is bounded: past a cap, new events fold to "other".
-	staandEvents sync.Map
+	datapuntEvents sync.Map
 
 	// Python capability provider (gRPC client from whichever plugin declared python_provider=true)
 	// TODO: capability-based routing — the frontend should discover providers dynamically
