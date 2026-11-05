@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,4 +93,41 @@ func TestAnAnswerThatDoesNotMarshalIsRefused(t *testing.T) {
 	asked.ends(&writtenBack{ResponseWriter: httptest.NewRecorder()})
 	require.True(t, result.IsError)
 	assert.Contains(t, textOf(t, result), "did not marshal")
+}
+
+// "yes truncate it"
+//
+// What a caller sent is written on the call's line cut to its most, and the
+// line says it was cut and how many bytes were sent.
+func TestWhatACallerSentIsCutOnTheLine(t *testing.T) {
+	core, logs := observer.New(zapcore.InfoLevel)
+	asked := &mcpAsked{arrived: time.Now(), logger: zap.New(core).Sugar()}
+	operation := strings.Repeat("o", mcpSaidMost+50)
+	traceparent := strings.Repeat("t", mcpSaidMost+7)
+	handler := asked.recording("github_ask", func(ctx context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		mcpAskedOf(ctx).says("operation", operation)
+		return &mcp.CallToolResult{}, nil
+	})
+	_, err := handler(context.Background(), &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Meta: mcp.Meta{"traceparent": traceparent}}})
+	require.NoError(t, err)
+	asked.ends(&writtenBack{ResponseWriter: httptest.NewRecorder()})
+
+	said := logs.All()
+	require.Len(t, said, 1)
+	line := said[0].ContextMap()
+	assert.Equal(t, strings.Repeat("o", mcpSaidMost)+"…", line["operation"])
+	assert.EqualValues(t, len(operation), line["operation_cut_from_bytes"])
+	assert.Equal(t, strings.Repeat("t", mcpSaidMost)+"…", line["traceparent"])
+	assert.EqualValues(t, len(traceparent), line["traceparent_cut_from_bytes"])
+
+	// What fits is written as it was, and says nothing of cutting.
+	short := &mcpAsked{arrived: time.Now(), logger: zap.New(core).Sugar()}
+	short.begins("github_ask", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")
+	short.says("operation", "GetABranch")
+	short.mu.Lock()
+	fields := short.fields()
+	short.mu.Unlock()
+	short.unanswered.Stop()
+	assert.NotContains(t, fields, "operation_cut_from_bytes")
+	assert.NotContains(t, fields, "traceparent_cut_from_bytes")
 }

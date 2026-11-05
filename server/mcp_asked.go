@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/teranos/QNTX/internal/measure"
@@ -54,6 +55,8 @@ type mcpAsked struct {
 	// Anthropic sends a W3C traceparent in a tools/call's _meta that names its
 	// own span of the call: with it the node's record and theirs are one call.
 	traceparent string
+	// How many bytes the traceparent was when it was cut, or zero.
+	traceparentCutFrom int
 	// What the sigil says of its own call: github ask's operation.
 	said []any
 	// What it is in now, since when, and how long each one before it took.
@@ -109,11 +112,30 @@ func (a *mcpAsked) recording(tool string, handler mcp.ToolHandler) mcp.ToolHandl
 	}
 }
 
+// "yes truncate it"
+//
+// mcpSaidMost is the longest, in runes, a caller's own words are written on a
+// call's line: as long as A2A writes a client's path and user agent
+// (a2a_refused.go). What is longer is cut, and the line says how many bytes
+// were sent.
+const mcpSaidMost = saidPathMost
+
+// mcpCut is what a caller sent as the line writes it, and how many bytes it
+// was when it was cut, or zero.
+func mcpCut(sent string) (string, int) {
+	written := bounded(sent, mcpSaidMost)
+	if utf8.RuneCountInString(sent) <= mcpSaidMost {
+		return written, 0
+	}
+	return written, len(sent)
+}
+
 // begins is the call arriving at its tool.
 func (a *mcpAsked) begins(tool, traceparent string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.tool, a.traceparent = tool, traceparent
+	a.tool = tool
+	a.traceparent, a.traceparentCutFrom = mcpCut(traceparent)
 	a.in, a.since = mcpAsking, time.Now()
 	a.unanswered = time.AfterFunc(mcpUnansweredAfter, a.notYet)
 }
@@ -142,9 +164,13 @@ func (a *mcpAsked) says(key, value string) {
 	if a == nil {
 		return
 	}
+	written, cutFrom := mcpCut(value)
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.said = append(a.said, key, value)
+	a.said = append(a.said, key, written)
+	if cutFrom > 0 {
+		a.said = append(a.said, key+"_cut_from_bytes", cutFrom)
+	}
 }
 
 // hands is the handler giving its answer to the MCP server to write.
@@ -201,6 +227,9 @@ func (a *mcpAsked) fields() []any {
 	}
 	if a.traceparent != "" {
 		fields = append(fields, "traceparent", a.traceparent)
+	}
+	if a.traceparentCutFrom > 0 {
+		fields = append(fields, "traceparent_cut_from_bytes", a.traceparentCutFrom)
 	}
 	return fields
 }
