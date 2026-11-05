@@ -101,6 +101,7 @@ func TestAProposalSaysWhatToChange(t *testing.T) {
 		"nothing to change":               {sigil.Sent{}, "files"},
 		"removes that are not a list":     {sigil.Sent{"removes": `docs/a.md`}, "removes"},
 		"held and not held":               {sigil.Sent{"files": `{"docs/a.md": "x"}`, "removes": `["docs/a.md"]`}, "removes"},
+		"a removal said twice":            {sigil.Sent{"removes": `["docs/adr/old/ADR-000.md", "docs/adr/old/ADR-000.md"]`}, "removes"},
 		"no name git takes":               {sigil.Sent{"files": `{"docs/a.md": "x"}`, "branch": "two words"}, "branch"},
 		"a forge the node does not reach": {sigil.Sent{"files": `{"docs/a.md": "x"}`, "repo": "gitlab.com/group/sub/project"}, "repo"},
 		"a repository with no host":       {sigil.Sent{"files": `{"docs/a.md": "x"}`, "repo": "abcd-nl/clean"}, "repo"},

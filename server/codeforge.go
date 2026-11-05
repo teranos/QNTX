@@ -90,10 +90,17 @@ func proposedFiles(sent sigil.Sent) (map[string]string, []string, *protocol.Refu
 			return nil, nil, &protocol.Refusal{Why: sigil.Invalid, Param: "files", Says: why}
 		}
 	}
+	// A path said twice would be two removals of one blob: the second is
+	// refused after the first is committed, and no change is opened.
+	said := map[string]bool{}
 	for _, file := range removes {
 		if why := notARepoFile(file); why != "" {
 			return nil, nil, &protocol.Refusal{Why: sigil.Invalid, Param: "removes", Says: why}
 		}
+		if said[file] {
+			return nil, nil, &protocol.Refusal{Why: sigil.Invalid, Param: "removes", Says: file + " is in removes twice"}
+		}
+		said[file] = true
 		if _, put := puts[file]; put {
 			return nil, nil, &protocol.Refusal{Why: sigil.Invalid, Param: "removes", Says: file + " is in files and in removes: the branch holds it or does not"}
 		}
