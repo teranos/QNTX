@@ -47,9 +47,10 @@ func (s *QNTXServer) datapuntsSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/datapunts"},
 				},
 				{
-					Name:   "create",
-					Does:   "Create a datapunt in a market. Its pixel starts recording at /d/{market}/{slug}.",
-					Takes:  []*protocol.Param{datapuntMarketParam(), {Name: "slug", Required: true, Says: "The new datapunt's slug. No slash."}},
+					Name: "create",
+					Does: "Create a datapunt in a market, as one pixel its CUE declares. Its pixel starts recording at /d/{market}/{slug}; what the pixel does not declare is refused and written down.",
+					Takes: []*protocol.Param{datapuntMarketParam(), {Name: "slug", Required: true, Says: "The new datapunt's slug. No slash."},
+						{Name: "pixel", Required: true, Says: "The pixel it is, as the datapunt plugin's CUE declares it: what its snippet may say. Read the datapunt pixel sigil for every pixel."}},
 					Answer: "protocol.DatapuntCreated",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: "/api/datapunts"},
 				},

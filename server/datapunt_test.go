@@ -66,16 +66,32 @@ func datapuntServer(t *testing.T, marketNames ...string) (*QNTXServer, ats.Attes
 	// system here is not one an arrival can reach.
 	s.held.SetKnown(m)
 	s.held.SetOpener(m)
+	// The pixel these datapunts are, as the datapunt plugin would say it: held
+	// as asked, and never stale, so no plugin is asked here.
+	s.datapuntPixels.Store(testPixel, &datapuntVocabulary{
+		pixel:  testPixel,
+		events: []string{"page_view", "contact_click", "hover"},
+		fields: map[string]datapuntFieldRule{
+			"method": {kind: "string"},
+			"s":      {kind: "string"},
+			"plan":   {kind: "enum", values: []string{"free", "pro"}},
+		},
+		asked: time.Now().Add(24 * time.Hour),
+	})
 	return s, sys, stores
 }
 
+// testPixel is the pixel every datapunt here is.
+const testPixel = "site"
+
 // define writes a datapunt's created line into system directly (ADR-035): the
-// subject is the datapunt's key market/slug. The definition carries no attributes.
+// subject is the datapunt's key market/slug, and it names the pixel it is.
 func define(t *testing.T, sys ats.AttestationStore, market, slug string, at time.Time) {
 	t.Helper()
 	_, err := sys.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
 		Subjects:   []string{market + "/" + slug},
 		Predicates: []string{datapuntCreated},
+		Attributes: map[string]any{datapuntPixelAttr: testPixel},
 		Contexts:   []string{"system"},
 		By:         types.ActorsNamed{Actors: named.ItemOf("root")},
 		Source:     "cli",
@@ -195,7 +211,7 @@ func TestDefinitionLivesInSystemNotMarket(t *testing.T) {
 	s, sys, stores := datapuntServer(t, "clean")
 
 	rec := httptest.NewRecorder()
-	body := `{"market":"clean","slug":"home"}`
+	body := `{"market":"clean","slug":"home","pixel":"site"}`
 	sigilHTTP(t, s, "/api/datapunts")(rec, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
@@ -210,7 +226,7 @@ func TestDefinitionLivesInSystemNotMarket(t *testing.T) {
 	}
 }
 
-// A slug no datapunt datapunts under records nothing, and still answers with the
+// A slug no datapunt stands under records nothing, and still answers with the
 // pixel — probing teaches nothing.
 func TestAnUndefinedDatapuntRecordsNothing(t *testing.T) {
 	s, _, stores := datapuntServer(t, "clean")
@@ -360,12 +376,12 @@ func TestCreatingAndRemovingADatapunt(t *testing.T) {
 	s, _, _ := datapuntServer(t, "clean")
 
 	rec := httptest.NewRecorder()
-	body := `{"market":"clean","slug":"home"}`
+	body := `{"market":"clean","slug":"home","pixel":"site"}`
 	sigilHTTP(t, s, "/api/datapunts")(rec, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
 	}
-	if got := listDatapunts(t, s); len(got) != 1 || got[0].Slug != "home" || got[0].Url != "/d/clean/home" {
+	if got := listDatapunts(t, s); len(got) != 1 || got[0].Slug != "home" || got[0].Url != "/d/clean/home" || got[0].Pixel != testPixel {
 		t.Fatalf("after create, listed %+v", got)
 	}
 
@@ -626,7 +642,7 @@ func TestCreatingADatapuntInSystemOrDefaultIsRefused(t *testing.T) {
 	s, _, _ := datapuntServer(t, "clean")
 	for _, market := range []string{"system", "default"} {
 		rec := httptest.NewRecorder()
-		body := `{"market":"` + market + `","slug":"x"}`
+		body := `{"market":"` + market + `","slug":"x","pixel":"site"}`
 		sigilHTTP(t, s, "/api/datapunts")(rec, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(body)))
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("%s: create returned %d, want 400", market, rec.Code)
@@ -648,5 +664,108 @@ func TestSeenOfLeadsWithTheMostRecent(t *testing.T) {
 	}
 	if len(got[1].Seen) != 3 || got[1].Seen[0] != float64(base.UnixMilli()) {
 		t.Fatalf("often was seen at %v", got[1].Seen)
+	}
+}
+
+// "One web analytics pixel is one datapunt": a datapunt is created as a pixel
+// its CUE declares, and only one that is declared.
+func TestADatapuntIsCreatedAsADeclaredPixel(t *testing.T) {
+	s, _, _ := datapuntServer(t, "clean")
+	for _, body := range []string{
+		`{"market":"clean","slug":"home"}`,
+		`{"market":"clean","slug":"home","pixel":"nowhere"}`,
+	} {
+		rec := httptest.NewRecorder()
+		sigilHTTP(t, s, "/api/datapunts")(rec, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(body)))
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "pixel") {
+			t.Fatalf("%s: create answered %d %s, want 400 naming pixel", body, rec.Code, rec.Body.String())
+		}
+	}
+	if got := listDatapunts(t, s); len(got) != 0 {
+		t.Fatalf("an undeclared pixel was created: %+v", got)
+	}
+}
+
+// What a pixel does not declare is refused and written down where datapunt
+// reads its own refusals: in the pixel's kind, about the page. An event it does
+// not declare is no arrival; a field it lacks, or a value its field does not
+// take, leaves the arrival and the rest of it.
+func TestWhatAPixelDoesNotDeclareIsRefusedAndWrittenDown(t *testing.T) {
+	s, sys, markets := datapuntServer(t, "clean")
+	define(t, sys, "clean", "boutique", time.Now())
+
+	fire(s, "/d/clean/boutique?e=wave&page=/a&v=VISITOR-01", "")
+	fire(s, "/d/clean/boutique?page=/b&v=VISITOR-01&fax=020&plan=gold&method=form", "")
+
+	got := arrivalsFor(t, markets["clean"], "/a")
+	if len(got) != 1 || got[0].Predicates[0] != datapuntRefused || got[0].Contexts[0] != testPixel {
+		t.Fatalf("an undeclared event: %+v", got)
+	}
+	if got[0].Attributes["field"] != "event" || got[0].Attributes["value"] != "wave" || got[0].Attributes["param"] != "value" {
+		t.Fatalf("the refusal of an event says %v", got[0].Attributes)
+	}
+
+	var arrival *types.As
+	refused := map[string]*types.As{}
+	for _, as := range arrivalsFor(t, markets["clean"], "/b") {
+		if as.Predicates[0] == datapuntRefused {
+			refused[attrString(as.Attributes, "field")] = as
+			continue
+		}
+		arrival = as
+	}
+	if arrival == nil || arrival.Predicates[0] != "datapunt:page_view" {
+		t.Fatalf("no arrival for a declared event: %+v", arrival)
+	}
+	if attrString(arrival.Attributes, "method") != "form" || arrival.Attributes["fax"] != nil || arrival.Attributes["plan"] != nil {
+		t.Fatalf("the arrival kept %v", arrival.Attributes)
+	}
+	if refused["fax"] == nil || attrString(refused["fax"].Attributes, "param") != "field" {
+		t.Fatalf("a field the pixel lacks: %+v", refused["fax"])
+	}
+	if refused["plan"] == nil || attrString(refused["plan"].Attributes, "says") != "not a legal plan value: gold. Legal: free, pro" {
+		t.Fatalf("a value its field does not take: %+v", refused["plan"])
+	}
+	if refused["plan"].Source != datapuntSource || refused["plan"].Actors[0] != "datapunt:boutique" {
+		t.Fatalf("a refusal is the datapunt's: %+v", refused["plan"])
+	}
+}
+
+// A datapunt created before it named its pixel records nothing: there is no
+// schema to hold what it says.
+func TestADatapuntWithNoPixelRecordsNothing(t *testing.T) {
+	s, sys, markets := datapuntServer(t, "clean")
+	_, err := sys.GenerateAndCreateAttestation(context.Background(), &types.AsCommand{
+		Subjects:   []string{"clean/old"},
+		Predicates: []string{datapuntCreated},
+		Contexts:   []string{"system"},
+		By:         types.ActorsNamed{Actors: named.ItemOf("root")},
+		Source:     "cli",
+		When:       types.At{Time: time.Now()},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fire(s, "/d/clean/old?page=/x&v=VISITOR-01", "")
+	if got := arrivalsFor(t, markets["clean"], "/x"); len(got) != 0 {
+		t.Fatalf("a datapunt with no pixel recorded %+v", got)
+	}
+}
+
+// The pixel sigil's answer, as datapunt 0.3.14 gives it, is what the node holds
+// a pixel to: what every arrival carries is not the pixel's own.
+func TestThePixelSigilReadsAsAVocabulary(t *testing.T) {
+	body := `{"rows":[{"pixel":"site","events":["page_view","contact_click","signup"],"fields":[` +
+		`{"field":"path","type":"string"},{"field":"visitor","type":"string"},{"field":"utm_source","type":"string"},` +
+		`{"field":"plan","type":"enum","values":["free","pro"]}]}]}`
+	v, err := datapuntVocabularyOf("site", []byte(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(v.events, ",") != "page_view,contact_click,signup" || len(v.fields) != 1 || v.fields["plan"].kind != "enum" {
+		t.Fatalf("read %+v", v)
+	}
+	if _, err := datapuntVocabularyOf("other", []byte(body)); err == nil {
+		t.Fatal("a pixel the answer does not name was read")
 	}
 }

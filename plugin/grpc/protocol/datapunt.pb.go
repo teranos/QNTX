@@ -447,7 +447,9 @@ type DatapuntCreated struct {
 	// The datapunt that was created.
 	Slug string `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"`
 	// The path its pixel is fired at.
-	Url           string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	// The pixel it is, as the datapunt plugin's CUE declares it.
+	Pixel         string `protobuf:"bytes,3,opt,name=pixel,proto3" json:"pixel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -492,6 +494,13 @@ func (x *DatapuntCreated) GetSlug() string {
 func (x *DatapuntCreated) GetUrl() string {
 	if x != nil {
 		return x.Url
+	}
+	return ""
+}
+
+func (x *DatapuntCreated) GetPixel() string {
+	if x != nil {
+		return x.Pixel
 	}
 	return ""
 }
@@ -576,7 +585,10 @@ type Datapunt struct {
 	Pages    []*DatapuntSeen        `protobuf:"bytes,14,rep,name=pages,proto3" json:"pages,omitempty"`
 	// How the people who arrived actually walked — what the counts above are a
 	// fold of.
-	Walks         []*DatapuntWalk `protobuf:"bytes,15,rep,name=walks,proto3" json:"walks,omitempty"`
+	Walks []*DatapuntWalk `protobuf:"bytes,15,rep,name=walks,proto3" json:"walks,omitempty"`
+	// The pixel it is, as the datapunt plugin's CUE declares it. Empty for a
+	// datapunt created before it named one, which records nothing.
+	Pixel         string `protobuf:"bytes,16,opt,name=pixel,proto3" json:"pixel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -714,6 +726,13 @@ func (x *Datapunt) GetWalks() []*DatapuntWalk {
 		return x.Walks
 	}
 	return nil
+}
+
+func (x *Datapunt) GetPixel() string {
+	if x != nil {
+		return x.Pixel
+	}
+	return ""
 }
 
 // DatapuntSeen is an event or a page and every moment it was attested, in unix
@@ -1343,13 +1362,14 @@ const file_plugin_grpc_protocol_datapunt_proto_rawDesc = "" +
 	"\x05views\x18\n" +
 	" \x01(\rR\x05views\x12\x16\n" +
 	"\x06events\x18\v \x01(\rR\x06events\x12\x16\n" +
-	"\x06bounce\x18\f \x01(\bR\x06bounce\"7\n" +
+	"\x06bounce\x18\f \x01(\bR\x06bounce\"M\n" +
 	"\x0fDatapuntCreated\x12\x12\n" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x10\n" +
-	"\x03url\x18\x02 \x01(\tR\x03url\"?\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12\x14\n" +
+	"\x05pixel\x18\x03 \x01(\tR\x05pixel\"?\n" +
 	"\x11DatapuntTakenDown\x12\x12\n" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\"\xba\x03\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\"\xd0\x03\n" +
 	"\bDatapunt\x12\x12\n" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06market\x18\x02 \x01(\tR\x06market\x12\x10\n" +
@@ -1366,7 +1386,8 @@ const file_plugin_grpc_protocol_datapunt_proto_rawDesc = "" +
 	"\blastSeen\x18\f \x01(\tR\blastSeen\x12.\n" +
 	"\x06events\x18\r \x03(\v2\x16.protocol.DatapuntSeenR\x06events\x12,\n" +
 	"\x05pages\x18\x0e \x03(\v2\x16.protocol.DatapuntSeenR\x05pages\x12,\n" +
-	"\x05walks\x18\x0f \x03(\v2\x16.protocol.DatapuntWalkR\x05walks\"6\n" +
+	"\x05walks\x18\x0f \x03(\v2\x16.protocol.DatapuntWalkR\x05walks\x12\x14\n" +
+	"\x05pixel\x18\x10 \x01(\tR\x05pixel\"6\n" +
 	"\fDatapuntSeen\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04seen\x18\x02 \x03(\x01R\x04seen\"H\n" +

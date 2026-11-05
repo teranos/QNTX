@@ -150,7 +150,7 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		rlWrite:        newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
 		rlRead:         newRateLimitGroup(rl.ReadRate, rl.ReadBurst),
 		rlPublic:       newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
-		rlDatapunt:       newRateLimitGroup(rl.DatapuntRate, rl.DatapuntBurst),
+		rlDatapunt:     newRateLimitGroup(rl.DatapuntRate, rl.DatapuntBurst),
 		rlOpened:       newRateLimitGroup(rl.OpenedRate, rl.OpenedBurst),
 		// The node's mail is its mail service's, which starts with the
 		// plugin services.

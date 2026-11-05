@@ -224,9 +224,10 @@ func (s *QNTXServer) HandleDatapunt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !s.datapuntList(market, slug) {
+	pixel, stands := s.datapuntStands(market, slug)
+	if !stands {
 		s.logger.Infow("Datapunt arrival refused",
-			"market", market, "slug", slug, "reason", "no datapunt datapunts here",
+			"market", market, "slug", slug, "reason", "no datapunt stands here",
 			"client", r.RemoteAddr)
 		return
 	}
@@ -263,6 +264,16 @@ func (s *QNTXServer) HandleDatapunt(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	arrival := datapuntArrival(r, market, slug, now)
 
+	// What the pixel holds, as its CUE declares it. A datapunt created before
+	// it named its pixel, or whose pixel cannot be asked, records nothing.
+	vocabulary, err := s.datapuntPixel(r.Context(), pixel)
+	if err != nil {
+		s.logger.Infow("Datapunt arrival refused",
+			"market", market, "slug", slug, "pixel", pixel, "reason", err.Error())
+		return
+	}
+	held, refused := datapuntHeld(vocabulary, arrival)
+
 	// The predicate is the datapunt vocabulary plus the event the pixel side named:
 	// ?e=contact_click records datapunt:contact_click. No event is a page view.
 	predicate := datapuntPredicate(arrival.Event)
@@ -276,6 +287,13 @@ func (s *QNTXServer) HandleDatapunt(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.logger.Errorw("Datapunt arrival lost: its market is not served",
 			"market", market, "slug", slug, "error", err)
+		return
+	}
+
+	// What the pixel would not hold is written down, as datapunt writes its own
+	// refusals, and an event it does not declare is not an arrival.
+	s.datapuntRefuse(store, vocabulary, slug, subject, refused)
+	if !held {
 		return
 	}
 
@@ -520,16 +538,16 @@ func attrString(attrs map[string]any, key string) string {
 	return ""
 }
 
-// datapuntList reports whether a datapunt datapunts. The definition is a system
+// datapuntStands reports whether a datapunt stands, and the pixel it is. The definition is a system
 // attestation; the latest of the datapunt's created and deleted lines is the whole
 // truth. A create that nothing has deleted since is live.
-func (s *QNTXServer) datapuntList(market, slug string) bool {
+func (s *QNTXServer) datapuntStands(market, slug string) (string, bool) {
 	if !datapuntMarket(market) {
-		return false
+		return "", false
 	}
 	sys, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
-		return false
+		return "", false
 	}
 	key := datapuntKey(market, slug)
 	// Query by the key alone and settle create against delete here: a store's
@@ -537,10 +555,13 @@ func (s *QNTXServer) datapuntList(market, slug string) bool {
 	// at once can match neither.
 	found, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{key}, Limit: 200})
 	if err != nil {
-		return false
+		return "", false
 	}
 	latest := latestDefinition(found)
-	return latest != nil && slices.Contains(latest.Predicates, datapuntCreated)
+	if latest == nil || !slices.Contains(latest.Predicates, datapuntCreated) {
+		return "", false
+	}
+	return attrString(latest.Attributes, datapuntPixelAttr), true
 }
 
 // namespaceDoorBinding is the write-origin a datapunt inherits: the hosts of its
@@ -753,11 +774,17 @@ func (s *QNTXServer) datapuntsCreate(ctx context.Context, sent sigil.Sent) (any,
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "slug",
 			Says: "a datapunt needs a slug with no slash"}
 	}
-	if err := s.writeDatapuntDef(ctx, market, slug, datapuntCreated, nil); err != nil {
+	// One web analytics pixel is one datapunt: it is created as a pixel its
+	// CUE declares, and only one that is declared.
+	pixel := sent["pixel"]
+	if _, err := s.datapuntPixel(ctx, pixel); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "pixel", Says: err.Error()}
+	}
+	if err := s.writeDatapuntDef(ctx, market, slug, datapuntCreated, map[string]any{datapuntPixelAttr: pixel}); err != nil {
 		s.logger.Errorw("could not create a datapunt", "market", market, "slug", slug, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not create the datapunt in " + market + ": " + err.Error()}
 	}
-	return &protocol.DatapuntCreated{Slug: slug, Url: datapuntPathPrefix + market + "/" + slug}, nil
+	return &protocol.DatapuntCreated{Slug: slug, Url: datapuntPathPrefix + market + "/" + slug, Pixel: pixel}, nil
 }
 
 // datapuntsTakeDown supersedes a datapunt with a deleted line, so its pixel stops
@@ -871,6 +898,7 @@ func (s *QNTXServer) liveDatapunts(since, until types.TimeBound) ([]*protocol.Da
 			Origin:  s.namespaceDoorBinding(market),
 			Creator: creator,
 			DefId:   as.ID,
+			Pixel:   attrString(as.Attributes, datapuntPixelAttr),
 			Created: as.Timestamp.Format(time.RFC3339),
 			Sites:   []string{},
 			Dropped: uint32(s.datapuntDropCount(key)),
@@ -1218,7 +1246,7 @@ func (s *QNTXServer) datapuntsVisits(_ context.Context, sent sigil.Sent) (any, *
 // datapuntTally is one datapunt's arrivals folded down: how many, when the last one
 // landed, and the distinct sites they came from.
 //
-// walks is the fold that keeps its shape. A datapunt datapunts and a person walks
+// walks is the fold that keeps its shape. A datapunt stands and a person walks
 // past it, so the counts say how much arrived and the walks say what happened.
 // Every other field here answers "how many"; this one answers "in what order".
 type datapuntTally struct {

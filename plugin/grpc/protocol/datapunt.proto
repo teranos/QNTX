@@ -109,6 +109,8 @@ message DatapuntCreated {
   string slug = 1;
   // The path its pixel is fired at.
   string url = 2;
+  // The pixel it is, as the datapunt plugin's CUE declares it.
+  string pixel = 3;
 }
 
 // DatapuntTakenDown is what datapunts take-down answers.
@@ -144,6 +146,9 @@ message Datapunt {
   // How the people who arrived actually walked — what the counts above are a
   // fold of.
   repeated DatapuntWalk walks = 15;
+  // The pixel it is, as the datapunt plugin's CUE declares it. Empty for a
+  // datapunt created before it named one, which records nothing.
+  string pixel = 16;
 }
 
 // DatapuntSeen is an event or a page and every moment it was attested, in unix

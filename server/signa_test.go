@@ -60,7 +60,7 @@ func TestAPathIsAnsweredFromItsSigils(t *testing.T) {
 	// One path, three sigils: what arrives in a body is read the same way.
 	stands := answering["/api/datapunts"]
 	created := httptest.NewRecorder()
-	stands(created, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(`{"market":"clean","slug":"second"}`)))
+	stands(created, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(`{"market":"clean","slug":"second","pixel":"site"}`)))
 	require.Equal(t, http.StatusOK, created.Code, created.Body.String())
 
 	slugless := httptest.NewRecorder()

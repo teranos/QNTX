@@ -90,7 +90,7 @@ func TestADatapuntAnswerIsWhatItsSigilGives(t *testing.T) {
 		{sigil: "metrics", sent: sigil.Sent{"market": "clean", "slug": "boutique", "type": "page"}},
 		{sigil: "activity", sent: sigil.Sent{"market": "clean", "slug": "boutique"}},
 		{sigil: "visits", sent: sigil.Sent{"market": "clean", "slug": "boutique"}},
-		{sigil: "create", sent: sigil.Sent{"market": "clean", "slug": "second"}},
+		{sigil: "create", sent: sigil.Sent{"market": "clean", "slug": "second", "pixel": testPixel}},
 		{sigil: "take-down", sent: sigil.Sent{"market": "clean", "slug": "second"}},
 	} {
 		t.Run(asked.sigil, func(t *testing.T) {
@@ -128,7 +128,7 @@ func TestADatapuntRefusesInItsOwnTerms(t *testing.T) {
 	}
 
 	create := sigilOf(t, s.datapuntsSignum(), "create")
-	_, refusal := create.answer(context.Background(), sigil.Sent{"market": "system", "slug": "home"})
+	_, refusal := create.answer(context.Background(), sigil.Sent{"market": "system", "slug": "home", "pixel": testPixel})
 	require.NotNil(t, refusal)
 	require.Equal(t, "market", refusal.GetParam())
 	require.Equal(t, http.StatusBadRequest, sigil.Status(refusal))
