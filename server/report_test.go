@@ -161,6 +161,8 @@ func (answeringSentry) Table(_ context.Context, q sentryread.TableQuery) ([]map[
 			row[f] = "store-proof"
 		case "path":
 			row[f] = "/api/attestations"
+		case "message":
+			row[f] = "periodic watcher fire flush failed"
 		case "tags[status,number]":
 			row[f] = 404.0
 		default:
@@ -168,6 +170,31 @@ func (answeringSentry) Table(_ context.Context, q sentryread.TableQuery) ([]map[
 		}
 	}
 	return []map[string]any{row}, nil
+}
+
+// Sentry dropping every error event of the week, as it has since 2026-10-18.
+func (answeringSentry) Outcomes(context.Context, string, sentryread.Window) ([]sentryread.Outcome, error) {
+	return []sentryread.Outcome{
+		{Outcome: "client_discard", Reason: "ratelimit_backoff", Count: 280},
+		{Outcome: "rate_limited", Reason: "error_usage_exceeded", Count: 364},
+	}, nil
+}
+
+// "Sentry Error ingest still dead."
+//
+// What Sentry dropped is said in the week it dropped it, with Sentry's own
+// reason, and the error lines the node logged most stand beside it.
+func TestTheReportSaysWhatSentryDroppedAndTheErrorLinesOfTheWeek(t *testing.T) {
+	s := rootKnowingServer(t)
+	mail, err := renderReport(s.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil))
+	require.NoError(t, err)
+	plain := nodeBody(t, mail, services.MailText)
+	assert.Contains(t, plain, "Error events Sentry took and dropped over 7 days\n  rate_limited error_usage_exceeded: 364\n  client_discard ratelimit_backoff: 280\n")
+	assert.Contains(t, plain, "Top 3 error lines\n  2 periodic watcher fire flush failed\n")
+	drawn := nodeBody(t, mail, services.MailHTML)
+	for _, said := range []string{"Error events Sentry took and dropped over 7 days", "rate_limited error_usage_exceeded:", "364", "Top 3 error lines", "periodic watcher fire flush failed"} {
+		assert.Contains(t, drawn, said)
+	}
 }
 
 // The report is one mail: html with the three graphs inline, and text beside.
@@ -188,6 +215,7 @@ func TestTheReportRendersEverySectionWithItsGraphs(t *testing.T) {
 		"Attestations created per namespace", "Users registered per namespace",
 		"Downtime", "CPU over 7 days", "Memory over 7 days", "Swap over 7 days", "Network over 7 days",
 		"boot.subsystem.took over 7 days", "Query took over 7 days", "Top 3 4xx", "Top 3 5xx", "Top 3 handler failures",
+		"Error events Sentry took and dropped over 7 days", "Top 3 error lines",
 	} {
 		assert.Contains(t, nodeBody(t, mail, services.MailHTML), section)
 		assert.Contains(t, nodeBody(t, mail, services.MailText), section)
