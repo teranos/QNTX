@@ -7,9 +7,13 @@ package comet
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +25,39 @@ import (
 // one project, and the node it reports to, whose token ground reads from QNTX_TOKEN (ground source/attest.d).
 func AgentDeclaration(work, url string) string {
 	return "project {\n  path: \"" + work + "\"\n}\n\nqntx {\n  url: \"" + url + "\"\n}\n"
+}
+
+// AgentGrove is the agent's checkout of sbvh-nl/grove, where its work keeps each repository as
+// work/<owner>/<repo> (AgentTrust): what a grove ritual needs stands there (ADR-050, Not done).
+func AgentGrove(home string) string { return filepath.Join(home, "work", "sbvh-nl", "grove") }
+
+// AgentSand is the agent's sand besides ground's own controls: its declaration, and each pbt of its
+// grove checkout's controls/, which declare grove's rituals. An agent with no grove checkout has none.
+func AgentSand(home, url string) (map[string]string, error) {
+	sand := map[string]string{"comet.pbt": AgentDeclaration(filepath.Join(home, "work"), url)}
+	controls := filepath.Join(AgentGrove(home), "controls")
+	found, err := filepath.Glob(filepath.Join(controls, "*.pbt"))
+	if err != nil {
+		return nil, errors.Wrapf(err, "the controls of the agent's grove checkout in %s were not listed", controls)
+	}
+	for _, path := range found {
+		pbt, err := os.ReadFile(path)
+		if err != nil {
+			return nil, errors.Wrapf(err, "the control %s of the agent's grove checkout was not read", path)
+		}
+		sand["grove-"+filepath.Base(path)] = string(pbt)
+	}
+	return sand, nil
+}
+
+// AgentLocalSand is where the agent's ground holds a local sand: under the HOME its turn carries,
+// which is the node's (internal/claudecode run.go, agentenv), as ground's localSandPathInto names it.
+func AgentLocalSand(platform string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", errors.Wrap(err, "the HOME the agent's turn carries was not found, so its sand has nowhere to be held from")
+	}
+	return filepath.Join(home, ".local", "share", "ground", "sand", SandFile(platform)), nil
 }
 
 // AgentGround is where an agent's ground is kept: in its home, beside its Claude Code configuration.
@@ -41,7 +78,12 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	building.Lock()
 	defer building.Unlock()
 	// An agent's ground runs on the node that builds it: natively.
-	if _, err := Native(); err != nil {
+	native, err := Native()
+	if err != nil {
+		return err
+	}
+	sand, err := AgentSand(home, url)
+	if err != nil {
 		return err
 	}
 	builds, err := b.Node.BuildsDir()
@@ -55,10 +97,136 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		return errors.Wrapf(err, "failed to make %s to build the agent's ground in", work)
 	}
-	sand := map[string]string{"comet.pbt": AgentDeclaration(filepath.Join(home, "work"), url)}
 	kept := map[string]string{"ground": AgentGround(home), "ground_hook": AgentHook(home),
 		"ground_sky": AgentSky(home), "ground_drive": AgentDrive(home)}
-	return b.ground(ctx, work, sand, "agent:"+filepath.Base(home), kept)
+	src, env, err := b.ground(ctx, work, sand, "agent:"+filepath.Base(home), kept)
+	if err != nil {
+		return err
+	}
+	held, err := AgentLocalSand(native)
+	if err != nil {
+		return err
+	}
+	// No rituals left: the sand this agent's build kept goes, and one another agent kept stays.
+	if len(sand) == 1 {
+		if keptBy(held) != home {
+			return nil
+		}
+		for _, path := range []string{held, held + ".digest", held + ".controls", held + ".agent"} {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return errors.Wrapf(err, "the sand kept for the agent's rituals at %s was not removed when none were left", path)
+			}
+		}
+		return nil
+	}
+	// The engine is built from ground's floor alone (ground dub.json -d-version=Floor): the rituals
+	// reach it as the sand it holds beside it (ground source/sand/load.d holdLanded).
+	if _, err := b.sandIn(ctx, src, env, native); err != nil {
+		return errors.Wrap(err, "the sand that declares the agent's rituals did not build")
+	}
+	if err := keepBuilt(src, filepath.Join("build", SandFile(native)), held); err != nil {
+		return err
+	}
+	if err := os.WriteFile(held+".controls", []byte(controlsDigest(sand)), 0o644); err != nil {
+		return errors.Wrapf(err, "what the sand at %s was built from was not written beside it", held)
+	}
+	return errors.Wrapf(os.WriteFile(held+".agent", []byte(home), 0o644), "whose the sand at %s is was not written beside it", held)
+}
+
+// keptBy is the home of the agent whose build kept the sand at held, or empty.
+func keptBy(held string) string {
+	said, err := os.ReadFile(held + ".agent")
+	if err != nil {
+		return ""
+	}
+	return string(said)
+}
+
+// controlsDigest is the sha256 of an agent's sand as it is written, file by file in name order.
+func controlsDigest(sand map[string]string) string {
+	names := make([]string, 0, len(sand))
+	for name := range sand {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	sum := sha256.New()
+	for _, name := range names {
+		sum.Write([]byte(name + "\x00" + sand[name] + "\x00"))
+	}
+	return hex.EncodeToString(sum.Sum(nil))
+}
+
+// SandStands is whether the sand the agent in home holds is the one its grove checkout's controls
+// make now: none where it has no rituals, and built from these controls where it has. Not standing,
+// it says why, and the agent's ground is built again.
+func SandStands(home, url string) error {
+	sand, err := AgentSand(home, url)
+	if err != nil {
+		return err
+	}
+	native, err := Native()
+	if err != nil {
+		return err
+	}
+	held, err := AgentLocalSand(native)
+	if err != nil {
+		return err
+	}
+	if len(sand) == 1 {
+		if keptBy(held) == home {
+			return errors.Newf("the agent's grove checkout declares no ritual, and the sand its last build kept at %s still does", held)
+		}
+		return nil
+	}
+	if _, err := os.Stat(held); err != nil {
+		return errors.Wrapf(err, "the agent's grove checkout declares rituals, and no sand holding them is kept at %s", held)
+	}
+	if keptBy(held) != home {
+		return errors.Newf("the sand at %s was not kept by this agent's build", held)
+	}
+	built, err := os.ReadFile(held + ".controls")
+	if err != nil || string(built) != controlsDigest(sand) {
+		return errors.Newf("the controls of the agent's grove checkout changed since the sand at %s was built", held)
+	}
+	return nil
+}
+
+// failure is what an agent's last failed build was built from, and when it failed.
+type failure struct {
+	controls string
+	at       time.Time
+}
+
+// failedFor is each agent's last failed build, by its home.
+var failedFor sync.Map
+
+// retryAfter is how long a build that failed on controls that have not changed waits to be started
+// again, for a failure that was not the controls'.
+const retryAfter = time.Hour
+
+// BuildWanted is whether a turn of the agent in home starts its ground build: its sand does not
+// stand, no build is going, and its last build did not fail on these same controls within retryAfter.
+func BuildWanted(home, url string) bool {
+	if SandStands(home, url) == nil || Building(home) {
+		return false
+	}
+	sand, err := AgentSand(home, url)
+	if err != nil {
+		return false
+	}
+	if last, failed := failedFor.Load(home); failed {
+		f := last.(failure)
+		if f.controls == controlsDigest(sand) && time.Since(f.at) < retryAfter {
+			return false
+		}
+	}
+	return true
+}
+
+// Building is whether the agent in home has a ground build going.
+func Building(home string) bool {
+	last, ok := agentBuilds.Load(home)
+	return ok && strings.HasPrefix(last.(string), "its ground is building")
 }
 
 // AgentPath is the PATH an agent's turn runs with: its own ground first, which its hooks and a
@@ -82,11 +250,15 @@ func (b Builder) GroundAgent(ctx context.Context, home, url string, keep func(ho
 			err = AgentSettings(home)
 		}
 		if err != nil {
+			if sand, read := AgentSand(home, url); read == nil {
+				failedFor.Store(home, failure{controls: controlsDigest(sand), at: time.Now()})
+			}
 			agentBuilds.Store(home, "its last ground build failed: "+err.Error())
 			log("An agent's ground build failed", "home", home, "error", err)
 			return
 		}
 		agentBuilds.Delete(home)
+		failedFor.Delete(home)
 		log("An agent's ground is built", "home", home, "ground", AgentGround(home))
 	})
 }

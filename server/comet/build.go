@@ -15,10 +15,10 @@ type Source struct{ Owner, Repo, Branch string }
 
 func (s Source) String() string { return s.Owner + "/" + s.Repo + "@" + s.Branch }
 
-// Ground is where ground's own sources and global controls come from: libacp
-// while ground's main is held, since `make sand` is there and not on main.
+// Ground is where ground's own sources and global controls come from: ground's main, which holds
+// `make sand` since libacp was merged into it and left GitHub.
 // "12 for now yes"
-var Ground = Source{Owner: "teranos", Repo: "ground", Branch: "libacp"}
+var Ground = Source{Owner: "teranos", Repo: "ground", Branch: "main"}
 
 // Node is what a build asks of the node it runs on: where a source is now, its tarball,
 // a directory to build in, and a step run.
@@ -197,21 +197,22 @@ func (b Builder) prepareFrom(ctx context.Context, ground Source, work string, sa
 }
 
 // ground builds ground's branch in work with sand beside its own controls, natively, and keeps
-// each binary kept names at its path, with its digest beside it.
-func (b Builder) ground(ctx context.Context, work string, sand map[string]string, of string, kept map[string]string) error {
+// each binary kept names at its path, with its digest beside it. It answers where it built, and
+// the environment its steps ran in.
+func (b Builder) ground(ctx context.Context, work string, sand map[string]string, of string, kept map[string]string) (string, []string, error) {
 	src, env, err := b.prepare(ctx, work, sand, of)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	for name, path := range kept {
 		if err := b.step(ctx, src, env, b.inGround(src, "make", goalOf(name))); err != nil {
-			return err
+			return "", nil, err
 		}
 		if err := keepBuilt(src, name, path); err != nil {
-			return err
+			return "", nil, err
 		}
 	}
-	return nil
+	return src, env, nil
 }
 
 // sandIn builds the sand in src for platform at build/<SandFile>, and answers the engine ABI it is for.
