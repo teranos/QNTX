@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	"go.uber.org/zap"
 )
 
 // asAgent is a token asking as itself, by its own DID: an agent the node
@@ -190,4 +194,68 @@ func TestINameIsReachedByWhoReachesMCP(t *testing.T) {
 		require.Nil(t, refusal, "%s", level)
 		assert.Equal(t, reaches, len(answered.(*protocol.Reaches).GetPaths()) == 1, "%s", level)
 	}
+}
+
+// "make each agent name itself"
+//
+// Agents started under one token each ask for a token of their own, through
+// the gate, and each names itself by its own DID: the token they ran under is
+// none of their names, and a name one agent holds is taken for the other.
+func TestEachAgentUnderOneTokenNamesItself(t *testing.T) {
+	s := rootKnowingServer(t)
+	tokens, _, err := auth.OpenTokenTable(s.nodeDB, nil)
+	require.NoError(t, err)
+	h, err := auth.New(s.nodeDB, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
+		func(next http.HandlerFunc) http.HandlerFunc { return next },
+		tokens, testUsers(t), false, []string{rootAccount}, nil)
+	require.NoError(t, err)
+	h.SetNodeKey(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)))
+	s.authHandler = h
+	shared, _, err := tokens.Create(auth.NewToken{Label: "ground-token", MintedBy: rootAccount,
+		Level: auth.LevelAttestor, Namespaces: []string{"garden"}, ExpiresAt: auth.NeverEnds()})
+	require.NoError(t, err)
+
+	// What the gate admits a bearer as, past the line the tablet writes.
+	admitting := func(raw string) context.Context {
+		var admitted auth.Admission
+		gated := h.Middleware(iNamePath, auth.Also(auth.LevelToken, auth.LevelAttestor), func(w http.ResponseWriter, r *http.Request) {
+			admitted, _ = auth.AdmissionFrom(r.Context())
+		})
+		asked := httptest.NewRequest(http.MethodPost, iNamePath, nil)
+		asked.Header.Set("Authorization", "Bearer "+raw)
+		gated.ServeHTTP(httptest.NewRecorder(), asked)
+		require.NotNil(t, admitted.Grant, "the gate admitted no token")
+		return auth.WithAdmission(context.Background(), admitted)
+	}
+	handAgent := h.Middleware("/auth/agent", auth.Also(auth.LevelToken, auth.LevelAttestor), h.Routes()["/auth/agent"])
+	handed := func(agent string) (raw, did string) {
+		asked := httptest.NewRequest(http.MethodPost, "/auth/agent", strings.NewReader(`{"agent":"`+agent+`"}`))
+		asked.Header.Set("Authorization", "Bearer "+shared)
+		answered := httptest.NewRecorder()
+		handAgent.ServeHTTP(answered, asked)
+		require.Equal(t, http.StatusCreated, answered.Code, answered.Body.String())
+		var body struct{ Token, DID string }
+		require.NoError(t, json.Unmarshal(answered.Body.Bytes(), &body))
+		return body.Token, body.DID
+	}
+
+	otari, otariDID := handed("otari")
+	sion, sionDID := handed("6sion")
+
+	named, refusal := s.iName(admitting(otari), sigil.Sent{"name": "Wren"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, otariDID, named.(*protocol.Named).GetDid())
+
+	_, refusal = s.iName(admitting(sion), sigil.Sent{"name": "wren"})
+	require.NotNil(t, refusal, "two agents hold one name")
+	assert.Contains(t, refusal.GetSays(), "is taken")
+
+	named, refusal = s.iName(admitting(sion), sigil.Sent{"name": "Rook"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, sionDID, named.(*protocol.Named).GetDid())
+
+	// The token they ran under names itself apart from both.
+	named, refusal = s.iName(admitting(shared), sigil.Sent{"name": "Alder"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.NotContains(t, []string{otariDID, sionDID}, named.(*protocol.Named).GetDid())
 }
