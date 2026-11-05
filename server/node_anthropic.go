@@ -232,10 +232,16 @@ func (s *QNTXServer) keepAnthropicLine(by string, kept anthropicKept) *protocol.
 	if err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "failed to name the node's %s line", anthropicLineSubject).Error()}
 	}
+	// 「[Opus 5.5] The newest line is the one with the latest timestamp, kept to the millisecond (stampPrecision):」
+	// 「[Opus 5.5] a new one is stamped at least a millisecond after the line it changes, as a name line is.」
 	now := time.Now()
+	stamped := now.Truncate(stampPrecision)
+	if newest := kept.at.Truncate(stampPrecision); !stamped.After(newest) {
+		stamped = newest.Add(stampPrecision)
+	}
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{anthropicLineSubject}, Predicates: []string{anthropicLinePredicate}, Contexts: []string{auth.NamespaceSystem},
-		Actors: []string{by}, Timestamp: now, CreatedAt: now, Source: "anthropic", Attributes: attributes,
+		Actors: []string{by}, Timestamp: stamped, CreatedAt: now, Source: "anthropic", Attributes: attributes,
 	}); err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "the node's %s line %s was not kept", anthropicLineSubject, id).Error()}
 	}
