@@ -28,4 +28,4 @@ Wants:
 
 - Staand needs to be renamed to Datapunt everywhere 
 - So Datapunt is the Pixel
-- 
+- One Web analytics pixel is one datapu
