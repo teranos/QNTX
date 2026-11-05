@@ -1,4 +1,4 @@
-# 「[Opus 5.5] libACP」
+# 「[Sonnet 5.5] libACP」
 
 「[Opus 5.5] A C11 [Agent Client Protocol](https://agentclientprotocol.com) library, agent and client」
 「[Opus 5.5] side, with a C ABI in `include/acp.h`. Ground's `ground code` speaks ACP through it, as it」
