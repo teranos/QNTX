@@ -27,6 +27,7 @@ type StreamChunk struct {
 	PromptTokens     int
 	CompletionTokens int
 	TotalTokens      int
+	Served           *Served // How the call was served, when its provider reports it
 }
 
 // TokenSignal carries per-token inference signal data
