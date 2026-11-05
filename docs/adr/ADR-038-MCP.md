@@ -23,7 +23,7 @@ QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://githu
 
 "WE USE IT"
 
-Which version is [parity](../../server/parity/references.go)'s.
+Which version is [parity](https://github.com/teranos/QNTX/blob/main/server/parity/references.go)'s.
 
 "Parity owns it outright"
 
