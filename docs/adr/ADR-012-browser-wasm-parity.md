@@ -12,7 +12,7 @@ The browser should not be a lite client that talks to a server. It should run th
 
 ## The problem
 
-kern (OCaml) compiles to WASM via `wasm_of_ocaml`, which outputs WasmGC instructions. The Rust engine compiles to WASM via `wasm-bindgen`. Both need to run in the browser and talk to each other.
+The Rust engine compiles to WASM via `wasm-bindgen`. Both need to run in the browser and talk to each other.
 
 ### WasmGC support
 
@@ -20,7 +20,6 @@ kern (OCaml) compiles to WASM via `wasm_of_ocaml`, which outputs WasmGC instruct
 - **wazero (Go)**: does not support WasmGC, no timeline ([#1860](https://github.com/tetratelabs/wazero/issues/1860))
 - **wasmtime (Rust)**: supports WasmGC since v27.0 (November 2024)
 
-This is why the browser path works but the Go server path doesn't for OCaml WASM.
 
 Those three rows were recorded 2026-03-15 and have not been re-checked since.
 
