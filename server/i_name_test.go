@@ -515,3 +515,27 @@ func TestANameLineWithNoSequenceToReadIsNoName(t *testing.T) {
 	require.Len(t, names, 1)
 	assert.Equal(t, "did:key:z6Mkash", names[0].did)
 }
+
+// Qodo's review of #1540: a build from before sequences, run after one that
+// writes them (a node flipped to an older branch), writes a rename with no
+// sequence. Read as older than every sequenced line, it was undone by the
+// rename it came after. A line with no sequence is read where its stamp puts
+// it among the sequenced lines.
+func TestARenameWithNoSequenceAfterASequencedOneStands(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s := rootKnowingServer(t)
+	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "deploy agent"})
+	require.Nil(t, refusal, refusal.GetSays())
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	later := time.Now().Add(time.Hour)
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-named-by-an-older-build", Subjects: []string{"did:key:z6Mkwalnut"}, Predicates: []string{predicateAgentNamed},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkwalnut"}, Timestamp: later, CreatedAt: later,
+		Source: "did:key:z6Mkwalnut", Attributes: map[string]any{"name": "late agent"},
+	}))
+	names, err := s.agentNames()
+	require.NoError(t, err)
+	require.Len(t, names, 1)
+	assert.Equal(t, "late agent", names[0].name)
+}
