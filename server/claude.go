@@ -209,6 +209,7 @@ func (s *QNTXServer) claudeHarness() *harness {
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs this in. Not sent, it is the one am.toml gives."},
 			{Name: "model", OneOf: claudeModels, Says: "The model it answers with. Not sent, it is the one am.toml gives."},
+			{Name: "in", Says: "The repository of its work it is said in, as owner/repo: the turn runs in that checkout, in the same session, so it stands where that repository's rituals are switched on. Not sent, it is said in its work."},
 		},
 		// am.toml naming the Node Agent names it in Claude Code.
 		named:    func() bool { return true },
@@ -327,7 +328,7 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			said := claudecode.Said{
 				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
 				Says: t.says, Model: model, Effort: named.Effort, Token: plan,
-				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
+				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env, In: sent["in"],
 				// "on a redeploy NODE agent would still be alive, which is the
 				// intended state, rather than being killed mid-turn" (#1256).
 				Apart:   s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,
