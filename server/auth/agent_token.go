@@ -87,11 +87,48 @@ func noAgent(agent string) string {
 	return ""
 }
 
-// askingToken is the live token whose DID this is, and whether there is one:
-// revoked, expired or gone is none.
-func (h *Handler) askingToken(did string) (TokenInfo, bool) {
-	if h.tokens == nil || did == "" {
-		return TokenInfo{}, false
+// derivedHere is whether this node's key derived the token with this DID
+// under this label. A label is a name anybody minting could have written; the
+// derivation is the node's alone.
+func (h *Handler) derivedHere(label, did string) bool {
+	if h.nodeKey == nil {
+		return false
+	}
+	_, derived, err := access.DeriveToken(h.nodeKey, label)
+	return err == nil && derived == did
+}
+
+// runsUnder is the token an agent's token runs under, whether this token is
+// an agent's at all, and whether it stands: derived by this node's key under
+// its own label, and the token it runs under live and a TOKEN or an ATTESTOR.
+// One named as an agent's that does not stand is refused, not taken as the
+// token its label names.
+func (h *Handler) runsUnder(label, did string) (asking TokenInfo, isAgents, stands bool) {
+	under, isAgents := askedUnder(label)
+	if !isAgents {
+		return TokenInfo{}, false, false
+	}
+	if !h.derivedHere(label, did) {
+		return TokenInfo{}, true, false
+	}
+	asking, live := h.askingToken(under)
+	if !live || (asking.Level != LevelToken && asking.Level != LevelAttestor) {
+		return TokenInfo{}, true, false
+	}
+	return asking, true, true
+}
+
+// tokenByDID is a TokenStore that finds a token by its DID without listing
+// every token. The operational table is one; a store that is not is listed.
+type tokenByDID interface {
+	ByDID(did string) (TokenInfo, bool)
+}
+
+// tokenOf is the token whose DID this is, revoked and expired ones included,
+// and whether the store holds one.
+func (h *Handler) tokenOf(did string) (TokenInfo, bool) {
+	if found, indexed := h.tokens.(tokenByDID); indexed {
+		return found.ByDID(did)
 	}
 	listed, err := h.tokens.List()
 	if err != nil {
@@ -99,15 +136,24 @@ func (h *Handler) askingToken(did string) (TokenInfo, bool) {
 		return TokenInfo{}, false
 	}
 	for _, t := range listed {
-		if t.DID != did {
-			continue
+		if t.DID == did {
+			return t, true
 		}
-		if t.RevokedAt != nil || t.ExpiresAt == nil || expiredAt(t.ExpiresAt) {
-			return TokenInfo{}, false
-		}
-		return t, true
 	}
 	return TokenInfo{}, false
+}
+
+// askingToken is the live token whose DID this is, and whether there is one:
+// revoked, expired or gone is none.
+func (h *Handler) askingToken(did string) (TokenInfo, bool) {
+	if h.tokens == nil || did == "" {
+		return TokenInfo{}, false
+	}
+	t, held := h.tokenOf(did)
+	if !held || t.RevokedAt != nil || t.ExpiresAt == nil || expiredAt(t.ExpiresAt) {
+		return TokenInfo{}, false
+	}
+	return t, true
 }
 
 // handleAgentToken hands the token asking the token of the agent it names.
@@ -168,6 +214,11 @@ func (h *Handler) handleAgentToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hash := sha256Hex(raw)
+	// Looked up and written as one: two asks that both found it absent would
+	// both write it, and the second write would turn back on a token switched
+	// off in between. One process only, as creating a User is.
+	h.handingAgents.Lock()
+	defer h.handingAgents.Unlock()
 	handed := map[string]any{
 		"token": raw, "did": did, "label": label, "agent": agent, "derived_by": asking.DID,
 		"level": string(asking.Level), "namespaces": asking.Namespaces,

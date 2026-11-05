@@ -442,9 +442,18 @@ func (h *Handler) answerFor(info TokenInfo) tokenAnswer {
 		Roles:      map[string][]string{},
 		KnownRoles: map[string][]string{},
 	}
+	// An agent's token holds what the token it runs under holds, where that
+	// token acts, as the gate admits it; one that does not stand holds nothing.
+	holder, namespaces := info.Label, info.Namespaces
+	if asking, isAgents, stands := h.runsUnder(info.Label, info.DID); isAgents {
+		holder, namespaces = asking.Label, asking.Namespaces
+		if !stands {
+			namespaces = nil
+		}
+	}
 	var held []string
-	for _, namespace := range info.Namespaces {
-		roles := h.RolesOfToken(info.Label, namespace)
+	for _, namespace := range namespaces {
+		roles := h.RolesOfToken(holder, namespace)
 		if roles == nil {
 			roles = []string{}
 		}

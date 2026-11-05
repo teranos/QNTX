@@ -240,3 +240,98 @@ func (m *memTokenStore) expire(id string, at time.Time) {
 		}
 	}
 }
+
+// A label is not a derivation. A token named as an agent's that the node's key
+// did not derive under that name stands on nobody's roles: it is refused.
+func TestALabelAloneMakesNoAgentsToken(t *testing.T) {
+	h, store, _, asking := agentsNode(t)
+	h.SetRoleReader(&memRoles{lines: map[string][]RoleLine{"ground": {
+		{Routes: []string{"ground-token"}, Roles: []string{"GROUND"}, Granted: true, Actor: mastodonAccount, At: time.Now()},
+	}}})
+	// Minted before a session was refused such a label, the way one already held is.
+	named, _, err := store.Create(NewToken{Label: agentLabel(asking.DID, "otari"), MintedBy: mastodonAccount,
+		Level: LevelAttestor, Namespaces: []string{"ground"}, ExpiresAt: NeverEnds()})
+	require.NoError(t, err)
+
+	_, ok := presentedAs(h, named)
+	assert.False(t, ok, "a token the node did not derive stood on the asking token's roles")
+}
+
+// Agents asking at once are handed one token, and it is written down once:
+// two asks that both found it absent would both write it, and the second write
+// would turn back on a token switched off in between.
+func TestAgentsAskingAtOnceAreHandedOneToken(t *testing.T) {
+	h, store, raw, _ := agentsNode(t)
+	kept := &memAttestor{}
+	h.SetAttestor(kept)
+	admitted, ok := presentedAs(h, raw)
+	require.True(t, ok)
+	// Each look holds until the other has looked too, or until it is plain
+	// the other cannot look while this one asks.
+	both := &lookingTogether{memTokenStore: store, looked: make(chan struct{}, 2)}
+	h.tokens = both
+
+	codes := make(chan int, 2)
+	for range 2 {
+		go func() { codes <- asksForAgent(h, admitted, `{"agent":"otari"}`).Code }()
+	}
+	created := 0
+	for range 2 {
+		if <-codes == http.StatusCreated {
+			created++
+		}
+	}
+	assert.Equal(t, 1, created, "both asks found the token absent and wrote it")
+	assert.Len(t, kept.wrote, 1, "the token was attested as minted more than once")
+}
+
+// lookingTogether is a store whose LookupSpent waits for a second look, so two
+// asks that may look at once do.
+type lookingTogether struct {
+	*memTokenStore
+	looked chan struct{}
+}
+
+func (l *lookingTogether) LookupSpent(hash string) (Grant, bool, bool) {
+	grant, live, held := l.memTokenStore.LookupSpent(hash)
+	l.looked <- struct{}{}
+	deadline := time.After(200 * time.Millisecond)
+	for len(l.looked) < 2 {
+		select {
+		case <-deadline:
+			return grant, live, held
+		case <-time.After(time.Millisecond):
+		}
+	}
+	return grant, live, held
+}
+
+// What the tokens element shows of an agent's token is what the gate admits it
+// as: the asking token's namespaces and roles, and none once that token is off.
+func TestAnAgentsTokenIsShownAsTheGateAdmitsIt(t *testing.T) {
+	h, store, raw, asking := agentsNode(t)
+	h.SetRoleReader(&memRoles{lines: map[string][]RoleLine{"ground": {
+		{Routes: []string{"ground-token"}, Roles: []string{"GROUND"}, Granted: true, Actor: mastodonAccount, At: time.Now()},
+	}}})
+	otari := handedTo(t, h, raw, "otari")
+	info := listed(t, store, otari.DID)
+
+	assert.Equal(t, map[string][]string{"ground": {"GROUND"}}, h.answerFor(info).Roles)
+
+	require.NoError(t, store.Revoke(asking.ID))
+	assert.Empty(t, h.answerFor(info).Roles, "an agent whose token is off was shown holding roles")
+}
+
+// listed is the token whose DID this is, as the store lists it.
+func listed(t *testing.T, store *memTokenStore, did string) TokenInfo {
+	t.Helper()
+	held, err := store.List()
+	require.NoError(t, err)
+	for _, info := range held {
+		if info.DID == did {
+			return info
+		}
+	}
+	t.Fatalf("%s is not listed", did)
+	return TokenInfo{}
+}

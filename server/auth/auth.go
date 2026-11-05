@@ -43,7 +43,10 @@ type Handler struct {
 	users UserStore
 	// Held across the read-then-write that creates a User. One process only:
 	// two nodes on one location still race, and nothing arbitrates that.
-	creating       sync.Mutex
+	creating sync.Mutex
+	// Held across the look-then-write that hands an agent its token, for the
+	// same reason and with the same reach.
+	handingAgents  sync.Mutex
 	sessions       *sessionStore
 	becomings      becomings
 	layeChallenges layeChallenges
@@ -399,12 +402,11 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// An agent's token is the token it runs under, under a DID of its own
 		// (ADR-025): its level, its namespaces and its roles are that token's,
 		// read now, and it stands while that token does.
-		if under, isAgents := askedUnder(grant.Label); isAgents {
-			asking, live := h.askingToken(under)
-			if !live || (asking.Level != LevelToken && asking.Level != LevelAttestor) {
+		if asking, isAgents, stands := h.runsUnder(grant.Label, grant.DID); isAgents {
+			if !stands {
 				h.logger.Infow("Bearer token refused",
 					"did", grant.DID,
-					"reason", "the token its agent runs under is not live")
+					"reason", "named as an agent's token, and not one this node derived for a token that is live")
 				return Admission{}, false
 			}
 			agents := *grant
