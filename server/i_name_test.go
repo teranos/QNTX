@@ -491,3 +491,51 @@ func TestANameLineIsStampedWhenItIsWrittenAndReadInTheOrderOfItsSequence(t *test
 	require.NoError(t, err)
 	assert.True(t, first.AttestationExists("AS-written-after"), "a row written after the name line is taken in")
 }
+
+// Qodo's review of #1540: a name line whose sequence is no whole number above
+// zero failed every name read and every i name after it. It is no name, as a
+// line some other actor wrote is no name, and the rest read as before.
+func TestANameLineWithNoSequenceToReadIsNoName(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s := rootKnowingServer(t)
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	at := time.Now()
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-named-bad-sequence", Subjects: []string{"did:key:z6Mkbirch"}, Predicates: []string{predicateAgentNamed},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkbirch"}, Timestamp: at, CreatedAt: at,
+		Source: "did:key:z6Mkbirch", Attributes: map[string]any{"name": "birch", "sequence": "first"},
+	}))
+
+	named, refusal := s.iName(asAgent("did:key:z6Mkash"), sigil.Sent{"name": "birch"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "birch", named.(*protocol.Named).GetName(), "the line that reads as no name holds no name")
+	names, err := s.agentNames()
+	require.NoError(t, err)
+	require.Len(t, names, 1)
+	assert.Equal(t, "did:key:z6Mkash", names[0].did)
+}
+
+// Qodo's review of #1540: a build from before sequences, run after one that
+// writes them (a node flipped to an older branch), writes a rename with no
+// sequence. Read as older than every sequenced line, it was undone by the
+// rename it came after. A line with no sequence is read where its stamp puts
+// it among the sequenced lines.
+func TestARenameWithNoSequenceAfterASequencedOneStands(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s := rootKnowingServer(t)
+	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "deploy agent"})
+	require.Nil(t, refusal, refusal.GetSays())
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	later := time.Now().Add(time.Hour)
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-named-by-an-older-build", Subjects: []string{"did:key:z6Mkwalnut"}, Predicates: []string{predicateAgentNamed},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkwalnut"}, Timestamp: later, CreatedAt: later,
+		Source: "did:key:z6Mkwalnut", Attributes: map[string]any{"name": "late agent"},
+	}))
+	names, err := s.agentNames()
+	require.NoError(t, err)
+	require.Len(t, names, 1)
+	assert.Equal(t, "late agent", names[0].name)
+}

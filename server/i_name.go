@@ -82,11 +82,16 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
 			Says: strconv.Quote(name) + " is taken: another agent holds it. Ask again with another name."}
 	}
+	// 「[Opus 5.5] The newest sequence is the greatest any line carries: the last line read may carry none.」
 	var newest int64
-	if len(lines) > 0 {
-		newest = lines[len(lines)-1].sequence
+	var newestStamp time.Time
+	for _, line := range lines {
+		newest = max(newest, line.sequence)
+		if line.at.After(newestStamp) {
+			newestStamp = line.at
+		}
 	}
-	if err := s.keepAgentName(did, name, newest); err != nil {
+	if err := s.keepAgentName(did, name, newest, newestStamp); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	if left != "" {
@@ -142,14 +147,26 @@ type agentName struct {
 	// 「[Opus 5.5] sequence is the line's place among every name line; 0 is a line written before lines」
 	// 「[Opus 5.5] carried one, before any that does.」
 	sequence int64
+	// 「[Opus 5.5] after is the newest stamp among the lines a sequenced line was written after: every line」
+	// 「[Opus 5.5] with no sequence stamped at or before it was there when it was written. A sequenced line」
+	// 「[Opus 5.5] that does not say is after the lines stamped at or before its own stamp.」
+	after time.Time
 }
+
+// 「[Opus 5.5] nameAfterAttribute is the attribute a name line's after is kept under, in Unix milliseconds.」
+const nameAfterAttribute = "after"
 
 // 「[Opus 5.5] nameSequenceAttribute is the attribute a name line's sequence is kept under.」
 const nameSequenceAttribute = "sequence"
 
 // 「[Opus 5.5] sequenceOf is the sequence a name line carries, 0 for one that carries none.」
 func sequenceOf(as *types.As) (int64, error) {
-	held, carried := as.Attributes[nameSequenceAttribute]
+	return wholeAttribute(as, nameSequenceAttribute)
+}
+
+// 「[Opus 5.5] wholeAttribute is the whole number above zero a name line keeps under attribute, 0 for none.」
+func wholeAttribute(as *types.As, attribute string) (int64, error) {
+	held, carried := as.Attributes[attribute]
 	if !carried {
 		return 0, nil
 	}
@@ -167,7 +184,7 @@ func sequenceOf(as *types.As) (int64, error) {
 			return sequence, nil
 		}
 	}
-	return 0, errors.Newf("the %s line %s keeps %s as %v (%T), not a whole number above zero", predicateAgentNamed, as.ID, nameSequenceAttribute, held, held)
+	return 0, errors.Newf("the %s line %s keeps %s as %v (%T), not a whole number above zero", predicateAgentNamed, as.ID, attribute, held, held)
 }
 
 // agentNames is the name each agent holds now, read from every line in the
@@ -207,19 +224,50 @@ func (s *QNTXServer) agentLines() ([]agentName, error) {
 			s.logger.Warnw("an agent:named line is no agent naming itself, and is no name", "id", as.ID)
 			continue
 		}
+		// 「[Opus 5.5] A line whose sequence does not read is no name, as one another actor wrote is not.」
 		sequence, err := sequenceOf(as)
 		if err != nil {
-			return nil, err
+			s.logger.Warnw("an agent:named line carries a sequence that does not read, and is no name", "id", as.ID, "error", err)
+			continue
 		}
-		names = append(names, agentName{did: as.Subjects[0], name: name, at: as.Timestamp, sequence: sequence})
+		line := agentName{did: as.Subjects[0], name: name, at: as.Timestamp, sequence: sequence, after: as.Timestamp}
+		after, err := wholeAttribute(as, nameAfterAttribute)
+		if err != nil {
+			s.logger.Warnw("an agent:named line carries an after that does not read, and is no name", "id", as.ID, "error", err)
+			continue
+		}
+		if after > 0 {
+			line.after = time.UnixMilli(after)
+		}
+		names = append(names, line)
 	}
-	slices.SortStableFunc(names, func(a, b agentName) int {
-		if a.sequence != b.sequence {
-			return cmp.Compare(a.sequence, b.sequence)
+	return inOrder(names), nil
+}
+
+// 「[Opus 5.5] inOrder is name lines in the order they were written: sequenced lines by their sequence,」
+// 「[Opus 5.5] and a line with none (written before sequences, or by a build from before them run after)」
+// 「[Opus 5.5] before the first sequenced line whose after is at or past its stamp: that line was written」
+// 「[Opus 5.5] after it, however far ahead of the clock it was stamped.」
+func inOrder(names []agentName) []agentName {
+	var sequenced, unsequenced []agentName
+	for _, line := range names {
+		if line.sequence > 0 {
+			sequenced = append(sequenced, line)
+		} else {
+			unsequenced = append(unsequenced, line)
 		}
-		return a.at.Compare(b.at)
-	})
-	return names, nil
+	}
+	slices.SortStableFunc(sequenced, func(a, b agentName) int { return cmp.Compare(a.sequence, b.sequence) })
+	slices.SortStableFunc(unsequenced, func(a, b agentName) int { return a.at.Compare(b.at) })
+	ordered := make([]agentName, 0, len(names))
+	for len(sequenced) > 0 && len(unsequenced) > 0 {
+		if unsequenced[0].at.UnixMilli() > sequenced[0].after.UnixMilli() {
+			ordered, sequenced = append(ordered, sequenced[0]), sequenced[1:]
+		} else {
+			ordered, unsequenced = append(ordered, unsequenced[0]), unsequenced[1:]
+		}
+	}
+	return append(append(ordered, unsequenced...), sequenced...)
 }
 
 // standing is the name each agent holds after these lines, read in order.
@@ -253,7 +301,7 @@ const stampPrecision = time.Millisecond
 // 「[Opus 5.5] namingNow is when a name line is written: the clock, which a test holds still.」
 var namingNow = time.Now
 
-func (s *QNTXServer) keepAgentName(did, name string, newest int64) error {
+func (s *QNTXServer) keepAgentName(did, name string, newest int64, newestStamp time.Time) error {
 	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
 		return errors.Wrapf(err, "no store to keep the name of %s in", did)
@@ -266,7 +314,7 @@ func (s *QNTXServer) keepAgentName(did, name string, newest int64) error {
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{did}, Predicates: []string{predicateAgentNamed}, Contexts: []string{auth.NamespaceSystem},
 		Actors: []string{did}, Timestamp: now, CreatedAt: now, Source: did,
-		Attributes: map[string]any{"name": name, nameSequenceAttribute: newest + 1},
+		Attributes: map[string]any{"name": name, nameSequenceAttribute: newest + 1, nameAfterAttribute: max(newestStamp.UnixMilli(), 1)},
 	}); err != nil {
 		return errors.Wrapf(err, "the name of %s was not kept", did)
 	}
