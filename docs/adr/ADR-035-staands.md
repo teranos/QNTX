@@ -1,7 +1,7 @@
 # ADR-035 — Staands
 
-**Status:** 
-**Date:** Accepted and Implemented. 2026-09-07 , revised: 2026
+**Status:** to be folded into D
+**Date:** Accepted and Implemented. 2026-09-07 , revised: 2026-11-05
 **Related:** [[ADR-025-access-tokens]] (Access Tokens), [[ADR-026-Namespaces]] (Namespaces), [[ADR-030-identity-providers]] (Identity Providers), ADR-031 (The User), [[ADR-032-Doors]] (Front Doors), [[ADR-034-roles-as-attestations]] (Roles as Attestations)
 
 Analytics Pixel
