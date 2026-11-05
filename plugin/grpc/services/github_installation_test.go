@@ -244,6 +244,28 @@ func TestAnArtifactIsReadAsTheInstallation(t *testing.T) {
 	assert.Equal(t, "Bearer ghs_minted", (*seen)[2].Header.Get("Authorization"))
 }
 
+// An artifact is a download and not an API call: otaripy's artifact, 526,284,574
+// bytes, stopped after 207,388,672 at the API's 30 seconds and was never
+// installed. One that takes longer than an API call is still read whole.
+func TestAnArtifactIsReadPastAnAPICallsTimeout(t *testing.T) {
+	s, _ := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"},
+		installedOn(time.Now().Add(time.Hour), func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("zip "))
+			w.(http.Flusher).Flush()
+			time.Sleep(300 * time.Millisecond)
+			_, _ = w.Write([]byte("bytes"))
+		}))
+	s.client.Timeout = 100 * time.Millisecond
+
+	body, err := s.Artifact(context.Background(), "teranos", "QNTX", 42)
+	require.NoError(t, err)
+	got, err := io.ReadAll(body)
+	require.NoError(t, err)
+	require.NoError(t, body.Close())
+	assert.Equal(t, "zip bytes", string(got))
+	assert.Equal(t, githubDownloadTimeout, s.downloads.Timeout)
+}
+
 // An artifact GitHub no longer holds is refused in GitHub's words, naming the call.
 func TestAnArtifactGitHubRefusesNamesTheCall(t *testing.T) {
 	s, _ := fakeGitHubAs(t, gardenApp{gardenTokens: gardenCreds, jwt: "the-apps-jwt"},
