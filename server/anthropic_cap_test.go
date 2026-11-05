@@ -1,11 +1,13 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/ats/types"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -113,4 +115,29 @@ func TestAnOrderAndACapAskedAtOnceBothStand(t *testing.T) {
 		require.Equal(t, amount, am.GetCap(), "round %d: the cap stands", round)
 		require.Equal(t, first, am.GetFirst(), "round %d: the order stands", round)
 	}
+}
+
+// Qodo's review of #1538: a store keeps a line's timestamp to the millisecond,
+// and the newest line is the one with the latest timestamp, so a line written
+// in the same millisecond as the one before it, or with the clock behind it,
+// was not read as the newest and its change was written away by the next.
+func TestAnOrderAndACapStandAfterALineStampedAheadOfTheClock(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _, _ := runningNamespaceAgents(t)
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	ahead := time.Now().Add(time.Hour)
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-anthropic-ahead", Subjects: []string{anthropicLineSubject}, Predicates: []string{anthropicLinePredicate},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"https://example.org/root"}, Timestamp: ahead, CreatedAt: ahead,
+		Source: "anthropic", Attributes: map[string]any{"first": anthropicSession, "then": false},
+	}))
+
+	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole, "then": "true"})
+	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "75"})
+
+	am := rootAsksAnthropic(t, s, "am", sigil.Sent{})
+	assert.Equal(t, anthropicConsole, am.GetFirst(), "the order stands")
+	assert.True(t, am.GetThen())
+	assert.Equal(t, "75", am.GetCap(), "the cap stands")
 }
