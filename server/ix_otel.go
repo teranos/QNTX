@@ -4,7 +4,7 @@ package server
 //
 // 「[Opus 5.5] The wire is the pinned one, server/parity/otlp_v1.11.0_790608c: a sender's OTLP」
 // 「[Opus 5.5] base endpoint is <node>/ix/otel, and the specification appends the signal's path,」
-// 「[Opus 5.5] v1/traces, to it. Binary protobuf and JSON bodies, gzip or not, answered in the」
+// 「[Opus 5.5] v1/traces or v1/metrics, to it. Binary protobuf and JSON bodies, gzip or not, answered in the」
 // 「[Opus 5.5] Content-Type they came in.」
 //
 // 「[Opus 5.5] Who may send is the reach table's line and the token's own namespace and WRITE」
@@ -28,6 +28,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
+	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	"google.golang.org/genproto/googleapis/rpc/status"
@@ -37,8 +38,9 @@ import (
 
 // 「[Opus 5.5] ixOtelPrefix is the route; each signal is the specification's default path under it.」
 const (
-	ixOtelPrefix = "/ix/otel/"
-	ixOtelTraces = ixOtelPrefix + "v1/traces"
+	ixOtelPrefix  = "/ix/otel/"
+	ixOtelTraces  = ixOtelPrefix + "v1/traces"
+	ixOtelMetrics = ixOtelPrefix + "v1/metrics"
 )
 
 // 「[Opus 5.5] The two encodings OTLP/HTTP carries, by the Content-Type each MUST be sent with.」
@@ -56,10 +58,50 @@ const otlpUnknownService = "unknown_service"
 // 「[Opus 5.5] HandleIxOtel answers one OTLP/HTTP export. A path under ix/otel that is no signal it takes is 404.」
 func (s *QNTXServer) HandleIxOtel(w http.ResponseWriter, r *http.Request) {
 	encoding := otlpEncodingOf(r)
-	if r.URL.Path != ixOtelTraces {
-		otlpRefuse(w, s, encoding, http.StatusNotFound, fmt.Sprintf("ix/otel takes %s, and %s is no signal it takes", ixOtelTraces, r.URL.Path))
-		return
+	switch r.URL.Path {
+	case ixOtelTraces:
+		s.takeIn(w, r, encoding, &coltracepb.ExportTraceServiceRequest{}, func(admitted auth.Admission, store ats.AttestationStore, export proto.Message) (proto.Message, error) {
+			traces, isTraces := export.(*coltracepb.ExportTraceServiceRequest)
+			if !isTraces {
+				return nil, errors.Newf("ix/otel decoded %T for traces", export)
+			}
+			rejected, why, err := s.keepSpans(admitted, store, traces)
+			if err != nil {
+				return nil, err
+			}
+			answer := &coltracepb.ExportTraceServiceResponse{}
+			if rejected > 0 {
+				answer.PartialSuccess = &coltracepb.ExportTracePartialSuccess{RejectedSpans: rejected, ErrorMessage: why}
+				s.logger.Warnw("ix/otel rejected spans of an export", "rejected", rejected, "why", why)
+			}
+			return answer, nil
+		})
+	case ixOtelMetrics:
+		s.takeIn(w, r, encoding, &colmetricspb.ExportMetricsServiceRequest{}, func(admitted auth.Admission, store ats.AttestationStore, export proto.Message) (proto.Message, error) {
+			metrics, isMetrics := export.(*colmetricspb.ExportMetricsServiceRequest)
+			if !isMetrics {
+				return nil, errors.Newf("ix/otel decoded %T for metrics", export)
+			}
+			rejected, why, err := s.keepNumbers(admitted, store, metrics)
+			if err != nil {
+				return nil, err
+			}
+			answer := &colmetricspb.ExportMetricsServiceResponse{}
+			if rejected > 0 {
+				answer.PartialSuccess = &colmetricspb.ExportMetricsPartialSuccess{RejectedDataPoints: rejected, ErrorMessage: why}
+				s.logger.Warnw("ix/otel rejected data points of an export", "rejected", rejected, "why", why)
+			}
+			return answer, nil
+		})
+	default:
+		otlpRefuse(w, s, encoding, http.StatusNotFound, fmt.Sprintf("ix/otel takes %s and %s, and %s is no signal it takes", ixOtelTraces, ixOtelMetrics, r.URL.Path))
 	}
+}
+
+// 「[Opus 5.5] takeIn is what every signal shares: a POST in an encoding OTLP speaks, bounded, read into export,」
+// 「[Opus 5.5] kept by keep in the store the caller acts in, and answered in the encoding it came in.」
+func (s *QNTXServer) takeIn(w http.ResponseWriter, r *http.Request, encoding string, export proto.Message,
+	keep func(auth.Admission, ats.AttestationStore, proto.Message) (proto.Message, error)) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		otlpRefuse(w, s, encoding, http.StatusMethodNotAllowed, "an OTLP/HTTP export is a POST")
@@ -75,9 +117,8 @@ func (s *QNTXServer) HandleIxOtel(w http.ResponseWriter, r *http.Request) {
 		otlpRefuse(w, s, encoding, code, err.Error())
 		return
 	}
-	export := &coltracepb.ExportTraceServiceRequest{}
 	if err := otlpDecode(encoding, body, export); err != nil {
-		otlpRefuse(w, s, encoding, http.StatusBadRequest, "the body is no ExportTraceServiceRequest: "+err.Error())
+		otlpRefuse(w, s, encoding, http.StatusBadRequest, fmt.Sprintf("the body is no %s: %v", export.ProtoReflect().Descriptor().Name(), err))
 		return
 	}
 	store, err := s.storeFor(r)
@@ -86,17 +127,12 @@ func (s *QNTXServer) HandleIxOtel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admitted, _ := auth.AdmissionFrom(r.Context())
-	rejected, why, err := s.keepSpans(admitted, store, export)
+	answer, err := keep(admitted, store, export)
 	if err != nil {
 		// 「[Opus 5.5] A store that failed is retried by the sender, and what was kept before it is kept once by its id.」
-		s.logger.Errorw("ix/otel kept part of an export and the store failed", "error", err)
+		s.logger.Errorw("ix/otel kept part of an export and the store failed", "path", r.URL.Path, "error", err)
 		otlpRefuse(w, s, encoding, http.StatusServiceUnavailable, err.Error())
 		return
-	}
-	answer := &coltracepb.ExportTraceServiceResponse{}
-	if rejected > 0 {
-		answer.PartialSuccess = &coltracepb.ExportTracePartialSuccess{RejectedSpans: rejected, ErrorMessage: why}
-		s.logger.Warnw("ix/otel rejected spans of an export", "rejected", rejected, "why", why)
 	}
 	otlpAnswer(w, s, encoding, http.StatusOK, answer)
 }
