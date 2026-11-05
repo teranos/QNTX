@@ -7,9 +7,13 @@ package comet
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -96,19 +100,101 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	kept := map[string]string{"ground": AgentGround(home), "ground_hook": AgentHook(home),
 		"ground_sky": AgentSky(home), "ground_drive": AgentDrive(home)}
 	src, env, err := b.ground(ctx, work, sand, "agent:"+filepath.Base(home), kept)
-	if err != nil || len(sand) == 1 {
+	if err != nil {
 		return err
+	}
+	held, err := AgentLocalSand(native)
+	if err != nil {
+		return err
+	}
+	// No rituals left: the sand this agent's build kept goes, and one another agent kept stays.
+	if len(sand) == 1 {
+		if keptBy(held) != home {
+			return nil
+		}
+		for _, path := range []string{held, held + ".digest", held + ".controls", held + ".agent"} {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return errors.Wrapf(err, "the sand kept for the agent's rituals at %s was not removed when none were left", path)
+			}
+		}
+		return nil
 	}
 	// The engine is built from ground's floor alone (ground dub.json -d-version=Floor): the rituals
 	// reach it as the sand it holds beside it (ground source/sand/load.d holdLanded).
 	if _, err := b.sandIn(ctx, src, env, native); err != nil {
 		return errors.Wrap(err, "the sand that declares the agent's rituals did not build")
 	}
+	if err := keepBuilt(src, filepath.Join("build", SandFile(native)), held); err != nil {
+		return err
+	}
+	if err := os.WriteFile(held+".controls", []byte(controlsDigest(sand)), 0o644); err != nil {
+		return errors.Wrapf(err, "what the sand at %s was built from was not written beside it", held)
+	}
+	return errors.Wrapf(os.WriteFile(held+".agent", []byte(home), 0o644), "whose the sand at %s is was not written beside it", held)
+}
+
+// keptBy is the home of the agent whose build kept the sand at held, or empty.
+func keptBy(held string) string {
+	said, err := os.ReadFile(held + ".agent")
+	if err != nil {
+		return ""
+	}
+	return string(said)
+}
+
+// controlsDigest is the sha256 of an agent's sand as it is written, file by file in name order.
+func controlsDigest(sand map[string]string) string {
+	names := make([]string, 0, len(sand))
+	for name := range sand {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	sum := sha256.New()
+	for _, name := range names {
+		sum.Write([]byte(name + "\x00" + sand[name] + "\x00"))
+	}
+	return hex.EncodeToString(sum.Sum(nil))
+}
+
+// SandStands is whether the sand the agent in home holds is the one its grove checkout's controls
+// make now: none where it has no rituals, and built from these controls where it has. Not standing,
+// it says why, and the agent's ground is built again.
+func SandStands(home, url string) error {
+	sand, err := AgentSand(home, url)
+	if err != nil {
+		return err
+	}
+	native, err := Native()
+	if err != nil {
+		return err
+	}
 	held, err := AgentLocalSand(native)
 	if err != nil {
 		return err
 	}
-	return keepBuilt(src, filepath.Join("build", SandFile(native)), held)
+	if len(sand) == 1 {
+		if keptBy(held) == home {
+			return errors.Newf("the agent's grove checkout declares no ritual, and the sand its last build kept at %s still does", held)
+		}
+		return nil
+	}
+	if _, err := os.Stat(held); err != nil {
+		return errors.Wrapf(err, "the agent's grove checkout declares rituals, and no sand holding them is kept at %s", held)
+	}
+	if keptBy(held) != home {
+		return errors.Newf("the sand at %s was not kept by this agent's build", held)
+	}
+	built, err := os.ReadFile(held + ".controls")
+	if err != nil || string(built) != controlsDigest(sand) {
+		return errors.Newf("the controls of the agent's grove checkout changed since the sand at %s was built", held)
+	}
+	return nil
+}
+
+// Building is whether the agent in home has a ground build going.
+func Building(home string) bool {
+	last, ok := agentBuilds.Load(home)
+	return ok && strings.HasPrefix(last.(string), "its ground is building")
 }
 
 // AgentPath is the PATH an agent's turn runs with: its own ground first, which its hooks and a
