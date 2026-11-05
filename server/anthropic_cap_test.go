@@ -3,6 +3,8 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -70,4 +72,45 @@ func TestRootTakesTheCapBackToTheDefault(t *testing.T) {
 	assert.True(t, back.GetThen())
 	again := rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "  "})
 	assert.True(t, again.GetCapDefault(), "an amount of nothing but spaces is left out too")
+}
+
+// Qodo's review of QNTX-Web#55, deferred to the node: an order and a cap asked
+// at once each read the ANTHROPIC line and wrote it anew, so the one written
+// second carried the other's old value, and the first was lost.
+func TestAnOrderAndACapAskedAtOnceBothStand(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _, _ := runningNamespaceAgents(t)
+	admitted := auth.Admitted(auth.LevelRoot)
+	admitted.Identity = "https://example.org/root"
+	asked := httptest.NewRequest(http.MethodPost, "/api/anthropic", nil)
+	asked = asked.WithContext(auth.WithAdmission(asked.Context(), admitted))
+	ctx := sigil.WithCaller(asked.Context(), asked)
+	signum := s.anthropicSignum()
+	for round := 0; round < 40; round++ {
+		first := []string{anthropicSession, anthropicConsole}[round%2]
+		amount := strconv.Itoa(100 + round)
+		var both sync.WaitGroup
+		refusals := make(chan string, 2)
+		both.Add(2)
+		go func() {
+			defer both.Done()
+			if _, refused := signum.Answers["order"](ctx, sigil.Sent{"first": first, "then": "true"}); refused != nil {
+				refusals <- refused.GetSays()
+			}
+		}()
+		go func() {
+			defer both.Done()
+			if _, refused := signum.Answers["cap"](ctx, sigil.Sent{"amount": amount}); refused != nil {
+				refusals <- refused.GetSays()
+			}
+		}()
+		both.Wait()
+		close(refusals)
+		for says := range refusals {
+			t.Fatalf("round %d: %s", round, says)
+		}
+		am := rootAsksAnthropic(t, s, "am", sigil.Sent{})
+		require.Equal(t, amount, am.GetCap(), "round %d: the cap stands", round)
+		require.Equal(t, first, am.GetFirst(), "round %d: the order stands", round)
+	}
 }

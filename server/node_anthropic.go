@@ -185,18 +185,32 @@ func (s *QNTXServer) anthropicSet(ctx context.Context, sent sigil.Sent) (any, *p
 		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "given", Says: "no id of Anthropic's in " + strings.TrimSpace(sent["given"]) + ": an organization's is a UUID, an issuer's starts fdis_, a service account's svac_, a rule's fdrl_"}
 	}
 	// What was given joins what the node kept: each id is given once, at its own step.
-	kept, _, err := s.anthropicLine()
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	}
-	for name, id := range found {
-		kept.ids[name] = id
-	}
-	if refused := s.keepAnthropicLine(admitted.Identity, kept); refused != nil {
+	if _, refused := s.changeAnthropicLine(admitted.Identity, func(kept *anthropicKept) {
+		for name, id := range found {
+			kept.ids[name] = id
+		}
+	}); refused != nil {
 		return nil, refused
 	}
 	s.logger.Infow("the node's ids at Anthropic were given", "given", found, "by", admitted.Identity)
 	return s.anthropicAm(ctx, sent)
+}
+
+// 「[Opus 5.5] changeAnthropicLine is one read of the node's ANTHROPIC line, change, and write of it」
+// 「[Opus 5.5] anew, that no other change comes between: each write carries the whole line, so one」
+// 「[Opus 5.5] read before another's write would write that other's change away.」
+func (s *QNTXServer) changeAnthropicLine(by string, change func(*anthropicKept)) (anthropicKept, *protocol.Refusal) {
+	s.anthropicLining.Lock()
+	defer s.anthropicLining.Unlock()
+	kept, _, err := s.anthropicLine()
+	if err != nil {
+		return anthropicKept{}, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	change(&kept)
+	if refused := s.keepAnthropicLine(by, kept); refused != nil {
+		return anthropicKept{}, refused
+	}
+	return kept, nil
 }
 
 // keepAnthropicLine writes the node's ANTHROPIC line anew: every id kept, and the order.
