@@ -200,7 +200,6 @@ var nodeReaders = map[string]string{
 	"sub_config_watcher.go:Init":                  "am.toml is the node's configuration, and watching it is the node's",
 	"sub_nodedid.go:Init":                         "the node's own identity, the row keyed self",
 	"sub_plugins.go:Init":                         "the plugin service registry, and plugins are the node's",
-	"sub_ticker.go:Init":                          "the poller that reports warnings and evictions about the file itself",
 	"sub_ticker.go:openPulseReadDB":               "a second connection to the same file, so a read does not wait on a write",
 }
 

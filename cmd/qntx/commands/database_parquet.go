@@ -151,7 +151,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	})
 
 	// The extra handle carries capabilities server.go asserts for. It embeds
-	// rustStore so the WAL checkpoint and age distiller assertions still find
+	// rustStore so the WAL checkpoint assertion still finds
 	// what they were finding, and adds the watchers on top.
 	// Spans every namespace at the location.
 	namespaces, err := duckdbcgo.NewNamespaceStore(location)
@@ -528,7 +528,7 @@ func (h *parquetHandles) universe(name string, landing *landed, watchers *duckdb
 		Schedules:   schedule.NewStore(h.operational),
 		Canvas:      elementstorage.NewCanvasStore(landing.db),
 		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
-		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
+		Rich:        storage.NewRichStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
 		Prompts:     prompt.NewPromptStore(h.operational, store),
 		Aliases:     storage.NewAliasStore(landing.db),
@@ -795,7 +795,7 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 		Schedules:   schedule.NewStore(h.operational),
 		Canvas:      elementstorage.NewCanvasStore(h.defaultDB),
 		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
-		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
+		Rich:        storage.NewRichStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
 		Prompts:     prompt.NewPromptStore(h.operational, dflt),
 		Aliases:     storage.NewAliasStore(dfltLanding.db),

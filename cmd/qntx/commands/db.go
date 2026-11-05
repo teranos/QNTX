@@ -26,18 +26,13 @@ Examples:
 
 var dbStatsCmd = &cobra.Command{
 	Use:   "stats",
-	Short: "Show database statistics and storage telemetry",
-	Long:  "Display database statistics including attestation counts, bounded storage enforcement events, and storage health",
+	Short: "Show database statistics",
+	Long:  "Display database statistics: attestation counts and the distinct actors, subjects and contexts",
 	RunE:  runDbStats,
 }
 
-var (
-	statsLimitFlag int
-)
-
 func init() {
 	DbCmd.AddCommand(dbStatsCmd)
-	dbStatsCmd.Flags().IntVar(&statsLimitFlag, "limit", 20, "Number of recent storage events to show")
 }
 
 func runDbStats(cmd *cobra.Command, args []string) (err error) {
@@ -87,104 +82,5 @@ func runDbStats(cmd *cobra.Command, args []string) (err error) {
 	fmt.Printf("Unique Contexts:    %d\n", uniqueContexts)
 	fmt.Println()
 
-	// Get bounded storage configuration
-	fmt.Printf("Bounded Storage Limits:\n")
-	fmt.Printf("  Actor/Context:    %d attestations per (actor, context) pair\n", cfg.Storage.Sqlite.BoundedStorage.ActorContextLimit)
-	fmt.Printf("  Actor Contexts:   %d contexts per actor\n", cfg.Storage.Sqlite.BoundedStorage.ActorContextsLimit)
-	fmt.Printf("  Entity Actors:    %d actors per entity\n", cfg.Storage.Sqlite.BoundedStorage.EntityActorsLimit)
-	fmt.Println()
-
-	// Get storage enforcement events
-	rows, err := database.Query(`
-		SELECT event_type, actor, context, entity, deletions_count, timestamp
-		FROM storage_events
-		ORDER BY created_at DESC
-		LIMIT ?
-	`, statsLimitFlag)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return errors.Wrap(err, "failed to query storage events")
-	}
-	if err == nil {
-		defer func() { err = sqlclose.With(err, rows.Close(), "rows for runDbStats") }()
-
-		// Count events by type
-		var (
-			hasEvents          bool
-			actorContextCount  int
-			actorContextsCount int
-			entityActorsCount  int
-		)
-
-		fmt.Printf("Recent Storage Enforcement Events (last %d):\n", statsLimitFlag)
-		fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-
-		for rows.Next() {
-			hasEvents = true
-			var (
-				eventType      string
-				actor          sql.NullString
-				context        sql.NullString
-				entity         sql.NullString
-				deletionsCount int
-				timestamp      string
-			)
-			if err := rows.Scan(&eventType, &actor, &context, &entity, &deletionsCount, &timestamp); err != nil {
-				return errors.Wrap(err, "failed to scan storage event")
-			}
-
-			// Count by type
-			switch eventType {
-			case "actor_context_limit":
-				actorContextCount++
-			case "actor_contexts_limit":
-				actorContextsCount++
-			case "entity_actors_limit":
-				entityActorsCount++
-			}
-
-			// Format event details
-			var details string
-			switch eventType {
-			case "actor_context_limit":
-				details = fmt.Sprintf("actor=%s, context=%s", nullStringValue(actor), nullStringValue(context))
-			case "actor_contexts_limit":
-				details = fmt.Sprintf("actor=%s", nullStringValue(actor))
-			case "entity_actors_limit":
-				details = fmt.Sprintf("entity=%s", nullStringValue(entity))
-			}
-
-			fmt.Printf("  [%s] %s: deleted %d attestations (%s)\n",
-				timestamp[:19], // trim to YYYY-MM-DD HH:MM:SS
-				eventType,
-				deletionsCount,
-				details,
-			)
-		}
-
-		// A read that stopped partway printed a shorter list and then said the
-		// node had never evicted anything.
-		if err := rows.Err(); err != nil {
-			return errors.Wrap(err, "the storage enforcement events stopped partway")
-		}
-
-		if !hasEvents {
-			fmt.Println("  No enforcement events recorded yet")
-		} else {
-			fmt.Println()
-			fmt.Printf("Event Summary:\n")
-			fmt.Printf("  Actor/Context limits hit:  %d times\n", actorContextCount)
-			fmt.Printf("  Actor contexts limits hit: %d times\n", actorContextsCount)
-			fmt.Printf("  Entity actors limits hit:  %d times\n", entityActorsCount)
-		}
-	}
-
 	return nil
-}
-
-// nullStringValue returns the value of a sql.NullString or a placeholder if NULL
-func nullStringValue(ns sql.NullString) string {
-	if ns.Valid {
-		return ns.String
-	}
-	return "<null>"
 }

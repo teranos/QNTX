@@ -7,7 +7,7 @@ type Message struct {
 	Type string `json:"type"` // "system_capabilities"
 	// Store is which store the node keeps (ADR-023) — "sqlite" or "parquet".
 	// Distinct from StorageBackend, which is the implementation behind it.
-	// Namespaces exist only under parquet, and sigma only under sqlite.
+	// Namespaces exist only under parquet.
 	Store            string `json:"store"`
 	StorageBackend   string `json:"storage_backend"`   // "rust" or "go" - which storage implementation is active
 	StorageOptimized bool   `json:"storage_optimized"` // true if using Rust SQLite (optimized), false if Go fallback

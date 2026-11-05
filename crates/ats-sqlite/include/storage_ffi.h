@@ -159,15 +159,6 @@ AttestationResultC read_conn_query_raw(const ReadConn *rc, const char *sql, cons
  */
 StringArrayResultC read_conn_integrity_check(const ReadConn *rc);
 
-/**
- * Set enforcement config on the store.
- * When set, enforcement runs automatically after every storage_put().
- *
- * @param store Store handle
- * @param config_json JSON enforcement config, e.g. {"actor_context_limit":16,"actor_contexts_limit":64,"entity_actors_limit":64}
- * @return Result indicating success/failure
- */
-StorageResultC storage_set_enforcement_config(SqliteStore *store, const char *config_json);
 
 // ============================================================================
 // CRUD Operations
@@ -271,18 +262,9 @@ AttestationResultC storage_query(const SqliteStore *store, const char *filter_js
 AttestationResultC storage_query_resolved(const SqliteStore *store, const char *filter_json);
 
 // ============================================================================
-// Enforcement & Stats
+// Stats
 // ============================================================================
 
-/**
- * Enforce storage limits and log events to storage_events table.
- * Returns JSON array of enforcement events that occurred.
- *
- * @param store Store handle
- * @param input_json JSON with actors, contexts, subjects, and config
- * @return Result with JSON array of enforcement events
- */
-AttestationResultC storage_enforce_limits(SqliteStore *store, const char *input_json);
 
 /**
  * Get storage statistics (counts of attestations, unique actors/subjects/contexts).
@@ -411,33 +393,6 @@ void query_result_free(QueryResultC result);
  * @return Result with string array of integrity check lines
  */
 StringArrayResultC storage_integrity_check(const SqliteStore *store);
-
-// ============================================================================
-// Age Distillation
-// ============================================================================
-
-typedef struct {
-    bool success;
-    char *error_msg;
-    size_t distilled;
-    size_t sigmas_created;
-    size_t skipped;
-} DistillResultC;
-
-/**
- * Run age-triggered distillation: fold old attestations into sigmas.
- * Queries attestations older than cutoff plus all existing sigmas,
- * groups by predicate, creates one sigma per group, deletes originals.
- * All within a single transaction.
- *
- * Caller must hold the write mutex before calling.
- *
- * @param store Store handle
- * @param cutoff_rfc3339 RFC3339 timestamp cutoff for old attestations
- * @param batch_size Maximum number of attestations to process
- * @return Result with distilled/sigmas_created/skipped counts
- */
-DistillResultC storage_age_distill(SqliteStore *store, const char *cutoff_rfc3339, size_t batch_size);
 
 // ============================================================================
 // WAL Checkpoint

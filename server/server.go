@@ -71,7 +71,6 @@ type QNTXServer struct {
 	tickerCfg             schedule.TickerConfig         // Ticker configuration (resolved at init)
 	ticker                *schedule.Ticker              // Pulse ticker for scheduled jobs
 	configWatcher         *config.ConfigWatcher         // Config watcher for auto-reload on config changes
-	storageEventsPoller   *StorageEventsPoller          // Poller for storage events (warnings/evictions)
 	handlerFailures       *statusline.HandlerFailureLog // Recent failed handler executions, for the status row
 	news                  *statusline.NewsLog           // What built-ins left on the status row, per caller
 	askPeers              statusline.PeerRows           // How the peers' rows are asked for the status row; statusline.NoPeers until auth declares them
@@ -230,7 +229,6 @@ type QNTXServer struct {
 	watcherDB          *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)
 	pulseReadDB        *sql.DB            // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
 	walCheckpointer    WALCheckpointer    // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
-	ageDistiller       AgeDistiller       // Rust-side age distillation (fold old attestations into sigmas)
 	writeLockInspector WriteLockInspector // Rust-side write lock holder tracking
 	shed               *auth.Shed         // the tokens the gate turns away while the operational store is slow
 	recordReporters    []RecordReporter   // What reading the record off-node has cost, per reader
@@ -254,11 +252,6 @@ type QNTXServer struct {
 // SetWALCheckpointer sets the Rust-side WAL checkpointer (closes read conns, checkpoints, reopens).
 func (s *QNTXServer) SetWALCheckpointer(c WALCheckpointer) {
 	s.walCheckpointer = c
-}
-
-// SetAgeDistiller sets the Rust-side age distiller (fold old attestations into sigmas).
-func (s *QNTXServer) SetAgeDistiller(d AgeDistiller) {
-	s.ageDistiller = d
 }
 
 // SetWriteLockInspector sets the write lock inspector for diagnostics.

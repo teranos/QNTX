@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	errors "github.com/teranos/sacred-error"
 )
@@ -85,13 +84,6 @@ func runHandlerCreate(cmd *cobra.Command, args []string) (err error) {
 	}
 	defer func() { err = sqlclose.With(err, database.Close(), "the handler database") }()
 
-	// BoundedStore wraps for CreateAttestationWithLimits (enforcement is in Rust now)
-	boundedStore := storage.NewBoundedStoreWithConfig(
-		database,
-		atsStore,
-		nil, // logger
-		storage.DefaultBoundedStoreConfig(),
-	)
 
 	// Generate ASID with self-certifying pattern
 	// Actor is empty string to create self-certifying ASID
@@ -114,7 +106,7 @@ func runHandlerCreate(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// Store attestation
-	err = boundedStore.CreateAttestation(attestation)
+	err = atsStore.CreateAttestation(attestation)
 	if err != nil {
 		return errors.Wrap(err, "failed to create handler attestation")
 	}

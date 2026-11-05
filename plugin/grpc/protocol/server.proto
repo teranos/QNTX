@@ -84,18 +84,6 @@ message JobUpdateMessage {
   map<string, string> metadata = 3;   // Additional metadata
 }
 
-// StorageWarningMessage represents bounded storage warning
-message StorageWarningMessage {
-  string type = 1;                 // "storage_warning"
-  string actor = 2;                // Actor approaching limit
-  string context = 3;              // Context approaching limit
-  int32 current = 4;               // Current attestation count
-  int32 limit = 5;                 // Configured limit
-  int32 fill_percentage = 6;       // Percentage full (0-100)
-  string time_until_full = 7;      // Human-readable time until hitting limit
-  int64 timestamp = 8;             // Unix timestamp
-}
-
 // RichSearchMatch represents a single match from rich string field search.
 // Mirrors storage.RichSearchMatch in ats/storage/rich_search.go.
 message RichSearchMatch {
@@ -127,7 +115,7 @@ message SystemCapabilitiesMessage {
   string type = 1;
   // store is which store the node keeps (ADR-023) — sqlite or parquet.
   // Distinct from storage_backend, which is the implementation behind it.
-  // Namespaces exist only under parquet, and sigma only under sqlite.
+  // Namespaces exist only under parquet.
   string store = 2;
   // rust or go: which storage implementation is active.
   string storage_backend = 3;
