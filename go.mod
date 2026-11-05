@@ -91,7 +91,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.47.0
 	go.opentelemetry.io/otel/exporters/zipkin v1.21.0 // indirect
-	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.11.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
@@ -210,5 +210,5 @@ require (
 	google.golang.org/api v0.264.0 // indirect
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc
 )

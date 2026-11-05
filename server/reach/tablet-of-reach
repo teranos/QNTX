@@ -59,6 +59,9 @@ REACH is '/n/'                                                            of ANY
 # The GitHub App's webhook, at the path ROOT sets under /github/. The
 # delivery's signature is the credential; every other path answers nobody.
 REACH is '/github/'                                                       of ANYONE
+# 「[Opus 5.5] ix/otel takes OpenTelemetry in as attestations: who reaches it is who writes」
+# 「[Opus 5.5] attestations, and a token's spans land where it acts, under its WRITE lines.」
+REACH is '/ix/otel/'                                                      of ROOT SUPER TOKEN ATTESTOR
 # Discovery documents (RFC 8414, RFC 9728): how a client that has never seen
 # this node finds its doors without being configured by hand. Read before it
 # sends anybody anywhere, so by a stranger.
