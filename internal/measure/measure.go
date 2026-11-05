@@ -15,11 +15,14 @@ package measure
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/getsentry/sentry-go/attribute"
+	otelattribute "go.opentelemetry.io/otel/attribute"
+	otelmetric "go.opentelemetry.io/otel/metric"
 )
 
 // The numbers.
@@ -280,6 +283,9 @@ func Start() {
 
 // Count adds to a running total: an attestation written, a caller refused.
 func Count(name string, n int64, attrs ...Attr) {
+	if o := otel.Load(); o != nil {
+		o.count(name, n, attrs)
+	}
 	m := meter.Load()
 	if m == nil {
 		return
@@ -289,6 +295,9 @@ func Count(name string, n int64, attrs ...Attr) {
 
 // Gauge records what a number is right now: a queue depth, a lock held.
 func Gauge(name string, value float64, attrs ...Attr) {
+	if o := otel.Load(); o != nil {
+		o.gauge(name, value, attrs)
+	}
 	m := meter.Load()
 	if m == nil {
 		return
@@ -300,6 +309,9 @@ func Gauge(name string, value float64, attrs ...Attr) {
 // every call site wants, and taking a time.Duration is what keeps the unit
 // from ever disagreeing with the number.
 func Took(name string, d time.Duration, attrs ...Attr) {
+	if o := otel.Load(); o != nil {
+		o.distribution(name, "ms", float64(d.Milliseconds()), attrs)
+	}
 	m := meter.Load()
 	if m == nil {
 		return
@@ -313,6 +325,9 @@ func Took(name string, d time.Duration, attrs ...Attr) {
 // a batch. Unitless on purpose: the name says what is being counted, and a
 // wrong unit is worse than none.
 func Sized(name string, n int, attrs ...Attr) {
+	if o := otel.Load(); o != nil {
+		o.distribution(name, "", float64(n), attrs)
+	}
 	m := meter.Load()
 	if m == nil {
 		return
@@ -328,4 +343,74 @@ func permitted(attrs []Attr) []Attr {
 		return nil
 	}
 	return attrs
+}
+
+// 「[Opus 5.5] otel is the second place the numbers go: an OpenTelemetry meter, when internal/otlp」
+// 「[Opus 5.5] started one because the environment named where. Each number keeps its name, and」
+// 「[Opus 5.5] each kind keeps its kind: a count is a counter, a gauge a gauge, a duration and a size」
+// 「[Opus 5.5] a histogram. Nil is no meter, and every call above costs one atomic load for it.」
+var otel atomic.Pointer[otelSink]
+
+// 「[Opus 5.5] ExportTo sends every number from here on to m as well as to Sentry. Nil stops it.」
+func ExportTo(m otelmetric.Meter) {
+	if m == nil {
+		otel.Store(nil)
+		return
+	}
+	otel.Store(&otelSink{meter: m})
+}
+
+// 「[Opus 5.5] otelSink holds one instrument per name, made the first time the name is measured.」
+type otelSink struct {
+	meter       otelmetric.Meter
+	instruments sync.Map
+}
+
+func (o *otelSink) count(name string, n int64, attrs []Attr) {
+	made, err := o.instrument(name, func() (any, error) { return o.meter.Int64Counter(name) })
+	if counter, isCounter := made.(otelmetric.Int64Counter); err == nil && isCounter {
+		counter.Add(context.Background(), n, otelmetric.WithAttributes(otelAttributes(attrs)...))
+	}
+}
+
+func (o *otelSink) gauge(name string, value float64, attrs []Attr) {
+	made, err := o.instrument(name, func() (any, error) { return o.meter.Float64Gauge(name) })
+	if gauge, isGauge := made.(otelmetric.Float64Gauge); err == nil && isGauge {
+		gauge.Record(context.Background(), value, otelmetric.WithAttributes(otelAttributes(attrs)...))
+	}
+}
+
+func (o *otelSink) distribution(name, unit string, value float64, attrs []Attr) {
+	made, err := o.instrument(name, func() (any, error) {
+		return o.meter.Float64Histogram(name, otelmetric.WithUnit(unit))
+	})
+	if histogram, isHistogram := made.(otelmetric.Float64Histogram); err == nil && isHistogram {
+		histogram.Record(context.Background(), value, otelmetric.WithAttributes(otelAttributes(attrs)...))
+	}
+}
+
+// 「[Opus 5.5] instrument is the one made for name, or makes it. A name measured as two kinds keeps the first.」
+func (o *otelSink) instrument(name string, make func() (any, error)) (any, error) {
+	if held, ok := o.instruments.Load(name); ok {
+		return held, nil
+	}
+	made, err := make()
+	if err != nil {
+		return nil, err
+	}
+	held, _ := o.instruments.LoadOrStore(name, made)
+	return held, nil
+}
+
+// 「[Opus 5.5] otelAttributes is the dimensions as OpenTelemetry's, key for key and value for value.」
+func otelAttributes(attrs []Attr) []otelattribute.KeyValue {
+	out := make([]otelattribute.KeyValue, 0, len(attrs))
+	for _, attr := range attrs {
+		if attr.Value.Type() == attribute.STRING {
+			out = append(out, otelattribute.String(attr.Key, attr.Value.AsString()))
+			continue
+		}
+		out = append(out, otelattribute.String(attr.Key, attr.Value.String()))
+	}
+	return out
 }

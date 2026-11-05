@@ -12,7 +12,7 @@ import (
 // 「[Opus 5.5] handed. The node's own exporter environment is never handed on (agentenv keeps none」
 // 「[Opus 5.5] of it), so no harness holds the key the node exports with.」
 //
-// 「[Opus 5.5] Metrics and logs are named none: ix/otel takes traces alone. A node that serves no」
+// 「[Opus 5.5] Logs are named none: ix/otel takes traces and metrics. A node that serves no」
 // 「[Opus 5.5] ix/otel, or an agent with no door, hands nothing.」
 func (s *QNTXServer) harnessOTel(agent *rootAgent) []string {
 	if s.served == nil || agent.door == "" {
@@ -25,7 +25,7 @@ func (s *QNTXServer) harnessOTel(agent *rootAgent) []string {
 		"CLAUDE_CODE_ENABLE_TELEMETRY=1",
 		"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1",
 		"OTEL_TRACES_EXPORTER=otlp",
-		"OTEL_METRICS_EXPORTER=none",
+		"OTEL_METRICS_EXPORTER=otlp",
 		"OTEL_LOGS_EXPORTER=none",
 		"OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
 		"OTEL_EXPORTER_OTLP_ENDPOINT=" + agent.door + "/ix/otel",

@@ -18,11 +18,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/measure"
 	errors "github.com/teranos/sacred-error"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -31,6 +34,8 @@ import (
 const (
 	TracesEndpoint = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
 	Endpoint       = "OTEL_EXPORTER_OTLP_ENDPOINT"
+	// 「[Opus 5.5] MetricsEndpoint names where the node's numbers go, over Endpoint.」
+	MetricsEndpoint = "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
 )
 
 // 「[Fable 5.1] flushWithin is how long the process waits for the last batch when it ends.」
@@ -39,6 +44,7 @@ const flushWithin = 5 * time.Second
 var (
 	mu       sync.Mutex
 	provider *sdktrace.TracerProvider
+	meters   *sdkmetric.MeterProvider
 )
 
 // 「[Fable 5.1] Said is the endpoint the environment names for spans, and whether it names one.」
@@ -92,14 +98,7 @@ func Start(ctx context.Context, release string, also ...sdktrace.SpanProcessor) 
 	}
 	// 「[Fable 5.1] The last value of a key wins, so what the environment says of the」
 	// 「[Fable 5.1] service stands over what is written here.」
-	described, err := resource.New(ctx,
-		resource.WithAttributes(
-			attribute.String("service.name", "qntx"),
-			attribute.String("service.version", release),
-		),
-		resource.WithFromEnv(),
-		resource.WithTelemetrySDK(),
-	)
+	described, err := describe(ctx, release)
 	if err != nil {
 		return errors.Wrapf(err, "failed to describe the node as an OpenTelemetry resource (endpoint=%q, release=%q)", endpoint, release)
 	}
@@ -117,21 +116,92 @@ func Running() bool {
 	return provider != nil
 }
 
+// 「[Opus 5.5] MetricsSaid is the endpoint the environment names for the node's numbers, and whether it names one.」
+func MetricsSaid() (string, bool) {
+	for _, name := range []string{MetricsEndpoint, Endpoint} {
+		if endpoint := os.Getenv(name); endpoint != "" {
+			return endpoint, true
+		}
+	}
+	return "", false
+}
+
+// 「[Opus 5.5] StartMetrics sends the numbers internal/measure takes over OTLP/HTTP, protobuf, to the」
+// 「[Opus 5.5] endpoint said, under the names they have, beside Sentry. The exporter reads the rest of」
+// 「[Opus 5.5] OpenTelemetry's own variables itself: OTEL_EXPORTER_OTLP_METRICS_HEADERS or」
+// 「[Opus 5.5] OTEL_EXPORTER_OTLP_HEADERS for what the receiver asks to be let in, and」
+// 「[Opus 5.5] OTEL_METRIC_EXPORT_INTERVAL for how often. No endpoint said starts nothing.」
+func StartMetrics(ctx context.Context, release string) error {
+	endpoint, said := MetricsSaid()
+	if !said {
+		return nil
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if meters != nil {
+		return errors.New("otlp.StartMetrics called twice: the second provider would replace the first and leave its numbers unsent")
+	}
+
+	exporter, err := otlpmetrichttp.New(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "failed to start the OTLP metric exporter (endpoint=%q)", endpoint)
+	}
+	described, err := describe(ctx, release)
+	if err != nil {
+		return errors.Wrapf(err, "failed to describe the node as an OpenTelemetry resource (endpoint=%q, release=%q)", endpoint, release)
+	}
+	meters = sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)),
+		sdkmetric.WithResource(described),
+	)
+	measure.ExportTo(meters.Meter("github.com/teranos/QNTX/internal/measure"))
+	return nil
+}
+
+// 「[Opus 5.5] MetricsRunning reports whether the node's numbers are leaving over OTLP.」
+func MetricsRunning() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return meters != nil
+}
+
 // 「[Fable 5.1] Flush sends what the batch still holds and stops the provider. The」
 // 「[Fable 5.1] exporter batches, so a process that ends without this drops the spans」
 // 「[Fable 5.1] of its last seconds. Safe to call when nothing started.」
 func Flush() error {
 	mu.Lock()
 	defer mu.Unlock()
-	if provider == nil {
-		return nil
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), flushWithin)
 	defer cancel()
-	err := provider.Shutdown(ctx)
-	provider = nil
-	if err != nil {
-		return errors.Wrapf(err, "the last OTLP batch did not leave within %s", flushWithin)
+	var spans, numbers error
+	if provider != nil {
+		spans = provider.Shutdown(ctx)
+		provider = nil
+	}
+	// 「[Opus 5.5] The node's last numbers are read and sent before the meter stops, and nothing is measured into it after.」
+	if meters != nil {
+		measure.ExportTo(nil)
+		numbers = meters.Shutdown(ctx)
+		meters = nil
+	}
+	if spans != nil {
+		return errors.WithSecondaryError(errors.Wrapf(spans, "the last OTLP batch did not leave within %s", flushWithin), numbers)
+	}
+	if numbers != nil {
+		return errors.Wrapf(numbers, "the node's last numbers did not leave over OTLP within %s", flushWithin)
 	}
 	return nil
+}
+
+// 「[Opus 5.5] describe is the node as an OpenTelemetry resource, the same for its spans and its numbers.」
+func describe(ctx context.Context, release string) (*resource.Resource, error) {
+	return resource.New(ctx,
+		resource.WithAttributes(
+			attribute.String("service.name", "qntx"),
+			attribute.String("service.version", release),
+		),
+		resource.WithFromEnv(),
+		resource.WithTelemetrySDK(),
+	)
 }
