@@ -13,6 +13,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
@@ -287,8 +289,8 @@ func TestTheTableGivesTheMCPServersANamespaceConsumesToNoToken(t *testing.T) {
 
 // "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
 //
-// 「[Opus 5.5] ROOT connects the node, in system; no namespace sees what the node consumes, and nobody but」
-// 「[Opus 5.5] ROOT handles it, a token at ROOT included.」
+// 「[Opus 5.5] ROOT connects the node, in system; no namespace sees what the node consumes, nobody but ROOT」
+// 「[Opus 5.5] handles it, and no token says the yes, at ROOT either.」
 func TestROOTConnectsTheNodeToAnMCPServer(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	up := standingUpstream(t)
@@ -319,7 +321,110 @@ func TestROOTConnectsTheNodeToAnMCPServer(t *testing.T) {
 	}
 	token := person("https://example.org/root", auth.LevelRoot)
 	token.Grant = &access.Grant{}
-	_, refused = consumedAs(s, token, "tools", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker"})
+	_, refused = consumedAs(s, token, "connect", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker", "url": up.at + "/mcp"})
 	require.NotNil(t, refused)
-	assert.Contains(t, refused.Says, "a token asked")
+	assert.Contains(t, refused.Says, "a token asked", "the yes is a person's, at ROOT too")
+}
+
+// "Node Agent uses them (B)"
+//
+// 「[Opus 5.5] What ROOT connected the node to, an agent at ROOT uses: its token lists the server's tools and」
+// 「[Opus 5.5] calls one, and the call is written down in system, as the token that called it. It does not」
+// 「[Opus 5.5] connect or drop one: the yes is a person's.」
+func TestTheNodesAgentCallsAToolOfAnMCPServerROOTConnected(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	up := standingUpstream(t)
+	root := person("https://example.org/root", auth.LevelRoot)
+	connecting, refused := consumedAs(s, root, "connect", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker", "url": up.at + "/mcp"})
+	require.Nil(t, refused)
+	back := httptest.NewRecorder()
+	s.handleConsumedCallback(back, sayingYes(t, connecting.(consumedConnecting).Authorize, root))
+	require.Equal(t, http.StatusOK, back.Code, back.Body.String())
+
+	agent := person("did:key:z6MkTheNodeAgent", auth.LevelRoot)
+	agent.Grant = &access.Grant{}
+	tools, refused := consumedAs(s, agent, "tools", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker"})
+	require.Nil(t, refused)
+	assert.Equal(t, []consumedTool{{Name: "issues", Description: "Lists the issues."}}, tools)
+
+	called, refused := consumedAs(s, agent, "call", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker", "tool": "issues", "arguments": `{"state":"open"}`})
+	require.Nil(t, refused)
+	holds(t, s.consumedSignum(), "call", called)
+	assert.False(t, called.(consumedCalled).IsError)
+	assert.JSONEq(t, `[{"type":"text","text":"none"}]`, string(called.(consumedCalled).Content))
+
+	reading, err := s.held.Read(auth.NamespaceSystem)
+	require.NoError(t, err)
+	lines, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{consumedCallSubject}, Limit: ats.EveryRow})
+	require.NoError(t, err)
+	require.Len(t, lines, 1)
+	assert.Equal(t, []string{"issues"}, lines[0].Predicates)
+	assert.Equal(t, []string{auth.NamespaceSystem, "mcp:tracker"}, lines[0].Contexts)
+	assert.Equal(t, []string{"did:key:z6MkTheNodeAgent"}, lines[0].Actors)
+	assert.Equal(t, `{"state":"open"}`, lines[0].Attributes["arguments"])
+
+	listed, refused := consumedAs(s, agent, "list", sigil.Sent{"namespace": auth.NamespaceSystem})
+	require.Nil(t, refused)
+	require.Len(t, listed.([]consumedServer), 1, "a call line is no server: the server the node consumes is still listed")
+
+	for _, handling := range []string{"connect", "drop"} {
+		_, refused = consumedAs(s, agent, handling, sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker", "url": up.at + "/mcp"})
+		require.NotNil(t, refused, handling)
+		assert.Contains(t, refused.Says, "a token asked", handling)
+	}
+	_, refused = consumedAs(s, person("https://example.org/super", auth.LevelSuper), "call", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker", "tool": "issues"})
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.NotAllowed, refused.Why, "the node's servers are ROOT's to use")
+
+	_, refused = consumedAs(s, agent, "call", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker", "tool": "issues", "arguments": "not json"})
+	require.NotNil(t, refused)
+	assert.Equal(t, "arguments", refused.Param)
+}
+
+// 「[Opus 5.5] At the node's MCP server, an agent at ROOT is offered the call as a tool, and the call reaches」
+// 「[Opus 5.5] the server ROOT connected: a sigil is one tool, nothing built for MCP alone.」
+func TestTheNodesMCPServerOffersItsAgentTheCall(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	up := standingUpstream(t)
+	root := person("https://example.org/root", auth.LevelRoot)
+	connecting, refused := consumedAs(s, root, "connect", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker", "url": up.at + "/mcp"})
+	require.Nil(t, refused)
+	back := httptest.NewRecorder()
+	s.handleConsumedCallback(back, sayingYes(t, connecting.(consumedConnecting).Authorize, root))
+	require.Equal(t, http.StatusOK, back.Code, back.Body.String())
+
+	if s.answering == nil {
+		s.setupHTTPRoutes()
+	}
+	require.NoError(t, s.open())
+
+	agent := person("did:key:z6MkTheNodeAgent", auth.LevelRoot)
+	agent.Grant = &access.Grant{}
+	asked := httptest.NewRequest(http.MethodPost, "/mcp", nil).WithContext(auth.WithAdmission(context.Background(), agent))
+	ctx := context.Background()
+	clientSide, serverSide := mcp.NewInMemoryTransports()
+	serving, err := s.mcpServerFor(asked).Connect(ctx, serverSide, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = serving.Close() })
+	session, err := mcp.NewClient(&mcp.Implementation{Name: "node-agent", Version: "0"}, nil).Connect(ctx, clientSide, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = session.Close() })
+
+	listed, err := session.ListTools(ctx, nil)
+	require.NoError(t, err)
+	offered := map[string]bool{}
+	for _, tool := range listed.Tools {
+		offered[tool.Name] = true
+	}
+	for _, name := range []string{"mcp_list", "mcp_tools", "mcp_call"} {
+		assert.True(t, offered[name], name)
+	}
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "mcp_call", Arguments: map[string]any{
+		"namespace": auth.NamespaceSystem, "name": "tracker", "tool": "issues", "arguments": `{}`}})
+	require.NoError(t, err)
+	require.False(t, result.IsError, "%s", result.Content[0].(*mcp.TextContent).Text)
+	text, isText := result.Content[0].(*mcp.TextContent)
+	require.True(t, isText)
+	assert.JSONEq(t, `{"content":[{"type":"text","text":"none"}],"is_error":false}`, text.Text)
 }

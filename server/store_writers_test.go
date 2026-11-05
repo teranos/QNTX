@@ -97,7 +97,8 @@ var storeWriters = map[string]string{
 	"writeConsumedLine": "an MCP line of a namespace, in the namespace's own store through Write as the caller " +
 		"is admitted, after consumedAsking refuses a token or a connector and mayHandle says they own the " +
 		"namespace, or are ROOT or SUPER, or in system when ROOT asks for the node; a refreshed token is kept as " +
-		"whoever's call refreshed it",
+		"whoever's call refreshed it; an MCP_CALL line is a call of one of its tools, as whoever called it, " +
+		"after consumedUsing says the namespace is theirs, or ROOT asks for the node",
 
 	"systemTasks": "a Task of the Node Agent or of an element's agent (A2A §3.4.2) lands in system, where " +
 		"their sessions are written, what the node knows of itself. Reached from the Task operations at no tenant " +

@@ -444,6 +444,13 @@
         "USER"
       ]
     },
+    "/api/mcp/{namespace}/call": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "USER"
+      ]
+    },
     "/api/mcp/{namespace}/drop": {
       "x-qntx-reach": [
         "ROOT",
