@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,11 +38,13 @@ type consoleStandIn struct {
 	budget map[string]any
 	// stop is the stop_reason the Session goes idle with: end_turn when empty.
 	stop string
+	// running is each Session still at work until it is interrupted; archived, each archived.
+	running, archived map[string]bool
 }
 
 func standInConsole(t *testing.T) (*consoleStandIn, string) {
 	t.Helper()
-	c := &consoleStandIn{made: map[string]int{}, bodies: map[string][]map[string]any{}, said: make(chan string, 4), answers: "the element answered at Anthropic", ended: map[string]bool{}, budget: map[string]any{}}
+	c := &consoleStandIn{made: map[string]int{}, bodies: map[string][]map[string]any{}, said: make(chan string, 4), answers: "the element answered at Anthropic", ended: map[string]bool{}, budget: map[string]any{}, running: map[string]bool{}, archived: map[string]bool{}}
 	served := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		var sent map[string]any
@@ -91,7 +94,10 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 		case r.Method == http.MethodGet && strings.Count(r.URL.Path, "/") == 3 && strings.HasPrefix(r.URL.Path, "/v1/sessions/"):
 			id := strings.TrimPrefix(r.URL.Path, "/v1/sessions/")
 			status := "idle"
-			if c.ended[id] {
+			if c.running[id] {
+				status = "running"
+			}
+			if c.ended[id] || c.archived[id] {
 				status = "terminated"
 			}
 			c.spent += 0.25
@@ -103,9 +109,25 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 			c.bodies["session update"] = append(c.bodies["session update"], sent)
 			c.budget[id] = sent["budget"]
 			answer(id)
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/archive"):
+			id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/sessions/"), "/archive")
+			if c.running[id] {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = io.WriteString(w, `{"type":"error","error":{"type":"invalid_request_error","message":"a running session cannot be archived"}}`)
+				break
+			}
+			c.made["archive"]++
+			c.archived[id] = true
+			answer(id)
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/events"):
 			events, _ := sent["events"].([]any)
 			first, _ := events[0].(map[string]any)
+			if first["type"] == "user.interrupt" {
+				c.made["interrupt"]++
+				delete(c.running, strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/sessions/"), "/events"))
+				_, _ = io.WriteString(w, `{"data":[]}`)
+				break
+			}
 			content, _ := first["content"].([]any)
 			c.bodies["said"] = append(c.bodies["said"], map[string]any{"content": content})
 			text, _ := content[0].(map[string]any)
@@ -301,13 +323,20 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	console.mu.Unlock()
 
 	// A Session kept from before, made without a cap, cannot be given one: it goes on in a new one that has it.
+	// Qodo's review of #1519: the uncapped one is ended at Anthropic first, interrupted while it
+	// still runs, so it spends nothing beside the capped one.
+	retireAsks = time.Millisecond
+	t.Cleanup(func() { retireAsks = time.Second })
 	console.mu.Lock()
 	delete(console.budget, "sesn_1")
+	console.running["sesn_1"] = true
 	console.mu.Unlock()
 	anew, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_2", anew.Session)
 	console.mu.Lock()
+	assert.Equal(t, 1, console.made["interrupt"], "the uncapped Session was running, and is interrupted")
+	assert.True(t, console.archived["sesn_1"], "and archived before another is made")
 	assert.Equal(t, budget("3000"), console.bodies["session"][1]["budget"])
 	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "with the Memory the uncapped one had")
 	console.mu.Unlock()

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
@@ -278,6 +279,42 @@ func (s *QNTXServer) managedEnvironment(ctx context.Context, client anthropic.Cl
 	return made.ID, nil
 }
 
+// 「[Opus 5.5] How long a Session that is interrupted is waited on to go idle, and how often it is asked.」
+var (
+	retireWaits = 2 * time.Minute
+	retireAsks  = time.Second
+)
+
+// 「[Opus 5.5] retireSession ends a Session the element no longer goes on in, before another is made:」
+// 「[Opus 5.5] one still running is interrupted and waited on until it is idle, since a running Session」
+// 「[Opus 5.5] cannot be archived, and archived it takes no new event (managed-agents/session-operations,」
+// 「[Opus 5.5] Archiving a session). Until that is done the element keeps it, and the turn says why.」
+func (s *QNTXServer) retireSession(ctx context.Context, client anthropic.Client, agent *rootAgent, id string, status anthropic.BetaManagedAgentsSessionStatus) error {
+	if status != "idle" {
+		if _, err := client.Beta.Sessions.Events.Send(ctx, id, anthropic.BetaSessionEventSendParams{
+			Events: []anthropic.BetaManagedAgentsEventParamsUnion{{OfUserInterrupt: &anthropic.BetaManagedAgentsUserInterruptEventParams{}}},
+		}); err != nil {
+			return errors.Wrapf(err, "the element %s's Session %s at Anthropic, %s, was not interrupted, so no Session is made beside it", agent.element, id, status)
+		}
+		for waited := time.Duration(0); status != "idle"; waited += retireAsks {
+			if waited >= retireWaits {
+				return errors.Newf("the element %s's Session %s at Anthropic was interrupted and is still %s after %s, so no Session is made beside it", agent.element, id, status, retireWaits)
+			}
+			time.Sleep(retireAsks)
+			now, err := client.Beta.Sessions.Get(ctx, id, anthropic.BetaSessionGetParams{})
+			if err != nil {
+				return errors.Wrapf(err, "the element %s's Session %s at Anthropic did not answer after it was interrupted", agent.element, id)
+			}
+			status = now.Status
+		}
+	}
+	if _, err := client.Beta.Sessions.Archive(ctx, id, anthropic.BetaSessionArchiveParams{}); err != nil {
+		return errors.Wrapf(err, "the element %s's Session %s at Anthropic was not archived, so no Session is made beside it", agent.element, id)
+	}
+	s.logger.Infow("the element's Session at Anthropic is archived", "element", agent.element, "session", id)
+	return nil
+}
+
 // 「[Opus 5.5] budgetOf is a Session's hard spend ceiling at Anthropic: cents, from centsOf.」
 func budgetOf(cents string) anthropic.BetaManagedAgentsBudgetLimitParam {
 	return anthropic.BetaManagedAgentsBudgetLimitParam{
@@ -384,6 +421,9 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 			held.Session = ""
 		// 「[Opus 5.5] A Session made without a cap cannot be given one (managed-agents/budgets): it ends here.」
 		case was == "":
+			if err := s.retireSession(ctx, client, agent, held.Session, session.Status); err != nil {
+				return managedOf{}, err
+			}
 			s.logger.Infow("the element's Session at Anthropic has no cap, and goes on in a new one that has it", "element", agent.element, "ended", held.Session, "max_list_cost", ceiling)
 			held.Session = ""
 		// 「[Opus 5.5] A capped Session's cap is changed in place, which resumes one the old cap paused.」
