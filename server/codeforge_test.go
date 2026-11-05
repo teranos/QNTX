@@ -149,3 +149,21 @@ func TestAFileGitHubListsItsFolderShortOfIsReplaced(t *testing.T) {
 	assert.Equal(t, []string{"docs/adr/diagram.png"}, got.(map[string]any)["committed"])
 	assert.Equal(t, "another picture", stand.branches["agent-picture"]["docs/adr/diagram.png"])
 }
+
+// Qodo's review of #1515: a proposal that differs in nothing from the branch
+// it is proposed into made its branch first, then no change could be opened,
+// and the branch was left behind.
+func TestAProposalThatChangesNothingMakesNoBranch(t *testing.T) {
+	s, _ := vaultBindingServer(t)
+	_, refused := askCodeForge(t, s, sigil.Sent{
+		"repo": "github.com/abcd-nl/clean", "branch": "agent-same", "title": "x",
+		"files":   `{"docs/adr/ADR-001.md": "# ADR-001\n\nAs main has it.\n"}`,
+		"removes": `["docs/adr/gone.md"]`,
+	})
+	require.NotNil(t, refused)
+	assert.Equal(t, "files", refused.GetParam())
+	assert.Contains(t, refused.GetSays(), "no branch agent-same was made")
+	assert.NotContains(t, stand.branches, "agent-same")
+	assert.Empty(t, stand.commits)
+	assert.Empty(t, stand.pulls)
+}

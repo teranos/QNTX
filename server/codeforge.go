@@ -167,7 +167,10 @@ func (s *QNTXServer) codeForgePropose(ctx context.Context, sent sigil.Sent) (any
 	}
 
 	proposal := forge.Proposal{Repo: repo, Branch: branch, Into: into}
-	if err := proposal.HoldBranch(ctx, host, forge.AsApp); err != nil {
+	// 「[Opus 5.5] A branch the forge has none of yet is read at the commit it is to be made from, and made」
+	// 「[Opus 5.5] only once something differs from it: one made for nothing would be left behind.」
+	reading, from, err := proposal.Reading(ctx, host, forge.AsApp)
+	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	files := make([]string, 0, len(puts))
@@ -175,7 +178,7 @@ func (s *QNTXServer) codeForgePropose(ctx context.Context, sent sigil.Sent) (any
 		files = append(files, file)
 	}
 	slices.Sort(files)
-	held, err := proposal.Holds(ctx, host, forge.AsApp, append(slices.Clone(files), removes...))
+	held, err := proposal.HoldsAt(ctx, host, forge.AsApp, reading, append(slices.Clone(files), removes...))
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
@@ -200,6 +203,15 @@ func (s *QNTXServer) codeForgePropose(ctx context.Context, sent sigil.Sent) (any
 	for _, file := range removes {
 		if blob, there := held[file]; there {
 			edits = append(edits, forge.Removed(file, blob, message))
+		}
+	}
+	if from != "" {
+		if len(edits) == 0 {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "files",
+				Says: into + " of " + repo.String() + " holds every file as sent and none sent to remove, so nothing is proposed and no branch " + branch + " was made"}
+		}
+		if err := proposal.MakeBranch(ctx, host, forge.AsApp, from); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
 	}
 	done, err := proposal.Commit(ctx, host, forge.AsApp, edits)

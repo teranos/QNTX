@@ -87,6 +87,7 @@ func (s *shelf) DeleteFile(_ context.Context, _ Acting, _ Repo, branch, path, sh
 }
 
 func (s *shelf) Entries(_ context.Context, _ Acting, _ Repo, ref, dir string) ([]Entry, error) {
+	ref = strings.TrimPrefix(ref, "tip of ")
 	if _, isFile := s.branches[ref][dir]; isFile {
 		return nil, NotADirectory{Kind: "file"}
 	}
@@ -129,6 +130,7 @@ func (s *shelf) Entries(_ context.Context, _ Acting, _ Repo, ref, dir string) ([
 }
 
 func (s *shelf) EntryAt(_ context.Context, _ Acting, _ Repo, ref, path string) (Entry, error) {
+	ref = strings.TrimPrefix(ref, "tip of ")
 	s.asked = append(s.asked, "at "+path)
 	if content, isFile := s.branches[ref][path]; isFile {
 		return Entry{Path: path, SHA: shelfBlob(content), Kind: File}, nil

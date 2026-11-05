@@ -137,7 +137,7 @@ func (repo *standInRepo) contents(asked, ref string, give func(int, any)) {
 		give(http.StatusForbidden, map[string]string{"message": "Resource not accessible by integration"})
 		return
 	}
-	notes, held := repo.branches[ref]
+	notes, held := repo.branches[strings.TrimPrefix(ref, "sha-of-")]
 	if !held {
 		give(http.StatusNotFound, map[string]string{"message": "No commit found for the ref " + ref})
 		return
