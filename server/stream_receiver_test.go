@@ -53,8 +53,10 @@ func openSocketAs(t *testing.T, srv *QNTXServer, identity string) socketHeld {
 	if socket == "" {
 		t.Fatalf("the node's first message names no socket: %v", first)
 	}
-	// Registered once the upgrade has handed it to the hub.
-	time.Sleep(50 * time.Millisecond)
+	// Named once it is held: a prompt can name it the moment it is read.
+	if _, ok := srv.receiverOf(socket, caller, true); !ok {
+		t.Fatalf("the socket %q was named before the node held it", socket)
+	}
 	return socketHeld{conn: conn, socket: socket, caller: caller}
 }
 
@@ -104,7 +106,7 @@ func TestAStreamReachesTheSocketThatAskedAndNoOther(t *testing.T) {
 	asker := openSocketAs(t, srv, "did:key:asker")
 	bystander := openSocketAs(t, srv, "did:key:bystander")
 
-	to, ok := srv.receiverOf(asker.socket, asker.caller)
+	to, ok := srv.receiverOf(asker.socket, asker.caller, true)
 	if !ok {
 		t.Fatalf("the asker's own socket %q is not its receiver", asker.socket)
 	}
@@ -128,14 +130,46 @@ func TestASocketThatIsNotTheCallersReceivesNothing(t *testing.T) {
 	asker := openSocketAs(t, srv, "did:key:asker")
 	someoneElse := openSocketAs(t, srv, "did:key:someone-else")
 
-	if _, ok := srv.receiverOf(someoneElse.socket, asker.caller); ok {
+	if _, ok := srv.receiverOf(someoneElse.socket, asker.caller, true); ok {
 		t.Errorf("a socket admitted as %q is the receiver of a caller admitted as %q",
 			someoneElse.caller.Identity, asker.caller.Identity)
 	}
-	if _, ok := srv.receiverOf("", asker.caller); ok {
+	if _, ok := srv.receiverOf("", asker.caller, true); ok {
 		t.Error("a request naming no socket has a receiver")
 	}
-	if _, ok := srv.receiverOf("127.0.0.1:1_1", asker.caller); ok {
+	if _, ok := srv.receiverOf("127.0.0.1:1_1", asker.caller, true); ok {
 		t.Error("a socket the node does not hold is a receiver")
+	}
+}
+
+// A socket is named to its page the moment it is held, and not before: a
+// prompt sent on the first message's word finds it.
+func TestASocketIsHeldWhenItIsNamed(t *testing.T) {
+	srv := nodeUnderTest(t)
+	for i := 0; i < 20; i++ {
+		openSocketAs(t, srv, "did:key:quick")
+	}
+}
+
+// Nothing crosses (ADR-026): the same person's socket in another namespace is
+// not the receiver of what they asked for in this one.
+func TestASocketInAnotherNamespaceIsNotTheReceiver(t *testing.T) {
+	srv := nodeUnderTest(t)
+	caller := auth.Admitted(auth.LevelAttestor, auth.NamespaceDefault)
+	caller.Identity = "did:key:same-person"
+	here := &Client{server: srv, sendMsg: make(chan any, 4), id: "here", in: auth.NamespaceDefault, admitted: caller, gated: true}
+	elsewhere := &Client{server: srv, sendMsg: make(chan any, 4), id: "elsewhere", in: "pond", admitted: caller, gated: true}
+	srv.mu.Lock()
+	srv.clients = map[*Client]bool{here: true, elsewhere: true}
+	srv.mu.Unlock()
+
+	if _, ok := srv.receiverOf("here", caller, true); !ok {
+		t.Error("the caller's socket in the namespace it asked in is not its receiver")
+	}
+	if _, ok := srv.receiverOf("elsewhere", caller, true); ok {
+		t.Error("the caller's socket in another namespace is the receiver of what it asked here")
+	}
+	if _, ok := srv.receiverOf("here", caller, false); ok {
+		t.Error("a request that passed no gate has a receiver")
 	}
 }

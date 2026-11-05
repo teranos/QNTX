@@ -283,8 +283,8 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	var resp *provider.ChatResponse
 
 	// "3. who? the receiver?": a stream is sent to the socket that asked for it.
-	caller, _ := auth.AdmissionFrom(r.Context())
-	receiver, received := s.receiverOf(req.Socket, caller)
+	caller, gated := auth.AdmissionFrom(r.Context())
+	receiver, received := s.receiverOf(req.Socket, caller, gated)
 	if req.Socket != "" && !received {
 		s.logger.Warnw("A prompt named a socket that is not the caller's, and is answered whole and streamed to nobody",
 			"socket", req.Socket, "identity", caller.Identity, "element_id", req.ElementID)
@@ -511,16 +511,21 @@ func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, r
 }
 
 // receiverOf is the socket a stream is sent to: the one named, when the node
-// holds it and it was admitted as the caller was. None is no receiver, and
+// holds it, it was admitted as the caller was, and it stands in the namespace
+// the caller asked in (nothing crosses, ADR-026). None is no receiver, and
 // nothing is sent to everyone instead.
-func (s *QNTXServer) receiverOf(socket string, caller auth.Admission) (audience, bool) {
+func (s *QNTXServer) receiverOf(socket string, caller auth.Admission, gated bool) (audience, bool) {
 	if socket == "" {
+		return audience{}, false
+	}
+	asked, err := s.universeFor(caller, gated)
+	if err != nil {
 		return audience{}, false
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for client := range s.clients {
-		if client.id == socket && client.admitted.Identity == caller.Identity {
+		if client.id == socket && client.admitted.Identity == caller.Identity && client.in == asked.Name() {
 			return toClient(socket), true
 		}
 	}
