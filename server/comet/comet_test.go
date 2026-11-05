@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -476,4 +477,70 @@ func TestAnEngineIsBuiltNoCometWhereNoneIsKept(t *testing.T) {
 		t.Fatalf("a build asked for %v", asked)
 	default:
 	}
+}
+
+// builtNode is a node on which every build of ground's sand succeeds, for the engine ABI abi.
+type builtNode struct {
+	builds, abi string
+}
+
+func (builtNode) Latest(context.Context, Source) (string, error) { return "0123456789abcdef", nil }
+
+func (builtNode) Fetch(context.Context, Source, string, string) error { return nil }
+
+func (b builtNode) BuildsDir() (string, error) { return b.builds, nil }
+
+func (b builtNode) Run(_ context.Context, dir string, _ []string, name string, args ...string) error {
+	if name == "tar" && filepath.Base(args[len(args)-1]) == "machine" {
+		controls := filepath.Join(args[len(args)-1], "controls")
+		if err := os.MkdirAll(controls, 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(controls, "qntx.pbt"), []byte("qntx {\n  url: \"https://n\"\n}\n"), 0o644)
+	}
+	if slices.Contains(args, "sand") {
+		if err := os.MkdirAll(filepath.Join(dir, "build"), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, "build", "libground_sand.abi"), []byte(b.abi+"\n"), 0o644); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(dir, "build", "libground_sand.so"), []byte("built at "+b.abi), 0o644)
+	}
+	return nil
+}
+
+// A ground an engine names that builds another ABI than the engine's is said, and nothing is
+// kept: the comet kept for that ABI was built for it, and stays.
+func TestAnEnginesGroundOfAnotherABIKeepsNothing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	kept := filepath.Join(home, ".qntx", "comets", "abcd-nl", "grove", "x86_64-linux", "7", "libground_sand.so")
+	require.NoError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
+	require.NoError(t, os.WriteFile(kept, []byte("a comet"), 0o644))
+	require.NoError(t, os.WriteFile(kept+".machine", []byte("abcd-nl/l"), 0o644))
+	require.NoError(t, KeepDigest(kept))
+
+	h := handler()
+	h.Builder = Builder{Node: builtNode{builds: t.TempDir(), abi: "7"}, NixBin: "/nix/bin"}
+	h.Ctx = context.Background()
+
+	ask := func() string {
+		got := httptest.NewRecorder()
+		h.ServeHTTP(got, httptest.NewRequest(http.MethodGet, "/comet/abcd-nl/grove/x86_64-linux/9?digest&ground=feedbee", nil))
+		assert.Equal(t, http.StatusNotFound, got.Code)
+		return got.Body.String()
+	}
+	said := ask()
+	for range 200 {
+		if strings.Contains(said, "builds the sand of engine ABI") {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+		said = ask()
+	}
+	assert.Contains(t, said, "ground feedbee builds the sand of engine ABI 7, not 9")
+	held, err := os.ReadFile(kept)
+	require.NoError(t, err)
+	assert.Equal(t, "a comet", string(held))
 }

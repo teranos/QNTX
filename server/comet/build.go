@@ -98,6 +98,11 @@ func (b Builder) buildIn(ctx context.Context, n Name, work string) (string, erro
 	if err != nil {
 		return "", errors.Wrapf(err, "the comet of %s did not build", n.Base())
 	}
+	// A ground an engine named that builds another ABI keeps nothing: the comet kept for that ABI
+	// was built for it. The caller says which ABI it built.
+	if n.GroundRev != "" && abi != n.ABI {
+		return abi, nil
+	}
 	n.ABI = abi
 	kept, err := Path(n)
 	if err != nil {

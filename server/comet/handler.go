@@ -171,7 +171,7 @@ func (h Handler) forEngine(n Name, rev, said string) string {
 			return
 		}
 		if abi != n.ABI {
-			engineBuilds.Store(key, "builds the sand of engine ABI "+abi+", not "+n.ABI+": the engine was not built from ground "+rev+" alone")
+			engineBuilds.Store(key, "builds the sand of engine ABI "+abi+", not "+n.ABI+", and nothing was kept: the engine was not built from ground "+rev+" alone")
 			return
 		}
 		engineBuilds.Delete(key)
