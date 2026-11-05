@@ -1,5 +1,5 @@
-// session/prompt's blocks, as #135 reads them: each one text, a resource link, a resource
-// holding text, or another kind told by its type.
+// 「[Opus 5.5] session/prompt's blocks, as #135 reads them: each one text, a resource link, a resource」
+// 「[Opus 5.5] holding text, or another kind told by its type.」
 #include "acp.h"
 
 #include <stdio.h>
@@ -40,8 +40,8 @@ static void kinds(void) {
     CHECK(in.blocks == NULL && in.count == 0);
 }
 
-// "Agent supports ContentBlock::Image": an image's data, "Base64-encoded media payload", and its
-// mimeType, both required; its uri is optional. Either missing, it is another kind, told by its type.
+// 「[Opus 5.5] "Agent supports ContentBlock::Image": an image's data, "Base64-encoded media payload", and its」
+// 「[Opus 5.5] mimeType, both required; its uri is optional. Either missing, it is another kind, told by its type.」
 static void images(void) {
     acp_prompt in;
     acp_buffer error;
@@ -57,7 +57,7 @@ static void images(void) {
     acp_prompt_free(&in);
 }
 
-// "Agent supports ContentBlock::Audio": an audio block's data and mimeType, both required.
+// 「[Opus 5.5] "Agent supports ContentBlock::Audio": an audio block's data and mimeType, both required.」
 static void audio(void) {
     acp_prompt in;
     acp_buffer error;
@@ -71,8 +71,8 @@ static void audio(void) {
     acp_prompt_free(&in);
 }
 
-// "required": a link's name and uri, a resource's uri, and a block's type. Missing one, it is
-// another kind, told by the type it names, or none.
+// 「[Opus 5.5] "required": a link's name and uri, a resource's uri, and a block's type. Missing one, it is」
+// 「[Opus 5.5] another kind, told by the type it names, or none.」
 static void incomplete(void) {
     acp_prompt in;
     acp_buffer error;
@@ -92,7 +92,7 @@ static void incomplete(void) {
     acp_prompt_free(&in);
 }
 
-// prompt is required, and a list.
+// 「[Opus 5.5] prompt is required, and a list.」
 static void refused(void) {
     acp_prompt in;
     acp_buffer error;
@@ -105,8 +105,8 @@ static void refused(void) {
     }
 }
 
-// A cancel, as #137 takes one: session/cancel by its session, $/cancel_request by the
-// request it names, that id as JSON text. Any other message is no cancel.
+// 「[Opus 5.5] A cancel, as #137 takes one: session/cancel by its session, $/cancel_request by the」
+// 「[Opus 5.5] request it names, that id as JSON text. Any other message is no cancel.」
 static acp_status cancel(const char *message, acp_cancel *out) {
     memset(out, 0, sizeof *out);
     return acp_cancel_read(message, strlen(message), out);
@@ -138,7 +138,7 @@ static void cancels(void) {
     CHECK(acp_cancel_read(NULL, 0, &c) == ACP_INVALID_ARGUMENT);
 }
 
-// A turn's answer, as #157's abort gives it: the stop reason, one of the five the schema names.
+// 「[Opus 5.5] A turn's answer, as #157's abort gives it: the stop reason, one of the five the schema names.」
 static void stop_reasons(void) {
     acp_buffer out = {0};
     const char *named[] = {"end_turn", "max_tokens", "max_turn_requests", "refusal", "cancelled"};

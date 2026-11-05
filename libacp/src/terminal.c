@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// jsonrpc and id, for the method its writer names next; NULL when request_id is no JSON.
+// 「[Opus 5.5] jsonrpc and id, for the method its writer names next; NULL when request_id is no JSON.」
 static json_object *request_head(const char *request_id) {
     json_object *id = acp_parse(request_id, strlen(request_id));
     if (id == NULL) return NULL;
@@ -14,7 +14,7 @@ static json_object *request_head(const char *request_id) {
     return message;
 }
 
-// The params of a request that names a terminal, and the whole message written.
+// 「[Opus 5.5] The params of a request that names a terminal, and the whole message written.」
 static acp_status terminal_finish(json_object *message, const char *session_id, const char *terminal_id,
     acp_buffer *message_json) {
     json_object *params = json_object_new_object();
@@ -60,7 +60,7 @@ acp_status acp_terminal_create_result_read(const char *message_json, size_t leng
     json_object *message = acp_parse(message_json, length);
     json_object *result = acp_field(message, "result");
     *terminal_id = acp_string(result, "terminalId");
-    // An id holding a NUL would name another terminal once it is a C string.
+    // 「[Opus 5.5] An id holding a NUL would name another terminal once it is a C string.」
     json_object *id = acp_field(result, "terminalId");
     if (*terminal_id != NULL && strlen(*terminal_id) != (size_t) json_object_get_string_len(id)) {
         free(*terminal_id);
@@ -110,7 +110,7 @@ acp_status acp_terminal_release_request_write(const char *request_id, const char
     return terminal_finish(message, session_id, terminal_id, message_json);
 }
 
-// TerminalExitStatus: exitCode, a uint32, and signal, each null when the other ended it:
+// 「[Opus 5.5] TerminalExitStatus: exitCode, a uint32, and signal, each null when the other ended it:」
 // "The process exit code (may be null if terminated by signal)"
 // "The signal that terminated the process (may be null if exited normally)"
 static void exit_status(json_object *status, acp_terminal_exit *out) {
@@ -149,7 +149,7 @@ acp_status acp_terminal_output_result_read(const char *message_json, size_t leng
     json_object *output = acp_field(result, "output");
     acp_status status = ACP_OK;
     if (json_object_is_type(output, json_type_string)) {
-        // Every byte, as the output may hold a NUL a C string would stop at.
+        // 「[Opus 5.5] Every byte, as the output may hold a NUL a C string would stop at.」
         int n = json_object_get_string_len(output);
         if ((out->output = malloc((size_t) n + 1)) == NULL) {
             status = ACP_NO_MEMORY;

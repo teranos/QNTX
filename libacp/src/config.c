@@ -16,7 +16,7 @@ acp_status acp_set_config_option_read(const char *params_json, size_t length, ac
     else if ((out->config_id = acp_string(params, "configId")) == NULL)
         status = acp_invalid(error_json, "session/set_config_option needs configId");
     else if ((out->value = acp_string(params, "value")) == NULL) {
-        // The boolean shape says its type: {"type":"boolean","value":true}.
+        // 「[Opus 5.5] The boolean shape says its type: {"type":"boolean","value":true}.」
         char *type = acp_string(params, "type");
         if (type != NULL && strcmp(type, "boolean") == 0
             && json_object_is_type(acp_field(params, "value"), json_type_boolean)) {
