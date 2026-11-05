@@ -148,7 +148,6 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	if s.nodeAgent == nil {
 		s.nodeAgent = &rootAgent{home: t.TempDir()}
 	}
-	s.deps.cfg.Agent.Root.Managed.MaxListCost = "2000"
 	for _, given := range []sigil.Sent{anOrganization, aServiceAcct, aRule} {
 		rootAsksAnthropic(t, s, "set", given)
 	}
@@ -260,10 +259,11 @@ func TestAStorysAgentHasItsOneStoryAsItsContract(t *testing.T) {
 }
 
 // "make 6SION set one, prep a pr"
+// "what  is max cap? like set it in the ui and make default of 200"
 // "6SION00: The bad session needs to not be able to murder us further."
-// 「[Opus 5.5] Each Session an element's agent runs in at Anthropic is made with the cap am.toml」
-// 「[Opus 5.5] names, and none is made without one (platform.claude.com/docs/en/managed-agents/budgets).」
-func TestAnElementsSessionAtAnthropicIsMadeWithTheCapAmTomlNames(t *testing.T) {
+// 「[Opus 5.5] Each Session an element's agent runs in at Anthropic is made with a cap: the node's」
+// 「[Opus 5.5] default until ROOT sets one in Node Connectors (platform.claude.com/docs/en/managed-agents/budgets).」
+func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	console, base := standInConsole(t)
 	s.anthropicBaseURL = base
@@ -277,35 +277,26 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapAmTomlNames(t *testing.T) {
 	home := t.TempDir()
 	agent := &rootAgent{home: home, namespace: auth.NamespaceSystem, element: "llm-provider-element", sessionDir: filepath.Join(elementsDir, "llm-provider-element"), did: "did:key:element", token: "the-element-token"}
 	said := rootSaid(filepath.Join(t.TempDir(), "no-claude-code-is-run"), home)
-	capOf := func(cents string) any {
-		return map[string]any{"type": "limit", "max_list_cost": map[string]any{"amount": cents, "currency": "USD"}}
+	budget := func(cents string) any {
+		return map[string]any{"type": "limit", "max_list_cost": map[string]any{"amount": cents, "currency": anthropicCapCurrency}}
 	}
 
-	// No cap named: nothing is made at Anthropic, and the turn says what am.toml lacks.
-	_, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "agent.root.managed.max_list_cost")
-	console.mu.Lock()
-	assert.Empty(t, console.made, "nothing is made at Anthropic without a cap")
-	console.mu.Unlock()
-
-	// Named: the Session is made with it, in whole US cents as Anthropic takes it.
-	s.deps.cfg.Agent.Root.Managed.MaxListCost = "2000"
+	// None set: the Session is made with the node's default, in the cents Anthropic takes.
 	answer, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_1", answer.Session)
 	console.mu.Lock()
-	assert.Equal(t, capOf("2000"), console.bodies["session"][0]["budget"])
+	assert.Equal(t, budget("20000"), console.bodies["session"][0]["budget"], "the default, 200")
 	console.mu.Unlock()
 
-	// Another cap named: the same Session is updated to it, and goes on.
-	s.deps.cfg.Agent.Root.Managed.MaxListCost = "3000"
+	// ROOT sets another: the same Session is updated to it, and goes on.
+	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "30"})
 	again, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_1", again.Session)
 	console.mu.Lock()
 	assert.Equal(t, 1, console.made["session update"])
-	assert.Equal(t, capOf("3000"), console.bodies["session update"][0]["budget"])
+	assert.Equal(t, budget("3000"), console.bodies["session update"][0]["budget"])
 	assert.Equal(t, 1, console.made["session"])
 	console.mu.Unlock()
 
@@ -317,7 +308,7 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapAmTomlNames(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_2", anew.Session)
 	console.mu.Lock()
-	assert.Equal(t, capOf("3000"), console.bodies["session"][1]["budget"])
+	assert.Equal(t, budget("3000"), console.bodies["session"][1]["budget"])
 	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "with the Memory the uncapped one had")
 	console.mu.Unlock()
 
@@ -329,6 +320,6 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapAmTomlNames(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, capped.IsError)
 	assert.Contains(t, capped.Text, "the element answered at Anthropic", "what it said before the cap is kept")
-	assert.Contains(t, capped.Text, "reached its cap, max_list_cost 3000 in whole US cents")
-	assert.Contains(t, capped.Text, "agent.root.managed.max_list_cost")
+	assert.Contains(t, capped.Text, "reached its cap of 30 "+anthropicCapCurrency)
+	assert.Contains(t, capped.Text, "Node Connectors")
 }

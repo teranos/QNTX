@@ -46,17 +46,6 @@ type NodeAgentConfig struct {
 	Codex CodexConfig `mapstructure:"codex"`
 	// "wiring it into node and namespace config as an actual harness"
 	Agy AgyConfig `mapstructure:"agy"`
-	// "make 6SION set one, prep a pr"
-	Managed ManagedConfig `mapstructure:"managed"`
-}
-
-// 「[Opus 5.5] ManagedConfig is what each Session an element's agent runs in at Anthropic」
-// 「[Opus 5.5] (Managed Agents) is made with. Nothing stands in for the cap: a node that names」
-// 「[Opus 5.5] none makes no Session there.」
-type ManagedConfig struct {
-	// 「[Opus 5.5] MaxListCost is the Session's budget.max_list_cost.amount, in whole US cents」
-	// 「[Opus 5.5] as Anthropic writes it: "2000" is $20.00 (platform.claude.com/docs/en/managed-agents/budgets).」
-	MaxListCost string `mapstructure:"max_list_cost"`
 }
 
 // 「[Opus 5.5] AgyConfig turns the Node Agent on in agy. It runs as the node's own identity at」
@@ -69,20 +58,6 @@ type AgyConfig struct {
 // 「[Opus 5.5] Named reports whether am.toml names agy for the Node Agent.」
 func (a AgyConfig) Named() bool {
 	return a.Model != ""
-}
-
-// 「[Opus 5.5] WholeCents reports whether amount is what Anthropic takes as a budget's amount:」
-// 「[Opus 5.5] digits only, no leading zero, above zero.」
-func WholeCents(amount string) bool {
-	if amount == "" || amount[0] == '0' {
-		return false
-	}
-	for _, c := range amount {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 // CodexConfig names how the Node Agent runs in codex. A node that names no

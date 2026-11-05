@@ -75,9 +75,9 @@ var storeWriters = map[string]string{
 	"setAgentLine": "the AGENT line a namespace opts into its agent by (ADR-048), in the namespace's own " +
 		"store through Write as the setter is admitted, after maySetAgent says they own the namespace, " +
 		"or are ROOT or SUPER",
-	"keepAnthropicLine": "the node's ANTHROPIC line, the ids of the rule its identity token is traded at " +
-		"and what ROOT's agents spend first, in system through WriteWhatTheNodeKnowsOfItself: a line about " +
-		"the node, and the reach table names /api/anthropic and /api/anthropic/order of ROOT alone",
+	"keepAnthropicLine": "the node's ANTHROPIC line, the ids of the rule its identity token is traded at, " +
+		"and what ROOT's agents spend first and the cap on a Session at Anthropic, in system through WriteWhatTheNodeKnowsOfItself: a line about " +
+		"the node, and the reach table names /api/anthropic, /api/anthropic/order and /api/anthropic/cap of ROOT alone",
 	"keepGoogleCostLine": "the node's GOOGLE-COSTS, GOOGLE-BUDGET, GOOGLE-LIMIT, GOOGLE-DAY-LIMIT, GOOGLE-AGY and GOOGLE-SPEND lines, in system through " +
 		"WriteWhatTheNodeKnowsOfItself: ROOT's yes at Google or ROOT's limit, and what Google's budgets reported to the node",
 	"keepGoogleLine": "the node's GOOGLE line, what it was set up as at Google Cloud, in system through " +

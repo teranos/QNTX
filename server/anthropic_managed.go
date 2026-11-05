@@ -83,10 +83,11 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 		return claudecode.Answer{}, errors.New("this node runs without auth, so it has no public origin an agent at Anthropic could reach its MCP by")
 	}
 	// "6SION00: The bad session needs to not be able to murder us further."
-	// 「[Opus 5.5] Nothing is made at Anthropic before the cap is known: no number stands in for ROOT's.」
-	ceiling := s.deps.cfg.Agent.Root.Managed.MaxListCost
-	if ceiling == "" {
-		return claudecode.Answer{}, errors.Newf("the element %s's agent runs at Anthropic in a Session capped at what am.toml names, and it names none: set agent.root.managed.max_list_cost, in whole US cents (\"2000\" is $20.00)", agent.element)
+	// 「[Opus 5.5] Every Session is capped: at what ROOT set in Node Connectors, or the node's default.」
+	amount, _ := capOf(kept)
+	ceiling, err := centsOf(amount)
+	if err != nil {
+		return claudecode.Answer{}, err
 	}
 	client, err := s.anthropicClient(kept)
 	if err != nil {
@@ -170,7 +171,7 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 			// 「[Opus 5.5] (managed-agents/budgets, When a session reaches its budget).」
 			if event.Type == "session.status_idle" && event.StopReason.Type == "budget_reached" {
 				answer.IsError = true
-				answer.Text = strings.TrimSpace(answer.Text + "\n\nSession " + held.Session + " at Anthropic reached its cap, max_list_cost " + ceiling + " in whole US cents, and is paused: it goes on once agent.root.managed.max_list_cost is raised above what it has spent.")
+				answer.Text = strings.TrimSpace(answer.Text + "\n\nSession " + held.Session + " at Anthropic reached its cap of " + amount + " " + anthropicCapCurrency + " and is paused: it goes on once the cap in Node Connectors is raised above what it has spent.")
 			}
 			if spent, err := s.spentBy(ctx, client, agent, &held); err != nil {
 				s.logger.Errorw("what the turn cost at Anthropic was not read", "element", agent.element, "session", held.Session, "error", err)
@@ -277,10 +278,10 @@ func (s *QNTXServer) managedEnvironment(ctx context.Context, client anthropic.Cl
 	return made.ID, nil
 }
 
-// 「[Opus 5.5] budgetOf is a Session's hard spend ceiling at Anthropic: cents, whole US cents as a string.」
+// 「[Opus 5.5] budgetOf is a Session's hard spend ceiling at Anthropic: cents, from centsOf.」
 func budgetOf(cents string) anthropic.BetaManagedAgentsBudgetLimitParam {
 	return anthropic.BetaManagedAgentsBudgetLimitParam{
-		MaxListCost: anthropic.BetaMonetaryAmountParam{Amount: cents, Currency: anthropic.BetaCurrencyUsd},
+		MaxListCost: anthropic.BetaMonetaryAmountParam{Amount: cents, Currency: anthropic.BetaCurrency(anthropicCapCurrency)},
 	}
 }
 
@@ -388,7 +389,7 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		// 「[Opus 5.5] A capped Session's cap is changed in place, which resumes one the old cap paused.」
 		case was != ceiling:
 			if _, err := client.Beta.Sessions.Update(ctx, held.Session, anthropic.BetaSessionUpdateParams{Budget: budgetOf(ceiling)}); err != nil {
-				return managedOf{}, errors.Wrapf(err, "the element %s's Session %s at Anthropic, capped at %s US cents, was not capped at %s", agent.element, held.Session, was, ceiling)
+				return managedOf{}, errors.Wrapf(err, "the element %s's Session %s at Anthropic, capped at %s cents of %s, was not capped at %s", agent.element, held.Session, was, anthropicCapCurrency, ceiling)
 			}
 			s.logger.Infow("the element's Session at Anthropic is capped anew", "element", agent.element, "session", held.Session, "was", was, "max_list_cost", ceiling)
 		}

@@ -115,6 +115,15 @@ func (s *QNTXServer) anthropicSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/order"},
 				},
 				{
+					Name: "cap",
+					Does: "The most each Session an element's agent runs in at Anthropic may spend: it pauses there, and goes on once the cap is raised past what it spent. Set none, the node's default.",
+					Takes: []*protocol.Param{
+						{Name: "amount", Required: true, Says: "A number above zero in " + anthropicCapCurrency + ", with at most two places after the point: 200 or 12.50."},
+					},
+					Answer: "protocol.NodeAnthropic",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/cap"},
+				},
+				{
 					Name:   "set",
 					Does:   "Keeps each id of Anthropic's in what was given, placed by its kind, and asks Anthropic whether it accepts the node once the organization, the service account and the rule are known.",
 					Takes:  takes,
@@ -127,6 +136,7 @@ func (s *QNTXServer) anthropicSignum() sigil.Signum {
 			"am":    s.anthropicAm,
 			"set":   s.anthropicSet,
 			"order": s.anthropicOrder,
+			"cap":   s.anthropicCapSet,
 		},
 	}
 }
@@ -144,6 +154,8 @@ func (s *QNTXServer) anthropicAm(ctx context.Context, _ sigil.Sent) (any, *proto
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	am.Cap, am.CapDefault = capOf(kept)
+	am.CapCurrency = anthropicCapCurrency
 	if !held {
 		return am, nil
 	}
@@ -190,6 +202,9 @@ func (s *QNTXServer) anthropicSet(ctx context.Context, sent sigil.Sent) (any, *p
 // keepAnthropicLine writes the node's ANTHROPIC line anew: every id kept, and the order.
 func (s *QNTXServer) keepAnthropicLine(by string, kept anthropicKept) *protocol.Refusal {
 	attributes := map[string]any{"first": kept.first, "then": kept.then}
+	if kept.cap != "" {
+		attributes["cap"] = kept.cap
+	}
 	for name, id := range kept.ids {
 		if id != "" {
 			attributes[name] = id
@@ -219,6 +234,8 @@ type anthropicKept struct {
 	// What ROOT's agents spend first, and whether the other follows.
 	first string
 	then  bool
+	// 「[Opus 5.5] The cap ROOT set on each Session at Anthropic, in anthropicCapCurrency; empty is none set.」
+	cap   string
 	setBy string
 	at    time.Time
 }
@@ -253,6 +270,15 @@ func (s *QNTXServer) anthropicLine() (anthropicKept, bool, error) {
 			return anthropicKept{}, false, errors.Newf("the node's %s line %s keeps then as %T, not a bool", anthropicLineSubject, newest.ID, newest.Attributes["then"])
 		}
 		kept.then = then
+	}
+	// 「[Opus 5.5] A line kept before ROOT set a cap has none, and the default holds.」
+	if _, capped := newest.Attributes["cap"]; capped {
+		if kept.cap, err = oneText(newest.Attributes, "cap", anthropicLineSubject, newest.ID, auth.NamespaceSystem); err != nil {
+			return anthropicKept{}, false, err
+		}
+		if _, err := centsOf(kept.cap); err != nil {
+			return anthropicKept{}, false, errors.Wrapf(err, "the node's %s line %s keeps a cap Anthropic would not take", anthropicLineSubject, newest.ID)
+		}
 	}
 	for _, name := range anthropicIDs {
 		// An id not given yet is absent from the line.

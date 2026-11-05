@@ -93,12 +93,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// 「[Opus 5.5] The cap is checked as Anthropic checks it (managed-agents/budgets, Error reference),」
-	// 「[Opus 5.5] so a cap it would reject is refused here, not at the first Session.」
-	if ceiling := c.Agent.Root.Managed.MaxListCost; ceiling != "" && !WholeCents(ceiling) {
-		return errors.Newf("agent.root.managed.max_list_cost is %q: it is a whole number of US cents above zero with no leading zero, \"2000\" is $20.00", ceiling)
-	}
-
 	// Plugin access tokens are references, never secrets. am.toml ships as a
 	// world-readable SSM String parameter, so a literal here is already leaked.
 	for i, entry := range c.Plugin.AccessToken {
