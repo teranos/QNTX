@@ -172,7 +172,7 @@ func (s *QNTXServer) runManaged(agent *rootAgent, said claudecode.Said, shot sha
 			// 「[Opus 5.5] (managed-agents/budgets, When a session reaches its budget).」
 			if event.Type == "session.status_idle" && event.StopReason.Type == "budget_reached" {
 				answer.IsError = true
-				answer.Text = strings.TrimSpace(answer.Text + "\n\nSession " + held.Session + " at Anthropic reached its cap of " + amount + " " + anthropicCapCurrency + " and is paused: it goes on once the cap in Node Connectors is raised above what it has spent.")
+				answer.Text = strings.TrimSpace(answer.Text + "\n\nSession " + held.Session + " at Anthropic reached its cap of " + amount + " " + anthropicCapCurrency + " and is paused: a cap set anew in Node Connectors goes on in a new Session, with this one's Memory.")
 			}
 			if spent, err := s.spentBy(ctx, client, agent, &held); err != nil {
 				s.logger.Errorw("what the turn cost at Anthropic was not read", "element", agent.element, "session", held.Session, "error", err)
@@ -426,12 +426,15 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 			}
 			s.logger.Infow("the element's Session at Anthropic has no cap, and goes on in a new one that has it", "element", agent.element, "ended", held.Session, "max_list_cost", ceiling)
 			held.Session = ""
-		// 「[Opus 5.5] A capped Session's cap is changed in place, which resumes one the old cap paused.」
+		// 「[Opus 5.5] Another cap goes on in a new Session, with the same Memory. Changed in place, it would」
+		// 「[Opus 5.5] resume what the old cap paused before this turn's stream is open, beside this turn's」
+		// 「[Opus 5.5] message, and a cap at or below what was spent is refused (managed-agents/budgets).」
 		case was != ceiling:
-			if _, err := client.Beta.Sessions.Update(ctx, held.Session, anthropic.BetaSessionUpdateParams{Budget: budgetOf(ceiling)}); err != nil {
-				return managedOf{}, errors.Wrapf(err, "the element %s's Session %s at Anthropic, capped at %s cents of %s, was not capped at %s", agent.element, held.Session, was, anthropicCapCurrency, ceiling)
+			if err := s.retireSession(ctx, client, agent, held.Session, session.Status); err != nil {
+				return managedOf{}, err
 			}
-			s.logger.Infow("the element's Session at Anthropic is capped anew", "element", agent.element, "session", held.Session, "was", was, "max_list_cost", ceiling)
+			s.logger.Infow("the element's Session at Anthropic was capped at another amount, and goes on in a new one", "element", agent.element, "ended", held.Session, "was", was, "max_list_cost", ceiling)
+			held.Session = ""
 		}
 	}
 	if held.Session == "" {

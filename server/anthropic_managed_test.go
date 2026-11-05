@@ -311,15 +311,18 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	assert.Equal(t, budget("20000"), console.bodies["session"][0]["budget"], "the default, 200")
 	console.mu.Unlock()
 
-	// ROOT sets another: the same Session is updated to it, and goes on.
+	// ROOT sets another: the element goes on in a new Session made with it, and the old one is archived.
+	// Qodo's review of #1519: updated in place, the old cap's paused work resumed before this turn's
+	// stream was open, and a cap below what was spent was refused on every turn after.
 	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "30"})
 	again, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
-	assert.Equal(t, "sesn_1", again.Session)
+	assert.Equal(t, "sesn_2", again.Session)
 	console.mu.Lock()
-	assert.Equal(t, 1, console.made["session update"])
-	assert.Equal(t, budget("3000"), console.bodies["session update"][0]["budget"])
-	assert.Equal(t, 1, console.made["session"])
+	assert.Zero(t, console.made["session update"], "no Session's cap is changed in place")
+	assert.True(t, console.archived["sesn_1"])
+	assert.Equal(t, budget("3000"), console.bodies["session"][1]["budget"])
+	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "with the same Memory")
 	console.mu.Unlock()
 
 	// A Session kept from before, made without a cap, cannot be given one: it goes on in a new one that has it.
@@ -328,17 +331,17 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	retireAsks = time.Millisecond
 	t.Cleanup(func() { retireAsks = time.Second })
 	console.mu.Lock()
-	delete(console.budget, "sesn_1")
-	console.running["sesn_1"] = true
+	delete(console.budget, "sesn_2")
+	console.running["sesn_2"] = true
 	console.mu.Unlock()
 	anew, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
-	assert.Equal(t, "sesn_2", anew.Session)
+	assert.Equal(t, "sesn_3", anew.Session)
 	console.mu.Lock()
 	assert.Equal(t, 1, console.made["interrupt"], "the uncapped Session was running, and is interrupted")
-	assert.True(t, console.archived["sesn_1"], "and archived before another is made")
-	assert.Equal(t, budget("3000"), console.bodies["session"][1]["budget"])
-	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "with the Memory the uncapped one had")
+	assert.True(t, console.archived["sesn_2"], "and archived before another is made")
+	assert.Equal(t, budget("3000"), console.bodies["session"][2]["budget"])
+	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][2]["resources"], "with the Memory the uncapped one had")
 	console.mu.Unlock()
 
 	// At its cap the Session pauses: the turn is an error that says so, and names the cap.
