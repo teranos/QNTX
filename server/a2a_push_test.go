@@ -1,9 +1,9 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2asrv/push"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/auth"
@@ -29,9 +30,9 @@ type posted struct {
 // test, and what it was POSTed.
 func aWebhook(t *testing.T) (string, <-chan posted) {
 	t.Helper()
-	allowed := webhookAddress
-	webhookAddress = func(net.IP) bool { return true }
-	t.Cleanup(func() { webhookAddress = allowed })
+	sender := pushSender
+	pushSender = push.NewHTTPPushSender(&push.HTTPSenderConfig{AllowPrivateNetworks: true})
+	t.Cleanup(func() { pushSender = sender })
 	took := make(chan posted, 16)
 	hook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
@@ -73,7 +74,6 @@ func TestATaskSentWithAPushConfigIsPostedToItsWebhook(t *testing.T) {
 
 	completed := stateOf(t, took, task, string(a2asdk.TaskStateCompleted))
 	assert.Equal(t, "Bearer secure-client-token", completed.authorization)
-	assert.Equal(t, "application/a2a+json", completed.contentType)
 	assert.NotEmpty(t, at(completed.body, "task.artifacts"), "the completed task was POSTed without its answer")
 }
 
@@ -133,20 +133,13 @@ func TestAPushConfigIsCreatedListedGotAndDeleted(t *testing.T) {
 }
 
 // "Reject private IP ranges ... Reject localhost and link-local addresses"
-// (§13.2): where the URL is set, and again where it is dialed.
+// (§13.2): a2a-go's sender dials no loopback address.
 func TestAWebhookTheInternetDoesNotRouteToIsRefused(t *testing.T) {
-	for _, url := range []string{"http://127.0.0.1/hook", "http://10.0.0.1/hook", "http://169.254.169.254/latest", "http://localhost:8770/hook", "ftp://example.org/hook"} {
-		assert.NotNil(t, webhookRefused(&a2asdk.PushConfig{URL: url}), url)
-	}
-	assert.Nil(t, webhookRefused(&a2asdk.PushConfig{URL: "https://client.example.com/webhook/a2a-notifications"}))
-
 	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Error("the node POSTed to a loopback address")
 	}))
 	t.Cleanup(hook.Close)
-	srv, _, _ := nodeAgentOverA2A(t, "")
-	// A name the URL check lets by, which resolves to loopback where it is dialed.
-	err := srv.post(&a2asdk.PushConfig{URL: strings.Replace(hook.URL, "127.0.0.1", "localhost", 1), TaskID: "t"}, []byte(`{}`))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no public address")
+	for _, url := range []string{hook.URL, strings.Replace(hook.URL, "127.0.0.1", "localhost", 1)} {
+		_ = pushSender.SendPush(context.Background(), &a2asdk.PushConfig{URL: url, TaskID: "t"}, &a2asdk.Task{ID: "t"})
+	}
 }

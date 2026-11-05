@@ -46,12 +46,15 @@ const (
 	tenantBodyMost = 1 << 20
 )
 
+// a2aContentType is the media type A2A's HTTP+JSON binding speaks in.
+const a2aContentType = "application/a2a+json"
+
 // a2aHTTP is the binding: the SDK's, made once, behind what the node asks of
 // every request first.
 func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	handler := a2asrv.NewHandler(turnExecutor{s},
 		a2asrv.WithTaskStore(tasksOnLines{s}),
-		a2asrv.WithPushNotifications(pushesOnLines{s}, pushesSent{s}),
+		a2asrv.WithPushNotifications(pushesOnLines{s}, pushSender),
 		a2asrv.WithCallInterceptors(a2aGate{s}),
 		a2asrv.WithExtendedAgentCardProducer(a2asrv.ExtendedAgentCardProducerFn(s.a2aExtendedCardOf)),
 		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{PushNotifications: true, ExtendedAgentCard: true}),
@@ -521,7 +524,30 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 	return ctx, nil, nil
 }
 
-func (a2aGate) After(context.Context, *a2asrv.CallContext, *a2asrv.Response) error { return nil }
+// After leaves a push config's credentials out of what is answered: the SDK
+// reads them from the store to send with, and a client is not answered them.
+func (a2aGate) After(_ context.Context, _ *a2asrv.CallContext, resp *a2asrv.Response) error {
+	if resp.Err != nil {
+		return nil
+	}
+	switch answered := resp.Payload.(type) {
+	case *a2asdk.PushConfig:
+		if answered != nil {
+			resp.Payload = withoutCredentials(answered)
+		}
+	case *a2asdk.ListTaskPushConfigResponse:
+		if answered == nil {
+			return nil
+		}
+		listed := *answered
+		listed.Configs = make([]*a2asdk.PushConfig, 0, len(answered.Configs))
+		for _, config := range answered.Configs {
+			listed.Configs = append(listed.Configs, withoutCredentials(config))
+		}
+		resp.Payload = &listed
+	}
+	return nil
+}
 
 // cancelable is nil when task id of ta is one a cancel ends, and
 // TaskNotCancelableError when it ended already: "The task is not in a
@@ -567,11 +593,6 @@ func (s *QNTXServer) messageTaken(ta taskAgent, sent *a2asdk.SendMessageRequest)
 		// "acceptedOutputModes": what the client takes, and the agent gives text.
 		if len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTextPlain) {
 			return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" answers in "+textPlain+", which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" does not take")
-		}
-		if config.PushConfig != nil {
-			if refused := webhookRefused(config.PushConfig); refused != nil {
-				return refused
-			}
 		}
 	}
 	if _, err := saidIn(m); err != nil {

@@ -54,7 +54,6 @@ type QNTXServer struct {
 	taskEnds              sync.Mutex                    // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
 	taskStreams           sync.Map                      // Each Task whose turn this process runs, by id, to the stream the turn prints to
 	taskCancels           sync.Map                      // Each Task canceled in this process, by id, to who canceled it
-	pushing               sync.Map                      // Each Task with push notifications, by id, to the *sync.Mutex its notifications go out under one after another
 	noNodeAgent           error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents       agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
 	elementAgents         agentsHeld                    // Each element's agent this node has held, by its purpose (ADR-054)
