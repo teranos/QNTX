@@ -173,3 +173,37 @@ func TestASocketInAnotherNamespaceIsNotTheReceiver(t *testing.T) {
 		t.Error("a request that passed no gate has a receiver")
 	}
 }
+
+// The answer says whether it was streamed: a page that named its socket and
+// was answered whole draws the answer from the response, since no stream comes.
+func TestTheAnswerSaysWhetherItWasStreamed(t *testing.T) {
+	srv := nodeUnderTest(t)
+	asker := openSocketAs(t, srv, "did:key:asker")
+	someoneElse := openSocketAs(t, srv, "did:key:someone-else")
+
+	streamed := func(socket, element string) bool {
+		t.Helper()
+		resp, streamed, err := srv.answerDirect(context.Background(), aStream{}, provider.ChatRequest{},
+			PromptDirectRequest{ElementID: element, Socket: socket}, asker.caller, true)
+		if err != nil {
+			t.Fatalf("the prompt was not answered: %v", err)
+		}
+		if resp.Content != "Up 3 days." {
+			t.Errorf("the answer is %q", resp.Content)
+		}
+		return streamed
+	}
+	if !streamed(asker.socket, "element-1") {
+		t.Error("a prompt naming the caller's own socket says it was not streamed")
+	}
+	if streamed("", "element-1") {
+		t.Error("a prompt naming no socket says it was streamed")
+	}
+	if streamed(someoneElse.socket, "element-1") {
+		t.Error("a prompt naming a socket that is not the caller's says it was streamed")
+	}
+	if streamed(asker.socket, "") {
+		t.Error("a prompt naming no element says it was streamed")
+	}
+	streamedTo(t, asker)
+}
