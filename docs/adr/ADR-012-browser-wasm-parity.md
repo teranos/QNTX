@@ -14,14 +14,6 @@ The browser should not be a lite client that talks to a server. It should run th
 
 The Rust engine compiles to WASM via `wasm-bindgen`. Both need to run in the browser and talk to each other.
 
-### WasmGC support
-
-- **Browsers**: Chrome 119+, Firefox 122+, Safari 18.2+ — all support WasmGC
-- **wazero (Go)**: does not support WasmGC, no timeline ([#1860](https://github.com/tetratelabs/wazero/issues/1860))
-- **wasmtime (Rust)**: supports WasmGC since v27.0 (November 2024)
-
-
-Those three rows were recorded 2026-03-15 and have not been re-checked since.
 
 ### Composition
 
