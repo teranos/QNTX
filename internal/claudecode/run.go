@@ -294,7 +294,18 @@ func (s Said) place(work string) (string, error) {
 			return "", refused
 		}
 	}
-	dir := filepath.Join(work, parts[0], parts[1])
+	// Resolved, so a link in the work that leads out of it is no checkout of it.
+	root, err := filepath.EvalSymlinks(work)
+	if err != nil {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	dir, err := filepath.EvalSymlinks(filepath.Join(work, parts[0], parts[1]))
+	if err != nil {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	if within, err := filepath.Rel(root, dir); err != nil || within != filepath.Join(parts[0], parts[1]) {
+		return "", errors.WithSecondaryError(refused, err)
+	}
 	if info, err := os.Stat(filepath.Join(dir, ".git")); err != nil || info == nil {
 		return "", errors.WithSecondaryError(refused, err)
 	}
