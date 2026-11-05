@@ -346,3 +346,33 @@ func TestEachAgentUnderOneTokenNamesItself(t *testing.T) {
 	require.Nil(t, refusal, refusal.GetSays())
 	assert.NotContains(t, []string{otariDID, sionDID}, named.(*protocol.Named).GetDid())
 }
+
+// Each line is stamped after every name line already written, at the
+// precision the store keeps, so the lines read back in the order they were
+// written however close together: a rename and another agent taking the name
+// it left read back as they were answered, even where the newest line written
+// is stamped later than this node's clock.
+func TestARenameAndATakeReadBackInTheOrderTheyWereWritten(t *testing.T) {
+	s := rootKnowingServer(t)
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	ahead := time.Now().Add(time.Hour).Truncate(time.Millisecond)
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-named-ahead", Subjects: []string{"did:key:z6Mkwalnut"}, Predicates: []string{predicateAgentNamed},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkwalnut"}, Timestamp: ahead, CreatedAt: ahead,
+		Source: "did:key:z6Mkwalnut", Attributes: map[string]any{"name": "room agent"},
+	}))
+
+	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "deploy agent"})
+	require.Nil(t, refusal, refusal.GetSays())
+	_, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "room agent"})
+	require.Nil(t, refusal, refusal.GetSays())
+
+	names, err := s.agentNames()
+	require.NoError(t, err)
+	holds := map[string]string{}
+	for _, held := range names {
+		holds[held.did] = held.name
+	}
+	assert.Equal(t, map[string]string{"did:key:z6Mkwalnut": "deploy agent", "did:key:z6Mkhazel": "room agent"}, holds)
+}
