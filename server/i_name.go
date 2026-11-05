@@ -151,7 +151,19 @@ func (s *QNTXServer) agentNames() ([]agentName, error) {
 		names = append(names, agentName{did: as.Subjects[0], name: name, at: as.Timestamp})
 	}
 	slices.SortStableFunc(names, func(a, b agentName) int { return a.at.Compare(b.at) })
-	return names, nil
+	// One name is one agent's and an agent holds one name. Of two lines about
+	// the same name or the same DID, the older stands and the other is no
+	// name, however the second came to be written.
+	var stands []agentName
+	for _, line := range names {
+		if slices.ContainsFunc(stands, func(older agentName) bool {
+			return older.did == line.did || strings.EqualFold(older.name, line.name)
+		}) {
+			continue
+		}
+		stands = append(stands, line)
+	}
+	return stands, nil
 }
 
 // keepAgentName writes the line down, by the agent itself.
