@@ -60,11 +60,18 @@ func (s *QNTXServer) anthropicClient(kept anthropicKept) (anthropic.Client, erro
 	), nil
 }
 
+// "it should have it otherwise its no use to run a managed agent"
+// 「[Opus 5.5] It holds no git credential (ADR-048, Its git): a change is proposed through the node,」
+// 「[Opus 5.5] which commits it as the App's installation and opens the change.」
+// "3. yes"
+var managedProposes = "You hold no git credential, and none is given to you. A change you make to a repository reaches it only through the tool codeforge_propose of the MCP server named " +
+	nodeAgentMCP + ": the node puts each file on a branch of its own and opens the pull request. "
+
 // managedIsSaidToBe is what an element's agent at Anthropic is told it is.
 func managedIsSaidToBe(a *rootAgent) string {
 	if story := storyOf(a.element); story != "" {
 		return "You run at Anthropic, in a container of your own, not on the machine the node runs on. Your DID is " + a.did + ". " +
-			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " + elementsAware(a.element)
+			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " + managedProposes + elementsAware(a.element)
 	}
 	return "You are the element " + a.element + " of a QNTX node's page, as ROOT speaks to it: one element, one conversation, continued every time ROOT shakes the phone with you on screen. " +
 		"ROOT says what they see; what you do about it is the prompt. " +
@@ -73,7 +80,7 @@ func managedIsSaidToBe(a *rootAgent) string {
 		"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
 		"What ROOT has said about you is quoted in your source's comments, and in the commit messages of github.com/teranos/QNTX-Web and github.com/teranos/QNTX that touch your files: " +
 		"ROOT's words are the quoted lines, and a commit's session: line names the conversation they were said in. " +
-		elementsAware(a.element)
+		managedProposes + elementsAware(a.element)
 }
 
 // runManaged says said to the element's agent at Anthropic, and reads its answer
