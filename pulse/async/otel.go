@@ -7,6 +7,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -98,18 +99,27 @@ func traceparentOf(ctx context.Context) (traceparent, bag string) {
 // 「[Opus 5.5] context is handed to it in that form here and nowhere else. A value」
 // 「[Opus 5.5] that is not a traceparent, a row written before the columns held W3C」
 // 「[Opus 5.5] trace context among them, is no cause: the span heads its own trace.」
+//
+// 「[Opus 5.5] Whether Sentry keeps the span is Sentry's decision, which its baggage」
+// 「[Opus 5.5] carries as sentry-sampled. The traceparent's flag is not it: a recorded」
+// 「[Opus 5.5] OpenTelemetry job span is sampled whatever Sentry decided. No」
+// 「[Opus 5.5] sentry-sampled leaves the decision to the span's own sample rate.」
 func continueFrom(traceparent, bag string) sentry.SpanOption {
 	cause := trace.SpanContextFromContext(propagation.TraceContext{}.Extract(
 		context.Background(), propagation.MapCarrier{"traceparent": traceparent}))
 	if !cause.IsValid() {
 		return sentry.ContinueFromHeaders("", "")
 	}
-	sampled := "0"
-	if cause.IsSampled() {
-		sampled = "1"
+	header := fmt.Sprintf("%s-%s", cause.TraceID(), cause.SpanID())
+	if members, err := baggage.Parse(bag); err == nil {
+		switch members.Member("sentry-sampled").Value() {
+		case "true":
+			header += "-1"
+		case "false":
+			header += "-0"
+		}
 	}
-	return sentry.ContinueFromHeaders(
-		fmt.Sprintf("%s-%s-%s", cause.TraceID(), cause.SpanID(), sampled), bag)
+	return sentry.ContinueFromHeaders(header, bag)
 }
 
 // 「[Fable 5.1] recordingOTel reports whether the context holds an OpenTelemetry span」
