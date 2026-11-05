@@ -28,6 +28,8 @@ type linkedForTest struct {
 	host        subsystem.Host
 	delivered   []string
 	reportFails bool
+	// reportPanics is a Reported that panics.
+	reportPanics bool
 }
 
 const linkedName = "fake"
@@ -86,6 +88,9 @@ func (f *linkedForTest) Delivered(_ context.Context, event string, body []byte) 
 func (f *linkedForTest) Reported(_ context.Context, start, end time.Time) ([]subsystem.ReportSection, error) {
 	if f.reportFails {
 		return nil, errors.New("the fake had nothing to read")
+	}
+	if f.reportPanics {
+		panic("the fake fell over")
 	}
 	return []subsystem.ReportSection{{
 		Title: "What the fake saw",
@@ -216,6 +221,23 @@ func TestALinkedSubsystemThatFailsItsPartIsSaidByName(t *testing.T) {
 		body := nodeBody(t, mail, kind)
 		assert.Contains(t, body, "From "+linkedName)
 		assert.Contains(t, body, "the fake had nothing to read")
+		assert.Contains(t, body, "Top 3 handler failures")
+	}
+}
+
+// Qodo's review of #1513: one that panics was asked inline by the report's
+// job, so the panic ended the job and no report went out. It is said under
+// its name as one that fails is, and the rest of the report still goes.
+func TestALinkedSubsystemThatPanicsInItsPartIsSaidByName(t *testing.T) {
+	srv, f := reportingServer(t)
+	f.reportPanics = true
+	r := srv.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil)
+	mail, err := renderReport(r)
+	require.NoError(t, err)
+	for _, kind := range []services.MailBodyKind{services.MailHTML, services.MailText} {
+		body := nodeBody(t, mail, kind)
+		assert.Contains(t, body, "From "+linkedName)
+		assert.Contains(t, body, "the fake fell over")
 		assert.Contains(t, body, "Top 3 handler failures")
 	}
 }

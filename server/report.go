@@ -370,7 +370,7 @@ func linkedParts(ctx context.Context, w sentryread.Window) []linkedPart {
 			continue
 		}
 		part := linkedPart{Subsystem: sub.Declare().GetName()}
-		sections, err := reporter.Reported(ctx, w.Start, w.End)
+		sections, err := reportedBy(ctx, reporter, w)
 		if err != nil {
 			part.Err = err.Error()
 		}
@@ -378,6 +378,18 @@ func linkedParts(ctx context.Context, w sentryread.Window) []linkedPart {
 		parts = append(parts, part)
 	}
 	return parts
+}
+
+// reportedBy is what one linked subsystem says of the week. One that panics
+// is an error said under its name, as one that fails is: asked inline by the
+// report's job, its panic would end the job and no report would go out.
+func reportedBy(ctx context.Context, reporter subsystem.Reported, w sentryread.Window) (sections []subsystem.ReportSection, err error) {
+	defer func() {
+		if fell := recover(); fell != nil {
+			sections, err = nil, errors.Newf("its part panicked: %v", fell)
+		}
+	}()
+	return reporter.Reported(ctx, w.Start, w.End)
 }
 
 // ---------------------------------------------------------------------------
