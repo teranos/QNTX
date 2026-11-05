@@ -183,3 +183,43 @@ func TestWithOTelTheChildHangsFromTheParentsOTelSpan(t *testing.T) {
 			got, parentOTel.SpanContext().SpanID())
 	}
 }
+
+// 「[Opus 5.5] The traceparent says which span is the cause; whether Sentry keeps the」
+// 「[Opus 5.5] child is Sentry's own decision, carried in the baggage. A recorded」
+// 「[Opus 5.5] OpenTelemetry span is sampled whatever Sentry decided, so its flag is not」
+// 「[Opus 5.5] that decision: a parent Sentry dropped has a child Sentry drops.」
+func TestAChildOfADroppedJobIsDroppedWithOTelRecording(t *testing.T) {
+	held := &heldTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:              "https://tim@example.com/1",
+		Transport:        held,
+		EnableTracing:    true,
+		TracesSampleRate: 0,
+	})
+	if err != nil {
+		t.Fatalf("could not build a Sentry client: %v", err)
+	}
+	previous := sentry.CurrentHub().Client()
+	sentry.CurrentHub().BindClient(client)
+	t.Cleanup(func() { sentry.CurrentHub().BindClient(previous) })
+	spans := recording(t)
+
+	pool := poolWith(t, &countingHandler{name: "unused"})
+	pool.Registry().Register(&enqueueingHandler{name: "parent.work", queue: pool.queue, child: "child.work"})
+	pool.Registry().Register(&countingHandler{name: "child.work"})
+	enqueue(t, pool, "parent.work")
+
+	if err := pool.processNextJob(); err != nil {
+		t.Fatalf("parent execution: %v", err)
+	}
+	if err := pool.processNextJob(); err != nil {
+		t.Fatalf("child execution: %v", err)
+	}
+
+	if len(spans.Ended()) != 2 {
+		t.Fatalf("recorded %d OpenTelemetry spans, want the parent's and the child's", len(spans.Ended()))
+	}
+	for _, e := range held.transactions() {
+		t.Errorf("Sentry dropped the parent and shipped %q", e.Transaction)
+	}
+}
