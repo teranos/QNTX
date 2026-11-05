@@ -142,8 +142,10 @@ func (s *QNTXServer) scrubJSON(ctx context.Context, raw []byte) ([]byte, string,
 	if len(words) == 0 {
 		return raw, "", nil
 	}
+	// The unit separator is only ever the middle of jsonBetween: a string that
+	// holds it anywhere could meet a separator beside it and move the split.
 	for _, word := range words {
-		if strings.Contains(word, jsonBetween) {
+		if strings.Contains(word, "\x1f") {
 			return nil, "", errors.New("a string of the answer holds what stands between its strings for the scanner")
 		}
 	}
