@@ -16,12 +16,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	errors "github.com/teranos/sacred-error"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
@@ -100,6 +102,108 @@ func TestTimTheNodeAgentReadsFixtures(t *testing.T) {
 
 	element := s.fixtured(context.Background(), agentAdmission(auth.ElementAgentLabel+":users"), answerOf(real))
 	assert.Equal(t, "tim@example.com", spoken(element))
+}
+
+// 6SION: GitHub's answer to a branch read carries a signed commit's payload,
+// an address between angle brackets, which JSON writes with an escape before
+// it. The scanner reads the answer's strings, so the answer is JSON after it.
+func TestTimAnAnswerIsStillJSONWithItsFixtures(t *testing.T) {
+	s, _ := fixturesServer(t)
+	real := "someone" + "@" + "gmail.com"
+	s.scrubWith = func(ctx context.Context, text string) (string, string, error) {
+		if strings.Contains(text, `\u003c`) {
+			return "", "", errors.New("the scanner was handed the answer's JSON, not its strings")
+		}
+		return standInScanner(ctx, text)
+	}
+	body, err := json.Marshal(map[string]any{"answer": map[string]any{"payload": "committer GitHub <" + real + "> 1 +0000\n\ngo.sum", "size": 7}})
+	require.NoError(t, err)
+	require.Contains(t, string(body), `\u003c`)
+
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}, StructuredContent: json.RawMessage(body)})
+	require.False(t, answered.IsError, spoken(answered))
+	want := `{"answer":{"payload":"committer GitHub <tim@example.com> 1 +0000\n\ngo.sum","size":7}}`
+	assert.JSONEq(t, want, spoken(answered))
+	assert.JSONEq(t, want, string(answered.StructuredContent.(json.RawMessage)))
+	_, err = json.Marshal(answered)
+	require.NoError(t, err, "an answer that does not marshal is answered to nobody")
+}
+
+// Qodo's review of #1510: a string ending in "\n\x1f" meets the separator
+// after it as "\n\x1f\n\x1f\n", and the split cuts at the first one. The
+// count still matches, and the strings beside it come back changed.
+//
+// Qodo's review of #1510 again: refusing such a string refused the whole
+// answer, an issue body holding one stray byte included. A string holding
+// the separator's middle byte is handed to the scanner apart from the rest, so
+// it is scrubbed and handed on, and the strings beside it are as they were.
+func TestSpikeAStringHoldingPartOfTheSeparatorIsScrubbedOnItsOwn(t *testing.T) {
+	s, _ := fixturesServer(t)
+	real := "someone" + "@" + "gmail.com"
+	body := `{"a":"x\n\u001f","b":"` + real + `","c":"` + real + `\u001f"}`
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: body}}})
+	require.False(t, answered.IsError, spoken(answered))
+	assert.JSONEq(t, `{"a":"x\n\u001f","b":"tim@example.com","c":"tim@example.com\u001f"}`, spoken(answered))
+	assert.NotContains(t, spoken(answered), real)
+}
+
+// Qodo's review of #1510, a third time: each string holding \x1f started a
+// scanner of its own, as many as a hostile answer held. They are handed to it
+// together, between a separator whose middle byte none of them holds: one
+// scan for the rest, and one for them, however many there are.
+func TestSpikeStringsHoldingTheSeparatorsByteAreScannedTogether(t *testing.T) {
+	s, _ := fixturesServer(t)
+	scans := 0
+	s.scrubWith = func(ctx context.Context, text string) (string, string, error) {
+		scans++
+		return standInScanner(ctx, text)
+	}
+	real := "someone" + "@" + "gmail.com"
+	held := map[string]any{"plain": real}
+	want := map[string]any{"plain": "tim@example.com"}
+	for i := range 50 {
+		key := "k" + strconv.Itoa(i)
+		held[key] = real + "\x1f" + strconv.Itoa(i)
+		want[key] = "tim@example.com\x1f" + strconv.Itoa(i)
+	}
+	body, err := json.Marshal(held)
+	require.NoError(t, err)
+	wanted, err := json.Marshal(want)
+	require.NoError(t, err)
+
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}})
+	require.False(t, answered.IsError, spoken(answered))
+	assert.JSONEq(t, string(wanted), spoken(answered))
+	assert.Equal(t, 2, scans)
+}
+
+// When the strings holding \x1f hold every separator byte there is between
+// them, there is no separator left to hand them over together: the answer is
+// refused, saying how many held \x1f, and nothing unscrubbed is handed on.
+func TestSpikeStringsHoldingEverySeparatorByteAreNotHandedOn(t *testing.T) {
+	s, _ := fixturesServer(t)
+	real := "someone" + "@" + "gmail.com"
+	body := `{"a":"` + real + `\u001f\u001e","b":"\u001f\u001d","c":"\u001f\u001c"}`
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: body}}})
+	assert.True(t, answered.IsError, spoken(answered))
+	assert.Contains(t, spoken(answered), "3 strings of the answer hold")
+	assert.NotContains(t, spoken(answered), real)
+}
+
+// Qodo's review of #1510: an address as a key becomes the fixture, and an
+// object that already holds the fixture as a key would keep one of the two.
+func TestSpikeTwoKeysThatBecomeOneFixtureAreNotHandedOn(t *testing.T) {
+	s, _ := fixturesServer(t)
+	real := "someone" + "@" + "gmail.com"
+	body := `{"` + real + `":"first","tim@example.com":"second"}`
+	answered := s.fixtured(context.Background(), agentAdmission(auth.NodeAgentLabel),
+		&mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: body}}})
+	assert.True(t, answered.IsError, spoken(answered))
+	assert.Contains(t, spoken(answered), "tim@example.com")
 }
 
 func TestSpikeAUserReadsTheAnswerAsItIs(t *testing.T) {

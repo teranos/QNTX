@@ -386,6 +386,19 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 			return managedOf{}, errors.Wrapf(err, "the element %s's Agent %s at Anthropic did not answer", agent.element, held.Agent)
 		}
 		if was.System != managedIsSaidToBe(agent) || string(was.Model.ID) != model {
+			// 「[Opus 5.5] The Session the old version ran in is archived at Anthropic first, not only dropped here:」
+			// 「[Opus 5.5] archived after the update, one that failed would leave it kept on an Agent that matches.」
+			if held.Session != "" {
+				left, err := client.Beta.Sessions.Get(ctx, held.Session, anthropic.BetaSessionGetParams{})
+				if err != nil {
+					return managedOf{}, errors.Wrapf(err, "the element %s's Session %s at Anthropic did not answer", agent.element, held.Session)
+				}
+				if left.Status != "terminated" {
+					if err := s.retireSession(ctx, client, agent, held.Session, left.Status); err != nil {
+						return managedOf{}, err
+					}
+				}
+			}
 			if _, err := client.Beta.Agents.Update(ctx, held.Agent, anthropic.BetaAgentUpdateParams{
 				Version: anthropic.Int(was.Version), System: anthropic.String(managedIsSaidToBe(agent)),
 				Model: anthropic.BetaManagedAgentsModelConfigParams{ID: anthropic.BetaManagedAgentsModel(model)},
@@ -454,7 +467,8 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 		if err := keep(); err != nil {
 			return managedOf{}, err
 		}
-		s.logger.Infow("the element's agent runs at Anthropic", "element", agent.element, "agent", held.Agent, "vault", held.Vault, "memory", held.Memory, "session", held.Session, "max_list_cost", ceiling)
+		// The model is said here because nothing a Session's events carry names it (6SION).
+		s.logger.Infow("the element's agent runs at Anthropic", "element", agent.element, "agent", held.Agent, "model", model, "vault", held.Vault, "memory", held.Memory, "session", held.Session, "max_list_cost", ceiling)
 	}
 	return held, nil
 }

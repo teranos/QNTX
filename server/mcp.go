@@ -25,16 +25,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	"go.uber.org/zap"
 )
 
 // operation is one route no sigil answers yet, called with one method.
@@ -168,6 +171,29 @@ func (s *QNTXServer) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, why)
 		return
 	}
+	// "very large requests we should not want to deal with"
+	//
+	// The node's MCP server takes what the Node Agent's A2A agent takes, and a
+	// namespace's what an agent at a tenant's takes: /mcp/<namespace> is that
+	// namespace's server as /a2a/<tenant>/ is its agent.
+	most := nodeBodyMost
+	if _, named := mcpNamespaceOf(r.URL.Path); named {
+		most = tenantBodyMost
+	}
+	if r.Body != nil {
+		body, err := io.ReadAll(io.LimitReader(r.Body, int64(most)+1))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "the MCP request body did not read: "+err.Error())
+			return
+		}
+		if len(body) > most {
+			writeError(w, http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("the MCP request body is more than the %d bytes %s takes", most, r.URL.Path))
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		r.ContentLength = int64(len(body))
+	}
 	s.mcpOnce.Do(func() {
 		s.mcpHTTP = mcp.NewStreamableHTTPHandler(s.mcpServerFor, &mcp.StreamableHTTPOptions{
 			Stateless: true,
@@ -177,7 +203,16 @@ func (s *QNTXServer) HandleMCP(w http.ResponseWriter, r *http.Request) {
 			DisableLocalhostProtection: true,
 		})
 	})
-	s.mcpHTTP.ServeHTTP(w, r)
+	// What the request carries and what is written back to it are recorded
+	// here, around the MCP server: a call nobody answers still ends here.
+	logger := s.logger
+	if logger == nil {
+		logger = zap.NewNop().Sugar()
+	}
+	asked := &mcpAsked{arrived: time.Now(), logger: logger}
+	wrote := &writtenBack{ResponseWriter: w}
+	s.mcpHTTP.ServeHTTP(wrote, r.WithContext(withMCPAsked(r.Context(), asked)))
+	asked.ends(wrote)
 }
 
 // mcpServerFor is the server one request is answered by: one tool per
@@ -186,6 +221,8 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 	// Who is asking was settled by the gate in front of /mcp and is in the
 	// request's context.
 	admitted, known := auth.AdmissionFrom(r.Context())
+	// The record of this request, which each tool writes its call into.
+	call := mcpAskedOf(r.Context())
 
 	// A caller is shown only what they reach, so what this server lists is
 	// that caller's, and no cache is to hand it to another (cacheScope). A
@@ -243,7 +280,7 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			if given.says {
 				tool.OutputSchema = given.schema
 			}
-			server.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			server.AddTool(tool, call.recording(tool.Name, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				args := map[string]any{}
 				if len(req.Params.Arguments) > 0 {
 					if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
@@ -258,8 +295,10 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				}
 				// Who reaches it is asked again on the call, so a line written
 				// since the list was drawn holds, and a listed tool is still gated.
-				return s.fixtured(ctx, admitted, overMCP(ctx, s.gate, s.reachingOver, r, held, args, given)), nil
-			})
+				answered := overMCP(ctx, s.gate, s.reachingOver, r, held, args, given)
+				mcpAskedOf(ctx).now(mcpMakingFixtures)
+				return s.fixtured(ctx, admitted, answered), nil
+			}))
 		}
 	}
 
@@ -289,7 +328,7 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 			Name:        toolName(path),
 			Description: describe(path, prefix),
 			InputSchema: calledThroughSchema,
-		}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		}, call.recording(toolName(path), func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			var in calledThrough
 			if len(req.Params.Arguments) > 0 {
 				if err := json.Unmarshal(req.Params.Arguments, &in); err != nil {
@@ -302,8 +341,11 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 				return refusal, nil
 			}
 			op := operation{Path: path, Method: strings.ToUpper(in.Method), Prefix: prefix}
-			return s.fixtured(ctx, admitted, callThrough(ctx, s.served, r, op, in)), nil
-		})
+			mcpAskedOf(ctx).says("method", op.Method)
+			answered := callThrough(ctx, s.served, r, op, in)
+			mcpAskedOf(ctx).now(mcpMakingFixtures)
+			return s.fixtured(ctx, admitted, answered), nil
+		}))
 	}
 	return server
 }

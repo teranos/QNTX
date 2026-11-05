@@ -55,6 +55,31 @@ func TestATableIsAskedOfTheOrganizationAndReadAsRows(t *testing.T) {
 	assert.Equal(t, "3", q.Get("per_page"))
 }
 
+// What Sentry dropped is in no table: the outcomes are asked of stats_v2, by
+// outcome and reason, for the project's errors in the window.
+func TestOutcomesAreWhatSentryTookAndWhatItDroppedAndWhy(t *testing.T) {
+	var asked http.Request
+	c := sentryAnswering(t, `{"start":"2026-09-18T00:00:00Z","end":"2026-09-25T00:00:00Z","intervals":[],"groups":[
+		{"by":{"outcome":"rate_limited","reason":"error_usage_exceeded"},"totals":{"sum(quantity)":364},"series":{}},
+		{"by":{"outcome":"client_discard","reason":"ratelimit_backoff"},"totals":{"sum(quantity)":280},"series":{}}]}`, &asked)
+
+	outcomes, err := c.Outcomes(context.Background(), CategoryError, week)
+	require.NoError(t, err)
+	assert.Equal(t, []Outcome{
+		{Outcome: "rate_limited", Reason: "error_usage_exceeded", Count: 364},
+		{Outcome: "client_discard", Reason: "ratelimit_backoff", Count: 280},
+	}, outcomes)
+
+	assert.Equal(t, "/api/0/organizations/abcd/stats_v2/", asked.URL.Path)
+	q := asked.URL.Query()
+	assert.Equal(t, "error", q.Get("category"))
+	assert.Equal(t, "sum(quantity)", q.Get("field"))
+	assert.Equal(t, []string{"outcome", "reason"}, q["groupBy"])
+	assert.Equal(t, "1234", q.Get("project"))
+	assert.Equal(t, "2026-09-18T00:00:00Z", q.Get("start"))
+	assert.Equal(t, "2026-09-25T00:00:00Z", q.Get("end"))
+}
+
 func TestASeriesIsReadAsOneValuePerBucket(t *testing.T) {
 	var asked http.Request
 	c := sentryAnswering(t, `{"data":[[1790208000,[{"count":13.668}]],[1790211600,[{"count":null}]],[1790215200,[]]]}`, &asked)

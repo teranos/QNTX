@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -621,4 +622,35 @@ func initializedFor(t *testing.T, s *QNTXServer, asked *http.Request) *mcp.Initi
 	t.Cleanup(func() { _ = asking.Close() })
 
 	return asking.InitializeResult()
+}
+
+// "very large requests we should not want to deal with"
+//
+// An MCP request past the most its server takes is refused before the MCP
+// server reads it, and the refusal says the most. The node's server takes
+// what the Node Agent's A2A agent takes; a namespace's what a tenant's does.
+func TestAnMCPRequestPastItsMostIsRefused(t *testing.T) {
+	connector := auth.Admitted(auth.LevelConnector, "Clean")
+	connector.ClientDID = "did:key:zconnector"
+	for path, c := range map[string]struct {
+		as   auth.Admission
+		most int
+	}{
+		"/mcp/":      {auth.Admitted(auth.LevelRoot), nodeBodyMost},
+		"/mcp/Clean": {connector, tenantBodyMost},
+	} {
+		sent := func(body string) *httptest.ResponseRecorder {
+			req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+			req = req.WithContext(auth.WithAdmission(req.Context(), c.as))
+			w := httptest.NewRecorder()
+			bareNode().HandleMCP(w, req)
+			return w
+		}
+		over := sent(strings.Repeat(" ", c.most+1))
+		assert.Equal(t, http.StatusRequestEntityTooLarge, over.Code, path)
+		assert.Contains(t, over.Body.String(), strconv.Itoa(c.most), path)
+
+		at := sent(`{}` + strings.Repeat(" ", c.most-2))
+		assert.NotEqual(t, http.StatusRequestEntityTooLarge, at.Code, path)
+	}
 }

@@ -29,8 +29,6 @@ var nodeWideBroadcasts = map[string]string{
 		"its load is what that pool is doing",
 	"broadcastJobUpdate": "the async job queue is the node's, one queue however many " +
 		"namespaces it runs",
-	"broadcastLLMStream": "an LLM stream is addressed by job id, and the job it belongs " +
-		"to came off the node's own queue",
 
 	// The four Pulse ones are the same claim: an execution is a run of the
 	// node's scheduler, reported by scheduled-job id.

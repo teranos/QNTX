@@ -160,3 +160,25 @@ func TestMigrationsRecordTheirChecksums(t *testing.T) {
 		"SELECT COUNT(*) FROM schema_migrations WHERE checksum IS NULL OR checksum = ''").Scan(&blank))
 	assert.Equal(t, 0, blank, "a migration was recorded without a checksum")
 }
+
+// Qodo's review of #1514: idx_pulse_executions_status_completed (085) begins
+// with status, so every read the single-column status index served it serves,
+// and a run's insert and each status it passes kept both up to date (087).
+func TestRunsAreFoundByStatusThroughOneIndex(t *testing.T) {
+	db, err := OpenWithMigrations(filepath.Join(t.TempDir(), "test.db"), nil)
+	require.NoError(t, err)
+	defer db.Close()
+
+	held := map[string]bool{}
+	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'pulse_executions'")
+	require.NoError(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		require.NoError(t, rows.Scan(&name))
+		held[name] = true
+	}
+	require.NoError(t, rows.Err())
+	assert.True(t, held["idx_pulse_executions_status_completed"])
+	assert.False(t, held["idx_pulse_executions_status"], "the status index the composite begins with is still kept")
+}

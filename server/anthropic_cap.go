@@ -62,7 +62,8 @@ func (s *QNTXServer) anthropicCapSet(ctx context.Context, sent sigil.Sent) (any,
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the cap on a Session at Anthropic is set through the gate, and this came through none"}
 	}
 	amount := strings.TrimSpace(sent["amount"])
-	if _, err := centsOf(amount); err != nil {
+	// 「[Opus 5.5] An amount left out takes the cap back to the node's default: the line keeps none.」
+	if _, err := centsOf(amount); amount != "" && err != nil {
 		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "amount", Says: err.Error()}
 	}
 	kept, _, err := s.anthropicLine()
@@ -73,6 +74,7 @@ func (s *QNTXServer) anthropicCapSet(ctx context.Context, sent sigil.Sent) (any,
 	if refused := s.keepAnthropicLine(admitted.Identity, kept); refused != nil {
 		return nil, refused
 	}
-	s.logger.Infow("the cap on a Session at Anthropic was set", "cap", amount, "currency", anthropicCapCurrency, "by", admitted.Identity)
+	capped, isDefault := capOf(kept)
+	s.logger.Infow("the cap on a Session at Anthropic was set", "cap", capped, "default", isDefault, "currency", anthropicCapCurrency, "by", admitted.Identity)
 	return s.anthropicAm(ctx, sent)
 }
