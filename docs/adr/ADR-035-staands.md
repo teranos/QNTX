@@ -29,4 +29,5 @@ Wants:
 - Staand needs to be renamed to Datapunt everywhere 
 - So Datapunt is the Pixel
 - One Web analytics pixel is one datapunt 
-- A visit is for datapunt to obs
+- A visit is for datapunt to observe, as it’s doing now
+- 
