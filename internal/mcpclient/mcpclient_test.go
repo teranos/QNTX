@@ -16,8 +16,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// The fake server: this test binary, run again with MCP_FAKE naming what it does. It answers as an MCP
-// server on stdin and stdout.
+// 「[Fable 5.1] The fake server: this test binary, run again with MCP_FAKE naming what it does. It answers as an MCP」
+// 「[Fable 5.1] server on stdin and stdout.」
 func TestMain(m *testing.M) {
 	if scenario := os.Getenv("MCP_FAKE"); scenario != "" {
 		os.Exit(fakeServer(scenario))
@@ -57,22 +57,22 @@ func fakeServer(scenario string) int {
 		case r.Method == "initialize":
 			say(r, `"result":`+opened)
 		case r.Method == "tools/call":
-			// What of the node's environment reached the server.
+			// 「[Fable 5.1] What of the node's environment reached the server.」
 			_, leaked := os.LookupEnv("MCPCLIENT_OF_THE_NODE")
 			say(r, fmt.Sprintf(`"result":{"content":[{"type":"text","text":"leaked=%t"}]}`, leaked))
 		case len(r.ID) > 0:
-			// Anything else asked of it, server/discover first, is a method it does not have.
+			// 「[Fable 5.1] Anything else asked of it, server/discover first, is a method it does not have.」
 			say(r, `"error":{"code":-32601,"message":"method not found"}`)
 		}
 	}
-	// Its input closed. A server that ends there has ended; these two run on.
+	// 「[Fable 5.1] Its input closed. A server that ends there has ended; these two run on.」
 	if scenario == "stays" || scenario == "deaf" {
 		time.Sleep(time.Minute)
 	}
 	return 0
 }
 
-// standIn is the SDK's own server, the one the node serves MCP with, connected in this process.
+// 「[Fable 5.1] standIn is the SDK's own server, the one the node serves MCP with, connected in this process.」
 func standIn(t *testing.T, options *mcp.ServerOptions, add func(*mcp.Server)) *Conn {
 	t.Helper()
 	ctx := context.Background()
@@ -101,7 +101,7 @@ func said(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}
 }
 
-// textOf is the text a result holds, when it holds one piece of text.
+// 「[Fable 5.1] textOf is the text a result holds, when it holds one piece of text.」
 func textOf(t *testing.T, result *mcp.CallToolResult) string {
 	t.Helper()
 	if len(result.Content) != 1 {
@@ -186,7 +186,7 @@ func TestAToolTheServerDoesNotHaveIsAnError(t *testing.T) {
 	}
 }
 
-// Under -race a Go binary sleeps a second as it exits, which is longer than a server is waited on here.
+// 「[Fable 5.1] Under -race a Go binary sleeps a second as it exits, which is longer than a server is waited on here.」
 func fake(scenario string) Server {
 	return Server{Binary: os.Args[0], Env: []string{"MCP_FAKE=" + scenario, "GORACE=atexit_sleep_ms=0"}}
 }
