@@ -33,11 +33,15 @@ type consoleStandIn struct {
 	ended map[string]bool
 	// spent is what the Session has cost, by each time it is read.
 	spent float64
+	// budget is each Session's budget as it was made or last updated; absent is none.
+	budget map[string]any
+	// stop is the stop_reason the Session goes idle with: end_turn when empty.
+	stop string
 }
 
 func standInConsole(t *testing.T) (*consoleStandIn, string) {
 	t.Helper()
-	c := &consoleStandIn{made: map[string]int{}, bodies: map[string][]map[string]any{}, said: make(chan string, 4), answers: "the element answered at Anthropic", ended: map[string]bool{}}
+	c := &consoleStandIn{made: map[string]int{}, bodies: map[string][]map[string]any{}, said: make(chan string, 4), answers: "the element answered at Anthropic", ended: map[string]bool{}, budget: map[string]any{}}
 	served := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		var sent map[string]any
@@ -79,7 +83,11 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/sessions":
 			c.made["session"]++
 			c.bodies["session"] = append(c.bodies["session"], sent)
-			answer(fmt.Sprintf("sesn_%d", c.made["session"]))
+			id := fmt.Sprintf("sesn_%d", c.made["session"])
+			if budget, capped := sent["budget"]; capped {
+				c.budget[id] = budget
+			}
+			answer(id)
 		case r.Method == http.MethodGet && strings.Count(r.URL.Path, "/") == 3 && strings.HasPrefix(r.URL.Path, "/v1/sessions/"):
 			id := strings.TrimPrefix(r.URL.Path, "/v1/sessions/")
 			status := "idle"
@@ -87,7 +95,14 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 				status = "terminated"
 			}
 			c.spent += 0.25
-			_, _ = io.WriteString(w, fmt.Sprintf(`{"id":"%s","status":"%s","usage":{"list_cost":{"amount":"%.2f","currency":"USD"}}}`, id, status, c.spent))
+			budget, _ := json.Marshal(c.budget[id])
+			_, _ = io.WriteString(w, fmt.Sprintf(`{"id":"%s","status":"%s","budget":%s,"usage":{"list_cost":{"amount":"%.2f","currency":"USD"}}}`, id, status, budget, c.spent))
+		case r.Method == http.MethodPost && strings.Count(r.URL.Path, "/") == 3 && strings.HasPrefix(r.URL.Path, "/v1/sessions/"):
+			id := strings.TrimPrefix(r.URL.Path, "/v1/sessions/")
+			c.made["session update"]++
+			c.bodies["session update"] = append(c.bodies["session update"], sent)
+			c.budget[id] = sent["budget"]
+			answer(id)
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/events"):
 			events, _ := sent["events"].([]any)
 			first, _ := events[0].(map[string]any)
@@ -104,10 +119,14 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 			c.mu.Unlock()
 			<-c.said
 			c.mu.Lock()
+			stop := c.stop
+			if stop == "" {
+				stop = "end_turn"
+			}
 			for _, event := range [][2]string{
 				{"agent.mcp_tool_use", `{"id":"ev_0","type":"agent.mcp_tool_use","processed_at":"2026-10-27T18:00:00Z","mcp_server_name":"qntx","name":"am_version","input":{}}`},
 				{"agent.message", `{"id":"ev_1","type":"agent.message","processed_at":"2026-10-27T18:00:00Z","content":[{"type":"text","text":"` + c.answers + `"}]}`},
-				{"session.status_idle", `{"id":"ev_2","type":"session.status_idle","processed_at":"2026-10-27T18:00:01Z","stop_reason":{"type":"end_turn"},"stop_details":{}}`},
+				{"session.status_idle", `{"id":"ev_2","type":"session.status_idle","processed_at":"2026-10-27T18:00:01Z","stop_reason":{"type":"` + stop + `"},"stop_details":{}}`},
 			} {
 				_, _ = io.WriteString(w, "event: "+event[0]+"\ndata: "+event[1]+"\n\n")
 				flusher.Flush()
@@ -129,6 +148,7 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	if s.nodeAgent == nil {
 		s.nodeAgent = &rootAgent{home: t.TempDir()}
 	}
+	s.deps.cfg.Agent.Root.Managed.MaxListCost = "2000"
 	for _, given := range []sigil.Sent{anOrganization, aServiceAcct, aRule} {
 		rootAsksAnthropic(t, s, "set", given)
 	}
@@ -237,4 +257,78 @@ func TestAStorysAgentHasItsOneStoryAsItsContract(t *testing.T) {
 	assert.Contains(t, story, "So is every other story, named story- and its file's name")
 	element := managedIsSaidToBe(&rootAgent{element: "approvals-element", did: "did:key:approvals"})
 	assert.Contains(t, element, "The user stories in stories/ of github.com/teranos/QNTX-Web that name you are your contract")
+}
+
+// "make 6SION set one, prep a pr"
+// "6SION00: The bad session needs to not be able to murder us further."
+// 「[Opus 5.5] Each Session an element's agent runs in at Anthropic is made with the cap am.toml」
+// 「[Opus 5.5] names, and none is made without one (platform.claude.com/docs/en/managed-agents/budgets).」
+func TestAnElementsSessionAtAnthropicIsMadeWithTheCapAmTomlNames(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	console, base := standInConsole(t)
+	s.anthropicBaseURL = base
+	if s.nodeAgent == nil {
+		s.nodeAgent = &rootAgent{home: t.TempDir()}
+	}
+	for _, given := range []sigil.Sent{anOrganization, aServiceAcct, aRule} {
+		rootAsksAnthropic(t, s, "set", given)
+	}
+	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole})
+	home := t.TempDir()
+	agent := &rootAgent{home: home, namespace: auth.NamespaceSystem, element: "llm-provider-element", sessionDir: filepath.Join(elementsDir, "llm-provider-element"), did: "did:key:element", token: "the-element-token"}
+	said := rootSaid(filepath.Join(t.TempDir(), "no-claude-code-is-run"), home)
+	capOf := func(cents string) any {
+		return map[string]any{"type": "limit", "max_list_cost": map[string]any{"amount": cents, "currency": "USD"}}
+	}
+
+	// No cap named: nothing is made at Anthropic, and the turn says what am.toml lacks.
+	_, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "agent.root.managed.max_list_cost")
+	console.mu.Lock()
+	assert.Empty(t, console.made, "nothing is made at Anthropic without a cap")
+	console.mu.Unlock()
+
+	// Named: the Session is made with it, in whole US cents as Anthropic takes it.
+	s.deps.cfg.Agent.Root.Managed.MaxListCost = "2000"
+	answer, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	assert.Equal(t, "sesn_1", answer.Session)
+	console.mu.Lock()
+	assert.Equal(t, capOf("2000"), console.bodies["session"][0]["budget"])
+	console.mu.Unlock()
+
+	// Another cap named: the same Session is updated to it, and goes on.
+	s.deps.cfg.Agent.Root.Managed.MaxListCost = "3000"
+	again, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	assert.Equal(t, "sesn_1", again.Session)
+	console.mu.Lock()
+	assert.Equal(t, 1, console.made["session update"])
+	assert.Equal(t, capOf("3000"), console.bodies["session update"][0]["budget"])
+	assert.Equal(t, 1, console.made["session"])
+	console.mu.Unlock()
+
+	// A Session kept from before, made without a cap, cannot be given one: it goes on in a new one that has it.
+	console.mu.Lock()
+	delete(console.budget, "sesn_1")
+	console.mu.Unlock()
+	anew, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	assert.Equal(t, "sesn_2", anew.Session)
+	console.mu.Lock()
+	assert.Equal(t, capOf("3000"), console.bodies["session"][1]["budget"])
+	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "with the Memory the uncapped one had")
+	console.mu.Unlock()
+
+	// At its cap the Session pauses: the turn is an error that says so, and names the cap.
+	console.mu.Lock()
+	console.stop = "budget_reached"
+	console.mu.Unlock()
+	capped, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
+	require.NoError(t, err)
+	assert.True(t, capped.IsError)
+	assert.Contains(t, capped.Text, "the element answered at Anthropic", "what it said before the cap is kept")
+	assert.Contains(t, capped.Text, "reached its cap, max_list_cost 3000 in whole US cents")
+	assert.Contains(t, capped.Text, "agent.root.managed.max_list_cost")
 }

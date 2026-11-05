@@ -213,3 +213,35 @@ model = "gemini-3.8-flash-low"
 		t.Errorf("Validate = %v, want nil", err)
 	}
 }
+
+// "make 6SION set one, prep a pr"
+// 「[Opus 5.5] The cap on each Session ROOT's agents run at Anthropic is am.toml's, in whole」
+// 「[Opus 5.5] US cents as Anthropic's budget.max_list_cost.amount is written: quoted or not.」
+func TestManagedSessionCapLoads(t *testing.T) {
+	for _, written := range []string{`"2000"`, `2000`} {
+		cfg, err := LoadFromFile(writeConfig(t, "[agent.root]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n\n[agent.root.managed]\nmax_list_cost = "+written+"\n"))
+		if err != nil {
+			t.Fatalf("LoadFromFile = %v", err)
+		}
+		if got := cfg.Agent.Root.Managed.MaxListCost; got != "2000" {
+			t.Errorf("max_list_cost = %s loaded as %q, want \"2000\"", written, got)
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Errorf("Validate = %v, want nil", err)
+		}
+	}
+}
+
+// 「[Opus 5.5] What Anthropic rejects is refused at load (managed-agents/budgets, Error reference):」
+// 「[Opus 5.5] a decimal form, zero, a negative, a leading zero.」
+func TestManagedSessionCapAnthropicRejectsIsRefused(t *testing.T) {
+	for _, written := range []string{`"25.00"`, `"0"`, `"-5"`, `"025"`, `"twenty"`} {
+		cfg, err := LoadFromFile(writeConfig(t, "[agent.root]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n\n[agent.root.managed]\nmax_list_cost = "+written+"\n"))
+		if err != nil {
+			t.Fatalf("LoadFromFile = %v", err)
+		}
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "agent.root.managed.max_list_cost") {
+			t.Errorf("max_list_cost = %s: Validate = %v, want it refused naming agent.root.managed.max_list_cost", written, err)
+		}
+	}
+}
