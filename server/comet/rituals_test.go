@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	errors "github.com/teranos/sacred-error"
 )
 
 // willow is a grove ritual as grove's controls/grove.pbt declares one.
@@ -187,4 +188,34 @@ func TestAnotherAgentsBuildLeavesTheSandItDidNotKeep(t *testing.T) {
 	assert.FileExists(t, held)
 	require.NoError(t, SandStands(node, "http://127.0.0.1:8772"))
 	require.NoError(t, SandStands(other, "http://127.0.0.1:8772"))
+}
+
+// failingSandNode builds every binary and fails the sand, as a grove control that does not parse would.
+type failingSandNode struct{ agentNode }
+
+func (f failingSandNode) Run(ctx context.Context, dir string, env []string, name string, args ...string) error {
+	if name == "nice" && slices.Contains(args, "sand") {
+		return errors.New("a grove control does not parse")
+	}
+	return f.agentNode.Run(ctx, dir, env, name, args...)
+}
+
+// Qodo on #1535: a build that failed on these controls is not started again by every turn. The
+// controls changing starts one; until then, the agent's turns are said on the sand it holds.
+func TestASandThatFailedToBuildIsNotBuiltAgainForTheSameControls(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	const url = "http://127.0.0.1:8772"
+	groveCheckout(t, home, map[string]string{"grove.pbt": willow})
+	require.True(t, BuildWanted(home, url), "a checkout whose rituals no sand holds")
+
+	ended := make(chan struct{})
+	Builder{Node: failingSandNode{agentNode{builds: t.TempDir()}}, NixBin: "/nix/bin"}.GroundAgent(context.Background(), home, url,
+		func(string) error { return nil }, func(string, ...any) { close(ended) })
+	<-ended
+	require.Error(t, Under(home), "the failure is said")
+	assert.False(t, BuildWanted(home, url), "the same controls, after their build failed")
+
+	groveCheckout(t, home, map[string]string{"grove.pbt": willow + "\n# fixed\n"})
+	assert.True(t, BuildWanted(home, url), "controls that changed since the build failed")
 }

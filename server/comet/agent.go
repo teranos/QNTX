@@ -191,6 +191,38 @@ func SandStands(home, url string) error {
 	return nil
 }
 
+// failure is what an agent's last failed build was built from, and when it failed.
+type failure struct {
+	controls string
+	at       time.Time
+}
+
+// failedFor is each agent's last failed build, by its home.
+var failedFor sync.Map
+
+// retryAfter is how long a build that failed on controls that have not changed waits to be started
+// again, for a failure that was not the controls'.
+const retryAfter = time.Hour
+
+// BuildWanted is whether a turn of the agent in home starts its ground build: its sand does not
+// stand, no build is going, and its last build did not fail on these same controls within retryAfter.
+func BuildWanted(home, url string) bool {
+	if SandStands(home, url) == nil || Building(home) {
+		return false
+	}
+	sand, err := AgentSand(home, url)
+	if err != nil {
+		return false
+	}
+	if last, failed := failedFor.Load(home); failed {
+		f := last.(failure)
+		if f.controls == controlsDigest(sand) && time.Since(f.at) < retryAfter {
+			return false
+		}
+	}
+	return true
+}
+
 // Building is whether the agent in home has a ground build going.
 func Building(home string) bool {
 	last, ok := agentBuilds.Load(home)
@@ -218,11 +250,15 @@ func (b Builder) GroundAgent(ctx context.Context, home, url string, keep func(ho
 			err = AgentSettings(home)
 		}
 		if err != nil {
+			if sand, read := AgentSand(home, url); read == nil {
+				failedFor.Store(home, failure{controls: controlsDigest(sand), at: time.Now()})
+			}
 			agentBuilds.Store(home, "its last ground build failed: "+err.Error())
 			log("An agent's ground build failed", "home", home, "error", err)
 			return
 		}
 		agentBuilds.Delete(home)
+		failedFor.Delete(home)
 		log("An agent's ground is built", "home", home, "ground", AgentGround(home))
 	})
 }
