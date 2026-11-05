@@ -42,7 +42,7 @@
     },
     "build-go": {
       "if": "!(github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbvh-qntx[bot]' && github.head_ref == 'docs-pr')",
-      "runs-on": "${{ matrix.os }}",
+      "runs-on": "ubuntu-latest",
       "steps": [
         {
           "name": "Checkout repository",
@@ -74,10 +74,46 @@
       ],
       "strategy": {
         "matrix": {
-          "os": [
-            "ubuntu-latest",
-            "macos-latest"
-          ],
+          "package": [
+            "qntx"
+          ]
+        }
+      }
+    },
+    "build-go-macos": {
+      "if": "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+      "runs-on": "macos-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v30",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Build ${{ matrix.package }}",
+          "run": "nix build .#${{ matrix.package }} --show-trace"
+        },
+        {
+          "name": "Push to Cachix",
+          "run": "nix build .#${{ matrix.package }} --print-out-paths --no-link | cachix push qntx"
+        }
+      ],
+      "strategy": {
+        "matrix": {
           "package": [
             "qntx"
           ]
@@ -98,6 +134,12 @@
       "branches": [
         "main"
       ]
-    }
+    },
+    "schedule": [
+      {
+        "cron": "0 4 * * 1"
+      }
+    ],
+    "workflow_dispatch": {}
   }
 }
