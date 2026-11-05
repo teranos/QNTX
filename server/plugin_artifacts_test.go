@@ -177,6 +177,29 @@ func TestARunsBuildIsInstalledFromItsArtifact(t *testing.T) {
 	assert.False(t, shown[0].Older)
 }
 
+// An artifact is downloaded to the node's builds directory as it arrives and
+// read from there, and is gone when the take is done, installed or not.
+func TestARunsArtifactIsDownloadedToDiskAndGoneAfter(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _ := artifactServingServer(t, map[int64][]map[string]any{
+		9:  {{"id": 3, "name": pyreBuild("1.0.0"), "expired": false}},
+		10: {{"id": 5, "name": pyreBuild("1.0.1"), "expired": false}},
+	}, map[int64][]byte{3: pyreArtifact(t, "1.0.0", []byte("\x7fELF pyre 1.0.0")), 5: []byte("not a zip")})
+	pyre := gitHubSource{Owner: "teranos", Repo: "pyre"}
+
+	require.NoError(t, s.takeRun(context.Background(), "pyre", pyre, workflowRun(t, "teranos/pyre", 9, "completed", "success", "2026-10-12T10:00:00Z")))
+	assert.Equal(t, "\x7fELF pyre 1.0.0", installedPyre(t))
+	err := s.takeRun(context.Background(), "pyre", pyre, workflowRun(t, "teranos/pyre", 10, "completed", "success", "2026-10-12T11:00:00Z"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not a zip")
+
+	builds, err := buildsDir()
+	require.NoError(t, err)
+	left, err := os.ReadDir(builds)
+	require.NoError(t, err)
+	assert.Empty(t, left, "an artifact's download was left in %s", builds)
+}
+
 // The newest run's build is the one that runs: a delivery of an older run,
 // arriving late or redelivered, is not installed over it.
 func TestARunOlderThanTheInstalledOneIsNotInstalledOverIt(t *testing.T) {

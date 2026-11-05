@@ -118,15 +118,7 @@ func (s *QNTXServer) takeRun(ctx context.Context, name string, source gitHubSour
 		if plugin, isBuild := grpcplugin.BuildPlugin(artifact.Name); artifact.Expired || !isBuild || plugin != name {
 			continue
 		}
-		zipped, err := s.downloadArtifact(ctx, source, artifact)
-		if err != nil {
-			return err
-		}
-		archive, digest, err := grpcplugin.ArtifactBuild(name, zipped)
-		if err != nil {
-			return errors.Wrapf(err, "artifact %s of %s", artifact.Name, run.WorkflowRun.HTMLURL)
-		}
-		taken, err := s.installRun(name, artifact.Name, archive, digest, run, logger)
+		taken, err := s.takeArtifact(ctx, name, source, artifact, run, logger)
 		if err != nil {
 			return err
 		}
@@ -142,23 +134,54 @@ func (s *QNTXServer) takeRun(ctx context.Context, name string, source gitHubSour
 	return nil
 }
 
-// downloadArtifact is what one artifact holds, as GitHub zips it.
-func (s *QNTXServer) downloadArtifact(ctx context.Context, source gitHubSource, artifact *protocol.GitHubActionsArtifactsArtifact) ([]byte, error) {
+// takeArtifact downloads one artifact of run to the node's builds directory,
+// reads name's build out of it there, and installs it unless the installed
+// build is of a newer run. The download is removed when the take is done.
+//
+// q, with 1,936 MB of memory, held otaripy's 526 MB artifact whole twice
+// over: once as the zip, and again as the archive read out of it.
+func (s *QNTXServer) takeArtifact(ctx context.Context, name string, source gitHubSource, artifact *protocol.GitHubActionsArtifactsArtifact, run gitHubWorkflowRun, logger *zap.SugaredLogger) (_ grpcplugin.TakenBuild, err error) {
+	builds, err := buildsDir()
+	if err != nil {
+		return grpcplugin.TakenBuild{}, err
+	}
+	zipped, err := os.CreateTemp(builds, "artifact-"+name+"-*.zip")
+	if err != nil {
+		return grpcplugin.TakenBuild{}, errors.Wrapf(err, "there is nowhere in %s to download artifact %s to", builds, artifact.Name)
+	}
+	defer func() {
+		err = sqlclose.With(err, zipped.Close(), "the download "+zipped.Name())
+		err = sqlclose.With(err, os.Remove(zipped.Name()), "the download "+zipped.Name())
+	}()
+	size, err := s.downloadArtifact(ctx, source, artifact, zipped)
+	if err != nil {
+		return grpcplugin.TakenBuild{}, err
+	}
+	archive, digest, err := grpcplugin.ArtifactBuild(name, zipped, size)
+	if err != nil {
+		return grpcplugin.TakenBuild{}, errors.Wrapf(err, "artifact %s of %s", artifact.Name, run.WorkflowRun.HTMLURL)
+	}
+	return s.installRun(name, artifact.Name, archive, digest, run, logger)
+}
+
+// downloadArtifact writes what one artifact holds, as GitHub zips it, to
+// into as it arrives, and is how many bytes that was.
+func (s *QNTXServer) downloadArtifact(ctx context.Context, source gitHubSource, artifact *protocol.GitHubActionsArtifactsArtifact, into io.Writer) (int64, error) {
 	// TODO(forge): Downloading a pipeline run's artifact is a Forge method (Reader), not GitHubService's Artifact.
 	body, err := s.gitHubService().Artifact(ctx, source.Owner, source.Repo, artifact.Id)
 	if err != nil {
-		return nil, errors.Wrapf(err, "artifact %s of %s/%s was not downloaded", artifact.Name, source.Owner, source.Repo)
+		return 0, errors.Wrapf(err, "artifact %s of %s/%s was not downloaded", artifact.Name, source.Owner, source.Repo)
 	}
-	zipped, err := io.ReadAll(body)
+	written, err := io.Copy(into, body)
 	if err != nil {
-		err = errors.Wrapf(err, "artifact %s of %s/%s stopped downloading after %d bytes", artifact.Name, source.Owner, source.Repo, len(zipped))
+		err = errors.Wrapf(err, "artifact %s of %s/%s stopped downloading after %d bytes", artifact.Name, source.Owner, source.Repo, written)
 	}
-	return zipped, sqlclose.With(err, body.Close(), "the download of artifact "+artifact.Name)
+	return written, sqlclose.With(err, body.Close(), "the download of artifact "+artifact.Name)
 }
 
 // installRun installs archive as name's build of run, unless the installed
 // build is of a newer run, and keeps which run it was.
-func (s *QNTXServer) installRun(name, artifact string, archive []byte, digest string, run gitHubWorkflowRun, logger *zap.SugaredLogger) (grpcplugin.TakenBuild, error) {
+func (s *QNTXServer) installRun(name, artifact string, archive grpcplugin.ArtifactArchive, digest string, run gitHubWorkflowRun, logger *zap.SugaredLogger) (grpcplugin.TakenBuild, error) {
 	s.artifacts.mu.Lock()
 	defer s.artifacts.mu.Unlock()
 	taken := grpcplugin.TakenBuild{Plugin: name, Archive: artifact, Digest: digest, At: time.Now(), Run: run.WorkflowRun.HTMLURL}
@@ -169,7 +192,7 @@ func (s *QNTXServer) installRun(name, artifact string, archive []byte, digest st
 		s.artifacts.record(taken)
 		return taken, nil
 	}
-	changed, installed, err := grpcplugin.InstallBuild(name, archive, logger)
+	changed, installed, err := grpcplugin.InstallArtifactBuild(name, archive, digest, logger)
 	if err != nil {
 		return grpcplugin.TakenBuild{}, errors.Wrapf(err, "artifact %s of %s", artifact, run.WorkflowRun.HTMLURL)
 	}
