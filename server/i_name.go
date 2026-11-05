@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strconv"
@@ -81,9 +82,9 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
 			Says: strconv.Quote(name) + " is taken: another agent holds it. Ask again with another name."}
 	}
-	var newest time.Time
+	var newest int64
 	if len(lines) > 0 {
-		newest = lines[len(lines)-1].at
+		newest = lines[len(lines)-1].sequence
 	}
 	if err := s.keepAgentName(did, name, newest); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
@@ -138,6 +139,35 @@ type agentName struct {
 	did  string
 	name string
 	at   time.Time
+	// 「[Opus 5.5] sequence is the line's place among every name line; 0 is a line written before lines」
+	// 「[Opus 5.5] carried one, before any that does.」
+	sequence int64
+}
+
+// 「[Opus 5.5] nameSequenceAttribute is the attribute a name line's sequence is kept under.」
+const nameSequenceAttribute = "sequence"
+
+// 「[Opus 5.5] sequenceOf is the sequence a name line carries, 0 for one that carries none.」
+func sequenceOf(as *types.As) (int64, error) {
+	held, carried := as.Attributes[nameSequenceAttribute]
+	if !carried {
+		return 0, nil
+	}
+	switch sequence := held.(type) {
+	case float64:
+		if sequence == float64(int64(sequence)) && sequence > 0 {
+			return int64(sequence), nil
+		}
+	case int:
+		if sequence > 0 {
+			return int64(sequence), nil
+		}
+	case int64:
+		if sequence > 0 {
+			return sequence, nil
+		}
+	}
+	return 0, errors.Newf("the %s line %s keeps %s as %v (%T), not a whole number above zero", predicateAgentNamed, as.ID, nameSequenceAttribute, held, held)
 }
 
 // agentNames is the name each agent holds now, read from every line in the
@@ -155,8 +185,9 @@ func (s *QNTXServer) agentNames() ([]agentName, error) {
 }
 
 // agentLines is every line an agent wrote naming itself, in the order they
-// were written: by when each is stamped, which keepAgentName makes later than
-// every one before it.
+// were written: by the sequence each carries, which keepAgentName makes one
+// more than every one before it; lines from before sequences come first, by
+// when each is stamped.
 func (s *QNTXServer) agentLines() ([]agentName, error) {
 	reading, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
@@ -176,9 +207,18 @@ func (s *QNTXServer) agentLines() ([]agentName, error) {
 			s.logger.Warnw("an agent:named line is no agent naming itself, and is no name", "id", as.ID)
 			continue
 		}
-		names = append(names, agentName{did: as.Subjects[0], name: name, at: as.Timestamp})
+		sequence, err := sequenceOf(as)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, agentName{did: as.Subjects[0], name: name, at: as.Timestamp, sequence: sequence})
 	}
-	slices.SortStableFunc(names, func(a, b agentName) int { return a.at.Compare(b.at) })
+	slices.SortStableFunc(names, func(a, b agentName) int {
+		if a.sequence != b.sequence {
+			return cmp.Compare(a.sequence, b.sequence)
+		}
+		return a.at.Compare(b.at)
+	})
 	return names, nil
 }
 
@@ -200,15 +240,20 @@ func standing(names []agentName) []agentName {
 	return stands
 }
 
+// keepAgentName writes the line down, by the agent itself, stamped when it is
+// written and carrying the sequence after newest, the newest name line's.
+// Lines stamped alike read back in no order, and a rename and another agent
+// taking the name it left, read back the other way round, would undo what
+// was answered; a line stamped ahead of the clock would become the record's
+// take-in mark (storage.TakeIn) and keep later rows out. Asked under naming,
+// so on this node no line comes between.
 // stampPrecision is how finely a line's timestamp is kept: to the millisecond.
 const stampPrecision = time.Millisecond
 
-// keepAgentName writes the line down, by the agent itself, stamped later than
-// newest, the newest name line already written, at the precision it is kept.
-// Lines stamped alike read back in no order, and a rename and another agent
-// taking the name it left, read back the other way round, would undo what
-// was answered. Asked under naming, so on this node no line comes between.
-func (s *QNTXServer) keepAgentName(did, name string, newest time.Time) error {
+// 「[Opus 5.5] namingNow is when a name line is written: the clock, which a test holds still.」
+var namingNow = time.Now
+
+func (s *QNTXServer) keepAgentName(did, name string, newest int64) error {
 	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
 		return errors.Wrapf(err, "no store to keep the name of %s in", did)
@@ -217,15 +262,11 @@ func (s *QNTXServer) keepAgentName(did, name string, newest time.Time) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to name the %s line of %s", predicateAgentNamed, did)
 	}
-	now := time.Now()
-	stamped := now.Truncate(stampPrecision)
-	if newest = newest.Truncate(stampPrecision); !stamped.After(newest) {
-		stamped = newest.Add(stampPrecision)
-	}
+	now := namingNow()
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{did}, Predicates: []string{predicateAgentNamed}, Contexts: []string{auth.NamespaceSystem},
-		Actors: []string{did}, Timestamp: stamped, CreatedAt: now, Source: did,
-		Attributes: map[string]any{"name": name},
+		Actors: []string{did}, Timestamp: now, CreatedAt: now, Source: did,
+		Attributes: map[string]any{"name": name, nameSequenceAttribute: newest + 1},
 	}); err != nil {
 		return errors.Wrapf(err, "the name of %s was not kept", did)
 	}
