@@ -26,8 +26,9 @@ import (
 // held by that DID: `<did> is 'agent:named' of system by <did>`, the name in
 // the line's attributes, as a person's display_name is in identity:named's
 // (ADR-031). A person's name is the User record's and is not unique; an
-// agent's is this line's and is one agent's on the node. Neither reads the
-// other, and root is nobody's to take in either.
+// agent's is the newest of these lines it could hold, and is one agent's on
+// the node at a time. Neither reads the other, and root is nobody's to take in
+// either.
 
 const iNamePath = "/i/name"
 
@@ -35,9 +36,15 @@ const iNamePath = "/i/name"
 // actor are the agent's DID.
 const predicateAgentNamed = "agent:named"
 
+// "ask the Qodo agent to name itself Qodoa"
+//
+// "ask the ground agent to rename itself to Slate"
+
 // iName assigns the agent asking the name it asked for. The name it already
-// holds is answered again; another is refused, because a name is settled once,
-// as a display_name is. A name another agent holds is refused as taken.
+// holds is answered again. Another name is taken in its place, and the one it
+// leaves is free for another agent. A name another agent holds is refused as
+// taken. A person's display_name is settled once (ADR-031); an agent's name is
+// the newest it could hold.
 func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	admitted, refusal := s.iAdmitted(ctx)
 	if refusal != nil {
@@ -62,22 +69,25 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	left := ""
 	if at := slices.IndexFunc(names, func(kept agentName) bool { return kept.did == did }); at >= 0 {
-		held := names[at].name
-		if strings.EqualFold(held, name) {
-			return &protocol.Named{Name: held, Did: did}, nil
+		left = names[at].name
+		if strings.EqualFold(left, name) {
+			return &protocol.Named{Name: left, Did: did}, nil
 		}
-		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
-			Says: did + " is " + strconv.Quote(held) + ": a name is settled once"}
 	}
-	if slices.ContainsFunc(names, func(kept agentName) bool { return strings.EqualFold(kept.name, name) }) {
+	if slices.ContainsFunc(names, func(kept agentName) bool { return kept.did != did && strings.EqualFold(kept.name, name) }) {
 		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
 			Says: strconv.Quote(name) + " is taken: another agent holds it. Ask again with another name."}
 	}
 	if err := s.keepAgentName(did, name); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	s.logger.Infow("an agent named itself", "did", did, "name", name)
+	if left != "" {
+		s.logger.Infow("an agent renamed itself", "did", did, "was", left, "name", name)
+	} else {
+		s.logger.Infow("an agent named itself", "did", did, "name", name)
+	}
 	return &protocol.Named{Name: name, Did: did}, nil
 }
 
@@ -125,10 +135,12 @@ type agentName struct {
 	at   time.Time
 }
 
-// agentNames is every name an agent gave itself, oldest first: the first line
-// about a DID is its name, and the first line about a name is who holds it.
-// A line some other actor wrote about a DID is not the agent naming itself,
-// and is no name.
+// agentNames is the name each agent holds now, read from every line in the
+// order they were written, so it is what i name answered as each was written,
+// on any node and after any restart. An agent's name is the newest line it
+// wrote about itself for a name nobody else held at that moment; the name it
+// held before is free from then on. A line some other actor wrote about a DID
+// is not the agent naming itself, and is no name.
 func (s *QNTXServer) agentNames() ([]agentName, error) {
 	reading, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
@@ -151,16 +163,17 @@ func (s *QNTXServer) agentNames() ([]agentName, error) {
 		names = append(names, agentName{did: as.Subjects[0], name: name, at: as.Timestamp})
 	}
 	slices.SortStableFunc(names, func(a, b agentName) int { return a.at.Compare(b.at) })
-	// One name is one agent's and an agent holds one name. Of two lines about
-	// the same name or the same DID, the older stands and the other is no
-	// name, however the second came to be written.
+	// One name is one agent's at a time and an agent holds one name. A line for
+	// a name another agent held when it was written is no name, however it came
+	// to be written; any other line is the agent's name from then on.
 	var stands []agentName
 	for _, line := range names {
-		if slices.ContainsFunc(stands, func(older agentName) bool {
-			return older.did == line.did || strings.EqualFold(older.name, line.name)
+		if slices.ContainsFunc(stands, func(held agentName) bool {
+			return held.did != line.did && strings.EqualFold(held.name, line.name)
 		}) {
 			continue
 		}
+		stands = slices.DeleteFunc(stands, func(held agentName) bool { return held.did == line.did })
 		stands = append(stands, line)
 	}
 	return stands, nil
