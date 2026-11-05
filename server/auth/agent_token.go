@@ -14,32 +14,32 @@ import (
 
 // "give yourself a name, and after you have given yourslef a name, ask each agent to give themselves a name."
 //
-// "2. fine change it, fix it"
+// "「[Opus 5.5] 2. fine change it, fix it」"
 
-// An agent has its own DID and its own credential (ADR-048), and an agent a
-// token starts is handed one by the node: derived from the node's key the way
-// its own agents' are, for the token it runs under and the agent it is
-// (ADR-025, An agent a token starts). It is a route and no sigil, because a
-// sigil is a tool to whoever reaches it, and a credential is offered to no
-// model (ADR-048).
+// 「[Opus 5.5] An agent has its own DID and its own credential (ADR-048), and an agent a」
+// 「[Opus 5.5] token starts is handed one by the node: derived from the node's key the way」
+// 「[Opus 5.5] its own agents' are, for the token it runs under and the agent it is」
+// 「[Opus 5.5] (ADR-025, An agent a token starts). It is a route and no sigil, because a」
+// 「[Opus 5.5] sigil is a tool to whoever reaches it, and a credential is offered to no」
+// 「[Opus 5.5] model (ADR-048).」
 
-// agentTokenPath is where a token asks for the token of an agent it starts.
+// 「[Opus 5.5] agentTokenPath is where a token asks for the token of an agent it starts.」
 const agentTokenPath = "/auth/agent"
 
-// agentOfLabel heads an agent's token by name, and the purpose it is derived
-// for: agent-of:<the asking token's DID>:<agent>. The node writes it, and a
-// session mints no token named so.
+// 「[Opus 5.5] agentOfLabel heads an agent's token by name, and the purpose it is derived」
+// 「[Opus 5.5] for: agent-of:<the asking token's DID>:<agent>. The node writes it, and a」
+// 「[Opus 5.5] session mints no token named so.」
 const agentOfLabel = "agent-of"
 
-// agentLabel is the label and the purpose of the token of agent, started under
-// the token whose DID is asking.
+// 「[Opus 5.5] agentLabel is the label and the purpose of the token of agent, started under」
+// 「[Opus 5.5] the token whose DID is asking.」
 func agentLabel(asking, agent string) string {
 	return agentOfLabel + ":" + asking + ":" + agent
 }
 
-// askedUnder is the DID of the token an agent's label says it runs under, and
-// whether the label is an agent's at all. A did:key holds no colon past its
-// own two, so the agent's part may hold any.
+// 「[Opus 5.5] askedUnder is the DID of the token an agent's label says it runs under, and」
+// 「[Opus 5.5] whether the label is an agent's at all. A did:key holds no colon past its」
+// 「[Opus 5.5] own two, so the agent's part may hold any.」
 func askedUnder(label string) (string, bool) {
 	const didKey = "did:key:"
 	rest, isAgents := strings.CutPrefix(label, agentOfLabel+":"+didKey)
@@ -53,9 +53,9 @@ func askedUnder(label string) (string, bool) {
 	return didKey + key, true
 }
 
-// handsAnAgent is the token an agent's token is handed to, or why this
-// admission is none: a TOKEN or an ATTESTOR, minted rather than issued through
-// a client, and no agent's own.
+// 「[Opus 5.5] handsAnAgent is the token an agent's token is handed to, or why this」
+// 「[Opus 5.5] admission is none: a TOKEN or an ATTESTOR, minted rather than issued through」
+// 「[Opus 5.5] a client, and no agent's own.」
 func handsAnAgent(admitted Admission) (Grant, string) {
 	if admitted.Grant == nil {
 		return Grant{}, "an agent's token is handed to the token it runs under, and this asks as a person, who mints one at /auth/tokens"
@@ -71,12 +71,12 @@ func handsAnAgent(admitted Admission) (Grant, string) {
 	case LevelToken, LevelAttestor:
 		return asking, ""
 	}
-	// ROOT's kind is the node's own agents' (ADR-048), and SUPER is ROOT's
-	// reach handed to a token (ADR-034): neither is handed on.
+	// 「[Opus 5.5] ROOT's kind is the node's own agents' (ADR-048), and SUPER is ROOT's」
+	// 「[Opus 5.5] reach handed to a token (ADR-034): neither is handed on.」
 	return Grant{}, "a " + string(asking.Level) + " token is handed no agent's token: only a " + string(LevelToken) + " or an " + string(LevelAttestor) + " is"
 }
 
-// noAgent says why this names no agent: what a name is held to (i name).
+// 「[Opus 5.5] noAgent says why this names no agent: what a name is held to (i name).」
 func noAgent(agent string) string {
 	switch {
 	case agent == "" || strings.ContainsFunc(agent, unicode.IsControl):
@@ -87,9 +87,9 @@ func noAgent(agent string) string {
 	return ""
 }
 
-// derivedHere is whether this node's key derived the token with this DID
-// under this label. A label is a name anybody minting could have written; the
-// derivation is the node's alone.
+// 「[Opus 5.5] derivedHere is whether this node's key derived the token with this DID」
+// 「[Opus 5.5] under this label. A label is a name anybody minting could have written; the」
+// 「[Opus 5.5] derivation is the node's alone.」
 func (h *Handler) derivedHere(label, did string) bool {
 	if h.nodeKey == nil {
 		return false
@@ -98,11 +98,11 @@ func (h *Handler) derivedHere(label, did string) bool {
 	return err == nil && derived == did
 }
 
-// runsUnder is the token an agent's token runs under, whether this token is
-// an agent's at all, and whether it stands: derived by this node's key under
-// its own label, and the token it runs under live and a TOKEN or an ATTESTOR.
-// One named as an agent's that does not stand is refused, not taken as the
-// token its label names.
+// 「[Opus 5.5] runsUnder is the token an agent's token runs under, whether this token is」
+// 「[Opus 5.5] an agent's at all, and whether it stands: derived by this node's key under」
+// 「[Opus 5.5] its own label, and the token it runs under live and a TOKEN or an ATTESTOR.」
+// 「[Opus 5.5] One named as an agent's that does not stand is refused, not taken as the」
+// 「[Opus 5.5] token its label names.」
 func (h *Handler) runsUnder(label, did string) (asking TokenInfo, isAgents, stands bool) {
 	under, isAgents := askedUnder(label)
 	if !isAgents {
@@ -118,14 +118,14 @@ func (h *Handler) runsUnder(label, did string) (asking TokenInfo, isAgents, stan
 	return asking, true, true
 }
 
-// tokenByDID is a TokenStore that finds a token by its DID without listing
-// every token. The operational table is one; a store that is not is listed.
+// 「[Opus 5.5] tokenByDID is a TokenStore that finds a token by its DID without listing」
+// 「[Opus 5.5] every token. The operational table is one; a store that is not is listed.」
 type tokenByDID interface {
 	ByDID(did string) (TokenInfo, bool)
 }
 
-// tokenOf is the token whose DID this is, revoked and expired ones included,
-// and whether the store holds one.
+// 「[Opus 5.5] tokenOf is the token whose DID this is, revoked and expired ones included,」
+// 「[Opus 5.5] and whether the store holds one.」
 func (h *Handler) tokenOf(did string) (TokenInfo, bool) {
 	if found, indexed := h.tokens.(tokenByDID); indexed {
 		return found.ByDID(did)
@@ -143,8 +143,8 @@ func (h *Handler) tokenOf(did string) (TokenInfo, bool) {
 	return TokenInfo{}, false
 }
 
-// askingToken is the live token whose DID this is, and whether there is one:
-// revoked, expired or gone is none.
+// 「[Opus 5.5] askingToken is the live token whose DID this is, and whether there is one:」
+// 「[Opus 5.5] revoked, expired or gone is none.」
 func (h *Handler) askingToken(did string) (TokenInfo, bool) {
 	if h.tokens == nil || did == "" {
 		return TokenInfo{}, false
@@ -156,10 +156,10 @@ func (h *Handler) askingToken(did string) (TokenInfo, bool) {
 	return t, true
 }
 
-// handleAgentToken hands the token asking the token of the agent it names.
-// POST /auth/agent
-// Body: {"agent": "<the agent>"}
-// Response: {"token","did","label","agent","derived_by","level","namespaces","expires_at"}
+// 「[Opus 5.5] handleAgentToken hands the token asking the token of the agent it names.」
+// 「[Opus 5.5] POST /auth/agent」
+// 「[Opus 5.5] Body: {"agent": "<the agent>"}」
+// 「[Opus 5.5] Response: {"token","did","label","agent","derived_by","level","namespaces","expires_at"}」
 func (h *Handler) handleAgentToken(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -195,7 +195,7 @@ func (h *Handler) handleAgentToken(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, says)
 		return
 	}
-	// The record of the token asking is when the agent's ends.
+	// 「[Opus 5.5] The record of the token asking is when the agent's ends.」
 	record, live := h.askingToken(asking.DID)
 	if !live {
 		h.writeError(w, http.StatusForbidden, "the token asking is not one the node holds live")
@@ -214,9 +214,9 @@ func (h *Handler) handleAgentToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hash := sha256Hex(raw)
-	// Looked up and written as one: two asks that both found it absent would
-	// both write it, and the second write would turn back on a token switched
-	// off in between. One process only, as creating a User is.
+	// 「[Opus 5.5] Looked up and written as one: two asks that both found it absent would」
+	// 「[Opus 5.5] both write it, and the second write would turn back on a token switched」
+	// 「[Opus 5.5] off in between. One process only, as creating a User is.」
 	h.handingAgents.Lock()
 	defer h.handingAgents.Unlock()
 	handed := map[string]any{
@@ -224,10 +224,10 @@ func (h *Handler) handleAgentToken(w http.ResponseWriter, r *http.Request) {
 		"level": string(asking.Level), "namespaces": asking.Namespaces,
 		"expires_at": ends.UTC().Format(time.RFC3339Nano),
 	}
-	// Held once: the same agent asking again is handed the same token.
+	// 「[Opus 5.5] Held once: the same agent asking again is handed the same token.」
 	if held, live, isHeld := h.tokens.LookupSpent(hash); isHeld {
-		// Revocation is a switch, and the hand on it holds: asking does not
-		// turn back on what was turned off.
+		// 「[Opus 5.5] Revocation is a switch, and the hand on it holds: asking does not」
+		// 「[Opus 5.5] turn back on what was turned off.」
 		if !live {
 			h.writeError(w, http.StatusForbidden, "the token of "+agent+", "+held.ID+", is switched off")
 			return

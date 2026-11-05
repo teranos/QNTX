@@ -285,9 +285,9 @@ func TestINameIsReachedByWhoReachesMCP(t *testing.T) {
 
 // "make each agent name itself"
 //
-// Agents started under one token each ask for a token of their own, through
-// the gate, and each names itself by its own DID: the token they ran under is
-// none of their names, and a name one agent holds is taken for the other.
+// 「[Opus 5.5] Agents started under one token each ask for a token of their own, through」
+// 「[Opus 5.5] the gate, and each names itself by its own DID: the token they ran under is」
+// 「[Opus 5.5] none of their names, and a name one agent holds is taken for the other.」
 func TestEachAgentUnderOneTokenNamesItself(t *testing.T) {
 	s := rootKnowingServer(t)
 	tokens, _, err := auth.OpenTokenTable(s.nodeDB, nil)
@@ -302,7 +302,7 @@ func TestEachAgentUnderOneTokenNamesItself(t *testing.T) {
 		Level: auth.LevelAttestor, Namespaces: []string{"garden"}, ExpiresAt: auth.NeverEnds()})
 	require.NoError(t, err)
 
-	// What the gate admits a bearer as, past the line the tablet writes.
+	// 「[Opus 5.5] What the gate admits a bearer as, past the line the tablet writes.」
 	admitting := func(raw string) context.Context {
 		var admitted auth.Admission
 		gated := h.Middleware(iNamePath, auth.Also(auth.LevelToken, auth.LevelAttestor), func(w http.ResponseWriter, r *http.Request) {
@@ -341,7 +341,7 @@ func TestEachAgentUnderOneTokenNamesItself(t *testing.T) {
 	require.Nil(t, refusal, refusal.GetSays())
 	assert.Equal(t, sionDID, named.(*protocol.Named).GetDid())
 
-	// The token they ran under names itself apart from both.
+	// 「[Opus 5.5] The token they ran under names itself apart from both.」
 	named, refusal = s.iName(admitting(shared), sigil.Sent{"name": "Alder"})
 	require.Nil(t, refusal, refusal.GetSays())
 	assert.NotContains(t, []string{otariDID, sionDID}, named.(*protocol.Named).GetDid())
