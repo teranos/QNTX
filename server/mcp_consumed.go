@@ -141,29 +141,54 @@ type consumedAttempt struct {
 // 「[Opus 5.5] consumedAsking is the namespace a call on the mcp signum names, when a person asks it. The yes」
 // 「[Opus 5.5] at the server is a person's, and the code comes back to the browser of whoever asked, so a token」
 // 「[Opus 5.5] and a connector are refused, as for keys.」
+//
+// "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
+//
+// 「[Opus 5.5] The node consumes in system, where it keeps its own lines, and only ROOT handles what it consumes.」
 func (s *QNTXServer) consumedAsking(ctx context.Context, sent sigil.Sent) (anAsking, *protocol.Refusal) {
+	if sent["namespace"] == auth.NamespaceSystem {
+		admitted, gated := auth.AdmissionFrom(ctx)
+		if !gated {
+			return anAsking{}, &protocol.Refusal{Why: sigil.Failed, Says: "the MCP servers the node consumes are asked for through the gate, and this asking came through none"}
+		}
+		if refused := consumedByAPerson(admitted, "the node consumes"); refused != nil {
+			return anAsking{}, refused
+		}
+		if !admitted.IsRoot() {
+			return anAsking{}, &protocol.Refusal{Why: sigil.NotAllowed, Param: "namespace", Says: "the MCP servers the node consumes are ROOT's to handle"}
+		}
+		return anAsking{admitted: admitted, namespace: auth.NamespaceSystem}, nil
+	}
 	asked, refused := agentNamespaceOf(ctx, sent)
 	return then(asked, refused, func(asked anAsking) (anAsking, *protocol.Refusal) {
-		switch asked.admitted.Asker().(type) {
-		case admission.TokenAsked:
-			return anAsking{}, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers a namespace consumes are a person's to handle, and a token asked"}
-		}
-		if client, err := named.TextOf("the connector's client", asked.admitted.ClientDID); err == nil {
-			return anAsking{}, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers a namespace consumes are a person's to handle, and the connector " + client.String() + " asked"}
+		if refused := consumedByAPerson(asked.admitted, "a namespace consumes"); refused != nil {
+			return anAsking{}, refused
 		}
 		return asked, s.mayHandle(asked.admitted, asked.namespace, "the MCP servers "+asked.namespace+" consumes are handled")
 	})
 }
 
+// 「[Opus 5.5] consumedByAPerson refuses a token and a connector: the MCP servers whoever consumes are a person's to handle.」
+func consumedByAPerson(admitted auth.Admission, whose string) *protocol.Refusal {
+	switch admitted.Asker().(type) {
+	case admission.TokenAsked:
+		return &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers " + whose + " are a person's to handle, and a token asked"}
+	}
+	if client, err := named.TextOf("the connector's client", admitted.ClientDID); err == nil {
+		return &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers " + whose + " are a person's to handle, and the connector " + client.String() + " asked"}
+	}
+	return nil
+}
+
 // 「[Opus 5.5] consumedSignum is the MCP servers a namespace consumes, at the namespace's path.」
 func (s *QNTXServer) consumedSignum() sigil.Signum {
 	at := "/api/mcp/{namespace}"
-	namespace := &protocol.Param{Name: "namespace", Required: true, Says: "The namespace that consumes the server."}
+	namespace := &protocol.Param{Name: "namespace", Required: true, Says: "The namespace that consumes the server. system is the node, ROOT's alone."}
 	name := &protocol.Param{Name: "name", Required: true, Says: "What the namespace calls the server, e.g. linear."}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "mcp",
-			Description: "The MCP servers of other systems a namespace consumes: connected by its owner, ROOT or SUPER saying yes at the server, the grant kept sealed and never answered back.",
+			Description: "The MCP servers of other systems a namespace consumes, or the node in system: connected by the namespace's owner, ROOT or SUPER, and the node's by ROOT alone, saying yes at the server, the grant kept sealed and never answered back.",
 			Tags:        []string{"mcp", "namespaces"},
 			Sigils: []*protocol.Sigil{
 				{

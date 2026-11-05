@@ -284,3 +284,42 @@ func TestTheTableGivesTheMCPServersANamespaceConsumesToNoToken(t *testing.T) {
 	assert.Equal(t, []string{"ROOT", "SUPER", "USER"}, compiled[ConsumedCallbackPath])
 	require.NoError(t, s.consumedSignum().Check())
 }
+
+// "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
+//
+// 「[Opus 5.5] ROOT connects the node, in system; no namespace sees what the node consumes, and nobody but」
+// 「[Opus 5.5] ROOT handles it, a token at ROOT included.」
+func TestROOTConnectsTheNodeToAnMCPServer(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	up := standingUpstream(t)
+	root := person("https://example.org/root", auth.LevelRoot)
+
+	connecting, refused := consumedAs(s, root, "connect", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker", "url": up.at + "/mcp"})
+	require.Nil(t, refused)
+	back := httptest.NewRecorder()
+	s.handleConsumedCallback(back, sayingYes(t, connecting.(consumedConnecting).Authorize, root))
+	require.Equal(t, http.StatusOK, back.Code, back.Body.String())
+
+	tools, refused := consumedAs(s, root, "tools", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker"})
+	require.Nil(t, refused)
+	assert.Equal(t, []consumedTool{{Name: "issues", Description: "Lists the issues."}}, tools)
+	listed, refused := consumedAs(s, root, "list", sigil.Sent{"namespace": auth.NamespaceSystem})
+	require.Nil(t, refused)
+	require.Len(t, listed.([]consumedServer), 1)
+	_, _, err := s.grantOf("garden", "tracker")
+	assert.Error(t, err, "no namespace holds what the node consumes")
+
+	for who, admitted := range map[string]auth.Admission{
+		"SUPER": person("https://example.org/super", auth.LevelSuper),
+		"USER":  person(gardener, auth.LevelUser, "garden"),
+	} {
+		_, refused = consumedAs(s, admitted, "list", sigil.Sent{"namespace": auth.NamespaceSystem})
+		require.NotNil(t, refused, who)
+		assert.Equal(t, sigil.NotAllowed, refused.Why, who)
+	}
+	token := person("https://example.org/root", auth.LevelRoot)
+	token.Grant = &access.Grant{}
+	_, refused = consumedAs(s, token, "tools", sigil.Sent{"namespace": auth.NamespaceSystem, "name": "tracker"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.Says, "a token asked")
+}
