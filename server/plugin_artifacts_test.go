@@ -28,6 +28,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -268,6 +271,32 @@ func TestARunsBuildNotInstalledIsSaidWhereTheBuildsAreShown(t *testing.T) {
 	assert.Contains(t, fault, "pyre")
 	assert.Contains(t, fault, "https://github.com/teranos/pyre/actions/runs/9")
 	assert.Contains(t, fault, "not a zip")
+}
+
+// A take that failed is said in the node's log when it fails, in the words the
+// fault keeps. On q, otaripy's journal had only the line that its run had
+// succeeded, and why nothing was installed was only in the status.
+func TestARunsBuildNotInstalledIsSaidInTheNodesLog(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _ := artifactServingServer(t, map[int64][]map[string]any{
+		9: {{"id": 3, "name": pyreBuild("1.0.0"), "expired": false}},
+	}, map[int64][]byte{3: []byte("not a zip")})
+	core, logs := observer.New(zapcore.ErrorLevel)
+	s.logger = zap.New(core).Sugar()
+
+	_, err := s.buildsOfRun(workflowRun(t, "teranos/pyre", 9, "completed", "success", "2026-10-12T10:00:00Z"))
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool { return logs.Len() == 1 }, 5*time.Second, 10*time.Millisecond)
+	line := logs.All()[0]
+	said, _ := answer(t, s, "status", sigil.Sent{})
+	faults := said.(*protocol.GitHubStatus).GetArtifactFaults()
+	require.Len(t, faults, 1)
+	assert.Equal(t, zapcore.ErrorLevel, line.Level)
+	assert.Equal(t, "pyre", line.ContextMap()["plugin"])
+	assert.Equal(t, "https://github.com/teranos/pyre/actions/runs/9", line.ContextMap()["run"])
+	fault, _ := line.ContextMap()["fault"].(string)
+	assert.True(t, strings.HasSuffix(faults[0], " "+fault), "the log says %q and the fault keeps %q", fault, faults[0])
 }
 
 // A plugin's repository is matched as GitHub names it, whatever its case.

@@ -91,10 +91,14 @@ func (s *QNTXServer) buildsOfRun(run gitHubWorkflowRun) ([]string, error) {
 		names = append(names, of.name)
 		logger.Infow("A workflow run succeeded in a plugin's repository", "plugin", of.name, "run", run.WorkflowRun.HTMLURL, "head_sha", run.WorkflowRun.HeadSha)
 		// The take runs on its own, with no caller to hand an error to: what it
-		// could not do is said where the builds are shown.
+		// could not do is said in the node's log when it fails, and kept where
+		// the builds are shown, in the same words.
 		sacred.Go("plugin.artifact."+of.name, func() {
 			if err := s.takeRun(s.lifetime(), of.name, of.source, run); err != nil {
-				s.artifacts.fault(of.name + " from " + run.WorkflowRun.HTMLURL + " was not installed: " + err.Error())
+				fault := of.name + " from " + run.WorkflowRun.HTMLURL + " was not installed: " + err.Error()
+				logger.Errorw("A workflow run's build was not installed",
+					"plugin", of.name, "run", run.WorkflowRun.HTMLURL, "fault", fault, "error", err)
+				s.artifacts.fault(fault)
 			}
 		})
 	}
