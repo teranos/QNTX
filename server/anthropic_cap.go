@@ -66,12 +66,8 @@ func (s *QNTXServer) anthropicCapSet(ctx context.Context, sent sigil.Sent) (any,
 	if _, err := centsOf(amount); amount != "" && err != nil {
 		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "amount", Says: err.Error()}
 	}
-	kept, _, err := s.anthropicLine()
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	}
-	kept.cap = amount
-	if refused := s.keepAnthropicLine(admitted.Identity, kept); refused != nil {
+	kept, refused := s.changeAnthropicLine(admitted.Identity, func(kept *anthropicKept) { kept.cap = amount })
+	if refused != nil {
 		return nil, refused
 	}
 	capped, isDefault := capOf(kept)

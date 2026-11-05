@@ -1,9 +1,13 @@
 package server
 
 import (
+	"github.com/teranos/QNTX/ats/types"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,4 +74,70 @@ func TestRootTakesTheCapBackToTheDefault(t *testing.T) {
 	assert.True(t, back.GetThen())
 	again := rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "  "})
 	assert.True(t, again.GetCapDefault(), "an amount of nothing but spaces is left out too")
+}
+
+// Qodo's review of QNTX-Web#55, deferred to the node: an order and a cap asked
+// at once each read the ANTHROPIC line and wrote it anew, so the one written
+// second carried the other's old value, and the first was lost.
+func TestAnOrderAndACapAskedAtOnceBothStand(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _, _ := runningNamespaceAgents(t)
+	admitted := auth.Admitted(auth.LevelRoot)
+	admitted.Identity = "https://example.org/root"
+	asked := httptest.NewRequest(http.MethodPost, "/api/anthropic", nil)
+	asked = asked.WithContext(auth.WithAdmission(asked.Context(), admitted))
+	ctx := sigil.WithCaller(asked.Context(), asked)
+	signum := s.anthropicSignum()
+	for round := 0; round < 40; round++ {
+		first := []string{anthropicSession, anthropicConsole}[round%2]
+		amount := strconv.Itoa(100 + round)
+		var both sync.WaitGroup
+		refusals := make(chan string, 2)
+		both.Add(2)
+		go func() {
+			defer both.Done()
+			if _, refused := signum.Answers["order"](ctx, sigil.Sent{"first": first, "then": "true"}); refused != nil {
+				refusals <- refused.GetSays()
+			}
+		}()
+		go func() {
+			defer both.Done()
+			if _, refused := signum.Answers["cap"](ctx, sigil.Sent{"amount": amount}); refused != nil {
+				refusals <- refused.GetSays()
+			}
+		}()
+		both.Wait()
+		close(refusals)
+		for says := range refusals {
+			t.Fatalf("round %d: %s", round, says)
+		}
+		am := rootAsksAnthropic(t, s, "am", sigil.Sent{})
+		require.Equal(t, amount, am.GetCap(), "round %d: the cap stands", round)
+		require.Equal(t, first, am.GetFirst(), "round %d: the order stands", round)
+	}
+}
+
+// Qodo's review of #1538: a store keeps a line's timestamp to the millisecond,
+// and the newest line is the one with the latest timestamp, so a line written
+// in the same millisecond as the one before it, or with the clock behind it,
+// was not read as the newest and its change was written away by the next.
+func TestAnOrderAndACapStandAfterALineStampedAheadOfTheClock(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s, _, _ := runningNamespaceAgents(t)
+	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
+	require.NoError(t, err)
+	ahead := time.Now().Add(time.Hour)
+	require.NoError(t, store.CreateAttestation(&types.As{
+		ID: "AS-anthropic-ahead", Subjects: []string{anthropicLineSubject}, Predicates: []string{anthropicLinePredicate},
+		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"https://example.org/root"}, Timestamp: ahead, CreatedAt: ahead,
+		Source: "anthropic", Attributes: map[string]any{"first": anthropicSession, "then": false},
+	}))
+
+	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole, "then": "true"})
+	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "75"})
+
+	am := rootAsksAnthropic(t, s, "am", sigil.Sent{})
+	assert.Equal(t, anthropicConsole, am.GetFirst(), "the order stands")
+	assert.True(t, am.GetThen())
+	assert.Equal(t, "75", am.GetCap(), "the cap stands")
 }
