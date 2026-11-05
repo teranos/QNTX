@@ -26,4 +26,5 @@ Wants:
 
 ---
 
-- Staand nee
+- Staand needs to be renamed to Datapunt everywhere 
+- 
