@@ -2,11 +2,11 @@ package server
 
 // 「[Opus 5.5] The node as a client of another system's MCP server (ADR-038).」
 //
-// "Think QNTX being a client of MCP in addition to just being the server."
+// "So, QNTX as an MCP client to other things."
+//
+// "Similar to me adding it to CHATGPT ? But then the reverse?"
 //
 // "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
-//
-// "THE NODE'S MCP NEEDS"
 //
 // 「[Opus 5.5] The OAuth is the SDK's (go-sdk auth). What is the node's: where the code comes back to,」
 // 「[Opus 5.5] where the grant is kept, and what the node lets itself be pointed at.」
@@ -765,9 +765,11 @@ func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Reque
 	say(w, http.StatusOK, true, "The node is connected to "+flow.name+", which lists "+strings.Join(flow.attempt.tools, ", "))
 }
 
-// "THE NODE'S MCP NEEDS"
+// "And actually apply to Node agents?"
 //
 // "I meant ROOT accessible agents"
+//
+// "And the Element Agents are ROOT SHAKE"
 //
 // 「[Opus 5.5] consumedForAgent is the MCP servers the node consumes, as a ROOT accessible agent is given them:」
 // 「[Opus 5.5] each at the node, under its name, reached with the agent's own token. The ROOT accessible agents」
