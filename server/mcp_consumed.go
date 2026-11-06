@@ -8,8 +8,6 @@ package server
 //
 // "THE NODE'S MCP NEEDS"
 //
-// "The thing you built, can we have it root only"
-//
 // 「[Opus 5.5] The OAuth is the SDK's (go-sdk auth). What is the node's: where the code comes back to,」
 // 「[Opus 5.5] where the grant is kept, and what the node lets itself be pointed at.」
 

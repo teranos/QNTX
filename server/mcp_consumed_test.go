@@ -260,7 +260,7 @@ func TestTheCodeGoesOnlyToWhoAskedForTheYes(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, again.Code, "a yes is finished once")
 }
 
-// "The thing you built, can we have it root only"
+// "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
 //
 // 「[Opus 5.5] Nobody below ROOT uses or handles what the node consumes; a token at ROOT uses it and does not」
 // 「[Opus 5.5] connect or drop it, and neither does a connector: the yes is a person's. A URL is https.」
