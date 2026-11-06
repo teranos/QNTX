@@ -19,9 +19,13 @@ Existing MCP servers can run on one box, behind QNTX.
 
 A token presented to QNTX is never passed on to an MCP server behind it; the MCP spec forbids passthrough.
 
-QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk), pinned at v1.8.0.
+QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk).
 
 "WE USE IT"
+
+Which version is [parity](https://github.com/teranos/QNTX/blob/main/server/parity/references.go)'s.
+
+"Parity owns it outright"
 
 The token the OAuth flow issues is the person who said yes at the passkey; what it reaches is the lines about its client's label, below.
 

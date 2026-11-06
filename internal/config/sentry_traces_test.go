@@ -10,9 +10,6 @@ import (
 func withSentry(sentry SentryConfig) *Config {
 	cfg := &Config{}
 	cfg.Storage.Backend = "sqlite"
-	cfg.Storage.Sqlite.BoundedStorage.ActorContextLimit = 32
-	cfg.Storage.Sqlite.BoundedStorage.ActorContextsLimit = 64
-	cfg.Storage.Sqlite.BoundedStorage.EntityActorsLimit = 64
 	cfg.Sentry = sentry
 	return cfg
 }

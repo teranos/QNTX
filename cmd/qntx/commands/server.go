@@ -139,7 +139,7 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 		Schedules:   schedule.NewStore(database),
 		Canvas:      elementstorage.NewCanvasStore(database),
 		Embeddings:  storage.NewEmbeddingStore(database, logger.Logger.Desugar()),
-		Rich:        storage.NewBoundedStore(database, nil, logger.Logger),
+		Rich:        storage.NewRichStore(database, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(database),
 		Prompts:     prompt.NewPromptStore(database, atsStore),
 		Aliases:     storage.NewAliasStore(database),
@@ -172,11 +172,6 @@ func runServer(cmd *cobra.Command, args []string) (err error) {
 	// Wire Rust-side WAL checkpointer (closes read conns, checkpoints, reopens)
 	if cp, ok := rustStore.(server.WALCheckpointer); ok {
 		srv.SetWALCheckpointer(cp)
-	}
-
-	// Wire Rust-side age distiller (fold old attestations into sigmas)
-	if ad, ok := rustStore.(server.AgeDistiller); ok {
-		srv.SetAgeDistiller(ad)
 	}
 
 	// Wire write lock inspector (diagnostics for UI)

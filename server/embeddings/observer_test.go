@@ -40,7 +40,7 @@ func createObserverWithRichFields(t *testing.T, richFields []string) *EmbeddingO
 	assert.NoError(t, err)
 
 	return &EmbeddingObserver{
-		richStore: storage.NewBoundedStore(db, nil, zap.NewNop().Sugar()),
+		richStore: storage.NewRichStore(db, nil, zap.NewNop().Sugar()),
 		logger:    zap.NewNop().Sugar(),
 	}
 }
@@ -154,7 +154,7 @@ func TestExtractRichText_NoRichFieldsDefined(t *testing.T) {
 	// No type definitions in the DB — no rich fields to discover
 	db := qntxtest.CreateTestDB(t)
 	observer := &EmbeddingObserver{
-		richStore: storage.NewBoundedStore(db, nil, zap.NewNop().Sugar()),
+		richStore: storage.NewRichStore(db, nil, zap.NewNop().Sugar()),
 		logger:    zap.NewNop().Sugar(),
 	}
 

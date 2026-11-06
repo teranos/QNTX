@@ -32,7 +32,6 @@ Watch knowledge evolution - how the system's understanding developed over time t
 - Future: semantic-aware temporal queries using ML-derived relatedness scores
 
 ## Technical Foundation
-- History depth managed by bounded storage
 - Temporal range queries (`since`, `until`, `between`)
 - Alternate timelines through attestation abstraction
 - Rolling window filters for continuous monitoring

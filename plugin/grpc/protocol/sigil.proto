@@ -56,8 +56,8 @@ message Transcript {
   string ended = 4;
   // Its turns, each naming the attestation it was read from.
   repeated Turn turns = 5;
-  // Events the store folded into sigmas (ADR-020), counted and not read.
-  uint32 folded = 6;
+  reserved 6;
+  reserved "folded";
   // The model the session started on, as its SessionStart says.
   string model = 7;
   // The effort its last Stop ran at, as that Stop's effort.level says.
@@ -518,11 +518,11 @@ message NodeAnthropic {
   repeated AnthropicWindow session = 15;
   // What ROOT's agents last ran on: "session" or "console"; empty before any turn.
   string in_use = 16;
-  // The most a Session an element's agent runs in at Anthropic may spend, in cap_currency: what ROOT set, or the node's default.
+  // 「[Opus 5.5] The most a Session an element's agent runs in at Anthropic may spend, in cap_currency: what ROOT set, or the node's default.」
   string cap = 17;
-  // The currency cap is in, the one Anthropic caps a Session in.
+  // 「[Opus 5.5] The currency cap is in, the one Anthropic caps a Session in.」
   string cap_currency = 18;
-  // Whether cap is the node's default, as ROOT set none.
+  // 「[Opus 5.5] Whether cap is the node's default, as ROOT set none.」
   bool cap_default = 19;
 }
 

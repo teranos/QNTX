@@ -85,7 +85,6 @@ impl PostgresError {
                 ats::storage::StoreError::Backend(_) => "backend",
                 ats::storage::StoreError::Query(_) => "query",
                 ats::storage::StoreError::Serialization(_) => "serialization",
-                ats::storage::StoreError::QuotaExceeded { .. } => "quota-exceeded",
             },
             PostgresError::Connect { .. } => "connect",
             PostgresError::BadNamespace { .. } => "bad-namespace",

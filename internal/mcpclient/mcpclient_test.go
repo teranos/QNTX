@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	errors "github.com/teranos/sacred-error"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/signal"
 	"strings"
@@ -14,6 +17,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/oauth2"
 )
 
 // 「[Fable 5.1] The fake server: this test binary, run again with MCP_FAKE naming what it does. It answers as an MCP」
@@ -233,5 +237,62 @@ func TestAServerNeedsItsBinary(t *testing.T) {
 	}
 	if _, err := Start(context.Background(), Server{Binary: "/nonexistent/mcp-server"}, Client{}); err == nil {
 		t.Error("a binary that is not there started")
+	}
+}
+
+// 「[Opus 5.5] bearing hands every request the one token it holds, and has nothing to say to a 401.」
+type bearing struct{ token string }
+
+func (b bearing) TokenSource(context.Context) (oauth2.TokenSource, error) {
+	return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: b.token, TokenType: "Bearer"}), nil
+}
+
+func (bearing) Authorize(context.Context, *http.Request, *http.Response) error {
+	return errors.New("bearing holds one token, and it was refused")
+}
+
+// 「[Opus 5.5] remote is the SDK's server at a URL, answering only a request that bears token.」
+func remote(t *testing.T, token string) string {
+	t.Helper()
+	server := mcp.NewServer(&mcp.Implementation{Name: "remote", Version: "0"}, nil)
+	server.AddTool(&mcp.Tool{Name: "echo", InputSchema: takesAnything}, func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return said(string(req.Params.Arguments)), nil
+	})
+	serving := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+	at := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+token {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		serving.ServeHTTP(w, r)
+	}))
+	t.Cleanup(at.Close)
+	return at.URL
+}
+
+func TestARemoteServerIsReachedWithWhatOAuthBears(t *testing.T) {
+	at := remote(t, "the-token")
+	conn, err := Dial(context.Background(), Remote{URL: at, OAuth: bearing{token: "the-token"}}, Client{})
+	if err != nil {
+		t.Fatalf("the session did not open: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	result, err := conn.Call(context.Background(), "echo", map[string]any{"note": "remote"})
+	if err != nil {
+		t.Fatalf("echo was not answered: %v", err)
+	}
+	if textOf(t, result) != `{"note":"remote"}` {
+		t.Errorf("echo answered %s", textOf(t, result))
+	}
+	if _, err := Dial(context.Background(), Remote{URL: at, OAuth: bearing{token: "another"}}, Client{}); err == nil {
+		t.Error("a token the server refuses opened a session")
+	}
+}
+
+func TestARemoteServerNeedsItsURL(t *testing.T) {
+	for _, at := range []string{"", "not a url", "/mcp"} {
+		if _, err := Dial(context.Background(), Remote{URL: at}, Client{}); err == nil {
+			t.Errorf("%q opened a session", at)
+		}
 	}
 }
