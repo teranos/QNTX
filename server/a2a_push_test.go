@@ -1,12 +1,15 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -235,3 +238,44 @@ func TestAConfigReplacedWhileAnotherIsToldIsToldWhereItNowSays(t *testing.T) {
 		t.Fatal("the replaced config was not told")
 	}
 }
+
+// A webhook that refuses a settled task is said in a2a-go's log with the task
+// and the config it was refused for.
+func TestARefusedSettledPushNamesItsTaskAndConfig(t *testing.T) {
+	sender := pushSender
+	pushSender = push.NewHTTPPushSender(&push.HTTPSenderConfig{AllowPrivateNetworks: true})
+	t.Cleanup(func() { pushSender = sender })
+	var said bytes.Buffer
+	var mu sync.Mutex
+	before := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(writerFunc(func(p []byte) (int, error) { mu.Lock(); defer mu.Unlock(); return said.Write(p) }), nil)))
+	t.Cleanup(func() { slog.SetDefault(before) })
+	refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusServiceUnavailable) }))
+	t.Cleanup(refusing.Close)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	root := tokens[auth.LevelRoot]
+
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("hi", ""), root)
+	require.Equal(t, http.StatusOK, code, sent)
+	task := at(sent, "task.id").(string)
+	code, created := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/"+task+"/pushNotificationConfigs", `{"id": "refuses", "url": "`+refusing.URL+`"}`, root)
+	require.Equal(t, http.StatusOK, code, created)
+	ta, err := srv.nodeTaskAgent()
+	require.NoError(t, err)
+	held, _, _, found, err := srv.heldTask(ta.taskLines, task)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	srv.notifySettled(ta.taskLines, held)
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		line := said.String()
+		return strings.Contains(line, "push sending failed") && strings.Contains(line, "task="+task) && strings.Contains(line, "config=refuses")
+	}, 5*time.Second, 20*time.Millisecond, "the refused push was not said with its task and config")
+}
+
+// writerFunc is a function as an io.Writer.
+type writerFunc func([]byte) (int, error)
+
+func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
