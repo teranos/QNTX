@@ -330,15 +330,28 @@ func (s *QNTXServer) a2aCalled(op a2aOperation, input protoreflect.MessageDescri
 		}
 		defer func() { _ = client.Destroy() }()
 		span.SetAttributes(attribute.String("a2a.agent", bounded(agent, saidPathMost)))
+		// "Peer turn time limit of 45 sec"
+		if sent["peer"] != "" {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, peerTurnTimeout)
+			defer cancel()
+		}
 		answered, err := op.call(ctx, client, request)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
+			if errors.Is(err, context.DeadlineExceeded) && sent["peer"] != "" {
+				return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " did not answer " + op.rpc + " within " + peerTurnTimeout.String()}
+			}
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " answered " + op.rpc + ": " + err.Error()}
 		}
 		return answered, nil
 	}
 }
+
+// peerTurnTimeout is how long a peer is given to answer one operation, its
+// turn included: "Peer turn time limit of 45 sec".
+var peerTurnTimeout = 45 * time.Second
 
 // a2aRequestJSON is what was sent as the spec's request in protojson: a field
 // holding a message or a list is sent as its JSON, any other as its value.
