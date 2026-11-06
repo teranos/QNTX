@@ -67,7 +67,6 @@ parity: rust-sqlite ## Report whether SQLite, DuckDB and Postgres each hold ever
 says: ## Write what the specs and our protocol say of themselves for the parity sigil
 	@go run ./cmd/says
 	@nix eval --raw -f nix/references/umami.nix > server/parity/umami_v3.3.1_ca661c7/openapi.words.json
-	@nix eval --raw -f nix/references/a2a.nix > server/parity/a2a_2026-03-12_7df7685/specification.md
 	@nix eval --raw -f nix/references/github.nix | jq . > server/parity/github_2026-03-10_7bdf5f0/openapi.json
 
 server: cli ## Start QNTX WebSocket server

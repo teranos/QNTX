@@ -27,8 +27,8 @@ import (
 )
 
 // QNTX as an A2A client, to the agents a peer serves. Each sigil is an
-// operation of the pinned A2AService (a2a_2026-03-12_7df7685): its name, its
-// method, what it does, what it takes and what it answers are the spec's, and
+// operation of the A2AService a2a-go compiles in (parity/sdk.go): its name, its
+// method, what it does, what it takes and what it answers are a2a-go's, and
 // a2a-go's client speaks it. What QNTX adds is peer: which node it is spoken to.
 
 // a2aOperation is one operation of A2AService, spoken through a2a-go's client.
