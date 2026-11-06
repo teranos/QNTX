@@ -1,0 +1,21 @@
+[package]
+name = "ats-dev"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "ATS on its own: read and write attestations in a SQLite file, no node, no WASM, no auth"
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "ats-dev"
+path = "src/main.rs"
+
+[dependencies]
+ats.workspace = true
+ats-sqlite = { path = "../ats-sqlite" }
+laye-error = { path = "../laye-error" }
+serde_json.workspace = true

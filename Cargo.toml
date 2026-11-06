@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/ats",
+    "crates/ats-dev",
     "crates/ats-duckdb",
     "crates/ats-postgres",
     "crates/ats-id",
