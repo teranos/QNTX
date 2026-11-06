@@ -15,7 +15,7 @@ answers on `/s/{market}/{slug}`
 Wants:
 
 - Real image as pixel
-- DNS stand
+- DNS pixel
 - PDF stand
 - QR stand
 - CF+S3 as stand
