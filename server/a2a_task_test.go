@@ -234,16 +234,26 @@ func TestTwoFirstMessagesAtOnceAreOneContext(t *testing.T) {
 		}()
 	}
 	var contexts []any
+	var tasks []string
 	for range 2 {
 		w := <-answers
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		var sent map[string]any
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &sent), w.Body.String())
 		contexts = append(contexts, at(sent, "task.contextId"))
+		tasks = append(tasks, at(sent, "task.id").(string))
 	}
 	require.NotEmpty(t, contexts[0])
 	assert.Equal(t, contexts[0], contexts[1])
 	require.NoError(t, os.Remove(held))
+	// The turns let go write into the test's directories: the test ends once they have ended.
+	for _, task := range tasks {
+		require.Eventually(t, func() bool {
+			_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+task, "", tokens[auth.LevelRoot])
+			state, _ := at(got, "status.state").(string)
+			return state == "TASK_STATE_COMPLETED" || state == "TASK_STATE_FAILED" || state == "TASK_STATE_CANCELED"
+		}, 10*time.Second, 20*time.Millisecond, "task %s did not end", task)
+	}
 }
 
 // What the Node Agent does not take is refused before anything is said to it.
@@ -539,4 +549,39 @@ func (s *QNTXServer) writeTaskLine(lines taskLines, id, state, by string, at tim
 		Contexts: append([]string{taskContext(id), agentContext(lines.did)}, also...),
 		Actors:   []string{by}, Timestamp: at, CreatedAt: at, Source: "a2a", Attributes: attributes,
 	})
+}
+
+// "streaming": true on the card (§3.3.4): SendStreamingMessage answers the
+// turn as it moves, a2a-go's events over SSE, the last the Task completed.
+func TestATurnIsStreamedAsItMoves(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	body := saidToTheNode("how long has the box been up?", "")
+	r := asBearer(http.MethodPost, "/a2a/message:stream", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("A2A-Version", "1.0")
+	r.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
+
+	var states []string
+	for _, line := range strings.Split(w.Body.String(), "\n") {
+		data, isData := strings.CutPrefix(line, "data: ")
+		if !isData {
+			continue
+		}
+		var event map[string]any
+		require.NoError(t, json.Unmarshal([]byte(data), &event), data)
+		if update, held := event["statusUpdate"]; held {
+			states = append(states, at(update.(map[string]any), "status.state").(string))
+		}
+		if task, held := event["task"]; held {
+			states = append(states, at(task.(map[string]any), "status.state").(string))
+		}
+	}
+	require.NotEmpty(t, states, w.Body.String())
+	assert.Contains(t, states, "TASK_STATE_WORKING", "the turn was not told as it moved")
+	assert.Equal(t, "TASK_STATE_COMPLETED", states[len(states)-1], w.Body.String())
 }

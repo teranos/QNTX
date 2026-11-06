@@ -234,7 +234,7 @@ func (c agentCard) sdk() *a2asdk.AgentCard {
 			{URL: c.URL, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant},
 			{URL: c.URL, ProtocolBinding: a2asdk.TransportProtocolJSONRPC, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant},
 		},
-		Capabilities:         a2asdk.AgentCapabilities{PushNotifications: true, ExtendedAgentCard: true, Extensions: c.Extensions},
+		Capabilities:         a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true, Extensions: c.Extensions},
 		SecuritySchemes:      a2asdk.NamedSecuritySchemes{"bearer": a2asdk.HTTPAuthSecurityScheme{Scheme: "Bearer"}},
 		SecurityRequirements: a2asdk.SecurityRequirementsOptions{bearer},
 		DefaultInputModes:    cardModes,

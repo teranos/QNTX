@@ -8,6 +8,7 @@ import (
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2asrv/push"
+	a2alog "github.com/a2aproject/a2a-go/v2/log"
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
@@ -274,7 +275,20 @@ func (s *QNTXServer) notifySettled(lines taskLines, task *a2asdk.Task) {
 	// Sent after endTask lets go of taskEnds: a slow webhook holds no other task.
 	sacred.Go("the push notifications of a settled task", func() {
 		for _, config := range pushes {
-			if err := pushSender.SendPush(s.ctx, config, task); err != nil {
+			// A config deleted while an earlier webhook took its time is sent nothing more (§3.1.10).
+			held, err := s.pushesOf(lines, string(task.ID))
+			if err != nil {
+				s.logger.Errorw("a task was settled and its push notification was not delivered: its configs were not read again", "agent", lines.did, "task", task.ID, "config", config.ID, "error", err)
+				continue
+			}
+			// Sent as the config now stands: one replaced under its id goes where it now says.
+			at := slices.IndexFunc(held, func(push *a2asdk.PushConfig) bool { return push.ID == config.ID })
+			if at < 0 {
+				continue
+			}
+			// a2a-go's sender says a failed delivery itself, in the logger the context carries.
+			naming := a2alog.AttachLogger(s.ctx, a2alog.LoggerFrom(s.ctx).With("agent", lines.did, "task", string(task.ID), "config", config.ID))
+			if err := pushSender.SendPush(naming, held[at], task); err != nil {
 				s.logger.Errorw("a task was settled and its push notification was not delivered", "agent", lines.did, "task", task.ID, "config", config.ID, "error", err)
 			}
 		}

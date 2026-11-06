@@ -14,6 +14,7 @@ import (
 	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/getsentry/sentry-go"
 	sentryotel "github.com/getsentry/sentry-go/otel"
@@ -32,11 +33,14 @@ import (
 type anotherAgent struct {
 	tenant []string
 	bearer []string
+	// thinks is how long its turn takes.
+	thinks time.Duration
 }
 
 func (a *anotherAgent) executor() a2asrv.AgentExecutor {
 	return a2asrv.AgentExecutorFunc(func(_ context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
 		return func(yield func(a2asdk.Event, error) bool) {
+			time.Sleep(a.thinks)
 			a.tenant = append(a.tenant, ec.Tenant)
 			yield(&a2asdk.Task{
 				ID: ec.TaskID, ContextID: ec.ContextID,
@@ -320,4 +324,88 @@ func TestTheNodesThisOneKnowsAreTheAgentsToSee(t *testing.T) {
 	assert.Equal(t, "https://orchard.example", peer["origin"])
 	assert.Equal(t, "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", peer["did"])
 	assert.Equal(t, []any{"orchard"}, peer["namespaces"])
+}
+
+// An agent that still speaks A2A 0.3, its card in 0.3's shape, is found and
+// spoken to in 0.3, by a2a-go's own compat parser and transports.
+func TestAnAgentSpeaking03IsFoundAndSpokenTo(t *testing.T) {
+	allowingLoopback(t)
+	agent := &anotherAgent{}
+	rest := a2av0.NewRESTHandler(a2asrv.NewHandler(agent.executor()))
+	var served *httptest.Server
+	served = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/.well-known/agent-card.json" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"protocolVersion": "0.3.0", "name": "the old orchard keeper", "description": "Keeps the old orchard.", "version": "0.9.0",
+				"url": "` + served.URL + `/a2a", "preferredTransport": "HTTP+JSON",
+				"capabilities": {}, "defaultInputModes": ["text/plain"], "defaultOutputModes": ["text/plain"],
+				"skills": [{"id": "keep", "name": "keep", "description": "Keeps.", "tags": ["orchard"]}]}`))
+			return
+		}
+		http.StripPrefix("/a2a", rest).ServeHTTP(w, r)
+	}))
+	t.Cleanup(served.Close)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	root := tokens[auth.LevelRoot]
+
+	code, card := a2aCalledOver(t, srv, root, http.MethodGet, "Resolve", map[string]any{"card": served.URL})
+	require.Equal(t, http.StatusOK, code, card)
+	assert.Equal(t, "the old orchard keeper", card["name"])
+	interfaces := card["supported_interfaces"].([]any)
+	require.Len(t, interfaces, 1, card)
+	assert.Equal(t, "0.3.0", interfaces[0].(map[string]any)["protocol_version"])
+
+	code, answered := a2aCalledOver(t, srv, root, http.MethodPost, "SendMessage", map[string]any{
+		"card": served.URL, "message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	require.Equal(t, http.StatusOK, code, answered)
+	assert.Equal(t, "TASK_STATE_COMPLETED", answered["task"].(map[string]any)["status"].(map[string]any)["state"])
+}
+
+// A message waits on the peer's turn however long it takes: what bounds a peer
+// is the card it hands over, not the turn it is asked for.
+func TestAPeersTurnIsWaitedOnPastTheCardsBound(t *testing.T) {
+	bound := peerCardTimeout
+	peerCardTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { peerCardTimeout = bound })
+	agent := &anotherAgent{thinks: 300 * time.Millisecond}
+	atTenant := a2asrv.NewTenantRESTHandler("/{*}", a2asrv.NewHandler(agent.executor()))
+	peerServer := httptest.NewServer(http.StripPrefix("/a2a", atTenant))
+	t.Cleanup(peerServer.Close)
+	namedNode(t)
+	srv, tokens := pluginServingServer(t, "fake")
+	keyedNode(srv)
+	require.NoError(t, srv.authHandler.DeclarePeer("orchardnode", "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", []string{"orchard"}, peerServer.URL, peerServer.URL))
+
+	code, sent := a2aCalledOver(t, srv, tokens[auth.LevelRoot], http.MethodPost, "SendMessage", map[string]any{
+		"peer": "orchardnode", "tenant": "orchard",
+		"message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	require.Equal(t, http.StatusOK, code, sent)
+	assert.Equal(t, "TASK_STATE_COMPLETED", sent["task"].(map[string]any)["status"].(map[string]any)["state"])
+}
+
+// A peer is given peerTurnTimeout to answer, its turn included, and is told so when it does not.
+func TestAPeerThatDoesNotAnswerWithinItsTimeIsLeft(t *testing.T) {
+	bound := peerTurnTimeout
+	peerTurnTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { peerTurnTimeout = bound })
+	agent := &anotherAgent{thinks: 2 * time.Second}
+	atTenant := a2asrv.NewTenantRESTHandler("/{*}", a2asrv.NewHandler(agent.executor()))
+	peerServer := httptest.NewServer(http.StripPrefix("/a2a", atTenant))
+	t.Cleanup(peerServer.Close)
+	namedNode(t)
+	srv, tokens := pluginServingServer(t, "fake")
+	keyedNode(srv)
+	require.NoError(t, srv.authHandler.DeclarePeer("orchardnode", "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", []string{"orchard"}, peerServer.URL, peerServer.URL))
+
+	started := time.Now()
+	code, refused := a2aCalledOver(t, srv, tokens[auth.LevelRoot], http.MethodPost, "SendMessage", map[string]any{
+		"peer": "orchardnode", "tenant": "orchard",
+		"message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	assert.NotEqual(t, http.StatusOK, code, refused)
+	assert.Less(t, time.Since(started), time.Second, "the peer was waited on past its time")
+	said, _ := json.Marshal(refused)
+	assert.Contains(t, string(said), "did not answer SendMessage within 100ms")
 }

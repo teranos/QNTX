@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
@@ -41,6 +42,9 @@ const (
 	tenantBodyMost = 1 << 20
 )
 
+// streamKeptAlive is how often a quiet stream is told the turn still runs.
+const streamKeptAlive = 15 * time.Second
+
 // a2aContentType is the media type A2A's HTTP+JSON binding speaks in.
 const a2aContentType = "application/a2a+json"
 
@@ -52,11 +56,14 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		a2asrv.WithPushNotifications(pushesOnLines{s}, pushSender),
 		a2asrv.WithCallInterceptors(a2aGate{s}),
 		a2asrv.WithExtendedAgentCardProducer(a2asrv.ExtendedAgentCardProducerFn(s.a2aExtendedCardOf)),
-		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{PushNotifications: true, ExtendedAgentCard: true}),
+		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true}),
 	)
-	atNoTenant := a2asrv.NewRESTHandler(handler)
-	atTenant := a2asrv.NewTenantRESTHandler("/{*}", handler)
-	jsonRPC := a2asrv.NewJSONRPCHandler(handler)
+	// A turn can be quiet for minutes: a stream is kept alive through the
+	// gateways in front of the node, which drop idle connections.
+	alive := a2asrv.WithTransportKeepAlive(streamKeptAlive)
+	atNoTenant := a2asrv.NewRESTHandler(handler, alive)
+	atTenant := a2asrv.NewTenantRESTHandler("/{*}", handler, alive)
+	jsonRPC := a2asrv.NewJSONRPCHandler(handler, alive)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// One id per request, answered to the client, so what it reports names what the node wrote down.
 		id := uuid.NewString()
@@ -166,6 +173,10 @@ type a2aAnswered struct {
 	wrote    bool
 	keepsAll bool
 	said     bytes.Buffer
+	// line is a stream's line not yet ended, and refusedIn the first of its
+	// events that is a JSON-RPC error, however much the stream said before it.
+	line      bytes.Buffer
+	refusedIn []byte
 }
 
 // a2aSaidMost is how much of an error's body is kept to say what it was.
@@ -183,10 +194,52 @@ func (a *a2aAnswered) Write(body []byte) (int, error) {
 	if a.status == 0 {
 		a.status = http.StatusOK
 	}
-	if (a.status >= http.StatusBadRequest || a.keepsAll) && a.said.Len() < a2aSaidMost {
+	switch {
+	case a.keepsAll && a.streams():
+		a.heard(body)
+	case (a.status >= http.StatusBadRequest || a.keepsAll) && a.said.Len() < a2aSaidMost:
 		a.said.Write(body[:min(len(body), a2aSaidMost-a.said.Len())])
 	}
 	return a.ResponseWriter.Write(body)
+}
+
+// streams is whether the answer is an SSE stream.
+func (a *a2aAnswered) streams() bool {
+	return strings.HasPrefix(a.Header().Get("Content-Type"), "text/event-stream")
+}
+
+// heard reads a stream's lines as they are written, and keeps the first
+// data line that is a JSON-RPC error.
+func (a *a2aAnswered) heard(body []byte) {
+	if a.refusedIn != nil {
+		return
+	}
+	a.line.Write(body)
+	for {
+		ended := bytes.IndexByte(a.line.Bytes(), '\n')
+		if ended < 0 {
+			break
+		}
+		line := a.line.Next(ended + 1)
+		data, isData := bytes.CutPrefix(bytes.TrimSpace(line), []byte("data:"))
+		if isData && jsonRPCError(bytes.TrimSpace(data)) {
+			a.refusedIn = bytes.Clone(bytes.TrimSpace(data))
+			a.line.Reset()
+			return
+		}
+	}
+	// A line longer than any refusal is no refusal.
+	if a.line.Len() > a2aSaidMost {
+		a.line.Reset()
+	}
+}
+
+// jsonRPCError is whether answer is a JSON-RPC response that is an error.
+func jsonRPCError(answer []byte) bool {
+	var said struct {
+		Error json.RawMessage `json:"error"`
+	}
+	return json.Unmarshal(answer, &said) == nil && len(said.Error) > 0 && string(said.Error) != "null"
 }
 
 func (a *a2aAnswered) Flush() {
@@ -230,7 +283,12 @@ func jsonRPCRefusalOf(exchange *a2aExchange, answered *a2aAnswered) (a2aRefusalS
 			Data    json.RawMessage `json:"data"`
 		} `json:"error"`
 	}
-	if json.Unmarshal(answered.said.Bytes(), &said) != nil || said.Error == nil {
+	// A stream's refusal is the first of its events that is an error.
+	answer := answered.said.Bytes()
+	if answered.streams() {
+		answer = answered.refusedIn
+	}
+	if json.Unmarshal(answer, &said) != nil || said.Error == nil {
 		return a2aRefusalSaid{}, false
 	}
 	refusal := a2aRefusalSaid{Operation: exchange.operation, JSONRPC: true, Status: answered.status, Message: said.Error.Message, Reason: strconv.Itoa(said.Error.Code)}
