@@ -1483,7 +1483,11 @@ type NodeAgentAm struct {
 	// In codex.
 	Codex *CodexAm `protobuf:"bytes,3,opt,name=codex,proto3" json:"codex,omitempty"`
 	// 「[Opus 5.5] In agy.」
-	Agy           *AgyAm `protobuf:"bytes,4,opt,name=agy,proto3" json:"agy,omitempty"`
+	Agy *AgyAm `protobuf:"bytes,4,opt,name=agy,proto3" json:"agy,omitempty"`
+	// 「[Opus 5.5] Asked in no harness: each harness am.toml names it in whose
+	// binary is still arriving. It is not in the answer until it has arrived, so
+	// whoever draws the answer asks again while this is not empty.」
+	Arriving      []string `protobuf:"bytes,5,rep,name=arriving,proto3" json:"arriving,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1542,6 +1546,13 @@ func (x *NodeAgentAm) GetCodex() *CodexAm {
 func (x *NodeAgentAm) GetAgy() *AgyAm {
 	if x != nil {
 		return x.Agy
+	}
+	return nil
+}
+
+func (x *NodeAgentAm) GetArriving() []string {
+	if x != nil {
+		return x.Arriving
 	}
 	return nil
 }
@@ -3804,12 +3815,13 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x06claude\x18\x01 \x01(\v2\x14.protocol.ClaudeSaidR\x06claude\x12 \n" +
 	"\x02pi\x18\x02 \x01(\v2\x10.protocol.PiSaidR\x02pi\x12)\n" +
 	"\x05codex\x18\x03 \x01(\v2\x13.protocol.CodexSaidR\x05codex\x12#\n" +
-	"\x03agy\x18\x04 \x01(\v2\x11.protocol.AgySaidR\x03agy\"\xa5\x01\n" +
+	"\x03agy\x18\x04 \x01(\v2\x11.protocol.AgySaidR\x03agy\"\xc1\x01\n" +
 	"\vNodeAgentAm\x12*\n" +
 	"\x06claude\x18\x01 \x01(\v2\x12.protocol.ClaudeAmR\x06claude\x12\x1e\n" +
 	"\x02pi\x18\x02 \x01(\v2\x0e.protocol.PiAmR\x02pi\x12'\n" +
 	"\x05codex\x18\x03 \x01(\v2\x11.protocol.CodexAmR\x05codex\x12!\n" +
-	"\x03agy\x18\x04 \x01(\v2\x0f.protocol.AgyAmR\x03agy\"\x8f\x02\n" +
+	"\x03agy\x18\x04 \x01(\v2\x0f.protocol.AgyAmR\x03agy\x12\x1a\n" +
+	"\barriving\x18\x05 \x03(\tR\barriving\"\x8f\x02\n" +
 	"\tCodexSaid\x12\x16\n" +
 	"\x06answer\x18\x01 \x01(\tR\x06answer\x12\x18\n" +
 	"\asession\x18\x02 \x01(\tR\asession\x12\x14\n" +

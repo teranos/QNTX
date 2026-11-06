@@ -739,6 +739,7 @@
   "protocol.Node.output_modes": "The media types the node gives, across every signum: JSON, everywhere. To A2A these are the card's default output modes, which a skill's own output modes override.",
   "protocol.NodeAgentAm": "NodeAgentAm is what agent am answers: who the Node Agent is and how the node runs it, in the harness named.",
   "protocol.NodeAgentAm.agy": "「[Opus 5.5] In agy.」",
+  "protocol.NodeAgentAm.arriving": "「[Opus 5.5] Asked in no harness: each harness am.toml names it in whose binary is still arriving. It is not in the answer until it has arrived, so whoever draws the answer asks again while this is not empty.」",
   "protocol.NodeAgentAm.claude": "In Claude Code.",
   "protocol.NodeAgentAm.codex": "In codex.",
   "protocol.NodeAgentAm.pi": "In Pi.",

@@ -294,6 +294,10 @@ message NodeAgentAm {
   CodexAm codex = 3;
   // 「[Opus 5.5] In agy.」
   AgyAm agy = 4;
+  // 「[Opus 5.5] Asked in no harness: each harness am.toml names it in whose
+  // binary is still arriving. It is not in the answer until it has arrived, so
+  // whoever draws the answer asks again while this is not empty.」
+  repeated string arriving = 5;
 }
 
 // CodexSaid is what an agent answered in codex.
