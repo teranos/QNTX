@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // peerClient is a2a-go's client of the agent peer serves at tenant, its own
@@ -32,7 +33,8 @@ func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant st
 		[]*a2asdk.AgentInterface{{URL: at, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: tenant}},
 		// The person's token goes to the peer and nowhere else: a redirect is
 		// the peer's answer, not a place to follow it to.
-		a2aclient.WithRESTTransport(&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}),
+		a2aclient.WithRESTTransport(&http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport),
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}),
 		a2aclient.WithCallInterceptors(bearerOf(bearer)))
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "no A2A client speaks to "+peer.Label+": "+err.Error())

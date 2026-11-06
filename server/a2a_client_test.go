@@ -16,6 +16,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/auth"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -159,15 +163,46 @@ func cardServing(t *testing.T, agent *anotherAgent) *httptest.Server {
 	return served
 }
 
+// spansRecorded is the spans the node opens for one test.
+func spansRecorded(t *testing.T) *tracetest.SpanRecorder {
+	t.Helper()
+	recorder := tracetest.NewSpanRecorder()
+	before := otel.GetTracerProvider()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder)))
+	t.Cleanup(func() { otel.SetTracerProvider(before) })
+	return recorder
+}
+
+// spansNamed is the ended spans called name.
+func spansNamed(recorder *tracetest.SpanRecorder, name string) []sdktrace.ReadOnlySpan {
+	var named []sdktrace.ReadOnlySpan
+	for _, span := range recorder.Ended() {
+		if span.Name() == name {
+			named = append(named, span)
+		}
+	}
+	return named
+}
+
+// attributeOf is span's attribute key, as text.
+func attributeOf(span sdktrace.ReadOnlySpan, key string) string {
+	for _, held := range span.Attributes() {
+		if string(held.Key) == key {
+			return held.Value.Emit()
+		}
+	}
+	return ""
+}
+
 // Discovery (§8.2): a card is resolved by a2a-go's resolver from the agent's
-// base URL, the agent it names is spoken to as no one, and both resolutions
-// are said to Sentry.
+// base URL, the agent it names is spoken to as no one, and each resolution
+// and operation is a span.
 func TestTheAgentACardNamesIsFoundAndSpokenTo(t *testing.T) {
 	allowingLoopback(t)
 	agent := &anotherAgent{}
 	served := cardServing(t, agent)
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
-	sent := toSentry(t)
+	recorder := spansRecorded(t)
 	root := tokens[auth.LevelRoot]
 
 	code, card := a2aCalledOver(t, srv, root, http.MethodGet, "Resolve", map[string]any{"card": served.URL})
@@ -183,16 +218,16 @@ func TestTheAgentACardNamesIsFoundAndSpokenTo(t *testing.T) {
 		assert.Empty(t, bearer, "an agent a card names was given a token")
 	}
 
-	logs, _ := sent.said()
-	resolved := 0
-	for _, l := range logs {
-		if l.Body == "An agent card was resolved" {
-			resolved++
-			name, _ := logAttr(l, "a2a.card.name")
-			assert.Equal(t, "the orchard keeper", name)
-		}
+	resolved := spansNamed(recorder, "a2a.Resolve")
+	require.Len(t, resolved, 2, "each resolution is a span")
+	for _, span := range resolved {
+		assert.Equal(t, "the orchard keeper", attributeOf(span, "a2a.card.name"))
+		assert.Equal(t, served.URL, attributeOf(span, "a2a.card.url"))
 	}
-	assert.Equal(t, 2, resolved, "each resolution is said to Sentry")
+	sends := spansNamed(recorder, "a2a.SendMessage")
+	require.Len(t, sends, 1)
+	assert.Equal(t, "the orchard keeper", attributeOf(sends[0], "a2a.agent"))
+	assert.Equal(t, sends[0].SpanContext().TraceID(), resolved[1].SpanContext().TraceID(), "the resolution is part of the operation's trace")
 }
 
 // A card is read from what the internet routes to alone, over http or https:
@@ -201,7 +236,7 @@ func TestACardIsReadFromThePublicInternetAlone(t *testing.T) {
 	agent := &anotherAgent{}
 	served := cardServing(t, agent)
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
-	sent := toSentry(t)
+	recorder := spansRecorded(t)
 	root := tokens[auth.LevelRoot]
 
 	for _, at := range []string{"file:///etc/passwd", served.URL} {
@@ -211,14 +246,11 @@ func TestACardIsReadFromThePublicInternetAlone(t *testing.T) {
 		assert.NotContains(t, string(said), "root:", at)
 	}
 	assert.Empty(t, agent.bearer, "the node spoke to loopback")
-	logs, _ := sent.said()
-	notResolved := 0
-	for _, l := range logs {
-		if strings.HasPrefix(l.Body, "An agent card was not resolved") {
-			notResolved++
-		}
+	resolved := spansNamed(recorder, "a2a.Resolve")
+	require.Len(t, resolved, 2)
+	for _, span := range resolved {
+		assert.Equal(t, codes.Error, span.Status().Code, "a card not resolved is an error span")
 	}
-	assert.Equal(t, 2, notResolved)
 
 	code, refused := a2aCalledOver(t, srv, root, http.MethodPost, "SendMessage", map[string]any{"peer": "orchardnode", "card": served.URL, "message": `{}`})
 	assert.Equal(t, http.StatusBadRequest, code, refused, "an agent is named by a peer or a card, not both")

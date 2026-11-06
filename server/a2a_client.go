@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -18,12 +17,16 @@ import (
 	"github.com/a2aproject/a2a-go/v2/a2aclient/agentcard"
 	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	"github.com/a2aproject/a2a-go/v2/a2apb/v1/pbconv"
-	"github.com/getsentry/sentry-go"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -36,7 +39,8 @@ import (
 // operation of the A2AService a2a-go compiles in (parity/sdk.go): its name, its
 // method, what it does, what it takes and what it answers are a2a-go's, and
 // a2a-go's client speaks it. What QNTX adds is which agent it is spoken to: a
-// peer's, or the one a card names, found with a2a-go's card resolver (§8.2).
+// peer's, or the one a card names, found with a2a-go's card resolver (§8.2);
+// and a span for each, over OTLP.
 
 // a2aOperation is one operation of A2AService, spoken through a2a-go's client.
 type a2aOperation struct {
@@ -289,13 +293,20 @@ func (s *QNTXServer) a2aCalled(op a2aOperation, input protoreflect.MessageDescri
 		if err := protojson.Unmarshal(said, request); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Says: "what was sent is no " + string(input.FullName()) + ": " + err.Error()}
 		}
+		ctx, span := a2aTracer().Start(ctx, "a2a."+op.rpc, trace.WithSpanKind(trace.SpanKindClient),
+			trace.WithAttributes(attribute.String("a2a.peer", sent["peer"]), attribute.String("a2a.card.url", bounded(sent["card"], saidPathMost))))
+		defer span.End()
 		client, agent, refusal := s.a2aClientOf(ctx, sent)
 		if refusal != nil {
+			span.SetStatus(codes.Error, refusal.GetSays())
 			return nil, refusal
 		}
 		defer func() { _ = client.Destroy() }()
+		span.SetAttributes(attribute.String("a2a.agent", bounded(agent, saidPathMost)))
 		answered, err := op.call(ctx, client, request)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " answered " + op.rpc + ": " + err.Error()}
 		}
 		return answered, nil
@@ -366,32 +377,42 @@ func (s *QNTXServer) a2aClientOf(ctx context.Context, sent sigil.Sent) (*a2aclie
 	return client, card.Name, nil
 }
 
+// a2aTracer opens the spans of QNTX as an A2A client, which leave over OTLP
+// when the node speaks it (internal/otlp). It is asked of the provider each
+// time, so a provider set after the package loaded is the one spans reach.
+func a2aTracer() trace.Tracer { return otel.Tracer("github.com/teranos/QNTX/server/a2a") }
+
 // resolveCard is the card at, found by a2a-go's resolver over what the
-// internet routes to alone (§13.2), and said to Sentry, found or not.
+// internet routes to alone (§13.2), as a span: what the card says, or why it
+// was not found.
 func resolveCard(ctx context.Context, at string) (*a2asdk.AgentCard, *protocol.Refusal) {
-	said := sentry.NewLogger(ctx)
+	ctx, span := a2aTracer().Start(ctx, "a2a.Resolve", trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(attribute.String("a2a.card.url", bounded(at, saidPathMost))))
+	defer span.End()
+	refused := func(refusal *protocol.Refusal) (*a2asdk.AgentCard, *protocol.Refusal) {
+		span.SetStatus(codes.Error, refusal.GetSays())
+		return nil, refusal
+	}
 	// The resolver reads a file:// card from the node's own disk.
 	if u, err := url.Parse(at); err != nil || (u.Scheme != "https" && u.Scheme != "http") {
-		said.Warn().String("a2a.card.url", bounded(at, saidPathMost)).Emit("An agent card was not resolved: it is no http or https URL")
-		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "card", Says: at + " is no http or https URL a card is read from"}
+		return refused(&protocol.Refusal{Why: sigil.Invalid, Param: "card", Says: at + " is no http or https URL a card is read from"})
 	}
 	card, err := (&agentcard.Resolver{Client: publicClient()}).Resolve(ctx, at)
 	if err != nil {
-		said.Warn().String("a2a.card.url", bounded(at, saidPathMost)).String("error", bounded(err.Error(), saidDefectMost)).Emit("An agent card was not resolved")
-		return nil, &protocol.Refusal{Why: sigil.Failed, Param: "card", Says: "the card at " + at + " was not resolved: " + err.Error()}
+		span.RecordError(err)
+		return refused(&protocol.Refusal{Why: sigil.Failed, Param: "card", Says: "the card at " + at + " was not resolved: " + err.Error()})
 	}
 	bindings := make([]string, 0, len(card.SupportedInterfaces))
 	for _, held := range card.SupportedInterfaces {
 		bindings = append(bindings, string(held.ProtocolBinding)+" "+string(held.ProtocolVersion))
 	}
-	said.Info().
-		String("a2a.card.url", bounded(at, saidPathMost)).
-		String("a2a.card.name", bounded(card.Name, saidPathMost)).
-		String("a2a.card.version", bounded(card.Version, saidVersionMost)).
-		String("a2a.card.interfaces", bounded(strings.Join(bindings, ", "), saidPathMost)).
-		Int("a2a.card.skills", len(card.Skills)).
-		Int("a2a.card.signatures", len(card.Signatures)).
-		Emit("An agent card was resolved")
+	span.SetAttributes(
+		attribute.String("a2a.card.name", bounded(card.Name, saidPathMost)),
+		attribute.String("a2a.card.version", bounded(card.Version, saidVersionMost)),
+		attribute.StringSlice("a2a.card.interfaces", bindings),
+		attribute.Int("a2a.card.skills", len(card.Skills)),
+		attribute.Int("a2a.card.signatures", len(card.Signatures)),
+	)
 	return card, nil
 }
 
@@ -413,5 +434,5 @@ func publicClient() *http.Client {
 		}
 		return nil
 	}}
-	return &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{Proxy: http.ProxyFromEnvironment, DialContext: dialer.DialContext}}
+	return &http.Client{Timeout: 30 * time.Second, Transport: otelhttp.NewTransport(&http.Transport{Proxy: http.ProxyFromEnvironment, DialContext: dialer.DialContext})}
 }
