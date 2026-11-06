@@ -384,3 +384,28 @@ func TestAPeersTurnIsWaitedOnPastTheCardsBound(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, sent)
 	assert.Equal(t, "TASK_STATE_COMPLETED", sent["task"].(map[string]any)["status"].(map[string]any)["state"])
 }
+
+// A peer is given peerTurnTimeout to answer, its turn included, and is told so when it does not.
+func TestAPeerThatDoesNotAnswerWithinItsTimeIsLeft(t *testing.T) {
+	bound := peerTurnTimeout
+	peerTurnTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { peerTurnTimeout = bound })
+	agent := &anotherAgent{thinks: 2 * time.Second}
+	atTenant := a2asrv.NewTenantRESTHandler("/{*}", a2asrv.NewHandler(agent.executor()))
+	peerServer := httptest.NewServer(http.StripPrefix("/a2a", atTenant))
+	t.Cleanup(peerServer.Close)
+	namedNode(t)
+	srv, tokens := pluginServingServer(t, "fake")
+	keyedNode(srv)
+	require.NoError(t, srv.authHandler.DeclarePeer("orchardnode", "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", []string{"orchard"}, peerServer.URL, peerServer.URL))
+
+	started := time.Now()
+	code, refused := a2aCalledOver(t, srv, tokens[auth.LevelRoot], http.MethodPost, "SendMessage", map[string]any{
+		"peer": "orchardnode", "tenant": "orchard",
+		"message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	assert.NotEqual(t, http.StatusOK, code, refused)
+	assert.Less(t, time.Since(started), time.Second, "the peer was waited on past its time")
+	said, _ := json.Marshal(refused)
+	assert.Contains(t, string(said), "did not answer SendMessage within 100ms")
+}

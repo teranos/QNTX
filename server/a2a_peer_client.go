@@ -50,8 +50,8 @@ func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant st
 	return client, nil
 }
 
-// peerCardTimeout is how long a peer is given to hand over a card. A message
-// waits on the peer's turn, which is the caller's to bound, not this.
+// peerCardTimeout is how long a peer is given to hand over a card. Its turn
+// is given peerTurnTimeout.
 var peerCardTimeout = 15 * time.Second
 
 // cardHeard keeps the body of the extended card a peer answers, the bytes it
