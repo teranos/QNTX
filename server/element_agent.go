@@ -391,6 +391,10 @@ func (s *QNTXServer) elementSay(ctx context.Context, sent sigil.Sent) (any, *pro
 }
 
 func (s *QNTXServer) elementAm(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	// The element named is read first: what is arriving is said only of an element.
+	if _, refused := elementOf(sent); refused != nil {
+		return nil, refused
+	}
 	amIn := func(h *harness) (any, *protocol.Refusal) {
 		agent, refused := s.elementAgentIn(h, sent)
 		if refused != nil {

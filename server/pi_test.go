@@ -248,6 +248,9 @@ func TestElementAmInNoHarnessReadyHoldsNoAgent(t *testing.T) {
 	assert.Equal(t, []string{"claude"}, am.GetArriving())
 	_, held := s.elementAgents.of(elementPurpose("never-seen"))
 	assert.False(t, held)
+	_, refused = s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "../never-seen"})
+	require.NotNil(t, refused, "an element named by a path is refused, arriving or not")
+	assert.Equal(t, sigil.Invalid, refused.GetWhy())
 
 	failed := &harnessHeld{name: "Claude Code", fetched: make(chan struct{}), err: errors.New("the download was cut off")}
 	close(failed.fetched)
