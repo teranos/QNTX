@@ -58,9 +58,12 @@ func Said() (string, bool) {
 //
 // 「[Fable 5.1] release is the build, as service.version. service.name is qntx unless」
 // 「[Fable 5.1] OTEL_SERVICE_NAME or OTEL_RESOURCE_ATTRIBUTES says another.」
-func Start(ctx context.Context, release string) error {
+//
+// also is where else each span goes, Sentry's span processor among them when
+// Sentry traces: given one, the provider starts with no endpoint said.
+func Start(ctx context.Context, release string, also ...sdktrace.SpanProcessor) error {
 	endpoint, said := Said()
-	if !said {
+	if !said && len(also) == 0 {
 		return nil
 	}
 
@@ -70,9 +73,22 @@ func Start(ctx context.Context, release string) error {
 		return errors.New("otlp.Start called twice: the second provider would replace the first and leave its batch unsent")
 	}
 
-	exporter, err := otlptracehttp.New(ctx)
-	if err != nil {
-		return errors.Wrapf(err, "failed to start the OTLP trace exporter (endpoint=%q)", endpoint)
+	options := []sdktrace.TracerProviderOption{}
+	var unexported error
+	if said {
+		exporter, err := otlptracehttp.New(ctx)
+		if err != nil && len(also) == 0 {
+			return errors.Wrapf(err, "failed to start the OTLP trace exporter (endpoint=%q)", endpoint)
+		}
+		if err != nil {
+			// The other processors still start: an endpoint that fails is no reason Sentry gets no spans.
+			unexported = errors.Wrapf(err, "failed to start the OTLP trace exporter (endpoint=%q); spans go to the other processors alone", endpoint)
+		} else {
+			options = append(options, sdktrace.WithBatcher(exporter))
+		}
+	}
+	for _, processor := range also {
+		options = append(options, sdktrace.WithSpanProcessor(processor))
 	}
 	// 「[Fable 5.1] The last value of a key wins, so what the environment says of the」
 	// 「[Fable 5.1] service stands over what is written here.」
@@ -88,13 +104,10 @@ func Start(ctx context.Context, release string) error {
 		return errors.Wrapf(err, "failed to describe the node as an OpenTelemetry resource (endpoint=%q, release=%q)", endpoint, release)
 	}
 
-	provider = sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(described),
-	)
+	provider = sdktrace.NewTracerProvider(append(options, sdktrace.WithResource(described))...)
 	otel.SetTracerProvider(provider)
 	otel.SetTextMapPropagator(propagation.TraceContext{})
-	return nil
+	return unexported
 }
 
 // 「[Fable 5.1] Running reports whether spans are leaving the node.」

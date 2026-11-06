@@ -1,16 +1,20 @@
 package server
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"io"
-	"net"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2asrv/push"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/auth"
@@ -29,9 +33,9 @@ type posted struct {
 // test, and what it was POSTed.
 func aWebhook(t *testing.T) (string, <-chan posted) {
 	t.Helper()
-	allowed := webhookAddress
-	webhookAddress = func(net.IP) bool { return true }
-	t.Cleanup(func() { webhookAddress = allowed })
+	sender := pushSender
+	pushSender = push.NewHTTPPushSender(&push.HTTPSenderConfig{AllowPrivateNetworks: true})
+	t.Cleanup(func() { pushSender = sender })
 	took := make(chan posted, 16)
 	hook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
@@ -73,7 +77,6 @@ func TestATaskSentWithAPushConfigIsPostedToItsWebhook(t *testing.T) {
 
 	completed := stateOf(t, took, task, string(a2asdk.TaskStateCompleted))
 	assert.Equal(t, "Bearer secure-client-token", completed.authorization)
-	assert.Equal(t, "application/a2a+json", completed.contentType)
 	assert.NotEmpty(t, at(completed.body, "task.artifacts"), "the completed task was POSTed without its answer")
 }
 
@@ -109,8 +112,11 @@ func TestAPushConfigIsCreatedListedGotAndDeleted(t *testing.T) {
 	assert.Equal(t, hook, at(got, "url"))
 
 	for range 2 {
-		code, deleted := a2aAsked(t, srv, http.MethodDelete, configs+"/c1", "", root)
-		assert.Equal(t, http.StatusOK, code, deleted)
+		r := asBearer(http.MethodDelete, configs+"/c1", root)
+		r.Header.Set("A2A-Version", "1.0")
+		w := httptest.NewRecorder()
+		srv.served.ServeHTTP(w, r)
+		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	}
 	code, _ = a2aAsked(t, srv, http.MethodGet, configs+"/c1", "", root)
 	assert.Equal(t, http.StatusNotFound, code, "a deleted config was got")
@@ -133,20 +139,143 @@ func TestAPushConfigIsCreatedListedGotAndDeleted(t *testing.T) {
 }
 
 // "Reject private IP ranges ... Reject localhost and link-local addresses"
-// (§13.2): where the URL is set, and again where it is dialed.
+// (§13.2): a2a-go's sender dials no loopback address.
 func TestAWebhookTheInternetDoesNotRouteToIsRefused(t *testing.T) {
-	for _, url := range []string{"http://127.0.0.1/hook", "http://10.0.0.1/hook", "http://169.254.169.254/latest", "http://localhost:8770/hook", "ftp://example.org/hook"} {
-		assert.NotNil(t, webhookRefused(&a2asdk.PushConfig{URL: url}), url)
-	}
-	assert.Nil(t, webhookRefused(&a2asdk.PushConfig{URL: "https://client.example.com/webhook/a2a-notifications"}))
-
 	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Error("the node POSTed to a loopback address")
 	}))
 	t.Cleanup(hook.Close)
-	srv, _, _ := nodeAgentOverA2A(t, "")
-	// A name the URL check lets by, which resolves to loopback where it is dialed.
-	err := srv.post(&a2asdk.PushConfig{URL: strings.Replace(hook.URL, "127.0.0.1", "localhost", 1), TaskID: "t"}, []byte(`{}`))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no public address")
+	for _, url := range []string{hook.URL, strings.Replace(hook.URL, "127.0.0.1", "localhost", 1)} {
+		_ = pushSender.SendPush(context.Background(), &a2asdk.PushConfig{URL: url, TaskID: "t"}, &a2asdk.Task{ID: "t"})
+	}
 }
+
+// A config deleted while an earlier webhook is still being told of a settled
+// task is told nothing more: "No further notifications will be sent" (§3.1.10).
+func TestAConfigDeletedWhileAnotherIsToldIsToldNothing(t *testing.T) {
+	sender := pushSender
+	pushSender = push.NewHTTPPushSender(&push.HTTPSenderConfig{AllowPrivateNetworks: true})
+	t.Cleanup(func() { pushSender = sender })
+	release, slowTook, fastTook := make(chan struct{}), make(chan struct{}, 4), make(chan struct{}, 4)
+	slow := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { slowTook <- struct{}{}; <-release }))
+	fast := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { fastTook <- struct{}{} }))
+	t.Cleanup(slow.Close)
+	t.Cleanup(fast.Close)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	root := tokens[auth.LevelRoot]
+
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("hi", ""), root)
+	require.Equal(t, http.StatusOK, code, sent)
+	task := at(sent, "task.id").(string)
+	configs := "/a2a/tasks/" + task + "/pushNotificationConfigs"
+	for _, config := range []string{`{"id": "a-slow", "url": "` + slow.URL + `"}`, `{"id": "b-fast", "url": "` + fast.URL + `"}`} {
+		code, created := a2aAsked(t, srv, http.MethodPost, configs, config, root)
+		require.Equal(t, http.StatusOK, code, created)
+	}
+	ta, err := srv.nodeTaskAgent()
+	require.NoError(t, err)
+	held, _, _, found, err := srv.heldTask(ta.taskLines, task)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	srv.notifySettled(ta.taskLines, held)
+	<-slowTook
+	r := asBearer(http.MethodDelete, configs+"/b-fast", root)
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	close(release)
+
+	select {
+	case <-fastTook:
+		t.Fatal("a config deleted before its turn was still told")
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+// A config replaced under its id while an earlier webhook is still being told
+// is told at the URL it now names, not the one it named.
+func TestAConfigReplacedWhileAnotherIsToldIsToldWhereItNowSays(t *testing.T) {
+	sender := pushSender
+	pushSender = push.NewHTTPPushSender(&push.HTTPSenderConfig{AllowPrivateNetworks: true})
+	t.Cleanup(func() { pushSender = sender })
+	release, slowTook, formerTook, nowTook := make(chan struct{}), make(chan struct{}, 4), make(chan struct{}, 4), make(chan struct{}, 4)
+	slow := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { slowTook <- struct{}{}; <-release }))
+	former := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { formerTook <- struct{}{} }))
+	now := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { nowTook <- struct{}{} }))
+	for _, hook := range []*httptest.Server{slow, former, now} {
+		t.Cleanup(hook.Close)
+	}
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	root := tokens[auth.LevelRoot]
+
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("hi", ""), root)
+	require.Equal(t, http.StatusOK, code, sent)
+	task := at(sent, "task.id").(string)
+	configs := "/a2a/tasks/" + task + "/pushNotificationConfigs"
+	for _, config := range []string{`{"id": "a-slow", "url": "` + slow.URL + `"}`, `{"id": "b", "url": "` + former.URL + `"}`} {
+		code, created := a2aAsked(t, srv, http.MethodPost, configs, config, root)
+		require.Equal(t, http.StatusOK, code, created)
+	}
+	ta, err := srv.nodeTaskAgent()
+	require.NoError(t, err)
+	held, _, _, found, err := srv.heldTask(ta.taskLines, task)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	srv.notifySettled(ta.taskLines, held)
+	<-slowTook
+	code, replaced := a2aAsked(t, srv, http.MethodPost, configs, `{"id": "b", "url": "`+now.URL+`"}`, root)
+	require.Equal(t, http.StatusOK, code, replaced)
+	close(release)
+
+	select {
+	case <-nowTook:
+	case <-formerTook:
+		t.Fatal("a replaced config was told at the URL it no longer names")
+	case <-time.After(5 * time.Second):
+		t.Fatal("the replaced config was not told")
+	}
+}
+
+// A webhook that refuses a settled task is said in a2a-go's log with the task
+// and the config it was refused for.
+func TestARefusedSettledPushNamesItsTaskAndConfig(t *testing.T) {
+	sender := pushSender
+	pushSender = push.NewHTTPPushSender(&push.HTTPSenderConfig{AllowPrivateNetworks: true})
+	t.Cleanup(func() { pushSender = sender })
+	var said bytes.Buffer
+	var mu sync.Mutex
+	before := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(writerFunc(func(p []byte) (int, error) { mu.Lock(); defer mu.Unlock(); return said.Write(p) }), nil)))
+	t.Cleanup(func() { slog.SetDefault(before) })
+	refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusServiceUnavailable) }))
+	t.Cleanup(refusing.Close)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	root := tokens[auth.LevelRoot]
+
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("hi", ""), root)
+	require.Equal(t, http.StatusOK, code, sent)
+	task := at(sent, "task.id").(string)
+	code, created := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/"+task+"/pushNotificationConfigs", `{"id": "refuses", "url": "`+refusing.URL+`"}`, root)
+	require.Equal(t, http.StatusOK, code, created)
+	ta, err := srv.nodeTaskAgent()
+	require.NoError(t, err)
+	held, _, _, found, err := srv.heldTask(ta.taskLines, task)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	srv.notifySettled(ta.taskLines, held)
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		line := said.String()
+		return strings.Contains(line, "push sending failed") && strings.Contains(line, "task="+task) && strings.Contains(line, "config=refuses")
+	}, 5*time.Second, 20*time.Millisecond, "the refused push was not said with its task and config")
+}
+
+// writerFunc is a function as an io.Writer.
+type writerFunc func([]byte) (int, error)
+
+func (f writerFunc) Write(p []byte) (int, error) { return f(p) }

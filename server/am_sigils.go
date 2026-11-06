@@ -7,11 +7,8 @@ import (
 
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/syscap"
-	errors "github.com/teranos/sacred-error"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // Am is the node about itself (ADR-039): which build runs, what it can do, and
@@ -49,10 +46,9 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 					// "am node same thing": am node answers the Agent Card the
 					// asker would be given.
 					Name: "node",
-					Does: "What the node says of itself, as the A2A agent card the asker would be given, read through the pinned spec, and what it leaves empty that the spec requires.",
+					Does: "What the node says of itself, as the A2A agent card the asker would be given, as a2a-go writes it.",
 					Gives: []*protocol.Field{
-						{Name: "card", Says: "The card, as the pinned A2A spec shapes it.", Message: a2a.AgentCard},
-						{Name: "missing", Says: "Every field the card leaves empty that the spec requires, by its path."},
+						{Name: "card", Says: "The card, as a2a-go writes it.", Message: "lf.a2a.v1.AgentCard"},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/am/node"},
 				},
@@ -101,10 +97,9 @@ func (s *QNTXServer) amSignum() sigil.Signum {
 	}
 }
 
-// amNode is what am node answers: the card, and what it lacks.
+// amNode is what am node answers: the card.
 type amNode struct {
-	Card    json.RawMessage `json:"card"`
-	Missing []string        `json:"missing"`
+	Card json.RawMessage `json:"card"`
 }
 
 func (s *QNTXServer) amNode(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
@@ -112,19 +107,11 @@ func (s *QNTXServer) amNode(ctx context.Context, _ sigil.Sent) (any, *protocol.R
 	if caller == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the card names where its caller reached the node, and this asking carried no request"}
 	}
-	card, err := s.a2aCard(caller).Message()
+	body, err := cardJSON(s.a2aCard(caller).sdk())
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	body, err := protojson.Marshal(card.Interface())
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrap(err, "the card did not marshal").Error()}
-	}
-	missing := a2a.Missing(card)
-	if missing == nil {
-		missing = []string{}
-	}
-	return amNode{Card: body, Missing: missing}, nil
+	return amNode{Card: body}, nil
 }
 
 // versionInfo is the build as am version answers it.
