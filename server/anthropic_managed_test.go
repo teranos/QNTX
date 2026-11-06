@@ -34,11 +34,11 @@ type consoleStandIn struct {
 	ended map[string]bool
 	// spent is what the Session has cost, by each time it is read.
 	spent float64
-	// budget is each Session's budget as it was made or last updated; absent is none.
+	// 「[Opus 5.5] budget is each Session's budget as it was made or last updated; absent is none.」
 	budget map[string]any
-	// stop is the stop_reason the Session goes idle with: end_turn when empty.
+	// 「[Opus 5.5] stop is the stop_reason the Session goes idle with: end_turn when empty.」
 	stop string
-	// running is each Session still at work until it is interrupted; archived, each archived.
+	// 「[Opus 5.5] running is each Session still at work until it is interrupted; archived, each archived.」
 	running, archived map[string]bool
 }
 
@@ -305,7 +305,7 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 		return map[string]any{"type": "limit", "max_list_cost": map[string]any{"amount": cents, "currency": anthropicCapCurrency}}
 	}
 
-	// None set: the Session is made with the node's default, in the cents Anthropic takes.
+	// 「[Opus 5.5] None set: the Session is made with the node's default, in the cents Anthropic takes.」
 	answer, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_1", answer.Session)
@@ -313,9 +313,9 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	assert.Equal(t, budget("20000"), console.bodies["session"][0]["budget"], "the default, 200")
 	console.mu.Unlock()
 
-	// ROOT sets another: the element goes on in a new Session made with it, and the old one is archived.
-	// Qodo's review of #1519: updated in place, the old cap's paused work resumed before this turn's
-	// stream was open, and a cap below what was spent was refused on every turn after.
+	// 「[Opus 5.5] ROOT sets another: the element goes on in a new Session made with it, and the old one is archived.」
+	// 「[Opus 5.5] Qodo's review of #1519: updated in place, the old cap's paused work resumed before this turn's」
+	// 「[Opus 5.5] stream was open, and a cap below what was spent was refused on every turn after.」
 	rootAsksAnthropic(t, s, "cap", sigil.Sent{"amount": "30"})
 	again, err := s.spend(agent, said, shaken{}, func(claudecode.Message) {})
 	require.NoError(t, err)
@@ -327,9 +327,9 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "with the same Memory")
 	console.mu.Unlock()
 
-	// A Session kept from before, made without a cap, cannot be given one: it goes on in a new one that has it.
-	// Qodo's review of #1519: the uncapped one is ended at Anthropic first, interrupted while it
-	// still runs, so it spends nothing beside the capped one.
+	// 「[Opus 5.5] A Session kept from before, made without a cap, cannot be given one: it goes on in a new one that has it.」
+	// 「[Opus 5.5] Qodo's review of #1519: the uncapped one is ended at Anthropic first, interrupted while it」
+	// 「[Opus 5.5] still runs, so it spends nothing beside the capped one.」
 	retireAsks = time.Millisecond
 	t.Cleanup(func() { retireAsks = time.Second })
 	console.mu.Lock()
@@ -346,7 +346,7 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][2]["resources"], "with the Memory the uncapped one had")
 	console.mu.Unlock()
 
-	// At its cap the Session pauses: the turn is an error that says so, and names the cap.
+	// 「[Opus 5.5] At its cap the Session pauses: the turn is an error that says so, and names the cap.」
 	console.mu.Lock()
 	console.stop = "budget_reached"
 	console.mu.Unlock()
@@ -354,7 +354,7 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	capped, err := s.spend(agent, said, shaken{}, func(m claudecode.Message) { ended = append(ended, m) })
 	require.NoError(t, err)
 	assert.True(t, capped.IsError)
-	// Qodo's review of #1519: the result said success, so live showed a failed turn as "success: …".
+	// 「[Opus 5.5] Qodo's review of #1519: the result said success, so live showed a failed turn as "success: …".」
 	assert.Equal(t, "budget_reached", capped.Subtype)
 	require.NotEmpty(t, ended)
 	assert.Equal(t, "budget_reached", ended[len(ended)-1].Subtype)
