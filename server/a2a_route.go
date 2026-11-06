@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
@@ -66,10 +68,10 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		r.URL.Path = "/" + strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, a2aPrefix[:len(a2aPrefix)-1]), "/")
 		r.URL.RawPath = ""
 		if r.Body != nil {
-			r.Body = http.MaxBytesReader(w, r.Body, nodeBodyMost)
+			r.Body = &a2aBodyRead{ReadCloser: http.MaxBytesReader(w, r.Body, nodeBodyMost), exchange: exchange}
 		}
 		exchange.request = r
-		answered := &a2aAnswered{ResponseWriter: w}
+		answered := &a2aAnswered{ResponseWriter: w, keepsAll: r.Method == http.MethodPost && r.URL.Path == "/"}
 		switch _, _, named := tenantOf(r.Method, r.URL.Path); {
 		case r.Method == http.MethodPost && r.URL.Path == "/":
 			exchange.jsonRPC = true
@@ -81,6 +83,11 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		}
 		if answered.status >= http.StatusBadRequest {
 			s.a2aRefused(r, refusalOf(exchange, answered))
+		} else if exchange.jsonRPC {
+			// JSON-RPC answers its errors with HTTP 200, in the body.
+			if refusal, refused := jsonRPCRefusalOf(exchange, answered); refused {
+				s.a2aRefused(r, refusal)
+			}
 		}
 	}
 }
@@ -129,6 +136,20 @@ type a2aExchange struct {
 	request   *http.Request
 	operation string
 	jsonRPC   bool
+	read      int
+}
+
+// a2aBodyRead counts what the SDK read of a request's body, so a tenant named
+// in the body as well as the path is held to tenantBodyMost.
+type a2aBodyRead struct {
+	io.ReadCloser
+	exchange *a2aExchange
+}
+
+func (b *a2aBodyRead) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	b.exchange.read += n
+	return n, err
 }
 
 type a2aExchangeKey struct{}
@@ -141,9 +162,10 @@ func a2aExchangeFrom(ctx context.Context) (*a2aExchange, bool) {
 // a2aAnswered is how the request was answered: its status, and an error's body.
 type a2aAnswered struct {
 	http.ResponseWriter
-	status int
-	wrote  bool
-	said   bytes.Buffer
+	status   int
+	wrote    bool
+	keepsAll bool
+	said     bytes.Buffer
 }
 
 // a2aSaidMost is how much of an error's body is kept to say what it was.
@@ -161,7 +183,7 @@ func (a *a2aAnswered) Write(body []byte) (int, error) {
 	if a.status == 0 {
 		a.status = http.StatusOK
 	}
-	if a.status >= http.StatusBadRequest && a.said.Len() < a2aSaidMost {
+	if (a.status >= http.StatusBadRequest || a.keepsAll) && a.said.Len() < a2aSaidMost {
 		a.said.Write(body[:min(len(body), a2aSaidMost-a.said.Len())])
 	}
 	return a.ResponseWriter.Write(body)
@@ -198,6 +220,34 @@ func refusalOf(exchange *a2aExchange, answered *a2aAnswered) a2aRefusalSaid {
 	return refusal
 }
 
+// jsonRPCRefusalOf is the refusal a JSON-RPC request was answered with, as
+// the error in its body says it, and whether there was one.
+func jsonRPCRefusalOf(exchange *a2aExchange, answered *a2aAnswered) (a2aRefusalSaid, bool) {
+	var said struct {
+		Error *struct {
+			Code    int             `json:"code"`
+			Message string          `json:"message"`
+			Data    json.RawMessage `json:"data"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(answered.said.Bytes(), &said) != nil || said.Error == nil {
+		return a2aRefusalSaid{}, false
+	}
+	refusal := a2aRefusalSaid{Operation: exchange.operation, JSONRPC: true, Status: answered.status, Message: said.Error.Message, Reason: strconv.Itoa(said.Error.Code)}
+	var details []struct {
+		Type   string `json:"@type"`
+		Reason string `json:"reason"`
+	}
+	if json.Unmarshal(said.Error.Data, &details) == nil {
+		for _, detail := range details {
+			if detail.Type == errordetails.ErrorInfoType && detail.Reason != "" {
+				refusal.Reason = detail.Reason
+			}
+		}
+	}
+	return refusal, true
+}
+
 // a2aGate is what the node asks of a call once the SDK read it: whether an
 // agent is served at the tenant it names wherever it named it, which agent
 // that is, and what the agent takes.
@@ -212,6 +262,10 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 	}
 	exchange.operation = callCtx.Method()
 	r, tenant := exchange.request, callCtx.Tenant()
+	// "Implement limits on message size" (§13.4): an agent at a tenant takes less than the Node Agent.
+	if tenant != "" && exchange.read > tenantBodyMost {
+		return ctx, nil, a2aRefusal(a2asdk.ErrInvalidRequest, "the request body is more than the "+strconv.Itoa(tenantBodyMost)+" bytes an agent at a tenant takes")
+	}
 	// A tenant no agent is served at is a resource that does not exist (§3.3.2).
 	if tenant != "" {
 		served, err := g.s.a2aServed(r, tenant)
@@ -273,6 +327,9 @@ func (s *QNTXServer) messageTaken(ta taskAgent, sent *a2asdk.SendMessageRequest)
 	m := sent.Message
 	if m == nil {
 		return nil
+	}
+	if m.Role != a2asdk.MessageRoleUser {
+		return a2aRefusal(a2asdk.ErrInvalidParams, "a message sent to "+ta.called+" is the user's, and this one's role is "+string(m.Role))
 	}
 	// A turn takes nothing more once it is said: a message naming a task is
 	// one no task here accepts (§3.1.1, §3.4.2).

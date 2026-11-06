@@ -127,7 +127,7 @@ func TestTheAgentCardIsSignedByTheNode(t *testing.T) {
 
 	served := &a2asdk.AgentCard{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), served))
-	require.NoError(t, verifiedBy(context.Background(), served, public, srv.nodeDID.KeyID()), "the served card does not verify against the node's key")
+	require.NoError(t, verifiedBy(context.Background(), w.Body.Bytes(), public, srv.nodeDID.KeyID()), "the served card does not verify against the node's key")
 
 	var card struct {
 		Signatures []struct {
@@ -142,7 +142,9 @@ func TestTheAgentCardIsSignedByTheNode(t *testing.T) {
 	assert.Equal(t, srv.nodeDID.DID+"#"+srv.nodeDID.DID[len("did:key:"):], srv.nodeDID.KeyID(), "the key id is not the one the DID document names")
 
 	served.Description = "Somebody else."
-	assert.Error(t, verifiedBy(context.Background(), served, public, srv.nodeDID.KeyID()), "a card changed on the way still verifies")
+	changed, err := json.Marshal(served)
+	require.NoError(t, err)
+	assert.Error(t, verifiedBy(context.Background(), changed, public, srv.nodeDID.KeyID()), "a card changed on the way still verifies")
 }
 
 // A node holding no key has nothing to sign its card with, and does not serve

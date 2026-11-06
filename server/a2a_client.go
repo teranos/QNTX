@@ -359,7 +359,7 @@ func (s *QNTXServer) a2aClientOf(ctx context.Context, sent sigil.Sent) (*a2aclie
 		if found < 0 {
 			return nil, "", &protocol.Refusal{Why: sigil.NotFound, Param: "peer", Says: "nodes.peers names no " + label}
 		}
-		client, err := s.peerClient(ctx, peers[found], "")
+		client, err := s.peerClient(ctx, peers[found], "", nil)
 		if err != nil {
 			return nil, "", &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
@@ -422,7 +422,8 @@ func resolveCard(ctx context.Context, at string) (*a2asdk.AgentCard, *protocol.R
 var publicAddress = auth.IsPublicIP
 
 // publicClient speaks to what the internet routes to alone: the address it
-// dials is asked where it is dialed, redirects included.
+// dials is asked where it is dialed, redirects included. No proxy: through one,
+// the address dialed is the proxy's, not the agent's.
 func publicClient() *http.Client {
 	dialer := &net.Dialer{Timeout: 30 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
 		host, _, err := net.SplitHostPort(address)
@@ -434,5 +435,5 @@ func publicClient() *http.Client {
 		}
 		return nil
 	}}
-	return &http.Client{Timeout: 30 * time.Second, Transport: otelhttp.NewTransport(&http.Transport{Proxy: http.ProxyFromEnvironment, DialContext: dialer.DialContext})}
+	return &http.Client{Timeout: 30 * time.Second, Transport: otelhttp.NewTransport(&http.Transport{DialContext: dialer.DialContext})}
 }

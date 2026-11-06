@@ -57,7 +57,7 @@ func TestTheExtendedCardIsWhatTheCallerReaches(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	served := &a2asdk.AgentCard{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), served))
-	require.NoError(t, verifiedBy(context.Background(), served, srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), "the extended card is not signed by the node")
+	require.NoError(t, verifiedBy(context.Background(), w.Body.Bytes(), srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), "the extended card is not signed by the node")
 
 	var card struct {
 		Capabilities struct {

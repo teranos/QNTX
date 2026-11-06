@@ -215,3 +215,59 @@ func TestVersionsAndMethodsAreTheNodesWords(t *testing.T) {
 	assert.Equal(t, "ab…", bounded("abc", 2))
 	assert.Equal(t, "a?b", bounded("a\x00b", 10))
 }
+
+// JSON-RPC answers a refusal with HTTP 200 and the error in the body; it is a Sentry log all the same.
+func TestARefusedJSONRPCRequestIsASentryLog(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	sent := toSentry(t)
+
+	r := asBearer(http.MethodPost, "/a2a/", tokens[auth.LevelRoot])
+	body := `{"jsonrpc":"2.0","id":1,"method":"CancelTask","params":{"id":"nothing"}}`
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"error"`)
+
+	logs, _ := sent.said()
+	require.Len(t, logs, 1)
+	for key, want := range map[string]string{"a2a.reason": "TASK_NOT_FOUND", "a2a.binding": "jsonrpc", "a2a.operation": "CancelTask"} {
+		got, held := logAttr(logs[0], key)
+		assert.True(t, held, key)
+		assert.Equal(t, want, got, key)
+	}
+}
+
+// A message sent to an agent is the user's: one in the agent's role is refused.
+func TestAMessageInTheAgentsRoleIsRefused(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	r := asBearer(http.MethodPost, "/a2a/message:send", tokens[auth.LevelRoot])
+	body := `{"message":{"messageId":"m1","role":"ROLE_AGENT","parts":[{"text":"hello"}]}}`
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/a2a+json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "role")
+}
+
+// An agent at a tenant takes less than the Node Agent: a body over tenantBodyMost is refused there.
+func TestATenantsAgentTakesLessThanTheNodeAgent(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	text := strings.Repeat("a", tenantBodyMost)
+	body := `{"message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"` + text + `"}]}}`
+	r := asBearer(http.MethodPost, "/a2a/orchard/message:send", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/a2a+json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "an agent at a tenant takes")
+}

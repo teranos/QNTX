@@ -101,7 +101,7 @@ func TestThePrimaryHandsOverTheCardOfAnAgentAPeerServes(t *testing.T) {
 
 	handed := &a2asdk.AgentCard{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), handed))
-	require.NoError(t, verifiedBy(context.Background(), handed, peer.key.Public(), nodedid.KeyIDOf(peer.did)), "the card handed over is not the one the peer signed")
+	require.NoError(t, verifiedBy(context.Background(), w.Body.Bytes(), peer.key.Public(), nodedid.KeyIDOf(peer.did)), "the card handed over is not the one the peer signed")
 	var card struct {
 		Interfaces []struct {
 			URL    string `json:"url"`

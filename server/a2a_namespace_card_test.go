@@ -49,7 +49,7 @@ func TestANamespaceAgentIsDescribedAtItsTenant(t *testing.T) {
 
 		served := &a2asdk.AgentCard{}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), served))
-		require.NoError(t, verifiedBy(context.Background(), served, srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), path+": the card is not signed by the node")
+		require.NoError(t, verifiedBy(context.Background(), w.Body.Bytes(), srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), path+": the card is not signed by the node")
 
 		var card struct {
 			Name       string `json:"name"`

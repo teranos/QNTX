@@ -117,10 +117,11 @@ func init() {
 		if logger.SentryRunning() && opt.TracesSampleRate > 0 {
 			toSentry = append(toSentry, sentryotel.NewSentrySpanProcessor())
 		}
-		if err := otlp.Start(context.Background(), version.VersionTag, toSentry...); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP span export: %v\n", err)
+		exported := otlp.Start(context.Background(), version.VersionTag, toSentry...)
+		if exported != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP span export: %v\n", exported)
 		}
-		if endpoint, said := otlp.Said(); otlp.Running() && said {
+		if endpoint, said := otlp.Said(); otlp.Running() && said && exported == nil {
 			logger.Infow("Shipping spans over OTLP", "endpoint", endpoint, "release", version.VersionTag)
 		}
 		if len(toSentry) > 0 && otlp.Running() {

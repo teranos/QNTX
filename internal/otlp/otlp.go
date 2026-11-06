@@ -74,12 +74,18 @@ func Start(ctx context.Context, release string, also ...sdktrace.SpanProcessor) 
 	}
 
 	options := []sdktrace.TracerProviderOption{}
+	var unexported error
 	if said {
 		exporter, err := otlptracehttp.New(ctx)
-		if err != nil {
+		if err != nil && len(also) == 0 {
 			return errors.Wrapf(err, "failed to start the OTLP trace exporter (endpoint=%q)", endpoint)
 		}
-		options = append(options, sdktrace.WithBatcher(exporter))
+		if err != nil {
+			// The other processors still start: an endpoint that fails is no reason Sentry gets no spans.
+			unexported = errors.Wrapf(err, "failed to start the OTLP trace exporter (endpoint=%q); spans go to the other processors alone", endpoint)
+		} else {
+			options = append(options, sdktrace.WithBatcher(exporter))
+		}
 	}
 	for _, processor := range also {
 		options = append(options, sdktrace.WithSpanProcessor(processor))
@@ -101,7 +107,7 @@ func Start(ctx context.Context, release string, also ...sdktrace.SpanProcessor) 
 	provider = sdktrace.NewTracerProvider(append(options, sdktrace.WithResource(described))...)
 	otel.SetTracerProvider(provider)
 	otel.SetTextMapPropagator(propagation.TraceContext{})
-	return nil
+	return unexported
 }
 
 // 「[Fable 5.1] Running reports whether spans are leaving the node.」

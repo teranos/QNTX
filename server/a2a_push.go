@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/sacred"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -270,9 +271,12 @@ func (s *QNTXServer) notifySettled(lines taskLines, task *a2asdk.Task) {
 		s.logger.Errorw("a task was settled and its push notifications were not read", "agent", lines.did, "task", task.ID, "error", err)
 		return
 	}
-	for _, config := range pushes {
-		if err := pushSender.SendPush(s.ctx, config, task); err != nil {
-			s.logger.Errorw("a task was settled and its push notification was not delivered", "agent", lines.did, "task", task.ID, "config", config.ID, "error", err)
+	// Sent after endTask lets go of taskEnds: a slow webhook holds no other task.
+	sacred.Go("the push notifications of a settled task", func() {
+		for _, config := range pushes {
+			if err := pushSender.SendPush(s.ctx, config, task); err != nil {
+				s.logger.Errorw("a task was settled and its push notification was not delivered", "agent", lines.did, "task", task.ID, "config", config.ID, "error", err)
+			}
 		}
-	}
+	})
 }
