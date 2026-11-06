@@ -134,9 +134,10 @@ This should already work! But we need to verify the search finds it.
 **Project am.toml:**
 ```toml
 [plugin]
-enabled = ["hello-world"]
 paths = ["~/.qntx/plugins", "./plugins"]  # Default, but explicit
 ```
+
+Plugins are added, configured, enabled and disabled in the plugin element, at runtime. See [ADR-002](../adr/ADR-002-plugin-configuration.md).
 
 **Plugin placement options:**
 1. `./plugins/hello-world/plugin.ts` (preferred - project-level)
@@ -372,11 +373,7 @@ export function loadCanvasCSS(): string {
 
 ### 2.6 Configuration
 
-**Project am.toml:**
-```toml
-[plugin]
-enabled = ["canvas-renderer"]  # Remove hello-world if no longer needed
-```
+Plugins are added, configured, enabled and disabled in the plugin element, at runtime. See [ADR-002](../adr/ADR-002-plugin-configuration.md).
 
 ### 2.7 Verification Steps
 
