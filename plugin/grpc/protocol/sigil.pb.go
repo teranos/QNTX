@@ -28,7 +28,7 @@ type Signum struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Name   string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Sigils []*Sigil               `protobuf:"bytes,2,rep,name=sigils,proto3" json:"sigils,omitempty"`
-	// The shapes this signum is held to, each by its name: "Staands will be
+	// The shapes this signum is held to, each by its name: "Datapunts will be
 	// Umami, one reference and not a blend." The parity sigil reads these.
 	Follows []*Follows `protobuf:"bytes,3,rep,name=follows,proto3" json:"follows,omitempty"`
 	// What it is for, in words, and the words it is found by. To A2A these are

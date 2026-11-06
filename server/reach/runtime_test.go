@@ -76,8 +76,8 @@ func TestARuntimeLevelNeverOpensWhatTheCompiledTableNames(t *testing.T) {
 	assert.False(t, rows["/pond"].reach.Admits(auth.Admitted(auth.LevelPublicRegistration)),
 		"a runtime line opened a path the compiled table names")
 
-	onTheNode := Line{Paths: []string{"/api/staands"}, Roles: []string{"PUBLIC_REGISTRATION"}}
-	assert.Equal(t, []string{"/api/staands"}, onTheNode.Unopenable(everything), "a write over the compiled table was not refused")
+	onTheNode := Line{Paths: []string{"/api/datapunts"}, Roles: []string{"PUBLIC_REGISTRATION"}}
+	assert.Equal(t, []string{"/api/datapunts"}, onTheNode.Unopenable(everything), "a write over the compiled table was not refused")
 }
 
 // A path that is no plugin's is the node's own, and stays static.

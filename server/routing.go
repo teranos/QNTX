@@ -55,9 +55,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// tool; the reach table names it of ROOT.
 	s.answer(approvalsAnswerPath, s.HandleApprovalAnswer)
 
-	// A staand answers the public pixel on /s/{namespace}/{slug} (ADR-035). The
+	// A datapunt answers the public pixel on /d/{namespace}/{slug} (ADR-035). The
 	// handler reads the market and the slug off the path.
-	s.answer(staandPathPrefix, s.HandleStaand)
+	s.answer(datapuntPathPrefix, s.HandleDatapunt)
 
 	// The code an element is, published as an attestation. Its own root because an
 	// import is judged by origin, and the edge puts this one on the node.
@@ -66,7 +66,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// Every role the lines name, whole (ADR-034).
 
 	// What a signum holds is answered from its sigils (ADR-039): a path per
-	// endpoint a sigil is bound to, the method picking the sigil. Staands
+	// endpoint a sigil is bound to, the method picking the sigil. Datapunts
 	// (ADR-035, ADR-036) is the first.
 	s.answerSigils()
 

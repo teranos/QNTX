@@ -48,9 +48,9 @@ var storeWriters = map[string]string{
 		"and who may write one is settled by mayGrantEvery and MayGrantRoles first",
 	"writeReachLine": "a reach line lands in system, as createAttestation writes one, " +
 		"and only after MayGrantRoles says ROOT, from /api/reach, which the reach table gives to ROOT",
-	"writeStaandDef": "a stand's definition is trusted config, not an arrival: it lands in " +
-		"system from /api/staands, which the reach table gives to ROOT and SUPER",
-	"HandleStaand": "the one ANYONE route that writes: WriteAsPublic refuses system " +
+	"writeDatapuntDef": "a stand's definition is trusted config, not an arrival: it lands in " +
+		"system from /api/datapunts, which the reach table gives to ROOT and SUPER",
+	"HandleDatapunt": "the one ANYONE route that writes: WriteAsPublic refuses system " +
 		"and default before a store exists to write to",
 
 	"mailRecords": "the mail the node sent on a plugin's behalf and the templates it fills. " +

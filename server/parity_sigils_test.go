@@ -13,25 +13,25 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// The gate of the parity sigil: it gives of staands what make parity prisma
+// The gate of the parity sigil: it gives of datapunts what make parity prisma
 // gave, as recorded beside the pinned Umami schema before the command went.
-func TestParityHoldsStaandsAsRecorded(t *testing.T) {
+func TestParityHoldsDatapuntsAsRecorded(t *testing.T) {
 	s := bareNode()
 	signum := s.paritySignum()
-	answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": "staands"})
+	answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": "datapunts"})
 	if refused != nil {
-		t.Fatalf("hold refused staands: %s", refused.GetSays())
+		t.Fatalf("hold refused datapunts: %s", refused.GetSays())
 	}
 	held, ok := answer.(parity.Parity)
 	if !ok {
 		t.Fatalf("answer is %T, not parity.Parity", answer)
 	}
-	want, err := os.ReadFile(filepath.Join("parity", "umami_v3.3.1_ca661c7", "staands"))
+	want, err := os.ReadFile(filepath.Join("parity", "umami_v3.3.1_ca661c7", "datapunts"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := held.Render(true); got != string(want) {
-		t.Errorf("staands no longer reads as parity/umami_v3.3.1_ca661c7/staands records; got\n%s", got)
+		t.Errorf("datapunts no longer reads as parity/umami_v3.3.1_ca661c7/datapunts records; got\n%s", got)
 	}
 	holds(t, signum, "hold", answer)
 }
@@ -78,8 +78,8 @@ func TestParityHoldRefuses(t *testing.T) {
 	}{
 		"no such signum":      {sigil.Sent{"signum": "nosuch"}, "signum", sigil.NotFound},
 		"follows nothing":     {sigil.Sent{"signum": "parity"}, "signum", sigil.NotFound},
-		"not a reference":     {sigil.Sent{"signum": "staands", "reference": "matomo"}, "reference", sigil.NotFound},
-		"no such sigil":       {sigil.Sent{"signum": "staands", "sigil": "nosuch"}, "sigil", sigil.NotFound},
+		"not a reference":     {sigil.Sent{"signum": "datapunts", "reference": "matomo"}, "reference", sigil.NotFound},
+		"no such sigil":       {sigil.Sent{"signum": "datapunts", "sigil": "nosuch"}, "sigil", sigil.NotFound},
 		"a sigil of no shape": {sigil.Sent{"signum": "am", "sigil": "ground"}, "sigil", sigil.Invalid},
 	} {
 		_, refused := hold(context.Background(), c.sent)
@@ -115,7 +115,7 @@ func TestParityStorageIsWhatMakeParityWrote(t *testing.T) {
 // description and tags follow, and nothing the spec requires is left.
 func TestParityHoldsEverySignumToA2A(t *testing.T) {
 	signum := bareNode().paritySignum()
-	for _, name := range []string{"staands", "parity"} {
+	for _, name := range []string{"datapunts", "parity"} {
 		answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": name, "reference": "a2a"})
 		if refused != nil {
 			t.Fatalf("hold refused %s against a2a: %s", name, refused.GetSays())
@@ -154,7 +154,7 @@ func TestParityHoldsEverySignumToA2A(t *testing.T) {
 // its name, and both conform.
 func TestParityHoldsEverySigilToMCP(t *testing.T) {
 	signum := bareNode().paritySignum()
-	for _, name := range []string{"staands", "parity"} {
+	for _, name := range []string{"datapunts", "parity"} {
 		answer, refused := signum.Answers["hold"](context.Background(), sigil.Sent{"signum": name, "reference": "mcp"})
 		if refused != nil {
 			t.Fatalf("hold refused %s against mcp: %s", name, refused.GetSays())
@@ -251,15 +251,15 @@ func TestParityFollowsIsEverySignumAndItsReferences(t *testing.T) {
 	for _, row := range followed.GetSigna() {
 		byName[row.GetSignum()] = row
 	}
-	staands, ok := byName["staands"]
+	datapunts, ok := byName["datapunts"]
 	if !ok {
-		t.Fatalf("follows has no staands: %v", followed.GetSigna())
+		t.Fatalf("follows has no datapunts: %v", followed.GetSigna())
 	}
-	if strings.Join(staands.GetDeclares(), " ") != "umami" {
-		t.Errorf("staands declares %v", staands.GetDeclares())
+	if strings.Join(datapunts.GetDeclares(), " ") != "umami" {
+		t.Errorf("datapunts declares %v", datapunts.GetDeclares())
 	}
-	if strings.Join(staands.GetByShape(), " ") != "a2a mcp" {
-		t.Errorf("by its shape staands follows %v", staands.GetByShape())
+	if strings.Join(datapunts.GetByShape(), " ") != "a2a mcp" {
+		t.Errorf("by its shape datapunts follows %v", datapunts.GetByShape())
 	}
 	if len(byName["parity"].GetDeclares()) != 0 {
 		t.Errorf("parity declares %v", byName["parity"].GetDeclares())

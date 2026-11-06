@@ -53,8 +53,8 @@ func TestTheToolsAreTheSigilsAndTheRoutesServed(t *testing.T) {
 	assert.ElementsMatch(t, expected, offered, "a tool that is not a sigil or a route, or one that is not a tool")
 
 	assert.True(t, named["http_api_attestations"], "asking and attesting are not a tool")
-	assert.True(t, named["staands_metrics"], "a sigil is not a tool")
-	assert.False(t, named["http_api_staands_metrics"], "a path sigils answer is offered twice")
+	assert.True(t, named["datapunts_metrics"], "a sigil is not a tool")
+	assert.False(t, named["http_api_datapunts_metrics"], "a path sigils answer is offered twice")
 	assert.False(t, named["http_ws"], "a socket is not something a tool call can hold open")
 	assert.False(t, named["http_mcp"], "the MCP endpoint offers itself")
 
@@ -154,9 +154,9 @@ func TestAnAnswerIsItsMessageWhole(t *testing.T) {
 
 	assert.Error(t, heldTo(promised.schema, []byte(`{"transcripts":[{"session":"s"}]}`)), "a session leaving out what it holds")
 
-	visits := promisedBy(t, &protocol.Sigil{Answer: "protocol.StaandVisits"})
+	visits := promisedBy(t, &protocol.Sigil{Answer: "protocol.DatapuntVisits"})
 	assert.Error(t, heldTo(visits.schema, []byte(`{"market":"m","slug":"s","visits":[{"visit":"v","visitor":"p","market":"m","slug":"s","started":"","ended":"","duration_seconds":"3","entry_path":"","exit_path":"","views":2,"events":0,"bounce":false}]}`)), "a count given as text")
-	written, err = answerJSON(&protocol.StaandVisits{Market: "m", Slug: "s", Visits: []*protocol.Visit{{Visit: "v", Visitor: "p", Market: "m", Slug: "s", DurationSeconds: 3, Views: 2}}})
+	written, err = answerJSON(&protocol.DatapuntVisits{Market: "m", Slug: "s", Visits: []*protocol.Visit{{Visit: "v", Visitor: "p", Market: "m", Slug: "s", DurationSeconds: 3, Views: 2}}})
 	require.NoError(t, err)
 	assert.NoError(t, heldTo(visits.schema, written), "the same with the count as a number")
 
@@ -475,13 +475,13 @@ func TestAToolSaysWhatItGivesAndWhatItsMethodPromises(t *testing.T) {
 		assert.Contains(t, string(schema), `"`+given+`"`, "outputSchema leaves out "+given)
 	}
 
-	takeDown := named["staands_take-down"]
+	takeDown := named["datapunts_take-down"]
 	require.NotNil(t, takeDown)
 	require.NotNil(t, takeDown.Annotations)
 	assert.True(t, takeDown.Annotations.IdempotentHint)
 	assert.False(t, takeDown.Annotations.ReadOnlyHint)
 
-	assert.Nil(t, named["staands_create"].Annotations, "a POST promised something")
+	assert.Nil(t, named["datapunts_create"].Annotations, "a POST promised something")
 	assert.Nil(t, named["http_api_attestations"].OutputSchema, "a route no sigil answers said what it gives")
 }
 
@@ -579,7 +579,7 @@ func TestAConnectorIsToldItsClientsInstructions(t *testing.T) {
 // "DEFAULT DENY"
 func TestAConnectorIsOfferedWhatItsLabelReaches(t *testing.T) {
 	srv := servedForTest(t)
-	picked := reach.Line{Paths: []string{"staands"}, Roles: []string{"APP"}, Actor: rootAccount, At: time.Now()}
+	picked := reach.Line{Paths: []string{"datapunts"}, Roles: []string{"APP"}, Actor: rootAccount, At: time.Now()}
 	_, err := srv.served.Reopen(srv.answering, srv.wrapping(), reach.Runtime{
 		Lines:  []reach.Line{picked},
 		IsRoot: func(actor string) bool { return actor == rootAccount },
@@ -602,9 +602,9 @@ func TestAConnectorIsOfferedWhatItsLabelReaches(t *testing.T) {
 
 	app := auth.Holding(nobody, "APP")
 	tools := offered(app)
-	require.NotEmpty(t, tools, "the line granting APP the staands signum offered nothing")
+	require.NotEmpty(t, tools, "the line granting APP the datapunts signum offered nothing")
 	for _, name := range tools {
-		assert.True(t, strings.HasPrefix(name, "staands_"), name+" is not staands', and APP holds staands alone")
+		assert.True(t, strings.HasPrefix(name, "datapunts_"), name+" is not datapunts', and APP holds datapunts alone")
 	}
 }
 

@@ -29,48 +29,48 @@ func sigilHTTP(t *testing.T, s *QNTXServer, path string) http.HandlerFunc {
 // A path is answered from the sigils bound to it: the method picks the sigil,
 // what was sent is read against what it takes, and only then is it asked.
 func TestAPathIsAnsweredFromItsSigils(t *testing.T) {
-	s, sys, _ := standServer(t, "clean")
+	s, sys, _ := datapuntServer(t, "clean")
 	define(t, sys, "clean", "boutique", time.Now())
-	fire(s, "/s/clean/boutique?page=/&v=WHO-000001", "https://clean.example/")
+	fire(s, "/d/clean/boutique?page=/&v=WHO-000001", "https://clean.example/")
 
 	answering := s.answeredFromSigils()
-	for _, path := range []string{"/api/staands", "/api/staands/metrics", "/api/staands/activity", "/api/staands/visits"} {
+	for _, path := range []string{"/api/datapunts", "/api/datapunts/metrics", "/api/datapunts/activity", "/api/datapunts/visits"} {
 		require.Contains(t, answering, path)
 	}
 
-	metrics := answering["/api/staands/metrics"]
+	metrics := answering["/api/datapunts/metrics"]
 
 	asked := httptest.NewRecorder()
-	metrics(asked, httptest.NewRequest(http.MethodGet, "/api/staands/metrics?market=clean&slug=boutique&type=page", nil))
+	metrics(asked, httptest.NewRequest(http.MethodGet, "/api/datapunts/metrics?market=clean&slug=boutique&type=page", nil))
 	require.Equal(t, http.StatusOK, asked.Code, asked.Body.String())
 
 	// The refusal the connector never got: it names type.
 	missing := httptest.NewRecorder()
-	metrics(missing, httptest.NewRequest(http.MethodGet, "/api/staands/metrics?market=clean&slug=boutique", nil))
+	metrics(missing, httptest.NewRequest(http.MethodGet, "/api/datapunts/metrics?market=clean&slug=boutique", nil))
 	require.Equal(t, http.StatusBadRequest, missing.Code)
 	require.Contains(t, missing.Body.String(), "metrics needs type")
 
 	// A method no sigil is bound to is not answered, and the refusal says
 	// which are.
 	unbound := httptest.NewRecorder()
-	metrics(unbound, httptest.NewRequest(http.MethodPost, "/api/staands/metrics", nil))
+	metrics(unbound, httptest.NewRequest(http.MethodPost, "/api/datapunts/metrics", nil))
 	require.Equal(t, http.StatusMethodNotAllowed, unbound.Code)
 	require.Contains(t, unbound.Body.String(), "GET")
 
 	// One path, three sigils: what arrives in a body is read the same way.
-	stands := answering["/api/staands"]
+	stands := answering["/api/datapunts"]
 	created := httptest.NewRecorder()
-	stands(created, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(`{"market":"clean","slug":"second"}`)))
+	stands(created, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(`{"market":"clean","slug":"second","pixel":"site"}`)))
 	require.Equal(t, http.StatusOK, created.Code, created.Body.String())
 
 	slugless := httptest.NewRecorder()
-	stands(slugless, httptest.NewRequest(http.MethodPost, "/api/staands", strings.NewReader(`{"market":"clean"}`)))
+	stands(slugless, httptest.NewRequest(http.MethodPost, "/api/datapunts", strings.NewReader(`{"market":"clean"}`)))
 	require.Equal(t, http.StatusBadRequest, slugless.Code)
 	require.Contains(t, slugless.Body.String(), "create needs slug")
 }
 
 // One path can hold sigils different people reach: listing the stands and
-// taking one down are both /api/staands. Over HTTP each sigil is put behind the
+// taking one down are both /api/datapunts. Over HTTP each sigil is put behind the
 // one gate with the lines about that sigil, somebody the gate turns away never
 // reaches what answers, and a method no sigil is bound to is refused behind the
 // gate too, with the row that admits ROOT alone.
@@ -83,10 +83,10 @@ func TestASigilIsGatedOverHTTPByTheLinesAboutIt(t *testing.T) {
 		}
 	}
 	bound := []heldBy{
-		{signum: "staands", answer: does("list"), sigil: &protocol.Sigil{Name: "list",
-			Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands"}}},
-		{signum: "staands", answer: does("take-down"), sigil: &protocol.Sigil{Name: "take-down",
-			Http: &protocol.Endpoint{Method: http.MethodDelete, Path: "/api/staands"}}},
+		{signum: "datapunts", answer: does("list"), sigil: &protocol.Sigil{Name: "list",
+			Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/datapunts"}}},
+		{signum: "datapunts", answer: does("take-down"), sigil: &protocol.Sigil{Name: "take-down",
+			Http: &protocol.Endpoint{Method: http.MethodDelete, Path: "/api/datapunts"}}},
 	}
 	reaching := func(_ string, held heldBy) (auth.Reach, bool) {
 		if held.sigil.GetName() == "list" {
@@ -102,10 +102,10 @@ func TestASigilIsGatedOverHTTPByTheLinesAboutIt(t *testing.T) {
 			next(w, r)
 		}
 	}
-	stands := overHTTP("/api/staands", bound, admits, reaching, nil)
+	stands := overHTTP("/api/datapunts", bound, admits, reaching, nil)
 
 	for _, method := range []string{http.MethodGet, http.MethodDelete, http.MethodPut} {
-		stands(httptest.NewRecorder(), httptest.NewRequest(method, "/api/staands", nil))
+		stands(httptest.NewRecorder(), httptest.NewRequest(method, "/api/datapunts", nil))
 	}
 	assert.Equal(t, []string{"list", "take-down"}, answered)
 	assert.Equal(t, []auth.Level{auth.LevelSuper, auth.LevelToken}, gated[http.MethodGet])
@@ -120,10 +120,10 @@ func TestASigilIsGatedOverHTTPByTheLinesAboutIt(t *testing.T) {
 			http.Error(w, "this route is not yours", http.StatusForbidden)
 		}
 	}
-	closed := overHTTP("/api/staands", bound, turnsAway, reaching, nil)
+	closed := overHTTP("/api/datapunts", bound, turnsAway, reaching, nil)
 	for _, method := range []string{http.MethodGet, http.MethodDelete, http.MethodPut} {
 		rec := httptest.NewRecorder()
-		closed(rec, httptest.NewRequest(method, "/api/staands", nil))
+		closed(rec, httptest.NewRequest(method, "/api/datapunts", nil))
 		assert.Equal(t, http.StatusForbidden, rec.Code, method)
 		assert.NotContains(t, rec.Body.String(), "answers", "somebody turned away was told what the path answers")
 	}
@@ -139,17 +139,17 @@ func TestASigilIsATool(t *testing.T) {
 	for _, tool := range toolsOffered(t, bareNode()) {
 		named[tool.Name] = tool
 	}
-	for _, name := range []string{"staands_list", "staands_create", "staands_take-down", "staands_metrics", "staands_activity", "staands_visits"} {
+	for _, name := range []string{"datapunts_list", "datapunts_create", "datapunts_take-down", "datapunts_metrics", "datapunts_activity", "datapunts_visits"} {
 		require.Contains(t, named, name)
 	}
 	// The tools the document made for the same paths are gone: the sigil is the
 	// one place, and one tool is one sigil.
-	for _, name := range []string{"get_api_staands", "post_api_staands", "delete_api_staands", "get_api_staands_metrics"} {
+	for _, name := range []string{"get_api_datapunts", "post_api_datapunts", "delete_api_datapunts", "get_api_datapunts_metrics"} {
 		require.NotContains(t, named, name)
 	}
 
-	metrics := named["staands_metrics"]
-	require.Equal(t, "One stand's arrivals grouped by one dimension, most first.", metrics.Description)
+	metrics := named["datapunts_metrics"]
+	require.Equal(t, "One datapunt's arrivals grouped by one dimension, most first.", metrics.Description)
 
 	raw, err := json.Marshal(metrics.InputSchema)
 	require.NoError(t, err)
@@ -165,7 +165,7 @@ func TestASigilIsATool(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &schema))
 	assert.Equal(t, "object", schema.Type)
 	assert.ElementsMatch(t, []string{"market", "slug", "type"}, schema.Required)
-	assert.Equal(t, staandDimensions(), schema.Properties["type"].Enum)
+	assert.Equal(t, datapuntDimensions(), schema.Properties["type"].Enum)
 	assert.Equal(t, "What to group the arrivals by.", schema.Properties["type"].Description)
 	assert.Contains(t, schema.Properties, "since")
 }
@@ -177,7 +177,7 @@ func TestASigilIsATool(t *testing.T) {
 func TestASigilIsAskedOverMCP(t *testing.T) {
 	var sentToIt sigil.Sent
 	counts := heldBy{
-		signum: "staands",
+		signum: "datapunts",
 		sigil: &protocol.Sigil{
 			Name: "metrics",
 			Takes: []*protocol.Param{
@@ -185,7 +185,7 @@ func TestASigilIsAskedOverMCP(t *testing.T) {
 				{Name: "type", Says: "What to group by.", Required: true, OneOf: []string{"page", "event"}},
 				{Name: "limit", Says: "How many."},
 			},
-			Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/metrics"},
+			Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/datapunts/metrics"},
 		},
 		answer: func(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 			sentToIt = sent
@@ -211,7 +211,7 @@ func TestASigilIsAskedOverMCP(t *testing.T) {
 	require.False(t, answered.IsError, textOf(t, answered))
 	assert.JSONEq(t, `{"type":"page","counts":[2,1]}`, textOf(t, answered))
 	assert.Equal(t, sigil.Sent{"market": "clean", "type": "page", "limit": "5"}, sentToIt)
-	assert.Equal(t, "mcp:staands:metrics", gatedRoute, "the gate was not told it is MCP asking")
+	assert.Equal(t, "mcp:datapunts:metrics", gatedRoute, "the gate was not told it is MCP asking")
 
 	// The refusal the connector never got.
 	sentToIt = nil
@@ -277,20 +277,20 @@ func TestTheServedDocumentSaysWhatTheSigilsSay(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(raw, &document))
 
-	stands := document.Paths["/api/staands"]
+	stands := document.Paths["/api/datapunts"]
 	require.NotNil(t, stands.Get, "list is not in the document")
 	require.NotNil(t, stands.Post, "create is not in the document")
 	require.NotNil(t, stands.Delete, "take-down is not in the document")
 	assert.Nil(t, stands.Put, "list, create and take-down are the three things this path does")
 	assert.Nil(t, stands.Patch, "list, create and take-down are the three things this path does")
-	assert.Equal(t, "staands_create", stands.Post.Sigil)
-	assert.Equal(t, "staands_take-down", stands.Delete.Sigil)
+	assert.Equal(t, "datapunts_create", stands.Post.Sigil)
+	assert.Equal(t, "datapunts_take-down", stands.Delete.Sigil)
 
 	assert.Nil(t, document.Paths["/api/types"].Get, "an operation no sigil says was invented")
 
-	metrics := document.Paths["/api/staands/metrics"].Get
+	metrics := document.Paths["/api/datapunts/metrics"].Get
 	require.NotNil(t, metrics, "metrics is not in the document")
-	assert.Equal(t, "staands_metrics", metrics.Sigil)
+	assert.Equal(t, "datapunts_metrics", metrics.Sigil)
 	assert.Equal(t, []string{"ROOT", "SUPER"}, metrics.Reached, "who reaches it is the table's to say, and stays")
 	var typed bool
 	for _, param := range metrics.Parameters {
@@ -298,7 +298,7 @@ func TestTheServedDocumentSaysWhatTheSigilsSay(t *testing.T) {
 			typed = true
 			assert.Equal(t, "query", param.In)
 			assert.True(t, param.Required)
-			assert.Equal(t, staandDimensions(), param.Schema.Enum)
+			assert.Equal(t, datapuntDimensions(), param.Schema.Enum)
 		}
 	}
 	assert.True(t, typed, "the document does not say metrics takes type")

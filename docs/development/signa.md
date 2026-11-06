@@ -2,7 +2,7 @@
 
 Every signum the node holds or will hold, a table each, a row per sigil (ADR-039). The mark says whether the sigil is real: `done` is served from its sigil over every surface, empty is not yet, `wont` is decided against. The names are the sigils' own; where a sigil is not yet real its name is provisional.
 
-## staands
+## datapunts
 
 | sigil | mark |
 | --- | --- |
@@ -280,6 +280,6 @@ Decided in ADR-039. No signum holds them and no tool is made for them.
 | the /auth ceremony | wont |
 | / and /health | wont |
 | /g/ | wont |
-| /s/ | wont |
+| /d/ | wont |
 | the sockets | wont |
 | /mcp | wont |

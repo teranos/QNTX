@@ -106,8 +106,8 @@ REACH is '/i/name'                                                        of ROO
 # First-time setup: the ways in this node offers, and claiming it.
 REACH is '/setup' '/setup/claim'                                          of ANYONE
 
-# A staand is a market's public receive point (ADR-035).
-REACH is '/s/'                                                            of ANYONE
+# A datapunt is a market's public receive point (ADR-035).
+REACH is '/d/'                                                            of ANYONE
 
 # An element module is UI, and a page importing it carries no session. Every
 # call the module goes on to make is gated on its own line above.
@@ -157,9 +157,9 @@ REACH is 'datapunt'                                                       of ROO
 REACH is '/api/namespaces/default/nuke'                                   of ROOT
 
 # Stands (ADR-035) and what arrives at them (ADR-036).
-REACH is '/api/staands'                                                   of ROOT SUPER
-REACH is '/api/staands/metrics' '/api/staands/visits'                     of ROOT SUPER
-REACH is '/api/staands/activity'                                          of ROOT SUPER
+REACH is '/api/datapunts'                                                   of ROOT SUPER
+REACH is '/api/datapunts/metrics' '/api/datapunts/visits'                     of ROOT SUPER
+REACH is '/api/datapunts/activity'                                          of ROOT SUPER
 
 # What arrives on a socket is gated per attestation by mayRead, not here.
 REACH is '/ws' '/ws/llm'                                                  of ROOT SUPER

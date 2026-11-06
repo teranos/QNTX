@@ -23,7 +23,7 @@ func breakdown() *protocol.Sigil {
 			{Name: "type", Says: "What to group by.", Required: true, OneOf: []string{"page", "event"}},
 			{Name: "limit", Says: "How many.", Kind: Count},
 		},
-		Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/staands/metrics"},
+		Http: &protocol.Endpoint{Method: http.MethodGet, Path: "/api/datapunts/metrics"},
 	}
 }
 
@@ -50,7 +50,7 @@ func TestAskingIsGatedThenReadThenAnswered(t *testing.T) {
 		}
 	}
 	asking := Asking{
-		Surface: "mcp", Signum: "staands", Sigil: breakdown(), Answer: answer,
+		Surface: "mcp", Signum: "datapunts", Sigil: breakdown(), Answer: answer,
 		Gate: admits, Reaching: reaching, Caller: caller,
 	}
 
@@ -60,7 +60,7 @@ func TestAskingIsGatedThenReadThenAnswered(t *testing.T) {
 	require.Equal(t, map[string]any{"type": "page"}, asked.Answer)
 	require.Equal(t, Sent{"market": "clean", "type": "page", "limit": "5"}, sentToIt)
 	require.Equal(t, "tim", askedBy, "the function was not handed who the gate admitted")
-	require.Equal(t, "mcp:staands:metrics", gatedRoute, "the gate was not told which sigil over which surface")
+	require.Equal(t, "mcp:datapunts:metrics", gatedRoute, "the gate was not told which sigil over which surface")
 	require.Equal(t, reaching.Beyond(), gatedReach.Beyond())
 	require.Equal(t, "Bearer qntx_caller", gatedCredential)
 
@@ -88,10 +88,10 @@ func TestSomebodyTheGateTurnsAwayReachesNothing(t *testing.T) {
 		}
 	}
 	asking := Asking{
-		Surface: "http", Signum: "staands", Sigil: breakdown(),
+		Surface: "http", Signum: "datapunts", Sigil: breakdown(),
 		Answer: func(context.Context, Sent) (any, *protocol.Refusal) { answered = true; return nil, nil },
 		Gate:   turnsAway, Reaching: auth.Also(auth.LevelSuper),
-		Caller: httptest.NewRequest(http.MethodGet, "/api/staands/metrics", nil),
+		Caller: httptest.NewRequest(http.MethodGet, "/api/datapunts/metrics", nil),
 	}
 
 	asked := asking.Ask(context.Background(), map[string]any{})
@@ -128,10 +128,10 @@ func TestWhatIsServedToAnyoneIsNotGated(t *testing.T) {
 		return next
 	}
 	asking := Asking{
-		Surface: "http", Signum: "staands", Sigil: breakdown(),
+		Surface: "http", Signum: "datapunts", Sigil: breakdown(),
 		Answer: func(_ context.Context, sent Sent) (any, *protocol.Refusal) { return sent["type"], nil },
 		Gate:   gate, Anyone: true,
-		Caller: httptest.NewRequest(http.MethodGet, "/api/staands/metrics", nil),
+		Caller: httptest.NewRequest(http.MethodGet, "/api/datapunts/metrics", nil),
 	}
 	asked := asking.Ask(context.Background(), map[string]any{"market": "clean", "type": "event"})
 	require.False(t, gated)

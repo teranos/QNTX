@@ -26,7 +26,7 @@ func TestValidationSeesTheConfigTheRecordHoldsAfter(t *testing.T) {
 		"bucket": {Type: "string", Required: true},
 		"region": {Type: "string"},
 	}
-	held := map[string]string{"bucket": "media", buildCore: "github.com/teranos/staands@main"}
+	held := map[string]string{"bucket": "media", buildCore: "github.com/teranos/datapunts@main"}
 
 	if errs, refused := validateConfigAgainstSchema(configAfter(held, map[string]string{"region": "eu"}), schema); refused != nil {
 		t.Fatalf("a PUT naming only region: %v (%v)", errs, refused)

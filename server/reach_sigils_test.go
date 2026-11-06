@@ -143,7 +143,7 @@ func TestAGrantOverTheCompiledTableIsRefused(t *testing.T) {
 	root.Identity = rootAccount
 
 	_, refusal := s.reachGrant(auth.WithAdmission(context.Background(), root),
-		sigil.Sent{"path": "/api/staands", "to": "PUBLIC_REGISTRATION"})
+		sigil.Sent{"path": "/api/datapunts", "to": "PUBLIC_REGISTRATION"})
 	require.NotNil(t, refusal)
 	assert.Equal(t, sigil.NotAllowed, refusal.GetWhy())
 	assert.Equal(t, "path", refusal.GetParam())
@@ -158,13 +158,13 @@ func TestAGrantToAnotherLevelIsRefused(t *testing.T) {
 	root.Identity = rootAccount
 
 	_, refusal := s.reachGrant(auth.WithAdmission(context.Background(), root),
-		sigil.Sent{"path": "/api/staands", "to": "SUPER"})
+		sigil.Sent{"path": "/api/datapunts", "to": "SUPER"})
 	require.NotNil(t, refusal)
 	assert.Equal(t, sigil.NotAllowed, refusal.GetWhy())
 	assert.Equal(t, "path", refusal.GetParam())
 
 	_, refusal = s.reachGrant(auth.WithAdmission(context.Background(), root),
-		sigil.Sent{"path": "/api/staands", "to": "ROOT"})
+		sigil.Sent{"path": "/api/datapunts", "to": "ROOT"})
 	require.NotNil(t, refusal)
 	assert.Equal(t, sigil.Invalid, refusal.GetWhy())
 	assert.Equal(t, "to", refusal.GetParam())
@@ -175,7 +175,7 @@ func TestOnlyRootGrants(t *testing.T) {
 	s := rootKnowingServer(t)
 
 	_, refusal := s.reachGrant(auth.WithAdmission(context.Background(), auth.Admitted(auth.LevelSuper, "garden")),
-		sigil.Sent{"path": "/api/staands", "to": "WORKER"})
+		sigil.Sent{"path": "/api/datapunts", "to": "WORKER"})
 	require.NotNil(t, refusal)
 	assert.Equal(t, sigil.NotAllowed, refusal.GetWhy())
 	assert.Contains(t, refusal.GetSays(), reach.Subject)

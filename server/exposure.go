@@ -50,7 +50,7 @@ var unsaidOnEveryNode = []string{
 	"server.rate_limit.write_rate", "server.rate_limit.write_burst",
 	"server.rate_limit.read_rate", "server.rate_limit.read_burst",
 	"server.rate_limit.public_rate", "server.rate_limit.public_burst",
-	"server.rate_limit.staand_rate", "server.rate_limit.staand_burst",
+	"server.rate_limit.datapunt_rate", "server.rate_limit.datapunt_burst",
 	"server.rate_limit.opened_rate", "server.rate_limit.opened_burst",
 	"llm.max_concurrent", "llm.max_calls_per_minute", "llm.max_queue_depth", "llm.cooldown_seconds",
 	"fetch.max_requests_per_window", "fetch.window_seconds",

@@ -160,7 +160,7 @@ func (s *QNTXServer) mailSent(_ context.Context, sent sigil.Sent) (any, *protoco
 	}
 
 	// One query per predicate: a store may read several in one filter as all
-	// of them rather than any (staand.go).
+	// of them rather than any (datapunt.go).
 	// Ordered by the time itself: the written time orders by whatever offset
 	// it carries.
 	type mail struct {

@@ -83,10 +83,10 @@ const (
 	// Woven is one per LLM call the node attested. It is the spend, counted.
 	Woven = "qntx.llm.woven"
 
-	// StaandArrivals is one per arrival a stand recorded (ADR-035), sliced by the
-	// stand. The event and the page are caller-controlled and unbounded, so they
-	// are not dimensions here — they live in the stand element's live fold instead.
-	StaandArrivals = "qntx.staand.arrivals"
+	// DatapuntArrivals is one per arrival a datapunt recorded (ADR-035), sliced by the
+	// datapunt. The event and the page are caller-controlled and unbounded, so they
+	// are not dimensions here — they live in the datapunt element's live fold instead.
+	DatapuntArrivals = "qntx.datapunt.arrivals"
 
 	// OpenedRefused is one per request a caller sent past the floor on a plugin
 	// path a line opened to strangers, sliced by the route. A flood is this
@@ -189,12 +189,12 @@ const (
 	// never an error string.
 	AttrOutcome = "outcome"
 
-	// AttrStand is which stand an arrival landed on: its key, market/slug. Bounded
-	// because ROOT names the stands.
-	AttrStand = "stand"
+	// AttrDatapunt is which datapunt an arrival landed on: its key, market/slug. Bounded
+	// because ROOT names the datapunts.
+	AttrDatapunt = "datapunt"
 
-	// AttrEvent is the stand event, staand:page_view and the like. The pixel side
-	// names it, so it is bounded not by nature but by the caller: only a stand's
+	// AttrEvent is the datapunt event, datapunt:page_view and the like. The pixel side
+	// names it, so it is bounded not by nature but by the caller: only a datapunt's
 	// first several distinct events keep their name, the rest fold to "other"
 	// before this is set (ADR-035), so an invented event cannot grow the series.
 	AttrEvent = "event"

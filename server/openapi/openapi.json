@@ -272,6 +272,30 @@
         "ROOT"
       ]
     },
+    "/api/datapunts": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/datapunts/activity": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/datapunts/metrics": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
+    "/api/datapunts/visits": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER"
+      ]
+    },
     "/api/debug": {
       "x-qntx-reach": [
         "ROOT"
@@ -577,30 +601,6 @@
     "/api/search/semantic": {
       "x-qntx-reach": [
         "ROOT"
-      ]
-    },
-    "/api/staands": {
-      "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
-      ]
-    },
-    "/api/staands/activity": {
-      "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
-      ]
-    },
-    "/api/staands/metrics": {
-      "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
-      ]
-    },
-    "/api/staands/visits": {
-      "x-qntx-reach": [
-        "ROOT",
-        "SUPER"
       ]
     },
     "/api/transcripts": {
@@ -910,6 +910,12 @@
       ],
       "x-qntx-prefix": true
     },
+    "/d/": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ],
+      "x-qntx-prefix": true
+    },
     "/g/": {
       "x-qntx-reach": [
         "ANYONE"
@@ -1017,12 +1023,6 @@
         "ROOT",
         "SUPER"
       ]
-    },
-    "/s/": {
-      "x-qntx-reach": [
-        "ANYONE"
-      ],
-      "x-qntx-prefix": true
     },
     "/setup": {
       "x-qntx-reach": [

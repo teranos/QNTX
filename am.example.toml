@@ -196,8 +196,8 @@ read_rate = 60       # GET per second
 read_burst = 120
 public_rate = 10     # /health, static per second
 public_burst = 20
-staand_rate = 20     # per staand, not per IP
-staand_burst = 40
+datapunt_rate = 20     # per datapunt, not per IP
+datapunt_burst = 40
 opened_rate = 1      # per caller per path a line opened to strangers
 opened_burst = 1
 

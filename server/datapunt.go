@@ -25,41 +25,45 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// A stand answers on /s/{market}/{slug} (ADR-035): a public pixel that records
+// A datapunt answers on /d/{market}/{slug} (ADR-035): a public pixel that records
 // one untrusted arrival per hit and returns a 1×1 GIF, so an <img> carries it
-// with no CORS, no preflight, no script. "stand" in the UI, staand in the code.
-const staandPathPrefix = "/s/"
+// with no CORS, no preflight, no script. "/d/ for datapixel".
+const datapuntPathPrefix = "/d/"
 
-// The stand's definition is an attestation written into system: trusted config,
-// not market data. The latest of created and deleted for a stand's key is the
+// The datapunt's definition is an attestation written into system: trusted config,
+// not market data. The latest of created and deleted for a datapunt's key is the
 // whole truth of whether it stands. Arrivals — untrusted public writes — land
 // in the market the definition names, never in system or default.
 const (
-	staandCreated = "staand:created"
-	staandDeleted = "staand:deleted"
-	staandSource  = "staand"
+	datapuntCreated = "datapunt:created"
+	datapuntDeleted = "datapunt:deleted"
+	datapuntSource  = "datapixel"
 )
 
-// staandPrefix fixes the vocabulary a stand may write. Every arrival's predicate
+// What a pixel writes is sourced datapixel, not datapunt: the datapunt plugin
+// writes its own statements in the same namespace, sourced datapunt, and a read
+// of arrivals is a read of one source.
+
+// datapuntPrefix fixes the vocabulary a datapunt may write. Every arrival's predicate
 // is this prefix plus an event the pixel side names in its snippet (ADR-035),
-// the way gtag('event', name, …) names an event. A stand writes nothing outside
+// the way gtag('event', name, …) names an event. A datapunt writes nothing outside
 // it. A bare hit is a page view, and page_view is Google's name for it,
 // mirrored rather than invented — a site that already fires gtag arrives here
 // speaking the word it already speaks.
 const (
-	staandPrefix  = "staand:"
-	staandEvent   = "e"
-	staandPage    = "page"
-	staandVisitor = "v"
-	staandVisit   = "visit"
-	staandRef     = "ref"
-	staandView    = "page_view"
+	datapuntPrefix  = "datapunt:"
+	datapuntEvent   = "e"
+	datapuntPage    = "page"
+	datapuntVisitor = "v"
+	datapuntVisit   = "visit"
+	datapuntRef     = "ref"
+	datapuntView    = "page_view"
 )
 
 // The campaign five, under the names every tool and every ad platform already
 // uses, so a link built for anything else arrives here already correct. They are
 // fields rather than parameters for that reason (ADR-036).
-var staandCampaign = []string{
+var datapuntCampaign = []string{
 	"utm_source",
 	"utm_medium",
 	"utm_campaign",
@@ -71,77 +75,77 @@ var staandCampaign = []string{
 // question people ask, and a whole URL answers it only after being split again
 // every time it is asked.
 const (
-	staandRefDomain = "referrer_domain"
-	staandRefPath   = "referrer_path"
+	datapuntRefDomain = "referrer_domain"
+	datapuntRefPath   = "referrer_path"
 )
 
-// A stand's definition carries no attributes: its key (market/slug) is the
+// A datapunt's definition carries no attributes: its key (market/slug) is the
 // subject, its creator is the actor, and its write-origin is inherited from the
-// namespace's front door (ADR-032), not stored on the stand.
+// namespace's front door (ADR-032), not stored on the datapunt.
 
-// staandSlugAttr carries the slug on every arrival, so arrivals attribute back
-// to the stand that recorded them. It is reserved: a pixel-side query parameter
+// datapuntSlugAttr carries the slug on every arrival, so arrivals attribute back
+// to the datapunt that recorded them. It is reserved: a pixel-side query parameter
 // of this name is dropped, never written, so attribution cannot be forged.
-const staandSlugAttr = "staand"
+const datapuntSlugAttr = "datapunt"
 
 // An arrival is a stranger's claim, so what it carries is capped rather than
 // trusted.
 const (
-	maxStaandSubject        = 128
-	maxStaandAttributes     = 8
-	maxStaandAttributeKey   = 32
-	maxStaandAttributeValue = 128
+	maxDatapuntSubject        = 128
+	maxDatapuntAttributes     = 8
+	maxDatapuntAttributeKey   = 32
+	maxDatapuntAttributeValue = 128
 )
 
 // The shortest thing the node will read as an id. Short enough that any minted
 // value clears it, long enough that a word somebody typed does not.
-const minStaandID = 8
+const minDatapuntID = 8
 
-// How much of a stand's life one read covers, and how many rows a breakdown
+// How much of a datapunt's life one read covers, and how many rows a breakdown
 // answers with when the caller names no limit.
 const (
-	maxStaandRead    = 5000
-	staandCountLimit = 100
+	maxDatapuntRead    = 5000
+	datapuntCountLimit = 100
 )
 
 // A 1×1 transparent GIF. Answering with an image is what lets an <img> carry
-// the stand with no CORS, no preflight and no script.
-var staandPixel = []byte{
+// the datapunt with no CORS, no preflight and no script.
+var datapuntPixel = []byte{
 	0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00,
 	0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
 	0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
 }
 
-// staandMarket reports whether a namespace may hold a stand's arrivals. Never
+// datapuntMarket reports whether a namespace may hold a datapunt's arrivals. Never
 // system or default: an arrival is an untrusted public write, and those two
 // namespaces hold the node's own records — users, tokens, grants (ADR-026).
 //
 // The rule lives in server/namespaces, which is where the store is handed out,
-// so a stand refused here is refused again at the door rather than only here.
-func staandMarket(namespace string) bool {
+// so a datapunt refused here is refused again at the door rather than only here.
+func datapuntMarket(namespace string) bool {
 	return namespaces.PublicMay(namespace)
 }
 
-// staandKey is a stand's identity in system: the market it feeds and its slug.
-// The definition is stored under this, so /s/{market}/{slug} resolves to one
+// datapuntKey is a datapunt's identity in system: the market it feeds and its slug.
+// The definition is stored under this, so /d/{market}/{slug} resolves to one
 // definition and two markets may share a slug without colliding.
-func staandKey(market, slug string) string {
+func datapuntKey(market, slug string) string {
 	return market + "/" + slug
 }
 
-// staandDrop counts one arrival refused by the per-stand rate limit, so the
+// datapuntDrop counts one arrival refused by the per-datapunt rate limit, so the
 // market view can show recorded against rate-limited (ADR-035).
-func (s *QNTXServer) staandDrop(key string) {
-	v, _ := s.staandDrops.LoadOrStore(key, new(atomic.Int64))
+func (s *QNTXServer) datapuntDrop(key string) {
+	v, _ := s.datapuntDrops.LoadOrStore(key, new(atomic.Int64))
 	if c, ok := v.(*atomic.Int64); ok {
 		c.Add(1)
 	}
 }
 
-// staandDropCount reads how many arrivals a stand has had refused by its budget.
-func (s *QNTXServer) staandDropCount(key string) int {
-	if v, ok := s.staandDrops.Load(key); ok {
+// datapuntDropCount reads how many arrivals a datapunt has had refused by its budget.
+func (s *QNTXServer) datapuntDropCount(key string) int {
+	if v, ok := s.datapuntDrops.Load(key); ok {
 		if c, ok := v.(*atomic.Int64); ok {
 			return int(c.Load())
 		}
@@ -149,54 +153,54 @@ func (s *QNTXServer) staandDropCount(key string) int {
 	return 0
 }
 
-// staandEventCap is how many distinct events one stand may name in the Sentry
+// datapuntEventCap is how many distinct events one datapunt may name in the Sentry
 // dimension before the rest fold to "other". The pixel side names events, so
 // this is what keeps a caller from inventing thousands of series.
-const staandEventCap = 20
+const datapuntEventCap = 20
 
-// staandEventSet is one stand's seen events, capped.
-type staandEventSet struct {
+// datapuntEventSet is one datapunt's seen events, capped.
+type datapuntEventSet struct {
 	mu   sync.Mutex
 	seen map[string]struct{}
 }
 
-func (e *staandEventSet) allow(event string) string {
+func (e *datapuntEventSet) allow(event string) string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if _, ok := e.seen[event]; ok {
 		return event
 	}
-	if len(e.seen) >= staandEventCap {
+	if len(e.seen) >= datapuntEventCap {
 		return "other"
 	}
 	e.seen[event] = struct{}{}
 	return event
 }
 
-// staandEventDim bounds the event dimension for Sentry: a stand's first
-// staandEventCap distinct events keep their name; past that, new ones fold into
+// datapuntEventDim bounds the event dimension for Sentry: a datapunt's first
+// datapuntEventCap distinct events keep their name; past that, new ones fold into
 // "other", so an invented event cannot explode the metric's cardinality.
-func (s *QNTXServer) staandEventDim(key, event string) string {
-	v, _ := s.staandEvents.LoadOrStore(key, &staandEventSet{seen: map[string]struct{}{}})
-	set, ok := v.(*staandEventSet)
+func (s *QNTXServer) datapuntEventDim(key, event string) string {
+	v, _ := s.datapuntEvents.LoadOrStore(key, &datapuntEventSet{seen: map[string]struct{}{}})
+	set, ok := v.(*datapuntEventSet)
 	if !ok {
 		return "other"
 	}
 	return set.allow(event)
 }
 
-// HandleStaand answers GET /s/{market}/{slug}. The market is where arrivals land
-// and the slug names the stand; together they resolve to the stand's defining
+// HandleDatapunt answers GET /d/{market}/{slug}. The market is where arrivals land
+// and the slug names the datapunt; together they resolve to the datapunt's defining
 // system attestation, which says whether it stands and the door it is bound to.
-func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
-	// The pixel goes out whatever happened: probing a stand teaches nothing.
+func (s *QNTXServer) HandleDatapunt(w http.ResponseWriter, r *http.Request) {
+	// The pixel goes out whatever happened: probing a datapunt teaches nothing.
 	defer func() {
 		w.Header().Set("Content-Type", "image/gif")
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusOK)
 		if r.Method == http.MethodGet {
-			if _, err := w.Write(staandPixel); err != nil {
-				s.logger.Errorw("could not write the stand pixel", "error", err)
+			if _, err := w.Write(datapuntPixel); err != nil {
+				s.logger.Errorw("could not write the datapunt pixel", "error", err)
 			}
 		}
 	}()
@@ -205,7 +209,7 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rest, ok := strings.CutPrefix(r.URL.Path, staandPathPrefix)
+	rest, ok := strings.CutPrefix(r.URL.Path, datapuntPathPrefix)
 	if !ok {
 		return
 	}
@@ -213,27 +217,28 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	if !ok || market == "" || slug == "" || strings.Contains(slug, "/") {
 		return
 	}
-	if !staandMarket(market) {
-		s.logger.Infow("Stand arrival refused",
+	if !datapuntMarket(market) {
+		s.logger.Infow("Datapunt arrival refused",
 			"market", market, "slug", slug,
-			"reason", "a stand market is never system or default")
+			"reason", "a datapunt market is never system or default")
 		return
 	}
 
-	if !s.staandStands(market, slug) {
-		s.logger.Infow("Stand arrival refused",
-			"market", market, "slug", slug, "reason", "no stand stands here",
+	pixel, stands := s.datapuntStands(market, slug)
+	if !stands {
+		s.logger.Infow("Datapunt arrival refused",
+			"market", market, "slug", slug, "reason", "no datapunt stands here",
 			"client", r.RemoteAddr)
 		return
 	}
 
-	// A budget per stand, keyed by its address, so one busy stand cannot spend
+	// A budget per datapunt, keyed by its address, so one busy datapunt cannot spend
 	// another's and a flood spends only its own. The pixel still goes out; the
 	// arrival is what a full bucket drops, and the drop is counted for the view.
-	key := staandKey(market, slug)
-	if s.rlStaand != nil && !s.rlStaand.allow(key) {
-		s.staandDrop(key)
-		s.logger.Infow("Stand arrival refused",
+	key := datapuntKey(market, slug)
+	if s.rlDatapunt != nil && !s.rlDatapunt.allow(key) {
+		s.datapuntDrop(key)
+		s.logger.Infow("Datapunt arrival refused",
 			"market", market, "slug", slug, "reason", "rate limit",
 			"client", r.RemoteAddr)
 		return
@@ -248,7 +253,7 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		// Refused from localhost is the site's own dev copy: noise. Any other
 		// host is someone else carrying the pixel, and that is said.
 		if host != "localhost" {
-			s.logger.Infow("Stand arrival refused",
+			s.logger.Infow("Datapunt arrival refused",
 				"market", market, "slug", slug, "reason", "origin not the namespace door",
 				"door", binding, "host", host, "client", r.RemoteAddr)
 		}
@@ -257,21 +262,38 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 
 	// Everything the hit says, read once into the shape ADR-036 fixed.
 	now := time.Now()
-	arrival := staandArrival(r, market, slug, now)
+	arrival := datapuntArrival(r, market, slug, now)
 
-	// The predicate is the stand vocabulary plus the event the pixel side named:
-	// ?e=contact_click records staand:contact_click. No event is a page view.
-	predicate := staandPredicate(arrival.Event)
+	// What the pixel holds, as its CUE declares it. A datapunt created before
+	// it named its pixel, or whose pixel cannot be asked, records nothing.
+	vocabulary, err := s.datapuntPixel(r.Context(), pixel)
+	if err != nil {
+		s.logger.Infow("Datapunt arrival refused",
+			"market", market, "slug", slug, "pixel", pixel, "reason", err.Error())
+		return
+	}
+	held, refused := datapuntHeld(vocabulary, arrival)
+
+	// The predicate is the datapunt vocabulary plus the event the pixel side named:
+	// ?e=contact_click records datapunt:contact_click. No event is a page view.
+	predicate := datapuntPredicate(arrival.Event)
 
 	// The subject is the thing the hit is about — the page — so the attestation
-	// reads aloud (CDR-010): "/deep-clean staand:page_view at golem.club by
-	// staand:boutique". The visitor id is an attribute, never the subject.
+	// reads aloud (CDR-010): "/deep-clean datapunt:page_view at golem.club by
+	// datapunt:boutique". The visitor id is an attribute, never the subject.
 	subject := arrival.Path
 
 	store, err := s.held.WriteAsPublic(market)
 	if err != nil {
-		s.logger.Errorw("Stand arrival lost: its market is not served",
+		s.logger.Errorw("Datapunt arrival lost: its market is not served",
 			"market", market, "slug", slug, "error", err)
+		return
+	}
+
+	// What the pixel would not hold is written down, as datapunt writes its own
+	// refusals, and an event it does not declare is not an arrival.
+	s.datapuntRefuse(store, vocabulary, slug, subject, refused)
+	if !held {
 		return
 	}
 
@@ -285,14 +307,14 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 	// The slug rides on the arrival (reserved key) so activity can attribute it;
 	// the visitor id rides as an attribute (v), there only to count, never the
 	// subject (CDR-010).
-	attrs := staandAttrs(arrival)
+	attrs := datapuntAttrs(arrival)
 
-	// The actor is the stand, forced here so the store cannot sign the arrival as
-	// whoever it is: the arrival is the stand's claim, recorded and untrusted.
-	actor := staandPrefix + slug
+	// The actor is the datapunt, forced here so the store cannot sign the arrival as
+	// whoever it is: the arrival is the datapunt's claim, recorded and untrusted.
+	actor := datapuntPrefix + slug
 	id, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, "_", store.AttestationExists)
 	if err != nil {
-		s.logger.Errorw("Stand arrival lost: no ASID for it",
+		s.logger.Errorw("Datapunt arrival lost: no ASID for it",
 			"market", market, "slug", slug, "subject", subject, "error", err)
 		return
 	}
@@ -302,84 +324,84 @@ func (s *QNTXServer) HandleStaand(w http.ResponseWriter, r *http.Request) {
 		Predicates: []string{predicate},
 		Contexts:   []string{context},
 		Actors:     []string{actor},
-		Source:     staandSource,
+		Source:     datapuntSource,
 		Timestamp:  now,
 		Attributes: attrs,
 		CreatedAt:  now,
 	}
 	if err := store.CreateAttestation(as); err != nil {
-		s.logger.Errorw("Stand arrival lost: the store did not take it",
+		s.logger.Errorw("Datapunt arrival lost: the store did not take it",
 			"market", market, "slug", slug, "subject", subject, "error", err)
 		return
 	}
-	// Sentry gets the counter, sliced by stand and by event (ADR-035). The event
+	// Sentry gets the counter, sliced by datapunt and by event (ADR-035). The event
 	// is caller-controlled, so it is bounded first: past a cap of distinct events
-	// per stand, the rest fold to "other". The page stays out — unbounded, in the
+	// per datapunt, the rest fold to "other". The page stays out — unbounded, in the
 	// element's fold instead.
-	measure.Count(measure.StaandArrivals, 1,
-		measure.String(measure.AttrStand, key),
-		measure.String(measure.AttrEvent, s.staandEventDim(key, predicate)))
+	measure.Count(measure.DatapuntArrivals, 1,
+		measure.String(measure.AttrDatapunt, key),
+		measure.String(measure.AttrEvent, s.datapuntEventDim(key, predicate)))
 	// The arrival is the attestation above and the count; the line is for
 	// whoever is at the machine.
-	s.logger.Debugw("Stand arrival recorded",
+	s.logger.Debugw("Datapunt arrival recorded",
 		"market", market, "slug", slug, "subject", subject, "predicate", predicate)
 }
 
-// staandArrival reads a hit into the shape ADR-036 fixed. It is the one place
-// the node decides what a request said, so what a stand can know is one struct
+// datapuntArrival reads a hit into the shape ADR-036 fixed. It is the one place
+// the node decides what a request said, so what a datapunt can know is one struct
 // to read rather than a handler to trace.
 //
 // The empty fields are the honest ones. Visit, the referrer split, the campaign
 // five, browser, operating system, device, screen, geo and language have no
 // source on this request yet; they are absent here, not hidden.
-func staandArrival(r *http.Request, market, slug string, at time.Time) *protocol.Arrival {
+func datapuntArrival(r *http.Request, market, slug string, at time.Time) *protocol.Arrival {
 	q := r.URL.Query()
 
-	event := staandEventName(q.Get(staandEvent))
+	event := datapuntEventName(q.Get(datapuntEvent))
 	if event == "" {
 		// Google calls a bare hit page_view, so a bare hit here is page_view.
 		// Borrowing the industry's word is not the node inventing one.
-		event = staandView
+		event = datapuntView
 	}
 
-	domain, path := staandReferrer(q.Get(staandRef))
+	domain, path := datapuntReferrer(q.Get(datapuntRef))
 
 	return &protocol.Arrival{
 		At:      at.Format(time.RFC3339Nano),
 		Market:  market,
 		Slug:    slug,
-		Visitor: staandID(q.Get(staandVisitor)),
-		Visit:   staandID(q.Get(staandVisit)),
-		Path:    standPage(q.Get(staandPage)),
+		Visitor: datapuntID(q.Get(datapuntVisitor)),
+		Visit:   datapuntID(q.Get(datapuntVisit)),
+		Path:    datapuntPagePath(q.Get(datapuntPage)),
 		Event:   event,
 
 		ReferrerDomain: domain,
 		ReferrerPath:   path,
 
-		UtmSource:   staandBounded(q.Get(staandCampaign[0])),
-		UtmMedium:   staandBounded(q.Get(staandCampaign[1])),
-		UtmCampaign: staandBounded(q.Get(staandCampaign[2])),
-		UtmContent:  staandBounded(q.Get(staandCampaign[3])),
-		UtmTerm:     staandBounded(q.Get(staandCampaign[4])),
+		UtmSource:   datapuntBounded(q.Get(datapuntCampaign[0])),
+		UtmMedium:   datapuntBounded(q.Get(datapuntCampaign[1])),
+		UtmCampaign: datapuntBounded(q.Get(datapuntCampaign[2])),
+		UtmContent:  datapuntBounded(q.Get(datapuntCampaign[3])),
+		UtmTerm:     datapuntBounded(q.Get(datapuntCampaign[4])),
 
-		Params: staandAttributes(q),
+		Params: datapuntAttributes(q),
 	}
 }
 
-// staandBounded is a stranger's value, kept only if it fits. Over the bound it
+// datapuntBounded is a stranger's value, kept only if it fits. Over the bound it
 // is nothing rather than a truncated something: half an id identifies nobody,
 // and half a campaign name is a campaign that was never run.
-func staandBounded(v string) string {
-	if len(v) > maxStaandAttributeValue {
+func datapuntBounded(v string) string {
+	if len(v) > maxDatapuntAttributeValue {
 		return ""
 	}
 	return v
 }
 
-// staandShared is what a site sends when it wanted an id and had none. A
+// datapuntShared is what a site sends when it wanted an id and had none. A
 // browser refusing storage cannot mint one, and the site that ships a fallback
 // ships the same fallback to everybody.
-var staandShared = []string{
+var datapuntShared = []string{
 	"anon",
 	"anonymous",
 	"none",
@@ -390,33 +412,33 @@ var staandShared = []string{
 	"-",
 }
 
-// staandID is an id the node is willing to believe identifies one browser.
+// datapuntID is an id the node is willing to believe identifies one browser.
 //
 // A shared sentinel is refused rather than stored: every arrival carrying it
 // folds into one visitor who never leaves and walks for months, and the node
 // cannot tell that from a real person afterwards. Empty is honest; "anon" is a
 // crowd wearing a name.
-func staandID(v string) string {
-	v = staandBounded(v)
+func datapuntID(v string) string {
+	v = datapuntBounded(v)
 	if v == "" {
 		return ""
 	}
-	if slices.Contains(staandShared, strings.ToLower(v)) {
+	if slices.Contains(datapuntShared, strings.ToLower(v)) {
 		return ""
 	}
 	// An id that cannot tell two browsers apart is not one. Anything a site
 	// mints for this — a UUID, a hash, a random string — clears this easily.
-	if len(v) < minStaandID {
+	if len(v) < minDatapuntID {
 		return ""
 	}
 	return v
 }
 
-// staandReferrer splits what the site says sent this person here. It is not the
+// datapuntReferrer splits what the site says sent this person here. It is not the
 // Referer header — on a pixel that names the page the img sits in, which is the
 // site's own page and already the arrival's context.
-func staandReferrer(raw string) (string, string) {
-	if raw == "" || len(raw) > maxStaandAttributeValue {
+func datapuntReferrer(raw string) (string, string) {
+	if raw == "" || len(raw) > maxDatapuntAttributeValue {
 		return "", ""
 	}
 	u, err := url.Parse(raw)
@@ -426,46 +448,55 @@ func staandReferrer(raw string) (string, string) {
 	return strings.ToLower(u.Hostname()), u.Path
 }
 
-// staandAttrs is what the record keeps beyond its subject, predicate, context
+// datapuntAttrs is what the record keeps beyond its subject, predicate, context
 // and actor. Empty means nil: a field the hit did not carry is absent from the
 // attestation rather than present and blank.
-func staandAttrs(a *protocol.Arrival) map[string]any {
+func datapuntAttrs(a *protocol.Arrival) map[string]any {
 	out := make(map[string]any, len(a.Params)+8)
 	for k, v := range a.Params {
 		out[k] = v
 	}
 	// The slug rides on every arrival (reserved key) so activity can attribute
-	// one back to the stand that recorded it.
-	out[staandSlugAttr] = a.Slug
+	// one back to the datapunt that recorded it.
+	out[datapuntSlugAttr] = a.Slug
 
 	keep := func(key, value string) {
 		if value != "" {
 			out[key] = value
 		}
 	}
-	keep(staandVisitor, a.Visitor)
-	keep(staandVisit, a.Visit)
-	keep(staandRefDomain, a.ReferrerDomain)
-	keep(staandRefPath, a.ReferrerPath)
-	keep(staandCampaign[0], a.UtmSource)
-	keep(staandCampaign[1], a.UtmMedium)
-	keep(staandCampaign[2], a.UtmCampaign)
-	keep(staandCampaign[3], a.UtmContent)
-	keep(staandCampaign[4], a.UtmTerm)
+	keep(datapuntVisitor, a.Visitor)
+	keep(datapuntVisit, a.Visit)
+	keep(datapuntRefDomain, a.ReferrerDomain)
+	keep(datapuntRefPath, a.ReferrerPath)
+	keep(datapuntCampaign[0], a.UtmSource)
+	keep(datapuntCampaign[1], a.UtmMedium)
+	keep(datapuntCampaign[2], a.UtmCampaign)
+	keep(datapuntCampaign[3], a.UtmContent)
+	keep(datapuntCampaign[4], a.UtmTerm)
 	return out
 }
 
-// staandPredicate is the stand vocabulary plus the event, which staandArrival
-// has already sanitised and defaulted. A stand writes nothing outside it.
-func staandPredicate(event string) string {
-	return staandPrefix + event
+// datapuntPredicate is the datapunt vocabulary plus the event, which datapuntArrival
+// has already sanitised and defaulted. A datapunt writes nothing outside it.
+func datapuntPredicate(event string) string {
+	return datapuntPrefix + event
 }
 
-// staandEventName is the event the pixel side named, sanitised to the vocabulary
+// datapuntEventName is the event the pixel side named, sanitised to the vocabulary
 // tail: letters, digits and -_. only (so page_view, contact_click pass), capped.
 // Empty when unusable.
-func staandEventName(local string) string {
-	if local == "" || len(local) > maxStaandSubject {
+// datapuntReservedEvents are the events no snippet may name: what datapunt itself
+// says of a kind, and what a definition says of a datapunt.
+var datapuntReservedEvents = []string{"observed", "refused", "wanted", "created", "deleted"}
+
+func datapuntEventName(local string) string {
+	if local == "" || len(local) > maxDatapuntSubject {
+		return ""
+	}
+	// The datapunt plugin's own statements and a datapunt's definition share
+	// the vocabulary, so a snippet may not name them (datapunt's #Event).
+	if slices.Contains(datapuntReservedEvents, local) {
 		return ""
 	}
 	for _, r := range local {
@@ -477,13 +508,13 @@ func staandEventName(local string) string {
 	return local
 }
 
-// standPage is the page the hit is about — the arrival's subject (CDR-010). It is
+// datapuntPagePath is the page the hit is about — the arrival's subject (CDR-010). It is
 // the caller's page path, trimmed, control-stripped and capped; empty falls back
 // to "/". A stranger controls it, so it is bounded, not trusted.
-func standPage(raw string) string {
+func datapuntPagePath(raw string) string {
 	raw = strings.TrimSpace(raw)
-	if len(raw) > maxStaandSubject {
-		raw = raw[:maxStaandSubject]
+	if len(raw) > maxDatapuntSubject {
+		raw = raw[:maxDatapuntSubject]
 	}
 	var b strings.Builder
 	for _, r := range raw {
@@ -507,32 +538,35 @@ func attrString(attrs map[string]any, key string) string {
 	return ""
 }
 
-// staandStands reports whether a stand stands. The definition is a system
-// attestation; the latest of the stand's created and deleted lines is the whole
+// datapuntStands reports whether a datapunt stands, and the pixel it is. The definition is a system
+// attestation; the latest of the datapunt's created and deleted lines is the whole
 // truth. A create that nothing has deleted since is live.
-func (s *QNTXServer) staandStands(market, slug string) bool {
-	if !staandMarket(market) {
-		return false
+func (s *QNTXServer) datapuntStands(market, slug string) (string, bool) {
+	if !datapuntMarket(market) {
+		return "", false
 	}
 	sys, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
-		return false
+		return "", false
 	}
-	key := staandKey(market, slug)
+	key := datapuntKey(market, slug)
 	// Query by the key alone and settle create against delete here: a store's
 	// filter may AND several predicates rather than OR them, so asking for both
 	// at once can match neither.
 	found, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{key}, Limit: 200})
 	if err != nil {
-		return false
+		return "", false
 	}
 	latest := latestDefinition(found)
-	return latest != nil && slices.Contains(latest.Predicates, staandCreated)
+	if latest == nil || !slices.Contains(latest.Predicates, datapuntCreated) {
+		return "", false
+	}
+	return attrString(latest.Attributes, datapuntPixelAttr), true
 }
 
-// namespaceDoorBinding is the write-origin a stand inherits: the hosts of its
+// namespaceDoorBinding is the write-origin a datapunt inherits: the hosts of its
 // namespace's front door (ADR-032). A namespace with no door binds nothing, so
-// the stand is open. The door's origins are full URLs; the binding is their
+// the datapunt is open. The door's origins are full URLs; the binding is their
 // hosts, space-joined, which originAllowed matches an arrival's host against.
 func (s *QNTXServer) namespaceDoorBinding(market string) string {
 	if s.deps == nil || s.deps.cfg == nil {
@@ -555,7 +589,7 @@ func (s *QNTXServer) namespaceDoorBinding(market string) string {
 func latestDefinition(found []*types.As) *types.As {
 	var latest *types.As
 	for _, as := range found {
-		if !slices.Contains(as.Predicates, staandCreated) && !slices.Contains(as.Predicates, staandDeleted) {
+		if !slices.Contains(as.Predicates, datapuntCreated) && !slices.Contains(as.Predicates, datapuntDeleted) {
 			continue
 		}
 		if latest == nil || as.Timestamp.After(latest.Timestamp) {
@@ -579,7 +613,7 @@ func originHost(referer string) string {
 	return strings.ToLower(u.Hostname())
 }
 
-// originAllowed reports whether an arrival from host may write to a stand bound
+// originAllowed reports whether an arrival from host may write to a datapunt bound
 // to origin. Empty binding is open; a present host must equal a bound host or be
 // its subdomain; a missing host (no Referer) is allowed (ADR-035) — refusing it
 // would shut out PDFs and other clients that carry no origin.
@@ -603,7 +637,7 @@ func originAllowed(origin, host string) bool {
 // seenOf is each name and when it was seen, the most recently seen first, the
 // first limit of them. Last seen and not most seen: a name that has not been
 // seen since last spring does not lead a list because it was seen often then.
-func seenOf(m map[string][]time.Time, limit int) []*protocol.StaandSeen {
+func seenOf(m map[string][]time.Time, limit int) []*protocol.DatapuntSeen {
 	type named struct {
 		name string
 		at   []time.Time
@@ -628,25 +662,25 @@ func seenOf(m map[string][]time.Time, limit int) []*protocol.StaandSeen {
 	if limit > 0 && len(all) > limit {
 		all = all[:limit]
 	}
-	out := make([]*protocol.StaandSeen, 0, len(all))
+	out := make([]*protocol.DatapuntSeen, 0, len(all))
 	for _, n := range all {
 		seen := make([]float64, 0, len(n.at))
 		for _, t := range n.at {
 			seen = append(seen, float64(t.UnixMilli()))
 		}
-		out = append(out, &protocol.StaandSeen{Name: n.name, Seen: seen})
+		out = append(out, &protocol.DatapuntSeen{Name: n.name, Seen: seen})
 	}
 	return out
 }
 
-// staandStep is one arrival read as a step, as it is read: what is answered is
-// protocol.StaandStep.
+// datapuntStep is one arrival read as a step, as it is read: what is answered is
+// protocol.DatapuntStep.
 //
 // when is the time itself and never leaves; At is what the view reads. Sorting
 // the formatted string instead looks right and is not: Format writes whatever
 // offset the store's time carries, so a tree of Z and +02:00 stamps orders by
 // the digits of the hour and puts the walk in an order nobody walked.
-type staandStep struct {
+type datapuntStep struct {
 	At    string
 	Page  string
 	Event string
@@ -655,12 +689,12 @@ type staandStep struct {
 }
 
 // walksOf turns the per-visitor steps into walks, most recently seen first, so
-// whoever was here last is read first. Every walk, every step: what a stand
+// whoever was here last is read first. Every walk, every step: what a datapunt
 // recorded is what the view is given.
-func walksOf(m map[string][]staandStep) []*protocol.StaandWalk {
+func walksOf(m map[string][]datapuntStep) []*protocol.DatapuntWalk {
 	type walk struct {
 		who   string
-		steps []staandStep
+		steps []datapuntStep
 	}
 	walks := make([]walk, 0, len(m))
 	for who, steps := range m {
@@ -677,22 +711,22 @@ func walksOf(m map[string][]staandStep) []*protocol.StaandWalk {
 		}
 		return walks[i].who < walks[j].who
 	})
-	out := make([]*protocol.StaandWalk, 0, len(walks))
+	out := make([]*protocol.DatapuntWalk, 0, len(walks))
 	for _, w := range walks {
-		steps := make([]*protocol.StaandStep, 0, len(w.steps))
+		steps := make([]*protocol.DatapuntStep, 0, len(w.steps))
 		for _, step := range w.steps {
-			steps = append(steps, &protocol.StaandStep{At: step.At, Page: step.Page, Event: step.Event})
+			steps = append(steps, &protocol.DatapuntStep{At: step.At, Page: step.Page, Event: step.Event})
 		}
-		out = append(out, &protocol.StaandWalk{Who: w.who, Steps: steps})
+		out = append(out, &protocol.DatapuntWalk{Who: w.who, Steps: steps})
 	}
 	return out
 }
 
 // topCounts turns a count map into a list, most first, ties by name, capped.
-func topCounts(m map[string]int, limit int) []*protocol.StaandCount {
-	out := make([]*protocol.StaandCount, 0, len(m))
+func topCounts(m map[string]int, limit int) []*protocol.DatapuntCount {
+	out := make([]*protocol.DatapuntCount, 0, len(m))
 	for name, c := range m {
-		out = append(out, &protocol.StaandCount{Name: name, Count: uint32(c)})
+		out = append(out, &protocol.DatapuntCount{Name: name, Count: uint32(c)})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].GetCount() != out[j].GetCount() {
@@ -706,70 +740,76 @@ func topCounts(m map[string]int, limit int) []*protocol.StaandCount {
 	return out
 }
 
-// The functions below answer the staands signum (staand_sigils.go). Each is
+// The functions below answer the datapunts signum (datapunt_sigils.go). Each is
 // handed who is asking and what they sent, and gives back the answer or a
 // refusal (ADR-039). What is required and what a param takes is the sigil's to
 // refuse, before any of these is asked.
 
-// staandsList is every stand across all markets, with what arrived at each.
-func (s *QNTXServer) staandsList(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+// datapuntsList is every datapunt across all markets, with what arrived at each.
+func (s *QNTXServer) datapuntsList(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	// The window the activity covers, in AX's own words. Naming none is a
-	// stand's whole life, which is what this answered before it could be asked.
-	since, until, refusal := staandRange(sent)
+	// datapunt's whole life, which is what this answered before it could be asked.
+	since, until, refusal := datapuntRange(sent)
 	if refusal != nil {
 		return nil, refusal
 	}
-	live, err := s.liveStaands(since, until)
+	live, err := s.liveDatapunts(since, until)
 	if err != nil {
-		s.logger.Errorw("could not list the stands", "error", err)
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "cannot list the stands: " + err.Error()}
+		s.logger.Errorw("could not list the datapunts", "error", err)
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "cannot list the datapunts: " + err.Error()}
 	}
-	return &protocol.Staands{Staands: live}, nil
+	return &protocol.Datapunts{Datapunts: live}, nil
 }
 
-// staandsCreate writes the defining attestation for a new stand into system.
+// datapuntsCreate writes the defining attestation for a new datapunt into system.
 // The namespace it feeds is named and is never system or default. The
 // definition carries no attributes: the write-origin is the namespace's door.
-func (s *QNTXServer) staandsCreate(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (s *QNTXServer) datapuntsCreate(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug := sent["market"], sent["slug"]
-	if !staandMarket(market) {
+	if !datapuntMarket(market) {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "market",
-			Says: "a stand namespace is never system or default"}
+			Says: "a datapunt namespace is never system or default"}
 	}
 	if strings.Contains(slug, "/") {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "slug",
-			Says: "a stand needs a slug with no slash"}
+			Says: "a datapunt needs a slug with no slash"}
 	}
-	if err := s.writeStaandDef(ctx, market, slug, staandCreated, nil); err != nil {
-		s.logger.Errorw("could not create a stand", "market", market, "slug", slug, "error", err)
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not create the stand in " + market + ": " + err.Error()}
+	// One web analytics pixel is one datapunt: it is created as a pixel its
+	// CUE declares, and only one that is declared.
+	pixel := sent["pixel"]
+	if _, err := s.datapuntPixel(ctx, pixel); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "pixel", Says: err.Error()}
 	}
-	return &protocol.StaandCreated{Slug: slug, Url: staandPathPrefix + market + "/" + slug}, nil
+	if err := s.writeDatapuntDef(ctx, market, slug, datapuntCreated, map[string]any{datapuntPixelAttr: pixel}); err != nil {
+		s.logger.Errorw("could not create a datapunt", "market", market, "slug", slug, "error", err)
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not create the datapunt in " + market + ": " + err.Error()}
+	}
+	return &protocol.DatapuntCreated{Slug: slug, Url: datapuntPathPrefix + market + "/" + slug, Pixel: pixel}, nil
 }
 
-// staandsTakeDown supersedes a stand with a deleted line, so its pixel stops
+// datapuntsTakeDown supersedes a datapunt with a deleted line, so its pixel stops
 // recording. Both lines stay (ADR-026).
-func (s *QNTXServer) staandsTakeDown(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (s *QNTXServer) datapuntsTakeDown(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug := sent["market"], sent["slug"]
-	if !staandMarket(market) {
+	if !datapuntMarket(market) {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "market",
-			Says: "a stand market is never system or default"}
+			Says: "a datapunt market is never system or default"}
 	}
-	if err := s.writeStaandDef(ctx, market, slug, staandDeleted, nil); err != nil {
-		s.logger.Errorw("could not remove a stand", "market", market, "slug", slug, "error", err)
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not remove the stand in " + market + ": " + err.Error()}
+	if err := s.writeDatapuntDef(ctx, market, slug, datapuntDeleted, nil); err != nil {
+		s.logger.Errorw("could not remove a datapunt", "market", market, "slug", slug, "error", err)
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "could not remove the datapunt in " + market + ": " + err.Error()}
 	}
-	return &protocol.StaandTakenDown{Slug: slug, Status: "removed"}, nil
+	return &protocol.DatapuntTakenDown{Slug: slug, Status: "removed"}, nil
 }
 
-// writeStaandDef writes a created or deleted line for a stand into system,
-// attributed to the identity that asked. The subject is the stand's key, so
-// /s/{market}/{slug} resolves to it.
+// writeDatapuntDef writes a created or deleted line for a datapunt into system,
+// attributed to the identity that asked. The subject is the datapunt's key, so
+// /d/{market}/{slug} resolves to it.
 //
 // A definition is trusted config rather than an arrival, so it is one of the
 // lines the node keeps about itself and lands in system, never in the market
 // its arrivals go to.
-func (s *QNTXServer) writeStaandDef(ctx context.Context, market, slug, predicate string, attrs map[string]any) error {
+func (s *QNTXServer) writeDatapuntDef(ctx context.Context, market, slug, predicate string, attrs map[string]any) error {
 	sys, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
 		return err
@@ -778,7 +818,7 @@ func (s *QNTXServer) writeStaandDef(ctx context.Context, market, slug, predicate
 	if admitted, ok := auth.AdmissionFrom(ctx); ok && admitted.Identity != "" {
 		actor = admitted.Identity
 	}
-	key := staandKey(market, slug)
+	key := datapuntKey(market, slug)
 	id, err := identity.GenerateASUIDWithRetry("AS", key, predicate, auth.NamespaceSystem, sys.AttestationExists)
 	if err != nil {
 		return err
@@ -790,18 +830,18 @@ func (s *QNTXServer) writeStaandDef(ctx context.Context, market, slug, predicate
 		Predicates: []string{predicate},
 		Contexts:   []string{auth.NamespaceSystem},
 		Actors:     []string{actor},
-		Source:     staandSource,
+		Source:     datapuntSource,
 		Timestamp:  now,
 		Attributes: attrs,
 		CreatedAt:  now,
 	})
 }
 
-// liveStaands is every stand that stands now, across all markets. The
-// definitions are read from system, the latest line per stand decides, and a
-// stand whose latest is a delete is left out. Each live stand is then filled
+// liveDatapunts is every datapunt that stands now, across all markets. The
+// definitions are read from system, the latest line per datapunt decides, and a
+// datapunt whose latest is a delete is left out. Each live datapunt is then filled
 // with the activity read from the market it feeds.
-func (s *QNTXServer) liveStaands(since, until types.TimeBound) ([]*protocol.Staand, error) {
+func (s *QNTXServer) liveDatapunts(since, until types.TimeBound) ([]*protocol.Datapunt, error) {
 	sys, err := s.held.Read(auth.NamespaceSystem)
 	if err != nil {
 		return nil, err
@@ -809,11 +849,11 @@ func (s *QNTXServer) liveStaands(since, until types.TimeBound) ([]*protocol.Staa
 
 	// Two single-predicate queries rather than one naming both, because a store
 	// may AND the predicates of a filter rather than OR them.
-	created, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{staandCreated}, Limit: 1000})
+	created, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{datapuntCreated}, Limit: 1000})
 	if err != nil {
 		return nil, err
 	}
-	deleted, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{staandDeleted}, Limit: 1000})
+	deleted, err := sys.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{datapuntDeleted}, Limit: 1000})
 	if err != nil {
 		return nil, err
 	}
@@ -835,38 +875,39 @@ func (s *QNTXServer) liveStaands(since, until types.TimeBound) ([]*protocol.Staa
 		keep(as)
 	}
 
-	// Activity is read from each market once, not once per stand.
-	activity := map[string]map[string]*staandTally{}
+	// Activity is read from each market once, not once per datapunt.
+	activity := map[string]map[string]*datapuntTally{}
 
-	var live []*protocol.Staand
+	var live []*protocol.Datapunt
 	for key, as := range latest {
-		if !slices.Contains(as.Predicates, staandCreated) {
+		if !slices.Contains(as.Predicates, datapuntCreated) {
 			continue
 		}
 		market, slug, ok := strings.Cut(key, "/")
-		if !ok || !staandMarket(market) {
+		if !ok || !datapuntMarket(market) {
 			continue
 		}
 		creator := ""
 		if len(as.Actors) > 0 {
 			creator = as.Actors[0]
 		}
-		info := &protocol.Staand{
+		info := &protocol.Datapunt{
 			Slug:    slug,
 			Market:  market,
-			Url:     staandPathPrefix + market + "/" + slug,
+			Url:     datapuntPathPrefix + market + "/" + slug,
 			Origin:  s.namespaceDoorBinding(market),
 			Creator: creator,
 			DefId:   as.ID,
+			Pixel:   attrString(as.Attributes, datapuntPixelAttr),
 			Created: as.Timestamp.Format(time.RFC3339),
 			Sites:   []string{},
-			Dropped: uint32(s.staandDropCount(key)),
-			Events:  []*protocol.StaandSeen{},
-			Pages:   []*protocol.StaandSeen{},
-			Walks:   []*protocol.StaandWalk{},
+			Dropped: uint32(s.datapuntDropCount(key)),
+			Events:  []*protocol.DatapuntSeen{},
+			Pages:   []*protocol.DatapuntSeen{},
+			Walks:   []*protocol.DatapuntWalk{},
 		}
 		if _, done := activity[market]; !done {
-			activity[market] = s.staandActivity(market, since, until)
+			activity[market] = s.datapuntActivity(market, since, until)
 		}
 		if t, seen := activity[market][slug]; seen {
 			info.Arrivals = uint32(t.count)
@@ -890,9 +931,9 @@ func (s *QNTXServer) liveStaands(since, until types.TimeBound) ([]*protocol.Staa
 	return live, nil
 }
 
-// staandDimension is what a breakdown groups by. Umami calls this `type` and
+// datapuntDimension is what a breakdown groups by. Umami calls this `type` and
 // its list is its own column names; ours are an arrival's fields (ADR-036), so
-// nothing translates between what a stand records and what may be asked of it.
+// nothing translates between what a datapunt records and what may be asked of it.
 const (
 	dimPage     = "page"
 	dimEvent    = "event"
@@ -902,10 +943,10 @@ const (
 	dimVisit    = "visit"
 )
 
-// staandDimensionOf reads one arrival's value for a dimension, or the empty
+// datapuntDimensionOf reads one arrival's value for a dimension, or the empty
 // string when that arrival does not carry it. An arrival missing the dimension
 // is not a row: it is a hit that did not answer this question.
-func staandDimensionOf(as *types.As, dim string) string {
+func datapuntDimensionOf(as *types.As, dim string) string {
 	switch dim {
 	case dimPage:
 		if len(as.Subjects) > 0 {
@@ -923,36 +964,36 @@ func staandDimensionOf(as *types.As, dim string) string {
 		}
 		return ""
 	case dimReferrer:
-		return attrString(as.Attributes, staandRefDomain)
+		return attrString(as.Attributes, datapuntRefDomain)
 	case dimVisitor:
-		return attrString(as.Attributes, staandVisitor)
+		return attrString(as.Attributes, datapuntVisitor)
 	case dimVisit:
-		return attrString(as.Attributes, staandVisit)
+		return attrString(as.Attributes, datapuntVisit)
 	}
 	// The campaign five answer under their own names, the ones every tool uses.
-	if slices.Contains(staandCampaign, dim) {
+	if slices.Contains(datapuntCampaign, dim) {
 		return attrString(as.Attributes, dim)
 	}
 	return ""
 }
 
-// staandKnownDimension reports whether a dimension is one a stand can answer.
+// datapuntKnownDimension reports whether a dimension is one a datapunt can answer.
 // An unknown one is refused rather than answered with nothing, so a caller's
-// typo does not read as a stand that saw no traffic.
-func staandKnownDimension(dim string) bool {
-	return slices.Contains(staandDimensions(), dim)
+// typo does not read as a datapunt that saw no traffic.
+func datapuntKnownDimension(dim string) bool {
+	return slices.Contains(datapuntDimensions(), dim)
 }
 
-// staandDimensions is every dimension a stand answers by. The one list: what a
+// datapuntDimensions is every dimension a datapunt answers by. The one list: what a
 // breakdown accepts and what its sigil says it takes are both read from here.
-func staandDimensions() []string {
-	return append([]string{dimPage, dimEvent, dimSite, dimReferrer, dimVisitor, dimVisit}, staandCampaign...)
+func datapuntDimensions() []string {
+	return append([]string{dimPage, dimEvent, dimSite, dimReferrer, dimVisitor, dimVisit}, datapuntCampaign...)
 }
 
-// staandRange is the window a read covers, in AX's own words: since and until
+// datapuntRange is the window a read covers, in AX's own words: since and until
 // take `yesterday`, `last monday` or an ISO stamp alike (ADR-036). Absent is
-// unbounded, which is what a stand's whole life is.
-func staandRange(sent sigil.Sent) (types.TimeBound, types.TimeBound, *protocol.Refusal) {
+// unbounded, which is what a datapunt's whole life is.
+func datapuntRange(sent sigil.Sent) (types.TimeBound, types.TimeBound, *protocol.Refusal) {
 	since, until := types.Unbounded(), types.Unbounded()
 	if v := sent["since"]; v != "" {
 		t, err := parser.ParseTemporalExpression(v)
@@ -973,26 +1014,26 @@ func staandRange(sent sigil.Sent) (types.TimeBound, types.TimeBound, *protocol.R
 	return since, until, nil
 }
 
-// staandsMetrics is one stand's arrivals grouped by one dimension, most first.
+// datapuntsMetrics is one datapunt's arrivals grouped by one dimension, most first.
 // One sigil taking a dimension rather than a sigil per question. That market,
-// slug and type were sent, and that type is one a stand answers by, is the
+// slug and type were sent, and that type is one a datapunt answers by, is the
 // sigil's to refuse before this is asked.
-func (s *QNTXServer) staandsMetrics(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (s *QNTXServer) datapuntsMetrics(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug, dim := sent["market"], sent["slug"], sent["type"]
-	since, until, refusal := staandRange(sent)
+	since, until, refusal := datapuntRange(sent)
 	if refusal != nil {
 		return nil, refusal
 	}
 	// That limit is a count is the sigil's to refuse (sigil.Count), so what
 	// arrives here reads.
-	limit := staandCountLimit
+	limit := datapuntCountLimit
 	if v := sent["limit"]; v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			limit = n
 		}
 	}
 
-	arrivals, refusal := s.staandArrivals("a breakdown", market, slug, since, until)
+	arrivals, refusal := s.datapuntArrivals("a breakdown", market, slug, since, until)
 	if refusal != nil {
 		return nil, refusal
 	}
@@ -1000,29 +1041,29 @@ func (s *QNTXServer) staandsMetrics(_ context.Context, sent sigil.Sent) (any, *p
 	// A campaign is counted by the pages it brought, as Umami counts it
 	// (getUTM: eventType pageView): a click on the page it landed on is not
 	// another arrival from the campaign.
-	viewsOnly := slices.Contains(staandCampaign, dim)
+	viewsOnly := slices.Contains(datapuntCampaign, dim)
 
 	counts := map[string]int{}
 	for _, as := range arrivals {
-		if attrString(as.Attributes, staandSlugAttr) != slug {
+		if attrString(as.Attributes, datapuntSlugAttr) != slug {
 			continue
 		}
-		if viewsOnly && staandDimensionOf(as, dimEvent) != staandPredicate(staandView) {
+		if viewsOnly && datapuntDimensionOf(as, dimEvent) != datapuntPredicate(datapuntView) {
 			continue
 		}
-		if v := staandDimensionOf(as, dim); v != "" {
+		if v := datapuntDimensionOf(as, dim); v != "" {
 			counts[v]++
 		}
 	}
-	return &protocol.StaandMetrics{Market: market, Slug: slug, Type: string(dim), Counts: topCounts(counts, limit)}, nil
+	return &protocol.DatapuntMetrics{Market: market, Slug: slug, Type: string(dim), Counts: topCounts(counts, limit)}, nil
 }
 
-// staandArrivals is what arrived in one market inside a window, read for the
-// three sigils that read one stand. A market the node does not serve is not
+// datapuntArrivals is what arrived in one market inside a window, read for the
+// three sigils that read one datapunt. A market the node does not serve is not
 // found, and a store that does not answer is the node's own failure: what went
 // wrong goes to the log with what was being read, and the caller is told only
 // that it did.
-func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until types.TimeBound) ([]*types.As, *protocol.Refusal) {
+func (s *QNTXServer) datapuntArrivals(reading, market, slug string, since, until types.TimeBound) ([]*types.As, *protocol.Refusal) {
 	store, err := s.held.Read(market)
 	if err != nil {
 		s.logger.Errorw("could not open a market for "+reading,
@@ -1031,10 +1072,10 @@ func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until t
 			Says: "no market " + market + " is served here"}
 	}
 	arrivals, err := store.GetAttestations(ats.AttestationFilter{
-		Source:    staandSource,
+		Source:    datapuntSource,
 		TimeStart: since,
 		TimeEnd:   until,
-		Limit:     maxStaandRead,
+		Limit:     maxDatapuntRead,
 	})
 	if err != nil {
 		s.logger.Errorw("could not read arrivals for "+reading,
@@ -1044,20 +1085,20 @@ func (s *QNTXServer) staandArrivals(reading, market, slug string, since, until t
 	return arrivals, nil
 }
 
-// staandVisits derives one sitting per visit id. Nothing writes a Visit — the
+// datapuntVisits derives one sitting per visit id. Nothing writes a Visit — the
 // arrivals stay the record and this is a projection over them, the same way
 // Plausible maintains sessions as a view over its event table (ADR-036).
 //
 // An arrival carrying no visit id belongs to no visit. Falling back to the
 // visitor would turn a person's whole life into one sitting and call it a
 // measurement, which is worse than answering with nothing.
-func staandVisits(arrivals []*types.As, market, slug string) []*protocol.Visit {
+func datapuntVisits(arrivals []*types.As, market, slug string) []*protocol.Visit {
 	grouped := map[string][]*types.As{}
 	for _, as := range arrivals {
-		if attrString(as.Attributes, staandSlugAttr) != slug {
+		if attrString(as.Attributes, datapuntSlugAttr) != slug {
 			continue
 		}
-		if id := attrString(as.Attributes, staandVisit); id != "" {
+		if id := attrString(as.Attributes, datapuntVisit); id != "" {
 			grouped[id] = append(grouped[id], as)
 		}
 	}
@@ -1076,13 +1117,13 @@ func staandVisits(arrivals []*types.As, market, slug string) []*protocol.Visit {
 
 		views := 0
 		for _, as := range steps {
-			if len(as.Predicates) > 0 && as.Predicates[0] == staandPrefix+staandView {
+			if len(as.Predicates) > 0 && as.Predicates[0] == datapuntPrefix+datapuntView {
 				views++
 			}
 		}
 		sittings = append(sittings, sitting{began: first.Timestamp, visit: &protocol.Visit{
 			Visit:           id,
-			Visitor:         attrString(first.Attributes, staandVisitor),
+			Visitor:         attrString(first.Attributes, datapuntVisitor),
 			Market:          market,
 			Slug:            slug,
 			Started:         first.Timestamp.Format(time.RFC3339),
@@ -1115,7 +1156,7 @@ func staandVisits(arrivals []*types.As, market, slug string) []*protocol.Visit {
 // anything sent a visit id, and one line for that browser is all the record
 // supports. Every arrival from a snippet that sends `visit` splits properly.
 func walkKey(as *types.As, visitor string) string {
-	if visit := attrString(as.Attributes, staandVisit); visit != "" {
+	if visit := attrString(as.Attributes, datapuntVisit); visit != "" {
 		return visit
 	}
 	return visitor
@@ -1129,34 +1170,34 @@ func subjectOf(as *types.As) string {
 	return ""
 }
 
-// staandActivityCap is how many rows one activity read answers with. Umami's
+// datapuntActivityCap is how many rows one activity read answers with. Umami's
 // session activity stops at 500 and so does this.
-const staandActivityCap = 500
+const datapuntActivityCap = 500
 
-// staandsActivity is what happened, in order, as rows. Naming a visit is one
-// sitting; naming a visitor is that person; naming neither is the stand.
-func (s *QNTXServer) staandsActivity(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+// datapuntsActivity is what happened, in order, as rows. Naming a visit is one
+// sitting; naming a visitor is that person; naming neither is the datapunt.
+func (s *QNTXServer) datapuntsActivity(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug := sent["market"], sent["slug"]
-	since, until, refusal := staandRange(sent)
+	since, until, refusal := datapuntRange(sent)
 	if refusal != nil {
 		return nil, refusal
 	}
 	wantVisit, wantVisitor := sent["visit"], sent["visitor"]
 
-	arrivals, refusal := s.staandArrivals("activity", market, slug, since, until)
+	arrivals, refusal := s.datapuntArrivals("activity", market, slug, since, until)
 	if refusal != nil {
 		return nil, refusal
 	}
 
 	kept := make([]*types.As, 0, len(arrivals))
 	for _, as := range arrivals {
-		if attrString(as.Attributes, staandSlugAttr) != slug {
+		if attrString(as.Attributes, datapuntSlugAttr) != slug {
 			continue
 		}
-		if wantVisit != "" && attrString(as.Attributes, staandVisit) != wantVisit {
+		if wantVisit != "" && attrString(as.Attributes, datapuntVisit) != wantVisit {
 			continue
 		}
-		if wantVisitor != "" && attrString(as.Attributes, staandVisitor) != wantVisitor {
+		if wantVisitor != "" && attrString(as.Attributes, datapuntVisitor) != wantVisitor {
 			continue
 		}
 		kept = append(kept, as)
@@ -1164,64 +1205,64 @@ func (s *QNTXServer) staandsActivity(_ context.Context, sent sigil.Sent) (any, *
 	// Newest first, on the instant rather than the stamp, the way Umami orders
 	// a session's activity.
 	sort.Slice(kept, func(i, j int) bool { return kept[j].Timestamp.Before(kept[i].Timestamp) })
-	if len(kept) > staandActivityCap {
-		kept = kept[:staandActivityCap]
+	if len(kept) > datapuntActivityCap {
+		kept = kept[:datapuntActivityCap]
 	}
 
-	rows := make([]*protocol.StaandActivityRow, 0, len(kept))
+	rows := make([]*protocol.DatapuntActivityRow, 0, len(kept))
 	for _, as := range kept {
 		event := ""
 		if len(as.Predicates) > 0 {
 			event = as.Predicates[0]
 		}
-		rows = append(rows, &protocol.StaandActivityRow{
+		rows = append(rows, &protocol.DatapuntActivityRow{
 			At:             as.Timestamp.Format(time.RFC3339),
-			Visit:          attrString(as.Attributes, staandVisit),
-			Visitor:        attrString(as.Attributes, staandVisitor),
+			Visit:          attrString(as.Attributes, datapuntVisit),
+			Visitor:        attrString(as.Attributes, datapuntVisitor),
 			Path:           subjectOf(as),
-			ReferrerDomain: attrString(as.Attributes, staandRefDomain),
+			ReferrerDomain: attrString(as.Attributes, datapuntRefDomain),
 			Event:          event,
 		})
 	}
-	return &protocol.StaandActivity{Market: market, Slug: slug, Activity: rows}, nil
+	return &protocol.DatapuntActivity{Market: market, Slug: slug, Activity: rows}, nil
 }
 
-// staandsVisits is one stand's sittings, derived. Entry, exit, duration and
+// datapuntsVisits is one datapunt's sittings, derived. Entry, exit, duration and
 // bounce are computed here every time and stored nowhere, because a visit is a
 // projection (ADR-036).
-func (s *QNTXServer) staandsVisits(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+func (s *QNTXServer) datapuntsVisits(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	market, slug := sent["market"], sent["slug"]
-	since, until, refusal := staandRange(sent)
+	since, until, refusal := datapuntRange(sent)
 	if refusal != nil {
 		return nil, refusal
 	}
-	arrivals, refusal := s.staandArrivals("visits", market, slug, since, until)
+	arrivals, refusal := s.datapuntArrivals("visits", market, slug, since, until)
 	if refusal != nil {
 		return nil, refusal
 	}
-	return &protocol.StaandVisits{Market: market, Slug: slug, Visits: staandVisits(arrivals, market, slug)}, nil
+	return &protocol.DatapuntVisits{Market: market, Slug: slug, Visits: datapuntVisits(arrivals, market, slug)}, nil
 }
 
-// staandTally is one stand's arrivals folded down: how many, when the last one
+// datapuntTally is one datapunt's arrivals folded down: how many, when the last one
 // landed, and the distinct sites they came from.
 //
-// walks is the fold that keeps its shape. A stand stands and a person walks
+// walks is the fold that keeps its shape. A datapunt stands and a person walks
 // past it, so the counts say how much arrived and the walks say what happened.
 // Every other field here answers "how many"; this one answers "in what order".
-type staandTally struct {
+type datapuntTally struct {
 	count    int
 	last     time.Time
 	hosts    map[string]struct{}
 	events   map[string][]time.Time
 	pages    map[string][]time.Time
 	visitors map[string]struct{}
-	walks    map[string][]staandStep
+	walks    map[string][]datapuntStep
 }
 
-// sites is the distinct hosts arrivals came from, sorted. A stand bound to a
+// sites is the distinct hosts arrivals came from, sorted. A datapunt bound to a
 // door still shows here what actually reported, so the door and the reality are
 // both visible.
-func (t *staandTally) sites() []string {
+func (t *datapuntTally) sites() []string {
 	out := make([]string, 0, len(t.hosts))
 	for h := range t.hosts {
 		out = append(out, h)
@@ -1230,35 +1271,35 @@ func (t *staandTally) sites() []string {
 	return out
 }
 
-// staandActivity folds a market's arrivals down per slug. Arrivals carry the
-// slug on a reserved attribute (staandSlugAttr) and their source is the stand;
+// datapuntActivity folds a market's arrivals down per slug. Arrivals carry the
+// slug on a reserved attribute (datapuntSlugAttr) and their source is the datapunt;
 // definitions live in system, so nothing here is a definition. The context is
 // the page URL, so its host is the site that reported.
-func (s *QNTXServer) staandActivity(market string, since, until types.TimeBound) map[string]*staandTally {
-	tally := map[string]*staandTally{}
+func (s *QNTXServer) datapuntActivity(market string, since, until types.TimeBound) map[string]*datapuntTally {
+	tally := map[string]*datapuntTally{}
 	store, err := s.held.Read(market)
 	if err != nil {
 		s.logger.Errorw("could not open a market for activity", "market", market, "error", err)
 		return tally
 	}
 	arrivals, err := store.GetAttestations(ats.AttestationFilter{
-		Source:    staandSource,
+		Source:    datapuntSource,
 		TimeStart: since,
 		TimeEnd:   until,
-		Limit:     maxStaandRead,
+		Limit:     maxDatapuntRead,
 	})
 	if err != nil {
-		s.logger.Errorw("could not read stand arrivals for activity", "market", market, "error", err)
+		s.logger.Errorw("could not read datapunt arrivals for activity", "market", market, "error", err)
 		return tally
 	}
 	for _, as := range arrivals {
-		slug := attrString(as.Attributes, staandSlugAttr)
+		slug := attrString(as.Attributes, datapuntSlugAttr)
 		if slug == "" {
 			continue
 		}
 		t, seen := tally[slug]
 		if !seen {
-			t = &staandTally{hosts: map[string]struct{}{}, events: map[string][]time.Time{}, pages: map[string][]time.Time{}, visitors: map[string]struct{}{}, walks: map[string][]staandStep{}}
+			t = &datapuntTally{hosts: map[string]struct{}{}, events: map[string][]time.Time{}, pages: map[string][]time.Time{}, visitors: map[string]struct{}{}, walks: map[string][]datapuntStep{}}
 			tally[slug] = t
 		}
 		t.count++
@@ -1268,7 +1309,7 @@ func (s *QNTXServer) staandActivity(market string, since, until types.TimeBound)
 		if len(as.Subjects) > 0 {
 			t.pages[as.Subjects[0]] = append(t.pages[as.Subjects[0]], as.Timestamp)
 		}
-		visitor := attrString(as.Attributes, staandVisitor)
+		visitor := attrString(as.Attributes, datapuntVisitor)
 		if visitor != "" {
 			t.visitors[visitor] = struct{}{}
 		}
@@ -1276,7 +1317,7 @@ func (s *QNTXServer) staandActivity(market string, since, until types.TimeBound)
 		// carries one. Keyed by the visitor it is a lifetime: somebody who came
 		// back six times over two days drew one line twenty-five hours long.
 		if key := walkKey(as, visitor); key != "" {
-			step := staandStep{At: as.Timestamp.Format(time.RFC3339), when: as.Timestamp}
+			step := datapuntStep{At: as.Timestamp.Format(time.RFC3339), when: as.Timestamp}
 			if len(as.Subjects) > 0 {
 				step.Page = as.Subjects[0]
 			}
@@ -1311,35 +1352,35 @@ func (s *QNTXServer) staandActivity(market string, since, until types.TimeBound)
 // offsets are live at once, and 02:15+01:00 comes after 02:30+02:00 while
 // sorting before it as text — the walk would read backwards exactly once a
 // year, which is worse than reading backwards always.
-func orderSteps(steps []staandStep) {
+func orderSteps(steps []datapuntStep) {
 	sort.Slice(steps, func(i, j int) bool { return steps[i].when.Before(steps[j].when) })
 }
 
-// staandAttributes is what survives of the query string: every parameter but the
+// datapuntAttributes is what survives of the query string: every parameter but the
 // event, the page, the visitor id and the reserved slug key, capped in count and
 // size. Arrivals past the cap lose their tail rather than the whole arrival,
 // which is the fact being recorded.
-// staandReserved reports whether a query key is the stand's own. Reserved keys
+// datapuntReserved reports whether a query key is the datapunt's own. Reserved keys
 // have a field on the arrival, so keeping them in params too would record the
 // same fact twice under two names.
-func staandReserved(key string) bool {
+func datapuntReserved(key string) bool {
 	switch key {
-	case staandEvent, staandPage, staandVisitor, staandVisit, staandRef, staandSlugAttr:
+	case datapuntEvent, datapuntPage, datapuntVisitor, datapuntVisit, datapuntRef, datapuntSlugAttr:
 		return true
 	}
-	return slices.Contains(staandCampaign, key)
+	return slices.Contains(datapuntCampaign, key)
 }
 
-func staandAttributes(params map[string][]string) map[string]string {
+func datapuntAttributes(params map[string][]string) map[string]string {
 	out := make(map[string]string)
 	for key, values := range params {
-		if staandReserved(key) || len(values) == 0 {
+		if datapuntReserved(key) || len(values) == 0 {
 			continue
 		}
-		if len(out) >= maxStaandAttributes {
+		if len(out) >= maxDatapuntAttributes {
 			break
 		}
-		if len(key) > maxStaandAttributeKey || len(values[0]) > maxStaandAttributeValue {
+		if len(key) > maxDatapuntAttributeKey || len(values[0]) > maxDatapuntAttributeValue {
 			continue
 		}
 		out[key] = values[0]

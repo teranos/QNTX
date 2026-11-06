@@ -17,7 +17,7 @@ option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 message Signum {
   string name = 1;
   repeated Sigil sigils = 2;
-  // The shapes this signum is held to, each by its name: "Staands will be
+  // The shapes this signum is held to, each by its name: "Datapunts will be
   // Umami, one reference and not a blend." The parity sigil reads these.
   repeated Follows follows = 3;
   // What it is for, in words, and the words it is found by. To A2A these are

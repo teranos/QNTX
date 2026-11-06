@@ -277,26 +277,26 @@ func TestWhatIsServedSaysWhoReachesAPath(t *testing.T) {
 // about one surface says nothing of another.
 func TestALineNamesASigilASignumOrEitherOverOneSurface(t *testing.T) {
 	granted, err := readReaches(
-		"REACH is '/api/staands/metrics' of ROOT SUPER\n" +
-			"REACH is 'staands' of ROOT TOKEN\n")
+		"REACH is '/api/datapunts/metrics' of ROOT SUPER\n" +
+			"REACH is 'datapunts' of ROOT TOKEN\n")
 	require.NoError(t, err)
 	addRuntime(granted, Runtime{Lines: []Line{
-		{Paths: []string{"mcp:staands:metrics"}, Roles: []string{"ANALYST"}, Actor: "root", At: time.Now()},
-		{Paths: []string{"staands:visits"}, Roles: []string{"AUDITOR"}, Actor: "root", At: time.Now()},
+		{Paths: []string{"mcp:datapunts:metrics"}, Roles: []string{"ANALYST"}, Actor: "root", At: time.Now()},
+		{Paths: []string{"datapunts:visits"}, Roles: []string{"AUDITOR"}, Actor: "root", At: time.Now()},
 	}})
 	served := &Served{}
 	served.rows.Store(&granted)
 
-	overMCP, anyone := served.ReachingSigil("mcp", "staands", "metrics", "/api/staands/metrics")
+	overMCP, anyone := served.ReachingSigil("mcp", "datapunts", "metrics", "/api/datapunts/metrics")
 	assert.False(t, anyone)
 	assert.ElementsMatch(t, []auth.Level{auth.LevelSuper, auth.LevelToken}, overMCP.Beyond(),
 		"the path's line and the signum's both count")
 	assert.Equal(t, []string{"ANALYST"}, overMCP.Roles())
 
-	overHTTP, _ := served.ReachingSigil("http", "staands", "metrics", "/api/staands/metrics")
+	overHTTP, _ := served.ReachingSigil("http", "datapunts", "metrics", "/api/datapunts/metrics")
 	assert.Empty(t, overHTTP.Roles(), "a line about MCP let a role in over HTTP")
 
-	visits, _ := served.ReachingSigil("mcp", "staands", "visits", "/api/staands/visits")
+	visits, _ := served.ReachingSigil("mcp", "datapunts", "visits", "/api/datapunts/visits")
 	assert.Equal(t, []string{"AUDITOR"}, visits.Roles(), "a line naming the sigil holds over every surface")
 	assert.NotContains(t, visits.Roles(), "ANALYST", "a line about one sigil let a role into another")
 }
@@ -340,12 +340,12 @@ func TestWhatGatesItselfIsNotGatedByThePathsLineToo(t *testing.T) {
 // path goes on the mux, so a named line nothing answers on does not stop the
 // node the way a path nothing answers on does.
 func TestANamedLineIsNotARoute(t *testing.T) {
-	granted, err := readReaches("REACH is '/pond' of ROOT\nREACH is 'staands:metrics' of ROOT SUPER")
+	granted, err := readReaches("REACH is '/pond' of ROOT\nREACH is 'datapunts:metrics' of ROOT SUPER")
 	require.NoError(t, err)
 
 	routes := routesIn(granted)
 	assert.Contains(t, routes, "/pond")
-	assert.NotContains(t, routes, "staands:metrics")
+	assert.NotContains(t, routes, "datapunts:metrics")
 
 	_, _, _, err = build(routes, routes, map[string]Answering{
 		"/pond": {Handler: func(http.ResponseWriter, *http.Request) {}},
@@ -370,26 +370,26 @@ func plainly() Wrapping {
 // another surface says nothing of A2A.
 func TestALineAboutA2AIsAboutA2AAlone(t *testing.T) {
 	// What reach grant writes, read back the way the node reads it.
-	written, err := ReadLine([]string{Subject}, []string{OverA2A + ":staands"}, []string{"agent"}, []string{"root"}, time.Now())
+	written, err := ReadLine([]string{Subject}, []string{OverA2A + ":datapunts"}, []string{"agent"}, []string{"root"}, time.Now())
 	require.NoError(t, err)
-	assert.Equal(t, []string{"a2a:staands"}, written.Paths)
+	assert.Equal(t, []string{"a2a:datapunts"}, written.Paths)
 	assert.Empty(t, written.Unopenable(nil), "a line naming a role over A2A was refused")
 
-	granted, err := readReaches("REACH is '/api/staands' of ROOT\n")
+	granted, err := readReaches("REACH is '/api/datapunts' of ROOT\n")
 	require.NoError(t, err)
 	addRuntime(granted, Runtime{Lines: []Line{
-		{Paths: []string{OverA2A + ":staands"}, Roles: []string{"AGENT"}, Actor: "root", At: time.Now()},
-		{Paths: []string{OverMCP + ":staands:list"}, Roles: []string{"ANALYST"}, Actor: "root", At: time.Now()},
+		{Paths: []string{OverA2A + ":datapunts"}, Roles: []string{"AGENT"}, Actor: "root", At: time.Now()},
+		{Paths: []string{OverMCP + ":datapunts:list"}, Roles: []string{"ANALYST"}, Actor: "root", At: time.Now()},
 	}})
 	served := &Served{}
 	served.rows.Store(&granted)
 
-	overA2A, anyone := served.ReachingSigil(OverA2A, "staands", "list", "/api/staands")
+	overA2A, anyone := served.ReachingSigil(OverA2A, "datapunts", "list", "/api/datapunts")
 	assert.False(t, anyone)
 	assert.Equal(t, []string{"AGENT"}, overA2A.Roles(), "the a2a line did not let its role in over A2A")
 
 	for _, surface := range []string{OverHTTP, OverMCP} {
-		other, _ := served.ReachingSigil(surface, "staands", "list", "/api/staands")
+		other, _ := served.ReachingSigil(surface, "datapunts", "list", "/api/datapunts")
 		assert.NotContains(t, other.Roles(), "AGENT", "a line about A2A let a role in over %s", surface)
 	}
 }

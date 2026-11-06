@@ -27,8 +27,8 @@ const agentCardPath = "/.well-known/agent-card.json"
 
 // agentCardSigna is the signa the public card shows, in this order, the ones
 // of these that are signa:
-// "Namespaces, MCP, Plugins, Attestations, Staand, i, mail, access tokens"
-var agentCardSigna = []string{"namespaces", "plugins", "staands", "i", "mail"}
+// "Namespaces, MCP, Plugins, Attestations, Datapunt, i, mail, access tokens"
+var agentCardSigna = []string{"namespaces", "plugins", "datapunts", "i", "mail"}
 
 // nodeExtensionURI names the extension that carries what the AgentCard has no
 // field for: the node's DID, its health and what this build can do.
