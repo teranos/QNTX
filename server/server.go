@@ -58,6 +58,7 @@ type QNTXServer struct {
 	namespaceAgents       agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
 	elementAgents         agentsHeld                    // Each element's agent this node has held, by its purpose (ADR-054)
 	providersAt           map[string]string             // Where each provider a key is asked of answers; nil is providersAt (provider_keys.go)
+	consuming             consumedFlows                 // 「[Opus 5.5] Each yes at an MCP server the node consumes, waiting on its callback (mcp_consumed.go)」
 	agentsDir             string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL                string                        // Where this node answers on its own machine; empty until it listens
 	anthropicBaseURL      string                        // Where Anthropic's API is; empty is api.anthropic.com

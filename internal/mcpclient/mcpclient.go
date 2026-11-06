@@ -12,11 +12,14 @@ package mcpclient
 import (
 	"context"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	errors "github.com/teranos/sacred-error"
 )
@@ -60,6 +63,25 @@ func Start(ctx context.Context, s Server, as Client) (*Conn, error) {
 		cmd.Stderr = os.Stderr
 	}
 	return open(ctx, &mcp.CommandTransport{Command: cmd, TerminateDuration: grace}, filepath.Base(s.Binary), as)
+}
+
+// 「[Opus 5.5] Remote is an MCP server another system serves at a URL, over Streamable HTTP.」
+type Remote struct {
+	URL string
+	// 「[Opus 5.5] HTTPClient is what reaches it. Nil is the SDK's own.」
+	HTTPClient *http.Client
+	// 「[Opus 5.5] OAuth authorizes each request, and answers a 401 with the authorization flow. Nil sends none.」
+	OAuth auth.OAuthHandler
+}
+
+// 「[Opus 5.5] Dial opens the session with a remote server. ctx bounds the opening, an authorization」
+// 「[Opus 5.5] the server asks for on the way included.」
+func Dial(ctx context.Context, r Remote, as Client) (*Conn, error) {
+	at, err := url.Parse(r.URL)
+	if err != nil || at.Host == "" {
+		return nil, errors.Newf("mcp: a remote server needs its URL, and %q is none", r.URL)
+	}
+	return open(ctx, &mcp.StreamableClientTransport{Endpoint: r.URL, HTTPClient: r.HTTPClient, OAuthHandler: r.OAuth}, at.Host, as)
 }
 
 // 「[Fable 5.1] open opens the session over a transport. The client offers no capability: the node answers」
