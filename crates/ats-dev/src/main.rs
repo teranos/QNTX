@@ -155,6 +155,12 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         return put_stdin(&mut s);
     }
     let parsed = Parser::parse(what).map_err(|e| fail("could not parse the sentence", e))?;
+    if parsed.has_temporal() {
+        return Err(fail(
+            "a sentence cannot carry a time clause",
+            "since/until/on/between/over name a range of time, not the moment an attestation was made; give \"timestamp\" (ms) on stdin (put -)",
+        ));
+    }
     let own = |w: &[&str]| w.iter().map(|x| x.to_string()).collect::<Vec<_>>();
     let mut a = Attestation {
         id: new_id()?,
@@ -167,6 +173,7 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         source: "ats-dev".into(),
         ..Attestation::default()
     };
+    needs_actor(&a)?;
     let mut flags = tail.iter().skip(1);
     while let Some(f) = flags.next() {
         match f.as_str() {
@@ -185,11 +192,37 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     emit(&a)
 }
 
+/// `ax` expands an attestation into subjects x predicates x contexts x actors
+/// claims (`ats::expand_cartesian`), so one without an actor is stored and
+/// found by `get` but is no claim `ax` can return. Refused, not written.
+fn needs_actor(a: &Attestation) -> Result<(), Box<Error>> {
+    if a.actors.is_empty() {
+        return Err(fail(
+            "an attestation needs an actor",
+            format!("{}: with none, ax expands it to no claims and never returns it (\"... by WHO\")", a.id),
+        ));
+    }
+    Ok(())
+}
+
+/// The fields of an `Attestation`; a line naming any other is refused.
+const FIELDS: [&str; 11] = [
+    "id", "subjects", "predicates", "contexts", "actors", "timestamp", "source",
+    "attributes", "created_at", "signature", "signer_did",
+];
+
 /// One JSON attestation per line. Missing id, timestamp, created_at, source,
 /// predicates, contexts and actors are filled; everything given is kept.
 fn complete(line: &str) -> Result<Attestation, Box<Error>> {
     let mut v: serde_json::Value = serde_json::from_str(line).map_err(|e| fail("not JSON", e))?;
     let obj = v.as_object_mut().ok_or_else(|| fail("not an object", line))?;
+    let unknown: Vec<&str> = obj.keys().map(String::as_str).filter(|k| !FIELDS.contains(k)).collect();
+    if !unknown.is_empty() {
+        return Err(fail(
+            "not an attestation field",
+            format!("{} (arbitrary data goes in \"attributes\")", unknown.join(", ")),
+        ));
+    }
     let now = now_ms();
     if !obj.contains_key("id") { obj.insert("id".into(), new_id()?.into()); }
     if !obj.contains_key("timestamp") { obj.insert("timestamp".into(), now.into()); }
@@ -199,17 +232,23 @@ fn complete(line: &str) -> Result<Attestation, Box<Error>> {
         if !obj.contains_key(k) { obj.insert(k.into(), serde_json::json!(["_"])); }
     }
     if !obj.contains_key("actors") { obj.insert("actors".into(), serde_json::json!([])); }
-    serde_json::from_value(v).map_err(|e| fail("not an attestation", e))
+    let a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
+    needs_actor(&a)?;
+    Ok(a)
 }
 
 fn put_stdin(s: &mut SqliteStore) -> Result<(), Box<Error>> {
-    let mut in_txn = 0usize;
+    let mut batch: Vec<String> = Vec::new();
     let mut total = 0usize;
-    for line in std::io::stdin().lock().lines() {
+    for (n, line) in std::io::stdin().lock().lines().enumerate() {
         let line = line.map_err(|e| fail("could not read stdin", e))?;
         if line.trim().is_empty() { continue; }
-        let a = complete(&line)?;
-        if in_txn == 0 {
+        let at = n + 1;
+        let a = match complete(&line) {
+            Ok(a) => a,
+            Err(e) => return abandon(s, &batch, fail(&format!("line {at}: {}", e.title), e.why)),
+        };
+        if batch.is_empty() {
             s.connection().execute_batch("BEGIN").map_err(|e| fail("BEGIN failed", e))?;
         }
         let id = a.id.clone();
@@ -218,26 +257,36 @@ fn put_stdin(s: &mut SqliteStore) -> Result<(), Box<Error>> {
             // put() runs a PASSIVE checkpoint after every 5000th put, which
             // SQLite refuses inside a transaction. The row is already inserted.
             Err(e) if e.to_string().contains("wal_checkpoint") => {}
-            Err(e) => {
-                s.connection().execute_batch("ROLLBACK").map_err(|e| fail("ROLLBACK failed", e))?;
-                return Err(fail("put failed", format!("{id}: {e}")));
-            }
+            Err(e) => return abandon(s, &batch, fail(&format!("line {at}: put failed"), format!("{id}: {e}"))),
         }
-        in_txn += 1;
+        batch.push(id);
         total += 1;
-        if in_txn == BATCH {
-            s.connection().execute_batch("COMMIT").map_err(|e| fail("COMMIT failed", e))?;
-            in_txn = 0;
+        if batch.len() == BATCH {
+            commit(s, &mut batch)?;
         }
-        emit_id(&id)?;
     }
-    if in_txn > 0 {
-        s.connection().execute_batch("COMMIT").map_err(|e| fail("COMMIT failed", e))?;
-    }
+    commit(s, &mut batch)?;
     // wal_autocheckpoint is 0 in SqliteStore::open, so nothing else folds the WAL back.
     s.wal_checkpoint_truncate().map_err(|e| fail("checkpoint failed", e))?;
     eprintln!("ats-dev: {total} attestations written");
     Ok(())
+}
+
+/// COMMIT the open batch, then say its ids: an id on stdout is a row on disk.
+fn commit(s: &SqliteStore, batch: &mut Vec<String>) -> Result<(), Box<Error>> {
+    if batch.is_empty() { return Ok(()); }
+    s.connection().execute_batch("COMMIT").map_err(|e| fail("COMMIT failed", e))?;
+    for id in batch.drain(..) { emit_id(&id)?; }
+    Ok(())
+}
+
+/// A line failed: the open batch is rolled back, none of its ids were said.
+fn abandon(s: &SqliteStore, batch: &[String], why: Box<Error>) -> Result<(), Box<Error>> {
+    if !batch.is_empty() {
+        s.connection().execute_batch("ROLLBACK").map_err(|e| fail("ROLLBACK failed", e))?;
+        eprintln!("ats-dev: rolled back {} attestations of the open batch", batch.len());
+    }
+    Err(why)
 }
 
 fn emit_id(id: &str) -> Result<(), Box<Error>> {

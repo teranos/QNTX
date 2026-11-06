@@ -412,6 +412,7 @@ dependencies = [
  "qntx-ats",
  "sacred-error",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
