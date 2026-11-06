@@ -274,6 +274,10 @@ func (s *QNTXServer) notifySettled(lines taskLines, task *a2asdk.Task) {
 	// Sent after endTask lets go of taskEnds: a slow webhook holds no other task.
 	sacred.Go("the push notifications of a settled task", func() {
 		for _, config := range pushes {
+			// A config deleted while an earlier webhook took its time is sent nothing more (§3.1.10).
+			if held, err := s.pushesOf(lines, string(task.ID)); err != nil || !slices.ContainsFunc(held, func(push *a2asdk.PushConfig) bool { return push.ID == config.ID }) {
+				continue
+			}
 			if err := pushSender.SendPush(s.ctx, config, task); err != nil {
 				s.logger.Errorw("a task was settled and its push notification was not delivered", "agent", lines.did, "task", task.ID, "config", config.ID, "error", err)
 			}

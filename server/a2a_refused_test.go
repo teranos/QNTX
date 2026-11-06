@@ -271,3 +271,27 @@ func TestATenantsAgentTakesLessThanTheNodeAgent(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	assert.Contains(t, w.Body.String(), "an agent at a tenant takes")
 }
+
+// A JSON-RPC stream that is refused answers its error as an SSE event; it is a Sentry log all the same.
+func TestARefusedJSONRPCStreamIsASentryLog(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	sent := toSentry(t)
+
+	r := asBearer(http.MethodPost, "/a2a/", tokens[auth.LevelRoot])
+	body := `{"jsonrpc":"2.0","id":1,"method":"SendStreamingMessage","params":{"message":{"messageId":"m1","role":"ROLE_AGENT","parts":[{"text":"hello"}]}}}`
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Contains(t, w.Body.String(), `"error"`, w.Body.String())
+
+	logs, _ := sent.said()
+	require.Len(t, logs, 1, w.Header().Get("Content-Type")+" "+w.Body.String())
+	for key, want := range map[string]string{"a2a.binding": "jsonrpc", "a2a.operation": "SendStreamingMessage"} {
+		got, held := logAttr(logs[0], key)
+		assert.True(t, held, key)
+		assert.Equal(t, want, got, key)
+	}
+}

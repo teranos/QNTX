@@ -146,3 +146,47 @@ func TestAWebhookTheInternetDoesNotRouteToIsRefused(t *testing.T) {
 		_ = pushSender.SendPush(context.Background(), &a2asdk.PushConfig{URL: url, TaskID: "t"}, &a2asdk.Task{ID: "t"})
 	}
 }
+
+// A config deleted while an earlier webhook is still being told of a settled
+// task is told nothing more: "No further notifications will be sent" (§3.1.10).
+func TestAConfigDeletedWhileAnotherIsToldIsToldNothing(t *testing.T) {
+	sender := pushSender
+	pushSender = push.NewHTTPPushSender(&push.HTTPSenderConfig{AllowPrivateNetworks: true})
+	t.Cleanup(func() { pushSender = sender })
+	release, slowTook, fastTook := make(chan struct{}), make(chan struct{}, 4), make(chan struct{}, 4)
+	slow := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { slowTook <- struct{}{}; <-release }))
+	fast := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { fastTook <- struct{}{} }))
+	t.Cleanup(slow.Close)
+	t.Cleanup(fast.Close)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	root := tokens[auth.LevelRoot]
+
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("hi", ""), root)
+	require.Equal(t, http.StatusOK, code, sent)
+	task := at(sent, "task.id").(string)
+	configs := "/a2a/tasks/" + task + "/pushNotificationConfigs"
+	for _, config := range []string{`{"id": "a-slow", "url": "` + slow.URL + `"}`, `{"id": "b-fast", "url": "` + fast.URL + `"}`} {
+		code, created := a2aAsked(t, srv, http.MethodPost, configs, config, root)
+		require.Equal(t, http.StatusOK, code, created)
+	}
+	ta, err := srv.nodeTaskAgent()
+	require.NoError(t, err)
+	held, _, _, found, err := srv.heldTask(ta.taskLines, task)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	srv.notifySettled(ta.taskLines, held)
+	<-slowTook
+	r := asBearer(http.MethodDelete, configs+"/b-fast", root)
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	close(release)
+
+	select {
+	case <-fastTook:
+		t.Fatal("a config deleted before its turn was still told")
+	case <-time.After(300 * time.Millisecond):
+	}
+}

@@ -237,7 +237,24 @@ func jsonRPCRefusalOf(exchange *a2aExchange, answered *a2aAnswered) (a2aRefusalS
 			Data    json.RawMessage `json:"data"`
 		} `json:"error"`
 	}
-	if json.Unmarshal(answered.said.Bytes(), &said) != nil || said.Error == nil {
+	// A stream answers each event as an SSE data line: the refusal is the first that is an error.
+	answers := []string{answered.said.String()}
+	if strings.HasPrefix(answered.Header().Get("Content-Type"), "text/event-stream") {
+		answers = nil
+		for _, line := range strings.Split(answered.said.String(), "\n") {
+			if data, isData := strings.CutPrefix(line, "data:"); isData {
+				answers = append(answers, strings.TrimSpace(data))
+			}
+		}
+	}
+	refused := false
+	for _, answer := range answers {
+		if json.Unmarshal([]byte(answer), &said) == nil && said.Error != nil {
+			refused = true
+			break
+		}
+	}
+	if !refused {
 		return a2aRefusalSaid{}, false
 	}
 	refusal := a2aRefusalSaid{Operation: exchange.operation, JSONRPC: true, Status: answered.status, Message: said.Error.Message, Reason: strconv.Itoa(said.Error.Code)}
