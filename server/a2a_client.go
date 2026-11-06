@@ -15,6 +15,7 @@ import (
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
 	"github.com/a2aproject/a2a-go/v2/a2aclient/agentcard"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
 	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	"github.com/a2aproject/a2a-go/v2/a2apb/v1/pbconv"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -396,7 +397,10 @@ func (s *QNTXServer) a2aClientOf(ctx context.Context, sent sigil.Sent) (*a2aclie
 		return nil, "", refusal
 	}
 	public := publicClient()
-	client, err := a2aclient.NewFromCard(ctx, card, a2aclient.WithRESTTransport(public), a2aclient.WithJSONRPCTransport(public))
+	// An agent that still speaks A2A 0.3 is spoken to in 0.3, by a2a-go's own transports for it.
+	client, err := a2aclient.NewFromCard(ctx, card, a2aclient.WithRESTTransport(public), a2aclient.WithJSONRPCTransport(public),
+		a2aclient.WithCompatTransport(a2av0.Version, a2asdk.TransportProtocolHTTPJSON, a2av0.NewRESTTransportFactory(a2av0.RESTTransportConfig{Client: public})),
+		a2aclient.WithCompatTransport(a2av0.Version, a2asdk.TransportProtocolJSONRPC, a2av0.NewJSONRPCTransportFactory(a2av0.JSONRPCTransportConfig{Client: public})))
 	if err != nil {
 		return nil, "", &protocol.Refusal{Why: sigil.Failed, Param: "card", Says: "no A2A client speaks to " + card.Name + ": " + err.Error()}
 	}
@@ -423,7 +427,8 @@ func resolveCard(ctx context.Context, at string) (*a2asdk.AgentCard, *protocol.R
 	if u, err := url.Parse(at); err != nil || (u.Scheme != "https" && u.Scheme != "http") {
 		return refused(&protocol.Refusal{Why: sigil.Invalid, Param: "card", Says: at + " is no http or https URL a card is read from"})
 	}
-	card, err := (&agentcard.Resolver{Client: publicClient()}).Resolve(ctx, at)
+	// a2a-go's 0.3 parser reads a card in either version, 1.0 as it is.
+	card, err := (&agentcard.Resolver{Client: publicClient(), CardParser: a2av0.NewAgentCardParser()}).Resolve(ctx, at)
 	if err != nil {
 		span.RecordError(err)
 		return refused(&protocol.Refusal{Why: sigil.Failed, Param: "card", Says: "the card at " + at + " was not resolved: " + err.Error()})

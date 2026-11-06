@@ -14,6 +14,7 @@ import (
 	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/getsentry/sentry-go"
 	sentryotel "github.com/getsentry/sentry-go/otel"
@@ -320,4 +321,40 @@ func TestTheNodesThisOneKnowsAreTheAgentsToSee(t *testing.T) {
 	assert.Equal(t, "https://orchard.example", peer["origin"])
 	assert.Equal(t, "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", peer["did"])
 	assert.Equal(t, []any{"orchard"}, peer["namespaces"])
+}
+
+// An agent that still speaks A2A 0.3, its card in 0.3's shape, is found and
+// spoken to in 0.3, by a2a-go's own compat parser and transports.
+func TestAnAgentSpeaking03IsFoundAndSpokenTo(t *testing.T) {
+	allowingLoopback(t)
+	agent := &anotherAgent{}
+	rest := a2av0.NewRESTHandler(a2asrv.NewHandler(agent.executor()))
+	var served *httptest.Server
+	served = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/.well-known/agent-card.json" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"protocolVersion": "0.3.0", "name": "the old orchard keeper", "description": "Keeps the old orchard.", "version": "0.9.0",
+				"url": "` + served.URL + `/a2a", "preferredTransport": "HTTP+JSON",
+				"capabilities": {}, "defaultInputModes": ["text/plain"], "defaultOutputModes": ["text/plain"],
+				"skills": [{"id": "keep", "name": "keep", "description": "Keeps.", "tags": ["orchard"]}]}`))
+			return
+		}
+		http.StripPrefix("/a2a", rest).ServeHTTP(w, r)
+	}))
+	t.Cleanup(served.Close)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	root := tokens[auth.LevelRoot]
+
+	code, card := a2aCalledOver(t, srv, root, http.MethodGet, "Resolve", map[string]any{"card": served.URL})
+	require.Equal(t, http.StatusOK, code, card)
+	assert.Equal(t, "the old orchard keeper", card["name"])
+	interfaces := card["supported_interfaces"].([]any)
+	require.Len(t, interfaces, 1, card)
+	assert.Equal(t, "0.3.0", interfaces[0].(map[string]any)["protocol_version"])
+
+	code, answered := a2aCalledOver(t, srv, root, http.MethodPost, "SendMessage", map[string]any{
+		"card": served.URL, "message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	require.Equal(t, http.StatusOK, code, answered)
+	assert.Equal(t, "TASK_STATE_COMPLETED", answered["task"].(map[string]any)["status"].(map[string]any)["state"])
 }

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
@@ -41,6 +42,9 @@ const (
 	tenantBodyMost = 1 << 20
 )
 
+// streamKeptAlive is how often a quiet stream is told the turn still runs.
+const streamKeptAlive = 15 * time.Second
+
 // a2aContentType is the media type A2A's HTTP+JSON binding speaks in.
 const a2aContentType = "application/a2a+json"
 
@@ -52,11 +56,14 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		a2asrv.WithPushNotifications(pushesOnLines{s}, pushSender),
 		a2asrv.WithCallInterceptors(a2aGate{s}),
 		a2asrv.WithExtendedAgentCardProducer(a2asrv.ExtendedAgentCardProducerFn(s.a2aExtendedCardOf)),
-		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{PushNotifications: true, ExtendedAgentCard: true}),
+		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true}),
 	)
-	atNoTenant := a2asrv.NewRESTHandler(handler)
-	atTenant := a2asrv.NewTenantRESTHandler("/{*}", handler)
-	jsonRPC := a2asrv.NewJSONRPCHandler(handler)
+	// A turn can be quiet for minutes: a stream is kept alive through the
+	// gateways in front of the node, which drop idle connections.
+	alive := a2asrv.WithTransportKeepAlive(streamKeptAlive)
+	atNoTenant := a2asrv.NewRESTHandler(handler, alive)
+	atTenant := a2asrv.NewTenantRESTHandler("/{*}", handler, alive)
+	jsonRPC := a2asrv.NewJSONRPCHandler(handler, alive)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// One id per request, answered to the client, so what it reports names what the node wrote down.
 		id := uuid.NewString()

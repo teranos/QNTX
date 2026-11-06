@@ -540,3 +540,38 @@ func (s *QNTXServer) writeTaskLine(lines taskLines, id, state, by string, at tim
 		Actors:   []string{by}, Timestamp: at, CreatedAt: at, Source: "a2a", Attributes: attributes,
 	})
 }
+
+// "streaming": true on the card (§3.3.4): SendStreamingMessage answers the
+// turn as it moves, a2a-go's events over SSE, the last the Task completed.
+func TestATurnIsStreamedAsItMoves(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	body := saidToTheNode("how long has the box been up?", "")
+	r := asBearer(http.MethodPost, "/a2a/message:stream", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("A2A-Version", "1.0")
+	r.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
+
+	var states []string
+	for _, line := range strings.Split(w.Body.String(), "\n") {
+		data, isData := strings.CutPrefix(line, "data: ")
+		if !isData {
+			continue
+		}
+		var event map[string]any
+		require.NoError(t, json.Unmarshal([]byte(data), &event), data)
+		if update, held := event["statusUpdate"]; held {
+			states = append(states, at(update.(map[string]any), "status.state").(string))
+		}
+		if task, held := event["task"]; held {
+			states = append(states, at(task.(map[string]any), "status.state").(string))
+		}
+	}
+	require.NotEmpty(t, states, w.Body.String())
+	assert.Contains(t, states, "TASK_STATE_WORKING", "the turn was not told as it moved")
+	assert.Equal(t, "TASK_STATE_COMPLETED", states[len(states)-1], w.Body.String())
+}
