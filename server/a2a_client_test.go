@@ -385,11 +385,11 @@ func TestAPeersTurnIsWaitedOnPastTheCardsBound(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_COMPLETED", sent["task"].(map[string]any)["status"].(map[string]any)["state"])
 }
 
-// A peer is given peerTurnTimeout to answer, its turn included, and is told so when it does not.
+// A peer is given agentTurnTimeout to answer, its turn included, and is told so when it does not.
 func TestAPeerThatDoesNotAnswerWithinItsTimeIsLeft(t *testing.T) {
-	bound := peerTurnTimeout
-	peerTurnTimeout = 100 * time.Millisecond
-	t.Cleanup(func() { peerTurnTimeout = bound })
+	bound := agentTurnTimeout
+	agentTurnTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { agentTurnTimeout = bound })
 	agent := &anotherAgent{thinks: 2 * time.Second}
 	atTenant := a2asrv.NewTenantRESTHandler("/{*}", a2asrv.NewHandler(agent.executor()))
 	peerServer := httptest.NewServer(http.StripPrefix("/a2a", atTenant))
@@ -406,6 +406,26 @@ func TestAPeerThatDoesNotAnswerWithinItsTimeIsLeft(t *testing.T) {
 	})
 	assert.NotEqual(t, http.StatusOK, code, refused)
 	assert.Less(t, time.Since(started), time.Second, "the peer was waited on past its time")
+	said, _ := json.Marshal(refused)
+	assert.Contains(t, string(said), "did not answer SendMessage within 100ms")
+}
+
+// An agent a card names is given agentTurnTimeout, the same as a peer.
+func TestACardsAgentThatDoesNotAnswerWithinItsTimeIsLeft(t *testing.T) {
+	allowingLoopback(t)
+	bound := agentTurnTimeout
+	agentTurnTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { agentTurnTimeout = bound })
+	agent := &anotherAgent{thinks: 2 * time.Second}
+	served := cardServing(t, agent)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	started := time.Now()
+	code, refused := a2aCalledOver(t, srv, tokens[auth.LevelRoot], http.MethodPost, "SendMessage", map[string]any{
+		"card": served.URL, "message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	assert.NotEqual(t, http.StatusOK, code, refused)
+	assert.Less(t, time.Since(started), time.Second, "the agent was waited on past its time")
 	said, _ := json.Marshal(refused)
 	assert.Contains(t, string(said), "did not answer SendMessage within 100ms")
 }
