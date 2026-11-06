@@ -203,6 +203,15 @@ REACH is '/api/agents/{namespace}' '/api/agents/{namespace}/say' '/api/agents/{n
 # handles them is the namespace's owner, ROOT or SUPER, asked there too.
 REACH is '/api/keys/{namespace}' '/api/keys/{namespace}/drop'              of ROOT SUPER USER
 
+# "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
+# 「[Opus 5.5] The MCP servers the node consumes (ADR-038) are ROOT's. The yes at the server is a person's, so」
+# 「[Opus 5.5] the handler refuses a token or a connector the connecting, and the callback is reached logged in:」
+# 「[Opus 5.5] the code goes only to who asked for the yes.」
+REACH is '/api/mcp' '/api/mcp/tools' '/api/mcp/drop'                      of ROOT
+# 「[Opus 5.5] Each server the node consumes, served to the node's agents, whose tokens stand at ROOT.」
+REACH is '/api/mcp/servers/{name}'                                        of ROOT
+REACH is '/auth/mcp/callback'                                             of ROOT
+
 # Approvals (ADR-052): "approvals is ROOT only for now". The list is a sigil;
 # the answer is a route and no sigil, "human only" and "only through it's
 # element", which the handler asks of the admission: a token is refused.
