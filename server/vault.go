@@ -75,15 +75,15 @@ func anyOf(items []string) []any {
 
 // "i want single file bindings that follow that format"
 
-// vaultBinding is one folder or note a vault holds, as its record names it.
+// 「[Opus 5.5] vaultBinding is one folder or note a vault holds, as its record names it.」
 type vaultBinding struct {
 	source buildSource
 	place  string
-	// note is a binding naming one file: its path, and its place, are a note.
+	// 「[Opus 5.5] note is a binding naming one file: its path, and its place, are a note.」
 	note bool
 }
 
-// bindingOf reads one of a vault's folders: a build's input, = and its place.
+// 「[Opus 5.5] bindingOf reads one of a vault's folders: a build's input, = and its place.」
 func bindingOf(folder string) (vaultBinding, error) {
 	repo, place, ok := strings.Cut(folder, "=")
 	if !ok || place == "" {
@@ -100,8 +100,8 @@ func bindingOf(folder string) (vaultBinding, error) {
 	return vaultBinding{source: source, place: place, note: note}, nil
 }
 
-// placeRoot is the vault's folder the binding's notes are under: its place, or
-// the folder its note is in.
+// 「[Opus 5.5] placeRoot is the vault's folder the binding's notes are under: its place, or」
+// 「[Opus 5.5] the folder its note is in.」
 func (b vaultBinding) placeRoot() string {
 	if b.note {
 		return path.Dir(b.place)
@@ -109,15 +109,15 @@ func (b vaultBinding) placeRoot() string {
 	return b.place
 }
 
-// rootIn is placeRoot in the vault's copy at vaultPath.
+// 「[Opus 5.5] rootIn is placeRoot in the vault's copy at vaultPath.」
 func (b vaultBinding) rootIn(vaultPath string) string {
 	return filepath.Join(vaultPath, filepath.FromSlash(b.placeRoot()))
 }
 
-// under is what a binding's note is placed by under placeRoot.
+// 「[Opus 5.5] under is what a binding's note is placed by under placeRoot.」
 func (b vaultBinding) under() string { return path.Base(b.place) }
 
-// repoFile is the repository's file of the note placed by under.
+// 「[Opus 5.5] repoFile is the repository's file of the note placed by under.」
 func (b vaultBinding) repoFile(under string) string {
 	if b.note {
 		return b.source.Path
