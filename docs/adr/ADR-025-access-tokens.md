@@ -3,7 +3,7 @@
 Date: 2026-10-19
 Status: Debated
 
-this 
+this doc has an identity crisis
 
 Access Tokens for Machine and Agent Access
 
