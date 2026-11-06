@@ -266,7 +266,7 @@ func TestTheMCPServersTheNodeConsumesAreROOTs(t *testing.T) {
 		"SUPER": person("https://example.org/super", auth.LevelSuper),
 		"USER":  person(gardener, auth.LevelUser, "garden"),
 	} {
-		for _, sigilName := range []string{"list", "connect", "tools", "call", "drop"} {
+		for _, sigilName := range []string{"list", "connect", "tools", "drop"} {
 			_, refused := consumedAs(s, admitted, sigilName, sigil.Sent{"name": "tracker", "url": "https://tracker.example/mcp", "tool": "issues"})
 			require.NotNil(t, refused, who+" "+sigilName)
 			assert.Equal(t, sigil.NotAllowed, refused.Why, who+" "+sigilName)
@@ -291,25 +291,52 @@ func TestTheMCPServersTheNodeConsumesAreROOTs(t *testing.T) {
 	}
 }
 
-// "Node Agent uses them (B)"
+// "THE NODE'S MCP NEEDS"
 //
-// 「[Opus 5.5] What ROOT connected the node to, an agent at ROOT uses: its token lists the server's tools and」
-// 「[Opus 5.5] calls one, and the call is written down in system, as the token that called it.」
-func TestTheNodesAgentCallsAToolOfAnMCPServerROOTConnected(t *testing.T) {
+// 「[Opus 5.5] End to end: ROOT connects the node, the Node Agent is given the server in its own MCP list, and」
+// 「[Opus 5.5] with its own token, through the node's gate, it lists the server's tools and calls one. The call」
+// 「[Opus 5.5] is written down in system, and the upstream's token never reaches the agent.」
+func TestTheNodeAgentIsGivenTheServerROOTConnectedAndCallsIt(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
-	nodeConnected(t, s, standingUpstream(t))
+	up := standingUpstream(t)
+	nodeConnected(t, s, up)
+	s.authEnabled = true
+	s.rlAuth, s.rlWS, s.rlWrite, s.rlRead, s.rlPublic = newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100)
+	if s.answering == nil {
+		s.setupHTTPRoutes()
+	}
+	require.NoError(t, s.open())
+	node := httptest.NewServer(s.served)
+	t.Cleanup(node.Close)
 
-	agent := person("did:key:z6MkTheNodeAgent", auth.LevelRoot)
-	agent.Grant = &access.Grant{}
-	tools, refused := consumedAs(s, agent, "tools", sigil.Sent{"name": "tracker"})
-	require.Nil(t, refused)
-	assert.Equal(t, []consumedTool{{Name: "issues", Description: "Lists the issues."}}, tools)
+	agent, err := theNodeAgent(s.nodeDID.PrivateKey, t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, s.authHandler.HoldNodeAgent(agent.token, agent.did))
 
-	called, refused := consumedAs(s, agent, "call", sigil.Sent{"name": "tracker", "tool": "issues", "arguments": `{"state":"open"}`})
-	require.Nil(t, refused)
-	holds(t, s.consumedSignum(), "call", called)
-	assert.False(t, called.(consumedCalled).IsError)
-	assert.JSONEq(t, `[{"type":"text","text":"none"}]`, string(called.(consumedCalled).Content))
+	given := s.consumedForAgent(agent, node.URL)
+	require.Len(t, given, 1)
+	assert.Equal(t, "tracker", given[0].Name)
+	assert.Equal(t, node.URL+ConsumedServedAt+"tracker", given[0].URL, "the agent reaches the server at the node, never at the upstream")
+	assert.NotContains(t, given[0].URL, up.at)
+	for _, server := range s.piMCP(agent, node.URL) {
+		assert.Equal(t, agent.token, server.Bearer, "every server the agent is given is reached with its own token: %s", server.Name)
+	}
+
+	ctx := context.Background()
+	client := mcp.NewClient(&mcp.Implementation{Name: "node-agent", Version: "0"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: given[0].URL, HTTPClient: &http.Client{Transport: bearing{token: agent.token}}}, nil)
+	require.NoError(t, err, "the node did not serve the server ROOT connected to its agent")
+	t.Cleanup(func() { _ = session.Close() })
+	listed, err := session.ListTools(ctx, nil)
+	require.NoError(t, err)
+	require.Len(t, listed.Tools, 1)
+	assert.Equal(t, "issues", listed.Tools[0].Name)
+	assert.Equal(t, "Lists the issues.", listed.Tools[0].Description)
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "issues", Arguments: map[string]any{"state": "open"}})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	assert.Equal(t, "none", result.Content[0].(*mcp.TextContent).Text)
 
 	reading, err := s.held.Read(consumedIn)
 	require.NoError(t, err)
@@ -318,56 +345,37 @@ func TestTheNodesAgentCallsAToolOfAnMCPServerROOTConnected(t *testing.T) {
 	require.Len(t, lines, 1)
 	assert.Equal(t, []string{"issues"}, lines[0].Predicates)
 	assert.Equal(t, []string{consumedIn, "mcp:tracker"}, lines[0].Contexts)
-	assert.Equal(t, []string{"did:key:z6MkTheNodeAgent"}, lines[0].Actors)
+	assert.Equal(t, agent.did, lines[0].Attributes["token"], "which token called is written down")
 	assert.Equal(t, `{"state":"open"}`, lines[0].Attributes["arguments"])
 
-	listed, refused := consumedAs(s, agent, "list", sigil.Sent{})
+	listedServers, refused := consumedAs(s, asROOT, "list", sigil.Sent{})
 	require.Nil(t, refused)
-	require.Len(t, listed.([]consumedServer), 1, "a call line is no server: the server the node consumes is still listed")
+	require.Len(t, listedServers.([]consumedServer), 1, "a call line is no server: the server the node consumes is still listed")
 
-	_, refused = consumedAs(s, agent, "call", sigil.Sent{"name": "tracker", "tool": "issues", "arguments": "not json"})
-	require.NotNil(t, refused)
-	assert.Equal(t, "arguments", refused.Param)
+	stranger, err := http.Post(given[0].URL, "application/json", strings.NewReader(`{}`))
+	require.NoError(t, err)
+	_ = stranger.Body.Close()
+	assert.Equal(t, http.StatusUnauthorized, stranger.StatusCode, "nobody reaches the server the node consumes without a credential")
 }
 
-// 「[Opus 5.5] At the node's MCP server, an agent at ROOT is offered the call as a tool, and the call reaches」
-// 「[Opus 5.5] the server ROOT connected: a sigil is one tool, nothing built for MCP alone.」
-func TestTheNodesMCPServerOffersItsAgentTheCall(t *testing.T) {
+// 「[Opus 5.5] A namespace's agent is given none of what the node consumes.」
+func TestANamespacesAgentIsGivenNoneOfWhatTheNodeConsumes(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	nodeConnected(t, s, standingUpstream(t))
-	if s.answering == nil {
-		s.setupHTTPRoutes()
-	}
-	require.NoError(t, s.open())
+	agent, refused := s.holdNamespaceAgent("garden", "claude-opus-5-5", gardener)
+	require.Nil(t, refused)
+	assert.Empty(t, s.consumedForAgent(agent, "http://node"))
+	assert.Len(t, s.piMCP(agent, "http://node"), 1, "the node's own MCP, and nothing it consumes")
+}
 
-	agent := person("did:key:z6MkTheNodeAgent", auth.LevelRoot)
-	agent.Grant = &access.Grant{}
-	asked := httptest.NewRequest(http.MethodPost, "/mcp", nil).WithContext(auth.WithAdmission(context.Background(), agent))
-	ctx := context.Background()
-	clientSide, serverSide := mcp.NewInMemoryTransports()
-	serving, err := s.mcpServerFor(asked).Connect(ctx, serverSide, nil)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = serving.Close() })
-	session, err := mcp.NewClient(&mcp.Implementation{Name: "node-agent", Version: "0"}, nil).Connect(ctx, clientSide, nil)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = session.Close() })
-
-	listed, err := session.ListTools(ctx, nil)
-	require.NoError(t, err)
-	offered := map[string]bool{}
-	for _, tool := range listed.Tools {
-		offered[tool.Name] = true
+// 「[Opus 5.5] A server is named as the node's agents are given it: not qntx, the node's own.」
+func TestAServerIsNamedAsTheNodesAgentsAreGivenIt(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	for _, name := range []string{"qntx", "Tracker", "track-er", "a b"} {
+		_, refused := consumedAs(s, asROOT, "connect", sigil.Sent{"name": name, "url": "https://tracker.example/mcp"})
+		require.NotNil(t, refused, name)
+		assert.Equal(t, "name", refused.Param, name)
 	}
-	for _, name := range []string{"mcp_list", "mcp_tools", "mcp_call"} {
-		assert.True(t, offered[name], name)
-	}
-
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "mcp_call", Arguments: map[string]any{"name": "tracker", "tool": "issues", "arguments": `{}`}})
-	require.NoError(t, err)
-	text, isText := result.Content[0].(*mcp.TextContent)
-	require.True(t, isText)
-	require.False(t, result.IsError, text.Text)
-	assert.JSONEq(t, `{"content":[{"type":"text","text":"none"}],"is_error":false}`, text.Text)
 }
 
 // 「[Opus 5.5] The node reaches no address the internet does not route to, whatever a URL names.」

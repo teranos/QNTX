@@ -329,6 +329,10 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			}
 			if s.ownURL != "" {
 				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
+				// "THE NODE'S MCP NEEDS"
+				for _, consumed := range s.consumedForAgent(agent, s.ownURL) {
+					said.MCP = append(said.MCP, claudecode.MCPServer{Name: consumed.Name, URL: consumed.URL, Bearer: agent.token})
+				}
 			}
 			answer, err := s.spend(agent, said, t.shot, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
 			if err != nil {

@@ -442,12 +442,12 @@
         "ROOT"
       ]
     },
-    "/api/mcp/call": {
+    "/api/mcp/drop": {
       "x-qntx-reach": [
         "ROOT"
       ]
     },
-    "/api/mcp/drop": {
+    "/api/mcp/servers/{name}": {
       "x-qntx-reach": [
         "ROOT"
       ]
