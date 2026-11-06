@@ -287,7 +287,7 @@ func (s *QNTXServer) notifySettled(lines taskLines, task *a2asdk.Task) {
 				continue
 			}
 			// a2a-go's sender says a failed delivery itself, in the logger the context carries.
-			naming := a2alog.AttachLogger(s.ctx, a2alog.LoggerFrom(s.ctx).With("agent", lines.did, "task", string(task.ID), "config", config.ID))
+			naming := a2alog.AttachLogger(s.ctx, a2aSaid().With("agent", lines.did, "task", string(task.ID), "config", config.ID))
 			if err := pushSender.SendPush(naming, held[at], task); err != nil {
 				s.logger.Errorw("a task was settled and its push notification was not delivered", "agent", lines.did, "task", task.ID, "config", config.ID, "error", err)
 			}

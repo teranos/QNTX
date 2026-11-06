@@ -315,3 +315,26 @@ func TestALateStreamedErrorIsStillARefusal(t *testing.T) {
 	assert.Equal(t, "no such task", said.Message)
 	assert.Equal(t, "-32001", said.Reason)
 }
+
+// What a2a-go says went wrong is a Sentry log while Sentry runs, and is
+// written nowhere else: "Observability, this kind, needs to be owned by sentry/otel".
+func TestWhatA2AGoSaysIsASentryLog(t *testing.T) {
+	sent := toSentry(t)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	r := asBearer(http.MethodPost, "/a2a/tasks/nothing:cancel", tokens[auth.LevelRoot])
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+
+	require.Eventually(t, func() bool {
+		logs, _ := sent.said()
+		for _, l := range logs {
+			if l.Body == "canceler setup failed" {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 20*time.Millisecond, "a2a-go's error was not a Sentry log")
+}

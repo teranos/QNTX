@@ -55,6 +55,7 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		a2asrv.WithTaskStore(tasksOnLines{s}),
 		a2asrv.WithPushNotifications(pushesOnLines{s}, pushSender),
 		a2asrv.WithCallInterceptors(a2aGate{s}),
+		a2asrv.WithLogger(a2aSaid()),
 		a2asrv.WithExtendedAgentCardProducer(a2asrv.ExtendedAgentCardProducerFn(s.a2aExtendedCardOf)),
 		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true}),
 	)

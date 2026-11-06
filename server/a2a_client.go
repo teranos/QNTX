@@ -320,7 +320,7 @@ func (s *QNTXServer) a2aCalled(op a2aOperation, input protoreflect.MessageDescri
 		if err := protojson.Unmarshal(said, request); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Says: "what was sent is no " + string(input.FullName()) + ": " + err.Error()}
 		}
-		ctx, span := a2aTracer().Start(ctx, "a2a."+op.rpc, trace.WithSpanKind(trace.SpanKindClient),
+		ctx, span := a2aTracer().Start(withA2ASaid(ctx), "a2a."+op.rpc, trace.WithSpanKind(trace.SpanKindClient),
 			trace.WithAttributes(attribute.String("a2a.peer", sent["peer"]), attribute.String("a2a.card.url", bounded(sent["card"], saidPathMost))))
 		defer span.End()
 		client, agent, refusal := s.a2aClientOf(ctx, sent)
@@ -429,7 +429,7 @@ func a2aTracer() trace.Tracer { return otel.Tracer("github.com/teranos/QNTX/serv
 // internet routes to alone (§13.2), as a span: what the card says, or why it
 // was not found.
 func resolveCard(ctx context.Context, at string) (*a2asdk.AgentCard, *protocol.Refusal) {
-	ctx, span := a2aTracer().Start(ctx, "a2a.Resolve", trace.WithSpanKind(trace.SpanKindClient),
+	ctx, span := a2aTracer().Start(withA2ASaid(ctx), "a2a.Resolve", trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(attribute.String("a2a.card.url", bounded(at, saidPathMost))))
 	defer span.End()
 	refused := func(refusal *protocol.Refusal) (*a2asdk.AgentCard, *protocol.Refusal) {
