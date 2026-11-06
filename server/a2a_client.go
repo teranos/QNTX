@@ -330,18 +330,15 @@ func (s *QNTXServer) a2aCalled(op a2aOperation, input protoreflect.MessageDescri
 		}
 		defer func() { _ = client.Destroy() }()
 		span.SetAttributes(attribute.String("a2a.agent", bounded(agent, saidPathMost)))
-		// "Peer turn time limit of 45 sec"
-		if sent["peer"] != "" {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, peerTurnTimeout)
-			defer cancel()
-		}
+		// "Peer turn time limit of 45 sec", and an agent a card names the same.
+		ctx, cancel := context.WithTimeout(ctx, agentTurnTimeout)
+		defer cancel()
 		answered, err := op.call(ctx, client, request)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
-			if errors.Is(err, context.DeadlineExceeded) && sent["peer"] != "" {
-				return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " did not answer " + op.rpc + " within " + peerTurnTimeout.String()}
+			if errors.Is(err, context.DeadlineExceeded) {
+				return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " did not answer " + op.rpc + " within " + agentTurnTimeout.String()}
 			}
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " answered " + op.rpc + ": " + err.Error()}
 		}
@@ -349,9 +346,13 @@ func (s *QNTXServer) a2aCalled(op a2aOperation, input protoreflect.MessageDescri
 	}
 }
 
-// peerTurnTimeout is how long a peer is given to answer one operation, its
-// turn included: "Peer turn time limit of 45 sec".
-var peerTurnTimeout = 45 * time.Second
+// agentTurnTimeout is how long an agent, a peer's or one a card names, is
+// given to answer one operation, its turn included: "Peer turn time limit of
+// 45 sec", and for a card's agent "yes".
+var agentTurnTimeout = 45 * time.Second
+
+// cardResolveTimeout is how long a card is given to be read.
+const cardResolveTimeout = 30 * time.Second
 
 // a2aRequestJSON is what was sent as the spec's request in protojson: a field
 // holding a message or a list is sent as its JSON, any other as its value.
@@ -432,6 +433,8 @@ func resolveCard(ctx context.Context, at string) (*a2asdk.AgentCard, *protocol.R
 	ctx, span := a2aTracer().Start(withA2ASaid(ctx), "a2a.Resolve", trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(attribute.String("a2a.card.url", bounded(at, saidPathMost))))
 	defer span.End()
+	ctx, cancel := context.WithTimeout(ctx, cardResolveTimeout)
+	defer cancel()
 	refused := func(refusal *protocol.Refusal) (*a2asdk.AgentCard, *protocol.Refusal) {
 		span.SetStatus(codes.Error, refusal.GetSays())
 		return nil, refusal
@@ -479,5 +482,7 @@ func publicClient() *http.Client {
 		}
 		return nil
 	}}
-	return &http.Client{Timeout: 30 * time.Second, Transport: otelhttp.NewTransport(&http.Transport{DialContext: dialer.DialContext})}
+	// No Timeout: the call is bounded by its context, a card's read by
+	// cardResolveTimeout and an agent's turn by agentTurnTimeout.
+	return &http.Client{Transport: otelhttp.NewTransport(&http.Transport{DialContext: dialer.DialContext})}
 }

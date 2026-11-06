@@ -390,6 +390,10 @@ func (s *QNTXServer) messageTaken(ta taskAgent, sent *a2asdk.SendMessageRequest)
 	if m.Role != a2asdk.MessageRoleUser {
 		return a2aRefusal(a2asdk.ErrInvalidParams, "a message sent to "+ta.called+" is the user's, and this one's role is "+string(m.Role))
 	}
+	// "acceptedOutputModes": what the client takes, and the agent gives text.
+	if config := sent.Config; config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTextPlain) {
+		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" answers in "+textPlain+", which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" does not take")
+	}
 	// A turn takes nothing more once it is said: a message naming a task is
 	// one no task here accepts (§3.1.1, §3.4.2).
 	if m.TaskID != "" {
