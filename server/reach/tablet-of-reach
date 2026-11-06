@@ -211,6 +211,7 @@ REACH is '/api/mcp' '/api/mcp/tools' '/api/mcp/drop'                      of ROO
 # 「[Opus 5.5] Each server the node consumes, served to the node's agents, whose tokens stand at ROOT.」
 REACH is '/api/mcp/servers/{name}'                                        of ROOT
 REACH is '/auth/mcp/callback'                                             of ROOT
+REACH is '/auth/mcp/return'                                               of ANYONE
 
 # Approvals (ADR-052): "approvals is ROOT only for now". The list is a sigil;
 # the answer is a route and no sigil, "human only" and "only through it's

@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -436,7 +437,7 @@ func (s *QNTXServer) awaitYes(ctx context.Context, attempt *consumedAttempt, adm
 // 「[Opus 5.5] dynamic client registration with its own callback, reaching out only through consumedClient,」
 // 「[Opus 5.5] and keeping each token it is issued, sealed, in system.」
 func (s *QNTXServer) consumedOAuth(admitted auth.Admission, name, at string, kept *consumedGrant, fetch mcpauth.AuthorizationCodeFetcher) (*mcpauth.AuthorizationCodeHandler, error) {
-	redirect := s.authHandler.PublicOrigin() + ConsumedCallbackPath
+	redirect := s.authHandler.PublicOrigin() + ConsumedReturnPath
 	keep := func(cfg *oauth2.Config, token *oauth2.Token) error {
 		return s.keepGrant(admitted, name, at, consumedGrant{
 			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret, AuthURL: cfg.Endpoint.AuthURL, TokenURL: cfg.Endpoint.TokenURL,
@@ -695,29 +696,55 @@ func (s *QNTXServer) grantOf(name string) (string, *consumedGrant, error) {
 	return at.String(), &grant, nil
 }
 
-// 「[Opus 5.5] handleConsumedCallback is where the server's authorization sends the person back. The code is」
-// 「[Opus 5.5] handed only to the yes this same person asked for: "the browser finishing has to be the browser」
-// 「[Opus 5.5] that started" (auth.handleBindingCallback), and here the person logged in is who asked.」
+// handleConsumedCallback finishes a yes for a person logged in here at ROOT: GET from a browser holding
+// the node's cookie, POST from the app, which holds the person's session as a bearer and is handed the
+// code by /auth/mcp/return.
 func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 	if s.authHandler == nil {
 		http.Error(w, "this node serves no auth, so no yes comes back to it", http.StatusNotFound)
 		return
 	}
-	say := s.authHandler.RenderCeremonyPage
-	q := r.URL.Query()
+	switch r.Method {
+	case http.MethodGet:
+		status, ok, says := s.finishConsumed(r, r.URL.Query())
+		s.authHandler.RenderCeremonyPage(w, status, ok, says)
+	case http.MethodPost:
+		var sent struct {
+			State            string `json:"state"`
+			Code             string `json:"code"`
+			Iss              string `json:"iss"`
+			Error            string `json:"error"`
+			ErrorDescription string `json:"error_description"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&sent); err != nil {
+			writeError(w, http.StatusBadRequest, "a yes is posted as JSON: state, code, iss, error, error_description")
+			return
+		}
+		q := url.Values{}
+		for k, v := range map[string]string{"state": sent.State, "code": sent.Code, "iss": sent.Iss, "error": sent.Error, "error_description": sent.ErrorDescription} {
+			if v != "" {
+				q.Set(k, v)
+			}
+		}
+		status, ok, says := s.finishConsumed(r, q)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(map[string]any{"connected": ok && status == http.StatusOK, "says": says})
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// finishConsumed hands the yes in q to the connecting it was asked for, when the person at the gate is
+// one it may come back to, and is what to say of how it ended.
+func (s *QNTXServer) finishConsumed(r *http.Request, q url.Values) (int, bool, string) {
 	held, open := s.consuming.pending.Load(q.Get("state"))
 	if !open {
-		say(w, http.StatusBadRequest, false, "This yes is unknown, already finished, or older than ten minutes")
-		return
+		return http.StatusBadRequest, false, "This yes is unknown, already finished, or older than ten minutes"
 	}
 	flow, isFlow := held.(*consumedFlow)
 	if !isFlow {
-		say(w, http.StatusInternalServerError, false, "What waits under this state is not a yes the node asked for")
-		return
+		return http.StatusInternalServerError, false, "What waits under this state is not a yes the node asked for"
 	}
 	// 「[Opus 5.5] The yes comes back to a person logged in here at ROOT: not a token, not a connector. One a」
 	// 「[Opus 5.5] person asked for comes back to that person; one an agent at ROOT asked for, to any person at ROOT.」
@@ -725,17 +752,14 @@ func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Reque
 	_, tokenAsked := admitted.Asker().(admission.TokenAsked)
 	if !gated || !admitted.IsRoot() || tokenAsked || admitted.ClientDID != "" {
 		s.logger.Infow("an MCP server's yes refused: not brought back by a person at ROOT", "server", flow.name)
-		say(w, http.StatusForbidden, false, "A yes comes back to a person logged in here as ROOT. Open the link in the browser you are logged in with.")
-		return
+		return http.StatusForbidden, false, "A yes comes back to a person logged in here as ROOT. Open the link in the browser you are logged in with."
 	}
 	if flow.byPerson && admitted.Identity != flow.by {
 		s.logger.Infow("an MCP server's yes refused: finished by somebody who did not ask for it", "server", flow.name)
-		say(w, http.StatusForbidden, false, "This yes was asked for by somebody else. Connect from your own window, logged in here.")
-		return
+		return http.StatusForbidden, false, "This yes was asked for by somebody else. Connect from your own window, logged in here."
 	}
 	if time.Since(flow.startedAt) > consumedFlowLife {
-		say(w, http.StatusBadRequest, false, "This yes is older than ten minutes: connect again")
-		return
+		return http.StatusBadRequest, false, "This yes is older than ten minutes: connect again"
 	}
 	back := consumedReturn{result: &mcpauth.AuthorizationResult{Code: q.Get("code"), State: q.Get("state"), Iss: q.Get("iss")}}
 	if refused := q.Get("error"); refused != "" {
@@ -746,21 +770,66 @@ func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Reque
 	select {
 	case flow.code <- back:
 	default:
-		say(w, http.StatusConflict, false, "This yes already came back")
-		return
+		return http.StatusConflict, false, "This yes already came back"
 	}
 	select {
 	case <-flow.attempt.over:
 	case <-time.After(consumedWait):
-		say(w, http.StatusAccepted, true, "The node is still connecting to "+flow.name+": mcp list says when it is")
-		return
+		return http.StatusAccepted, true, "The node is still connecting to " + flow.name + ": mcp list says when it is"
 	}
 	if flow.attempt.err != nil {
-		say(w, http.StatusBadGateway, false, "The node is not connected to "+flow.name+": "+flow.attempt.err.Error())
+		return http.StatusBadGateway, false, "The node is not connected to " + flow.name + ": " + flow.attempt.err.Error()
+	}
+	s.logger.Infow("an MCP server's yes came back", "server", flow.name, "by", admitted.Identity)
+	return http.StatusOK, true, "The node is connected to " + flow.name + ", which lists " + strings.Join(flow.attempt.tools, ", ")
+}
+
+// ConsumedReturnPath is where the server's authorization sends the person back with the code: anyone's,
+// because the browser it comes back to may hold no session here. The person finishes the yes from it, in
+// the QNTX app, which is logged in, or in this browser, when it is (ConsumedCallbackPath).
+//
+// "the QNTX app is here on my phone, I am talking to you through it"
+const ConsumedReturnPath = "/auth/mcp/return"
+
+// consumedAppReturn is where the QNTX app takes a yes back to the node (QNTX-Web app-door.ts).
+const consumedAppReturn = "qntx://mcp"
+
+// handleConsumedReturn shows the person the two ways to finish a yes the node is waiting on. It hands the
+// code on and finishes nothing: the code redeems nothing without the verifier this node alone holds, and
+// is finished only by a person at ROOT (finishConsumed).
+func (s *QNTXServer) handleConsumedReturn(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	say(w, http.StatusOK, true, "The node is connected to "+flow.name+", which lists "+strings.Join(flow.attempt.tools, ", "))
+	q := r.URL.Query()
+	held, open := s.consuming.pending.Load(q.Get("state"))
+	flow, isFlow := held.(*consumedFlow)
+	if !open || !isFlow || time.Since(flow.startedAt) > consumedFlowLife {
+		if s.authHandler != nil {
+			s.authHandler.RenderCeremonyPage(w, http.StatusBadRequest, false, "This yes is unknown, already finished, or older than ten minutes")
+			return
+		}
+		http.Error(w, "this yes is unknown, already finished, or older than ten minutes", http.StatusBadRequest)
+		return
+	}
+	carried := url.Values{}
+	for _, k := range []string{"state", "code", "iss", "error", "error_description"} {
+		if v := q.Get(k); v != "" {
+			carried.Set(k, v)
+		}
+	}
+	inApp := consumedAppReturn + "?" + carried.Encode()
+	here := ConsumedCallbackPath + "?" + carried.Encode()
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	_, _ = fmt.Fprintf(w, consumedReturnPage, html.EscapeString(flow.name), html.EscapeString(inApp), html.EscapeString(here))
 }
+
+const consumedReturnPage = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>QNTX</title>
+<style>body{background:#1a1b2e;color:#e6e6ef;font-family:-apple-system,system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}main{text-align:center;max-width:22rem;padding:1.5rem}h1{letter-spacing:.3em}a{display:block;margin:1rem 0;padding:.9rem 1.2rem;border-radius:.6rem;background:#4a4a6e;color:#fff;text-decoration:none}a.quiet{background:none;color:#a0a0bf;text-decoration:underline}</style></head>
+<body><main><h1>QNTX</h1><p>Finish connecting %s.</p><a href="%s">Open in the QNTX app</a><a class="quiet" href="%s">Finish in this browser, logged in to the node</a></main></body></html>`
 
 // "And actually apply to Node agents?"
 //
