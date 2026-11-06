@@ -107,3 +107,17 @@ fn a_negative_timestamp_with_a_sub_second_is_kept() {
     let o = run(&p, &["ax", "OLD"], "");
     assert!(out(&o).contains("\"timestamp\":-1500"), "{}", out(&o));
 }
+
+#[test]
+fn a_signed_attestation_without_actors_is_refused_not_authored_over_its_signature() {
+    let (_d, p) = db();
+    let o = run(&p, &["put", "-"], "{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"signature\":[1,2,3]}\n");
+    assert!(!o.status.success());
+    assert!(err(&o).contains("signed attestation must name its actors"), "{}", err(&o));
+    assert_eq!(out(&o), "");
+    assert_eq!(count(&p), "0");
+    // named actors under a signature stand, untouched
+    let o = run(&p, &["put", "-"], "{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"actors\":[\"bob\"],\"signature\":[1,2,3]}\n");
+    assert!(o.status.success(), "{}", err(&o));
+    assert_eq!(count(&p), "1");
+}

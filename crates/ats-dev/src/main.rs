@@ -225,6 +225,15 @@ fn complete(line: &str) -> Result<Attestation, Box<Error>> {
     }
     if !obj.contains_key("actors") { obj.insert("actors".into(), serde_json::json!([])); }
     let a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
+    // The actors are under the signature. Naming one here would store a row
+    // whose signature no longer holds; the node's door refuses that too
+    // ("the signer names them so"), so the signer must.
+    if a.signature.is_some() && a.actors.is_empty() {
+        return Err(fail(
+            "a signed attestation must name its actors",
+            format!("{}: the signature covers them, so ats-dev cannot author one in", a.id),
+        ));
+    }
     Ok(a.authored_by(ACTOR))
 }
 
