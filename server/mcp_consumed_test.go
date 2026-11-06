@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	"golang.org/x/oauth2"
 )
 
 // 「[Opus 5.5] upstream is another system's MCP server and its authorization server, as the MCP」
@@ -31,6 +33,8 @@ type upstream struct {
 	verifier  bool
 	refreshed []string
 	live      map[string]bool
+	// 「[Opus 5.5] open is an upstream that asks for no authorization.」
+	open bool
 }
 
 const upstreamCode = "the-code"
@@ -113,7 +117,7 @@ func standingUpstream(t *testing.T) *upstream {
 		up.mu.Lock()
 		live := up.live[bearer]
 		up.mu.Unlock()
-		if !live {
+		if !live && !up.open {
 			w.Header().Set("WWW-Authenticate", `Bearer resource_metadata="`+up.at+`/.well-known/oauth-protected-resource/mcp"`)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -212,6 +216,7 @@ func TestROOTConnectsTheNodeToAnMCPServerAndTheGrantIsKeptSealed(t *testing.T) {
 	}
 	_, grant, err := s.grantOf("tracker")
 	require.NoError(t, err)
+	require.NotNil(t, grant)
 	assert.Equal(t, "refresh-2", grant.Token.RefreshToken, "the token the refresh rotated to is the one kept")
 	assert.Equal(t, "qntx-at-upstream", grant.ClientID, "the client registered is kept, since a refresh is asked as it")
 
@@ -396,4 +401,85 @@ func TestTheTableGivesTheMCPServersTheNodeConsumesToROOT(t *testing.T) {
 	}
 	assert.Equal(t, []string{"ROOT"}, compiled[ConsumedCallbackPath])
 	require.NoError(t, s.consumedSignum().Check())
+}
+
+// 「[Opus 5.5] A server that asks for no authorization is kept as open: listed, given to the node's agents, and」
+// 「[Opus 5.5] reached as it is, with no grant.」
+func TestAServerThatAsksForNoYesIsKeptOpen(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	up := standingUpstream(t)
+	up.open = true
+
+	connecting, refused := consumedAs(s, asROOT, "connect", sigil.Sent{"name": "tracker", "url": up.at + "/mcp"})
+	require.Nil(t, refused)
+	assert.Empty(t, connecting.(consumedConnecting).Authorize)
+	assert.Equal(t, []string{"issues"}, connecting.(consumedConnecting).Tools)
+
+	listed, refused := consumedAs(s, asROOT, "list", sigil.Sent{})
+	require.Nil(t, refused)
+	require.Len(t, listed.([]consumedServer), 1, "a server connected without a yes is still connected")
+	_, grant, err := s.grantOf("tracker")
+	require.NoError(t, err)
+	assert.Nil(t, grant)
+	tools, refused := consumedAs(s, asROOT, "tools", sigil.Sent{"name": "tracker"})
+	require.Nil(t, refused)
+	assert.Equal(t, []consumedTool{{Name: "issues", Description: "Lists the issues."}}, tools)
+	agent, err := theNodeAgent(s.nodeDID.PrivateKey, t.TempDir())
+	require.NoError(t, err)
+	assert.Len(t, s.consumedForAgent(agent, "http://node"), 1)
+}
+
+// 「[Opus 5.5] A redirect away from https is not followed: the grant never goes in the clear.」
+func TestARedirectAwayFromHTTPSIsNotFollowed(t *testing.T) {
+	from := httptest.NewRequest(http.MethodPost, "https://tracker.example/mcp", nil)
+	assert.Error(t, consumedRedirect(httptest.NewRequest(http.MethodPost, "http://tracker.example/mcp", nil), []*http.Request{from}))
+	assert.NoError(t, consumedRedirect(httptest.NewRequest(http.MethodPost, "https://tracker.example/v2/mcp", nil), []*http.Request{from}))
+}
+
+// 「[Opus 5.5] A call that fails is written down too, with why.」
+func TestAFailedCallIsWrittenDown(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	nodeConnected(t, s, standingUpstream(t))
+	result := s.consumedCall(context.Background(), asROOT, "tracker", "nothing", json.RawMessage(`{"q":1}`))
+	require.True(t, result.IsError)
+
+	reading, err := s.held.Read(consumedIn)
+	require.NoError(t, err)
+	lines, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Subjects: []string{consumedCallSubject}, Limit: ats.EveryRow})
+	require.NoError(t, err)
+	require.Len(t, lines, 1)
+	assert.Equal(t, []string{"nothing"}, lines[0].Predicates)
+	assert.Equal(t, true, lines[0].Attributes["is_error"])
+	assert.NotEmpty(t, lines[0].Attributes["failed"])
+	assert.Equal(t, `{"q":1}`, lines[0].Attributes["arguments"])
+}
+
+// 「[Opus 5.5] Every connection to a server shares one token source, so a refresh is asked once.」
+func TestEveryConnectionToAServerSharesOneTokenSource(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	nodeConnected(t, s, standingUpstream(t))
+	at, grant, err := s.grantOf("tracker")
+	require.NoError(t, err)
+	never := func(context.Context, *mcpauth.AuthorizationArgs) (*mcpauth.AuthorizationResult, error) {
+		return nil, nil
+	}
+	first, err := s.consumedOAuth(asROOT, "tracker", at, grant, never)
+	require.NoError(t, err)
+	second, err := s.consumedOAuth(asROOT, "tracker", at, grant, never)
+	require.NoError(t, err)
+	one, err := first.TokenSource(context.Background())
+	require.NoError(t, err)
+	other, err := second.TokenSource(context.Background())
+	require.NoError(t, err)
+	assert.Same(t, one, other)
+}
+
+// 「[Opus 5.5] A refresh that keeps the access token and rotates the refresh token is kept.」
+func TestARotatedRefreshTokenIsKept(t *testing.T) {
+	var kept []string
+	source := &keptSource{from: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "a", RefreshToken: "r2"}), last: oauth2.Token{AccessToken: "a", RefreshToken: "r1"},
+		keep: func(token *oauth2.Token) error { kept = append(kept, token.RefreshToken); return nil }}
+	_, err := source.Token()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"r2"}, kept)
 }

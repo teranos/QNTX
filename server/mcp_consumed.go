@@ -64,6 +64,8 @@ const (
 	consumedURL     = "url"
 	consumedSealed  = "sealed"
 	consumedDropped = "dropped"
+	// 「[Opus 5.5] consumedOpen is a server that asked for no authorization: it holds no grant, and is reached as it is.」
+	consumedOpen = "open"
 )
 
 // 「[Opus 5.5] consumedName is what a server is named: its name is the MCP server's name in the node's agents,」
@@ -86,6 +88,11 @@ const consumedFlowLife = 10 * time.Minute
 var consumedWait = 30 * time.Second
 
 // 「[Opus 5.5] consumedDialTimeout bounds reaching the server's address, and nothing after: its stream stays open.」
+
+// 「[Opus 5.5] consumedCallLife bounds one call of the node's agents through to the server: listing its tools,」
+// 「[Opus 5.5] or one tool's call. An upstream that stops answering does not hold the node past it.」
+var consumedCallLife = 5 * time.Minute
+
 const consumedDialTimeout = 15 * time.Second
 
 // 「[Opus 5.5] consumedAddress is whether the node reaches ip for an MCP server a person named: what the」
@@ -109,7 +116,22 @@ var consumedClient = func() *http.Client {
 		}
 		return nil
 	}}
-	return &http.Client{Transport: &http.Transport{DialContext: dialer.DialContext, ResponseHeaderTimeout: consumedDialTimeout}}
+	// 「[Opus 5.5] No response is waited on for a set time here: a tool's call answers when the tool is done.」
+	// 「[Opus 5.5] consumedCallLife bounds the whole of it instead.」
+	return &http.Client{Transport: &http.Transport{DialContext: dialer.DialContext},
+		CheckRedirect: consumedRedirect}
+}
+
+// 「[Opus 5.5] consumedRedirect follows a redirect over https alone, so a request carrying the grant never」
+// 「[Opus 5.5] goes in the clear.」
+func consumedRedirect(req *http.Request, via []*http.Request) error {
+	if req.URL.Scheme != "https" {
+		return errors.Newf("%s redirected to %s, and the node reaches an MCP server over https alone", via[len(via)-1].URL.Host, req.URL.Redacted())
+	}
+	if len(via) >= 10 {
+		return errors.Newf("%s redirected ten times", via[0].URL.Host)
+	}
+	return nil
 }
 
 // 「[Opus 5.5] consumedGrant is what is sealed: the client the server's authorization knows the node by, and」
@@ -149,6 +171,9 @@ type consumedReturn struct {
 // 「[Opus 5.5] consumedFlows is every yes being waited on, by the state the SDK put in its URL.」
 type consumedFlows struct {
 	pending sync.Map
+	// 「[Opus 5.5] sources is each server's token source, one for the node, so a refresh is asked once however」
+	// 「[Opus 5.5] many calls find the token expired at once: a provider spends a refresh token on its first use.」
+	sources sync.Map
 }
 
 // 「[Opus 5.5] consumedAttempt is one connecting: where to say yes once the server asks for it, and how it」
@@ -294,6 +319,7 @@ func (s *QNTXServer) consumedDrop(ctx context.Context, sent sigil.Sent) (any, *p
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: err.Error()}
 		}
+		s.consuming.sources.Delete(name.String())
 		if err := s.writeConsumedLine(admitted, consumedLineSubject, name.String(), map[string]any{consumedDropped: true}); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
@@ -366,12 +392,30 @@ func (s *QNTXServer) consume(admitted auth.Admission, name, at string) *consumed
 			attempt.err = err
 			return
 		}
+		began := time.Now()
 		attempt.tools, attempt.err = s.toolNamesAt(ctx, at, handler)
+		if attempt.err == nil {
+			attempt.err = s.keepOpenUnlessGranted(admitted, name, at, began)
+		}
 		if attempt.err == nil {
 			s.logger.Infow("the node is connected to an MCP server", "server", name, "url", at, "tools", len(attempt.tools), "by", admitted.Identity)
 		}
 	})
 	return attempt
+}
+
+// 「[Opus 5.5] keepOpenUnlessGranted writes the server down as open when it answered without asking for a yes:」
+// 「[Opus 5.5] no grant was kept for it since began.」
+func (s *QNTXServer) keepOpenUnlessGranted(admitted auth.Admission, name, at string, began time.Time) error {
+	newest, err := s.newestConsumed()
+	if err != nil {
+		return err
+	}
+	if line, kept := newest[name]; kept && !line.Timestamp.Before(began) {
+		return nil
+	}
+	s.consuming.sources.Delete(name)
+	return s.writeConsumedLine(admitted, consumedLineSubject, name, map[string]any{consumedURL: at, consumedOpen: true})
 }
 
 // 「[Opus 5.5] awaitYes hands the URL to say yes at to whoever asked, and waits for the callback's code.」
@@ -427,14 +471,17 @@ func (s *QNTXServer) consumedOAuth(admitted auth.Admission, name, at string, kep
 			if err := keep(cfg, token); err != nil {
 				return nil, err
 			}
-			return &keptSource{from: cfg.TokenSource(ctx, token), last: token.AccessToken, keep: func(token *oauth2.Token) error { return keep(cfg, token) }}, nil
+			source := &keptSource{from: cfg.TokenSource(ctx, token), last: *token, keep: func(token *oauth2.Token) error { return keep(cfg, token) }}
+			s.consuming.sources.Store(name, source)
+			return source, nil
 		},
 	}
 	if kept != nil {
 		cfg := kept.config(redirect)
 		refreshing := context.WithValue(context.Background(), oauth2.HTTPClient, reaching)
-		config.InitialTokenSource = &keptSource{from: cfg.TokenSource(refreshing, kept.Token), last: kept.Token.AccessToken,
-			keep: func(token *oauth2.Token) error { return keep(cfg, token) }}
+		held, _ := s.consuming.sources.LoadOrStore(name, &keptSource{from: cfg.TokenSource(refreshing, kept.Token), last: *kept.Token,
+			keep: func(token *oauth2.Token) error { return keep(cfg, token) }})
+		config.InitialTokenSource = held.(*keptSource)
 	}
 	handler, err := mcpauth.NewAuthorizationCodeHandler(config)
 	return handler, errors.Wrapf(err, "no authorization for %s at %s", name, at)
@@ -442,25 +489,28 @@ func (s *QNTXServer) consumedOAuth(admitted auth.Admission, name, at string, kep
 
 // 「[Opus 5.5] keptSource keeps every token its source hands out that it has not kept yet: a refresh rotates」
 // 「[Opus 5.5] the refresh token, and one not kept is a grant the next start cannot use.」
+//
+// 「[Opus 5.5] One is held per server for the node (consumedFlows.sources), so its refresh is asked once; a」
+// 「[Opus 5.5] refresh is kept as whoever's call first made the source.」
 type keptSource struct {
 	from oauth2.TokenSource
 	mu   sync.Mutex
-	last string
+	last oauth2.Token
 	keep func(*oauth2.Token) error
 }
 
 func (k *keptSource) Token() (*oauth2.Token, error) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
 	token, err := k.from.Token()
 	if err != nil {
 		return nil, err
 	}
-	k.mu.Lock()
-	defer k.mu.Unlock()
-	if token.AccessToken != k.last {
+	if token.AccessToken != k.last.AccessToken || token.RefreshToken != k.last.RefreshToken {
 		if err := k.keep(token); err != nil {
 			return nil, err
 		}
-		k.last = token.AccessToken
+		k.last = *token
 	}
 	return token, nil
 }
@@ -500,15 +550,19 @@ func (s *QNTXServer) consumedConn(ctx context.Context, admitted auth.Admission, 
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: err.Error()}
 	}
-	if s.authHandler == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node serves no auth, so no authorization can come back to it"}
-	}
-	again := func(context.Context, *mcpauth.AuthorizationArgs) (*mcpauth.AuthorizationResult, error) {
-		return nil, errors.Newf("%s no longer takes the grant the node keeps for it: say yes again with mcp connect", at)
-	}
-	handler, err := s.consumedOAuth(admitted, name, at, &grant, again)
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	var handler mcpauth.OAuthHandler
+	if grant != nil {
+		if s.authHandler == nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node serves no auth, so no authorization can come back to it"}
+		}
+		again := func(context.Context, *mcpauth.AuthorizationArgs) (*mcpauth.AuthorizationResult, error) {
+			return nil, errors.Newf("%s no longer takes the grant the node keeps for it: say yes again with mcp connect", at)
+		}
+		held, err := s.consumedOAuth(admitted, name, at, grant, again)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		}
+		handler = held
 	}
 	conn, err := mcpclient.Dial(ctx, mcpclient.Remote{URL: at, HTTPClient: consumedClient(), OAuth: handler},
 		mcpclient.Client{Name: "qntx", Version: version.Get().Version})
@@ -525,6 +579,8 @@ func (s *QNTXServer) consumedTools(ctx context.Context, sent sigil.Sent) (any, *
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Missing, Param: "name", Says: err.Error()}
 		}
+		ctx, cancel := context.WithTimeout(ctx, consumedCallLife)
+		defer cancel()
 		conn, refused := s.consumedConn(ctx, admitted, name.String())
 		if refused != nil {
 			return nil, refused
@@ -601,7 +657,8 @@ func (s *QNTXServer) consumedOf() ([]consumedServer, *protocol.Refusal) {
 	}
 	servers := []consumedServer{}
 	for name, as := range newest {
-		if _, holds := as.Attributes[consumedSealed].(string); !holds {
+		_, holds := as.Attributes[consumedSealed].(string)
+		if open, _ := as.Attributes[consumedOpen].(bool); !holds && !open {
 			continue
 		}
 		at, _ := as.Attributes[consumedURL].(string)
@@ -615,37 +672,40 @@ func (s *QNTXServer) consumedOf() ([]consumedServer, *protocol.Refusal) {
 	return servers, nil
 }
 
-// 「[Opus 5.5] grantOf is the server's URL and its grant, unsealed.」
-func (s *QNTXServer) grantOf(name string) (string, consumedGrant, error) {
+// 「[Opus 5.5] grantOf is the server's URL and its grant, unsealed; no grant for a server that asked for none.」
+func (s *QNTXServer) grantOf(name string) (string, *consumedGrant, error) {
 	newest, err := s.newestConsumed()
 	if err != nil {
-		return "", consumedGrant{}, err
+		return "", nil, err
 	}
 	as, set := newest[name]
 	if !set {
-		return "", consumedGrant{}, errors.Newf("the node consumes no MCP server %s: connect one with mcp connect", name)
-	}
-	sealed, holds := as.Attributes[consumedSealed].(string)
-	if !holds {
-		return "", consumedGrant{}, errors.Newf("the MCP server %s was dropped: connect it again with mcp connect", name)
+		return "", nil, errors.Newf("the node consumes no MCP server %s: connect one with mcp connect", name)
 	}
 	where, _ := as.Attributes[consumedURL].(string)
+	sealed, holds := as.Attributes[consumedSealed].(string)
+	if open, _ := as.Attributes[consumedOpen].(bool); !holds && !open {
+		return "", nil, errors.Newf("the MCP server %s was dropped: connect it again with mcp connect", name)
+	}
 	at, err := named.TextOf(consumedLineSubject+" line "+as.ID+", its url,", where)
 	if err != nil {
-		return "", consumedGrant{}, err
+		return "", nil, err
+	}
+	if !holds {
+		return at.String(), nil, nil
 	}
 	opened, err := s.unsealFor(consumedPurpose, consumedIn, sealed)
 	if err != nil {
-		return "", consumedGrant{}, err
+		return "", nil, err
 	}
 	var grant consumedGrant
 	if err := json.Unmarshal([]byte(opened), &grant); err != nil {
-		return "", consumedGrant{}, errors.Wrapf(err, "the grant for %s did not read", name)
+		return "", nil, errors.Wrapf(err, "the grant for %s did not read", name)
 	}
 	if grant.Token == nil {
-		return "", consumedGrant{}, errors.Newf("the grant for %s holds no token", name)
+		return "", nil, errors.Newf("the grant for %s holds no token", name)
 	}
-	return at.String(), grant, nil
+	return at.String(), &grant, nil
 }
 
 // 「[Opus 5.5] handleConsumedCallback is where the server's authorization sends the person back. The code is」
@@ -764,6 +824,8 @@ func (s *QNTXServer) HandleConsumedServer(w http.ResponseWriter, r *http.Request
 func (s *QNTXServer) consumedServerFor(ctx context.Context, admitted auth.Admission, name string) *mcp.Server {
 	ctx, done := apartFrom(ctx)
 	defer done()
+	ctx, cancel := context.WithTimeout(ctx, consumedCallLife)
+	defer cancel()
 	server := mcp.NewServer(&mcp.Implementation{Name: name, Version: version.VersionTag}, nil)
 	conn, refused := s.consumedConn(ctx, admitted, name)
 	if refused != nil {
@@ -777,12 +839,28 @@ func (s *QNTXServer) consumedServerFor(ctx context.Context, admitted auth.Admiss
 	}
 	for _, tool := range listed {
 		upstream := tool.Name
-		server.AddTool(&mcp.Tool{Name: tool.Name, Title: tool.Title, Description: tool.Description, InputSchema: tool.InputSchema, Annotations: tool.Annotations},
-			func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return s.consumedCall(ctx, admitted, name, upstream, req.Params.Arguments), nil
-			})
+		served := &mcp.Tool{Name: tool.Name, Title: tool.Title, Description: tool.Description, InputSchema: tool.InputSchema,
+			OutputSchema: tool.OutputSchema, Annotations: tool.Annotations}
+		if err := addUpstreamTool(server, served, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return s.consumedCall(ctx, admitted, name, upstream, req.Params.Arguments), nil
+		}); err != nil {
+			s.logger.Warnw("a tool of an MCP server the node consumes is not served: the SDK does not take it", "server", name, "tool", upstream, "error", err)
+		}
 	}
 	return server
+}
+
+// 「[Opus 5.5] addUpstreamTool adds a tool another system listed. The SDK panics on a tool it does not take,」
+// 「[Opus 5.5] an input schema that is no object among them, and what an upstream lists is not the node's to」
+// 「[Opus 5.5] trust that far: such a tool is not served.」
+func addUpstreamTool(server *mcp.Server, tool *mcp.Tool, handler mcp.ToolHandler) (err error) {
+	defer func() {
+		if refused := recover(); refused != nil {
+			err = errors.Newf("%v", refused)
+		}
+	}()
+	server.AddTool(tool, handler)
+	return nil
 }
 
 // 「[Opus 5.5] consumedCall calls one tool of the server on the grant kept for it, and writes the call down:」
@@ -794,19 +872,33 @@ func (s *QNTXServer) consumedCall(ctx context.Context, admitted auth.Admission, 
 	}
 	ctx, done := apartFrom(ctx)
 	defer done()
-	conn, refused := s.consumedConn(ctx, admitted, name)
-	if refused != nil {
-		return refusedTool(refused.GetSays())
-	}
-	result, err := conn.Call(ctx, tool, arguments)
-	if closed := conn.Close(); err != nil || closed != nil {
-		return refusedTool(errors.WithSecondaryError(err, closed).Error())
-	}
-	said := map[string]any{"server": name, "arguments": string(arguments), "is_error": result.IsError}
+	ctx, cancel := context.WithTimeout(ctx, consumedCallLife)
+	defer cancel()
+	said := map[string]any{"server": name, "arguments": string(arguments)}
 	// 「[Opus 5.5] A token carries the identity that minted it, so which token called is said beside it.」
 	if admitted.Grant != nil && admitted.Grant.DID != "" {
 		said["token"] = admitted.Grant.DID
 	}
+	// 「[Opus 5.5] A call that did not reach the tool, or that failed, is written down too, with why.」
+	failed := func(why string) *mcp.CallToolResult {
+		said["is_error"], said["failed"] = true, why
+		if err := s.writeConsumedLine(admitted, consumedCallSubject, tool, said, consumedContext(name)); err != nil {
+			why = errors.WithSecondaryError(errors.New(why), err).Error()
+		}
+		return refusedTool(why)
+	}
+	conn, refused := s.consumedConn(ctx, admitted, name)
+	if refused != nil {
+		return failed(refused.GetSays())
+	}
+	result, err := conn.Call(ctx, tool, arguments)
+	if closed := conn.Close(); closed != nil {
+		s.logger.Infow("a session with an MCP server the node consumes closed with an error", "server", name, "tool", tool, "error", closed)
+	}
+	if err != nil {
+		return failed(err.Error())
+	}
+	said["is_error"] = result.IsError
 	if err := s.writeConsumedLine(admitted, consumedCallSubject, tool, said, consumedContext(name)); err != nil {
 		return refusedTool(errors.Wrapf(err, "%s of %s answered, and the call was not written down, so its answer is not handed on", tool, name).Error())
 	}
