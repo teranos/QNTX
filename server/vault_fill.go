@@ -80,6 +80,64 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 	return notes, nil
 }
 
+// boundNotes is every note of a binding on branch: the notes under its folder,
+// or its one note, placed by its own name, and none when that is not on branch.
+func (s *QNTXServer) boundNotes(ctx context.Context, b vaultBinding, branch string) ([]repoNote, error) {
+	if !b.note {
+		return s.repoNotes(ctx, b.source.Repo, branch, b.source.Path)
+	}
+	reader, err := s.forges().For(b.source.Repo)
+	if err != nil {
+		return nil, err
+	}
+	dir := path.Dir(b.source.Path)
+	entries, err := reader.Entries(ctx, forge.AsApp, b.source.Repo, branch, dir)
+	var notADirectory forge.NotADirectory
+	if errors.As(err, &notADirectory) {
+		return nil, errors.Newf("%s is a %s of %s on %s, not a folder", dir, notADirectory.Kind, b.source.Repo, branch)
+	}
+	var refused forge.Refused
+	if errors.As(err, &refused) {
+		gone, goneErr := folderGone(ctx, reader, b.source.Repo, branch, dir)
+		if goneErr != nil {
+			return nil, goneErr
+		}
+		if gone {
+			return nil, nil
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if entry.Kind == forge.File && entry.Path == b.source.Path {
+			return []repoNote{{under: b.under(), path: entry.Path, sha: entry.SHA}}, nil
+		}
+	}
+	return nil, nil
+}
+
+// folderGone says whether dir, which the forge refused to list, is gone from
+// branch: git keeps no empty folder, so a note's folder goes with its last
+// note. It is gone when the nearest folder above it that the forge lists does
+// not hold it; one that holds it was refused for another reason.
+func folderGone(ctx context.Context, reader forge.Reader, repo forge.Repo, branch, dir string) (bool, error) {
+	for dir != forge.Root {
+		parent := path.Dir(dir)
+		entries, err := reader.Entries(ctx, forge.AsApp, repo, branch, parent)
+		var refused forge.Refused
+		if errors.As(err, &refused) {
+			dir = parent
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		return !slices.ContainsFunc(entries, func(e forge.Entry) bool { return e.Kind == forge.Dir && e.Path == dir }), nil
+	}
+	return false, nil
+}
+
 // repoNoteContent is a note's content on branch.
 func (s *QNTXServer) repoNoteContent(ctx context.Context, repo forge.Repo, branch, file string) ([]byte, error) {
 	reader, err := s.forges().For(repo)
@@ -125,22 +183,20 @@ func writeNote(at string, content []byte, mode os.FileMode) error {
 // copy, against what main had when they last agreed (the base).
 func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder string) vaultFilled {
 	filled := vaultFilled{Folder: folder, Wrote: []string{}, Merged: []string{}, Kept: []string{}, Removed: []string{}}
-	repo, place, named := strings.Cut(folder, "=")
-	if !named {
-		filled.Refused = errors.Newf("%s names no place in the vault", folder)
-		return filled
-	}
-	source, err := parseBuildSource(repo, true)
+	binding, err := bindingOf(folder)
 	if err != nil {
 		filled.Refused = err
 		return filled
 	}
-	notes, err := s.repoNotes(ctx, source.Repo, source.Branch, source.Path)
+	repo, source, place := binding.source.Repo, binding.source, binding.placeRoot()
+	notes, err := s.boundNotes(ctx, binding, source.Branch)
 	if err != nil {
 		filled.Refused = err
 		return filled
 	}
-	root := filepath.Join(vault.Path, filepath.FromSlash(place))
+	root := binding.rootIn(vault.Path)
+	// A note's base is kept where a folder bound at its folder keeps it, so a
+	// place bound again as the other keeps what main last agreed on.
 	bases, err := vaultBases(vault.Name, place)
 	if err != nil {
 		filled.Refused = err
@@ -218,6 +274,10 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 	// "yes"
 	// A note main no longer has is gone from the vault too, unless the vault changed it.
 	gone, err := basesNotIn(bases, now)
+	if binding.note {
+		// The bases beside a note's are other notes', bound apart: only its own is its.
+		gone = slices.DeleteFunc(gone, func(under string) bool { return under != binding.under() })
+	}
 	if err != nil {
 		filled.Refused = err
 		return filled
@@ -275,7 +335,8 @@ func vaultBases(name, place string) (string, error) {
 	}
 	kept := filepath.Join(dir, name)
 	at := filepath.Join(kept, filepath.FromSlash(path.Clean(place)))
-	if !strings.HasPrefix(at, kept+string(filepath.Separator)) {
+	// A note at the vault's top keeps its base at the top of the vault's bases.
+	if at != kept && !strings.HasPrefix(at, kept+string(filepath.Separator)) {
 		return "", errors.Newf("the bases of %s would be kept outside %s, at %s", place, kept, at)
 	}
 	return at, nil
@@ -361,10 +422,15 @@ func (s *QNTXServer) fillPlaceSoon(name, place string) {
 	})
 }
 
-// movedBy is whether push changed a file directly in source's folder on its branch.
+// movedBy is whether push changed a file directly in source's folder on its
+// branch, or the one note source names.
 func movedBy(push forge.Push) folderMoved {
 	return func(source buildSource, _ string) bool {
-		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && push.TouchedIn(source.Path)
+		touched := push.TouchedIn(source.Path)
+		if strings.HasSuffix(source.Path, noteSuffix) {
+			touched = push.Touched(source.Path)
+		}
+		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && touched
 	}
 }
 
