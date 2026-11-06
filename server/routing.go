@@ -151,6 +151,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/mcp/", s.HandleMCP)
 	// 「[Opus 5.5] An MCP server the node consumes sends the person back here with the code (mcp_consumed.go).」
 	s.answer(ConsumedCallbackPath, s.handleConsumedCallback)
+	s.answer(ConsumedReturnPath, s.handleConsumedReturn)
 	// 「[Opus 5.5] Each MCP server the node consumes, served to the node's agents as one of its own (mcp_consumed.go).」
 	s.answer(ConsumedServedAt+"{name}", s.HandleConsumedServer)
 
