@@ -2537,11 +2537,11 @@ type NodeAnthropic struct {
 	Session []*AnthropicWindow `protobuf:"bytes,15,rep,name=session,proto3" json:"session,omitempty"`
 	// What ROOT's agents last ran on: "session" or "console"; empty before any turn.
 	InUse string `protobuf:"bytes,16,opt,name=in_use,json=inUse,proto3" json:"in_use,omitempty"`
-	// The most a Session an element's agent runs in at Anthropic may spend, in cap_currency: what ROOT set, or the node's default.
+	// 「[Opus 5.5] The most a Session an element's agent runs in at Anthropic may spend, in cap_currency: what ROOT set, or the node's default.」
 	Cap string `protobuf:"bytes,17,opt,name=cap,proto3" json:"cap,omitempty"`
-	// The currency cap is in, the one Anthropic caps a Session in.
+	// 「[Opus 5.5] The currency cap is in, the one Anthropic caps a Session in.」
 	CapCurrency string `protobuf:"bytes,18,opt,name=cap_currency,json=capCurrency,proto3" json:"cap_currency,omitempty"`
-	// Whether cap is the node's default, as ROOT set none.
+	// 「[Opus 5.5] Whether cap is the node's default, as ROOT set none.」
 	CapDefault    bool `protobuf:"varint,19,opt,name=cap_default,json=capDefault,proto3" json:"cap_default,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
