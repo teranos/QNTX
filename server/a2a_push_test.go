@@ -190,3 +190,48 @@ func TestAConfigDeletedWhileAnotherIsToldIsToldNothing(t *testing.T) {
 	case <-time.After(300 * time.Millisecond):
 	}
 }
+
+// A config replaced under its id while an earlier webhook is still being told
+// is told at the URL it now names, not the one it named.
+func TestAConfigReplacedWhileAnotherIsToldIsToldWhereItNowSays(t *testing.T) {
+	sender := pushSender
+	pushSender = push.NewHTTPPushSender(&push.HTTPSenderConfig{AllowPrivateNetworks: true})
+	t.Cleanup(func() { pushSender = sender })
+	release, slowTook, formerTook, nowTook := make(chan struct{}), make(chan struct{}, 4), make(chan struct{}, 4), make(chan struct{}, 4)
+	slow := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { slowTook <- struct{}{}; <-release }))
+	former := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { formerTook <- struct{}{} }))
+	now := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { nowTook <- struct{}{} }))
+	for _, hook := range []*httptest.Server{slow, former, now} {
+		t.Cleanup(hook.Close)
+	}
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	root := tokens[auth.LevelRoot]
+
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("hi", ""), root)
+	require.Equal(t, http.StatusOK, code, sent)
+	task := at(sent, "task.id").(string)
+	configs := "/a2a/tasks/" + task + "/pushNotificationConfigs"
+	for _, config := range []string{`{"id": "a-slow", "url": "` + slow.URL + `"}`, `{"id": "b", "url": "` + former.URL + `"}`} {
+		code, created := a2aAsked(t, srv, http.MethodPost, configs, config, root)
+		require.Equal(t, http.StatusOK, code, created)
+	}
+	ta, err := srv.nodeTaskAgent()
+	require.NoError(t, err)
+	held, _, _, found, err := srv.heldTask(ta.taskLines, task)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	srv.notifySettled(ta.taskLines, held)
+	<-slowTook
+	code, replaced := a2aAsked(t, srv, http.MethodPost, configs, `{"id": "b", "url": "`+now.URL+`"}`, root)
+	require.Equal(t, http.StatusOK, code, replaced)
+	close(release)
+
+	select {
+	case <-nowTook:
+	case <-formerTook:
+		t.Fatal("a replaced config was told at the URL it no longer names")
+	case <-time.After(5 * time.Second):
+		t.Fatal("the replaced config was not told")
+	}
+}

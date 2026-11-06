@@ -280,10 +280,12 @@ func (s *QNTXServer) notifySettled(lines taskLines, task *a2asdk.Task) {
 				s.logger.Errorw("a task was settled and its push notification was not delivered: its configs were not read again", "agent", lines.did, "task", task.ID, "config", config.ID, "error", err)
 				continue
 			}
-			if !slices.ContainsFunc(held, func(push *a2asdk.PushConfig) bool { return push.ID == config.ID }) {
+			// Sent as the config now stands: one replaced under its id goes where it now says.
+			at := slices.IndexFunc(held, func(push *a2asdk.PushConfig) bool { return push.ID == config.ID })
+			if at < 0 {
 				continue
 			}
-			if err := pushSender.SendPush(s.ctx, config, task); err != nil {
+			if err := pushSender.SendPush(s.ctx, held[at], task); err != nil {
 				s.logger.Errorw("a task was settled and its push notification was not delivered", "agent", lines.did, "task", task.ID, "config", config.ID, "error", err)
 			}
 		}
