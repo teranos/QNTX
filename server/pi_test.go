@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "NOT BE ENTIRELY DEPENDENT ON ONE HARNESS"
@@ -199,6 +200,33 @@ func TestAmInNoHarnessIsEveryHarnessItIsNamedIn(t *testing.T) {
 	assert.Equal(t, "anthropic/claude-sonnet-4.6", am.GetPi().GetModel())
 	holds(t, withPi.nodeAgentSignum(), "am", am)
 	require.NoError(t, withPi.nodeAgentSignum().Check())
+}
+
+// 「[Opus 5.5] A harness whose binary has not arrived, or failed to, is not in am
+// asked in no harness; asked in it by name, am still says why.」
+func TestAmInNoHarnessLeavesOutAHarnessNotReady(t *testing.T) {
+	for name, held := range map[string]*harnessHeld{
+		"still arriving": {name: "Pi", fetched: make(chan struct{})},
+		"failed to arrive": func() *harnessHeld {
+			h := &harnessHeld{name: "Pi", fetched: make(chan struct{}), err: errors.New("the download was cut off")}
+			close(h.fetched)
+			return h
+		}(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, _, _ := runningPiToo(t)
+			s.holdHarness("pi", held)
+			answer, refused := s.nodeAgentSignum().Answers["am"](context.Background(), sigil.Sent{})
+			require.Nil(t, refused)
+			am := answer.(*protocol.NodeAgentAm)
+			assert.NotNil(t, am.GetClaude())
+			assert.Nil(t, am.GetPi())
+
+			named, refused := s.harnessAm(s.piHarness())
+			require.Nil(t, refused)
+			assert.NotEmpty(t, named.(*protocol.PiAm).GetNotReady())
+		})
+	}
 }
 
 // 「[Opus 5.5] An element's agent, asked am in no harness, answers in the ones it can be spoken to in.」

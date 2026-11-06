@@ -399,7 +399,7 @@ func (s *QNTXServer) elementAm(_ context.Context, sent sigil.Sent) (any, *protoc
 		return s.amOf(h, agent, h.spec()), nil
 	}
 	if sent["harness"] == "" {
-		return amInEvery(s.elementHarnesses(), "the element's agent", amIn)
+		return s.amInEvery(s.elementHarnesses(), "the element's agent", amIn)
 	}
 	h, refused := s.harnessNamed(sent)
 	if refused != nil {

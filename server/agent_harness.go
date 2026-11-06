@@ -168,7 +168,7 @@ func (s *QNTXServer) nodeAgentSay(ctx context.Context, sent sigil.Sent) (any, *p
 
 func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	if sent["harness"] == "" {
-		return amInEvery(s.harnesses(), "the Node Agent", s.harnessAm)
+		return s.amInEvery(s.harnesses(), "the Node Agent", s.harnessAm)
 	}
 	h, refused := s.harnessNamed(sent)
 	if refused != nil {
@@ -183,6 +183,22 @@ func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *prot
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent said who it is in " + h.called + " as no Coding Agent Harness this node runs"}
 	}
 	return into, nil
+}
+
+// 「[Opus 5.5] harnessNotReady is why nothing can be said in h yet: its binary
+// has not arrived, or failed to. Nil when it is ready.」
+func (s *QNTXServer) harnessNotReady(h *harness) *protocol.Refusal {
+	held := s.harnessHeldBy(h.name)
+	if held == nil {
+		return h.absent()
+	}
+	switch _, arrived, err := held.Now(); {
+	case !arrived:
+		return &protocol.Refusal{Why: sigil.Failed, Says: h.fetching}
+	case err != nil:
+		return &protocol.Refusal{Why: sigil.Failed, Says: h.called + " did not arrive: " + err.Error()}
+	}
+	return nil
 }
 
 // amInto puts what am answered in one harness where NodeAgentAm carries that
@@ -204,17 +220,21 @@ func amInto(into *protocol.NodeAgentAm, answer any) bool {
 }
 
 // 「[Opus 5.5] amInEvery is am in every harness of hs the agent can be spoken to
-// in, each where NodeAgentAm carries it: a harness am.toml does not name, or
-// whose binary the node does not hold, is not in it. When it can be spoken to
-// in none, the first harness's refusal says why.」
+// in, each where NodeAgentAm carries it: a harness am.toml does not name, whose
+// binary the node does not hold, or whose binary has not arrived or failed to,
+// is not in it. When it can be spoken to in none, the first harness's refusal
+// says why. am in the one harness named still says why it is not ready.」
 //
 // "We shouldn't be displaying unavailable things to people"
-func amInEvery(hs []*harness, called string, am func(*harness) (any, *protocol.Refusal)) (any, *protocol.Refusal) {
+func (s *QNTXServer) amInEvery(hs []*harness, called string, am func(*harness) (any, *protocol.Refusal)) (any, *protocol.Refusal) {
 	every := &protocol.NodeAgentAm{}
 	var first *protocol.Refusal
 	offered := 0
 	for _, h := range hs {
 		answer, refused := am(h)
+		if refused == nil {
+			refused = s.harnessNotReady(h)
+		}
 		if refused != nil {
 			if first == nil {
 				first = refused
