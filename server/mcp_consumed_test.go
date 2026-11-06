@@ -262,8 +262,7 @@ func TestTheCodeGoesOnlyToWhoAskedForTheYes(t *testing.T) {
 
 // "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
 //
-// 「[Opus 5.5] Nobody below ROOT uses or handles what the node consumes; a token at ROOT uses it and does not」
-// 「[Opus 5.5] connect or drop it, and neither does a connector: the yes is a person's. A URL is https.」
+// 「[Opus 5.5] Nobody below ROOT uses or handles what the node consumes. A URL is https.」
 func TestTheMCPServersTheNodeConsumesAreROOTs(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 
@@ -275,18 +274,6 @@ func TestTheMCPServersTheNodeConsumesAreROOTs(t *testing.T) {
 			_, refused := consumedAs(s, admitted, sigilName, sigil.Sent{"name": "tracker", "url": "https://tracker.example/mcp", "tool": "issues"})
 			require.NotNil(t, refused, who+" "+sigilName)
 			assert.Equal(t, sigil.NotAllowed, refused.Why, who+" "+sigilName)
-		}
-	}
-
-	token := person("https://example.org/root", auth.LevelRoot)
-	token.Grant = &access.Grant{}
-	connector := person("https://example.org/root", auth.LevelRoot)
-	connector.ClientDID = "did:key:z6MkTheConnector"
-	for who, admitted := range map[string]auth.Admission{"a token": token, "the connector": connector} {
-		for _, handling := range []string{"connect", "drop"} {
-			_, refused := consumedAs(s, admitted, handling, sigil.Sent{"name": "tracker", "url": "https://tracker.example/mcp"})
-			require.NotNil(t, refused, who+" "+handling)
-			assert.Contains(t, refused.Says, who, handling)
 		}
 	}
 
@@ -514,4 +501,50 @@ func TestAnElementsAgentIsGivenTheServerAsAROOTAccessibleAgent(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listed.Tools, 1)
 	assert.Equal(t, "issues", listed.Tools[0].Name)
+}
+
+// "Keeps deferring to a human who doesn't have the tools"
+//
+// 「[Opus 5.5] The Node Agent connects the node itself: a server that asks for no yes is connected there and」
+// 「[Opus 5.5] then; for one that asks, the agent is handed the link, a person at ROOT says yes in the browser」
+// 「[Opus 5.5] logged in here, and the grant is kept. A token bringing the code back is refused: the yes is a person's.」
+func TestTheNodeAgentConnectsTheNodeAndAPersonAtROOTSaysYes(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	agent := person("https://example.org/root", auth.LevelRoot)
+	agent.Grant = &access.Grant{DID: "did:key:z6MkTheNodeAgent"}
+
+	open := standingUpstream(t)
+	open.open = true
+	connecting, refused := consumedAs(s, agent, "connect", sigil.Sent{"name": "wiki", "url": open.at + "/mcp"})
+	require.Nil(t, refused)
+	assert.Empty(t, connecting.(consumedConnecting).Authorize)
+	assert.Equal(t, []string{"issues"}, connecting.(consumedConnecting).Tools)
+
+	up := standingUpstream(t)
+	connecting, refused = consumedAs(s, agent, "connect", sigil.Sent{"name": "tracker", "url": up.at + "/mcp"})
+	require.Nil(t, refused)
+	authorize := connecting.(consumedConnecting).Authorize
+	require.NotEmpty(t, authorize, "the agent is handed where a person says yes")
+
+	byToken := httptest.NewRecorder()
+	s.handleConsumedCallback(byToken, sayingYes(t, authorize, agent))
+	assert.Equal(t, http.StatusForbidden, byToken.Code, "a token does not bring the yes back")
+	byUser := httptest.NewRecorder()
+	s.handleConsumedCallback(byUser, sayingYes(t, authorize, person(gardener, auth.LevelUser, "garden")))
+	assert.Equal(t, http.StatusForbidden, byUser.Code, "nobody below ROOT brings it back")
+
+	back := httptest.NewRecorder()
+	s.handleConsumedCallback(back, sayingYes(t, authorize, person("https://example.org/root-on-the-phone", auth.LevelRoot)))
+	require.Equal(t, http.StatusOK, back.Code, back.Body.String())
+
+	listed, refused := consumedAs(s, agent, "list", sigil.Sent{})
+	require.Nil(t, refused)
+	names := []string{}
+	for _, server := range listed.([]consumedServer) {
+		names = append(names, server.Name)
+	}
+	assert.Equal(t, []string{"tracker", "wiki"}, names)
+
+	_, refused = consumedAs(s, agent, "drop", sigil.Sent{"name": "wiki"})
+	assert.Nil(t, refused, "the agent drops what it connected")
 }

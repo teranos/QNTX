@@ -153,7 +153,9 @@ func (g consumedGrant) config(redirect string) *oauth2.Config {
 
 // 「[Opus 5.5] consumedFlow is one yes being waited on: who asked for it, and where the code goes.」
 type consumedFlow struct {
-	by        string
+	by string
+	// 「[Opus 5.5] byPerson is whether a person asked, rather than a token or a connector at ROOT.」
+	byPerson  bool
 	name      string
 	code      chan consumedReturn
 	attempt   *consumedAttempt
@@ -183,26 +185,12 @@ type consumedAttempt struct {
 	err       error
 }
 
-// 「[Opus 5.5] consumedHandling is who connects or drops a server the node consumes: ROOT, as a person. The」
-// 「[Opus 5.5] yes at the server is a person's, and the code comes back to the browser of whoever asked, so a」
-// 「[Opus 5.5] token and a connector are refused, ROOT's included.」
-func consumedHandling(ctx context.Context) (auth.Admission, *protocol.Refusal) {
-	admitted, refused := consumedUsing(ctx)
-	if refused != nil {
-		return auth.Admission{}, refused
-	}
-	switch admitted.Asker().(type) {
-	case admission.TokenAsked:
-		return auth.Admission{}, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers the node consumes are connected by a person, and a token asked"}
-	}
-	if client, err := named.TextOf("the connector's client", admitted.ClientDID); err == nil {
-		return auth.Admission{}, &protocol.Refusal{Why: sigil.NotAllowed, Says: "the MCP servers the node consumes are connected by a person, and the connector " + client.String() + " asked"}
-	}
-	return admitted, nil
-}
-
-// 「[Opus 5.5] consumedUsing is who uses a server the node consumes: whoever stands at ROOT, its agents'」
-// 「[Opus 5.5] tokens included, "as ROOT, everything ROOT reaches".」
+// 「[Opus 5.5] consumedUsing is who connects, uses and drops a server the node consumes: whoever stands at」
+// 「[Opus 5.5] ROOT, its agents' tokens included, "as ROOT, everything ROOT reaches". The yes an upstream」
+// 「[Opus 5.5] asks for is still a person's: it comes back only to a person logged in here at ROOT」
+// 「[Opus 5.5] (handleConsumedCallback).」
+//
+// "Keeps deferring to a human who doesn't have the tools"
 func consumedUsing(ctx context.Context) (auth.Admission, *protocol.Refusal) {
 	admitted, gated := auth.AdmissionFrom(ctx)
 	if !gated {
@@ -221,7 +209,7 @@ func (s *QNTXServer) consumedSignum() sigil.Signum {
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "mcp",
-			Description: "The MCP servers of other systems the node consumes: ROOT's alone, connected by ROOT saying yes at the server, the grant kept sealed and never answered back, and served to the node's agents as MCP servers of their own, through the node.",
+			Description: "The MCP servers of other systems the node consumes: ROOT's alone, connected by whoever stands at ROOT, the node's agents included, with a person at ROOT saying yes at the server when it asks for one, the grant kept sealed and never answered back, and served to the node's agents as MCP servers of their own, through the node.",
 			Tags:        []string{"mcp"},
 			Sigils: []*protocol.Sigil{
 				{
@@ -243,7 +231,7 @@ func (s *QNTXServer) consumedSignum() sigil.Signum {
 					Gives: []*protocol.Field{
 						{Name: "name", Says: "What the node calls the server."},
 						{Name: "url", Says: "Where the server answers."},
-						{Name: "authorize", Says: "Where to say yes, in the browser logged in here. Empty when the server asked for none."},
+						{Name: "authorize", Says: "Where a person at ROOT says yes, in a browser logged in here. An agent hands it to them. Empty when the server asked for none."},
 						{Name: "tools", Says: "The names of the server's tools, when it answered without a yes. Empty while a yes is waited on."},
 					},
 					Http: &protocol.Endpoint{Method: http.MethodPost, Path: at},
@@ -311,7 +299,7 @@ func (s *QNTXServer) consumedList(ctx context.Context, _ sigil.Sent) (any, *prot
 }
 
 func (s *QNTXServer) consumedDrop(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	admitted, refused := consumedHandling(ctx)
+	admitted, refused := consumedUsing(ctx)
 	return then(admitted, refused, func(admitted auth.Admission) (any, *protocol.Refusal) {
 		name, err := named.TextOf("name", strings.TrimSpace(sent["name"]))
 		if err != nil {
@@ -329,7 +317,7 @@ func (s *QNTXServer) consumedDrop(ctx context.Context, sent sigil.Sent) (any, *p
 // 「[Opus 5.5] consumedConnect starts connecting and waits until the server says where to say yes, or that」
 // 「[Opus 5.5] it needed none, or consumedWait passes.」
 func (s *QNTXServer) consumedConnect(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	admitted, refused := consumedHandling(ctx)
+	admitted, refused := consumedUsing(ctx)
 	return then(admitted, refused, func(admitted auth.Admission) (any, *protocol.Refusal) {
 		name, err := named.TextOf("name", strings.TrimSpace(sent["name"]))
 		if err != nil {
@@ -426,7 +414,8 @@ func (s *QNTXServer) awaitYes(ctx context.Context, attempt *consumedAttempt, adm
 	if state == "" {
 		return nil, errors.Newf("the URL to say yes at for %s names no state", name)
 	}
-	flow := &consumedFlow{by: admitted.Identity, name: name,
+	_, tokenAsked := admitted.Asker().(admission.TokenAsked)
+	flow := &consumedFlow{by: admitted.Identity, byPerson: !tokenAsked && admitted.ClientDID == "", name: name,
 		code: make(chan consumedReturn, 1), attempt: attempt, startedAt: time.Now()}
 	s.consuming.pending.Store(state, flow)
 	defer s.consuming.pending.Delete(state)
@@ -730,8 +719,16 @@ func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Reque
 		say(w, http.StatusInternalServerError, false, "What waits under this state is not a yes the node asked for")
 		return
 	}
+	// 「[Opus 5.5] The yes comes back to a person logged in here at ROOT: not a token, not a connector. One a」
+	// 「[Opus 5.5] person asked for comes back to that person; one an agent at ROOT asked for, to any person at ROOT.」
 	admitted, gated := auth.AdmissionFrom(r.Context())
-	if !gated || admitted.Identity != flow.by {
+	_, tokenAsked := admitted.Asker().(admission.TokenAsked)
+	if !gated || !admitted.IsRoot() || tokenAsked || admitted.ClientDID != "" {
+		s.logger.Infow("an MCP server's yes refused: not brought back by a person at ROOT", "server", flow.name)
+		say(w, http.StatusForbidden, false, "A yes comes back to a person logged in here as ROOT. Open the link in the browser you are logged in with.")
+		return
+	}
+	if flow.byPerson && admitted.Identity != flow.by {
 		s.logger.Infow("an MCP server's yes refused: finished by somebody who did not ask for it", "server", flow.name)
 		say(w, http.StatusForbidden, false, "This yes was asked for by somebody else. Connect from your own window, logged in here.")
 		return
