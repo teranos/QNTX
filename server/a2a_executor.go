@@ -100,9 +100,37 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 			answered <- ta.say.asking(reach.OverA2A, e.s.gate, e.s.reachingOver, call.request.WithContext(turn)).Ask(turn, asked)
 		})
 
+		// A turn Claude Code still prints in is working, and is told so once
+		// in each quarter of turnQuietMost it printed in: the turn is quiet
+		// when Claude Code is, not when the Task has no news.
+		printed := make(chan struct{}, 1)
+		told := time.NewTicker(turnQuietMost / 4)
+		defer told.Stop()
+		moved := false
 		for {
 			select {
-			case <-started:
+			case stream := <-started:
+				if !yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateWorking, nil), nil) {
+					stop()
+					return
+				}
+				sacred.Go("the stream of a task's turn, read for whether it moves", func() {
+					if _, _, err := claudecode.Tail(turn, stream, 0, func([]byte, int64) {
+						select {
+						case printed <- struct{}{}:
+						default:
+						}
+					}); err != nil {
+						e.s.logger.Warnw("a task's turn was not read for whether it moves", "agent", ta.did, "task", id, "stream", stream, "error", err)
+					}
+				})
+			case <-printed:
+				moved = true
+			case <-told.C:
+				if !moved {
+					continue
+				}
+				moved = false
 				if !yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateWorking, nil), nil) {
 					stop()
 					return

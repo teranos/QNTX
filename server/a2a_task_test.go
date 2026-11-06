@@ -510,6 +510,50 @@ func TestCancelingAWorkingTaskStopsItsTurn(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_CANCELED", at(got, "status.state"), "the turn ending wrote over its cancel")
 }
 
+// A turn Claude Code prints in past turnQuietMost is working, not quiet: it is
+// left to answer.
+func TestATurnThatPrintsPastItsQuietTimeIsNotStopped(t *testing.T) {
+	quiet := turnQuietMost
+	turnQuietMost = 400 * time.Millisecond
+	t.Cleanup(func() { turnQuietMost = quiet })
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	srv.harnessBinaries.mu.Lock()
+	held := srv.harnessBinaries.held["claude"]
+	srv.harnessBinaries.mu.Unlock()
+	prints := filepath.Join(filepath.Dir(held.path), "claude-printing")
+	require.NoError(t, os.WriteFile(prints, []byte("#!/bin/sh\n"+
+		"i=0\nwhile [ $i -lt 30 ]; do echo '{\"type\":\"system\",\"subtype\":\"status\"}'; sleep 0.05; i=$((i+1)); done\n"+
+		"exec '"+held.path+"' \"$@\"\n"), 0o755))
+	srv.holdHarness("claude", &harnessHeld{fetched: held.fetched, path: prints})
+
+	started := time.Now()
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to thirty", ""), tokens[auth.LevelRoot])
+	assert.Greater(t, time.Since(started), 3*turnQuietMost, "the turn did not print past its quiet time")
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(sent, "task.status.state"), sent)
+}
+
+// A Task that ended is not canceled, and one no id names is not found: a2a-go
+// refuses both before the executor is asked.
+func TestATaskEndedOrMissingIsNotCanceled(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("how long has the box been up?", ""), tokens[auth.LevelRoot])
+	id := at(sent, "task.id").(string)
+	require.Equal(t, "TASK_STATE_COMPLETED", at(sent, "task.status.state"), sent)
+
+	code, refused := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/"+id+":cancel", `{}`, tokens[auth.LevelRoot])
+	assert.NotEqual(t, http.StatusOK, code, refused)
+	said, _ := json.Marshal(refused)
+	assert.Contains(t, string(said), "TASK_NOT_CANCELABLE")
+	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(got, "status.state"))
+
+	code, refused = a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/no-such-task:cancel", `{}`, tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusNotFound, code, refused)
+	said, _ = json.Marshal(refused)
+	assert.Contains(t, string(said), "TASK_NOT_FOUND")
+}
+
 // A turn quiet past turnQuietMost is stopped, and its Task ends.
 func TestATurnQuietPastItsTimeIsStopped(t *testing.T) {
 	quiet := turnQuietMost
