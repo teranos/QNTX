@@ -510,6 +510,30 @@ func TestCancelingAWorkingTaskStopsItsTurn(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_CANCELED", at(got, "status.state"), "the turn ending wrote over its cancel")
 }
 
+// A turn quiet past turnQuietMost is stopped, and its Task ends.
+func TestATurnQuietPastItsTimeIsStopped(t *testing.T) {
+	quiet := turnQuietMost
+	turnQuietMost = 300 * time.Millisecond
+	t.Cleanup(func() { turnQuietMost = quiet })
+	held := filepath.Join(t.TempDir(), "held")
+	require.NoError(t, os.WriteFile(held, nil, 0o600))
+	srv, tokens, _ := nodeAgentOverA2A(t, held)
+
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to a million", `{"returnImmediately": true}`), tokens[auth.LevelRoot])
+	id := at(sent, "task.id").(string)
+	var state any
+	require.Eventually(t, func() bool {
+		_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+		state = at(got, "status.state")
+		return state != "TASK_STATE_SUBMITTED" && state != "TASK_STATE_WORKING"
+	}, 10*time.Second, 20*time.Millisecond)
+	assert.Equal(t, "TASK_STATE_FAILED", state)
+
+	// The turn stopped while the stand-in was still held: nothing let it answer.
+	require.Eventually(t, func() bool { return srv.nodeAgent.in(srv.claudeHarness()).answering.Load() == nil }, 10*time.Second, 20*time.Millisecond)
+	assert.FileExists(t, held)
+}
+
 // A Task canceled while its turn waits on another never starts its turn.
 func TestATaskCanceledBeforeItsTurnStartsNeverStartsIt(t *testing.T) {
 	srv, tokens, ran := nodeAgentOverA2A(t, "")

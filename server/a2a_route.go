@@ -45,6 +45,10 @@ const (
 // streamKeptAlive is how often a quiet stream is told the turn still runs.
 const streamKeptAlive = 15 * time.Second
 
+// turnQuietMost is how long a turn may be quiet: "for minutes? So make it 4
+// minutes".
+var turnQuietMost = 4 * time.Minute
+
 // a2aContentType is the media type A2A's HTTP+JSON binding speaks in.
 const a2aContentType = "application/a2a+json"
 
@@ -56,6 +60,7 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		a2asrv.WithPushNotifications(pushesOnLines{s}, pushSender),
 		a2asrv.WithCallInterceptors(a2aGate{s}),
 		a2asrv.WithLogger(a2aSaid()),
+		a2asrv.WithAgentInactivityTimeout(turnQuietMost),
 		a2asrv.WithExtendedAgentCardProducer(a2asrv.ExtendedAgentCardProducerFn(s.a2aExtendedCardOf)),
 		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true}),
 	)
