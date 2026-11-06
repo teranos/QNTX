@@ -19,7 +19,6 @@ pub fn sacred(e: StoreError, surface: &str, call: &str) -> String {
         StoreError::Backend(_) => "backend",
         StoreError::Query(_) => "query",
         StoreError::Serialization(_) => "serialization",
-        StoreError::QuotaExceeded { .. } => "quota-exceeded",
     };
     if let StoreError::Backend(json) = &e {
         if serde_json::from_str::<laye_error::Error>(json).is_ok() {

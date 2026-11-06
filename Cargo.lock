@@ -491,7 +491,6 @@ dependencies = [
  "sqlite-vec",
  "tempfile",
  "thiserror 2.0.19",
- "uuid",
  "zerocopy",
 ]
 

@@ -10,8 +10,6 @@ import (
 	"sort"
 	"time"
 
-	"strings"
-
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/internal/db/rustdriver"
 	"github.com/teranos/QNTX/internal/measure"
@@ -298,11 +296,11 @@ func (s *QNTXServer) refreshDBStats() []Landing {
 	s.logger.Debugw("DB stats queries complete", "elapsed", time.Since(queryStart), "attestations", totalAttestations)
 
 	// Rich fields
-	boundedStore := storage.NewBoundedStore(statsDB, nil, s.logger.Named("db-stats-cache"))
+	richStore := storage.NewRichStore(statsDB, nil, s.logger.Named("db-stats-cache"))
 	var richFields any
-	richFieldsWithStats, err := boundedStore.GetRichFieldsWithStats(overAtMost)
+	richFieldsWithStats, err := richStore.GetRichFieldsWithStats(overAtMost)
 	if err != nil {
-		richFields = boundedStore.GetDiscoveredRichFields()
+		richFields = richStore.GetDiscoveredRichFields()
 	} else {
 		richFields = richFieldsWithStats
 	}
@@ -312,11 +310,6 @@ func (s *QNTXServer) refreshDBStats() []Landing {
 	if syscap.IsStorageOptimized() {
 		storageBackend = "rust"
 	}
-
-	// Recent evictions. Beside the rest rather than instead of it: what was
-	// deleted to stay inside a limit is worth knowing, and not knowing it is
-	// not a reason to blank the panel.
-	recentEvictions, evictionsErr := queryRecentEvictions(statsDB)
 
 	// Performance snapshot (slow ops + mutex contention)
 	perfData := buildPerformanceData()
@@ -367,7 +360,6 @@ func (s *QNTXServer) refreshDBStats() []Landing {
 		"storage_version":    syscap.GetStorageVersion(),
 		"total_attestations": totalAttestations,
 		"rich_fields":        richFields,
-		"recent_evictions":   recentEvictions,
 		"performance":        perfData,
 		"live":               liveStatus,
 	}
@@ -391,41 +383,11 @@ func (s *QNTXServer) refreshDBStats() []Landing {
 		response["record_spend"] = recordSpend
 	}
 
-	if evictionsErr != nil {
-		envelope := newErrorEnvelope("recent evictions", evictionsErr)
-		s.logger.Warnw("Recent evictions unavailable",
-			"error", evictionsErr, "error_id", envelope.ID)
-		response["recent_evictions_error"] = envelope
-	}
-
 	// Absent says the operational tables do not describe these attestations.
 	// Zero says they do and the answer is none.
 	if !dimensionsDescribeTheCount {
 		s.dbStatsCache.Store(&cachedDBStats{response: response})
 		return landings
-	}
-
-	// Distillation folds attestations held in this database. A backend keeping
-	// them elsewhere has no distillation to report and no key for it.
-	distillStats, err := queryDistillStats(statsDB)
-	if err != nil {
-		s.publishStatsFailure("distillation stats", err)
-		return landings
-	}
-	if len(distillStats) > 0 {
-		response["distillation"] = distillStats
-	}
-
-	// One surface that could not be read does not take the rest of the panel
-	// with it. The failure travels beside the fields that did answer, so a
-	// reader sees which is missing rather than an empty cache.
-	histograms, err := queryPredicateHistograms(statsDB)
-	if err != nil {
-		envelope := newErrorEnvelope("predicate histograms", err)
-		s.logger.Warnw("Predicate histograms unavailable", "error", err, "error_id", envelope.ID)
-		response["predicate_histograms_error"] = envelope
-	} else {
-		response["predicate_histograms"] = histograms
 	}
 
 	s.dbStatsCache.Store(&cachedDBStats{response: response})
@@ -493,276 +455,4 @@ func parseLegacyPredicates(raw any) []string {
 		}
 	}
 	return result
-}
-
-// queryDistillStats returns nil when nothing has been distilled, and an error
-// when it could not find out — which are different answers.
-func queryDistillStats(db *sql.DB) (_ map[string]any, err error) {
-	var distillCount int
-	var totalPreserved sql.NullInt64
-	var oldestDistill, newestDistill sql.NullString
-
-	if err := db.QueryRow("SELECT COUNT(*) FROM attestations WHERE source = 'distill'").
-		Scan(&distillCount); err != nil {
-		return nil, errors.Wrap(err, "failed to count distilled attestations")
-	}
-	if distillCount == 0 {
-		return map[string]any{}, nil
-	}
-
-	if err := db.QueryRow(`
-		SELECT SUM(json_extract(attributes, '$._count')),
-		       MIN(json_extract(attributes, '$._first_seen')),
-		       MAX(json_extract(attributes, '$._last_seen'))
-		FROM attestations WHERE source = 'distill'
-		  AND json_extract(attributes, '$._first_seen') > '0002'
-	`).Scan(&totalPreserved, &oldestDistill, &newestDistill); err != nil {
-		return nil, errors.Wrap(err, "failed to summarize distilled attestations")
-	}
-
-	result := map[string]any{
-		"sigmas": distillCount,
-	}
-	if totalPreserved.Valid {
-		result["preserved_count"] = totalPreserved.Int64
-	}
-	if oldestDistill.Valid {
-		result["oldest"] = oldestDistill.String
-	}
-	if newestDistill.Valid {
-		result["newest"] = newestDistill.String
-	}
-
-	// Distill predicates, the most recently observed first: which are named
-	// follows when, not how many. Their lines come from predicate_histograms.
-	rows, err := db.Query(`
-		SELECT jp.predicate,
-		       MAX(strftime('%Y-%m-%dT%H:%M:%SZ', json_extract(a.attributes, '$._last_seen'))) AS last
-		FROM attestation_predicates jp
-		JOIN attestations a ON a.id = jp.attestation_id
-		WHERE a.source = 'distill'
-		GROUP BY jp.predicate
-		ORDER BY last IS NULL, last DESC, jp.predicate
-		LIMIT 10
-	`)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query distill predicates")
-	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for queryDistillStats") }()
-	var predicates []map[string]any
-	for rows.Next() {
-		var pred string
-		var last sql.NullString
-		if err := rows.Scan(&pred, &last); err != nil {
-			return nil, errors.Wrap(err, "failed to scan a distill predicate")
-		}
-		one := map[string]any{"predicate": pred}
-		if last.Valid {
-			one["last"] = last.String
-		}
-		predicates = append(predicates, one)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "failed to iterate distill predicates")
-	}
-	if len(predicates) > 0 {
-		result["predicates"] = predicates
-	}
-
-	// Top sigmas ranked by total observations (>= 100 obs only)
-	// Includes full row data so the frontend can open sigma windows on click.
-	sigmaRows, err := db.Query(`
-		SELECT id, subjects, predicates, actors, contexts,
-		       timestamp, source, attributes
-		FROM attestations
-		WHERE source = 'distill'
-		  AND COALESCE(json_extract(attributes, '$._total'), json_extract(attributes, '$._count'), 0) >= 100
-		ORDER BY COALESCE(json_extract(attributes, '$._total'), json_extract(attributes, '$._count'), 0) DESC
-		LIMIT 200
-	`)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query top sigmas")
-	}
-	defer func() { err = sqlclose.With(err, sigmaRows.Close(), "the sigma rows") }()
-
-	var topSigmas []map[string]any
-	for sigmaRows.Next() {
-		var id, subjects, predicates, actors, contexts, source string
-		var timestamp sql.NullString
-		var attributes string
-		if err := sigmaRows.Scan(&id, &subjects, &predicates, &actors, &contexts,
-			&timestamp, &source, &attributes); err != nil {
-			return nil, errors.Wrap(err, "failed to scan a top sigma")
-		}
-		sigma := map[string]any{
-			"id":         id,
-			"subjects":   subjects,
-			"predicates": predicates,
-			"actors":     actors,
-			"contexts":   contexts,
-			"source":     source,
-			"attributes": attributes,
-		}
-		if timestamp.Valid {
-			sigma["timestamp"] = timestamp.String
-		}
-		topSigmas = append(topSigmas, sigma)
-	}
-	if err := sigmaRows.Err(); err != nil {
-		return nil, errors.Wrap(err, "failed to iterate top sigmas")
-	}
-	if len(topSigmas) > 0 {
-		result["top_sigmas"] = topSigmas
-	}
-
-	return result, nil
-}
-
-// queryPredicateHistograms aggregates _histogram data from distill attestations
-// grouped by predicate. Returns map[predicate] -> map[timeKey] -> count.
-func queryPredicateHistograms(db *sql.DB) (_ map[string]map[string]int64, err error) {
-	rows, err := db.Query(`
-		SELECT jp.predicate, a.attributes
-		FROM attestation_predicates jp
-		JOIN attestations a ON a.id = jp.attestation_id
-		WHERE a.source = 'distill'
-		  AND json_extract(a.attributes, '$._histogram') IS NOT NULL
-	`)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query the predicate histograms")
-	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for queryPredicateHistograms") }()
-
-	result := make(map[string]map[string]int64)
-	for rows.Next() {
-		var predicate, attrsJSON string
-		if err := rows.Scan(&predicate, &attrsJSON); err != nil {
-			return nil, errors.Wrap(err, "failed to scan a predicate histogram")
-		}
-
-		// Strip distill: prefix layers for clean predicate names
-		clean := predicate
-		for strings.HasPrefix(clean, "distill:") {
-			clean = clean[len("distill:"):]
-		}
-
-		// The row was selected for having a histogram, so one that will not
-		// parse is a row nobody can read rather than a row without one.
-		var attrs map[string]any
-		if err := json.Unmarshal([]byte(attrsJSON), &attrs); err != nil {
-			return nil, errors.Wrapf(err, "the attributes of a %s histogram do not parse", clean)
-		}
-		histRaw, ok := attrs["_histogram"]
-		if !ok {
-			continue
-		}
-		hist, ok := histRaw.(map[string]any)
-		if !ok {
-			return nil, errors.Newf("the _histogram of %s is %T, not an object", clean, histRaw)
-		}
-
-		if result[clean] == nil {
-			result[clean] = make(map[string]int64)
-		}
-		for key, val := range hist {
-			switch v := val.(type) {
-			case float64:
-				result[clean][key] += int64(v)
-			case json.Number:
-				if n, err := v.Int64(); err == nil {
-					result[clean][key] += n
-				}
-			}
-		}
-	}
-
-	// A read that stopped partway hands back what it managed, which reads as
-	// the whole of what is there.
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "the predicate histograms stopped partway")
-	}
-	// An empty map already says no distill attestation carried a histogram.
-	// Nil on top of it is a second way to say the same thing, and the caller
-	// then has two absences to tell apart.
-	return result, nil
-}
-
-// An eviction is data this node deleted to stay inside its limits. A read that
-// could not say what was evicted must not answer as a node that evicted
-// nothing.
-func queryRecentEvictions(db *sql.DB) (_ []map[string]any, err error) {
-	var evictions []map[string]any
-	rows, err := db.Query(`
-		SELECT event_type, actor, context, entity, deletions_count, limit_value, timestamp, eviction_details
-		FROM storage_events
-		WHERE event_type != 'storage_warning'
-		ORDER BY id DESC
-		LIMIT 1000
-	`)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query the recent evictions")
-	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for queryRecentEvictions") }()
-
-	for rows.Next() {
-		var (
-			eventType       string
-			actor           sql.NullString
-			ctx             sql.NullString
-			entity          sql.NullString
-			deletionsCount  int
-			limitValue      sql.NullInt64
-			timestamp       string
-			evictionDetails sql.NullString
-		)
-		if err := rows.Scan(&eventType, &actor, &ctx, &entity, &deletionsCount, &limitValue, &timestamp, &evictionDetails); err != nil {
-			return nil, errors.Wrap(err, "failed to scan a storage eviction")
-		}
-		limit := int(limitValue.Int64)
-		if !limitValue.Valid {
-			limit = 0
-		}
-		var message string
-		switch eventType {
-		case "actor_context_limit":
-			message = fmt.Sprintf("Evicted %d old attestations for %s/%s (limit: %d)", deletionsCount, actor.String, ctx.String, limit)
-		case "actor_contexts_limit":
-			message = fmt.Sprintf("Evicted %d attestations for actor %s (contexts limit: %d)", deletionsCount, actor.String, limit)
-		case "entity_actors_limit":
-			message = fmt.Sprintf("Evicted %d attestations for entity %s (actors limit: %d)", deletionsCount, entity.String, limit)
-		default:
-			message = fmt.Sprintf("Evicted %d attestations (%s)", deletionsCount, eventType)
-		}
-
-		ev := map[string]any{
-			"event_type":      eventType,
-			"actor":           actor.String,
-			"context":         ctx.String,
-			"entity":          entity.String,
-			"deletions_count": deletionsCount,
-			"message":         message,
-			"timestamp":       timestamp,
-		}
-
-		if evictionDetails.Valid && evictionDetails.String != "" {
-			var details map[string]any
-			if err := json.Unmarshal([]byte(evictionDetails.String), &details); err == nil {
-				if preds, ok := details["predicates"]; ok {
-					ev["predicates"] = preds
-				} else if rawPreds, ok := details["sample_predicates"]; ok {
-					// Legacy format: each entry is a JSON array string like "[\"type\"]"
-					ev["predicates"] = parseLegacyPredicates(rawPreds)
-				}
-				if ls, ok := details["last_seen"]; ok {
-					ev["last_seen"] = ls
-				}
-			}
-		}
-
-		evictions = append(evictions, ev)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "the recent evictions stopped partway")
-	}
-	return evictions, nil
 }

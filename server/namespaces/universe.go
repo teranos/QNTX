@@ -40,7 +40,7 @@ type Made struct {
 	Embeddings *storage.EmbeddingStore
 	// Rich is the rich string fields of this namespace's types, which is what
 	// search and embedding read.
-	Rich *storage.BoundedStore
+	Rich *storage.RichStore
 	// Executions are the runs of this namespace's schedules.
 	Executions *schedule.ExecutionStore
 	// Prompts are the prompt templates written here. TODO: delete the subsystem.
@@ -150,7 +150,7 @@ func (u *Universe) Embeddings() *storage.EmbeddingStore {
 }
 
 // Rich is the rich string fields of this namespace.
-func (u *Universe) Rich() *storage.BoundedStore {
+func (u *Universe) Rich() *storage.RichStore {
 	if u == nil {
 		return nil
 	}

@@ -55,7 +55,7 @@ The statistics are written — `parquet_metadata` reports min and max on `timest
 **All other state** (watchers, canvas, aliases, node identity, WebAuthn credentials, watcher execution queue, scheduled jobs, storage events, etc.) lives under its namespace at `<location>/<namespace>/`, in a prefix named for the SQLite table it stands in for — `make parity` pairs them by name, and a second name would read as a second thing. No store opens without being told which namespace it is. Shape per class:
 
 - Small config (aliases, daemon config, WebAuthn creds, minimized windows) — one object per record, rewritten on change.
-- Append-only logs (storage_events, task_logs, pulse_executions, ai_model_usage) — Parquet, same pattern as attestations.
+- Append-only logs (task_logs, pulse_executions, ai_model_usage) — Parquet, same pattern as attestations.
 - Mutable config (watchers, canvas state, canvas elements, compositions, edges) — one object per entity, rewritten on save.
 - State machines (scheduled jobs, job checkpoints, watcher execution queue, async jobs) — one object per record, rewritten on status transition.
 
@@ -71,9 +71,7 @@ The system namespace is a literal rather than a DID because this object names th
 
 **No Parquet format knobs exposed.** Compression, row-group size, page size, column encodings are hardcoded to DuckDB's defaults inside the backend. Add knobs only when a real workload forces the question.
 
-**No distillation, no bounded-storage enforcement.** Parquet storage is unbounded; the SQLite-era pressure that made these necessary is gone. Compaction is not a bound: it changes how many files hold the rows, never which rows are held. This is why `openParquetDatabase` passes nil limits to `NewBoundedStore`.
-
-The pressure comes back from the other side. [ADR-037](ADR-037-operational-db.md) puts attestations in a store that is read from rather than archived to, and what a node can serve is bounded by what it can hold locally. Whether that bound is distillation, eviction, or a serving window is 037's to decide.
+**Nothing is evicted.** Compaction changes how many files hold the rows, never which rows are held.
 
 **Vector data** (embeddings, cluster centroids, embedding projections, cluster tracking) is out of scope for this ADR.
 

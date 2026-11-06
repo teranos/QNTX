@@ -135,31 +135,6 @@ func TestTranscriptsAreNewestFirstAndCut(t *testing.T) {
 	assert.Empty(t, transcriptsOf(nil, 10))
 }
 
-// Spike: a sigma (ADR-020) lists hook predicates but holds no turn. It is
-// counted as folded, never read as an empty turn.
-func TestAFoldedSessionSaysSo(t *testing.T) {
-	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
-	sigma := streamed("AS-distill-1", "PreToolUse", "s-1", at.Add(time.Hour), map[string]any{
-		"_distill": true, "_total": float64(46),
-		"_first_seen": "2026-10-01T21:00:00+00:00", "_last_seen": "2026-10-01T23:30:00+00:00",
-	})
-	sigma.Predicates = []string{"PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop"}
-	sigma.Source = "distill"
-
-	got := transcriptsOf(append(aSession(at), sigma), 10)
-	require.Len(t, got, 1)
-	assert.Equal(t, 46, got[0].Folded)
-	assert.Len(t, got[0].Turns, 7)
-	assert.Equal(t, "2026-10-01T21:00:00Z", got[0].Started, "what was folded began before what is left")
-	assert.Equal(t, "2026-10-01T23:30:00Z", got[0].Ended)
-
-	only := transcriptsOf([]*types.As{sigma}, 10)
-	require.Len(t, only, 1)
-	assert.Equal(t, 46, only[0].Folded)
-	assert.Empty(t, only[0].Turns)
-	assert.Equal(t, "2026-10-01T23:30:00Z", only[0].Ended)
-}
-
 // Jenny: the sigil reads the namespace the caller stands in, and one session
 // can be asked for by its id.
 func TestTheTranscriptsSigilReadsWhereTheCallerStands(t *testing.T) {

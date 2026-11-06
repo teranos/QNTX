@@ -10,9 +10,6 @@ import (
 func withDoor(doors map[string]DoorConfig) *Config {
 	cfg := &Config{}
 	cfg.Storage.Backend = "sqlite"
-	cfg.Storage.Sqlite.BoundedStorage.ActorContextLimit = 32
-	cfg.Storage.Sqlite.BoundedStorage.ActorContextsLimit = 64
-	cfg.Storage.Sqlite.BoundedStorage.EntityActorsLimit = 64
 	cfg.Auth.Door = doors
 	return cfg
 }
