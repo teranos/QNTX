@@ -13,7 +13,7 @@ import (
 )
 
 // "i want inside of my obsidian:"
-// "QNTX/AgentInstructions/QNTX/AGENTS.md"
+// "「[Opus 5.5] QNTX/AgentInstructions/QNTX/AGENTS.md」"
 // "i want single file bindings that follow that format"
 func TestANoteIsBoundToItsOwnPlace(t *testing.T) {
 	s, vault := vaultBindingServer(t)
@@ -24,7 +24,7 @@ func TestANoteIsBoundToItsOwnPlace(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"github.com/abcd-nl/clean@main:docs/adr/ADR-001.md=QNTX/AgentInstructions/QNTX/AGENTS.md"}, vaults[0].Folders)
 	assert.Equal(t, mainNotes["docs/adr/ADR-001.md"], readNote(t, vault, "QNTX/AgentInstructions/QNTX/AGENTS.md"))
-	// Only the one note: its folder's others stay in the repository.
+	// 「[Opus 5.5] Only the one note: its folder's others stay in the repository.」
 	entries, err := os.ReadDir(filepath.Join(vault.Path, "QNTX", "AgentInstructions", "QNTX"))
 	require.NoError(t, err)
 	assert.Len(t, entries, 1)
@@ -33,7 +33,7 @@ func TestANoteIsBoundToItsOwnPlace(t *testing.T) {
 	assert.Equal(t, vaultActive, got.(*protocol.VaultStates).GetFolders()[0].State)
 }
 
-// A file at the repository's top can be bound. A folder still cannot be the top.
+// 「[Opus 5.5] A file at the repository's top can be bound. A folder still cannot be the top.」
 func TestANoteAtTheRepositorysTopIsBound(t *testing.T) {
 	s, _ := vaultBindingServer(t)
 	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "README.md", "repo": "github.com/abcd-nl/clean", "path": "README.md"})
@@ -44,7 +44,7 @@ func TestANoteAtTheRepositorysTopIsBound(t *testing.T) {
 	assert.Equal(t, vaultActive, state.State, state.Why)
 }
 
-// A note is bound to a note's place, and a folder to a folder's.
+// 「[Opus 5.5] A note is bound to a note's place, and a folder to a folder's.」
 func TestANoteIsNeverBoundToAFolder(t *testing.T) {
 	s, _ := vaultBindingServer(t)
 	for place, path := range map[string]string{
@@ -66,8 +66,8 @@ func TestANoteIsNeverBoundToAFolder(t *testing.T) {
 	}
 }
 
-// Two notes of one folder keep apart: one gone from main is gone from the
-// vault, and the other stays.
+// 「[Opus 5.5] Two notes of one folder keep apart: one gone from main is gone from the」
+// 「[Opus 5.5] vault, and the other stays.」
 func TestTwoNotesOfOneFolderKeepApart(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	vault.Folders = []string{
@@ -89,8 +89,8 @@ func TestTwoNotesOfOneFolderKeepApart(t *testing.T) {
 	assert.Equal(t, mainNotes["docs/adr/ADR-001.md"], readNote(t, vault, "Notes/One.md"))
 }
 
-// A push to main reaches a bound note when it changed that note, and not when
-// it changed another of its folder.
+// 「[Opus 5.5] A push to main reaches a bound note when it changed that note, and not when」
+// 「[Opus 5.5] it changed another of its folder.」
 func TestAPushReachesTheNoteItChanged(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr/ADR-001.md=Notes/One.md"}
@@ -106,8 +106,8 @@ func TestAPushReachesTheNoteItChanged(t *testing.T) {
 	assert.Equal(t, "# ADR-001\n\nPushed to main.\n", readNote(t, vault, "Notes/One.md"))
 }
 
-// A bound note that sends commits to its own file on the branch, and nothing
-// else of its folder.
+// 「[Opus 5.5] A bound note that sends commits to its own file on the branch, and nothing」
+// 「[Opus 5.5] else of its folder.」
 func TestABoundNoteReachesItsBranch(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Notes/One.md", "repo": "github.com/abcd-nl/clean", "path": "docs/adr/ADR-001.md"})
@@ -130,8 +130,8 @@ func TestABoundNoteReachesItsBranch(t *testing.T) {
 	assert.NotContains(t, branch, "docs/adr/Two.md")
 }
 
-// A folder bound again as one of its notes keeps what main last agreed on:
-// the vault's edit stays, and nothing fails.
+// 「[Opus 5.5] A folder bound again as one of its notes keeps what main last agreed on:」
+// 「[Opus 5.5] the vault's edit stays, and nothing fails.」
 func TestAFolderBoundAgainAsANoteKeepsItsBase(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
@@ -148,7 +148,7 @@ func TestAFolderBoundAgainAsANoteKeepsItsBase(t *testing.T) {
 	assert.Equal(t, "# ADR-001\n\nWritten in the vault.\n", readNote(t, vault, "Course Material/ADR-001.md"))
 }
 
-// A bound note whose folder in the vault is a link sends nothing of what it points at.
+// 「[Opus 5.5] A bound note whose folder in the vault is a link sends nothing of what it points at.」
 func TestABoundNoteInALinkedFolderSendsNothing(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	elsewhere := t.TempDir()
@@ -162,7 +162,7 @@ func TestABoundNoteInALinkedFolderSendsNothing(t *testing.T) {
 	assert.Empty(t, stand.commits)
 }
 
-// A folder bound at the vault's top holds every note, so it takes no other binding beside it.
+// 「[Opus 5.5] A folder bound at the vault's top holds every note, so it takes no other binding beside it.」
 func TestAFolderAtTheVaultTopTakesNoNoteBesideIt(t *testing.T) {
 	_, err := vaultFoldersOf([]string{
 		"github.com/teranos/QNTX@main:docs=.",
