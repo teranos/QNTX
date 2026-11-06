@@ -234,16 +234,26 @@ func TestTwoFirstMessagesAtOnceAreOneContext(t *testing.T) {
 		}()
 	}
 	var contexts []any
+	var tasks []string
 	for range 2 {
 		w := <-answers
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		var sent map[string]any
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &sent), w.Body.String())
 		contexts = append(contexts, at(sent, "task.contextId"))
+		tasks = append(tasks, at(sent, "task.id").(string))
 	}
 	require.NotEmpty(t, contexts[0])
 	assert.Equal(t, contexts[0], contexts[1])
 	require.NoError(t, os.Remove(held))
+	// The turns let go write into the test's directories: the test ends once they have ended.
+	for _, task := range tasks {
+		require.Eventually(t, func() bool {
+			_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+task, "", tokens[auth.LevelRoot])
+			state, _ := at(got, "status.state").(string)
+			return state == "TASK_STATE_COMPLETED" || state == "TASK_STATE_FAILED" || state == "TASK_STATE_CANCELED"
+		}, 10*time.Second, 20*time.Millisecond, "task %s did not end", task)
+	}
 }
 
 // What the Node Agent does not take is refused before anything is said to it.
