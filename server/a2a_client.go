@@ -253,7 +253,33 @@ func (s *QNTXServer) a2aClientSignum() (sigil.Signum, error) {
 		}
 		return answered, nil
 	}
+	// The nodes this one knows, so its agents can name each by peer.
+	signum.Sigils = append(signum.Sigils, &protocol.Sigil{
+		Name:   "Peers",
+		Does:   "The nodes this one knows: nodes.peers, each by the label peer names it by, where it answers, the did:key its card is verified by and the namespaces it serves; and nodes.primary, the origin this node's people log in at.",
+		Answer: "protocol.NodePeers",
+		Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/api/a2a/Peers"},
+	})
+	answers["Peers"] = func(context.Context, sigil.Sent) (any, *protocol.Refusal) {
+		return s.nodePeers(), nil
+	}
 	return sigil.Signum{Signum: signum, Answers: answers}, nil
+}
+
+// nodePeers is what Peers answers.
+func (s *QNTXServer) nodePeers() *protocol.NodePeers {
+	known := &protocol.NodePeers{}
+	for _, peer := range s.peers() {
+		origin := ""
+		if peer.Origin != nil {
+			origin = peer.Origin.String()
+		}
+		known.Peers = append(known.Peers, &protocol.NodePeer{Label: peer.Label, Origin: origin, Did: peer.DID, Namespaces: peer.Namespaces})
+	}
+	if s.authHandler != nil {
+		known.Primary = s.authHandler.Primary()
+	}
+	return known
 }
 
 // resolveSays is what a2a-go's card resolver says it does, as make says read it.

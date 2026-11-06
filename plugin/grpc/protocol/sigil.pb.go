@@ -3682,6 +3682,136 @@ func (x *Refusal) GetSays() string {
 	return ""
 }
 
+// NodePeers is what a2a Peers answers: the nodes this one knows, which an
+// agent here names by peer.
+type NodePeers struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// nodes.peers: the nodes this one is the primary of.
+	Peers []*NodePeer `protobuf:"bytes,1,rep,name=peers,proto3" json:"peers,omitempty"`
+	// nodes.primary: the origin of the node this one's people log in at, or
+	// none when they log in here.
+	Primary       string `protobuf:"bytes,2,opt,name=primary,proto3" json:"primary,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodePeers) Reset() {
+	*x = NodePeers{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodePeers) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodePeers) ProtoMessage() {}
+
+func (x *NodePeers) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodePeers.ProtoReflect.Descriptor instead.
+func (*NodePeers) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *NodePeers) GetPeers() []*NodePeer {
+	if x != nil {
+		return x.Peers
+	}
+	return nil
+}
+
+func (x *NodePeers) GetPrimary() string {
+	if x != nil {
+		return x.Primary
+	}
+	return ""
+}
+
+// NodePeer is one of nodes.peers.
+type NodePeer struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Its label, which peer names it by.
+	Label string `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
+	// Where it answers.
+	Origin string `protobuf:"bytes,2,opt,name=origin,proto3" json:"origin,omitempty"`
+	// The did:key its card is verified by.
+	Did string `protobuf:"bytes,3,opt,name=did,proto3" json:"did,omitempty"`
+	// The namespaces it serves, each a tenant its agents are at.
+	Namespaces    []string `protobuf:"bytes,4,rep,name=namespaces,proto3" json:"namespaces,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodePeer) Reset() {
+	*x = NodePeer{}
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodePeer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodePeer) ProtoMessage() {}
+
+func (x *NodePeer) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_sigil_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodePeer.ProtoReflect.Descriptor instead.
+func (*NodePeer) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *NodePeer) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *NodePeer) GetOrigin() string {
+	if x != nil {
+		return x.Origin
+	}
+	return ""
+}
+
+func (x *NodePeer) GetDid() string {
+	if x != nil {
+		return x.Did
+	}
+	return ""
+}
+
+func (x *NodePeer) GetNamespaces() []string {
+	if x != nil {
+		return x.Namespaces
+	}
+	return nil
+}
+
 var File_plugin_grpc_protocol_sigil_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
@@ -3998,7 +4128,17 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\aRefusal\x12\x10\n" +
 	"\x03why\x18\x01 \x01(\tR\x03why\x12\x14\n" +
 	"\x05param\x18\x02 \x01(\tR\x05param\x12\x12\n" +
-	"\x04says\x18\x03 \x01(\tR\x04saysB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\x04says\x18\x03 \x01(\tR\x04says\"O\n" +
+	"\tNodePeers\x12(\n" +
+	"\x05peers\x18\x01 \x03(\v2\x12.protocol.NodePeerR\x05peers\x12\x18\n" +
+	"\aprimary\x18\x02 \x01(\tR\aprimary\"j\n" +
+	"\bNodePeer\x12\x14\n" +
+	"\x05label\x18\x01 \x01(\tR\x05label\x12\x16\n" +
+	"\x06origin\x18\x02 \x01(\tR\x06origin\x12\x10\n" +
+	"\x03did\x18\x03 \x01(\tR\x03did\x12\x1e\n" +
+	"\n" +
+	"namespaces\x18\x04 \x03(\tR\n" +
+	"namespacesB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_sigil_proto_rawDescOnce sync.Once
@@ -4012,7 +4152,7 @@ func file_plugin_grpc_protocol_sigil_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*Signum)(nil),             // 0: protocol.Signum
 	(*Node)(nil),               // 1: protocol.Node
@@ -4053,6 +4193,8 @@ var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*Field)(nil),              // 36: protocol.Field
 	(*Endpoint)(nil),           // 37: protocol.Endpoint
 	(*Refusal)(nil),            // 38: protocol.Refusal
+	(*NodePeers)(nil),          // 39: protocol.NodePeers
+	(*NodePeer)(nil),           // 40: protocol.NodePeer
 }
 var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	34, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
@@ -4087,11 +4229,12 @@ var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	35, // 29: protocol.Sigil.takes:type_name -> protocol.Param
 	36, // 30: protocol.Sigil.gives:type_name -> protocol.Field
 	37, // 31: protocol.Sigil.http:type_name -> protocol.Endpoint
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	40, // 32: protocol.NodePeers.peers:type_name -> protocol.NodePeer
+	33, // [33:33] is the sub-list for method output_type
+	33, // [33:33] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }
@@ -4105,7 +4248,7 @@ func file_plugin_grpc_protocol_sigil_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_sigil_proto_rawDesc), len(file_plugin_grpc_protocol_sigil_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   39,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

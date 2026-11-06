@@ -119,7 +119,7 @@ func TestEachA2ASigilIsAnOperationOfThePinnedSpec(t *testing.T) {
 	pinned, err := a2aSpec()
 	require.NoError(t, err)
 	for _, held := range signum.GetSigils() {
-		if held.GetName() == "Resolve" {
+		if held.GetName() == "Resolve" || held.GetName() == "Peers" {
 			continue
 		}
 		method := pinned.service.Methods().ByName(protoreflect.Name(held.GetName()))
@@ -132,7 +132,7 @@ func TestEachA2ASigilIsAnOperationOfThePinnedSpec(t *testing.T) {
 			assert.Equal(t, string(fields.Get(i).Name()), held.GetTakes()[i+2].GetName(), held.GetName())
 		}
 	}
-	assert.Len(t, signum.GetSigils(), pinned.service.Methods().Len()-2+1, "every operation but the two that stream, and Resolve")
+	assert.Len(t, signum.GetSigils(), pinned.service.Methods().Len()-2+2, "every operation but the two that stream, Resolve and Peers")
 }
 
 // allowingLoopback lets the node speak to httptest, which is on loopback, for
@@ -299,4 +299,25 @@ func TestAResolutionShipsToSentry(t *testing.T) {
 	defer held.Unlock()
 	require.NotEmpty(t, shipped, "no transaction reached Sentry")
 	assert.Equal(t, "a2a.Resolve", shipped[0].Transaction)
+}
+
+// The nodes this one knows are the agent's to see: each peer by the label
+// peer names it by, and the primary its people log in at.
+func TestTheNodesThisOneKnowsAreTheAgentsToSee(t *testing.T) {
+	namedNode(t)
+	srv, tokens := pluginServingServer(t, "fake")
+	keyedNode(srv)
+	require.NoError(t, srv.authHandler.DeclarePeer("orchardnode", "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", []string{"orchard"}, "https://orchard.example", "https://orchard.example"))
+	require.NoError(t, srv.authHandler.SetPrimary("https://primary.example"))
+
+	code, known := a2aCalledOver(t, srv, tokens[auth.LevelRoot], http.MethodGet, "Peers", map[string]any{})
+	require.Equal(t, http.StatusOK, code, known)
+	assert.Equal(t, "https://primary.example", known["primary"])
+	peers := known["peers"].([]any)
+	require.Len(t, peers, 1)
+	peer := peers[0].(map[string]any)
+	assert.Equal(t, "orchardnode", peer["label"])
+	assert.Equal(t, "https://orchard.example", peer["origin"])
+	assert.Equal(t, "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", peer["did"])
+	assert.Equal(t, []any{"orchard"}, peer["namespaces"])
 }
