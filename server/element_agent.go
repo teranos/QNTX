@@ -280,7 +280,7 @@ func must(b []byte, err error) []byte {
 func (s *QNTXServer) elementsSignum() sigil.Signum {
 	claude := s.claudeHarness()
 	element := &protocol.Param{Name: "element", Required: true, Says: "The id of the element on screen: a canvas element id, or a tray element id such as agent-element."}
-	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi}, Says: "The harness it runs in: claude for Claude Code, pi for Pi."}
+	harness := harnessParam(s.elementHarnesses(), true)
 	return sigil.Signum{
 		Signum: &protocol.Signum{
 			Name:        "elements",
@@ -302,8 +302,8 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 				},
 				{
 					Name:   "am",
-					Does:   "Who the element's agent is and how the node runs it, in the harness named.",
-					Takes:  []*protocol.Param{element, harness},
+					Does:   "Who the element's agent is and how the node runs it, in the harness named, or in every harness it can be spoken to in.",
+					Takes:  []*protocol.Param{element, harnessParam(s.elementHarnesses(), false)},
 					Answer: "protocol.NodeAgentAm",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: elementAgentPath},
 				},
@@ -341,27 +341,35 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 	}
 }
 
+// 「[Opus 5.5] elementHarnesses is every harness an element's agent runs in: it
+// runs as [agent.root] says, in Claude Code and in Pi so far.」
+func (s *QNTXServer) elementHarnesses() []*harness {
+	return []*harness{s.claudeHarness(), s.piHarness()}
+}
+
 // elementAgentNamed is the agent of the element a call names, in the harness it names.
 func (s *QNTXServer) elementAgentNamed(sent sigil.Sent) (*harness, *rootAgent, *protocol.Refusal) {
 	h, refused := s.harnessNamed(sent)
 	if refused != nil {
 		return nil, nil, refused
 	}
+	agent, refused := s.elementAgentIn(h, sent)
+	return h, agent, refused
+}
+
+// elementAgentIn is the agent of the element a call names, when it can be spoken to in h.
+func (s *QNTXServer) elementAgentIn(h *harness, sent sigil.Sent) (*rootAgent, *protocol.Refusal) {
 	if s.nodeAgent == nil {
-		return nil, nil, s.thereIsNoNodeAgent()
+		return nil, s.thereIsNoNodeAgent()
 	}
 	if !h.named() || s.harnessHeldBy(h.name) == nil {
-		return nil, nil, h.absent()
+		return nil, h.absent()
 	}
 	element, refused := elementOf(sent)
 	if refused != nil {
-		return nil, nil, refused
+		return nil, refused
 	}
-	agent, refused := s.holdElementAgent(element)
-	if refused != nil {
-		return nil, nil, refused
-	}
-	return h, agent, nil
+	return s.holdElementAgent(element)
 }
 
 func (s *QNTXServer) elementSay(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -383,17 +391,33 @@ func (s *QNTXServer) elementSay(ctx context.Context, sent sigil.Sent) (any, *pro
 }
 
 func (s *QNTXServer) elementAm(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	h, agent, refused := s.elementAgentNamed(sent)
+	// The element named is read first: what is arriving is said only of an element.
+	if _, refused := elementOf(sent); refused != nil {
+		return nil, refused
+	}
+	amIn := func(h *harness) (any, *protocol.Refusal) {
+		agent, refused := s.elementAgentIn(h, sent)
+		if refused != nil {
+			return nil, refused
+		}
+		return s.amOf(h, agent, h.spec()), nil
+	}
+	if sent["harness"] == "" {
+		return s.amInEvery(s.elementHarnesses(), "the element's agent", amIn)
+	}
+	h, refused := s.harnessNamed(sent)
 	if refused != nil {
 		return nil, refused
 	}
-	switch am := s.amOf(h, agent, h.spec()).(type) {
-	case *protocol.ClaudeAm:
-		return &protocol.NodeAgentAm{Claude: am}, nil
-	case *protocol.PiAm:
-		return &protocol.NodeAgentAm{Pi: am}, nil
+	answer, refused := amIn(h)
+	if refused != nil {
+		return nil, refused
 	}
-	return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " said who it is in " + h.called + " as no Coding Agent Harness this node runs"}
+	into := &protocol.NodeAgentAm{}
+	if !amInto(into, answer) {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the element's agent said who it is in " + h.called + " as no Coding Agent Harness this node runs"}
+	}
+	return into, nil
 }
 
 func (s *QNTXServer) elementSession(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
