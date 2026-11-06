@@ -135,19 +135,24 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	// The Node Agent's turns run apart from the node from its boot on: "on a
 	// redeploy NODE agent would still be alive" (#1256).
 	s.nodeAgentApart = true
+	agent := s.nodeAgent
+	// A Task is settled by this node only when the node before it held it.
+	since := time.Now()
 	// 「[Opus 5.5] The turns a last process left are Claude Code's: with none
-	// named, there are none to read on.」
+	// named, there are none to read on, and a Task they left is settled now.」
 	if !root.Claude.Named() {
+		s.wg.Go("agent.settle", func() {
+			if err := s.settleTasksNoTurnLeft(agent, since); err != nil {
+				s.logger.Errorw("The tasks the node's last process left with no turn to end them were not settled", "agent", agent.did, "error", err)
+			}
+		})
 		return nil
 	}
 	// The session is held from here, before anything can be said to it, until
 	// the turns the node's last process left are read on.
-	agent := s.nodeAgent
 	in := agent.in(s.claudeHarness())
 	in.turn <- struct{}{}
 	effort := root.Claude.Effort
-	// A Task is settled by this node only when the node before it held it.
-	since := time.Now()
 	s.wg.Go("agent.follow", func() { s.followLeftTurns(agent, in, effort, since) })
 	return nil
 }

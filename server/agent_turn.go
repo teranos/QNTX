@@ -108,11 +108,17 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	// Its ground is the one its hooks run (ADR-050, Hosted agents under ground),
 	// and the node's Claude Code the one a ritual it performs starts its agent with (ground ritual/run.d).
 	if !t.withoutClaude {
-		claude, err := s.harnessHeldBy("claude").Path(ctx)
-		if err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Claude Code for a ritual " + agent.called + " performs to start: " + err.Error()}
+		path := os.Getenv("PATH")
+		// 「[Opus 5.5] A node that names no Claude Code holds none: its rituals
+		// start no agent in it, and the turn goes on in its own harness.」
+		if held := s.harnessHeldBy("claude"); held != nil {
+			claude, err := held.Path(ctx)
+			if err != nil {
+				return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Claude Code for a ritual " + agent.called + " performs to start: " + err.Error()}
+			}
+			path = filepath.Dir(claude) + ":" + path
 		}
-		itsGit = append(itsGit, "PATH="+comet.AgentPath(agent.home, filepath.Dir(claude)+":"+os.Getenv("PATH")))
+		itsGit = append(itsGit, "PATH="+comet.AgentPath(agent.home, path))
 	}
 
 	if t.keepBeforeRun && !kept {

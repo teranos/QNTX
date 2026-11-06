@@ -90,6 +90,22 @@ func TestWhatIsSaidToCodexIsAnsweredByCodex(t *testing.T) {
 	assert.Contains(t, string(config), `command = "`+comet.AgentHook(home)+`"`)
 }
 
+// "Let's say that I don't like how it's putting Claude on a pedestal."
+//
+// 「[Opus 5.5] A Node Agent am.toml names in codex alone is answered in codex: a
+// node that names no Claude Code holds none, and the turn does not need it.」
+func TestCodexAnswersOnANodeWithNoClaudeCode(t *testing.T) {
+	s, _ := runningCodexToo(t)
+	s.deps.cfg.Agent.Root.Claude = appcfg.ClaudeConfig{}
+	s.harnessBinaries.mu.Lock()
+	delete(s.harnessBinaries.held, "claude")
+	s.harnessBinaries.mu.Unlock()
+
+	answer, refused := sayingToCodex(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.Nil(t, refused)
+	assert.Equal(t, "Up 3 days.", answer.GetAnswer())
+}
+
 // "keep Codex's thread ID distinct from QNTX's current preallocated session ID"
 // codex names its thread on the first turn; the next resumes that thread, and
 // both are written down in the one session.
