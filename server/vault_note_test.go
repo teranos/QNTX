@@ -161,3 +161,12 @@ func TestABoundNoteInALinkedFolderSendsNothing(t *testing.T) {
 	assert.Empty(t, s.sendVault(t.Context(), "abcd", everyPlace))
 	assert.Empty(t, stand.commits)
 }
+
+// A folder bound at the vault's top holds every note, so it takes no other binding beside it.
+func TestAFolderAtTheVaultTopTakesNoNoteBesideIt(t *testing.T) {
+	_, err := vaultFoldersOf([]string{
+		"github.com/teranos/QNTX@main:docs=.",
+		"github.com/teranos/QNTX@main:AGENTS.md=AGENTS.md",
+	})
+	assert.Error(t, err)
+}

@@ -148,7 +148,7 @@ func vaultFoldersOf(fields []string) ([]string, error) {
 		place = filepath.ToSlash(filepath.Clean(place))
 		// A note is one folder's, so no place is another's or inside it.
 		for _, other := range places {
-			if place == other || strings.HasPrefix(place, other+"/") || strings.HasPrefix(other, place+"/") {
+			if place == other || place == "." || other == "." || strings.HasPrefix(place, other+"/") || strings.HasPrefix(other, place+"/") {
 				return nil, errors.Newf("%s and %s are one place in the vault, or one holds the other", other, place)
 			}
 		}
