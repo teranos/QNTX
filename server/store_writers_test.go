@@ -95,8 +95,8 @@ var storeWriters = map[string]string{
 		"they own the namespace, or are ROOT or SUPER",
 	// 「[Opus 5.5] An MCP server the node consumes (ADR-038).」
 	"writeConsumedLine": "an MCP or MCP_CALL line of the node, in system through Write as the caller is admitted, " +
-		"after consumedUsing says they stand at ROOT, and for connecting and dropping consumedHandling refuses a token " +
-		"or a connector; a refreshed token is kept as whoever's call refreshed it",
+		"after consumedUsing says they stand at ROOT, the node's agents included; a refreshed token is kept as " +
+		"whoever's call refreshed it",
 
 	"systemTasks": "a Task of the Node Agent or of an element's agent (A2A §3.4.2) lands in system, where " +
 		"their sessions are written, what the node knows of itself. Reached from the Task operations at no tenant " +
