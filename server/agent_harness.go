@@ -227,13 +227,22 @@ func amInto(into *protocol.NodeAgentAm, answer any) bool {
 //
 // "We shouldn't be displaying unavailable things to people"
 func (s *QNTXServer) amInEvery(hs []*harness, called string, am func(*harness) (any, *protocol.Refusal)) (any, *protocol.Refusal) {
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
+	}
 	every := &protocol.NodeAgentAm{}
 	var first *protocol.Refusal
 	offered := 0
 	for _, h := range hs {
-		answer, refused := am(h)
+		// Whether it can be spoken to in h is asked before am, which holds
+		// an element's agent: no harness ready, no agent held.
+		refused := s.harnessNotReady(h)
+		if !h.named() {
+			refused = h.absent()
+		}
+		var answer any
 		if refused == nil {
-			refused = s.harnessNotReady(h)
+			answer, refused = am(h)
 		}
 		if refused != nil {
 			if first == nil {

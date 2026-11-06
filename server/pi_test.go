@@ -229,6 +229,18 @@ func TestAmInNoHarnessLeavesOutAHarnessNotReady(t *testing.T) {
 	}
 }
 
+// 「[Opus 5.5] An element asked am in no harness while no harness is ready is
+// refused, and no agent of it is held.」
+func TestElementAmInNoHarnessReadyHoldsNoAgent(t *testing.T) {
+	s, _ := runningElementAgents(t)
+	s.holdHarness("claude", &harnessHeld{name: "Claude Code", fetched: make(chan struct{})})
+	_, refused := s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "never-seen"})
+	require.NotNil(t, refused)
+	assert.Equal(t, s.claudeHarness().fetching, refused.GetSays())
+	_, held := s.elementAgents.of(elementPurpose("never-seen"))
+	assert.False(t, held)
+}
+
 // 「[Opus 5.5] An element's agent, asked am in no harness, answers in the ones it can be spoken to in.」
 func TestElementAmInNoHarnessIsEveryHarnessItIsNamedIn(t *testing.T) {
 	s, _ := runningElementAgents(t)
