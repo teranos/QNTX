@@ -696,3 +696,25 @@ message Refusal {
   string param = 2;
   string says = 3;
 }
+
+// NodePeers is what a2a Peers answers: the nodes this one knows, which an
+// agent here names by peer.
+message NodePeers {
+  // nodes.peers: the nodes this one is the primary of.
+  repeated NodePeer peers = 1;
+  // nodes.primary: the origin of the node this one's people log in at, or
+  // none when they log in here.
+  string primary = 2;
+}
+
+// NodePeer is one of nodes.peers.
+message NodePeer {
+  // Its label, which peer names it by.
+  string label = 1;
+  // Where it answers.
+  string origin = 2;
+  // The did:key its card is verified by.
+  string did = 3;
+  // The namespaces it serves, each a tenant its agents are at.
+  repeated string namespaces = 4;
+}
