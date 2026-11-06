@@ -60,7 +60,7 @@ type RichFieldInfo struct {
 
 // SearchRichStringFields searches for matches in RichStringFields across attestations.
 // Returns results with potential warnings about degraded functionality.
-func (bs *BoundedStore) SearchRichStringFields(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
+func (bs *RichStore) SearchRichStringFields(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
 	result, err := bs.SearchRichStringFieldsWithResult(ctx, query, limit)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (bs *BoundedStore) SearchRichStringFields(ctx context.Context, query string
 // SearchRichStringFieldsWithResult searches and returns full result with warnings.
 // Uses substring matching. MeiliSearch via qntx-meili plugin (ADR-015) will provide
 // typo-tolerant search when wired in.
-func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, query string, limit int) (*RichSearchResult, error) {
+func (bs *RichStore) SearchRichStringFieldsWithResult(ctx context.Context, query string, limit int) (*RichSearchResult, error) {
 	if query == "" {
 		return nil, errors.New("empty search query")
 	}
@@ -93,7 +93,7 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 }
 
 // searchExactSQL performs exact substring matching using SQL
-func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit int) (_ []RichSearchMatch, err error) {
+func (bs *RichStore) searchExactSQL(ctx context.Context, query string, limit int) (_ []RichSearchMatch, err error) {
 	// Get dynamic fields from type definitions
 	richStringFields := bs.buildDynamicRichStringFields(ctx)
 
@@ -268,7 +268,7 @@ const typeFieldsCacheTTL = 5 * time.Minute
 // getTypeDefinitions queries type definition attestations and extracts RichStringFields.
 // Returns a map of type name -> list of rich string fields.
 // Results are cached for performance.
-func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (_ map[string][]string, err error) {
+func (bs *RichStore) getTypeDefinitions(ctx context.Context) (_ map[string][]string, err error) {
 	// Check cache first
 	bs.typeFieldsCacheLock.RLock()
 	if bs.typeFieldsCache != nil && time.Since(bs.typeFieldsCacheTime) < typeFieldsCacheTTL {
@@ -281,7 +281,7 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (_ map[string][]
 	bs.typeFieldsCacheLock.RUnlock()
 
 	// Query type definitions directly from the database.
-	// Uses bs.db (not bs.store) because BoundedStore may have a nil store
+	// Uses bs.db (not bs.store) because RichStore may have a nil store
 	// when created for enforcement/rich-field purposes only.
 	rows, err := bs.db.QueryContext(ctx, `
 		SELECT json_extract(subjects, '$[0]') as type_name, attributes
@@ -336,7 +336,7 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (_ map[string][]
 
 // GetDiscoveredRichFields returns the list of searchable rich string fields
 // discovered from type definitions in the database.
-func (bs *BoundedStore) GetDiscoveredRichFields() []string {
+func (bs *RichStore) GetDiscoveredRichFields() []string {
 	ctx := context.Background()
 	return bs.buildDynamicRichStringFields(ctx)
 }
@@ -347,7 +347,7 @@ func (bs *BoundedStore) GetDiscoveredRichFields() []string {
 // cut at that same hour, so a busy one is not drawn shorter than a quiet one.
 // The most recently carried come first: "The axis of time is more useful than
 // a tally."
-func (bs *BoundedStore) GetRichFieldsWithStats(overAtMost int) ([]RichFieldInfo, error) {
+func (bs *RichStore) GetRichFieldsWithStats(overAtMost int) ([]RichFieldInfo, error) {
 	ctx := context.Background()
 
 	// Get type definitions with their fields
@@ -424,7 +424,7 @@ func (bs *BoundedStore) GetRichFieldsWithStats(overAtMost int) ([]RichFieldInfo,
 
 // carriedOver is how many attestations matching a condition landed in each
 // hour from the hour since on.
-func (bs *BoundedStore) carriedOver(ctx context.Context, condition, since string) (_ map[string]int64, err error) {
+func (bs *RichStore) carriedOver(ctx context.Context, condition, since string) (_ map[string]int64, err error) {
 	rows, err := bs.db.QueryContext(ctx,
 		"SELECT strftime('%Y-%m-%dT%H', timestamp) AS bucket, COUNT(*) FROM attestations WHERE"+condition+
 			" AND bucket >= ? GROUP BY bucket", since)
@@ -448,7 +448,7 @@ func (bs *BoundedStore) carriedOver(ctx context.Context, condition, since string
 // buildDynamicRichStringFields creates a list of searchable fields
 // by aggregating RichStringFields from type definitions in the database.
 // Returns empty slice if no type definitions with rich fields are found.
-func (bs *BoundedStore) buildDynamicRichStringFields(ctx context.Context) []string {
+func (bs *RichStore) buildDynamicRichStringFields(ctx context.Context) []string {
 	typeFields, err := bs.getTypeDefinitions(ctx)
 	if err != nil {
 		bs.logger.Warnw("Failed to query type definitions, no fields available", "error", err)

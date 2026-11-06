@@ -74,11 +74,6 @@ const (
 	QueueDepth    = "qntx.pulse.queue.depth"
 	WorkersActive = "qntx.pulse.workers.active"
 
-	// AttestationsEvicted is the other side of AttestationsWritten: what the
-	// store let go of to stay within its bounds. Written climbing while evicted
-	// climbs with it is a store at capacity.
-	AttestationsEvicted = "qntx.attestations.evicted"
-
 	// Embedded is one per attestation given a vector, and Clustered is one per
 	// vector placed, sliced by outcome: assigned to a cluster, or noise. Many
 	// embedded and few assigned is a model that no longer fits its data.

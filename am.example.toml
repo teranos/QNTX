@@ -26,19 +26,6 @@ path = "qntx.db"
 # Hot backup interval (seconds). 0, or left out, backs nothing up.
 backup_interval_seconds = 3600
 
-[storage.sqlite.bounded_storage]
-# Bounded storage limits prevent unbounded database growth.
-# Oldest attestations are deleted when a limit is exceeded.
-
-# Maximum attestations per (actor, context) pair.
-actor_context_limit = 32
-
-# Maximum contexts per actor.
-actor_contexts_limit = 64
-
-# Maximum actors per entity (subject).
-entity_actors_limit = 64
-
 # ── Parquet backend (ADR-024) ───────────────────────────────────
 # Uncomment when backend = "parquet". Location is a URL: "s3://..."
 # or "file:///...". Credentials come from the AWS SDK default
@@ -55,22 +42,6 @@ entity_actors_limit = 64
 #
 # [storage.postgres]
 # ca = "supabase-ca.crt"
-
-# ════════════════════════════════════════════════════════════════
-# Attestation Distillation (ADR-020)
-# Folds old attestations into compressed summaries before deletion.
-# ════════════════════════════════════════════════════════════════
-
-[distill]
-# How often the age-based distill cycle runs (seconds). Left out, nothing
-# is distilled. Said, the two below are said with it.
-# interval_seconds = 300
-
-# Attestations older than this are candidates for distillation.
-# max_age_hours = 720
-
-# Maximum attestations to process per cycle.
-# batch_size = 500
 
 # ════════════════════════════════════════════════════════════════
 # Sentry

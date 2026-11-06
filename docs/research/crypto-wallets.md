@@ -34,7 +34,7 @@ A `qntx-evm` / `qntx-solana` plugin ingests the way `qntx-atproto` does — Puls
 
 - Balances and reads: `[0xdead…] is [holder-of erc20:usdc {balance}] of [ethereum:mainnet] by [rpc:alchemy] at [block-time]`. The actor is the *observer*, not the address — provenance is which RPC said so. Two providers attesting the same read is convergent verification for free; disagreement is visible instead of silently resolved.
 - Events: transfers, swaps, mints as attestations per log.
-- Volume is the constraint: a popular token's transfer stream is unbounded. Bounded storage + sigma distillation (min/max/sum/count over evicted transfers) is the existing answer — portfolio history compresses into statistical shape instead of being dropped.
+- Volume is the constraint: a popular token's transfer stream is unbounded.
 - Finality: attest at observation with block depth in context; a finalized observation supersedes a tentative one. No mutation needed.
 
 ## Smart contract protocol integration

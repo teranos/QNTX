@@ -32,15 +32,6 @@ pub enum StoreError {
     /// Serialization/deserialization error
     #[error("serialization error: {0}")]
     Serialization(String),
-
-    /// Storage quota exceeded
-    #[error("quota exceeded for actor '{actor}' in context '{context}': {current} >= {limit}")]
-    QuotaExceeded {
-        actor: String,
-        context: String,
-        current: usize,
-        limit: usize,
-    },
 }
 
 /// Result type for storage operations

@@ -375,82 +375,6 @@ pub extern "C" fn storage_wal_checkpoint(
     })
 }
 
-/// C-compatible distill result
-#[repr(C)]
-pub struct DistillResultC {
-    pub success: bool,
-    pub error_msg: *mut c_char,
-    pub distilled: usize,
-    pub sigmas_created: usize,
-    pub skipped: usize,
-}
-
-impl FfiResult for DistillResultC {
-    const ERROR_FALLBACK: &'static str = "error message contains null";
-
-    fn error_fields(error_msg: *mut c_char) -> Self {
-        Self {
-            success: false,
-            error_msg,
-            distilled: 0,
-            sigmas_created: 0,
-            skipped: 0,
-        }
-    }
-}
-
-/// Run age-triggered distillation: fold old attestations into sigmas.
-/// Caller must hold the write mutex (muWrite) before calling.
-#[no_mangle]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn storage_age_distill(
-    store: *mut SqliteStore,
-    cutoff_rfc3339: *const c_char,
-    batch_size: usize,
-) -> DistillResultC {
-    qntx_ffi_common::guarded_result("storage_age_distill", || {
-        if store.is_null() {
-            return DistillResultC {
-                success: false,
-                error_msg: cstring_new_or_empty("null store pointer"),
-                distilled: 0,
-                sigmas_created: 0,
-                skipped: 0,
-            };
-        }
-        let store = unsafe { &*store };
-        let cutoff = match unsafe { cstr_to_str(cutoff_rfc3339) } {
-            Ok(s) => s,
-            Err(e) => {
-                return DistillResultC {
-                    success: false,
-                    error_msg: cstring_new_or_empty(&e.to_string()),
-                    distilled: 0,
-                    sigmas_created: 0,
-                    skipped: 0,
-                }
-            }
-        };
-
-        match store.age_distill(cutoff, batch_size) {
-            Ok((distilled, sigmas_created, skipped)) => DistillResultC {
-                success: true,
-                error_msg: ptr::null_mut(),
-                distilled,
-                sigmas_created,
-                skipped,
-            },
-            Err(e) => DistillResultC {
-                success: false,
-                error_msg: cstring_new_or_empty(&format!("{}", e)),
-                distilled: 0,
-                sigmas_created: 0,
-                skipped: 0,
-            },
-        }
-    })
-}
-
 /// Get an attestation by ID through the read connection.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -905,42 +829,6 @@ fn query_distinct(conn: &rusqlite::Connection, sql: &str) -> Result<Vec<String>,
     Ok(results)
 }
 
-/// Set enforcement config on the store. When set, enforcement runs after every put().
-/// config_json: `{"actor_context_limit":16,"actor_contexts_limit":64,"entity_actors_limit":64}`
-#[no_mangle]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn storage_set_enforcement_config(
-    store: *mut SqliteStore,
-    config_json: *const c_char,
-) -> StorageResultC {
-    qntx_ffi_common::guarded_result("storage_set_enforcement_config", || {
-        if store.is_null() {
-            return StorageResultC::error("null store pointer");
-        }
-
-        let json_str = match unsafe { cstr_to_str(config_json) } {
-            Ok(s) => s,
-            Err(e) => return StorageResultC::error(e),
-        };
-
-        let store = unsafe { &mut *store };
-
-        let config: ats::storage::enforcement::EnforcementConfig =
-            match serde_json::from_str(json_str) {
-                Ok(c) => c,
-                Err(e) => {
-                    return StorageResultC::error(&format!(
-                        "invalid enforcement config JSON: {}",
-                        e
-                    ))
-                }
-            };
-
-        store.set_enforcement_config(config);
-        StorageResultC::ok()
-    })
-}
-
 // ============================================================================
 // CRUD Operations
 // ============================================================================
@@ -1365,54 +1253,8 @@ fn now_ms() -> i64 {
 }
 
 // ============================================================================
-// Enforcement & Stats
+// Stats
 // ============================================================================
-
-/// Enforce storage limits and log events. Returns JSON array of enforcement events.
-///
-/// Input JSON: `{"actors":["a"],"contexts":["c"],"subjects":["s"],"config":{...}}`
-/// Output JSON: `[{"event_type":"...","actor":"...","deleted_count":N,...},...]`
-#[no_mangle]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn storage_enforce_limits(
-    store: *mut SqliteStore,
-    input_json: *const c_char,
-) -> AttestationResultC {
-    qntx_ffi_common::guarded_result("storage_enforce_limits", || {
-        if store.is_null() {
-            return AttestationResultC::error("null store pointer");
-        }
-
-        let json_str = match unsafe { cstr_to_str(input_json) } {
-            Ok(s) => s,
-            Err(e) => return AttestationResultC::error(e),
-        };
-
-        if json_str.len() > MAX_JSON_LENGTH {
-            return AttestationResultC::error("enforcement input JSON exceeds maximum length");
-        }
-
-        let store = unsafe { &mut *store };
-
-        let input: ats::storage::EnforcementInput = match serde_json::from_str(json_str) {
-            Ok(i) => i,
-            Err(e) => {
-                return AttestationResultC::error(&format!("invalid enforcement input JSON: {}", e))
-            }
-        };
-
-        match store.enforce_limits(&input) {
-            Ok(events) => match serde_json::to_string(&events) {
-                Ok(json) => AttestationResultC::ok(json),
-                Err(e) => AttestationResultC::error(&format!(
-                    "failed to serialize enforcement events: {}",
-                    e
-                )),
-            },
-            Err(e) => AttestationResultC::error(&format!("enforcement failed: {}", e)),
-        }
-    })
-}
 
 /// Get storage statistics. Returns JSON with counts.
 ///

@@ -141,7 +141,6 @@ See [Design Philosophy](https://github.com/teranos/QNTX-Web/blob/main/design-phi
 
 Architecture deep-dives:
 
-- [Bounded Storage](architecture/bounded-storage.md)
 - [Config System](architecture/config-system.md)
 - [Pulse Async](architecture/pulse-async-ix.md)
 - [Two-Phase Jobs](architecture/two-phase-jobs.md)
