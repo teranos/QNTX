@@ -42,7 +42,10 @@ require (
 
 require github.com/a2aproject/a2a-go/v2 v2.7.0
 
-require github.com/a2aproject/a2a-go v0.3.15 // indirect
+require (
+	github.com/a2aproject/a2a-go v0.3.15 // indirect
+	github.com/getsentry/sentry-go/slog v0.45.1
+)
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
