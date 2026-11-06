@@ -10,7 +10,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	// v0.45.1 is the last release with Event.Extra, which cockroachdb/errors
 	// still reads. Anything from v0.46.0 up stops this module compiling.
-	github.com/getsentry/sentry-go v0.45.1
+	github.com/getsentry/sentry-go v0.50.0
 	github.com/go-webauthn/webauthn v0.15.0
 	github.com/google/jsonschema-go v0.4.3
 	github.com/google/uuid v1.6.0
