@@ -13,7 +13,7 @@ Separately, database operations are migrating from Go to Rust (PR #691+). Rust i
 
 ## Decision
 
-kern (OCaml) is the innermost layer — parser, classifier, expander. Rust is the engine — database, enforcement, query execution. Go is the shell — HTTP, plugins, UI.
+kern (OCaml) is the innermost layer — parser, classifier, expander. Rust is the engine — database, query execution. Go is the shell — HTTP, plugins, UI.
 
 Parser via menhir, AST as algebraic types, classifier and expander as pattern matches. Build with dune.
 
