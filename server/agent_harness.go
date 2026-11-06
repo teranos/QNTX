@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -58,10 +59,34 @@ const nodeAgentPath = "/api/agent"
 
 // "Node Agent is Node agent"
 
+// harnessNames is each harness's name, in the order given.
+func harnessNames(hs []*harness) []string {
+	names := make([]string, len(hs))
+	for i, h := range hs {
+		names[i] = h.name
+	}
+	return names
+}
+
+// 「[Opus 5.5] harnessParam is the harness an agent's sigils take, one of those it
+// runs in, and a sentence of each. Not required, am answers in every harness
+// the agent can be spoken to in.」
+func harnessParam(hs []*harness, required bool) *protocol.Param {
+	says := make([]string, len(hs))
+	for i, h := range hs {
+		says[i] = h.name + " for " + h.called
+	}
+	param := &protocol.Param{Name: "harness", Required: required, OneOf: harnessNames(hs), Says: "The harness it runs in: " + strings.Join(says, ", ") + "."}
+	if !required {
+		param.Says += " Not sent, it is every harness am.toml names it in."
+	}
+	return param
+}
+
 // nodeAgentSignum is the Node Agent's say, am and session, in the harness named, and its sign-in
 // to Claude Code.
 func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
-	harness := &protocol.Param{Name: "harness", Required: true, OneOf: []string{agentLineClaude, agentLinePi, agentLineCodex, agentLineAgy}, Says: "The harness it runs in: claude for Claude Code, pi for Pi, codex for codex, agy for agy."}
+	harness := harnessParam(s.harnesses(), true)
 	claude := s.claudeHarness()
 	login := s.loginSigil()
 	return sigil.Signum{
@@ -80,8 +105,8 @@ func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
 				},
 				{
 					Name:   "am",
-					Does:   "Who the Node Agent is and how the node runs it, in the harness named.",
-					Takes:  []*protocol.Param{harness},
+					Does:   "Who the Node Agent is and how the node runs it, in the harness named, or in every harness it can be spoken to in.",
+					Takes:  []*protocol.Param{harnessParam(s.harnesses(), false)},
 					Answer: "protocol.NodeAgentAm",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: nodeAgentPath},
 				},
@@ -116,7 +141,7 @@ func (s *QNTXServer) harnessNamed(sent sigil.Sent) (*harness, *protocol.Refusal)
 	case agentLineAgy:
 		return s.agyHarness(), nil
 	}
-	return nil, notAHarness(sent)
+	return nil, notAHarness(s.harnesses(), sent)
 }
 
 func (s *QNTXServer) nodeAgentSay(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -142,6 +167,9 @@ func (s *QNTXServer) nodeAgentSay(ctx context.Context, sent sigil.Sent) (any, *p
 }
 
 func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	if sent["harness"] == "" {
+		return amInEvery(s.harnesses(), "the Node Agent", s.harnessAm)
+	}
 	h, refused := s.harnessNamed(sent)
 	if refused != nil {
 		return nil, refused
@@ -150,17 +178,58 @@ func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *prot
 	if refused != nil {
 		return nil, refused
 	}
+	into := &protocol.NodeAgentAm{}
+	if !amInto(into, answer) {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent said who it is in " + h.called + " as no Coding Agent Harness this node runs"}
+	}
+	return into, nil
+}
+
+// amInto puts what am answered in one harness where NodeAgentAm carries that
+// harness, and reports whether it carries it.
+func amInto(into *protocol.NodeAgentAm, answer any) bool {
 	switch am := answer.(type) {
 	case *protocol.ClaudeAm:
-		return &protocol.NodeAgentAm{Claude: am}, nil
+		into.Claude = am
 	case *protocol.PiAm:
-		return &protocol.NodeAgentAm{Pi: am}, nil
+		into.Pi = am
 	case *protocol.CodexAm:
-		return &protocol.NodeAgentAm{Codex: am}, nil
+		into.Codex = am
 	case *protocol.AgyAm:
-		return &protocol.NodeAgentAm{Agy: am}, nil
+		into.Agy = am
+	default:
+		return false
 	}
-	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent said who it is in " + h.called + " as no Coding Agent Harness this node runs"}
+	return true
+}
+
+// 「[Opus 5.5] amInEvery is am in every harness of hs the agent can be spoken to
+// in, each where NodeAgentAm carries it: a harness am.toml does not name, or
+// whose binary the node does not hold, is not in it. When it can be spoken to
+// in none, the first harness's refusal says why.」
+//
+// "We shouldn't be displaying unavailable things to people"
+func amInEvery(hs []*harness, called string, am func(*harness) (any, *protocol.Refusal)) (any, *protocol.Refusal) {
+	every := &protocol.NodeAgentAm{}
+	var first *protocol.Refusal
+	offered := 0
+	for _, h := range hs {
+		answer, refused := am(h)
+		if refused != nil {
+			if first == nil {
+				first = refused
+			}
+			continue
+		}
+		if !amInto(every, answer) {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: called + " said who it is in " + h.called + " as no Coding Agent Harness this node runs"}
+		}
+		offered++
+	}
+	if offered == 0 {
+		return nil, first
+	}
+	return every, nil
 }
 
 func (s *QNTXServer) nodeAgentSession(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {

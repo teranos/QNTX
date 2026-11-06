@@ -176,6 +176,65 @@ func TestPiSaysWhoItIs(t *testing.T) {
 	require.NoError(t, s.nodeAgentSignum().Check())
 }
 
+// "We shouldn't be displaying unavailable things to people"
+//
+// 「[Opus 5.5] am asked in no harness answers in every harness am.toml names the
+// Node Agent in, and in none other.」
+func TestAmInNoHarnessIsEveryHarnessItIsNamedIn(t *testing.T) {
+	alone, _ := runningTheNodeAgent(t, opusLow)
+	answer, refused := alone.nodeAgentSignum().Answers["am"](context.Background(), sigil.Sent{})
+	require.Nil(t, refused)
+	am := answer.(*protocol.NodeAgentAm)
+	assert.NotNil(t, am.GetClaude())
+	assert.Nil(t, am.GetPi(), "this node's am.toml names no Pi")
+	assert.Nil(t, am.GetCodex())
+	assert.Nil(t, am.GetAgy())
+	holds(t, alone.nodeAgentSignum(), "am", am)
+
+	withPi, _, _ := runningPiToo(t)
+	answer, refused = withPi.nodeAgentSignum().Answers["am"](context.Background(), sigil.Sent{})
+	require.Nil(t, refused)
+	am = answer.(*protocol.NodeAgentAm)
+	assert.NotNil(t, am.GetClaude())
+	assert.Equal(t, "anthropic/claude-sonnet-4.6", am.GetPi().GetModel())
+	holds(t, withPi.nodeAgentSignum(), "am", am)
+	require.NoError(t, withPi.nodeAgentSignum().Check())
+}
+
+// 「[Opus 5.5] An element's agent, asked am in no harness, answers in the ones it can be spoken to in.」
+func TestElementAmInNoHarnessIsEveryHarnessItIsNamedIn(t *testing.T) {
+	s, _ := runningElementAgents(t)
+	answer, refused := s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "ground-element"})
+	require.Nil(t, refused)
+	am := answer.(*protocol.NodeAgentAm)
+	assert.NotNil(t, am.GetClaude())
+	assert.Nil(t, am.GetPi(), "this node's am.toml names no Pi")
+	holds(t, s.elementsSignum(), "am", am)
+}
+
+// 「[Opus 5.5] The harnesses an agent's sigils take are the harnesses it runs in, said once.」
+func TestTheHarnessesTakenAreTheHarnessesItRunsIn(t *testing.T) {
+	s, _, _ := runningPiToo(t)
+	takes := func(signum *protocol.Signum, name string) []string {
+		for _, each := range signum.GetSigils() {
+			if each.GetName() == name {
+				for _, param := range each.GetTakes() {
+					if param.GetName() == "harness" {
+						return param.GetOneOf()
+					}
+				}
+			}
+		}
+		return nil
+	}
+	assert.Equal(t, []string{"claude", "pi", "codex", "agy"}, takes(s.nodeAgentSignum().Signum, "say"))
+	assert.Equal(t, []string{"claude", "pi", "codex", "agy"}, takes(s.nodeAgentSignum().Signum, "am"))
+	assert.Equal(t, []string{"claude", "pi"}, takes(s.elementsSignum().Signum, "am"))
+	_, refused := s.harnessNamed(sigil.Sent{"harness": "gemini"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "claude, pi, codex, agy")
+}
+
 // Only ROOT talks to it, in Pi as in Claude Code.
 func TestOnlyRootTalksToItInPi(t *testing.T) {
 	compiled, err := reach.Reached()
