@@ -17,11 +17,10 @@ var DbCmd = &cobra.Command{
 	Short: "Manage QNTX database",
 	Long: `db — Manage QNTX database operations
 
-Manage database operations including statistics, storage telemetry, and diagnostics.
+Manage database operations including statistics and diagnostics.
 
 Examples:
-  qntx db stats                   # Show database statistics and storage telemetry
-  qntx db stats --limit 10        # Show last 10 storage enforcement events`,
+  qntx db stats                   # Show database statistics`,
 }
 
 var dbStatsCmd = &cobra.Command{
