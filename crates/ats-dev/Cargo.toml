@@ -17,5 +17,5 @@ path = "src/main.rs"
 [dependencies]
 ats.workspace = true
 ats-sqlite = { path = "../ats-sqlite" }
-laye-error = { path = "../laye-error" }
+sacred-error.workspace = true
 serde_json.workspace = true

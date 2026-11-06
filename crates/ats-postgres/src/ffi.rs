@@ -180,7 +180,7 @@ impl Crosses for serde_json::Error {
 impl Crosses for StoreError {
     fn crosses(self, call: &str) -> String {
         if let StoreError::Backend(json) = &self {
-            if serde_json::from_str::<laye_error::Error>(json).is_ok() {
+            if serde_json::from_str::<sacred_error::Error>(json).is_ok() {
                 return json.clone();
             }
         }

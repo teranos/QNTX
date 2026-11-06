@@ -11,7 +11,7 @@
 //! ```
 //!
 //! `--db` defaults to `$ATS_DEV_DB`, else `ats-dev.db`. Rows come out as JSON,
-//! one attestation per line. A failure goes to stderr as a laye-error `Error`
+//! one attestation per line. A failure goes to stderr as a sacred-error `Error`
 //! and exits 1.
 
 use std::io::{BufRead, Write};
@@ -20,7 +20,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ats::{ax, AttestationStore, TemporalConfig};
 use ats::{Attestation, Parser};
 use ats_sqlite::SqliteStore;
-use laye_error::{Context, Error, Severity};
+use sacred_error::{Context, Error, Severity};
 
 /// Puts per transaction on `put -`. Unbatched, each put is five commits
 /// (`SqliteStore::put` commits the row and each junction loop on its own).

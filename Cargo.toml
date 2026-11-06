@@ -10,7 +10,6 @@ members = [
     "crates/ats-sign",
     "crates/ats-sqlite",
     "crates/ats-wasm",
-    "crates/laye-error",
     "crates/laye-me",
     "crates/laye-net",
     "crates/laye-p2p",
@@ -70,6 +69,10 @@ string_slice = "deny"
 # use site; qntx-ats is what crates.io calls it (docs/release.md).
 ats = { package = "qntx-ats", path = "crates/ats", version = "0.2.44" }
 qntx-proto = { path = "crates/qntx-proto", version = "0.2.44" }
+
+# The one error type, in its own repository (github.com/teranos/sacred-error). A
+# git dependency until it is on crates.io, so no crate that publishes may use it.
+sacred-error = { git = "https://github.com/teranos/sacred-error", rev = "aaf9a743a2b9b0d22c6059dddbfdc4897f6528c7" }
 qntx-grpc = { path = "crates/qntx-grpc", version = "0.2.44" }
 
 # OpenTelemetry: pinned exactly, the three crates move together
