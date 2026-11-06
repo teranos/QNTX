@@ -434,15 +434,15 @@ impl DuckdbError {
 
     /// The one typed value this crosses every layer as. `ffi_call` names the
     /// C function it left through, or is empty inside the crate.
-    pub fn sacred(self, ffi_call: &str) -> laye_error::Error {
+    pub fn sacred(self, ffi_call: &str) -> sacred_error::Error {
         let at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis().to_string())
             .unwrap_or_default();
-        laye_error::Error {
+        sacred_error::Error {
             id: format!("err-{SURFACE}-{at}"),
-            severity: laye_error::Severity::Error,
-            context: laye_error::Context {
+            severity: sacred_error::Severity::Error,
+            context: sacred_error::Context {
                 surface: SURFACE.to_string(),
                 region: Some(self.region().to_string()),
                 anchor: None,
