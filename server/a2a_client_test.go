@@ -5,16 +5,25 @@ import (
 	"encoding/json"
 	"io"
 	"iter"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
+	"github.com/getsentry/sentry-go"
+	sentryotel "github.com/getsentry/sentry-go/otel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/auth"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -110,15 +119,184 @@ func TestEachA2ASigilIsAnOperationOfThePinnedSpec(t *testing.T) {
 	pinned, err := a2aSpec()
 	require.NoError(t, err)
 	for _, held := range signum.GetSigils() {
+		if held.GetName() == "Resolve" {
+			continue
+		}
 		method := pinned.service.Methods().ByName(protoreflect.Name(held.GetName()))
 		require.NotNil(t, method, held.GetName())
 		assert.Equal(t, string(method.Output().FullName()), held.GetAnswer(), held.GetName())
 		assert.NotEmpty(t, held.GetDoes(), held.GetName())
 		fields := method.Input().Fields()
-		require.Len(t, held.GetTakes(), fields.Len()+1, held.GetName())
+		require.Len(t, held.GetTakes(), fields.Len()+2, held.GetName())
 		for i := 0; i < fields.Len(); i++ {
-			assert.Equal(t, string(fields.Get(i).Name()), held.GetTakes()[i+1].GetName(), held.GetName())
+			assert.Equal(t, string(fields.Get(i).Name()), held.GetTakes()[i+2].GetName(), held.GetName())
 		}
 	}
-	assert.Len(t, signum.GetSigils(), pinned.service.Methods().Len()-2, "every operation but the two that stream")
+	assert.Len(t, signum.GetSigils(), pinned.service.Methods().Len()-2+1, "every operation but the two that stream, and Resolve")
+}
+
+// allowingLoopback lets the node speak to httptest, which is on loopback, for
+// an agent found by its card.
+func allowingLoopback(t *testing.T) {
+	t.Helper()
+	allowed := publicAddress
+	publicAddress = func(net.IP) bool { return true }
+	t.Cleanup(func() { publicAddress = allowed })
+}
+
+// cardServing is an agent a2a-go serves, its card at the well-known path and
+// its HTTP+JSON binding at /a2a.
+func cardServing(t *testing.T, agent *anotherAgent) *httptest.Server {
+	t.Helper()
+	rest := a2asrv.NewRESTHandler(a2asrv.NewHandler(agent.executor()))
+	var served *httptest.Server
+	served = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		agent.bearer = append(agent.bearer, r.Header.Get("Authorization"))
+		if r.URL.Path == "/.well-known/agent-card.json" {
+			a2asrv.NewStaticAgentCardHandler(&a2asdk.AgentCard{
+				Name: "the orchard keeper", Description: "Keeps the orchard.", Version: "1.0.0",
+				SupportedInterfaces: []*a2asdk.AgentInterface{a2asdk.NewAgentInterface(served.URL+"/a2a", a2asdk.TransportProtocolHTTPJSON)},
+				DefaultInputModes:   []string{"text/plain"}, DefaultOutputModes: []string{"text/plain"},
+				Skills: []a2asdk.AgentSkill{{ID: "keep", Name: "keep", Description: "Keeps.", Tags: []string{"orchard"}}},
+			}).ServeHTTP(w, r)
+			return
+		}
+		http.StripPrefix("/a2a", rest).ServeHTTP(w, r)
+	}))
+	t.Cleanup(served.Close)
+	return served
+}
+
+// spansRecorded is the spans the node opens for one test.
+func spansRecorded(t *testing.T) *tracetest.SpanRecorder {
+	t.Helper()
+	recorder := tracetest.NewSpanRecorder()
+	before := otel.GetTracerProvider()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder)))
+	t.Cleanup(func() { otel.SetTracerProvider(before) })
+	return recorder
+}
+
+// spansNamed is the ended spans called name.
+func spansNamed(recorder *tracetest.SpanRecorder, name string) []sdktrace.ReadOnlySpan {
+	var named []sdktrace.ReadOnlySpan
+	for _, span := range recorder.Ended() {
+		if span.Name() == name {
+			named = append(named, span)
+		}
+	}
+	return named
+}
+
+// attributeOf is span's attribute key, as text.
+func attributeOf(span sdktrace.ReadOnlySpan, key string) string {
+	for _, held := range span.Attributes() {
+		if string(held.Key) == key {
+			return held.Value.Emit()
+		}
+	}
+	return ""
+}
+
+// Discovery (§8.2): a card is resolved by a2a-go's resolver from the agent's
+// base URL, the agent it names is spoken to as no one, and each resolution
+// and operation is a span.
+func TestTheAgentACardNamesIsFoundAndSpokenTo(t *testing.T) {
+	allowingLoopback(t)
+	agent := &anotherAgent{}
+	served := cardServing(t, agent)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	recorder := spansRecorded(t)
+	root := tokens[auth.LevelRoot]
+
+	code, card := a2aCalledOver(t, srv, root, http.MethodGet, "Resolve", map[string]any{"card": served.URL})
+	require.Equal(t, http.StatusOK, code, card)
+	assert.Equal(t, "the orchard keeper", card["name"])
+
+	code, answered := a2aCalledOver(t, srv, root, http.MethodPost, "SendMessage", map[string]any{
+		"card": served.URL, "message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	require.Equal(t, http.StatusOK, code, answered)
+	assert.Equal(t, "TASK_STATE_COMPLETED", answered["task"].(map[string]any)["status"].(map[string]any)["state"])
+	for _, bearer := range agent.bearer {
+		assert.Empty(t, bearer, "an agent a card names was given a token")
+	}
+
+	resolved := spansNamed(recorder, "a2a.Resolve")
+	require.Len(t, resolved, 2, "each resolution is a span")
+	for _, span := range resolved {
+		assert.Equal(t, "the orchard keeper", attributeOf(span, "a2a.card.name"))
+		assert.Equal(t, served.URL, attributeOf(span, "a2a.card.url"))
+	}
+	sends := spansNamed(recorder, "a2a.SendMessage")
+	require.Len(t, sends, 1)
+	assert.Equal(t, "the orchard keeper", attributeOf(sends[0], "a2a.agent"))
+	assert.Equal(t, sends[0].SpanContext().TraceID(), resolved[1].SpanContext().TraceID(), "the resolution is part of the operation's trace")
+}
+
+// A card is read from what the internet routes to alone, over http or https:
+// a2a-go's resolver would read a file:// card from the node's own disk.
+func TestACardIsReadFromThePublicInternetAlone(t *testing.T) {
+	agent := &anotherAgent{}
+	served := cardServing(t, agent)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	recorder := spansRecorded(t)
+	root := tokens[auth.LevelRoot]
+
+	for _, at := range []string{"file:///etc/passwd", served.URL} {
+		code, refused := a2aCalledOver(t, srv, root, http.MethodGet, "Resolve", map[string]any{"card": at})
+		assert.NotEqual(t, http.StatusOK, code, at)
+		said, _ := json.Marshal(refused)
+		assert.NotContains(t, string(said), "root:", at)
+	}
+	assert.Empty(t, agent.bearer, "the node spoke to loopback")
+	resolved := spansNamed(recorder, "a2a.Resolve")
+	require.Len(t, resolved, 2)
+	for _, span := range resolved {
+		assert.Equal(t, codes.Error, span.Status().Code, "a card not resolved is an error span")
+	}
+
+	code, refused := a2aCalledOver(t, srv, root, http.MethodPost, "SendMessage", map[string]any{"peer": "orchardnode", "card": served.URL, "message": `{}`})
+	assert.Equal(t, http.StatusBadRequest, code, refused, "an agent is named by a peer or a card, not both")
+}
+
+// "make it ship to sentry": a resolution is a span, and sentry-go's span
+// processor, which the node starts when Sentry traces, ships it to Sentry as
+// a transaction.
+func TestAResolutionShipsToSentry(t *testing.T) {
+	allowingLoopback(t)
+	served := cardServing(t, &anotherAgent{})
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	var shipped []*sentry.Event
+	var held sync.Mutex
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn: "https://tim@example.com/0", EnableTracing: true, TracesSampleRate: 1,
+		Transport: &sentry.MockTransport{},
+		BeforeSendTransaction: func(e *sentry.Event, _ *sentry.EventHint) *sentry.Event {
+			held.Lock()
+			defer held.Unlock()
+			shipped = append(shipped, e)
+			return nil
+		},
+	})
+	require.NoError(t, err)
+	hub := sentry.CurrentHub()
+	before := hub.Client()
+	hub.BindClient(client)
+	t.Cleanup(func() { hub.BindClient(before) })
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sentryotel.NewSentrySpanProcessor()))
+	formerly := otel.GetTracerProvider()
+	otel.SetTracerProvider(provider)
+	t.Cleanup(func() { otel.SetTracerProvider(formerly) })
+
+	code, card := a2aCalledOver(t, srv, tokens[auth.LevelRoot], http.MethodGet, "Resolve", map[string]any{"card": served.URL})
+	require.Equal(t, http.StatusOK, code, card)
+	require.NoError(t, provider.ForceFlush(context.Background()))
+	client.Flush(5 * time.Second)
+
+	held.Lock()
+	defer held.Unlock()
+	require.NotEmpty(t, shipped, "no transaction reached Sentry")
+	assert.Equal(t, "a2a.Resolve", shipped[0].Transaction)
 }

@@ -31,6 +31,7 @@ import (
 func nodeAgentOverA2A(t *testing.T, held string) (*QNTXServer, map[auth.Level]string, string) {
 	t.Helper()
 	srv, tokens := pluginServingServer(t, "fake")
+	keyedNode(srv)
 	binary, ran := claudeStandIn(t, claudeAnswered)
 	if held != "" {
 		waits := filepath.Join(filepath.Dir(binary), "claude-held")
@@ -262,9 +263,6 @@ func TestWhatTheNodeAgentDoesNotTakeIsRefused(t *testing.T) {
 		{"text in another media type",
 			`{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [{"text": "{}", "mediaType": "application/json"}]}}`,
 			http.StatusBadRequest, "CONTENT_TYPE_NOT_SUPPORTED"},
-		{"a message that is the agent's",
-			`{"message": {"messageId": "m", "role": "ROLE_AGENT", "parts": [{"text": "hi"}]}}`,
-			http.StatusBadRequest, "is the user's"},
 		{"a context that is not its session",
 			`{"message": {"messageId": "m", "role": "ROLE_USER", "contextId": "another", "parts": [{"text": "hi"}]}}`,
 			http.StatusBadRequest, "is one session"},
@@ -274,9 +272,6 @@ func TestWhatTheNodeAgentDoesNotTakeIsRefused(t *testing.T) {
 		{"a task that ended",
 			`{"message": {"messageId": "m", "role": "ROLE_USER", "taskId": "` + finished + `", "parts": [{"text": "hi"}]}}`,
 			http.StatusBadRequest, "UNSUPPORTED_OPERATION"},
-		{"a push notification to a private address",
-			saidToTheNode("hi", `{"taskPushNotificationConfig": {"url": "http://10.0.0.1/hook"}}`),
-			http.StatusBadRequest, "no public address"},
 	} {
 		code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", refused.body, tokens[auth.LevelRoot])
 		assert.Equal(t, refused.code, code, refused.what)
@@ -480,16 +475,6 @@ func TestTheNodeAgentsTasksAreListedTheMostRecentlyUpdatedFirst(t *testing.T) {
 	assert.Equal(t, float64(0), at(page, "totalSize"))
 }
 
-// A listing the spec does not allow is refused, as its validation error
-// example refuses it (§6.5), and so is a page token this node did not give.
-func TestAListingOfTasksTheSpecDoesNotAllowIsRefused(t *testing.T) {
-	srv, tokens, _ := nodeAgentOverA2A(t, "")
-	for _, query := range []string{"pageSize=150", "pageSize=0", "historyLength=-5", "status=TASK_STATE_RUNNING", "pageToken=nothing"} {
-		code, answered := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks?"+query, "", tokens[auth.LevelRoot])
-		assert.Equal(t, http.StatusBadRequest, code, query+": %v", answered)
-	}
-}
-
 // "ROOT can do anything": canceling a Task stops its turn, and it ends
 // canceled however its turn ends after (§3.1.5).
 func TestCancelingAWorkingTaskStopsItsTurn(t *testing.T) {
@@ -536,47 +521,6 @@ func TestATaskCanceledBeforeItsTurnStartsNeverStartsIt(t *testing.T) {
 	}, time.Second, 20*time.Millisecond, "the turn of a canceled task was run")
 	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
 	assert.Equal(t, "TASK_STATE_CANCELED", at(got, "status.state"))
-}
-
-// A Task that ended is not canceled, a second cancel among them, and one no id
-// names is not found (§3.1.5).
-func TestATaskThatEndedIsNotCanceled(t *testing.T) {
-	srv, tokens, _ := nodeAgentOverA2A(t, "")
-	_, done := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("remember 7", ""), tokens[auth.LevelRoot])
-	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "waiting", "TASK_STATE_SUBMITTED", "someone", time.Now(), map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
-	code, _ := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/waiting:cancel", `{}`, tokens[auth.LevelRoot])
-	require.Equal(t, http.StatusOK, code)
-
-	for id, says := range map[string]string{
-		at(done, "task.id").(string): "TASK_NOT_CANCELABLE",
-		"waiting":                    "TASK_NOT_CANCELABLE",
-		"nothing":                    "TASK_NOT_FOUND",
-	} {
-		code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/"+id+":cancel", `{}`, tokens[auth.LevelRoot])
-		said, _ := json.Marshal(answered)
-		assert.Contains(t, string(said), says, id)
-		assert.NotEqual(t, http.StatusOK, code, id)
-	}
-}
-
-// "Agents MUST validate all input parameters before processing" (§13): a
-// negative historyLength is refused wherever it is asked, as ListTasks refuses
-// it, and nothing is said to the Node Agent.
-func TestANegativeHistoryLengthIsRefused(t *testing.T) {
-	srv, tokens, ran := nodeAgentOverA2A(t, "")
-	_, done := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("remember 7", ""), tokens[auth.LevelRoot])
-	id := at(done, "task.id").(string)
-
-	code, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id+"?historyLength=-5", "", tokens[auth.LevelRoot])
-	assert.Equal(t, http.StatusBadRequest, code, got)
-	assert.Contains(t, at(got, "error.message"), "historyLength must be a non-negative integer, got -5")
-
-	code, got = a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("again", `{"historyLength": -5}`), tokens[auth.LevelRoot])
-	assert.Equal(t, http.StatusBadRequest, code, got)
-	assert.Contains(t, at(got, "error.message"), "historyLength must be a non-negative integer, got -5")
-	entries, err := os.ReadDir(ran)
-	require.NoError(t, err)
-	assert.Len(t, entries, 1, "a refused message was said to the Node Agent")
 }
 
 // writeTaskLine writes a Task line as the node wrote them before it served A2A

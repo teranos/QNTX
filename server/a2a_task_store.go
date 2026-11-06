@@ -144,17 +144,10 @@ func (t tasksOnLines) List(ctx context.Context, req *a2asdk.ListTasksRequest) (*
 		return nil, err
 	}
 	size := req.PageSize
-	if size == 0 {
+	if size <= 0 {
 		size = listedSize
-	} else if size < 1 || size > listedMost {
-		return nil, a2aRefusal(a2asdk.ErrInvalidParams, "pageSize must be between 1 and 100 inclusive, got "+strconv.Itoa(size))
 	}
-	if req.Status != a2asdk.TaskStateUnspecified && !slices.Contains(taskStates, req.Status) {
-		return nil, a2aRefusal(a2asdk.ErrInvalidParams, "status "+string(req.Status)+" is no TaskState")
-	}
-	if refused := historyRefused(req.HistoryLength); refused != nil {
-		return nil, refused
-	}
+	size = min(size, listedMost)
 	after, err := cursorOf(req.PageToken)
 	if err != nil {
 		return nil, err
@@ -195,22 +188,6 @@ func (t tasksOnLines) List(ctx context.Context, req *a2asdk.ListTasksRequest) (*
 		}
 	}
 	return &a2asdk.ListTasksResponse{Tasks: page, TotalSize: len(tasks), PageSize: size, NextPageToken: next}, nil
-}
-
-// taskStates is every TaskState a client names.
-var taskStates = []a2asdk.TaskState{
-	a2asdk.TaskStateSubmitted, a2asdk.TaskStateWorking, a2asdk.TaskStateCompleted, a2asdk.TaskStateFailed,
-	a2asdk.TaskStateCanceled, a2asdk.TaskStateInputRequired, a2asdk.TaskStateRejected, a2asdk.TaskStateAuthRequired,
-}
-
-// historyRefused is why a historyLength is not one the node takes, nil when it
-// is: "Agents MUST validate all input parameters before processing" (§13),
-// and a negative one is refused, as §6.5's validation error example refuses it.
-func historyRefused(length *int) error {
-	if length == nil || *length >= 0 {
-		return nil
-	}
-	return a2aRefusal(a2asdk.ErrInvalidParams, "historyLength must be a non-negative integer, got "+strconv.Itoa(*length))
 }
 
 // historyOf is as much of history as length gives: all of it for none, "the

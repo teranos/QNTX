@@ -67,11 +67,16 @@ func sdkReference(files []protoreflect.FileDescriptor) (Schema, *protocol.Refusa
 	}}, nil
 }
 
+// A2AResolveSays is what a2a-go's card resolver's Resolve says it does, by
+// the name a2a.says.json holds it under.
+const A2AResolveSays = "a2aclient/agentcard.Resolver.Resolve"
+
 // A2AGoSays is what a2a-go's generated Go says of each message, field,
 // service and method of lf.a2a.v1, by full name: protoc-gen-go keeps a .proto's
 // comments as Go's. pb is a2av1.pb.go, and grpc a2av1_grpc.pb.go, whose client
-// interface carries the service's and each method's.
-func A2AGoSays(pb, grpc []byte) (map[string]string, error) {
+// interface carries the service's and each method's. resolver is
+// a2aclient/agentcard/resolver.go, whose Resolve says what discovery does.
+func A2AGoSays(pb, grpc, resolver []byte) (map[string]string, error) {
 	file := a2apb.File_a2av1_proto
 	messages := map[string]protoreflect.MessageDescriptor{}
 	var named func(protoreflect.MessageDescriptors, string)
@@ -168,6 +173,18 @@ func A2AGoSays(pb, grpc []byte) (map[string]string, error) {
 				}
 			}
 		}
+	}
+	parsed, err = parser.ParseFile(token.NewFileSet(), "resolver.go", resolver, parser.ParseComments)
+	if err != nil {
+		return nil, errors.Wrap(err, "resolver.go did not parse")
+	}
+	for _, decl := range parsed.Decls {
+		if fn, isFunc := decl.(*ast.FuncDecl); isFunc && fn.Recv != nil && fn.Name.Name == "Resolve" {
+			keep(A2AResolveSays, fn.Doc)
+		}
+	}
+	if says[A2AResolveSays] == "" {
+		return nil, errors.New("a2a-go's card resolver says nothing of Resolve")
 	}
 	return says, nil
 }

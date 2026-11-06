@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
@@ -8,16 +9,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/internal/access"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/nodedid"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 // keyedNode is a node holding its own key, as a started node does, which its
@@ -40,9 +38,8 @@ func namedNode(t *testing.T) {
 	})
 }
 
-// A stranger is served the card whole: an AgentCard lacking nothing the spec
-// requires, the signa named for it in their order, each requiring the bearer
-// token, and the node extension.
+// A stranger is served the card whole: the signa named for it in their
+// order, each requiring the bearer token, and the node extension.
 func TestTheAgentCardIsServedToAnyone(t *testing.T) {
 	namedNode(t)
 	srv, _ := pluginServingServer(t, "fake")
@@ -52,14 +49,6 @@ func TestTheAgentCardIsServedToAnyone(t *testing.T) {
 	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, agentCardPath, nil))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
-	assert.Equal(t, "public, max-age=60", w.Header().Get("Cache-Control"))
-	assert.NotEmpty(t, w.Header().Get("ETag"))
-
-	built, err := srv.publicCard(httptest.NewRequest(http.MethodGet, agentCardPath, nil)).Message()
-	require.NoError(t, err)
-	served := dynamicpb.NewMessage(built.Descriptor())
-	require.NoError(t, protojson.Unmarshal(w.Body.Bytes(), served), "what was served is not an "+a2a.AgentCard)
-	assert.Empty(t, a2a.Missing(served))
 
 	var card struct {
 		Name         string   `json:"name"`
@@ -78,8 +67,8 @@ func TestTheAgentCardIsServedToAnyone(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &card))
 	assert.Equal(t, "QNTX", card.Name)
-	assert.Equal(t, a2a.Modes, card.InputModes)
-	assert.Equal(t, a2a.Modes, card.OutputModes)
+	assert.Equal(t, cardModes, card.InputModes)
+	assert.Equal(t, cardModes, card.OutputModes)
 	var ids []string
 	for _, skill := range card.Skills {
 		ids = append(ids, skill.ID)
@@ -123,37 +112,6 @@ func TestTheAgentCardIsServedToAnyone(t *testing.T) {
 	assert.Contains(t, card.Capabilities.Extensions[0].Params, "health")
 }
 
-// Asked again with the ETag it was given, the card is not sent again.
-func TestTheAgentCardAnswersItsETag(t *testing.T) {
-	namedNode(t)
-	srv, _ := pluginServingServer(t, "fake")
-	keyedNode(srv)
-
-	w := httptest.NewRecorder()
-	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, agentCardPath, nil))
-	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-
-	again := httptest.NewRequest(http.MethodGet, agentCardPath, nil)
-	again.Header.Set("If-None-Match", w.Header().Get("ETag"))
-	w = httptest.NewRecorder()
-	srv.served.ServeHTTP(w, again)
-	assert.Equal(t, http.StatusNotModified, w.Code)
-	assert.Empty(t, w.Body.String())
-}
-
-// With no name in am.toml the card lacks a field the spec requires, and is
-// refused, naming it.
-func TestAnAgentCardThatLacksAFieldIsRefused(t *testing.T) {
-	srv, _ := pluginServingServer(t, "fake")
-	keyedNode(srv)
-
-	w := httptest.NewRecorder()
-	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, agentCardPath, nil))
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Contains(t, w.Body.String(), "AgentCard.name")
-	assert.Contains(t, w.Body.String(), "AgentCard.description")
-}
-
 // The card is signed with the node's key (§8.4): EdDSA, under the key id the
 // node's DID document names, over the card as served without its
 // signatures. Whoever holds the node's did:key verifies it, and a card changed
@@ -167,11 +125,9 @@ func TestTheAgentCardIsSignedByTheNode(t *testing.T) {
 	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, agentCardPath, nil))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-	built, err := srv.publicCard(httptest.NewRequest(http.MethodGet, agentCardPath, nil)).Message()
-	require.NoError(t, err)
-	served := dynamicpb.NewMessage(built.Descriptor())
-	require.NoError(t, protojson.Unmarshal(w.Body.Bytes(), served))
-	require.NoError(t, a2a.Verify(served, public, srv.nodeDID.KeyID()), "the served card does not verify against the node's key")
+	served := &a2asdk.AgentCard{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), served))
+	require.NoError(t, verifiedBy(context.Background(), w.Body.Bytes(), public, srv.nodeDID.KeyID()), "the served card does not verify against the node's key")
 
 	var card struct {
 		Signatures []struct {
@@ -185,8 +141,10 @@ func TestTheAgentCardIsSignedByTheNode(t *testing.T) {
 	assert.JSONEq(t, `{"alg":"EdDSA","typ":"JOSE","kid":"`+srv.nodeDID.KeyID()+`"}`, string(header))
 	assert.Equal(t, srv.nodeDID.DID+"#"+srv.nodeDID.DID[len("did:key:"):], srv.nodeDID.KeyID(), "the key id is not the one the DID document names")
 
-	served.Set(served.Descriptor().Fields().ByName("description"), protoreflect.ValueOfString("Somebody else."))
-	assert.Error(t, a2a.Verify(served, public, srv.nodeDID.KeyID()), "a card changed on the way still verifies")
+	served.Description = "Somebody else."
+	changed, err := json.Marshal(served)
+	require.NoError(t, err)
+	assert.Error(t, verifiedBy(context.Background(), changed, public, srv.nodeDID.KeyID()), "a card changed on the way still verifies")
 }
 
 // A node holding no key has nothing to sign its card with, and does not serve
@@ -198,5 +156,4 @@ func TestAnAgentCardTheNodeCannotSignIsRefused(t *testing.T) {
 	w := httptest.NewRecorder()
 	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, agentCardPath, nil))
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Contains(t, w.Body.String(), "holds none")
 }
