@@ -80,6 +80,33 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 	return notes, nil
 }
 
+// boundNotes is every note of a binding on branch: the notes under its folder,
+// or its one note, placed by its own name, and none when that is not on branch.
+func (s *QNTXServer) boundNotes(ctx context.Context, b vaultBinding, branch string) ([]repoNote, error) {
+	if !b.note {
+		return s.repoNotes(ctx, b.source.Repo, branch, b.source.Path)
+	}
+	reader, err := s.forges().For(b.source.Repo)
+	if err != nil {
+		return nil, err
+	}
+	dir := path.Dir(b.source.Path)
+	entries, err := reader.Entries(ctx, forge.AsApp, b.source.Repo, branch, dir)
+	var notADirectory forge.NotADirectory
+	if errors.As(err, &notADirectory) {
+		return nil, errors.Newf("%s is a %s of %s on %s, not a folder", dir, notADirectory.Kind, b.source.Repo, branch)
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if entry.Kind == forge.File && entry.Path == b.source.Path {
+			return []repoNote{{under: b.under(), path: entry.Path, sha: entry.SHA}}, nil
+		}
+	}
+	return nil, nil
+}
+
 // repoNoteContent is a note's content on branch.
 func (s *QNTXServer) repoNoteContent(ctx context.Context, repo forge.Repo, branch, file string) ([]byte, error) {
 	reader, err := s.forges().For(repo)
@@ -125,23 +152,20 @@ func writeNote(at string, content []byte, mode os.FileMode) error {
 // copy, against what main had when they last agreed (the base).
 func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder string) vaultFilled {
 	filled := vaultFilled{Folder: folder, Wrote: []string{}, Merged: []string{}, Kept: []string{}, Removed: []string{}}
-	repo, place, named := strings.Cut(folder, "=")
-	if !named {
-		filled.Refused = errors.Newf("%s names no place in the vault", folder)
-		return filled
-	}
-	source, err := parseBuildSource(repo, true)
+	binding, err := bindingOf(folder)
 	if err != nil {
 		filled.Refused = err
 		return filled
 	}
-	notes, err := s.repoNotes(ctx, source.Repo, source.Branch, source.Path)
+	repo, source, place := binding.source.Repo, binding.source, binding.placeRoot()
+	notes, err := s.boundNotes(ctx, binding, source.Branch)
 	if err != nil {
 		filled.Refused = err
 		return filled
 	}
-	root := filepath.Join(vault.Path, filepath.FromSlash(place))
-	bases, err := vaultBases(vault.Name, place)
+	root := binding.rootIn(vault.Path)
+	// A note's bases are kept by its own place, so two notes of one folder keep apart.
+	bases, err := vaultBases(vault.Name, binding.place)
 	if err != nil {
 		filled.Refused = err
 		return filled
@@ -361,10 +385,15 @@ func (s *QNTXServer) fillPlaceSoon(name, place string) {
 	})
 }
 
-// movedBy is whether push changed a file directly in source's folder on its branch.
+// movedBy is whether push changed a file directly in source's folder on its
+// branch, or the one note source names.
 func movedBy(push forge.Push) folderMoved {
 	return func(source buildSource, _ string) bool {
-		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && push.TouchedIn(source.Path)
+		touched := push.TouchedIn(source.Path)
+		if strings.HasSuffix(source.Path, noteSuffix) {
+			touched = push.Touched(source.Path)
+		}
+		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && touched
 	}
 }
 
