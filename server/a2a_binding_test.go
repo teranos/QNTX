@@ -93,4 +93,3 @@ func TestATenantNamedAfterAnOperationIsATenant(t *testing.T) {
 		assert.Equal(t, asked.tenant != "", named, asked.method+" "+asked.path)
 	}
 }
-

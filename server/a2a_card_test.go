@@ -1,8 +1,8 @@
 package server
 
 import (
-	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"context"
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"net/http"
 	"net/http/httptest"
 	"testing"

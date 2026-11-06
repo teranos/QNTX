@@ -215,4 +215,3 @@ func TestVersionsAndMethodsAreTheNodesWords(t *testing.T) {
 	assert.Equal(t, "ab…", bounded("abc", 2))
 	assert.Equal(t, "a?b", bounded("a\x00b", 10))
 }
-

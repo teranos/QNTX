@@ -1,9 +1,9 @@
 package server
 
 import (
-	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"context"
 	"encoding/json"
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"net/http"
 	"slices"
 
