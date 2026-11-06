@@ -32,11 +32,14 @@ import (
 type anotherAgent struct {
 	tenant []string
 	bearer []string
+	// thinks is how long its turn takes.
+	thinks time.Duration
 }
 
 func (a *anotherAgent) executor() a2asrv.AgentExecutor {
 	return a2asrv.AgentExecutorFunc(func(_ context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
 		return func(yield func(a2asdk.Event, error) bool) {
+			time.Sleep(a.thinks)
 			a.tenant = append(a.tenant, ec.Tenant)
 			yield(&a2asdk.Task{
 				ID: ec.TaskID, ContextID: ec.ContextID,
@@ -299,4 +302,27 @@ func TestAResolutionShipsToSentry(t *testing.T) {
 	defer held.Unlock()
 	require.NotEmpty(t, shipped, "no transaction reached Sentry")
 	assert.Equal(t, "a2a.Resolve", shipped[0].Transaction)
+}
+
+// A message waits on the peer's turn however long it takes: what bounds a peer
+// is the card it hands over, not the turn it is asked for.
+func TestAPeersTurnIsWaitedOnPastTheCardsBound(t *testing.T) {
+	bound := peerCardTimeout
+	peerCardTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { peerCardTimeout = bound })
+	agent := &anotherAgent{thinks: 300 * time.Millisecond}
+	atTenant := a2asrv.NewTenantRESTHandler("/{*}", a2asrv.NewHandler(agent.executor()))
+	peerServer := httptest.NewServer(http.StripPrefix("/a2a", atTenant))
+	t.Cleanup(peerServer.Close)
+	namedNode(t)
+	srv, tokens := pluginServingServer(t, "fake")
+	keyedNode(srv)
+	require.NoError(t, srv.authHandler.DeclarePeer("orchardnode", "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", []string{"orchard"}, peerServer.URL, peerServer.URL))
+
+	code, sent := a2aCalledOver(t, srv, tokens[auth.LevelRoot], http.MethodPost, "SendMessage", map[string]any{
+		"peer": "orchardnode", "tenant": "orchard",
+		"message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	require.Equal(t, http.StatusOK, code, sent)
+	assert.Equal(t, "TASK_STATE_COMPLETED", sent["task"].(map[string]any)["status"].(map[string]any)["state"])
 }

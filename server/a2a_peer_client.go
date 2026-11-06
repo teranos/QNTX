@@ -41,7 +41,7 @@ func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant st
 		[]*a2asdk.AgentInterface{{URL: at, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: tenant}},
 		// The person's token goes to the peer and nowhere else: a redirect is
 		// the peer's answer, not a place to follow it to.
-		a2aclient.WithRESTTransport(&http.Client{Timeout: peerTimeout, Transport: carried,
+		a2aclient.WithRESTTransport(&http.Client{Transport: carried,
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}),
 		a2aclient.WithCallInterceptors(bearerOf(bearer)))
 	if err != nil {
@@ -50,8 +50,9 @@ func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant st
 	return client, nil
 }
 
-// peerTimeout is how long a peer is given to answer one call.
-const peerTimeout = 15 * time.Second
+// peerCardTimeout is how long a peer is given to hand over a card. A message
+// waits on the peer's turn, which is the caller's to bound, not this.
+var peerCardTimeout = 15 * time.Second
 
 // cardHeard keeps the body of the extended card a peer answers, the bytes it
 // signed, which a card a2a-go decoded and wrote out again is not.
@@ -92,13 +93,15 @@ func (bearerOf) After(context.Context, *a2aclient.Response) error { return nil }
 // the peer with a2a-go's client as the person asking here, and verified by
 // a2a-go's verifier against the did:key nodes.peers pins (§8.4.3).
 func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace string) (*a2asdk.AgentCard, error) {
+	ctx, cancel := context.WithTimeout(r.Context(), peerCardTimeout)
+	defer cancel()
 	heard := &cardHeard{}
-	client, err := s.peerClient(r.Context(), peer, namespace, heard)
+	client, err := s.peerClient(ctx, peer, namespace, heard)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = client.Destroy() }()
-	card, err := client.GetExtendedAgentCard(r.Context(), &a2asdk.GetExtendedAgentCardRequest{Tenant: namespace})
+	card, err := client.GetExtendedAgentCard(ctx, &a2asdk.GetExtendedAgentCardRequest{Tenant: namespace})
 	if errors.Is(err, a2asdk.ErrTaskNotFound) {
 		return nil, a2aRefusal(a2asdk.ErrTaskNotFound, peer.Label+" serves no agent at tenant "+namespace)
 	}
