@@ -308,7 +308,7 @@ func TestEachBoundFolderSaysWhetherItIsActive(t *testing.T) {
 	assert.Equal(t, vaultInvalid, states[1].State)
 	assert.Contains(t, states[1].Why, "Not Found")
 	assert.Equal(t, vaultInvalid, states[2].State)
-	assert.Contains(t, states[2].Why, "cdr/CDR-001.md is a file")
+	assert.Contains(t, states[2].Why, "binds a note to a folder")
 	assert.Equal(t, vaultInvalid, states[3].State)
 	assert.Contains(t, states[3].Why, "Gone is no folder of abcd")
 }

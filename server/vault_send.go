@@ -135,6 +135,10 @@ func boundVaultNotes(vaultPath string, b vaultBinding) (map[string][]byte, error
 		return vaultNotesAt(b.rootIn(vaultPath))
 	}
 	notes := map[string][]byte{}
+	// A note's folder that is a link is not a folder of the vault, as a bound folder's is not.
+	if folder, err := os.Lstat(b.rootIn(vaultPath)); err == nil && folder.Mode()&os.ModeSymlink != 0 {
+		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", b.rootIn(vaultPath))
+	}
 	at := filepath.Join(b.rootIn(vaultPath), b.under())
 	placed, err := os.Lstat(at)
 	if errors.Is(err, fs.ErrNotExist) {

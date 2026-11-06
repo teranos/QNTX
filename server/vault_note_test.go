@@ -129,3 +129,35 @@ func TestABoundNoteReachesItsBranch(t *testing.T) {
 	assert.Equal(t, "# ADR-000\n", branch["docs/adr/old/ADR-000.md"])
 	assert.NotContains(t, branch, "docs/adr/Two.md")
 }
+
+// A folder bound again as one of its notes keeps what main last agreed on:
+// the vault's edit stays, and nothing fails.
+func TestAFolderBoundAgainAsANoteKeepsItsBase(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
+	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
+	s.fillVault(t.Context(), "abcd", everyFolder)
+	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "ADR-001.md"), []byte("# ADR-001\n\nWritten in the vault.\n"), 0o644))
+
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr/ADR-001.md=Course Material/ADR-001.md"}
+	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
+	filled := s.fillVault(t.Context(), "abcd", everyFolder)
+	require.Len(t, filled, 1)
+	require.NoError(t, filled[0].Refused)
+	assert.Equal(t, []string{"Course Material/ADR-001.md"}, filled[0].Kept)
+	assert.Equal(t, "# ADR-001\n\nWritten in the vault.\n", readNote(t, vault, "Course Material/ADR-001.md"))
+}
+
+// A bound note whose folder in the vault is a link sends nothing of what it points at.
+func TestABoundNoteInALinkedFolderSendsNothing(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	elsewhere := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(elsewhere, "One.md"), []byte("not the vault's\n"), 0o644))
+	require.NoError(t, os.Symlink(elsewhere, filepath.Join(vault.Path, "Linked")))
+	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr/ADR-001.md=Linked/One.md"}
+	vault.Sends = map[string]string{"Linked/One.md": "obsidian-abcd"}
+	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
+
+	assert.Empty(t, s.sendVault(t.Context(), "abcd", everyPlace))
+	assert.Empty(t, stand.commits)
+}
