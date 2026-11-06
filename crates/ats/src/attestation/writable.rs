@@ -83,6 +83,24 @@ impl Attestation {
     }
 }
 
+impl Attestation {
+    /// The attestation, authored by `author` when its caller named nobody.
+    ///
+    /// A store takes an attestation with no actor, but `ax` expands one into
+    /// subjects x predicates x contexts x actors claims
+    /// ([`crate::expand_cartesian`]), so a row with no actor is stored and
+    /// found by id and is no claim a query can return. The door that writes
+    /// it names who made it: the node's, for what its caller named nobody for;
+    /// a development node's own, for its own. Actors a caller named stand.
+    #[must_use]
+    pub fn authored_by(mut self, author: &str) -> Self {
+        if self.actors.is_empty() {
+            self.actors.push(author.to_string());
+        }
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,6 +146,14 @@ mod tests {
                 field: "predicates"
             })
         );
+    }
+
+    #[test]
+    fn authored_by_names_an_actor_only_where_none_was_named() {
+        let none = tim().build().authored_by("the-node");
+        assert_eq!(none.actors, ["the-node"]);
+        let named = tim().actor("bob").build().authored_by("the-node");
+        assert_eq!(named.actors, ["bob"]);
     }
 
     /// Contexts and actors may be empty: the node names the actor, and an

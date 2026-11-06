@@ -173,7 +173,7 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         source: "ats-dev".into(),
         ..Attestation::default()
     };
-    let mut a = named_actor(a);
+    let mut a = a.authored_by(ACTOR);
     let mut flags = tail.iter().skip(1);
     while let Some(f) = flags.next() {
         match f.as_str() {
@@ -192,20 +192,10 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     emit(&a)
 }
 
-/// Who authors what its caller named nobody for. The node's door does the same
-/// (`if len(actors) == 0 { actors = []string{s.nodeActor()} }`, in
-/// server/attestation_handlers.go): `ax` expands an attestation into
-/// subjects x predicates x contexts x actors claims, so a row with no actor is
-/// stored but is no claim `ax` can return. ats-dev is the door here and has no
-/// node, so the actor it names is itself.
+/// Who authors what its caller named nobody for: the rule is ATS's
+/// ([`Attestation::authored_by`]), the node's door applies it with the node's
+/// actor, and ats-dev, which has no node, with its own.
 const ACTOR: &str = "ats-dev";
-
-fn named_actor(mut a: Attestation) -> Attestation {
-    if a.actors.is_empty() {
-        a.actors.push(ACTOR.into());
-    }
-    a
-}
 
 /// The fields of an `Attestation`; a line naming any other is refused.
 const FIELDS: [&str; 11] = [
@@ -235,7 +225,7 @@ fn complete(line: &str) -> Result<Attestation, Box<Error>> {
     }
     if !obj.contains_key("actors") { obj.insert("actors".into(), serde_json::json!([])); }
     let a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
-    Ok(named_actor(a))
+    Ok(a.authored_by(ACTOR))
 }
 
 fn put_stdin(s: &mut SqliteStore) -> Result<(), Box<Error>> {
