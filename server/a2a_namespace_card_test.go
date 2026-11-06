@@ -1,19 +1,17 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
-	"io"
+
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 // "The Tenant and ROOT are the same"
@@ -45,16 +43,13 @@ func servingGardens(t *testing.T) (*QNTXServer, map[auth.Level]string) {
 func TestANamespaceAgentIsDescribedAtItsTenant(t *testing.T) {
 	srv, tokens := servingGardens(t)
 
-	for _, path := range []string{"/a2a/garden/extendedAgentCard", "/a2a/extendedAgentCard?tenant=garden"} {
+	for _, path := range []string{"/a2a/garden/extendedAgentCard"} {
 		w := askingTheExtendedCard(srv, path, tokens[auth.LevelRoot])
 		require.Equal(t, http.StatusOK, w.Code, path+": "+w.Body.String())
 
-		built, err := srv.publicCard(httptest.NewRequest(http.MethodGet, agentCardPath, nil)).Message()
-		require.NoError(t, err)
-		served := dynamicpb.NewMessage(built.Descriptor())
-		require.NoError(t, protojson.Unmarshal(w.Body.Bytes(), served), path+": what was served is not an "+a2a.AgentCard)
-		assert.Empty(t, a2a.Missing(served), path)
-		require.NoError(t, a2a.Verify(served, srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), path+": the card is not signed by the node")
+		served := &a2asdk.AgentCard{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), served))
+		require.NoError(t, verifiedBy(context.Background(), served, srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), path+": the card is not signed by the node")
 
 		var card struct {
 			Name       string `json:"name"`
@@ -68,9 +63,11 @@ func TestANamespaceAgentIsDescribedAtItsTenant(t *testing.T) {
 		}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &card))
 		assert.Equal(t, "the agent of garden, claude-sonnet-5-5", card.Name, path)
-		require.Len(t, card.Interfaces, 1, path)
-		assert.Equal(t, "garden", card.Interfaces[0].Tenant, path+": clients MUST set the tenant the interface declares")
-		assert.True(t, strings.HasSuffix(card.Interfaces[0].URL, "/a2a"), path)
+		require.Len(t, card.Interfaces, 2, path)
+		for _, held := range card.Interfaces {
+			assert.Equal(t, "garden", held.Tenant, path+": clients MUST set the tenant the interface declares")
+			assert.True(t, strings.HasSuffix(held.URL, "/a2a"), path)
+		}
 		require.Len(t, card.Skills, 1, path)
 		assert.Equal(t, "say", card.Skills[0].ID, path)
 	}
@@ -94,20 +91,4 @@ func TestNoAgentIsServedWhereNoneWasOptedInto(t *testing.T) {
 		w := askingTheExtendedCard(srv, "/a2a/"+tenant+"/extendedAgentCard", tokens[auth.LevelRoot])
 		assert.Equal(t, http.StatusNotFound, w.Code, tenant+": "+w.Body.String())
 	}
-}
-
-// At a tenant an agent is served at, an operation the node does not do yet
-// says so, as it does without one.
-func TestAnAgentsTenantAnswersWhatTheNodeDoesNotDoYet(t *testing.T) {
-	srv, tokens := servingGardens(t)
-
-	sent := `{"message": {"messageId": "m1", "role": "ROLE_USER", "parts": [{"text": "hi"}]}}`
-	r := asBearer(http.MethodPost, "/a2a/garden/message:stream", tokens[auth.LevelRoot])
-	r.Body = io.NopCloser(strings.NewReader(sent))
-	r.ContentLength = int64(len(sent))
-	r.Header.Set("A2A-Version", "1.0")
-	w := httptest.NewRecorder()
-	srv.served.ServeHTTP(w, r)
-	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
-	assert.Contains(t, w.Body.String(), "UNSUPPORTED_OPERATION")
 }

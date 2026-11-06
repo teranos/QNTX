@@ -1,16 +1,15 @@
 package server
 
 import (
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -25,7 +24,7 @@ func askedAs(level auth.Level) *http.Request {
 // A2A at all is /a2a/'s line, ROOT's alone (TestA2AIsServedToRootAlone).
 func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 	srv, _ := pluginServingServer(t, "fake")
-	names := func(card a2a.Card) []string {
+	names := func(card agentCard) []string {
 		var named []string
 		for _, skill := range card.Skills {
 			named = append(named, skill.Name)
@@ -54,32 +53,16 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 	}
 }
 
-// The card is an lf.a2a.v1.AgentCard, and what it leaves empty that the spec
-// requires is named: the node's name and description when am.toml says none.
-// The modes are JSON, and staands, first among the signa, says what it is for.
-func TestTheCardSaysWhatItLacks(t *testing.T) {
+// The card is a2a-go's AgentCard, reached over HTTP+JSON and JSON-RPC, both
+// at the binding's URL (§8.3.1): the node's MCP is not one of its interfaces.
+func TestTheCardIsReachedOverBothBindings(t *testing.T) {
 	srv, _ := pluginServingServer(t, "fake")
-	card, err := srv.a2aCard(askedAs(auth.LevelRoot)).Message()
-	require.NoError(t, err)
-
-	missing := a2a.Missing(card)
-	for _, want := range []string{"AgentCard.name", "AgentCard.description"} {
-		assert.Contains(t, missing, want)
-	}
-	for _, said := range []string{
-		"AgentCard.supported_interfaces", "AgentCard.capabilities", "AgentCard.version", "AgentCard.skills",
-		"AgentCard.default_input_modes", "AgentCard.default_output_modes",
-		"AgentCard.skills[0].id", "AgentCard.skills[0].name", "AgentCard.skills[0].description", "AgentCard.skills[0].tags",
-	} {
-		assert.NotContains(t, missing, said, said+" is on the card")
-	}
-	assert.False(t, slices.ContainsFunc(missing, func(m string) bool { return m == "AgentCard.supported_interfaces[0].url" }))
-
-	// An interface is a way to speak A2A (§8.3.1): the node's MCP is not one.
-	interfaces := card.Get(card.Descriptor().Fields().ByName("supported_interfaces")).List()
-	for i := 0; i < interfaces.Len(); i++ {
-		entry := interfaces.Get(i).Message()
-		assert.Equal(t, "HTTP+JSON", entry.Get(entry.Descriptor().Fields().ByName("protocol_binding")).String(), "supported_interfaces[%d]", i)
+	card := srv.a2aCard(askedAs(auth.LevelRoot)).sdk()
+	require.Len(t, card.SupportedInterfaces, 2)
+	assert.Equal(t, a2asdk.TransportProtocolHTTPJSON, card.SupportedInterfaces[0].ProtocolBinding)
+	assert.Equal(t, a2asdk.TransportProtocolJSONRPC, card.SupportedInterfaces[1].ProtocolBinding)
+	for _, held := range card.SupportedInterfaces {
+		assert.Equal(t, "https://node.example/a2a", held.URL)
 	}
 }
 

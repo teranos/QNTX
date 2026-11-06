@@ -1,6 +1,7 @@
 package server
 
 import (
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -127,12 +127,12 @@ func (s *QNTXServer) oasfRecordFor(ctx context.Context, r *http.Request) (protor
 		}
 	}
 
-	cardMessage, err := card.Message()
+	raw, err := cardJSON(card.sdk())
 	if err != nil {
 		return failed(err)
 	}
-	cardData, err := asJSONObject(cardMessage.Interface())
-	if err != nil {
+	cardData := map[string]any{}
+	if err := json.Unmarshal(raw, &cardData); err != nil {
 		return failed(errors.Wrap(err, "the card is not a JSON object"))
 	}
 	tools, err := s.mcpToolsFor(ctx, r)
@@ -149,7 +149,7 @@ func (s *QNTXServer) oasfRecordFor(ctx context.Context, r *http.Request) (protor
 		"modules": []map[string]any{
 			{"name": oasfA2AModule, "id": modules[oasfA2AModule], "data": map[string]any{
 				"card_data":           cardData,
-				"card_schema_version": a2a.Version,
+				"card_schema_version": a2asdk.Version,
 			}},
 			{"name": oasfMCPModule, "id": modules[oasfMCPModule], "data": map[string]any{
 				"name":        "qntx",

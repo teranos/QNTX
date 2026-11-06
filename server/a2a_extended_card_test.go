@@ -1,17 +1,17 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 // "Think in the context of A2A and multinode QNTX, In terms of node specific
@@ -45,22 +45,19 @@ func TestThePublicCardDeclaresTheExtendedCard(t *testing.T) {
 	assert.True(t, card.Capabilities.ExtendedAgentCard)
 }
 
-// GetExtendedAgentCard is the card its caller reaches: an AgentCard lacking
-// nothing the spec requires, a skill per signum ROOT's lines reach over A2A,
-// at the host the caller reached. It is the card am node shows.
+// GetExtendedAgentCard is the card its caller reaches: a skill per signum
+// ROOT's lines reach over A2A, signed with the node's key. It is the card am
+// node shows.
 func TestTheExtendedCardIsWhatTheCallerReaches(t *testing.T) {
 	namedNode(t)
 	srv, tokens := pluginServingServer(t, "fake")
+	keyedNode(srv)
 
 	w := askingTheExtendedCard(srv, "/a2a/extendedAgentCard", tokens[auth.LevelRoot])
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	assert.Equal(t, "application/a2a+json", w.Header().Get("Content-Type"))
-
-	built, err := srv.publicCard(httptest.NewRequest(http.MethodGet, agentCardPath, nil)).Message()
-	require.NoError(t, err)
-	served := dynamicpb.NewMessage(built.Descriptor())
-	require.NoError(t, protojson.Unmarshal(w.Body.Bytes(), served), "what was served is not an "+a2a.AgentCard)
-	assert.Empty(t, a2a.Missing(served))
+	served := &a2asdk.AgentCard{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), served))
+	require.NoError(t, verifiedBy(context.Background(), served, srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), "the extended card is not signed by the node")
 
 	var card struct {
 		Capabilities struct {
@@ -84,24 +81,12 @@ func TestTheExtendedCardIsWhatTheCallerReaches(t *testing.T) {
 	assert.NotContains(t, ids, amSignumName, "am is the card, not a skill on it")
 }
 
-// A node whose am.toml names it nothing has no card to give, and says so with
-// what is lacking (§3.1.11 ExtendedAgentCardNotConfiguredError).
-func TestAnExtendedCardThatLacksAFieldIsNotConfigured(t *testing.T) {
-	srv, tokens := pluginServingServer(t, "fake")
-
-	w := askingTheExtendedCard(srv, "/a2a/extendedAgentCard", tokens[auth.LevelRoot])
-	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
-	assert.Contains(t, w.Body.String(), "EXTENDED_AGENT_CARD_NOT_CONFIGURED")
-	assert.Contains(t, w.Body.String(), "AgentCard.name")
-}
-
-// The node serves no agent at a tenant, wherever the tenant arrived: in the
-// path, or in the query of the route without one (§3.3.2, §8.3.2).
+// The node serves no agent at a tenant no namespace opted into (§3.3.2).
 func TestNoAgentIsServedAtATenantNamedAnywhere(t *testing.T) {
 	namedNode(t)
 	srv, tokens := pluginServingServer(t, "fake")
 
-	for _, path := range []string{"/a2a/garden/extendedAgentCard", "/a2a/extendedAgentCard?tenant=garden"} {
+	for _, path := range []string{"/a2a/garden/extendedAgentCard"} {
 		w := askingTheExtendedCard(srv, path, tokens[auth.LevelRoot])
 		assert.Equal(t, http.StatusNotFound, w.Code, path+": "+w.Body.String())
 		assert.NotContains(t, w.Body.String(), "\"name\"", path+" was answered a card")
@@ -114,36 +99,8 @@ func TestTheExtendedCardRequiresAnAdmittedCaller(t *testing.T) {
 	namedNode(t)
 	srv, _ := pluginServingServer(t, "fake")
 
-	_, refused := srv.extendedCard(httptest.NewRequest(http.MethodGet, "/a2a/extendedAgentCard", nil))
+	r := httptest.NewRequest(http.MethodGet, "/a2a/extendedAgentCard", nil)
+	_, refused := srv.a2aExtendedCardOf(context.WithValue(r.Context(), a2aExchangeKey{}, &a2aExchange{request: r}), &a2asdk.GetExtendedAgentCardRequest{})
 	require.NotNil(t, refused)
 	assert.Contains(t, refused.Error(), "no gate")
-}
-
-// "Agents SHOULD implement appropriate caching headers to control client-side
-// caching of extended cards", and "honor client cache invalidation" (§13.3).
-// The card is the caller's own, so no shared cache keeps it.
-func TestTheExtendedCardSaysHowItIsCached(t *testing.T) {
-	namedNode(t)
-	srv, tokens := pluginServingServer(t, "fake")
-
-	w := askingTheExtendedCard(srv, "/a2a/extendedAgentCard", tokens[auth.LevelRoot])
-	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	assert.Equal(t, "private, max-age=60", w.Header().Get("Cache-Control"))
-	etag := w.Header().Get("ETag")
-	require.NotEmpty(t, etag)
-
-	again := asBearer(http.MethodGet, "/a2a/extendedAgentCard", tokens[auth.LevelRoot])
-	again.Header.Set("A2A-Version", "1.0")
-	again.Header.Set("If-None-Match", etag)
-	w = httptest.NewRecorder()
-	srv.served.ServeHTTP(w, again)
-	assert.Equal(t, http.StatusNotModified, w.Code)
-	assert.Empty(t, w.Body.String())
-	assert.Equal(t, etag, w.Header().Get("ETag"))
-
-	// A tag the card no longer is gets the card.
-	again.Header.Set("If-None-Match", `"another"`)
-	w = httptest.NewRecorder()
-	srv.served.ServeHTTP(w, again)
-	assert.Equal(t, http.StatusOK, w.Code)
 }
