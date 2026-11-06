@@ -90,7 +90,7 @@ func A2AGoSays(pb, grpc []byte) (map[string]string, error) {
 
 	says := map[string]string{}
 	keep := func(name protoreflect.FullName, comment *ast.CommentGroup) {
-		if said := words(comment.Text()); said != "" {
+		if said := words(withoutToolLines(comment.Text())); said != "" {
 			says[string(name)] = said
 		}
 	}
@@ -156,7 +156,7 @@ func A2AGoSays(pb, grpc []byte) (map[string]string, error) {
 			// protoc-gen-go-grpc says what the interface is before the
 			// service's own words, a paragraph each.
 			paragraphs := strings.Split(strings.TrimSpace(gen.Doc.Text()), "\n\n")
-			if said := words(paragraphs[len(paragraphs)-1]); said != "" {
+			if said := words(withoutToolLines(paragraphs[len(paragraphs)-1])); said != "" {
 				says[string(service.FullName())] = said
 			}
 			for _, method := range client.Methods.List {
@@ -170,6 +170,20 @@ func A2AGoSays(pb, grpc []byte) (map[string]string, error) {
 		}
 	}
 	return says, nil
+}
+
+// withoutToolLines is a comment without the lines the .proto keeps for its tools:
+// protolint's directives, and the next field number a message hands out.
+func withoutToolLines(comment string) string {
+	var kept []string
+	for _, line := range strings.Split(comment, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "protolint:") || strings.HasPrefix(trimmed, "Next ID:") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }
 
 // protoName is the .proto name a generated field's struct tag gives it.
