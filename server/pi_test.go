@@ -203,24 +203,30 @@ func TestAmInNoHarnessIsEveryHarnessItIsNamedIn(t *testing.T) {
 }
 
 // 「[Opus 5.5] A harness whose binary has not arrived, or failed to, is not in am
-// asked in no harness; asked in it by name, am still says why.」
+// asked in no harness, and one still arriving is said to be; asked in it by
+// name, am still says why.」
 func TestAmInNoHarnessLeavesOutAHarnessNotReady(t *testing.T) {
-	for name, held := range map[string]*harnessHeld{
-		"still arriving": {name: "Pi", fetched: make(chan struct{})},
-		"failed to arrive": func() *harnessHeld {
+	for name, each := range map[string]struct {
+		held     *harnessHeld
+		arriving []string
+	}{
+		"still arriving": {&harnessHeld{name: "Pi", fetched: make(chan struct{})}, []string{"pi"}},
+		"failed to arrive": {func() *harnessHeld {
 			h := &harnessHeld{name: "Pi", fetched: make(chan struct{}), err: errors.New("the download was cut off")}
 			close(h.fetched)
 			return h
-		}(),
+		}(), nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s, _, _ := runningPiToo(t)
-			s.holdHarness("pi", held)
+			s.holdHarness("pi", each.held)
 			answer, refused := s.nodeAgentSignum().Answers["am"](context.Background(), sigil.Sent{})
 			require.Nil(t, refused)
 			am := answer.(*protocol.NodeAgentAm)
 			assert.NotNil(t, am.GetClaude())
 			assert.Nil(t, am.GetPi())
+			assert.Equal(t, each.arriving, am.GetArriving())
+			holds(t, s.nodeAgentSignum(), "am", am)
 
 			named, refused := s.harnessAm(s.piHarness())
 			require.Nil(t, refused)
@@ -230,14 +236,26 @@ func TestAmInNoHarnessLeavesOutAHarnessNotReady(t *testing.T) {
 }
 
 // 「[Opus 5.5] An element asked am in no harness while no harness is ready is
-// refused, and no agent of it is held.」
+// answered in none, the one arriving named, and no agent of it is held. When
+// none is ready or arriving, it is refused, and still no agent is held.」
 func TestElementAmInNoHarnessReadyHoldsNoAgent(t *testing.T) {
 	s, _ := runningElementAgents(t)
 	s.holdHarness("claude", &harnessHeld{name: "Claude Code", fetched: make(chan struct{})})
-	_, refused := s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "never-seen"})
-	require.NotNil(t, refused)
-	assert.Equal(t, s.claudeHarness().fetching, refused.GetSays())
+	answer, refused := s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "never-seen"})
+	require.Nil(t, refused)
+	am := answer.(*protocol.NodeAgentAm)
+	assert.Nil(t, am.GetClaude())
+	assert.Equal(t, []string{"claude"}, am.GetArriving())
 	_, held := s.elementAgents.of(elementPurpose("never-seen"))
+	assert.False(t, held)
+
+	failed := &harnessHeld{name: "Claude Code", fetched: make(chan struct{}), err: errors.New("the download was cut off")}
+	close(failed.fetched)
+	s.holdHarness("claude", failed)
+	_, refused = s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "never-seen"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "the download was cut off")
+	_, held = s.elementAgents.of(elementPurpose("never-seen"))
 	assert.False(t, held)
 }
 

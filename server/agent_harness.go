@@ -186,19 +186,20 @@ func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *prot
 }
 
 // 「[Opus 5.5] harnessNotReady is why nothing can be said in h yet: its binary
-// has not arrived, or failed to. Nil when it is ready.」
-func (s *QNTXServer) harnessNotReady(h *harness) *protocol.Refusal {
+// has not arrived, or failed to. Nil when it is ready. arriving is whether it
+// is still on its way, and will be ready.」
+func (s *QNTXServer) harnessNotReady(h *harness) (refused *protocol.Refusal, arriving bool) {
 	held := s.harnessHeldBy(h.name)
 	if held == nil {
-		return h.absent()
+		return h.absent(), false
 	}
 	switch _, arrived, err := held.Now(); {
 	case !arrived:
-		return &protocol.Refusal{Why: sigil.Failed, Says: h.fetching}
+		return &protocol.Refusal{Why: sigil.Failed, Says: h.fetching}, true
 	case err != nil:
-		return &protocol.Refusal{Why: sigil.Failed, Says: h.called + " did not arrive: " + err.Error()}
+		return &protocol.Refusal{Why: sigil.Failed, Says: h.called + " did not arrive: " + err.Error()}, false
 	}
-	return nil
+	return nil, false
 }
 
 // amInto puts what am answered in one harness where NodeAgentAm carries that
@@ -222,10 +223,16 @@ func amInto(into *protocol.NodeAgentAm, answer any) bool {
 // 「[Opus 5.5] amInEvery is am in every harness of hs the agent can be spoken to
 // in, each where NodeAgentAm carries it: a harness am.toml does not name, whose
 // binary the node does not hold, or whose binary has not arrived or failed to,
-// is not in it. When it can be spoken to in none, the first harness's refusal
-// says why. am in the one harness named still says why it is not ready.」
+// is not in it. A harness whose binary is still arriving is named in arriving,
+// so whoever draws the answer asks again until it has arrived. When it can be
+// spoken to in none and none is arriving, the first harness's refusal says why.
+// am in the one harness named still says why it is not ready.」
 //
 // "We shouldn't be displaying unavailable things to people"
+//
+// "My recommendation is that the node also says which harnesses are still
+// downloading, and the page asks again only while that list isn't empty."
+// "Sure"
 func (s *QNTXServer) amInEvery(hs []*harness, called string, am func(*harness) (any, *protocol.Refusal)) (any, *protocol.Refusal) {
 	if s.nodeAgent == nil {
 		return nil, s.thereIsNoNodeAgent()
@@ -236,9 +243,12 @@ func (s *QNTXServer) amInEvery(hs []*harness, called string, am func(*harness) (
 	for _, h := range hs {
 		// Whether it can be spoken to in h is asked before am, which holds
 		// an element's agent: no harness ready, no agent held.
-		refused := s.harnessNotReady(h)
+		refused, arriving := s.harnessNotReady(h)
 		if !h.named() {
-			refused = h.absent()
+			refused, arriving = h.absent(), false
+		}
+		if arriving {
+			every.Arriving = append(every.Arriving, h.name)
 		}
 		var answer any
 		if refused == nil {
@@ -255,7 +265,7 @@ func (s *QNTXServer) amInEvery(hs []*harness, called string, am func(*harness) (
 		}
 		offered++
 	}
-	if offered == 0 {
+	if offered == 0 && len(every.Arriving) == 0 {
 		return nil, first
 	}
 	return every, nil
