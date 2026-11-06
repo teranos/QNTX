@@ -35,14 +35,33 @@ fn a_sentence_is_written_and_ax_returns_it() {
 }
 
 #[test]
-fn an_attestation_without_an_actor_is_refused_by_both_paths() {
+fn an_attestation_no_actor_was_named_for_is_authored_by_ats_dev_and_ax_returns_it() {
     let (_d, p) = db();
     let o = run(&p, &["put", "ALICE is author of GITHUB"], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert!(out(&o).contains("\"actors\":[\"ats-dev\"]"), "{}", out(&o));
+    let o = run(&p, &["put", "-"], "{\"subjects\":[\"CAROL\"],\"predicates\":[\"reviewer\"]}\n");
+    assert!(o.status.success(), "{}", err(&o));
+    for who in ["ALICE", "CAROL"] {
+        let o = run(&p, &["ax", who], "");
+        assert!(out(&o).contains("\"ats-dev\""), "ax {who} returned nothing: {}", err(&o));
+    }
+}
+
+#[test]
+fn an_actor_that_was_named_stands() {
+    let (_d, p) = db();
+    let o = run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(out(&o).contains("\"actors\":[\"BOB\"]"), "{}", out(&o));
+}
+
+#[test]
+fn a_date_no_store_holds_is_refused_not_kept_as_today() {
+    let (_d, p) = db();
+    let o = run(&p, &["put", "-"], "{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"timestamp\":9223372036854775807}\n");
     assert!(!o.status.success());
-    assert!(err(&o).contains("needs an actor"), "{}", err(&o));
-    let o = run(&p, &["put", "-"], "{\"subjects\":[\"A\"],\"predicates\":[\"p\"]}\n");
-    assert!(!o.status.success());
-    assert!(err(&o).contains("needs an actor"), "{}", err(&o));
+    assert!(err(&o).contains("outside the dates"), "{}", err(&o));
+    assert_eq!(out(&o), "");
     assert_eq!(count(&p), "0");
 }
 

@@ -162,7 +162,7 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         ));
     }
     let own = |w: &[&str]| w.iter().map(|x| x.to_string()).collect::<Vec<_>>();
-    let mut a = Attestation {
+    let a = Attestation {
         id: new_id()?,
         subjects: own(&parsed.subjects),
         contexts: if parsed.contexts.is_empty() { vec!["_".into()] } else { own(&parsed.contexts) },
@@ -173,7 +173,7 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         source: "ats-dev".into(),
         ..Attestation::default()
     };
-    needs_actor(&a)?;
+    let mut a = named_actor(a);
     let mut flags = tail.iter().skip(1);
     while let Some(f) = flags.next() {
         match f.as_str() {
@@ -192,17 +192,19 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     emit(&a)
 }
 
-/// `ax` expands an attestation into subjects x predicates x contexts x actors
-/// claims (`ats::expand_cartesian`), so one without an actor is stored and
-/// found by `get` but is no claim `ax` can return. Refused, not written.
-fn needs_actor(a: &Attestation) -> Result<(), Box<Error>> {
+/// Who authors what its caller named nobody for. The node's door does the same
+/// (`if len(actors) == 0 { actors = []string{s.nodeActor()} }`, in
+/// server/attestation_handlers.go): `ax` expands an attestation into
+/// subjects x predicates x contexts x actors claims, so a row with no actor is
+/// stored but is no claim `ax` can return. ats-dev is the door here and has no
+/// node, so the actor it names is itself.
+const ACTOR: &str = "ats-dev";
+
+fn named_actor(mut a: Attestation) -> Attestation {
     if a.actors.is_empty() {
-        return Err(fail(
-            "an attestation needs an actor",
-            format!("{}: with none, ax expands it to no claims and never returns it (\"... by WHO\")", a.id),
-        ));
+        a.actors.push(ACTOR.into());
     }
-    Ok(())
+    a
 }
 
 /// The fields of an `Attestation`; a line naming any other is refused.
@@ -233,8 +235,7 @@ fn complete(line: &str) -> Result<Attestation, Box<Error>> {
     }
     if !obj.contains_key("actors") { obj.insert("actors".into(), serde_json::json!([])); }
     let a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
-    needs_actor(&a)?;
-    Ok(a)
+    Ok(named_actor(a))
 }
 
 fn put_stdin(s: &mut SqliteStore) -> Result<(), Box<Error>> {

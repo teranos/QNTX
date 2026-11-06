@@ -42,19 +42,23 @@ pub fn deserialize_attributes(json: Option<String>) -> Result<HashMap<String, Va
     }
 }
 
-/// Convert Unix timestamp milliseconds to SQLite DATETIME string (RFC3339)
-pub fn timestamp_to_sql(timestamp_ms: i64) -> String {
-    // Convert milliseconds to seconds + nanoseconds
+/// Unix timestamp milliseconds as a SQLite DATETIME string (RFC3339), or `None`
+/// when the instant is outside the dates `chrono` holds.
+pub fn try_timestamp_to_sql(timestamp_ms: i64) -> Option<String> {
     // Floored, so -1500 ms is -2 s + 500 ms, not -1 s and a negative remainder
-    // that wraps as u32 and falls through to "now" below.
+    // that wraps as u32 and is no instant.
     let secs = timestamp_ms.div_euclid(1000);
     let nanos = (timestamp_ms.rem_euclid(1000) * 1_000_000) as u32;
+    chrono::DateTime::from_timestamp(secs, nanos).map(|dt| dt.to_rfc3339())
+}
 
-    // Create DateTime and format as RFC3339
-    match chrono::DateTime::from_timestamp(secs, nanos) {
-        Some(dt) => dt.to_rfc3339(),
-        None => chrono::Utc::now().to_rfc3339(), // Fallback to now if invalid
-    }
+/// [`try_timestamp_to_sql`], and "now" for an instant outside the dates held.
+///
+/// Only for a filter's bound, which names a window and writes nothing. What is
+/// written asks [`try_timestamp_to_sql`]: a date that cannot be stored is
+/// refused, not stored as another.
+pub fn timestamp_to_sql(timestamp_ms: i64) -> String {
+    try_timestamp_to_sql(timestamp_ms).unwrap_or_else(|| chrono::Utc::now().to_rfc3339())
 }
 
 /// Convert SQLite DATETIME string (RFC3339) to Unix timestamp milliseconds
@@ -78,6 +82,12 @@ mod tests {
             let back = sql_to_timestamp(&timestamp_to_sql(ms)).unwrap();
             assert_eq!(back, ms, "{ms} ms did not survive the round trip");
         }
+    }
+
+    #[test]
+    fn an_instant_outside_the_dates_held_is_none_not_now() {
+        assert_eq!(try_timestamp_to_sql(i64::MAX), None);
+        assert_eq!(try_timestamp_to_sql(i64::MIN), None);
     }
 
     #[test]
