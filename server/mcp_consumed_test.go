@@ -483,3 +483,35 @@ func TestARotatedRefreshTokenIsKept(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"r2"}, kept)
 }
+
+// "I meant ROOT accessible agents"
+//
+// 「[Opus 5.5] An element's agent stands at ROOT as the Node Agent does: it is given the server, and through」
+// 「[Opus 5.5] the node's gate its own token lists the server's tools.」
+func TestAnElementsAgentIsGivenTheServerAsAROOTAccessibleAgent(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	nodeConnected(t, s, standingUpstream(t))
+	s.authEnabled = true
+	s.rlAuth, s.rlWS, s.rlWrite, s.rlRead, s.rlPublic = newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100), newRateLimitGroup(100, 100)
+	if s.answering == nil {
+		s.setupHTTPRoutes()
+	}
+	require.NoError(t, s.open())
+	node := httptest.NewServer(s.served)
+	t.Cleanup(node.Close)
+
+	element, refused := s.holdElementAgent("phone")
+	require.Nil(t, refused)
+	given := s.consumedForAgent(element, node.URL)
+	require.Len(t, given, 1)
+
+	ctx := context.Background()
+	session, err := mcp.NewClient(&mcp.Implementation{Name: "element", Version: "0"}, nil).Connect(ctx,
+		&mcp.StreamableClientTransport{Endpoint: given[0].URL, HTTPClient: &http.Client{Transport: bearing{token: element.token}}}, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = session.Close() })
+	listed, err := session.ListTools(ctx, nil)
+	require.NoError(t, err)
+	require.Len(t, listed.Tools, 1)
+	assert.Equal(t, "issues", listed.Tools[0].Name)
+}

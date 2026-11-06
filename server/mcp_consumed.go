@@ -769,8 +769,12 @@ func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Reque
 
 // "THE NODE'S MCP NEEDS"
 //
-// 「[Opus 5.5] consumedForAgent is the MCP servers the node consumes, as a node agent is given them: each at the」
-// 「[Opus 5.5] node, under its name, reached with the agent's own token. A namespace's agent is given none.」
+// "I meant ROOT accessible agents"
+//
+// 「[Opus 5.5] consumedForAgent is the MCP servers the node consumes, as a ROOT accessible agent is given them:」
+// 「[Opus 5.5] each at the node, under its name, reached with the agent's own token. The ROOT accessible agents」
+// 「[Opus 5.5] are the ones in system, the Node Agent and each element's, whose tokens stand at ROOT」
+// 「[Opus 5.5] (holdRootsAgent). A namespace's agent holds a TOKEN, and is given none.」
 func (s *QNTXServer) consumedForAgent(agent *rootAgent, own string) []consumedServer {
 	if agent.namespace != auth.NamespaceSystem {
 		return nil
