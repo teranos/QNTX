@@ -80,18 +80,18 @@ and the folder itself carries nothing.
 "i DONT want the binding to include subdirs"
 - A folder holds the notes directly in it. A folder inside it is not its, nor are the notes in that one (#1507).
 
-## One file
+## 「[Opus 5.5] One file」
 
 "i want inside of my obsidian:"
-"QNTX/AgentInstructions/QNTX/AGENTS.md"
+"「[Opus 5.5] QNTX/AgentInstructions/QNTX/AGENTS.md」"
 "QNTX/AgentInstructions/QNTX/CLAUDE.md"
 "QNTX/AgentInstructions/QNTX/README.md"
 "QNTX/AgentInstructions/QNTX-Web/CLAUDE.md"
 "QNTX/AgentInstructions/QNTX-App/CLADUE.md"
 "i want single file bindings that follow that format"
-- A binding can name one file: `github.com/owner/repo@branch:file=place`, the place being the note's own path in the vault, as `github.com/teranos/QNTX@main:AGENTS.md=QNTX/AgentInstructions/QNTX/AGENTS.md`.
-- A file at the repository's top can be bound. A folder still cannot be the top.
-- A path ending `.md` names one file, and its place ends `.md`.
+- 「[Opus 5.5] A binding can name one file: `github.com/owner/repo@branch:file=place`, the place being the note's own path in the vault, as `github.com/teranos/QNTX@main:AGENTS.md=QNTX/AgentInstructions/QNTX/AGENTS.md`.」
+- 「[Opus 5.5] A file at the repository's top can be bound. A folder still cannot be the top.」
+- 「[Opus 5.5] A path ending `.md` names one file, and its place ends `.md`.」
 
 ## What reaches the vault
 

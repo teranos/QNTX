@@ -80,8 +80,8 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 	return notes, nil
 }
 
-// boundNotes is every note of a binding on branch: the notes under its folder,
-// or its one note, placed by its own name, and none when that is not on branch.
+// 「[Opus 5.5] boundNotes is every note of a binding on branch: the notes under its folder,」
+// 「[Opus 5.5] or its one note, placed by its own name, and none when that is not on branch.」
 func (s *QNTXServer) boundNotes(ctx context.Context, b vaultBinding, branch string) ([]repoNote, error) {
 	if !b.note {
 		return s.repoNotes(ctx, b.source.Repo, branch, b.source.Path)
@@ -117,10 +117,10 @@ func (s *QNTXServer) boundNotes(ctx context.Context, b vaultBinding, branch stri
 	return nil, nil
 }
 
-// folderGone says whether dir, which the forge refused to list, is gone from
-// branch: git keeps no empty folder, so a note's folder goes with its last
-// note. It is gone when the nearest folder above it that the forge lists does
-// not hold it; one that holds it was refused for another reason.
+// 「[Opus 5.5] folderGone says whether dir, which the forge refused to list, is gone from」
+// 「[Opus 5.5] branch: git keeps no empty folder, so a note's folder goes with its last」
+// 「[Opus 5.5] note. It is gone when the nearest folder above it that the forge lists does」
+// 「[Opus 5.5] not hold it; one that holds it was refused for another reason.」
 func folderGone(ctx context.Context, reader forge.Reader, repo forge.Repo, branch, dir string) (bool, error) {
 	for dir != forge.Root {
 		parent := path.Dir(dir)
@@ -195,8 +195,8 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		return filled
 	}
 	root := binding.rootIn(vault.Path)
-	// A note's base is kept where a folder bound at its folder keeps it, so a
-	// place bound again as the other keeps what main last agreed on.
+	// 「[Opus 5.5] A note's base is kept where a folder bound at its folder keeps it, so a」
+	// 「[Opus 5.5] place bound again as the other keeps what main last agreed on.」
 	bases, err := vaultBases(vault.Name, place)
 	if err != nil {
 		filled.Refused = err
@@ -275,7 +275,7 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 	// A note main no longer has is gone from the vault too, unless the vault changed it.
 	gone, err := basesNotIn(bases, now)
 	if binding.note {
-		// The bases beside a note's are other notes', bound apart: only its own is its.
+		// 「[Opus 5.5] The bases beside a note's are other notes', bound apart: only its own is its.」
 		gone = slices.DeleteFunc(gone, func(under string) bool { return under != binding.under() })
 	}
 	if err != nil {
@@ -335,7 +335,7 @@ func vaultBases(name, place string) (string, error) {
 	}
 	kept := filepath.Join(dir, name)
 	at := filepath.Join(kept, filepath.FromSlash(path.Clean(place)))
-	// A note at the vault's top keeps its base at the top of the vault's bases.
+	// 「[Opus 5.5] A note at the vault's top keeps its base at the top of the vault's bases.」
 	if at != kept && !strings.HasPrefix(at, kept+string(filepath.Separator)) {
 		return "", errors.Newf("the bases of %s would be kept outside %s, at %s", place, kept, at)
 	}
@@ -422,8 +422,8 @@ func (s *QNTXServer) fillPlaceSoon(name, place string) {
 	})
 }
 
-// movedBy is whether push changed a file directly in source's folder on its
-// branch, or the one note source names.
+// 「[Opus 5.5] movedBy is whether push changed a file directly in source's folder on its」
+// 「[Opus 5.5] branch, or the one note source names.」
 func movedBy(push forge.Push) folderMoved {
 	return func(source buildSource, _ string) bool {
 		touched := push.TouchedIn(source.Path)
