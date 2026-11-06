@@ -21,7 +21,7 @@ import (
 // The references a signum can be held to, each pinned in a directory named for
 // the reference, its version and the commit it was taken at, with SOURCE
 // saying where it came from: umami is umami_v3.3.1_ca661c7, a2a is
-// a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b, github is
+// a2a_2026-03-12_7df7685, mcp is mcp_2026-07-28_5f5440b, github is
 // github_2026-03-10_7bdf5f0, oasf is oasf_v1.1.3_243e9dd. A reference is read
 // as it is: a schema.prisma as Prisma, a .proto as the descriptors it compiles
 // to, a schema.json as JSON Schema, a .d.ts as the TypeScript types it
