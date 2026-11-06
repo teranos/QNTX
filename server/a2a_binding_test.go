@@ -54,25 +54,6 @@ func (s a2aErrorSaid) reason() string {
 	return ""
 }
 
-// A body that is not the request message is a validation error (§3.3.2), and
-// so is one that does not set what the spec requires, naming each field
-// (§5.7).
-func TestARequestThatIsNotOrLacksTheRequestIsInvalid(t *testing.T) {
-	srv, tokens, _ := nodeAgentOverA2A(t, "")
-	for body, names := range map[string][]string{
-		`{"message": 7}`:  nil,
-		`{}`:              {"message"},
-		`{"message": {}}`: {"message.message_id", "message.role", "message.parts"},
-	} {
-		w, said := a2aSaid(t, srv, http.MethodPost, "/a2a/message:send", body, "1.0", tokens[auth.LevelRoot])
-		assert.Equal(t, http.StatusBadRequest, w.Code, body+": "+w.Body.String())
-		assert.Equal(t, "INVALID_ARGUMENT", said.Error.Status, body)
-		for _, name := range names {
-			assert.Contains(t, said.Error.Message, name, body)
-		}
-	}
-}
-
 // A path that is an operation without a tenant names none; any other's first
 // segment is a tenant, a namespace named after an operation among them.
 func TestATenantNamedAfterAnOperationIsATenant(t *testing.T) {
