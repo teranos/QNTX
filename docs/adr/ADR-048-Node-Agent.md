@@ -26,6 +26,9 @@ QNTX interacts with a Node Agent; Claude Code in our case, until we support Pi m
 
 
 - am.toml names each under `[agent.root]`: its model, its effort, and a  reference to the Claude plan token. A node that names no model has no NODE agent, and nothing stands in for the model named.
+- 「[Opus 5.5] Each harness it runs in is its own table under `[agent.root]`, none above another: `[agent.root.claude]` (its model, its effort, a reference to the Claude plan token), `[agent.root.pi]`, `[agent.root.codex]`, `[agent.root.agy]`. A node that names it in any one has a NODE agent; Claude Code's keys said under `[agent.root]` itself, as before, are read as `[agent.root.claude]` and the node warns that they moved.」
+
+  "Let's say that I don't like how it's putting Claude on a pedestal."
 - It is one session: `--resume` continues it, and Claude Code compacts its own  context.
 - Its key is derived from the node's own, for its model, so it is the same DID wherever the node is rebuilt from its record, and nothing more is kept for it.
 - It reaches sigils through the node's own MCP, with a token of its own. The  token is ROOT's kind, which minting hands to nobody, and the node writes it

@@ -9,7 +9,7 @@ import (
 // and where the Claude plan token is kept.
 func TestNodeAgentLoads(t *testing.T) {
 	path := writeConfig(t, `
-[agent.root]
+[agent.root.claude]
 model  = "claude-opus-5-5"
 effort = "low"
 token  = "ssm:///q/box/claude/oauth-token"
@@ -19,7 +19,7 @@ token  = "ssm:///q/box/claude/oauth-token"
 	if err != nil {
 		t.Fatalf("LoadFromFile = %v", err)
 	}
-	root := cfg.Agent.Root
+	root := cfg.Agent.Root.Claude
 	if root.Model != "claude-opus-5-5" || root.Effort != "low" || root.TokenRef != "ssm:///q/box/claude/oauth-token" {
 		t.Errorf("the Node Agent loaded as %+v", root)
 	}
@@ -32,7 +32,7 @@ token  = "ssm:///q/box/claude/oauth-token"
 // may use without being asked, are am.toml's to say.
 func TestNodeAgentPermissionsLoad(t *testing.T) {
 	path := writeConfig(t, `
-[agent.root]
+[agent.root.claude]
 model           = "claude-opus-5-5"
 effort          = "low"
 permission_mode = "dontAsk"
@@ -42,7 +42,7 @@ allow           = ["mcp__qntx", "Bash", "Read"]
 	if err != nil {
 		t.Fatalf("LoadFromFile = %v", err)
 	}
-	root := cfg.Agent.Root
+	root := cfg.Agent.Root.Claude
 	if root.Mode != "dontAsk" || len(root.Allow) != 3 || root.Allow[0] != "mcp__qntx" {
 		t.Errorf("the Node Agent's permissions loaded as mode %q, allow %v", root.Mode, root.Allow)
 	}
@@ -55,7 +55,7 @@ allow           = ["mcp__qntx", "Bash", "Read"]
 // an agent that fails at the first thing said to it.
 func TestNodeAgentModeClaudeCodeDoesNotHaveIsRefused(t *testing.T) {
 	path := writeConfig(t, `
-[agent.root]
+[agent.root.claude]
 model           = "claude-opus-5-5"
 effort          = "low"
 permission_mode = "everything"
@@ -65,7 +65,7 @@ permission_mode = "everything"
 		t.Fatalf("LoadFromFile = %v", err)
 	}
 	err = cfg.Validate()
-	if err == nil || !strings.Contains(err.Error(), "agent.root.permission_mode") || !strings.Contains(err.Error(), "dontAsk") {
+	if err == nil || !strings.Contains(err.Error(), "agent.root.claude.permission_mode") || !strings.Contains(err.Error(), "dontAsk") {
 		t.Errorf("Validate = %v, want it to name the field and the modes there are", err)
 	}
 }
@@ -87,7 +87,7 @@ func TestNoNodeAgentIsValid(t *testing.T) {
 // A literal token in a world-readable am.toml is already disclosed.
 func TestNodeAgentTokenLiteralRejected(t *testing.T) {
 	path := writeConfig(t, `
-[agent.root]
+[agent.root.claude]
 model  = "claude-opus-5-5"
 effort = "low"
 token  = "sk-ant-oat01-a-literal"
@@ -100,7 +100,7 @@ token  = "sk-ant-oat01-a-literal"
 	if err == nil {
 		t.Fatal("Validate = nil, want the literal token refused")
 	}
-	if !strings.Contains(err.Error(), "agent.root.token") {
+	if !strings.Contains(err.Error(), "agent.root.claude.token") {
 		t.Errorf("error does not name the field: %v", err)
 	}
 	if strings.Contains(err.Error(), "sk-ant-oat01-a-literal") {
@@ -112,8 +112,8 @@ token  = "sk-ant-oat01-a-literal"
 // refused, saying which half is missing.
 func TestNodeAgentNamedByHalfIsRefused(t *testing.T) {
 	for missing, body := range map[string]string{
-		"agent.root.model":  "[agent.root]\neffort = \"low\"\n",
-		"agent.root.effort": "[agent.root]\nmodel = \"claude-opus-5-5\"\n",
+		"agent.root.claude.model":  "[agent.root.claude]\neffort = \"low\"\n",
+		"agent.root.claude.effort": "[agent.root.claude]\nmodel = \"claude-opus-5-5\"\n",
 	} {
 		cfg, err := LoadFromFile(writeConfig(t, body))
 		if err != nil {
@@ -130,7 +130,7 @@ func TestNodeAgentNamedByHalfIsRefused(t *testing.T) {
 // gateway plugin every model call goes through.
 func TestNodeAgentPiLoads(t *testing.T) {
 	path := writeConfig(t, `
-[agent.root]
+[agent.root.claude]
 model  = "claude-opus-5-5"
 effort = "low"
 
@@ -158,7 +158,7 @@ func TestNodeAgentPiNamedByHalfIsRefused(t *testing.T) {
 		"both or neither":        "[agent.root.pi]\nmodel = \"m\"\n",
 		"agent.root.pi.thinking": "[agent.root.pi]\nmodel = \"claude-opus-5-5\"\ngateway = \"g\"\nthinking = \"loud\"\n",
 	} {
-		cfg, err := LoadFromFile(writeConfig(t, "[agent.root]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n"+body))
+		cfg, err := LoadFromFile(writeConfig(t, "[agent.root.claude]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n"+body))
 		if err != nil {
 			t.Fatalf("LoadFromFile = %v", err)
 		}
@@ -171,8 +171,8 @@ func TestNodeAgentPiNamedByHalfIsRefused(t *testing.T) {
 // "any model that isn't Opus or Fable shouldn't be allowed to be NODE agent"
 func TestNodeAgentOtherThanOpusOrFableIsRefused(t *testing.T) {
 	for want, body := range map[string]string{
-		"agent.root.model":    "[agent.root]\nmodel = \"claude-sonnet-5-5\"\neffort = \"low\"\n",
-		"agent.root.pi.model": "[agent.root]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n[agent.root.pi]\nmodel = \"openai/gpt-oss-120b\"\ngateway = \"g\"\n",
+		"agent.root.claude.model": "[agent.root.claude]\nmodel = \"claude-sonnet-5-5\"\neffort = \"low\"\n",
+		"agent.root.pi.model":     "[agent.root.claude]\nmodel = \"claude-opus-5-5\"\neffort = \"low\"\n[agent.root.pi]\nmodel = \"openai/gpt-oss-120b\"\ngateway = \"g\"\n",
 	} {
 		cfg, err := LoadFromFile(writeConfig(t, body))
 		if err != nil {
@@ -194,7 +194,7 @@ func TestNodeAgentOtherThanOpusOrFableIsRefused(t *testing.T) {
 // 「[Opus 5.5] or Fable, which agy never serves: "Exempt agy".」
 func TestNodeAgentAgyLoads(t *testing.T) {
 	path := writeConfig(t, `
-[agent.root]
+[agent.root.claude]
 model  = "claude-opus-5-5"
 effort = "low"
 
@@ -211,5 +211,85 @@ model = "gemini-3.8-flash-low"
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("Validate = %v, want nil", err)
+	}
+}
+
+// "Let's say that I don't like how it's putting Claude on a pedestal."
+//
+// 「[Opus 5.5] A Node Agent named in Pi alone is a Node Agent: Claude Code is one
+// harness among the others, not the agent itself.」
+func TestNodeAgentInPiAloneIsNamed(t *testing.T) {
+	cfg, err := LoadFromFile(writeConfig(t, `
+[agent.root.pi]
+model   = "anthropic/claude-opus-4.6"
+gateway = "openrouter-qntx"
+`))
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	if !cfg.Agent.Root.Named() || cfg.Agent.Root.Claude.Named() {
+		t.Errorf("a Node Agent in Pi alone loaded as %+v", cfg.Agent.Root)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate = %v, want nil", err)
+	}
+}
+
+// 「[Opus 5.5] Claude Code named the way it was before [agent.root.claude] is read
+// as [agent.root.claude], and the keys that moved are kept so the node says so.」
+// "Read them as Claude, warn"
+func TestClaudeNamedTheOldWayIsReadAsClaude(t *testing.T) {
+	cfg, err := LoadFromFile(writeConfig(t, `
+[agent.root]
+model           = "claude-opus-5-5"
+effort          = "low"
+permission_mode = "dontAsk"
+
+[agent.root.pi]
+model   = "anthropic/claude-opus-4.6"
+gateway = "openrouter-qntx"
+`))
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	claude := cfg.Agent.Root.Claude
+	if claude.Model != "claude-opus-5-5" || claude.Effort != "low" || claude.Mode != "dontAsk" {
+		t.Errorf("Claude Code named the old way loaded as %+v", claude)
+	}
+	if got := strings.Join(cfg.Agent.Root.MovedKeys(), " "); got != "agent.root.model agent.root.effort agent.root.permission_mode" {
+		t.Errorf("MovedKeys = %q", got)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate = %v, want nil", err)
+	}
+
+	// Half named the old way, the old key is the one said to be missing.
+	cfg, err = LoadFromFile(writeConfig(t, "[agent.root]\nmodel = \"claude-opus-5-5\"\n"))
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "agent.root.effort is required") {
+		t.Errorf("Validate = %v, want it to name agent.root.effort", err)
+	}
+}
+
+// 「[Opus 5.5] Named both ways, which one is meant is not guessed.」
+func TestClaudeNamedBothWaysIsRefused(t *testing.T) {
+	cfg, err := LoadFromFile(writeConfig(t, `
+[agent.root]
+model = "claude-opus-5-5"
+
+[agent.root.claude]
+model  = "claude-fable-5-1"
+effort = "low"
+`))
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	if cfg.Agent.Root.Claude.Model != "claude-fable-5-1" {
+		t.Errorf("[agent.root.claude] did not stand: %+v", cfg.Agent.Root.Claude)
+	}
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "agent.root.model") || !strings.Contains(err.Error(), "[agent.root.claude] alone") {
+		t.Errorf("Validate = %v, want it to name agent.root.model and say where Claude Code is named", err)
 	}
 }

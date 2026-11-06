@@ -270,7 +270,7 @@ func (s *QNTXServer) namespaceAgent(ctx context.Context, sent sigil.Sent) (anAge
 		return anAgentHeld{}, &protocol.Refusal{Why: sigil.NotFound, Says: namespace + " opted into no agent: set one with agents set"}
 	}
 	if s.harnessHeldBy("claude") == nil {
-		return anAgentHeld{}, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Claude Code to run the agent of " + namespace + " in: am.toml names no [agent.root], which is what fetches it"}
+		return anAgentHeld{}, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Claude Code to run the agent of " + namespace + " in: am.toml names no [agent.root.claude], which is what fetches it"}
 	}
 	agent, refused := s.holdNamespaceAgent(namespace, line.spec.Model, line.setBy)
 	return anAgentHeld{agent: agent, line: line}, refused

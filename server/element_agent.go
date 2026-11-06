@@ -295,7 +295,7 @@ func (s *QNTXServer) elementsSignum() sigil.Signum {
 				},
 				{
 					Name:   "say",
-					Does:   "Says something to the element's agent and gives what it answered. One conversation that continues: shaken on day 3, it goes on from day 1. Runs as [agent.root] says.",
+					Does:   "Says something to the element's agent and gives what it answered. One conversation that continues: shaken on day 3, it goes on from day 1. Runs as [agent.root.claude] says.",
 					Takes:  append([]*protocol.Param{element, harness, {Name: "says", Required: true, Says: "What is said to it."}, screenshotParam()}, claude.sayTakes...),
 					Answer: "protocol.NodeAgentSaid",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: elementAgentPath + "/say"},

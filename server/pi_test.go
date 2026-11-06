@@ -162,6 +162,24 @@ func TestANodeThatNamesNoPiHasNoneToSpeakTo(t *testing.T) {
 	assert.Contains(t, refused.GetSays(), "[agent.root.pi]")
 }
 
+// "Let's say that I don't like how it's putting Claude on a pedestal."
+//
+// 「[Opus 5.5] A Node Agent am.toml names in Pi alone answers in Pi, and asked
+// in Claude Code says that harness is not named, not that there is no Node Agent.」
+func TestNodeAgentInPiAloneIsNotInClaudeCode(t *testing.T) {
+	s, _, _ := runningPiToo(t)
+	s.deps.cfg.Agent.Root.Claude = appcfg.ClaudeConfig{}
+	require.True(t, s.deps.cfg.Agent.Root.Named())
+
+	_, refused := s.harnessAm(s.piHarness())
+	require.Nil(t, refused)
+	_, refused = s.harnessAm(s.claudeHarness())
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.NotFound, refused.GetWhy())
+	assert.Contains(t, refused.GetSays(), "[agent.root.claude]")
+	assert.NotContains(t, refused.GetSays(), "names no Node Agent")
+}
+
 // Pi says who answers in it and how it is run, which the Pi element draws.
 func TestPiSaysWhoItIs(t *testing.T) {
 	s, _, _ := runningPiToo(t)

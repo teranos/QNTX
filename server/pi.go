@@ -45,7 +45,7 @@ func (s *QNTXServer) thereIsNoPi() *protocol.Refusal {
 		return s.thereIsNoNodeAgent()
 	}
 	if !s.deps.cfg.Agent.Root.Pi.Named() {
-		return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it runs in Claude Code alone"}
+		return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it does not run in Pi"}
 	}
 	return piIsOff()
 }
