@@ -6,11 +6,7 @@ Status: Debated
 
 Access Tokens for Machine and Agent Access
 
-"so, in a sense, the true goal is"
 
-"eliminate access tokens before we 1.0.0"
-
-"kill the entire concept"
 
 ## Context
 
