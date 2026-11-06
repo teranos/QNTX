@@ -9,10 +9,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
+	"github.com/getsentry/sentry-go"
+	sentryotel "github.com/getsentry/sentry-go/otel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/auth"
@@ -254,4 +258,45 @@ func TestACardIsReadFromThePublicInternetAlone(t *testing.T) {
 
 	code, refused := a2aCalledOver(t, srv, root, http.MethodPost, "SendMessage", map[string]any{"peer": "orchardnode", "card": served.URL, "message": `{}`})
 	assert.Equal(t, http.StatusBadRequest, code, refused, "an agent is named by a peer or a card, not both")
+}
+
+// "make it ship to sentry": a resolution is a span, and sentry-go's span
+// processor, which the node starts when Sentry traces, ships it to Sentry as
+// a transaction.
+func TestAResolutionShipsToSentry(t *testing.T) {
+	allowingLoopback(t)
+	served := cardServing(t, &anotherAgent{})
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	var shipped []*sentry.Event
+	var held sync.Mutex
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn: "https://tim@example.com/0", EnableTracing: true, TracesSampleRate: 1,
+		Transport: &sentry.MockTransport{},
+		BeforeSendTransaction: func(e *sentry.Event, _ *sentry.EventHint) *sentry.Event {
+			held.Lock()
+			defer held.Unlock()
+			shipped = append(shipped, e)
+			return nil
+		},
+	})
+	require.NoError(t, err)
+	hub := sentry.CurrentHub()
+	before := hub.Client()
+	hub.BindClient(client)
+	t.Cleanup(func() { hub.BindClient(before) })
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sentryotel.NewSentrySpanProcessor()))
+	formerly := otel.GetTracerProvider()
+	otel.SetTracerProvider(provider)
+	t.Cleanup(func() { otel.SetTracerProvider(formerly) })
+
+	code, card := a2aCalledOver(t, srv, tokens[auth.LevelRoot], http.MethodGet, "Resolve", map[string]any{"card": served.URL})
+	require.Equal(t, http.StatusOK, code, card)
+	require.NoError(t, provider.ForceFlush(context.Background()))
+	client.Flush(5 * time.Second)
+
+	held.Lock()
+	defer held.Unlock()
+	require.NotEmpty(t, shipped, "no transaction reached Sentry")
+	assert.Equal(t, "a2a.Resolve", shipped[0].Transaction)
 }

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	sentryotel "github.com/getsentry/sentry-go/otel"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
 	"github.com/teranos/QNTX/internal/config"
@@ -24,6 +25,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server"
 	errors "github.com/teranos/sacred-error"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -110,11 +112,19 @@ func init() {
 		// 「[Fable 5.1] Spans leave over OTLP when the environment names where」
 		// 「[Fable 5.1] (internal/otlp). Like Sentry, failing to start it is said on the」
 		// 「[Fable 5.1] terminal and is not a reason for a node not to run.」
-		if err := otlp.Start(context.Background(), version.VersionTag); err != nil {
+		// Spans go to Sentry too when it traces: sentry-go's own span processor.
+		var toSentry []sdktrace.SpanProcessor
+		if logger.SentryRunning() && opt.TracesSampleRate > 0 {
+			toSentry = append(toSentry, sentryotel.NewSentrySpanProcessor())
+		}
+		if err := otlp.Start(context.Background(), version.VersionTag, toSentry...); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP span export: %v\n", err)
 		}
-		if endpoint, _ := otlp.Said(); otlp.Running() {
+		if endpoint, said := otlp.Said(); otlp.Running() && said {
 			logger.Infow("Shipping spans over OTLP", "endpoint", endpoint, "release", version.VersionTag)
+		}
+		if len(toSentry) > 0 && otlp.Running() {
+			logger.Infow("Shipping spans to Sentry", "traces_sample_rate", opt.TracesSampleRate)
 		}
 
 		if logger.SentryRunning() {

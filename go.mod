@@ -44,6 +44,7 @@ require github.com/a2aproject/a2a-go/v2 v2.7.0
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
+	github.com/getsentry/sentry-go/otel v0.45.1
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 )
 
