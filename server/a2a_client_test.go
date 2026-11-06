@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"iter"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -110,15 +111,115 @@ func TestEachA2ASigilIsAnOperationOfThePinnedSpec(t *testing.T) {
 	pinned, err := a2aSpec()
 	require.NoError(t, err)
 	for _, held := range signum.GetSigils() {
+		if held.GetName() == "Resolve" {
+			continue
+		}
 		method := pinned.service.Methods().ByName(protoreflect.Name(held.GetName()))
 		require.NotNil(t, method, held.GetName())
 		assert.Equal(t, string(method.Output().FullName()), held.GetAnswer(), held.GetName())
 		assert.NotEmpty(t, held.GetDoes(), held.GetName())
 		fields := method.Input().Fields()
-		require.Len(t, held.GetTakes(), fields.Len()+1, held.GetName())
+		require.Len(t, held.GetTakes(), fields.Len()+2, held.GetName())
 		for i := 0; i < fields.Len(); i++ {
-			assert.Equal(t, string(fields.Get(i).Name()), held.GetTakes()[i+1].GetName(), held.GetName())
+			assert.Equal(t, string(fields.Get(i).Name()), held.GetTakes()[i+2].GetName(), held.GetName())
 		}
 	}
-	assert.Len(t, signum.GetSigils(), pinned.service.Methods().Len()-2, "every operation but the two that stream")
+	assert.Len(t, signum.GetSigils(), pinned.service.Methods().Len()-2+1, "every operation but the two that stream, and Resolve")
+}
+
+// allowingLoopback lets the node speak to httptest, which is on loopback, for
+// an agent found by its card.
+func allowingLoopback(t *testing.T) {
+	t.Helper()
+	allowed := publicAddress
+	publicAddress = func(net.IP) bool { return true }
+	t.Cleanup(func() { publicAddress = allowed })
+}
+
+// cardServing is an agent a2a-go serves, its card at the well-known path and
+// its HTTP+JSON binding at /a2a.
+func cardServing(t *testing.T, agent *anotherAgent) *httptest.Server {
+	t.Helper()
+	rest := a2asrv.NewRESTHandler(a2asrv.NewHandler(agent.executor()))
+	var served *httptest.Server
+	served = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		agent.bearer = append(agent.bearer, r.Header.Get("Authorization"))
+		if r.URL.Path == "/.well-known/agent-card.json" {
+			a2asrv.NewStaticAgentCardHandler(&a2asdk.AgentCard{
+				Name: "the orchard keeper", Description: "Keeps the orchard.", Version: "1.0.0",
+				SupportedInterfaces: []*a2asdk.AgentInterface{a2asdk.NewAgentInterface(served.URL+"/a2a", a2asdk.TransportProtocolHTTPJSON)},
+				DefaultInputModes:   []string{"text/plain"}, DefaultOutputModes: []string{"text/plain"},
+				Skills: []a2asdk.AgentSkill{{ID: "keep", Name: "keep", Description: "Keeps.", Tags: []string{"orchard"}}},
+			}).ServeHTTP(w, r)
+			return
+		}
+		http.StripPrefix("/a2a", rest).ServeHTTP(w, r)
+	}))
+	t.Cleanup(served.Close)
+	return served
+}
+
+// Discovery (§8.2): a card is resolved by a2a-go's resolver from the agent's
+// base URL, the agent it names is spoken to as no one, and both resolutions
+// are said to Sentry.
+func TestTheAgentACardNamesIsFoundAndSpokenTo(t *testing.T) {
+	allowingLoopback(t)
+	agent := &anotherAgent{}
+	served := cardServing(t, agent)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	sent := toSentry(t)
+	root := tokens[auth.LevelRoot]
+
+	code, card := a2aCalledOver(t, srv, root, http.MethodGet, "Resolve", map[string]any{"card": served.URL})
+	require.Equal(t, http.StatusOK, code, card)
+	assert.Equal(t, "the orchard keeper", card["name"])
+
+	code, answered := a2aCalledOver(t, srv, root, http.MethodPost, "SendMessage", map[string]any{
+		"card": served.URL, "message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	require.Equal(t, http.StatusOK, code, answered)
+	assert.Equal(t, "TASK_STATE_COMPLETED", answered["task"].(map[string]any)["status"].(map[string]any)["state"])
+	for _, bearer := range agent.bearer {
+		assert.Empty(t, bearer, "an agent a card names was given a token")
+	}
+
+	logs, _ := sent.said()
+	resolved := 0
+	for _, l := range logs {
+		if l.Body == "An agent card was resolved" {
+			resolved++
+			name, _ := logAttr(l, "a2a.card.name")
+			assert.Equal(t, "the orchard keeper", name)
+		}
+	}
+	assert.Equal(t, 2, resolved, "each resolution is said to Sentry")
+}
+
+// A card is read from what the internet routes to alone, over http or https:
+// a2a-go's resolver would read a file:// card from the node's own disk.
+func TestACardIsReadFromThePublicInternetAlone(t *testing.T) {
+	agent := &anotherAgent{}
+	served := cardServing(t, agent)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	sent := toSentry(t)
+	root := tokens[auth.LevelRoot]
+
+	for _, at := range []string{"file:///etc/passwd", served.URL} {
+		code, refused := a2aCalledOver(t, srv, root, http.MethodGet, "Resolve", map[string]any{"card": at})
+		assert.NotEqual(t, http.StatusOK, code, at)
+		said, _ := json.Marshal(refused)
+		assert.NotContains(t, string(said), "root:", at)
+	}
+	assert.Empty(t, agent.bearer, "the node spoke to loopback")
+	logs, _ := sent.said()
+	notResolved := 0
+	for _, l := range logs {
+		if strings.HasPrefix(l.Body, "An agent card was not resolved") {
+			notResolved++
+		}
+	}
+	assert.Equal(t, 2, notResolved)
+
+	code, refused := a2aCalledOver(t, srv, root, http.MethodPost, "SendMessage", map[string]any{"peer": "orchardnode", "card": served.URL, "message": `{}`})
+	assert.Equal(t, http.StatusBadRequest, code, refused, "an agent is named by a peer or a card, not both")
 }

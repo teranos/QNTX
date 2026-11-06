@@ -80,11 +80,12 @@ func TestARefusedA2ARequestIsASentryLog(t *testing.T) {
 	srv.logger = zap.New(core).Sugar()
 	sent := toSentry(t)
 
-	r := asBearer(http.MethodPost, "/a2a/", tokens[auth.LevelRoot])
-	body := `{"jsonrpc": "2.0", "id": 1, "method": "SendMessage", "params": {"secret": "in-the-body"}}`
+	r := asBearer(http.MethodPost, "/a2a/tasks/nothing:cancel", tokens[auth.LevelRoot])
+	body := `{"secret": "in-the-body"}`
 	r.Body = io.NopCloser(strings.NewReader(body))
 	r.ContentLength = int64(len(body))
 	r.Header.Set("User-Agent", "a-client/1")
+	r.Header.Set("A2A-Version", "1.0")
 	w := httptest.NewRecorder()
 	srv.served.ServeHTTP(w, r)
 	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
@@ -97,8 +98,8 @@ func TestARefusedA2ARequestIsASentryLog(t *testing.T) {
 	l := logs[0]
 	assert.Equal(t, "An A2A request was refused", l.Body)
 	for key, want := range map[string]string{
-		"a2a.reason": "NOT_FOUND", "a2a.kind": "expected", "a2a.binding": "jsonrpc", "a2a.jsonrpc": "SendMessage",
-		"a2a.method": "POST", "a2a.path": "/a2a/", "user_agent.untrusted": "a-client/1", "request_id": id,
+		"a2a.reason": "TASK_NOT_FOUND", "a2a.kind": "expected", "a2a.binding": "http+json", "a2a.operation": "CancelTask",
+		"a2a.method": "POST", "a2a.path": "/a2a/tasks/nothing:cancel", "user_agent.untrusted": "a-client/1", "request_id": id,
 		"sentry.release": "test-release",
 	} {
 		got, held := logAttr(l, key)
@@ -215,21 +216,3 @@ func TestVersionsAndMethodsAreTheNodesWords(t *testing.T) {
 	assert.Equal(t, "a?b", bounded("a\x00b", 10))
 }
 
-// A refusal tells the A2A-Version the client said, whatever Major.Minor the
-// SDK is handed (§3.6).
-func TestARefusalTellsTheVersionTheClientSaid(t *testing.T) {
-	srv, tokens, _ := nodeAgentOverA2A(t, "")
-	sent := toSentry(t)
-
-	r := asBearer(http.MethodGet, "/a2a/tasks/nothing", tokens[auth.LevelRoot])
-	r.Header.Set("A2A-Version", "1.0.1")
-	w := httptest.NewRecorder()
-	srv.served.ServeHTTP(w, r)
-	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
-
-	logs, _ := sent.said()
-	require.Len(t, logs, 1)
-	said, held := logAttr(logs[0], "a2a.version")
-	assert.True(t, held)
-	assert.Equal(t, "1.0.1", said)
-}

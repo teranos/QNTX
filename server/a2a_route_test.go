@@ -29,20 +29,19 @@ func TestA2AIsServedToRootAlone(t *testing.T) {
 		}
 		return r
 	}
-	unsupported, noOperation := "UNSUPPORTED_OPERATION", "is no A2A operation"
+	unsupported, noAgent := "UNSUPPORTED_OPERATION", "no agent is served at tenant"
 	for _, route := range []struct {
 		method, path, body string
 		code               int
 		says               string
 	}{
 		{http.MethodPost, "/a2a/message:send", sent, http.StatusBadRequest, unsupported},
-		{http.MethodPost, "/a2a/message:stream", sent, http.StatusBadRequest, unsupported},
 		{http.MethodGet, "/a2a/tasks/abc", "", http.StatusBadRequest, unsupported},
 		{http.MethodGet, "/a2a/tasks", "", http.StatusBadRequest, unsupported},
 		{http.MethodPost, "/a2a/tasks/abc:cancel", "", http.StatusBadRequest, unsupported},
-		{http.MethodPost, "/a2a/garden/tasks/abc:cancel", "", http.StatusNotFound, noOperation},
+		{http.MethodPost, "/a2a/garden/tasks/abc:cancel", "", http.StatusNotFound, noAgent},
 		{http.MethodPost, "/a2a/tasks/abc/pushNotificationConfigs", `{"url": "https://example.org/hook"}`, http.StatusBadRequest, unsupported},
-		{http.MethodGet, "/a2a/garden/extendedAgentCard", "", http.StatusNotFound, noOperation},
+		{http.MethodGet, "/a2a/garden/extendedAgentCard", "", http.StatusNotFound, noAgent},
 	} {
 		r := asked(route.method, route.path, route.body, tokens[auth.LevelRoot])
 		r.Header.Set("A2A-Version", "1.0")

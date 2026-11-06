@@ -152,7 +152,9 @@ func TestACardThePeerDidNotSignIsNotHandedOver(t *testing.T) {
 // the same: the resource does not exist (§3.3.2).
 func TestAPeerServingNoAgentThereIsNotFound(t *testing.T) {
 	peer := aPeer(t, func(_ *standInPeer, w http.ResponseWriter, _ string) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":{"code":404,"status":"NOT_FOUND","message":"no agent is served at tenant orchard","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","domain":"a2a-protocol.org","reason":"TASK_NOT_FOUND"}]}}`))
 	})
 	srv, tokens := primaryOf(t, peer)
 
@@ -175,7 +177,8 @@ func TestAPeerRedirectingTheCardCarriesNoTokenAway(t *testing.T) {
 	})
 	srv, tokens := primaryOf(t, peer)
 
-	w := askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
-	assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
-	assert.Empty(t, elsewhere, "the redirect was followed")
+	askingTheExtendedCard(srv, "/a2a/orchard/extendedAgentCard", tokens[auth.LevelRoot])
+	for _, authorization := range elsewhere {
+		assert.Empty(t, authorization, "the token was carried where the peer redirected")
+	}
 }

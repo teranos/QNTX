@@ -30,6 +30,9 @@ func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant st
 	at := strings.TrimSuffix(peer.Origin.JoinPath(a2aPrefix).String(), "/")
 	client, err := a2aclient.NewFromEndpoints(ctx,
 		[]*a2asdk.AgentInterface{{URL: at, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: tenant}},
+		// The person's token goes to the peer and nowhere else: a redirect is
+		// the peer's answer, not a place to follow it to.
+		a2aclient.WithRESTTransport(&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}),
 		a2aclient.WithCallInterceptors(bearerOf(bearer)))
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "no A2A client speaks to "+peer.Label+": "+err.Error())
@@ -57,8 +60,11 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 	}
 	defer func() { _ = client.Destroy() }()
 	card, err := client.GetExtendedAgentCard(r.Context(), &a2asdk.GetExtendedAgentCardRequest{Tenant: namespace})
+	if errors.Is(err, a2asdk.ErrTaskNotFound) {
+		return nil, a2aRefusal(a2asdk.ErrTaskNotFound, peer.Label+" serves no agent at tenant "+namespace)
+	}
 	if err != nil {
-		return nil, errors.Wrapf(err, "%s did not hand over the card of the agent of %s", peer.Label, namespace)
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, peer.Label+" did not hand over the card of the agent of "+namespace+": "+err.Error())
 	}
 	if err := verifiedByPeer(r.Context(), card, peer); err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card "+peer.Label+" handed over for the agent of "+namespace+" is not one it signed: "+err.Error())

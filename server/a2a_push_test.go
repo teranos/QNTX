@@ -109,8 +109,11 @@ func TestAPushConfigIsCreatedListedGotAndDeleted(t *testing.T) {
 	assert.Equal(t, hook, at(got, "url"))
 
 	for range 2 {
-		code, deleted := a2aAsked(t, srv, http.MethodDelete, configs+"/c1", "", root)
-		assert.Equal(t, http.StatusOK, code, deleted)
+		r := asBearer(http.MethodDelete, configs+"/c1", root)
+		r.Header.Set("A2A-Version", "1.0")
+		w := httptest.NewRecorder()
+		srv.served.ServeHTTP(w, r)
+		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	}
 	code, _ = a2aAsked(t, srv, http.MethodGet, configs+"/c1", "", root)
 	assert.Equal(t, http.StatusNotFound, code, "a deleted config was got")
