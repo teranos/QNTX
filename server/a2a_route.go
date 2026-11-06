@@ -173,6 +173,10 @@ type a2aAnswered struct {
 	wrote    bool
 	keepsAll bool
 	said     bytes.Buffer
+	// line is a stream's line not yet ended, and refusedIn the first of its
+	// events that is a JSON-RPC error, however much the stream said before it.
+	line      bytes.Buffer
+	refusedIn []byte
 }
 
 // a2aSaidMost is how much of an error's body is kept to say what it was.
@@ -190,10 +194,52 @@ func (a *a2aAnswered) Write(body []byte) (int, error) {
 	if a.status == 0 {
 		a.status = http.StatusOK
 	}
-	if (a.status >= http.StatusBadRequest || a.keepsAll) && a.said.Len() < a2aSaidMost {
+	switch {
+	case a.keepsAll && a.streams():
+		a.heard(body)
+	case (a.status >= http.StatusBadRequest || a.keepsAll) && a.said.Len() < a2aSaidMost:
 		a.said.Write(body[:min(len(body), a2aSaidMost-a.said.Len())])
 	}
 	return a.ResponseWriter.Write(body)
+}
+
+// streams is whether the answer is an SSE stream.
+func (a *a2aAnswered) streams() bool {
+	return strings.HasPrefix(a.Header().Get("Content-Type"), "text/event-stream")
+}
+
+// heard reads a stream's lines as they are written, and keeps the first
+// data line that is a JSON-RPC error.
+func (a *a2aAnswered) heard(body []byte) {
+	if a.refusedIn != nil {
+		return
+	}
+	a.line.Write(body)
+	for {
+		ended := bytes.IndexByte(a.line.Bytes(), '\n')
+		if ended < 0 {
+			break
+		}
+		line := a.line.Next(ended + 1)
+		data, isData := bytes.CutPrefix(bytes.TrimSpace(line), []byte("data:"))
+		if isData && jsonRPCError(bytes.TrimSpace(data)) {
+			a.refusedIn = bytes.Clone(bytes.TrimSpace(data))
+			a.line.Reset()
+			return
+		}
+	}
+	// A line longer than any refusal is no refusal.
+	if a.line.Len() > a2aSaidMost {
+		a.line.Reset()
+	}
+}
+
+// jsonRPCError is whether answer is a JSON-RPC response that is an error.
+func jsonRPCError(answer []byte) bool {
+	var said struct {
+		Error json.RawMessage `json:"error"`
+	}
+	return json.Unmarshal(answer, &said) == nil && len(said.Error) > 0 && string(said.Error) != "null"
 }
 
 func (a *a2aAnswered) Flush() {
@@ -237,24 +283,12 @@ func jsonRPCRefusalOf(exchange *a2aExchange, answered *a2aAnswered) (a2aRefusalS
 			Data    json.RawMessage `json:"data"`
 		} `json:"error"`
 	}
-	// A stream answers each event as an SSE data line: the refusal is the first that is an error.
-	answers := []string{answered.said.String()}
-	if strings.HasPrefix(answered.Header().Get("Content-Type"), "text/event-stream") {
-		answers = nil
-		for _, line := range strings.Split(answered.said.String(), "\n") {
-			if data, isData := strings.CutPrefix(line, "data:"); isData {
-				answers = append(answers, strings.TrimSpace(data))
-			}
-		}
+	// A stream's refusal is the first of its events that is an error.
+	answer := answered.said.Bytes()
+	if answered.streams() {
+		answer = answered.refusedIn
 	}
-	refused := false
-	for _, answer := range answers {
-		if json.Unmarshal([]byte(answer), &said) == nil && said.Error != nil {
-			refused = true
-			break
-		}
-	}
-	if !refused {
+	if json.Unmarshal(answer, &said) != nil || said.Error == nil {
 		return a2aRefusalSaid{}, false
 	}
 	refusal := a2aRefusalSaid{Operation: exchange.operation, JSONRPC: true, Status: answered.status, Message: said.Error.Message, Reason: strconv.Itoa(said.Error.Code)}

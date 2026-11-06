@@ -295,3 +295,23 @@ func TestARefusedJSONRPCStreamIsASentryLog(t *testing.T) {
 		assert.Equal(t, want, got, key)
 	}
 }
+
+// A stream's error is heard however much the stream said before it, and when
+// it arrives split across writes.
+func TestALateStreamedErrorIsStillARefusal(t *testing.T) {
+	answered := &a2aAnswered{ResponseWriter: httptest.NewRecorder(), keepsAll: true}
+	answered.Header().Set("Content-Type", "text/event-stream")
+	event := `data: {"jsonrpc":"2.0","id":1,"result":{"statusUpdate":{"taskId":"t","status":{"state":"TASK_STATE_WORKING"}}}}` + "\n\n"
+	require.Greater(t, len(event)*200, a2aSaidMost, "the stream before the error is not longer than what an answer keeps")
+	for range 200 {
+		_, _ = answered.Write([]byte(event))
+	}
+	refusal := `data: {"jsonrpc":"2.0","id":1,"error":{"code":-32001,"message":"no such task"}}` + "\n\n"
+	_, _ = answered.Write([]byte(refusal[:30]))
+	_, _ = answered.Write([]byte(refusal[30:]))
+
+	said, refused := jsonRPCRefusalOf(&a2aExchange{operation: "SendStreamingMessage", jsonRPC: true}, answered)
+	require.True(t, refused, "an error after %d bytes of stream was not heard", len(event)*200)
+	assert.Equal(t, "no such task", said.Message)
+	assert.Equal(t, "-32001", said.Reason)
+}
