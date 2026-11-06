@@ -76,6 +76,31 @@ func a2aCalledOver(t *testing.T, srv *QNTXServer, token, method, rpc string, sen
 	return w.Code, answered
 }
 
+// A call whose caller stops waiting first is not the agent's time run out.
+func TestACallItsCallerStopsWaitingOnIsNotTheAgentsTimeRunOut(t *testing.T) {
+	allowingLoopback(t)
+	agent := &anotherAgent{thinks: 2 * time.Second}
+	served := cardServing(t, agent)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	body, err := json.Marshal(map[string]any{
+		"card": served.URL, "message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	require.NoError(t, err)
+	r := asBearer(http.MethodPost, "/api/a2a/SendMessage", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(string(body)))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/json")
+	waits, stop := context.WithTimeout(r.Context(), 100*time.Millisecond)
+	defer stop()
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r.WithContext(waits))
+
+	assert.NotEqual(t, http.StatusOK, w.Code, w.Body.String())
+	assert.NotContains(t, w.Body.String(), "within "+agentTurnTimeout.String())
+	assert.Contains(t, w.Body.String(), "its caller stopped waiting")
+}
+
 // SendMessage and GetTask, spoken to an agent a peer serves at a tenant, as
 // the person asking here; what the peer answered is the spec's response.
 func TestAPeersAgentIsSpokenToAsTheSpecSays(t *testing.T) {
