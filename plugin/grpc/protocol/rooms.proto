@@ -102,8 +102,8 @@ message Room {
   // "there is always 1 Agent assigned to doing those PR deploy's"
   string instructions = 5;
   RoomOf of = 6;
-  // What the room is connected to beyond its provider, as the provider names
-  // it: a Telegram group, say. Empty is nothing.
+  // 「[Opus 5.5] What the room is connected to beyond its provider, as the provider names」
+  // 「[Opus 5.5] it: a Telegram group, say. Empty is nothing.」
   string connected = 7;
 }
 
@@ -144,7 +144,7 @@ message ListRoomsRequest {
 }
 
 message ListRoomsResponse {
-  // Each room the provider holds that the asker may see.
+  // 「[Opus 5.5] Each room the provider holds that the asker may see.」
   repeated Room list = 1;
 }
 
@@ -156,7 +156,7 @@ message GetRoomRequest {
 }
 
 message GetRoomResponse {
-  // The room.
+  // 「[Opus 5.5] The room.」
   Room room = 1;
   // 「[Fable 5.1] The agents in it.」
   // 「[Fable 5.1] Unbacked by Telegram for a bot, which is told a chat's administrators and」
@@ -286,7 +286,7 @@ message ReadRoomRequest {
 message ReadRoomResponse {
   // 「[Fable 5.1] Oldest first.」
   repeated RoomMessage messages = 1;
-  // Who arrived in the room over the same stretch, oldest first.
+  // 「[Opus 5.5] Who arrived in the room over the same stretch, oldest first.」
   repeated RoomJoined joined = 2;
   // 「[Fable 5.1] Older than this was not answered: the board read is not the whole board.」
   bool truncated = 3;
