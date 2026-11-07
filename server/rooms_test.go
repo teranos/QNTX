@@ -8,7 +8,7 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// A read past what a provider's int32 holds is refused, not sent on negative.
+// 「[Opus 5.5] A read past what a provider's int32 holds is refused, not sent on negative.」
 func TestARoomReadPastInt32IsRefused(t *testing.T) {
 	s := servedForTest(t)
 	_, refused := s.roomsRead(t.Context(), sigil.Sent{"room": "node", "limit": "2147483648"})
@@ -17,7 +17,7 @@ func TestARoomReadPastInt32IsRefused(t *testing.T) {
 	assert.Equal(t, "limit", refused.GetParam())
 }
 
-// With no plugin holding rooms, every room sigil says so.
+// 「[Opus 5.5] With no plugin holding rooms, every room sigil says so.」
 func TestNoPluginHoldingRoomsIsSaid(t *testing.T) {
 	s := servedForTest(t)
 	for name, answer := range s.roomsSignum().Answers {
