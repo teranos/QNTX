@@ -64,7 +64,7 @@ func TestAStoryAndItsNoteNameAreNotBothFilled(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(vault.Path, "Course Material", "13-user-connects-obsidian.feature.md"))
 }
 
-// A note the repository names X.feature.md is a note, and goes back to the branch as itself.
+// 「[Opus 5.5] A note the repository names X.feature.md is a note, and goes back to the branch as itself.」
 func TestANoteNamedAsAStorysNoteIsSentBackAsItself(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	mainNotes["docs/adr/13-user-connects-obsidian.feature.md"] = "# a note\n"
@@ -85,7 +85,7 @@ func TestANoteNamedAsAStorysNoteIsSentBackAsItself(t *testing.T) {
 	assert.NotContains(t, branch, "docs/adr/13-user-connects-obsidian.feature")
 }
 
-// One story is bound as one note of the vault.
+// 「[Opus 5.5] One story is bound as one note of the vault.」
 func TestOneStoryIsBoundAsANote(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	mainNotes["docs/adr/13-user-connects-obsidian.feature"] = story
@@ -95,7 +95,7 @@ func TestOneStoryIsBoundAsANote(t *testing.T) {
 	assert.Equal(t, story, readNote(t, vault, "Course Material/13-user-connects-obsidian.feature.md"))
 }
 
-// A folder may be named as a story is, and is bound as a folder.
+// 「[Opus 5.5] A folder may be named as a story is, and is bound as a folder.」
 func TestAFolderNamedAsAStoryIsBoundAsAFolder(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	mainNotes["docs/adr/stories.feature/13-user-connects-obsidian.feature"] = story
