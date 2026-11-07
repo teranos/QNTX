@@ -1,10 +1,14 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"slices"
+	"strings"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2acrypto"
@@ -149,7 +153,65 @@ func (s *QNTXServer) HandleAgentCard(w http.ResponseWriter, r *http.Request) {
 	producer := a2asrv.AgentCardProducerFn(func(context.Context) (*a2asdk.AgentCard, error) {
 		return s.publicCard(r).sdk(), nil
 	})
-	a2asrv.NewAgentCardHandler(a2asrv.NewSignedCardProducer(producer, s.cardSigners)).ServeHTTP(w, r)
+	cardCached(a2asrv.NewAgentCardHandler(a2asrv.NewSignedCardProducer(producer, s.cardSigners))).ServeHTTP(w, r)
+}
+
+// cardMaxAge is how long a client keeps the public card: short, because health
+// is on the card (§8.6.1).
+const cardMaxAge = "60"
+
+// cardCached is the card a2a-go's handler answers, with how a client caches it:
+// a strong ETag of the card it would be sent, and 304 when it holds that one.
+func cardCached(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			handler.ServeHTTP(w, r)
+			return
+		}
+		held := &cardHeld{header: http.Header{}, status: http.StatusOK}
+		handler.ServeHTTP(held, r)
+		for name, values := range held.header {
+			w.Header()[name] = values
+		}
+		if held.status != http.StatusOK {
+			w.WriteHeader(held.status)
+			_, _ = w.Write(held.body.Bytes())
+			return
+		}
+		sum := sha256.Sum256(held.body.Bytes())
+		etag := `"` + hex.EncodeToString(sum[:]) + `"`
+		w.Header().Set("Cache-Control", "public, max-age="+cardMaxAge)
+		w.Header().Set("ETag", etag)
+		if etagMatches(r.Header.Get("If-None-Match"), etag) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		_, _ = w.Write(held.body.Bytes())
+	})
+}
+
+// cardHeld is what a2a-go's card handler answered, held until how it is
+// cached is known.
+type cardHeld struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (c *cardHeld) Header() http.Header         { return c.header }
+func (c *cardHeld) Write(b []byte) (int, error) { return c.body.Write(b) }
+func (c *cardHeld) WriteHeader(status int)      { c.status = status }
+
+// etagMatches is If-None-Match against one strong ETag (RFC 9110 §13.1.2): a
+// list of tags, a weak one compared by its opaque part, or *.
+func etagMatches(header, etag string) bool {
+	for _, tag := range strings.Split(header, ",") {
+		tag = strings.TrimPrefix(strings.TrimSpace(tag), "W/")
+		if tag == "*" || tag == etag {
+			return true
+		}
+	}
+	return false
 }
 
 // cardSigners is the node's own key, under the key id its DID document names

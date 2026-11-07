@@ -510,6 +510,108 @@ func TestCancelingAWorkingTaskStopsItsTurn(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_CANCELED", at(got, "status.state"), "the turn ending wrote over its cancel")
 }
 
+// What a turn says as it moves is streamed as its "said" artifact, chunk by
+// chunk and masked, and the Task completed holds it whole beside its answer.
+func TestWhatATurnSaysIsStreamedAsItSaysIt(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	srv.harnessBinaries.mu.Lock()
+	held := srv.harnessBinaries.held["claude"]
+	srv.harnessBinaries.mu.Unlock()
+	says := filepath.Join(filepath.Dir(held.path), "claude-saying")
+	require.NoError(t, os.WriteFile(says, []byte("#!/bin/sh\n"+
+		`echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Looking at uptime."}]}}'`+"\n"+
+		`echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{}}]}}'`+"\n"+
+		`echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Found ghp_abcdefghijklmnopqrstuvwxyz0123 in env."}]}}'`+"\n"+
+		"sleep 0.3\nexec '"+held.path+"' \"$@\"\n"), 0o755))
+	srv.holdHarness("claude", &harnessHeld{fetched: held.fetched, path: says})
+
+	body := saidToTheNode("how long has the box been up?", "")
+	r := asBearer(http.MethodPost, "/a2a/message:stream", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("A2A-Version", "1.0")
+	r.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var chunks []string
+	var appends []bool
+	var final map[string]any
+	for _, line := range strings.Split(w.Body.String(), "\n") {
+		data, isData := strings.CutPrefix(line, "data: ")
+		if !isData {
+			continue
+		}
+		var event map[string]any
+		require.NoError(t, json.Unmarshal([]byte(data), &event), data)
+		if update, held := event["artifactUpdate"].(map[string]any); held {
+			assert.Equal(t, "said", at(update, "artifact.artifactId"))
+			chunks = append(chunks, at(update, "artifact.parts.0.text").(string))
+			appending, _ := update["append"].(bool)
+			appends = append(appends, appending)
+		}
+		if task, held := event["task"].(map[string]any); held {
+			final = task
+		}
+	}
+	require.Len(t, chunks, 2, w.Body.String())
+	assert.Equal(t, "Looking at uptime.", chunks[0])
+	assert.NotContains(t, chunks[1], "ghp_abcdefghijklmnopqrstuvwxyz0123", "a secret was streamed")
+	assert.Equal(t, []bool{false, true}, appends)
+
+	require.NotNil(t, final, w.Body.String())
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(final, "status.state"))
+	assert.Equal(t, "answer", at(final, "artifacts.0.artifactId"))
+	assert.Equal(t, "said", at(final, "artifacts.1.artifactId"))
+	assert.Equal(t, chunks[0], at(final, "artifacts.1.parts.0.text"))
+	assert.Equal(t, chunks[1], at(final, "artifacts.1.parts.1.text"))
+}
+
+// A turn Claude Code prints in past turnQuietMost is working, not quiet: it is
+// left to answer.
+func TestATurnThatPrintsPastItsQuietTimeIsNotStopped(t *testing.T) {
+	quiet := turnQuietMost
+	turnQuietMost = 400 * time.Millisecond
+	t.Cleanup(func() { turnQuietMost = quiet })
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	srv.harnessBinaries.mu.Lock()
+	held := srv.harnessBinaries.held["claude"]
+	srv.harnessBinaries.mu.Unlock()
+	prints := filepath.Join(filepath.Dir(held.path), "claude-printing")
+	require.NoError(t, os.WriteFile(prints, []byte("#!/bin/sh\n"+
+		"i=0\nwhile [ $i -lt 30 ]; do echo '{\"type\":\"system\",\"subtype\":\"status\"}'; sleep 0.05; i=$((i+1)); done\n"+
+		"exec '"+held.path+"' \"$@\"\n"), 0o755))
+	srv.holdHarness("claude", &harnessHeld{fetched: held.fetched, path: prints})
+
+	started := time.Now()
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to thirty", ""), tokens[auth.LevelRoot])
+	assert.Greater(t, time.Since(started), 3*turnQuietMost, "the turn did not print past its quiet time")
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(sent, "task.status.state"), sent)
+}
+
+// A Task that ended is not canceled, and one no id names is not found: a2a-go
+// refuses both before the executor is asked.
+func TestATaskEndedOrMissingIsNotCanceled(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("how long has the box been up?", ""), tokens[auth.LevelRoot])
+	id := at(sent, "task.id").(string)
+	require.Equal(t, "TASK_STATE_COMPLETED", at(sent, "task.status.state"), sent)
+
+	code, refused := a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/"+id+":cancel", `{}`, tokens[auth.LevelRoot])
+	assert.NotEqual(t, http.StatusOK, code, refused)
+	said, _ := json.Marshal(refused)
+	assert.Contains(t, string(said), "TASK_NOT_CANCELABLE")
+	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(got, "status.state"))
+
+	code, refused = a2aAsked(t, srv, http.MethodPost, "/a2a/tasks/no-such-task:cancel", `{}`, tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusNotFound, code, refused)
+	said, _ = json.Marshal(refused)
+	assert.Contains(t, string(said), "TASK_NOT_FOUND")
+}
+
 // A turn quiet past turnQuietMost is stopped, and its Task ends.
 func TestATurnQuietPastItsTimeIsStopped(t *testing.T) {
 	quiet := turnQuietMost
@@ -608,4 +710,23 @@ func TestATurnIsStreamedAsItMoves(t *testing.T) {
 	require.NotEmpty(t, states, w.Body.String())
 	assert.Contains(t, states, "TASK_STATE_WORKING", "the turn was not told as it moved")
 	assert.Equal(t, "TASK_STATE_COMPLETED", states[len(states)-1], w.Body.String())
+}
+
+// JSON-RPC is answered at /a2a, where the card names it, and not redirected to
+// /a2a/: a client that does not follow the redirect reads nothing.
+func TestJSONRPCIsAnsweredWhereTheCardNamesIt(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	body := `{"jsonrpc": "2.0", "id": 1, "method": "GetTask", "params": {"id": "no-such-task"}}`
+	r := asBearer(http.MethodPost, "/a2a", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var answered map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answered), w.Body.String())
+	assert.Equal(t, "2.0", answered["jsonrpc"])
+	assert.NotNil(t, answered["error"], "a task no id names is not found")
 }
