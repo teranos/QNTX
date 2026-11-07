@@ -48,6 +48,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "ScheduleTick",
         "ScheduleProgress",
         "ScheduledJob",
+        // What a rooms provider answers, written by a provider in another
+        // language (pyre's @rooms returns a dict) that leaves out what is empty.
+        "RoomAgent",
+        "RoomOf",
+        "ElementOf",
+        "Room",
+        "RoomMessage",
+        "RoomJoined",
+        "RoomWoken",
+        "RoomGap",
+        "RoomArrival",
+        "RegisterRoomAgentResponse",
+        "CreateRoomResponse",
+        "ListRoomsResponse",
+        "GetRoomResponse",
+        "InvolveInRoomResponse",
+        "ReadRoomResponse",
+        "PostToRoomResponse",
+        "WakeInRoomResponse",
     ] {
         config.type_attribute(format!("protocol.{}", msg), "#[serde(default)]");
     }
