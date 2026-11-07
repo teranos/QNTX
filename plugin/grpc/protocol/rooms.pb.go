@@ -343,8 +343,11 @@ type Room struct {
 	// 「[Fable 5.1] holds a name and no more.」
 	//
 	// "there is always 1 Agent assigned to doing those PR deploy's"
-	Instructions  string  `protobuf:"bytes,5,opt,name=instructions,proto3" json:"instructions,omitempty"`
-	Of            *RoomOf `protobuf:"bytes,6,opt,name=of,proto3" json:"of,omitempty"`
+	Instructions string  `protobuf:"bytes,5,opt,name=instructions,proto3" json:"instructions,omitempty"`
+	Of           *RoomOf `protobuf:"bytes,6,opt,name=of,proto3" json:"of,omitempty"`
+	// What the room is connected to beyond its provider, as the provider names
+	// it: a Telegram group, say. Empty is nothing.
+	Connected     string `protobuf:"bytes,7,opt,name=connected,proto3" json:"connected,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -419,6 +422,13 @@ func (x *Room) GetOf() *RoomOf {
 		return x.Of
 	}
 	return nil
+}
+
+func (x *Room) GetConnected() string {
+	if x != nil {
+		return x.Connected
+	}
+	return ""
 }
 
 type RegisterRoomAgentRequest struct {
@@ -721,8 +731,9 @@ func (x *ListRoomsRequest) GetBy() *RoomAgent {
 }
 
 type ListRoomsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	List          []*Room                `protobuf:"bytes,1,rep,name=list,proto3" json:"list,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Each room the provider holds that the asker may see.
+	List          []*Room `protobuf:"bytes,1,rep,name=list,proto3" json:"list,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -827,7 +838,8 @@ func (x *GetRoomRequest) GetRoom() string {
 
 type GetRoomResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Room  *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	// The room.
+	Room *Room `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
 	// 「[Fable 5.1] The agents in it.」
 	// 「[Fable 5.1] Unbacked by Telegram for a bot, which is told a chat's administrators and」
 	// 「[Fable 5.1] how many are in it, and for a topic, which has no members of its own.」
@@ -1598,7 +1610,8 @@ type ReadRoomResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 「[Fable 5.1] Oldest first.」
 	Messages []*RoomMessage `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
-	Joined   []*RoomJoined  `protobuf:"bytes,2,rep,name=joined,proto3" json:"joined,omitempty"`
+	// Who arrived in the room over the same stretch, oldest first.
+	Joined []*RoomJoined `protobuf:"bytes,2,rep,name=joined,proto3" json:"joined,omitempty"`
 	// 「[Fable 5.1] Older than this was not answered: the board read is not the whole board.」
 	Truncated     bool `protobuf:"varint,3,opt,name=truncated,proto3" json:"truncated,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1996,14 +2009,15 @@ const file_plugin_grpc_protocol_rooms_proto_rawDesc = "" +
 	"\x02ofJ\x04\b\x03\x10\x04\"C\n" +
 	"\tElementOf\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x18\n" +
-	"\aelement\x18\x02 \x01(\tR\aelement\"\xae\x01\n" +
+	"\aelement\x18\x02 \x01(\tR\aelement\"\xcc\x01\n" +
 	"\x04Room\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\"\n" +
 	"\finstructions\x18\x05 \x01(\tR\finstructions\x12 \n" +
-	"\x02of\x18\x06 \x01(\v2\x10.protocol.RoomOfR\x02of\"\x83\x01\n" +
+	"\x02of\x18\x06 \x01(\v2\x10.protocol.RoomOfR\x02of\x12\x1c\n" +
+	"\tconnected\x18\a \x01(\tR\tconnected\"\x83\x01\n" +
 	"\x18RegisterRoomAgentRequest\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12)\n" +
 	"\x05agent\x18\x02 \x01(\v2\x13.protocol.RoomAgentR\x05agent\x12 \n" +
