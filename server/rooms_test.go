@@ -1,6 +1,8 @@
 package server
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,7 +30,6 @@ func TestNoPluginHoldingRoomsIsSaid(t *testing.T) {
 		assert.Contains(t, refused.GetSays(), "no plugin holds rooms on this node", name)
 	}
 }
-
 
 // "i want all Node Agents to be in the Node Room"
 func TestTheNodeRoomIsOfThisNode(t *testing.T) {
@@ -63,4 +64,17 @@ func TestANamesakeUnderAnotherDIDIsNotTheNodeAgent(t *testing.T) {
 	s.roomAgentAs(agent)
 	assert.Equal(t, "switch", agent.GetHarness())
 	assert.Equal(t, "did:key:z6Mkother", agent.GetDid())
+}
+
+// A file a woken Node Agent writes for the room is sent with its answer.
+func TestAWokenNodeAgentsFileGoesIntoTheRoom(t *testing.T) {
+	s := servedForTest(t)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "plot.png"), []byte("\x89PNG"), 0o600))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "nested"), 0o700))
+	files := s.answerFiles(dir)
+	require.Len(t, files, 1)
+	assert.Equal(t, "plot.png", files[0].GetName())
+	assert.Equal(t, "image/png", files[0].GetType())
+	assert.Equal(t, []byte("\x89PNG"), files[0].GetData())
 }
