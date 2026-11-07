@@ -471,17 +471,18 @@ func (s *ExecutionStore) GetAsyncJobIDForScheduledJob(scheduledJobID string) (st
 // Returns the number of executions deleted.
 //
 // This implements TTL cleanup to prevent unbounded growth of pulse_executions and task_logs tables.
-// Recommended retention: 90 days (3 months) for production use.
-func (s *ExecutionStore) CleanupOldExecutions(retentionDays int) (int, error) {
+// A pass removes at most atMost rows: on q pulse_executions held 249,855 rows,
+// and one statement over them holds the write lock for all of them at once.
+func (s *ExecutionStore) CleanupOldExecutions(retentionDays int, atMost int) (int, error) {
 	// Calculate cutoff time in Go for clarity and portability
 	cutoffTime := time.Now().AddDate(0, 0, -retentionDays).Format(time.RFC3339)
 
 	query := `
 		DELETE FROM pulse_executions
-		WHERE started_at < ?
+		WHERE id IN (SELECT id FROM pulse_executions WHERE started_at < ? LIMIT ?)
 	`
 
-	result, err := s.db.Exec(query, cutoffTime)
+	result, err := s.db.Exec(query, cutoffTime, atMost)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to cleanup old executions")
 	}

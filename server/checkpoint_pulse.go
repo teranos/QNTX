@@ -197,12 +197,28 @@ func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
 		case <-time.After(jobsPassPause):
 		}
 	}
-	executions, err := s.held.ServedUniverse().Executions().CleanupOldExecutions(int(jobsKeptFor.Hours() / 24))
-	if err != nil {
-		log.Errorw("Old executions were not removed", "kept_for", jobsKeptFor.String(), "error", err)
+	executions := 0
+	for {
+		n, err := s.held.ServedUniverse().Executions().CleanupOldExecutions(int(jobsKeptFor.Hours()/24), jobsRemovedPerPass)
+		if err != nil {
+			log.Errorw("Old executions were not removed", "kept_for", jobsKeptFor.String(), "removed_before", executions, "error", err)
+			break
+		}
+		executions += n
+		if n < jobsRemovedPerPass {
+			break
+		}
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-time.After(jobsPassPause):
+		}
 	}
 	if removed > 0 || executions > 0 {
 		log.Infow("Old jobs removed", "jobs", removed, "executions", executions, "kept_for", jobsKeptFor.String())
+	}
+	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
+		log.Errorw("Stale forwards were not dropped", "error", err)
 	}
 }
 

@@ -476,6 +476,16 @@ func (q *Queue) Cleanup(ctx context.Context, olderThan time.Duration, atMost int
 	return q.store.CleanupOldJobs(olderThan, atMost, keep...)
 }
 
+// CancelQueuedBefore cancels at most atMost queued jobs of handler older than
+// olderThan, with reason as their error, and says how many.
+func (q *Queue) CancelQueuedBefore(handler string, olderThan time.Duration, reason string, atMost int) (int, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.forgetCounts()
+	return q.store.CancelQueuedBefore(handler, time.Now().Add(-olderThan), reason, atMost)
+}
+
 // QueueStats returns statistics about the queue
 type QueueStats struct {
 	Queued    int `json:"queued"`

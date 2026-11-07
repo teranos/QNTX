@@ -415,6 +415,34 @@ func (s *Store) CleanupOldJobs(olderThan time.Duration, atMost int, keep ...stri
 	return int(rows), nil
 }
 
+// CancelQueuedBefore cancels at most atMost queued jobs of handler created before
+// cutoff, with reason as their error, and says how many. A queued job the worker
+// never reached is not run late; it is dropped, and said.
+func (s *Store) CancelQueuedBefore(handler string, cutoff time.Time, reason string, atMost int) (int, error) {
+	now := time.Now()
+	completedAt, err := At(now).column("the cancel of queued " + handler + " jobs")
+	if err != nil {
+		return 0, err
+	}
+	result, err := s.db.Exec(`
+		UPDATE async_ix_jobs
+		SET status = ?, error = ?, completed_at = ?, updated_at = ?
+		WHERE id IN (
+			SELECT id FROM async_ix_jobs
+			WHERE handler_name = ? AND status = ? AND created_at < ?
+			LIMIT ?
+		)
+	`, JobStatusCancelled, reason, completedAt, now, handler, JobStatusQueued, cutoff, atMost)
+	if err != nil {
+		return 0, errors.Wrapf(err, "the queued %s jobs before %s were not cancelled", handler, cutoff.Format(time.RFC3339))
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get rows affected")
+	}
+	return int(rows), nil
+}
+
 // ErrJobNotFound says a job lookup miss out loud, so a miss and a broken
 // query can never be confused, and no caller carries a nil it forgot to check.
 var ErrJobNotFound = errors.New("job not found")

@@ -590,3 +590,58 @@ func TestCleanupSparesForwardsLiveParentsAndTheRecent(t *testing.T) {
 		}
 	}
 }
+
+// A queued job older than the horizon is cancelled with the reason as its error;
+// a newer one, a running one, and another handler's are not touched. A pass
+// takes at most atMost.
+func TestCancelQueuedBeforeDropsOnlyTheOldQueuedOfTheHandler(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewStore(db)
+	old := time.Now().Add(-48 * time.Hour)
+	mk := func(id, handler string, status JobStatus, at time.Time) {
+		t.Helper()
+		j := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+			ID: id, HandlerName: handler, Source: id, Status: status, CreatedAt: at, UpdatedAt: at}
+		if err := store.CreateJob(j); err != nil {
+			t.Fatalf("CreateJob(%s): %v", id, err)
+		}
+	}
+	mk("OLD_FWD_1", "github.forward", JobStatusQueued, old)
+	mk("OLD_FWD_2", "github.forward", JobStatusQueued, old)
+	mk("OLD_FWD_RUNNING", "github.forward", JobStatusRunning, old)
+	mk("NEW_FWD", "github.forward", JobStatusQueued, time.Now())
+	mk("OLD_OTHER", "test.other", JobStatusQueued, old)
+
+	n, err := store.CancelQueuedBefore("github.forward", time.Now().Add(-24*time.Hour), "dropped", 1)
+	if err != nil {
+		t.Fatalf("CancelQueuedBefore: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("a pass of one cancelled %d", n)
+	}
+	n, err = store.CancelQueuedBefore("github.forward", time.Now().Add(-24*time.Hour), "dropped", 1000)
+	if err != nil {
+		t.Fatalf("CancelQueuedBefore: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("the second pass cancelled %d, want the one old queued forward left", n)
+	}
+	for _, id := range []string{"OLD_FWD_1", "OLD_FWD_2"} {
+		j, err := store.GetJob(id)
+		if err != nil {
+			t.Fatalf("GetJob(%s): %v", id, err)
+		}
+		if j.Status != JobStatusCancelled || j.Error != "dropped" {
+			t.Errorf("%s is %s with error %q, want cancelled with dropped", id, j.Status, j.Error)
+		}
+	}
+	for id, want := range map[string]JobStatus{"OLD_FWD_RUNNING": JobStatusRunning, "NEW_FWD": JobStatusQueued, "OLD_OTHER": JobStatusQueued} {
+		j, err := store.GetJob(id)
+		if err != nil {
+			t.Fatalf("GetJob(%s): %v", id, err)
+		}
+		if j.Status != want {
+			t.Errorf("%s is %s, want %s", id, j.Status, want)
+		}
+	}
+}
