@@ -234,8 +234,8 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 			continue
 		}
 		message := vault.Name + ": " + path.Join(binding.placeRoot(), under)
-		// A note the branch holds goes back where it is: its vault name may
-		// read as a story's (a note named X.feature.md) when it is not one.
+		// 「[Opus 5.5] A note the branch holds goes back where it is: its vault name may」
+		// 「[Opus 5.5] read as a story's (a note named X.feature.md) when it is not one.」
 		if there {
 			edits = append(edits, forge.Replaced(was.path, content, was.sha, message))
 		} else {
