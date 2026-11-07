@@ -711,3 +711,22 @@ func TestATurnIsStreamedAsItMoves(t *testing.T) {
 	assert.Contains(t, states, "TASK_STATE_WORKING", "the turn was not told as it moved")
 	assert.Equal(t, "TASK_STATE_COMPLETED", states[len(states)-1], w.Body.String())
 }
+
+// JSON-RPC is answered at /a2a, where the card names it, and not redirected to
+// /a2a/: a client that does not follow the redirect reads nothing.
+func TestJSONRPCIsAnsweredWhereTheCardNamesIt(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	body := `{"jsonrpc": "2.0", "id": 1, "method": "GetTask", "params": {"id": "no-such-task"}}`
+	r := asBearer(http.MethodPost, "/a2a", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var answered map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answered), w.Body.String())
+	assert.Equal(t, "2.0", answered["jsonrpc"])
+	assert.NotNil(t, answered["error"], "a task no id names is not found")
+}
