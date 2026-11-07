@@ -333,8 +333,8 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 				// "THE NODE'S MCP NEEDS"
 				for _, consumed := range s.consumedForAgent(agent, s.ownURL) {
 					said.MCP = append(said.MCP, claudecode.MCPServer{Name: consumed.Name, URL: consumed.URL, Bearer: agent.token})
-					// A server ROOT said yes to is one the agent may use, unasked:
-					// each of its tools, whatever its name holds.
+					// 「[Opus 5.5] A server ROOT said yes to is one the agent may use, unasked:」
+					// 「[Opus 5.5] each of its tools, whatever its name holds.」
 					said.Allow = append(slices.Clone(said.Allow), "mcp__"+consumed.Name, "mcp__"+consumed.Name+"__*")
 				}
 			}
