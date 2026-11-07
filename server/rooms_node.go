@@ -10,7 +10,7 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// "i want all Node Agents to be in the Node Room"
+// "「[Opus 5.5] i want all Node Agents to be in the Node Room」"
 
 // nodeRoomName is the room of this node: the provider holds it under this name,
 // and the node says it is of this node (RoomOf.node), which the provider does
