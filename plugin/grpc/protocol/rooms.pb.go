@@ -731,8 +731,9 @@ func (x *ListRoomsRequest) GetBy() *RoomAgent {
 }
 
 type ListRoomsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	List          []*Room                `protobuf:"bytes,1,rep,name=list,proto3" json:"list,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Each room the provider holds that the asker may see.
+	List          []*Room `protobuf:"bytes,1,rep,name=list,proto3" json:"list,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -837,7 +838,8 @@ func (x *GetRoomRequest) GetRoom() string {
 
 type GetRoomResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Room  *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	// The room.
+	Room *Room `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
 	// 「[Fable 5.1] The agents in it.」
 	// 「[Fable 5.1] Unbacked by Telegram for a bot, which is told a chat's administrators and」
 	// 「[Fable 5.1] how many are in it, and for a topic, which has no members of its own.」
@@ -1608,7 +1610,8 @@ type ReadRoomResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 「[Fable 5.1] Oldest first.」
 	Messages []*RoomMessage `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
-	Joined   []*RoomJoined  `protobuf:"bytes,2,rep,name=joined,proto3" json:"joined,omitempty"`
+	// Who arrived in the room over the same stretch, oldest first.
+	Joined []*RoomJoined `protobuf:"bytes,2,rep,name=joined,proto3" json:"joined,omitempty"`
 	// 「[Fable 5.1] Older than this was not answered: the board read is not the whole board.」
 	Truncated     bool `protobuf:"varint,3,opt,name=truncated,proto3" json:"truncated,omitempty"`
 	unknownFields protoimpl.UnknownFields
