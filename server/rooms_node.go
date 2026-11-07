@@ -60,8 +60,11 @@ func (s *QNTXServer) nodeAgentRuns(harness string) (model, effort string) {
 // harness, and the model and effort it runs at, so one read of the room says
 // what each agent is. One the provider holds under another DID is not it.
 func (s *QNTXServer) roomAgentAs(agent *protocol.RoomAgent) {
+	if s.nodeAgent == nil || (agent.GetDid() != "" && agent.GetDid() != s.nodeAgent.did) {
+		return
+	}
 	h, is := s.nodeAgentIn(agent.GetName())
-	if !is || (agent.GetDid() != "" && agent.GetDid() != s.nodeAgent.did) {
+	if !is {
 		return
 	}
 	agent.Did = s.nodeAgent.did
