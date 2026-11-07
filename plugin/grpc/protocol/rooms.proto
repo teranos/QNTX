@@ -31,7 +31,7 @@ service RoomsService {
   // "An Agent should be able to Involve other Agents (it can reach) into a Room that Agent can access"
   rpc InvolveInRoom(InvolveInRoomRequest) returns (InvolveInRoomResponse);
 
-  // "shared message board"
+  // "「[Opus 5.5] shared message board」"
   rpc PostToRoom(PostToRoomRequest) returns (PostToRoomResponse);
 
   // "you can wake a specific Agent so it will check the room"
@@ -55,7 +55,7 @@ message RoomAgent {
   // 「[Fable 5.1] a session in each, and each is in a room by itself. Empty is the node」
   // 「[Fable 5.1] itself, which no harness runs.」
   //
-  // "the Agy, Claude, Codex Node Agents are all in the Node Room"
+  // "「[Opus 5.5] the Agy, Claude, Codex Node Agents are all in the Node Room」"
   string harness = 2;
   // 「[Fable 5.1] What it is addressed by in a room, as the provider holds it.」
   string name = 3;
@@ -79,8 +79,8 @@ message RoomOf {
   reserved 3;
 }
 
-// ElementOf is an element as its room is of it: by its namespace and by itself,
-// so one element in two namespaces is two rooms.
+// 「[Fable 5.1, Opus 5.5] ElementOf is an element as its room is of it: by its namespace and by itself,」
+// 「[Fable 5.1, Opus 5.5] so one element in two namespaces is two rooms.」
 message ElementOf {
   string namespace = 1;
   string element = 2;
@@ -264,7 +264,7 @@ enum RoomReach {
 }
 
 // 「[Fable 5.1] Unbacked by Telegram for a bot: it reads no chat back. A person's account」
-// 「[Fable 5.1] does.」
+// 「[Opus 5.5] does.」
 message ReadRoomRequest {
   string provider = 1;
   // 「[Fable 5.1] Who reads. It is in the room.」
@@ -279,7 +279,7 @@ message ReadRoomRequest {
 }
 
 message ReadRoomResponse {
-  // 「[Fable 5.1] Oldest first.」
+  // 「[Opus 5[1m]] Oldest first.」
   repeated RoomMessage messages = 1;
   repeated RoomJoined joined = 2;
   // 「[Fable 5.1] Older than this was not answered: the board read is not the whole board.」
@@ -298,8 +298,8 @@ message StreamRoomArrivalsRequest {
     bool head = 4;
   }
   // 「[Fable 5.1] Only what is addressed to the agent: wakes, and nothing else said.」
-  // It filters messages and joins. A gap arrives whatever it says, so a lost wake
-  // is never passed over by the sequence.
+  // 「[Fable 5.1, Opus 5.5] It filters messages and joins. A gap arrives whatever it says, so a lost wake」
+  // 「[Fable 5.1, Opus 5.5] is never passed over by the sequence.」
   bool addressed_only = 5;
 }
 
@@ -311,9 +311,9 @@ message RoomArrival {
   // 「[Fable 5.1] Unbacked by Telegram for a person's account: it has a sequence per」
   // 「[Fable 5.1] supergroup and none across them. A bot's updates are one sequence, kept」
   // 「[Fable 5.1] 24 hours.」
-  // The sequence is the provider's own, one across all of the agent's rooms and
-  // kept across reconnects: where its source has none across rooms, the provider
-  // numbers what it carried and keeps that numbering.
+  // 「[Fable 5.1, Opus 5.5] The sequence is the provider's own, one across all of the agent's rooms and」
+  // 「[Fable 5.1, Opus 5.5] kept across reconnects: where its source has none across rooms, the provider」
+  // 「[Fable 5.1, Opus 5.5] numbers what it carried and keeps that numbering.」
   int64 sequence = 1;
   // 「[Fable 5.1] On a message: it is addressed to the agent. A wake arrives as this.」
   bool addressed = 2;
@@ -335,8 +335,8 @@ message RoomGap {
   // 「[Fable 5.1] The loss is in every room the agent is in, named above or not.」
   bool all_rooms = 3;
   string reason = 4;
-  // The loss cannot be read from the room either: its provider reads no room
-  // back for this agent (a Telegram bot). What was said in the gap is gone for it.
+  // 「[Fable 5.1, Opus 5.5] The loss cannot be read from the room either: its provider reads no room」
+  // 「[Fable 5.1, Opus 5.5] back for this agent (a Telegram bot). What was said in the gap is gone for it.」
   bool unrecoverable = 5;
 }
 
