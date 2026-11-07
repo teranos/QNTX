@@ -44,14 +44,14 @@ const noteSuffix = ".md"
 // a story is a note, named as the story with noteSuffix after it.
 const storySuffix = ".feature"
 
-// noteFile says whether a file of the repository is one note in the vault:
-// a note, or a story.
+// 「[Opus 5.5] noteFile says whether a file of the repository is one note in the vault:」
+// 「[Opus 5.5] a note, or a story.」
 func noteFile(name string) bool {
 	return strings.HasSuffix(name, noteSuffix) || strings.HasSuffix(name, storySuffix)
 }
 
-// noteBound says whether the repository's path, bound at place, is one note:
-// a note, or a story placed as a note. A folder may be named as a story is.
+// 「[Opus 5.5] noteBound says whether the repository's path, bound at place, is one note:」
+// 「[Opus 5.5] a note, or a story placed as a note. A folder may be named as a story is.」
 func noteBound(repoPath, place string) bool {
 	return strings.HasSuffix(repoPath, noteSuffix) || (strings.HasSuffix(repoPath, storySuffix) && strings.HasSuffix(place, noteSuffix))
 }
