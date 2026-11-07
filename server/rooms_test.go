@@ -55,3 +55,12 @@ func TestARoomAgentTheNodeDoesNotRunIsLeftAlone(t *testing.T) {
 	assert.Equal(t, "switch", agent.GetHarness())
 	assert.Empty(t, agent.GetModel())
 }
+
+// A room's agent held under another DID is not the Node Agent, whatever its name.
+func TestANamesakeUnderAnotherDIDIsNotTheNodeAgent(t *testing.T) {
+	s := &QNTXServer{nodeAgent: &rootAgent{did: "did:key:z6Mkagent"}}
+	agent := &protocol.RoomAgent{Name: "claude", Did: "did:key:z6Mkother", Harness: "switch"}
+	s.roomAgentAs(agent)
+	assert.Equal(t, "switch", agent.GetHarness())
+	assert.Equal(t, "did:key:z6Mkother", agent.GetDid())
+}

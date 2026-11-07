@@ -204,8 +204,11 @@ func (s *QNTXServer) roomsGet(ctx context.Context, sent sigil.Sent) (any, *proto
 		return nil, roomsFailed(err)
 	}
 	s.roomOfNode(answer.GetRoom())
-	for _, agent := range answer.GetAgents() {
-		s.roomAgentAs(agent)
+	// Only in the Node Room is a claude or an agy the Node Agent.
+	if answer.GetRoom().GetName() == nodeRoomName {
+		for _, agent := range answer.GetAgents() {
+			s.roomAgentAs(agent)
+		}
 	}
 	return answer, nil
 }
@@ -263,7 +266,9 @@ func (s *QNTXServer) roomsWake(ctx context.Context, sent sigil.Sent) (any, *prot
 	// is posted into the room.
 	s.wakeNodeAgents(ctx, provider, rooms, sent["room"], sent["thread"], sent["says"], answer)
 	for _, woken := range answer.GetWoken() {
-		s.roomAgentAs(woken.GetAgent())
+		if woken.GetReach() == protocol.RoomReach_ROOM_REACH_ARRIVES {
+			s.roomAgentAs(woken.GetAgent())
+		}
 	}
 	return answer, nil
 }
