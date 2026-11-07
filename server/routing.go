@@ -44,6 +44,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 
 	// A2A over HTTP+JSON (server/a2a).
 	s.answer(a2aPrefix, s.a2aHTTP())
+	// A2AService's streaming operations, spoken to a peer's agent or a card's (SSE).
+	s.answerA2AStreams()
 
 	// The GitHub App's one webhook, for every event it is subscribed to.
 	s.answer(githubWebhookPrefix, s.HandleGitHubWebhook)
