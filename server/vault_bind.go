@@ -227,6 +227,37 @@ func (s *QNTXServer) repoDirs(ctx context.Context, repo forge.Repo, branch, dir 
 	return dirs, nil
 }
 
+// "in reality its still one story"
+
+// repoBindable is what directly inside dir of repo on branch can be bound:
+// its folders, and its notes and stories.
+func (s *QNTXServer) repoBindable(ctx context.Context, repo forge.Repo, branch, dir string) (dirs, files []string, err error) {
+	reader, err := s.forges().For(repo)
+	if err != nil {
+		return nil, nil, err
+	}
+	entries, err := reader.Entries(ctx, forge.AsApp, repo, branch, dir)
+	var notADirectory forge.NotADirectory
+	if errors.As(err, &notADirectory) {
+		return nil, nil, errors.Newf("%s is a %s of %s on %s, not a folder", dir, notADirectory.Kind, repo, branch)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	dirs, files = []string{}, []string{}
+	for _, entry := range entries {
+		switch {
+		case entry.Kind == forge.Dir:
+			dirs = append(dirs, entry.Path)
+		case entry.Kind == forge.File && (strings.HasSuffix(entry.Name, noteSuffix) || strings.HasSuffix(entry.Name, storySuffix)):
+			files = append(files, entry.Path)
+		}
+	}
+	slices.Sort(dirs)
+	slices.Sort(files)
+	return dirs, files, nil
+}
+
 func (s *QNTXServer) vaultSubdirs(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	repo, refused := repoOf(sent["repo"])
 	if refused != nil {
@@ -236,11 +267,11 @@ func (s *QNTXServer) vaultSubdirs(ctx context.Context, sent sigil.Sent) (any, *p
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	dirs, err := s.repoDirs(ctx, repo, branch, path.Clean(sent["path"]))
+	dirs, files, err := s.repoBindable(ctx, repo, branch, path.Clean(sent["path"]))
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return &protocol.VaultSubdirs{Dirs: dirs, Branch: branch}, nil
+	return &protocol.VaultSubdirs{Dirs: dirs, Files: files, Branch: branch}, nil
 }
 
 func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {

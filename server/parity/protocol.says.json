@@ -1052,6 +1052,7 @@
   "protocol.VaultSubdirs": "VaultSubdirs is what vault subdirs answers.",
   "protocol.VaultSubdirs.branch": "The repository's default branch, which the folders are read on and a folder is bound to.",
   "protocol.VaultSubdirs.dirs": "Each folder's path from the repository's top.",
+  "protocol.VaultSubdirs.files": "Each note and story directly in the folder, by its path from the repository's top: what a note of the vault can be bound to.",
   "protocol.Vaults": "Vaults is what vault list answers, and what every vault sigil that changes one answers after it.",
   "protocol.Vaults.vaults": "Every vault the node keeps now, one per vault: its name, its path on the box, and its folders as owner/repo@branch:path=place.",
   "protocol.VersionInfo": "VersionInfo is which build is running, as am version answers it. Mirrors version.Info.",

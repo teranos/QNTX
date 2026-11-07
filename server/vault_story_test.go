@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 )
 
@@ -103,4 +104,17 @@ func TestAFolderNamedAsAStoryIsBoundAsAFolder(t *testing.T) {
 	require.Nil(t, refused, "%v", refused)
 
 	assert.Equal(t, story, readNote(t, vault, "Course Material/13-user-connects-obsidian.feature.md"))
+}
+
+// "in reality its still one story"
+// What a repository's folder offers to be bound: its folders, and its notes and stories beside them.
+func TestARepositoryFolderOffersItsFoldersNotesAndStories(t *testing.T) {
+	s, _ := vaultBindingServer(t)
+	mainNotes["docs/adr/13-root-connects-obsidian.feature"] = story
+
+	got, refused := askVault(t, s, "subdirs", sigil.Sent{"repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
+	require.Nil(t, refused, "%v", refused)
+	offered := got.(*protocol.VaultSubdirs)
+	assert.Equal(t, []string{"docs/adr/old"}, offered.GetDirs())
+	assert.Equal(t, []string{"docs/adr/13-root-connects-obsidian.feature", "docs/adr/ADR-001.md"}, offered.GetFiles(), "what is neither a note nor a story is not offered")
 }

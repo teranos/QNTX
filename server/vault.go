@@ -257,7 +257,7 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 				},
 				{
 					Name: "subdirs",
-					Does: "The folders directly inside one folder of a repository, on its default branch, asked as the App's installation where the repository is.",
+					Does: "The folders, notes and stories directly inside one folder of a repository, on its default branch, asked as the App's installation where the repository is: what a folder or a note of a vault can be bound to.",
 					Takes: []*protocol.Param{
 						{Name: "repo", Required: true, Says: "The repository, as owner/repo."},
 						{Name: "path", Says: "The folder, from the repository's top. Its top when not sent."},
