@@ -59,6 +59,12 @@ message RoomAgent {
   string harness = 2;
   // 「[Fable 5.1] What it is addressed by in a room, as the provider holds it.」
   string name = 3;
+  // The model it runs on, as the node runs it. Empty where the node runs no
+  // agent of that name.
+  string model = 4;
+  // The effort it runs at: claude's effort, pi's thinking. Empty where its
+  // harness has none.
+  string effort = 5;
 }
 
 // 「[Fable 5.1] RoomOf is what a room is of. It is core's record: core says it when a room」

@@ -67,7 +67,7 @@ func (s *QNTXServer) roomsSignum() sigil.Signum {
 				},
 				{
 					Name:   "wake",
-					Does:   "Wakes agents in a room with what is said to them, and answers whether each wake arrives.",
+					Does:   "Wakes agents in a room with what is said to them, and answers whether each wake arrives. A woken Node Agent runs a turn on the node, and its answer is posted into the room as it.",
 					Takes:  []*protocol.Param{room, provider, {Name: "agents", Required: true, Says: "The agents to wake, by the names the room holds them under, comma-separated."}, {Name: "says", Says: "What they are woken with."}, thread},
 					Answer: "protocol.WakeInRoomResponse",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: roomsPath + "/{room}/wake"},
@@ -158,6 +158,9 @@ func (s *QNTXServer) roomsList(ctx context.Context, sent sigil.Sent) (any, *prot
 		if err != nil {
 			return nil, roomsFailed(err)
 		}
+		for _, room := range answer.GetList() {
+			s.roomOfNode(room)
+		}
 		return answer, nil
 	}
 	holders, refused := s.roomsHolders()
@@ -172,6 +175,9 @@ func (s *QNTXServer) roomsList(ctx context.Context, sent sigil.Sent) (any, *prot
 		}
 		all.List = append(all.List, answer.GetList()...)
 	}
+	for _, room := range all.GetList() {
+		s.roomOfNode(room)
+	}
 	return all, nil
 }
 
@@ -183,6 +189,10 @@ func (s *QNTXServer) roomsGet(ctx context.Context, sent sigil.Sent) (any, *proto
 	answer, err := rooms.GetRoom(ctx, &protocol.GetRoomRequest{Provider: provider, By: roomsBy(ctx), Room: sent["room"]})
 	if err != nil {
 		return nil, roomsFailed(err)
+	}
+	s.roomOfNode(answer.GetRoom())
+	for _, agent := range answer.GetAgents() {
+		s.roomAgentAs(agent)
 	}
 	return answer, nil
 }
@@ -235,6 +245,12 @@ func (s *QNTXServer) roomsWake(ctx context.Context, sent sigil.Sent) (any, *prot
 	answer, err := rooms.WakeInRoom(ctx, &protocol.WakeInRoomRequest{Provider: provider, By: roomsBy(ctx), Room: sent["room"], Agents: agents, Says: sent["says"], Thread: sent["thread"]})
 	if err != nil {
 		return nil, roomsFailed(err)
+	}
+	// A woken Node Agent is woken on the node: its turn runs, and its answer
+	// is posted into the room.
+	s.wakeNodeAgents(ctx, provider, rooms, sent["room"], sent["thread"], sent["says"], answer)
+	for _, woken := range answer.GetWoken() {
+		s.roomAgentAs(woken.GetAgent())
 	}
 	return answer, nil
 }

@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/internal/nodedid"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 )
 
@@ -27,3 +29,29 @@ func TestNoPluginHoldingRoomsIsSaid(t *testing.T) {
 	}
 }
 
+
+// "i want all Node Agents to be in the Node Room"
+func TestTheNodeRoomIsOfThisNode(t *testing.T) {
+	s := &QNTXServer{nodeDID: &nodedid.Handler{DID: "did:key:z6Mknode"}}
+	node, other := &protocol.Room{Name: nodeRoomName}, &protocol.Room{Name: "pond"}
+	s.roomOfNode(node)
+	s.roomOfNode(other)
+	assert.Equal(t, "did:key:z6Mknode", node.GetOf().GetNode())
+	assert.Nil(t, other.GetOf())
+}
+
+// A woken Node Agent's answer is what its turn said, whichever harness ran it.
+func TestAWokenNodeAgentAnswersInItsHarnessWords(t *testing.T) {
+	assert.Equal(t, "here", saidText(&protocol.NodeAgentSaid{Claude: &protocol.ClaudeSaid{Answer: "here"}}))
+	assert.Equal(t, "too", saidText(&protocol.NodeAgentSaid{Pi: &protocol.PiSaid{Answer: "too"}}))
+	assert.Equal(t, "", saidText(&protocol.NodeAgentSaid{}))
+}
+
+// A room's agent that is no Node Agent is left as the provider holds it.
+func TestARoomAgentTheNodeDoesNotRunIsLeftAlone(t *testing.T) {
+	s := &QNTXServer{}
+	agent := &protocol.RoomAgent{Name: "claude", Harness: "switch"}
+	s.roomAgentAs(agent)
+	assert.Equal(t, "switch", agent.GetHarness())
+	assert.Empty(t, agent.GetModel())
+}
