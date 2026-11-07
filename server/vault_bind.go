@@ -227,10 +227,10 @@ func (s *QNTXServer) repoDirs(ctx context.Context, repo forge.Repo, branch, dir 
 	return dirs, nil
 }
 
-// "in reality its still one story"
+// "「[Opus 5.5] in reality its still one story」"
 
-// repoBindable is what directly inside dir of repo on branch can be bound:
-// its folders, and its notes and stories.
+// 「[Opus 5.5] repoBindable is what directly inside dir of repo on branch can be bound:」
+// 「[Opus 5.5] its folders, and its notes and stories.」
 func (s *QNTXServer) repoBindable(ctx context.Context, repo forge.Repo, branch, dir string) (dirs, files []string, err error) {
 	reader, err := s.forges().For(repo)
 	if err != nil {
