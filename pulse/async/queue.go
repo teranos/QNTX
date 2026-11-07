@@ -21,6 +21,46 @@ type Queue struct {
 	store       *Store
 	mu          sync.RWMutex
 	subscribers []chan *Job // Channels to notify of job updates
+	counted     heldCounts  // The last count by status, held for CountsHeldFor
+}
+
+// "it has to be a place where we do like a stupid query"
+
+// CountsHeldFor is how long one count by status answers for. The status
+// broadcaster asks twice a second when the queue is busy, the ticker and the
+// system metrics ask too, and each ask was a GROUP BY over every job the queue
+// ever ran: 162 slow ones an hour on q, 18.8 s the slowest. A badge five
+// seconds behind is a badge; the table walked every second is the outage.
+const CountsHeldFor = 5 * time.Second
+
+// heldCounts is a count by status and when it was taken.
+type heldCounts struct {
+	mu     sync.Mutex
+	at     time.Time
+	counts map[JobStatus]int
+}
+
+// countByStatus is the store's count, taken again once the held one is older
+// than CountsHeldFor or forgotten by a write.
+func (q *Queue) countByStatus() (map[JobStatus]int, error) {
+	q.counted.mu.Lock()
+	defer q.counted.mu.Unlock()
+	if q.counted.counts != nil && time.Since(q.counted.at) < CountsHeldFor {
+		return q.counted.counts, nil
+	}
+	counts, err := q.store.CountByStatus()
+	if err != nil {
+		return nil, err
+	}
+	q.counted.counts, q.counted.at = counts, time.Now()
+	return counts, nil
+}
+
+// forgetCounts drops the held count: a write changed what it says.
+func (q *Queue) forgetCounts() {
+	q.counted.mu.Lock()
+	q.counted.counts = nil
+	q.counted.mu.Unlock()
 }
 
 // NewQueue creates a new job queue
@@ -329,6 +369,7 @@ func (q *Queue) DeleteJobWithChildren(jobID string) error {
 	}
 
 	// Now delete the parent job from database
+	q.forgetCounts()
 	if err := q.store.DeleteJob(jobID); err != nil {
 		err = errors.Wrapf(err, "failed to delete parent job %s", jobID)
 		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
@@ -404,6 +445,7 @@ func (q *Queue) Unsubscribe(ch chan *Job) {
 // REQUIRES: q.mu must be held by caller (either Lock or RLock).
 // Uses non-blocking send to avoid stalling if a subscriber is slow.
 func (q *Queue) notifySubscribers(job *Job) {
+	q.forgetCounts()
 	for _, ch := range q.subscribers {
 		select {
 		case ch <- job:
@@ -427,6 +469,7 @@ func (q *Queue) Cleanup(ctx context.Context, olderThan time.Duration) (int, erro
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
+	q.forgetCounts()
 	return q.store.CleanupOldJobs(olderThan)
 }
 
@@ -445,7 +488,7 @@ func (q *Queue) GetStats() (*QueueStats, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
-	counts, err := q.store.CountByStatus()
+	counts, err := q.countByStatus()
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +512,7 @@ func (q *Queue) GetJobCounts() (queued int, running int, err error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
-	counts, err := q.store.CountByStatus()
+	counts, err := q.countByStatus()
 	if err != nil {
 		return 0, 0, err
 	}

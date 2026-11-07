@@ -54,6 +54,21 @@ type checkpointHandler struct {
 func (h *checkpointHandler) Name() string { return checkpointHandlerName }
 
 func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
+	return h.checkpoint()
+}
+
+// "it has to be a place where we do like a stupid query"
+
+// "pulse failing seems to be quite critical"
+
+// "pulse is too important"
+
+// checkpoint runs one checkpoint and says its numbers. On q the hourly job had
+// completed 18,650 times and said nothing, while system.db-wal stood at 1.4 GB
+// and a PASSIVE checkpoint run by hand copied all 340,107 of its pages in 31 s:
+// a success that is not seen is not one, so every run is logged with what it
+// measured, before and after.
+func (h *checkpointHandler) checkpoint() error {
 	checkpointer := h.server.walCheckpointer
 	if checkpointer == nil {
 		h.logger.Warnw("WAL checkpoint cannot run", "error", ErrNoCheckpointer)
@@ -63,7 +78,7 @@ func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 
 	before := walBytes(h.server.dbPath)
 	start := time.Now()
-	busy, _, _, err := checkpointer.WALCheckpoint(walTruncateAtBytes)
+	busy, walPages, checkpointed, err := checkpointer.WALCheckpoint(walTruncateAtBytes)
 	dur := time.Since(start)
 	if err != nil {
 		h.logger.Warnw("WAL checkpoint failed",
@@ -80,8 +95,75 @@ func (h *checkpointHandler) Execute(ctx context.Context, job *async.Job) error {
 			fmt.Sprintf("busy: %d, wal_bytes: %d, took_ms: %d", busy, before, dur.Milliseconds()))
 	}
 
-	// A checkpoint that worked is noise; only one that fails or is blocked is said.
+	h.logger.Infow("WAL checkpointed",
+		"wal_bytes_before", before, "wal_bytes_after", walBytes(h.server.dbPath),
+		"wal_pages", walPages, "checkpointed_pages", checkpointed, "took_ms", dur.Milliseconds())
 	return nil
+}
+
+// "we also need to fix the actual issue, why is pulse failing in the first place"
+
+// checkpointEvery is how often the node checkpoints on its own, apart from the
+// queue; checkpointFirstAfter is how soon after boot the first one runs.
+const (
+	checkpointFirstAfter = time.Minute
+	checkpointEvery      = 10 * time.Minute
+)
+
+// jobsKeptFor is how long a completed or failed job stays in async_ix_jobs. A
+// job's run is a span on its trace, exported to Sentry; the row is the queue's
+// own memory of it. On q nothing removed one since 2026-08-03: 210,190 completed
+// rows, 1.5 GB, and every status count walked them.
+const jobsKeptFor = 7 * 24 * time.Hour
+
+// jobsCleanedEvery is how often completed and failed jobs past jobsKeptFor go.
+const jobsCleanedEvery = time.Hour
+
+// keepCheckpointing checkpoints on the node's own clock. The schedule job stays
+// for the Pulse element to show; this runs whether or not the queue gets to it.
+func (s *QNTXServer) keepCheckpointing(handler *checkpointHandler) {
+	s.wg.Go("wal.checkpoint", func() {
+		next := time.NewTimer(checkpointFirstAfter)
+		defer next.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-next.C:
+				// What went wrong is in the log; the next tick is the retry.
+				_ = handler.checkpoint()
+				next.Reset(checkpointEvery)
+			}
+		}
+	})
+}
+
+// keepCleaningJobs removes completed and failed jobs older than jobsKeptFor,
+// on the node's own clock.
+func (s *QNTXServer) keepCleaningJobs() {
+	if s.daemon == nil {
+		return
+	}
+	log := s.logger.Named("jobs")
+	s.wg.Go("jobs.cleanup", func() {
+		ticker := time.NewTicker(jobsCleanedEvery)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-ticker.C:
+				removed, err := s.daemon.GetQueue().Cleanup(s.ctx, jobsKeptFor)
+				if err != nil {
+					log.Errorw("Old jobs were not removed", "kept_for", jobsKeptFor.String(), "error", err)
+					continue
+				}
+				if removed > 0 {
+					log.Infow("Old jobs removed", "removed", removed, "kept_for", jobsKeptFor.String())
+				}
+			}
+		}
+	})
 }
 
 // walBytes is the size of the WAL beside dbPath, and -1 when that cannot be
@@ -107,6 +189,8 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 	registry.Register(handler)
 
 	s.ensureCheckpointSchedule(s.held.ServedUniverse().Schedules())
+	s.keepCheckpointing(handler)
+	s.keepCleaningJobs()
 }
 
 // ensureCheckpointSchedule creates the checkpoint job, or moves the one this

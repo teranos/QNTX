@@ -1041,3 +1041,50 @@ func TestVacanciesScraperChildJobsContinue(t *testing.T) {
 	t.Log("  'The parent completes, but the children must continue' - the vacancies workflow lives!")
 	t.Log("  Genesis 8:17 - 'Bring out with you every living thing... that they may multiply on the earth.'")
 }
+
+// "it has to be a place where we do like a stupid query"
+//
+// One count by status answers every ask within CountsHeldFor; a write forgets it.
+func TestOneCountAnswersEveryAskUntilAWrite(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	queue := NewQueue(db)
+
+	first := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+		ID: "JOB_COUNTED_001", HandlerName: "test.count", Source: "a", Status: JobStatusQueued, CreatedAt: time.Now()}
+	if err := queue.Enqueue(first); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	stats, err := queue.GetStats()
+	if err != nil {
+		t.Fatalf("GetStats: %v", err)
+	}
+	if stats.Queued != 1 {
+		t.Fatalf("queued = %d, want 1", stats.Queued)
+	}
+	takenAt := queue.counted.at
+
+	queued, running, err := queue.GetJobCounts()
+	if err != nil {
+		t.Fatalf("GetJobCounts: %v", err)
+	}
+	if queued != 1 || running != 0 {
+		t.Fatalf("counts = %d queued, %d running, want 1, 0", queued, running)
+	}
+	if !queue.counted.at.Equal(takenAt) {
+		t.Fatal("the second ask within CountsHeldFor took a new count")
+	}
+
+	second := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+		ID: "JOB_COUNTED_002", HandlerName: "test.count", Source: "b", Status: JobStatusQueued, CreatedAt: time.Now()}
+	if err := queue.Enqueue(second); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	stats, err = queue.GetStats()
+	if err != nil {
+		t.Fatalf("GetStats after a write: %v", err)
+	}
+	if stats.Queued != 2 {
+		t.Fatalf("queued after a write = %d, want 2: the write did not forget the held count", stats.Queued)
+	}
+}
