@@ -372,16 +372,37 @@ func (s *Store) FailedHandlersSince(since time.Time, limit int) (_ []HandlerFail
 }
 
 // CleanupOldJobs removes completed/failed jobs older than the specified duration
-func (s *Store) CleanupOldJobs(olderThan time.Duration) (int, error) {
+func (s *Store) CleanupOldJobs(olderThan time.Duration, atMost int, keep ...string) (int, error) {
 	cutoff := time.Now().Add(-olderThan)
 
+	// A pass takes at most atMost rows, so the write lock is held for one batch
+	// and not for a quarter year of history at once. A handler named in keep is
+	// never removed: a forward's completed row is what refuses the delivery's
+	// redelivery, and its failed row is what the sweep queues again. A parent
+	// whose child is still queued, running or paused stays: the worker cancels
+	// a child whose parent is gone.
+	args := make([]any, 0, len(keep)+2)
+	args = append(args, cutoff)
+	holders := ""
+	for _, name := range keep {
+		holders += " AND j.handler_name != ?"
+		args = append(args, name)
+	}
+	args = append(args, atMost)
 	query := `
 		DELETE FROM async_ix_jobs
-		WHERE status IN ('completed', 'failed')
-		  AND updated_at < ?
+		WHERE id IN (
+			SELECT j.id FROM async_ix_jobs j
+			WHERE j.status IN ('completed', 'failed')
+			  AND j.updated_at < ?` + holders + `
+			  AND NOT EXISTS (
+				SELECT 1 FROM async_ix_jobs c
+				WHERE c.parent_job_id = j.id AND c.status IN ('queued', 'running', 'paused'))
+			LIMIT ?
+		)
 	`
 
-	result, err := s.db.Exec(query, cutoff)
+	result, err := s.db.Exec(query, args...)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to cleanup old jobs")
 	}
