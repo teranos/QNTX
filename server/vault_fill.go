@@ -40,8 +40,8 @@ const noteSuffix = ".md"
 
 // "i see, but i want those .feature files to be authored in Obsidian"
 
-// storySuffix is what a story of a repository's folder ends with. In the vault
-// a story is a note, named as the story with noteSuffix after it.
+// 「[Opus 5.5] storySuffix is what a story of a repository's folder ends with. In the vault」
+// 「[Opus 5.5] a story is a note, named as the story with noteSuffix after it.」
 const storySuffix = ".feature"
 
 // noteFile says whether a file of the repository is one note in the vault:
@@ -56,7 +56,7 @@ func noteBound(repoPath, place string) bool {
 	return strings.HasSuffix(repoPath, noteSuffix) || (strings.HasSuffix(repoPath, storySuffix) && strings.HasSuffix(place, noteSuffix))
 }
 
-// placedName is what a file of the repository is named in the vault.
+// 「[Opus 5.5] placedName is what a file of the repository is named in the vault.」
 func placedName(name string) string {
 	if strings.HasSuffix(name, storySuffix) {
 		return name + noteSuffix
@@ -64,8 +64,8 @@ func placedName(name string) string {
 	return name
 }
 
-// repoName is what a note of the vault is named in the repository: a story's
-// note is the story.
+// 「[Opus 5.5] repoName is what a note of the vault is named in the repository: a story's」
+// 「[Opus 5.5] note is the story.」
 func repoName(name string) string {
 	if story, ok := strings.CutSuffix(name, noteSuffix); ok && strings.HasSuffix(story, storySuffix) {
 		return story
@@ -112,7 +112,7 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 			continue
 		}
 		under := placedName(strings.TrimPrefix(entry.Path, folder+"/"))
-		// A story and a note named as its note would be one note in the vault.
+		// 「[Opus 5.5] A story and a note named as its note would be one note in the vault.」
 		if other, taken := placed[under]; taken {
 			return nil, errors.Newf("%s and %s of %s on %s are both %s in the vault", other, entry.Path, repo, branch, under)
 		}
