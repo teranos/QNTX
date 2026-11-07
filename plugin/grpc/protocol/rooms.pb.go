@@ -345,8 +345,8 @@ type Room struct {
 	// "there is always 1 Agent assigned to doing those PR deploy's"
 	Instructions string  `protobuf:"bytes,5,opt,name=instructions,proto3" json:"instructions,omitempty"`
 	Of           *RoomOf `protobuf:"bytes,6,opt,name=of,proto3" json:"of,omitempty"`
-	// What the room is connected to beyond its provider, as the provider names
-	// it: a Telegram group, say. Empty is nothing.
+	// 「[Opus 5.5] What the room is connected to beyond its provider, as the provider names」
+	// 「[Opus 5.5] it: a Telegram group, say. Empty is nothing.」
 	Connected     string `protobuf:"bytes,7,opt,name=connected,proto3" json:"connected,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -732,7 +732,7 @@ func (x *ListRoomsRequest) GetBy() *RoomAgent {
 
 type ListRoomsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Each room the provider holds that the asker may see.
+	// 「[Opus 5.5] Each room the provider holds that the asker may see.」
 	List          []*Room `protobuf:"bytes,1,rep,name=list,proto3" json:"list,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -838,7 +838,7 @@ func (x *GetRoomRequest) GetRoom() string {
 
 type GetRoomResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The room.
+	// 「[Opus 5.5] The room.」
 	Room *Room `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
 	// 「[Fable 5.1] The agents in it.」
 	// 「[Fable 5.1] Unbacked by Telegram for a bot, which is told a chat's administrators and」
@@ -1610,7 +1610,7 @@ type ReadRoomResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 「[Fable 5.1] Oldest first.」
 	Messages []*RoomMessage `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
-	// Who arrived in the room over the same stretch, oldest first.
+	// 「[Opus 5.5] Who arrived in the room over the same stretch, oldest first.」
 	Joined []*RoomJoined `protobuf:"bytes,2,rep,name=joined,proto3" json:"joined,omitempty"`
 	// 「[Fable 5.1] Older than this was not answered: the board read is not the whole board.」
 	Truncated     bool `protobuf:"varint,3,opt,name=truncated,proto3" json:"truncated,omitempty"`
