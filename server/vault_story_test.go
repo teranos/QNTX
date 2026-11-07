@@ -98,8 +98,8 @@ func TestOneStoryIsBoundAsANote(t *testing.T) {
 // A folder may be named as a story is, and is bound as a folder.
 func TestAFolderNamedAsAStoryIsBoundAsAFolder(t *testing.T) {
 	s, vault := vaultBindingServer(t)
-	mainNotes["docs/stories.feature/13-user-connects-obsidian.feature"] = story
-	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/stories.feature"})
+	mainNotes["docs/adr/stories.feature/13-user-connects-obsidian.feature"] = story
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr/stories.feature"})
 	require.Nil(t, refused, "%v", refused)
 
 	assert.Equal(t, story, readNote(t, vault, "Course Material/13-user-connects-obsidian.feature.md"))
