@@ -62,6 +62,24 @@ func (h *harnessHeld) Now() (path string, arrived bool, err error) {
 	}
 }
 
+// 「[Opus 5.5] claudeCode is the Claude Code this node holds, fetched the first
+// time it is needed: at start when am.toml names the Node Agent in it, or when
+// a namespace's agent in Claude Code is first asked for. Holding it names
+// nobody in Claude Code.」
+func (s *QNTXServer) claudeCode() (*harnessHeld, error) {
+	return s.holdHarnessOnce("claude", func() (*harnessHeld, error) {
+		pin, err := claudecode.Pinned()
+		if err != nil {
+			return nil, errors.Wrap(err, "the Claude Code this build pins did not read")
+		}
+		dir, err := claudeCodeDir()
+		if err != nil {
+			return nil, err
+		}
+		return holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger), nil
+	})
+}
+
 // holdClaudeCode fetches what pin names into dir, off the boot's own time: the
 // binary is hundreds of megabytes and the node serves while it arrives.
 func holdClaudeCode(ctx context.Context, pin claudecode.Pin, dir string, spawn func(string, func()), logger *zap.SugaredLogger) *harnessHeld {
@@ -114,11 +132,9 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 		return err
 	}
 	if root.Claude.Named() {
-		pin, err := claudecode.Pinned()
-		if err != nil {
-			return errors.Wrap(err, "the Claude Code this build pins did not read")
+		if _, err := s.claudeCode(); err != nil {
+			return err
 		}
-		s.holdHarness("claude", holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger))
 	}
 	if s.deps.cfg.Agent.Root.Codex.Named() {
 		s.holdHarness("codex", holdCodex(s.ctx, filepath.Join(filepath.Dir(dir), "codex"), s.wg.Go, s.logger))

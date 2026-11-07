@@ -126,6 +126,9 @@ type CodexConfig struct {
 	Sandbox string `mapstructure:"sandbox"`
 }
 
+// 「[Opus 5.5] CodexSandboxes is each sandbox codex runs in, as codex names them.」
+var CodexSandboxes = []string{"read-only", "workspace-write"}
+
 // Named reports whether am.toml names codex for the Node Agent.
 func (c CodexConfig) Named() bool {
 	return c.Model != "" || c.Gateway != ""

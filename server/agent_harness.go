@@ -247,6 +247,26 @@ func (s *QNTXServer) harnessHeldBy(name string) *harnessHeld {
 	return s.harnessBinaries.held[name]
 }
 
+// 「[Opus 5.5] holdHarnessOnce is the binary of the harness named, kept by
+// fetch the first time it is needed when the node holds none: asked twice at
+// once, it is fetched once.」
+func (s *QNTXServer) holdHarnessOnce(name string, fetch func() (*harnessHeld, error)) (*harnessHeld, error) {
+	s.harnessBinaries.mu.Lock()
+	defer s.harnessBinaries.mu.Unlock()
+	if held := s.harnessBinaries.held[name]; held != nil {
+		return held, nil
+	}
+	held, err := fetch()
+	if err != nil {
+		return nil, err
+	}
+	if s.harnessBinaries.held == nil {
+		s.harnessBinaries.held = map[string]*harnessHeld{}
+	}
+	s.harnessBinaries.held[name] = held
+	return held, nil
+}
+
 // holdHarness keeps the binary of the harness named.
 func (s *QNTXServer) holdHarness(name string, held *harnessHeld) {
 	s.harnessBinaries.mu.Lock()

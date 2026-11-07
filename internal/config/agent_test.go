@@ -293,3 +293,31 @@ effort = "low"
 		t.Errorf("Validate = %v, want it to name agent.root.model and say where Claude Code is named", err)
 	}
 }
+
+// "Incomplete Codex settings start the node" — "Yes"
+//
+// 「[Opus 5.5] Codex named by half, or in a sandbox codex has not, is refused at
+// load, as codex itself would refuse it at the first turn.」
+func TestNodeAgentCodexNamedByHalfIsRefused(t *testing.T) {
+	for want, body := range map[string]string{
+		"both or neither":           "[agent.root.codex]\ngateway = \"g\"\nsandbox = \"read-only\"\n",
+		"agent.root.codex.sandbox":  "[agent.root.codex]\nmodel = \"m\"\ngateway = \"g\"\n",
+		"agent.root.codex.sandbox ": "[agent.root.codex]\nmodel = \"m\"\ngateway = \"g\"\nsandbox = \"everything\"\n",
+		"agent.root.codex.token":    "[agent.root.codex]\nmodel = \"m\"\ngateway = \"g\"\nsandbox = \"read-only\"\ntoken = \"a-literal\"\n",
+	} {
+		cfg, err := LoadFromFile(writeConfig(t, body))
+		if err != nil {
+			t.Fatalf("LoadFromFile = %v", err)
+		}
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), strings.TrimSpace(want)) {
+			t.Errorf("Validate = %v, want it to say %s", err, want)
+		}
+	}
+	cfg, err := LoadFromFile(writeConfig(t, "[agent.root.codex]\nmodel = \"m\"\ngateway = \"g\"\nsandbox = \"workspace-write\"\n"))
+	if err != nil {
+		t.Fatalf("LoadFromFile = %v", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate = %v, want codex named whole to hold", err)
+	}
+}

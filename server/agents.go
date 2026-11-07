@@ -269,8 +269,9 @@ func (s *QNTXServer) namespaceAgent(ctx context.Context, sent sigil.Sent) (anAge
 	if !set {
 		return anAgentHeld{}, &protocol.Refusal{Why: sigil.NotFound, Says: namespace + " opted into no agent: set one with agents set"}
 	}
-	if s.harnessHeldBy("claude") == nil {
-		return anAgentHeld{}, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Claude Code to run the agent of " + namespace + " in: am.toml names no [agent.root.claude], which is what fetches it"}
+	// "Arrange for Claude Code to be held when a namespace Claude agent needs it" — "Yes"
+	if _, err := s.claudeCode(); err != nil {
+		return anAgentHeld{}, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Claude Code to run the agent of " + namespace + " in: " + err.Error()}
 	}
 	agent, refused := s.holdNamespaceAgent(namespace, line.spec.Model, line.setBy)
 	return anAgentHeld{agent: agent, line: line}, refused
@@ -444,7 +445,7 @@ func (s *QNTXServer) agentsSignum() sigil.Signum {
 						&protocol.Param{Name: "effort", Says: "In Claude Code, the effort it runs at: low, medium, high, xhigh or max."},
 						&protocol.Param{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs in when whoever speaks names none."},
 						&protocol.Param{Name: "allow", Says: "In Claude Code, the tools it may use without being asked, by Claude Code's own names, comma-separated."},
-						&protocol.Param{Name: "sandbox", OneOf: []string{"read-only", "workspace-write"}, Says: "In Codex, the explicitly selected sandbox."},
+						&protocol.Param{Name: "sandbox", OneOf: appcfg.CodexSandboxes, Says: "In Codex, the explicitly selected sandbox."},
 						&protocol.Param{Name: "thinking", OneOf: appcfg.ThinkingLevels, Says: "In Pi, the thinking level it runs at."},
 						&protocol.Param{Name: "provider", OneOf: piProviderNames(), Says: "In Pi, the provider its model calls are made at, on the namespace's key of that name (keys set)."},
 					),

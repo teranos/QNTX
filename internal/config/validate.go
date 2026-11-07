@@ -103,6 +103,21 @@ func (c *Config) Validate() error {
 			return errors.Newf("agent.root.pi.thinking must be one of [%s], got %q", strings.Join(ThinkingLevels, ", "), pi.Thinking)
 		}
 	}
+	// "Incomplete Codex settings start the node" — "Yes"
+	// 「[Opus 5.5] Codex named by half is refused here, as codex itself refuses
+	// it at the first turn: a model, the gateway its calls go through, and one
+	// of its two sandboxes.」
+	if codex := root.Codex; codex.Named() {
+		if codex.Model == "" || codex.Gateway == "" {
+			return errors.New("agent.root.codex names a model and the gateway its calls go through, both or neither")
+		}
+		if !slices.Contains(CodexSandboxes, codex.Sandbox) {
+			return errors.Newf("agent.root.codex.sandbox must be one of [%s], got %q", strings.Join(CodexSandboxes, ", "), codex.Sandbox)
+		}
+		if err := secretref.Validate(codex.TokenRef); err != nil {
+			return errors.Wrap(err, "agent.root.codex.token is invalid")
+		}
+	}
 
 	// Plugin access tokens are references, never secrets. am.toml ships as a
 	// world-readable SSM String parameter, so a literal here is already leaked.
