@@ -93,10 +93,11 @@ func TestYugiDequeuesJob(t *testing.T) {
 	t.Log("  'It's time to duel!' *drew card job successfully*")
 }
 
-// TestTASBotJobPriority tests that TAS Bot's high-priority jobs are dequeued first
+// TestTASBotJobPriority tests that the job that waited longest is dequeued first.
+// There is no priority on a job; what TAS Bot enqueued first, Yugi draws first.
 func TestTASBotJobPriority(t *testing.T) {
-	t.Log("🎮 TAS Bot tests job priority ordering...")
-	t.Log("   'High-priority jobs must execute first for optimal speedrun'")
+	t.Log("🎮 TAS Bot tests job ordering...")
+	t.Log("   'The job that waited longest executes first'")
 
 	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
@@ -125,17 +126,17 @@ func TestTASBotJobPriority(t *testing.T) {
 	}
 	queue.Enqueue(highPriorityJob)
 
-	// Yugi dequeues - should get high-priority job first
+	// Yugi dequeues - the job enqueued first has waited longest and comes first
 	firstJob, err := queue.Dequeue()
 	if err != nil {
 		t.Fatalf("Failed to dequeue first job: %v", err)
 	}
 
-	if firstJob.ID != "JOB_HIGH_PRIORITY" {
-		t.Errorf("TAS Bot expected high-priority job first, got %s", firstJob.ID)
+	if firstJob.ID != "JOB_LOW_PRIORITY" {
+		t.Errorf("TAS Bot expected the job enqueued first to be dequeued first, got %s", firstJob.ID)
 	}
 
-	t.Log("✓ TAS Bot confirmed high-priority job dequeued first")
+	t.Log("✓ TAS Bot confirmed the job that waited longest was dequeued first")
 	t.Log("  'Optimal speedrun route achieved'")
 }
 
@@ -367,8 +368,7 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
-	// TAS Bot enqueues multiple jobs in sequence
-	// NOTE: Currently the queue is LIFO (Last-In-First-Out) due to DESC ordering
+	// TAS Bot enqueues multiple jobs in sequence; Yugi draws them in that order.
 	jobs := []Job{
 		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CreatedAt: time.Now()},
 		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CreatedAt: time.Now().Add(time.Millisecond)},
@@ -384,7 +384,7 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 		time.Sleep(5 * time.Millisecond) // Ensure distinct timestamps
 	}
 
-	// Yugi processes jobs in LIFO order (newest first due to DESC ordering in store)
+	// Yugi processes jobs in the order they were enqueued: the one that waited longest first
 	processedOrder := []string{}
 	for i := 0; i < 3; i++ {
 		job, err := queue.Dequeue()
@@ -398,16 +398,16 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 		t.Logf("  Yugi: Processed %s", job.ID)
 	}
 
-	// Verify LIFO ordering (last job enqueued is first dequeued)
-	expectedOrder := []string{"JOB_INT_003", "JOB_INT_002", "JOB_INT_001"}
+	// Verify the order: first enqueued is first dequeued
+	expectedOrder := []string{"JOB_INT_001", "JOB_INT_002", "JOB_INT_003"}
 	for i, expected := range expectedOrder {
 		if processedOrder[i] != expected {
 			t.Errorf("Job %d: expected %s, got %s", i, expected, processedOrder[i])
 		}
 	}
 
-	t.Log("✓ Integration test complete: jobs processed in LIFO order")
-	t.Log("  TAS Bot: 'Frame-perfect LIFO ordering confirmed!'")
+	t.Log("✓ Integration test complete: jobs processed in the order enqueued")
+	t.Log("  TAS Bot: 'Frame-perfect ordering confirmed!'")
 	t.Log("  Yugi: 'It's time to duel!' *perfect card draw sequence*")
 }
 
