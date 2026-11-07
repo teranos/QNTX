@@ -157,3 +157,33 @@ func TestAnAgentCardTheNodeCannotSignIsRefused(t *testing.T) {
 	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, agentCardPath, nil))
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
+
+// The card says how it is cached: a short max-age, as health is on it, and a
+// strong ETag a client sends back to be told it holds the card it would get.
+func TestTheAgentCardSaysHowItIsCached(t *testing.T) {
+	namedNode(t)
+	srv, _ := pluginServingServer(t, "fake")
+	keyedNode(srv)
+
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, agentCardPath, nil))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "public, max-age=60", w.Header().Get("Cache-Control"))
+	etag := w.Header().Get("ETag")
+	require.NotEmpty(t, etag)
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+	again := httptest.NewRequest(http.MethodGet, agentCardPath, nil)
+	again.Header.Set("If-None-Match", etag)
+	w = httptest.NewRecorder()
+	srv.served.ServeHTTP(w, again)
+	assert.Equal(t, http.StatusNotModified, w.Code)
+	assert.Empty(t, w.Body.String())
+
+	stale := httptest.NewRequest(http.MethodGet, agentCardPath, nil)
+	stale.Header.Set("If-None-Match", `"not-this-card"`)
+	w = httptest.NewRecorder()
+	srv.served.ServeHTTP(w, stale)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotEmpty(t, w.Body.String())
+}

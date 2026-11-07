@@ -58,8 +58,11 @@ func (s *QNTXServer) nodeAgentRuns(harness string) (model, effort string) {
 
 // roomAgentAs fills in a room's agent that is the Node Agent: its DID, its
 // harness, and the model and effort it runs at, so one read of the room says
-// what each agent is.
+// what each agent is. One the provider holds under another DID is not it.
 func (s *QNTXServer) roomAgentAs(agent *protocol.RoomAgent) {
+	if s.nodeAgent == nil || (agent.GetDid() != "" && agent.GetDid() != s.nodeAgent.did) {
+		return
+	}
 	h, is := s.nodeAgentIn(agent.GetName())
 	if !is {
 		return
@@ -84,24 +87,43 @@ func saidText(said *protocol.NodeAgentSaid) string {
 	return ""
 }
 
-// wakeNodeAgents runs a turn of each woken agent that is the Node Agent, as the
-// waker asked it, and posts its answer into the room as that agent. A turn
-// takes as long as it takes, so each runs on the node's own lifetime and the
-// wake answers at once; the answer arrives in the room.
+// nodeAgentsInNodeRoom is each agent of room that is the Node Agent, when room
+// is the Node Room: a namesake elsewhere, or a harness the room does not hold,
+// is no Node Agent of it.
+func (s *QNTXServer) nodeAgentsInNodeRoom(ctx context.Context, provider string, rooms protocol.RoomsServiceClient, room string) map[string]bool {
+	got, err := rooms.GetRoom(ctx, &protocol.GetRoomRequest{Provider: provider, By: roomsBy(ctx), Room: room})
+	if err != nil || got.GetRoom().GetName() != nodeRoomName {
+		return nil
+	}
+	in := map[string]bool{}
+	for _, agent := range got.GetAgents() {
+		if _, is := s.nodeAgentIn(agent.GetName()); is {
+			in[agent.GetName()] = true
+		}
+	}
+	return in
+}
+
+// wakeNodeAgents runs a turn of each woken agent that is the Node Agent in the
+// Node Room, as the waker asked it, and posts its answer into the room as that
+// agent. A wake the provider declined runs nothing. A turn takes as long as it
+// takes, so each runs on the node's own lifetime and the wake answers at once;
+// the answer arrives in the room.
 func (s *QNTXServer) wakeNodeAgents(ctx context.Context, provider string, rooms protocol.RoomsServiceClient, room, thread, says string, answer *protocol.WakeInRoomResponse) {
 	caller := sigil.Caller(ctx)
 	if caller == nil {
 		return
 	}
+	inRoom := s.nodeAgentsInNodeRoom(ctx, provider, rooms, room)
 	waker := "a person at ROOT"
 	if by := roomsBy(ctx); by != nil && by.GetName() != "" {
 		waker = by.GetName()
 	}
 	for _, woken := range answer.GetWoken() {
-		h, is := s.nodeAgentIn(woken.GetAgent().GetName())
-		if !is {
+		if !inRoom[woken.GetAgent().GetName()] || woken.GetReach() == protocol.RoomReach_ROOM_REACH_DECLINED {
 			continue
 		}
+		h, _ := s.nodeAgentIn(woken.GetAgent().GetName())
 		woken.Reach = protocol.RoomReach_ROOM_REACH_ARRIVES
 		name := h.name
 		turn := "In the " + nodeRoomName + ", " + waker + " woke you (" + name + ") with:\n\n" + says +
@@ -119,14 +141,16 @@ func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms p
 	said, refused := s.nodeAgentSay(sigil.WithCaller(lifetime, caller), sigil.Sent{"harness": harness, "says": turn})
 	body := ""
 	if refused != nil {
-		body = harness + " was woken and did not answer: " + refused.GetSays()
+		// What refused stays in the node's log; the room is told only that it did.
+		s.logger.Warnw("A woken Node Agent did not answer", "harness", harness, "room", room, "refused", refused.GetSays())
+		body = harness + " was woken and did not answer"
 	} else if answered, ok := said.(*protocol.NodeAgentSaid); ok {
 		body = strings.TrimSpace(saidText(answered))
 	}
 	if body == "" {
 		body = harness + " was woken and answered nothing"
 	}
-	if _, err := rooms.PostToRoom(lifetime, &protocol.PostToRoomRequest{Provider: provider, By: &protocol.RoomAgent{Name: harness}, Room: room, Body: body, Thread: thread}); err != nil {
+	if _, err := rooms.PostToRoom(lifetime, &protocol.PostToRoomRequest{Provider: provider, By: &protocol.RoomAgent{Did: s.nodeAgent.did, Harness: harness, Name: harness}, Room: room, Body: body, Thread: thread}); err != nil {
 		s.logger.Errorw("A woken Node Agent's answer was not posted into its room", "harness", harness, "room", room, "error", err)
 	}
 }

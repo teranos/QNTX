@@ -41,6 +41,11 @@
         "ANYONE"
       ]
     },
+    "/a2a": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/a2a/": {
       "x-qntx-reach": [
         "ROOT"
@@ -967,7 +972,12 @@
     },
     "/g/": {
       "x-qntx-reach": [
-        "ANYONE"
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION",
+        "USER"
       ],
       "x-qntx-prefix": true
     },
