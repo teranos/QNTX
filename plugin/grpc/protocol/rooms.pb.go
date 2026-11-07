@@ -1048,7 +1048,7 @@ type RoomMessage struct {
 	Thread string `protobuf:"bytes,7,opt,name=thread,proto3" json:"thread,omitempty"`
 	// 「[Fable 5.1] When it was said, RFC3339.」
 	At string `protobuf:"bytes,8,opt,name=at,proto3" json:"at,omitempty"`
-	// What was sent with it: an image, a file.
+	// 「[Opus 5.5] What was sent with it: an image, a file.」
 	Attachments   []*RoomAttachment `protobuf:"bytes,9,rep,name=attachments,proto3" json:"attachments,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1147,13 +1147,13 @@ func (x *RoomMessage) GetAttachments() []*RoomAttachment {
 	return nil
 }
 
-// RoomAttachment is a file said in a room, read back where the node serves it.
+// 「[Opus 5.5] RoomAttachment is a file said in a room, read back where the node serves it.」
 type RoomAttachment struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Its media type, as image/png.
+	// 「[Opus 5.5] Its media type, as image/png.」
 	Type string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	// Where the node serves its bytes, as the provider names it.
+	// 「[Opus 5.5] Where the node serves its bytes, as the provider names it.」
 	Url           string `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1184,7 +1184,7 @@ func (x *RoomAttachment) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RoomAttachment.ProtoReflect.Descriptor instead.
+// 「[Opus 5.5] Deprecated: Use RoomAttachment.ProtoReflect.Descriptor instead.」
 func (*RoomAttachment) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{15}
 }
@@ -1210,11 +1210,11 @@ func (x *RoomAttachment) GetUrl() string {
 	return ""
 }
 
-// RoomFile is a file posted into a room, whole.
+// 「[Opus 5.5] RoomFile is a file posted into a room, whole.」
 type RoomFile struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Its media type, as image/png.
+	// 「[Opus 5.5] Its media type, as image/png.」
 	Type          string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	Data          []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1246,7 +1246,7 @@ func (x *RoomFile) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RoomFile.ProtoReflect.Descriptor instead.
+// 「[Opus 5.5] Deprecated: Use RoomFile.ProtoReflect.Descriptor instead.」
 func (*RoomFile) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{16}
 }
@@ -1361,7 +1361,7 @@ type PostToRoomRequest struct {
 	Body string     `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
 	// 「[Fable 5.1] The message it is said under, or empty for the top of the room.」
 	Thread string `protobuf:"bytes,5,opt,name=thread,proto3" json:"thread,omitempty"`
-	// What is sent with it, the body its caption.
+	// 「[Opus 5.5] What is sent with it, the body its caption.」
 	Files         []*RoomFile `protobuf:"bytes,6,rep,name=files,proto3" json:"files,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
