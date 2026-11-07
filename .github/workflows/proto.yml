@@ -39,7 +39,7 @@
         },
         {
           "name": "make proto, make says",
-          "run": "make proto\nmake says\n"
+          "run": "# make proto writes the TypeScript too, into a QNTX-Web beside this checkout.\ngit clone --depth 1 https://github.com/teranos/QNTX-Web.git ../QNTX-Web\nmake proto\nmake says\n"
         },
         {
           "name": "Commit what changed to the branch",
