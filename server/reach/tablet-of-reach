@@ -109,9 +109,12 @@ REACH is '/setup' '/setup/claim'                                          of ANY
 # A staand is a market's public receive point (ADR-035).
 REACH is '/s/'                                                            of ANYONE
 
-# An element module is UI, and a page importing it carries no session. Every
-# call the module goes on to make is gated on its own line above.
-REACH is '/g/'                                                            of ANYONE
+# An element module is served from the reader's own namespace store (ADR-026),
+# so the reader is admitted: a page's import is same-origin and carries its
+# session; a token carries itself. A stranger stands in no namespace and is
+# published nothing. Every call the module goes on to make is gated on its own
+# line above.
+REACH is '/g/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 
 # Tokens (ADR-025) and Users (ADR-031). A write on either is a session's
 # alone, gated by the handler and not by this line.
