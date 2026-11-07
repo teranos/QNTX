@@ -464,13 +464,16 @@ func (q *Queue) ListTasksByParent(parentJobID string) ([]*Job, error) {
 	return q.store.ListTasksByParent(parentJobID)
 }
 
-// Cleanup removes old completed/failed jobs
-func (q *Queue) Cleanup(ctx context.Context, olderThan time.Duration) (int, error) {
+// Cleanup removes at most atMost completed or failed jobs older than olderThan,
+// none of a handler named in keep and no parent with a child still to run; it
+// says how many went. A caller removing more calls again; between calls the
+// locks are free.
+func (q *Queue) Cleanup(ctx context.Context, olderThan time.Duration, atMost int, keep ...string) (int, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	q.forgetCounts()
-	return q.store.CleanupOldJobs(olderThan)
+	return q.store.CleanupOldJobs(olderThan, atMost, keep...)
 }
 
 // QueueStats returns statistics about the queue
