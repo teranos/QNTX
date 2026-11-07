@@ -41,6 +41,11 @@
         "ANYONE"
       ]
     },
+    "/a2a": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/a2a/": {
       "x-qntx-reach": [
         "ROOT"

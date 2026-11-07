@@ -52,6 +52,150 @@ func (a *anotherAgent) executor() a2asrv.AgentExecutor {
 	})
 }
 
+// streamingAgentAt serves, on a card that says it streams, an agent whose turn
+// moves: working, a chunk of what it says once let go, then completed.
+func streamingAgentAt(t *testing.T, letGo <-chan struct{}) *httptest.Server {
+	t.Helper()
+	moving := a2asrv.AgentExecutorFunc(func(_ context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
+		return func(yield func(a2asdk.Event, error) bool) {
+			if ec.StoredTask == nil && !yield(a2asdk.NewSubmittedTask(ec, ec.Message), nil) {
+				return
+			}
+			if !yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateWorking, nil), nil) {
+				return
+			}
+			if letGo != nil {
+				<-letGo
+			}
+			if !yield(a2asdk.NewArtifactEvent(ec, a2asdk.NewTextPart("the apples are in")), nil) {
+				return
+			}
+			yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateCompleted, nil), nil)
+		}
+	})
+	rest := a2asrv.NewRESTHandler(a2asrv.NewHandler(moving))
+	var served *httptest.Server
+	served = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/.well-known/agent-card.json" {
+			a2asrv.NewStaticAgentCardHandler(&a2asdk.AgentCard{
+				Name: "the orchard keeper", Description: "Keeps the orchard.", Version: "1.0.0",
+				SupportedInterfaces: []*a2asdk.AgentInterface{a2asdk.NewAgentInterface(served.URL+"/a2a", a2asdk.TransportProtocolHTTPJSON)},
+				Capabilities:        a2asdk.AgentCapabilities{Streaming: true},
+				DefaultInputModes:   []string{"text/plain"}, DefaultOutputModes: []string{"text/plain"},
+				Skills: []a2asdk.AgentSkill{{ID: "keep", Name: "keep", Description: "Keeps.", Tags: []string{"orchard"}}},
+			}).ServeHTTP(w, r)
+			return
+		}
+		http.StripPrefix("/a2a", rest).ServeHTTP(w, r)
+	}))
+	t.Cleanup(served.Close)
+	return served
+}
+
+// a2aStreamedOver is an A2A operation that answers as a stream, asked of the
+// node as the bearer of token: its status, and each event's data.
+func a2aStreamedOver(t *testing.T, srv *QNTXServer, token, method, rpc string, sent map[string]any) (int, []map[string]any, string) {
+	t.Helper()
+	r := asBearer(method, "/api/a2a/"+rpc, token)
+	if method == http.MethodGet {
+		query := r.URL.Query()
+		for name, value := range sent {
+			query.Set(name, value.(string))
+		}
+		r.URL.RawQuery = query.Encode()
+	} else {
+		body, err := json.Marshal(sent)
+		require.NoError(t, err)
+		r.Body = io.NopCloser(strings.NewReader(string(body)))
+		r.ContentLength = int64(len(body))
+		r.Header.Set("Content-Type", "application/json")
+	}
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	var events []map[string]any
+	for _, line := range strings.Split(w.Body.String(), "\n") {
+		data, isData := strings.CutPrefix(line, "data: ")
+		if !isData {
+			continue
+		}
+		var event map[string]any
+		require.NoError(t, json.Unmarshal([]byte(data), &event), data)
+		events = append(events, event)
+	}
+	return w.Code, events, w.Body.String()
+}
+
+// SendStreamingMessage to the agent a card names: what its turn streams
+// reaches the person asking here as it moves, one event at a time.
+func TestATurnAnotherAgentStreamsIsStreamedOn(t *testing.T) {
+	allowingLoopback(t)
+	served := streamingAgentAt(t, nil)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	code, events, body := a2aStreamedOver(t, srv, tokens[auth.LevelRoot], http.MethodPost, "SendStreamingMessage", map[string]any{
+		"card": served.URL, "message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+	})
+	require.Equal(t, http.StatusOK, code, body)
+	var kinds []string
+	var said string
+	for _, event := range events {
+		for kind := range event {
+			kinds = append(kinds, kind)
+		}
+		if update, held := event["artifact_update"].(map[string]any); held {
+			said = at(update, "artifact.parts.0.text").(string)
+		}
+	}
+	assert.Equal(t, []string{"task", "status_update", "artifact_update", "status_update"}, kinds, body)
+	assert.Equal(t, "the apples are in", said)
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(events[len(events)-1], "status_update.status.state"), body)
+}
+
+// SubscribeToTask for a task the agent does not hold is its refusal, not a
+// stream that says nothing.
+func TestSubscribingToATaskAnotherAgentDoesNotHoldIsRefused(t *testing.T) {
+	allowingLoopback(t)
+	served := streamingAgentAt(t, nil)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	code, events, body := a2aStreamedOver(t, srv, tokens[auth.LevelRoot], http.MethodGet, "SubscribeToTask", map[string]any{
+		"card": served.URL, "id": "no-such-task",
+	})
+	assert.NotEqual(t, http.StatusOK, code, body)
+	assert.Empty(t, events)
+	assert.Contains(t, body, "the orchard keeper answered SubscribeToTask")
+}
+
+// SubscribeToTask to a task the agent a card names is still working on: the
+// rest of its turn reaches the person asking here as it moves.
+func TestATaskAnotherAgentIsWorkingOnIsSubscribedTo(t *testing.T) {
+	allowingLoopback(t)
+	letGo := make(chan struct{})
+	served := streamingAgentAt(t, letGo)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	code, sent := a2aCalledOver(t, srv, tokens[auth.LevelRoot], http.MethodPost, "SendMessage", map[string]any{
+		"card": served.URL, "message": `{"message_id": "m1", "role": "ROLE_USER", "parts": [{"text": "how is the harvest?"}]}`,
+		"configuration": `{"return_immediately": true}`,
+	})
+	require.Equal(t, http.StatusOK, code, sent)
+	id := at(sent, "task.id").(string)
+
+	time.AfterFunc(200*time.Millisecond, func() { close(letGo) })
+	code, events, body := a2aStreamedOver(t, srv, tokens[auth.LevelRoot], http.MethodGet, "SubscribeToTask", map[string]any{
+		"card": served.URL, "id": id,
+	})
+	require.Equal(t, http.StatusOK, code, body)
+	var said string
+	for _, event := range events {
+		if update, held := event["artifact_update"].(map[string]any); held {
+			said = at(update, "artifact.parts.0.text").(string)
+		}
+	}
+	assert.Equal(t, "the apples are in", said, body)
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(events[len(events)-1], "status_update.status.state"), body)
+}
+
 func a2aCalledOver(t *testing.T, srv *QNTXServer, token, method, rpc string, sent map[string]any) (int, map[string]any) {
 	t.Helper()
 	path := "/api/a2a/" + rpc
