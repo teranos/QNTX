@@ -1,16 +1,13 @@
-# ADR-025: Access Tokens
+
 
 Date: 2026-10-19
 Status: Debated
 
+this doc has an identity crisis
 
 Access Tokens for Machine and Agent Access
 
-"so, in a sense, the true goal is"
 
-"eliminate access tokens before we 1.0.0"
-
-"kill the entire concept"
 
 ## Context
 
