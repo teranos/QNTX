@@ -111,6 +111,7 @@ func TestTASBotJobPriority(t *testing.T) {
 		Status:      "queued",
 
 		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	queue.Enqueue(lowPriorityJob)
 
@@ -123,6 +124,7 @@ func TestTASBotJobPriority(t *testing.T) {
 		Source:      "fast_strat.html",
 		Status:      "queued",
 		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 	queue.Enqueue(highPriorityJob)
 
@@ -370,9 +372,9 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 
 	// TAS Bot enqueues multiple jobs in sequence; Yugi draws them in that order.
 	jobs := []Job{
-		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CreatedAt: time.Now()},
-		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CreatedAt: time.Now().Add(time.Millisecond)},
-		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_003", HandlerName: "test.jd-extraction", Source: "third.html", Status: "queued", CreatedAt: time.Now().Add(2 * time.Millisecond)},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CreatedAt: time.Now().Add(time.Millisecond), UpdatedAt: time.Now().Add(time.Millisecond)},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_003", HandlerName: "test.jd-extraction", Source: "third.html", Status: "queued", CreatedAt: time.Now().Add(2 * time.Millisecond), UpdatedAt: time.Now().Add(2 * time.Millisecond)},
 	}
 
 	for _, job := range jobs {
@@ -1118,5 +1120,40 @@ func TestYugiDrawsTheOldestQueuedJob(t *testing.T) {
 	}
 	if _, err := queue.Dequeue(); !errors.Is(err, ErrJobNotFound) {
 		t.Fatalf("an empty queue answered %v, want ErrJobNotFound", err)
+	}
+}
+
+// A job put back in the queue is touched, and stands behind every other queued
+// job: the worker does not take it again at once.
+func TestAJobPutBackStandsBehindTheOthers(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	queue := NewQueue(db)
+	mk := func(id string, at time.Time) {
+		t.Helper()
+		j := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+			ID: id, HandlerName: "test.order", Source: id, Status: JobStatusQueued, CreatedAt: at, UpdatedAt: at}
+		if err := queue.Enqueue(j); err != nil {
+			t.Fatalf("Enqueue(%s): %v", id, err)
+		}
+	}
+	mk("JOB_NO_HANDLER", time.Now().Add(-2*time.Hour))
+	mk("JOB_NEXT", time.Now().Add(-time.Hour))
+
+	first, err := queue.Dequeue()
+	if err != nil || first.ID != "JOB_NO_HANDLER" {
+		t.Fatalf("first Dequeue = %v, %v; want JOB_NO_HANDLER", first, err)
+	}
+	// What the worker does for a handler not yet registered.
+	first.Status, first.UpdatedAt = JobStatusQueued, time.Now()
+	if err := queue.UpdateJob(first); err != nil {
+		t.Fatalf("UpdateJob: %v", err)
+	}
+
+	second, err := queue.Dequeue()
+	if err != nil {
+		t.Fatalf("second Dequeue: %v", err)
+	}
+	if second.ID != "JOB_NEXT" {
+		t.Fatalf("second Dequeue = %s, want JOB_NEXT: the job put back was taken again at once", second.ID)
 	}
 }
