@@ -81,7 +81,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 		}
 	}
 	for _, name := range s.pluginRegistry.ListEnabled() {
-		// A plugin named as a path the node answers itself (rooms) does not take it over.
+		// 「[Opus 5.5] A plugin named as a path the node answers itself (rooms) does not take it over.」
 		if ownPaths["/api/"+name] {
 			s.logger.Errorw("A plugin is named as a path the node answers itself; its HTTP routes are not served", "plugin", name, "path", "/api/"+name)
 			continue
