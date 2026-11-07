@@ -180,6 +180,11 @@ func (s *QNTXServer) keepCleaningJobs() {
 // cleanJobsOnce runs the passes of one cleanup, until a pass takes fewer than it
 // may or the node stops.
 func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
+	// First, and apart from how the rest goes: a stale forward queued is a
+	// stale forward the worker may run.
+	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
+		log.Errorw("Stale forwards were not dropped", "error", err)
+	}
 	removed := 0
 	for {
 		n, err := s.daemon.GetQueue().Cleanup(s.ctx, jobsKeptFor, jobsRemovedPerPass, forwardHandlerName)
@@ -197,9 +202,22 @@ func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
 		case <-time.After(jobsPassPause):
 		}
 	}
-	executions, err := s.held.ServedUniverse().Executions().CleanupOldExecutions(int(jobsKeptFor.Hours() / 24))
-	if err != nil {
-		log.Errorw("Old executions were not removed", "kept_for", jobsKeptFor.String(), "error", err)
+	executions := 0
+	for {
+		n, err := s.held.ServedUniverse().Executions().CleanupOldExecutions(int(jobsKeptFor.Hours()/24), jobsRemovedPerPass)
+		if err != nil {
+			log.Errorw("Old executions were not removed", "kept_for", jobsKeptFor.String(), "removed_before", executions, "error", err)
+			break
+		}
+		executions += n
+		if n < jobsRemovedPerPass {
+			break
+		}
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-time.After(jobsPassPause):
+		}
 	}
 	if removed > 0 || executions > 0 {
 		log.Infow("Old jobs removed", "jobs", removed, "executions", executions, "kept_for", jobsKeptFor.String())
@@ -230,6 +248,12 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 
 	s.ensureCheckpointSchedule(s.held.ServedUniverse().Schedules())
 	s.keepCheckpointing(handler)
+	// Before the worker takes its first job: it takes the oldest, and on q the
+	// oldest were 12,915 forwards from five weeks that the far node must not
+	// get replayed at it.
+	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
+		s.logger.Named("jobs").Errorw("Stale forwards were not dropped at boot", "error", err)
+	}
 	s.keepCleaningJobs()
 }
 

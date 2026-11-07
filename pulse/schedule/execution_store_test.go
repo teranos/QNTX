@@ -384,9 +384,12 @@ func TestCleanupOldExecutions(t *testing.T) {
 	}
 
 	// Cleanup executions older than 90 days (3 months)
-	deleted, err := execStore.CleanupOldExecutions(90)
+	deleted, err := execStore.CleanupOldExecutions(90, 1)
 	require.NoError(t, err)
-	assert.Equal(t, 2, deleted, "should delete 2 old executions")
+	assert.Equal(t, 1, deleted, "a pass of one removes one")
+	deleted, err = execStore.CleanupOldExecutions(90, 1000)
+	require.NoError(t, err)
+	assert.Equal(t, 1, deleted, "the next pass removes the other old execution")
 
 	// Verify only recent execution remains
 	execs, total, err := execStore.ListExecutions(job.Id, 10, 0, "")
@@ -427,7 +430,7 @@ func TestCleanupOldExecutions_NoneToDelete(t *testing.T) {
 	}
 
 	// Cleanup executions older than 90 days - should delete nothing
-	deleted, err := execStore.CleanupOldExecutions(90)
+	deleted, err := execStore.CleanupOldExecutions(90, 1000)
 	require.NoError(t, err)
 	assert.Equal(t, 0, deleted, "should delete 0 executions when all are recent")
 
