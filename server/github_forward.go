@@ -186,9 +186,21 @@ func sweepForwards(queue *async.Queue, logger *zap.SugaredLogger) (int, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "the failed jobs were not read")
 	}
-	swept := 0
+	swept, dropped := 0, 0
+	horizon := time.Now().Add(-forwardKeptFor)
 	for _, job := range failed {
 		if job.HandlerName != forwardHandlerName || !strings.Contains(job.Error, forwardUnanswered) {
+			continue
+		}
+		// A forward the far node did not take within forwardKeptFor is not
+		// queued again from here either: the horizon holds for failed and
+		// queued alike.
+		if job.CreatedAt.Before(horizon) {
+			job.Cancel(forwardDropped)
+			if err := queue.UpdateJob(job); err != nil {
+				return swept, errors.Wrapf(err, "the forward %s was not dropped", job.ID)
+			}
+			dropped++
 			continue
 		}
 		job.Status, job.Error, job.Completed = async.JobStatusQueued, "", async.NotYet()
@@ -199,6 +211,9 @@ func sweepForwards(queue *async.Queue, logger *zap.SugaredLogger) (int, error) {
 	}
 	if swept > 0 {
 		logger.Infow("Forwards nobody answered are queued again", "forwards", swept)
+	}
+	if dropped > 0 {
+		logger.Infow("Forwards the far node did not take were dropped", "forwards", dropped, "kept_for", forwardKeptFor.String())
 	}
 	return swept, nil
 }

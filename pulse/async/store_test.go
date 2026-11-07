@@ -612,19 +612,19 @@ func TestCancelQueuedBeforeDropsOnlyTheOldQueuedOfTheHandler(t *testing.T) {
 	mk("NEW_FWD", "github.forward", JobStatusQueued, time.Now())
 	mk("OLD_OTHER", "test.other", JobStatusQueued, old)
 
-	n, err := store.CancelQueuedBefore("github.forward", time.Now().Add(-24*time.Hour), "dropped", 1)
+	cancelled, err := store.CancelQueuedBefore("github.forward", time.Now().Add(-24*time.Hour), "dropped", 1)
 	if err != nil {
 		t.Fatalf("CancelQueuedBefore: %v", err)
 	}
-	if n != 1 {
-		t.Fatalf("a pass of one cancelled %d", n)
+	if len(cancelled) != 1 || cancelled[0].Status != JobStatusCancelled || cancelled[0].Error != "dropped" {
+		t.Fatalf("a pass of one answered %+v", cancelled)
 	}
-	n, err = store.CancelQueuedBefore("github.forward", time.Now().Add(-24*time.Hour), "dropped", 1000)
+	cancelled, err = store.CancelQueuedBefore("github.forward", time.Now().Add(-24*time.Hour), "dropped", 1000)
 	if err != nil {
 		t.Fatalf("CancelQueuedBefore: %v", err)
 	}
-	if n != 1 {
-		t.Fatalf("the second pass cancelled %d, want the one old queued forward left", n)
+	if len(cancelled) != 1 {
+		t.Fatalf("the second pass cancelled %d, want the one old queued forward left", len(cancelled))
 	}
 	for _, id := range []string{"OLD_FWD_1", "OLD_FWD_2"} {
 		j, err := store.GetJob(id)

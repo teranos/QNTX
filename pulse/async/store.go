@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/teranos/QNTX/internal/sqlclose"
+	"strings"
 	"time"
 
 	errors "github.com/teranos/sacred-error"
@@ -416,31 +417,53 @@ func (s *Store) CleanupOldJobs(olderThan time.Duration, atMost int, keep ...stri
 }
 
 // CancelQueuedBefore cancels at most atMost queued jobs of handler created before
-// cutoff, with reason as their error, and says how many. A queued job the worker
-// never reached is not run late; it is dropped, and said.
-func (s *Store) CancelQueuedBefore(handler string, cutoff time.Time, reason string, atMost int) (int, error) {
+// cutoff, with reason as their error, and answers them as they now stand. A
+// queued job the worker never reached is not run late; it is dropped, and said.
+func (s *Store) CancelQueuedBefore(handler string, cutoff time.Time, reason string, atMost int) ([]*Job, error) {
+	jobs, err := s.listJobs(`SELECT `+StandardJobSelectColumns()+`
+		FROM async_ix_jobs WHERE handler_name = ? AND status = ? AND created_at < ?
+		ORDER BY created_at ASC LIMIT ?`, handler, JobStatusQueued, cutoff, atMost)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the queued %s jobs before %s were not read", handler, cutoff.Format(time.RFC3339))
+	}
+	if len(jobs) == 0 {
+		return nil, nil
+	}
 	now := time.Now()
 	completedAt, err := At(now).column("the cancel of queued " + handler + " jobs")
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
+	args := []any{JobStatusCancelled, reason, completedAt, now}
+	marks := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		marks = append(marks, "?")
+		args = append(args, job.ID)
+	}
+	// status = queued again: a job the worker took between the read and here is
+	// its, not this pass's.
+	args = append(args, JobStatusQueued)
 	result, err := s.db.Exec(`
 		UPDATE async_ix_jobs
 		SET status = ?, error = ?, completed_at = ?, updated_at = ?
-		WHERE id IN (
-			SELECT id FROM async_ix_jobs
-			WHERE handler_name = ? AND status = ? AND created_at < ?
-			LIMIT ?
-		)
-	`, JobStatusCancelled, reason, completedAt, now, handler, JobStatusQueued, cutoff, atMost)
+		WHERE id IN (`+strings.Join(marks, ", ")+`) AND status = ?
+	`, args...)
 	if err != nil {
-		return 0, errors.Wrapf(err, "the queued %s jobs before %s were not cancelled", handler, cutoff.Format(time.RFC3339))
+		return nil, errors.Wrapf(err, "the queued %s jobs before %s were not cancelled", handler, cutoff.Format(time.RFC3339))
 	}
-	rows, err := result.RowsAffected()
+	changed, err := result.RowsAffected()
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to get rows affected")
+		return nil, errors.Wrap(err, "failed to get rows affected")
 	}
-	return int(rows), nil
+	cancelled := make([]*Job, 0, changed)
+	for _, job := range jobs {
+		job.Cancel(reason)
+		cancelled = append(cancelled, job)
+		if len(cancelled) == int(changed) {
+			break
+		}
+	}
+	return cancelled, nil
 }
 
 // ErrJobNotFound says a job lookup miss out loud, so a miss and a broken

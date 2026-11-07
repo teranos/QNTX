@@ -180,6 +180,11 @@ func (s *QNTXServer) keepCleaningJobs() {
 // cleanJobsOnce runs the passes of one cleanup, until a pass takes fewer than it
 // may or the node stops.
 func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
+	// First, and apart from how the rest goes: a stale forward queued is a
+	// stale forward the worker may run.
+	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
+		log.Errorw("Stale forwards were not dropped", "error", err)
+	}
 	removed := 0
 	for {
 		n, err := s.daemon.GetQueue().Cleanup(s.ctx, jobsKeptFor, jobsRemovedPerPass, forwardHandlerName)
@@ -216,9 +221,6 @@ func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
 	}
 	if removed > 0 || executions > 0 {
 		log.Infow("Old jobs removed", "jobs", removed, "executions", executions, "kept_for", jobsKeptFor.String())
-	}
-	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
-		log.Errorw("Stale forwards were not dropped", "error", err)
 	}
 }
 
