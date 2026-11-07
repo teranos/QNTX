@@ -3693,14 +3693,14 @@ func (x *Refusal) GetSays() string {
 	return ""
 }
 
-// NodePeers is what a2a Peers answers: the nodes this one knows, which an
-// agent here names by peer.
+// 「[Opus 5.5] NodePeers is what a2a Peers answers: the nodes this one knows, which an」
+// 「[Opus 5.5] agent here names by peer.」
 type NodePeers struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// nodes.peers: the nodes this one is the primary of.
+	// 「[Opus 5.5] nodes.peers: the nodes this one is the primary of.」
 	Peers []*NodePeer `protobuf:"bytes,1,rep,name=peers,proto3" json:"peers,omitempty"`
-	// nodes.primary: the origin of the node this one's people log in at, or
-	// none when they log in here.
+	// 「[Opus 5.5] nodes.primary: the origin of the node this one's people log in at, or」
+	// 「[Opus 5.5] none when they log in here.」
 	Primary       string `protobuf:"bytes,2,opt,name=primary,proto3" json:"primary,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3731,7 +3731,7 @@ func (x *NodePeers) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use NodePeers.ProtoReflect.Descriptor instead.
+// 「[Opus 5.5] Deprecated: Use NodePeers.ProtoReflect.Descriptor instead.」
 func (*NodePeers) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{39}
 }
@@ -3750,16 +3750,16 @@ func (x *NodePeers) GetPrimary() string {
 	return ""
 }
 
-// NodePeer is one of nodes.peers.
+// 「[Opus 5.5] NodePeer is one of nodes.peers.」
 type NodePeer struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Its label, which peer names it by.
+	// 「[Opus 5.5] Its label, which peer names it by.」
 	Label string `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
-	// Where it answers.
+	// 「[Opus 5.5] Where it answers.」
 	Origin string `protobuf:"bytes,2,opt,name=origin,proto3" json:"origin,omitempty"`
-	// The did:key its card is verified by.
+	// 「[Opus 5.5] The did:key its card is verified by.」
 	Did string `protobuf:"bytes,3,opt,name=did,proto3" json:"did,omitempty"`
-	// The namespaces it serves, each a tenant its agents are at.
+	// 「[Opus 5.5] The namespaces it serves, each a tenant its agents are at.」
 	Namespaces    []string `protobuf:"bytes,4,rep,name=namespaces,proto3" json:"namespaces,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3790,7 +3790,7 @@ func (x *NodePeer) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use NodePeer.ProtoReflect.Descriptor instead.
+// 「[Opus 5.5] Deprecated: Use NodePeer.ProtoReflect.Descriptor instead.」
 func (*NodePeer) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescGZIP(), []int{40}
 }
