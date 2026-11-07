@@ -286,8 +286,8 @@ message InitializeResponse {
   SigilsFrom sigils_from = 11;
 
   // "rooms will be plugin provided"
-  // rooms_provider indicates this plugin implements RoomsService (ADR-057).
-  // Core's rooms signum reaches the rooms it holds by the plugin's name.
+  // 「[Opus 5.5] rooms_provider indicates this plugin implements RoomsService (ADR-057).」
+  // 「[Opus 5.5] Core's rooms signum reaches the rooms it holds by the plugin's name.」
   bool rooms_provider = 12;
 }
 
