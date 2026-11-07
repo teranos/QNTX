@@ -72,10 +72,18 @@ message RoomOf {
     // "a Room per Namespace"
     string namespace = 2;
     // "each **element** is also a room"
-    string element = 3;
+    ElementOf element = 5;
     // 「[Fable 5.1] A room for one purpose, by the purpose's name: deployment.」
     string purpose = 4;
   }
+  reserved 3;
+}
+
+// ElementOf is an element as its room is of it: by its namespace and by itself,
+// so one element in two namespaces is two rooms.
+message ElementOf {
+  string namespace = 1;
+  string element = 2;
 }
 
 // 「[Fable 5.1] Room is one room.」
@@ -301,6 +309,9 @@ message RoomArrival {
   // 「[Fable 5.1] Unbacked by Telegram for a person's account: it has a sequence per」
   // 「[Fable 5.1] supergroup and none across them. A bot's updates are one sequence, kept」
   // 「[Fable 5.1] 24 hours.」
+  // The sequence is the provider's own, one across all of the agent's rooms and
+  // kept across reconnects: where its source has none across rooms, the provider
+  // numbers what it carried and keeps that numbering.
   int64 sequence = 1;
   // 「[Fable 5.1] On a message: it is addressed to the agent. A wake arrives as this.」
   bool addressed = 2;
@@ -322,6 +333,9 @@ message RoomGap {
   // 「[Fable 5.1] The loss is in every room the agent is in, named above or not.」
   bool all_rooms = 3;
   string reason = 4;
+  // The loss cannot be read from the room either: its provider reads no room
+  // back for this agent (a Telegram bot). What was said in the gap is gone for it.
+  bool unrecoverable = 5;
 }
 
 // 「[Fable 5.1] What is core's, and asked of no provider.」
