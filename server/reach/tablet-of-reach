@@ -132,6 +132,8 @@ REACH is '/api/namespaces/{name}/store'                                 of ROOT 
 # The lines the gate reads (ADR-034). Writing one is gated at the
 # attestation handler, not by this line.
 REACH is '/api/roles'                                                     of ROOT SUPER
+REACH is '/api/rooms' '/api/rooms/{room}' '/api/rooms/{room}/read'        of ROOT
+REACH is '/api/rooms/{room}/post' '/api/rooms/{room}/wake'              of ROOT
 
 # Who reaches what at runtime, granted and revoked (the reach signum).
 REACH is '/api/reach'                                                     of ROOT
