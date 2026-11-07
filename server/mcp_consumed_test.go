@@ -158,7 +158,7 @@ func sayingYes(t *testing.T, authorize string, admitted auth.Admission) *http.Re
 	return httptest.NewRequest(http.MethodGet, ConsumedCallbackPath+"?"+back.RawQuery, nil).WithContext(auth.WithAdmission(context.Background(), admitted))
 }
 
-// returned is what the server sent the person back with, as the return page is asked for it.
+// 「[Opus 5.5] returned is what the server sent the person back with, as the return page is asked for it.」
 func returned(t *testing.T, authorize string) url.Values {
 	t.Helper()
 	client := consumedClient()
@@ -567,8 +567,8 @@ func TestTheNodeAgentConnectsTheNodeAndAPersonAtROOTSaysYes(t *testing.T) {
 
 // "the QNTX app is here on my phone, I am talking to you through it"
 //
-// The yes comes back to a browser with no session here: the return page hands the code to the app, and the
-// app, logged in as a person at ROOT, finishes it. A token posting the same code is refused.
+// 「[Opus 5.5] The yes comes back to a browser with no session here: the return page hands the code to the app, and the」
+// 「[Opus 5.5] app, logged in as a person at ROOT, finishes it. A token posting the same code is refused.」
 func TestAYesComesBackThroughTheApp(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	agent := person("https://example.org/root", auth.LevelRoot)
@@ -604,7 +604,7 @@ func TestAYesComesBackThroughTheApp(t *testing.T) {
 	assert.Equal(t, "tracker", listed.([]consumedServer)[0].Name)
 }
 
-// A return page is shown only for a yes the node waits on: an unknown state carries nothing on.
+// 「[Opus 5.5] A return page is shown only for a yes the node waits on: an unknown state carries nothing on.」
 func TestAReturnForNoYesShowsNothing(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	page := httptest.NewRecorder()
