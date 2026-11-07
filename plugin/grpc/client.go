@@ -61,8 +61,8 @@ type ExternalDomainProxy struct {
 	// pythonProvider indicates this plugin can execute Python code (populated during Initialize)
 	pythonProvider bool
 
-	// roomsProvider indicates this plugin holds rooms (populated during Initialize).
-	// Atomic: a plugin initialized again while a room is asked for writes it.
+	// 「[Opus 5.5] roomsProvider indicates this plugin holds rooms (populated during Initialize).」
+	// 「[Opus 5.5] Atomic: a plugin initialized again while a room is asked for writes it.」
 	roomsProvider atomic.Bool
 
 	// Watchers this plugin wants registered (populated during Initialize)
@@ -260,12 +260,12 @@ func (c *ExternalDomainProxy) PythonServiceClient() protocol.PythonServiceClient
 	return protocol.NewPythonServiceClient(c.conn)
 }
 
-// IsRoomsProvider returns true if the plugin holds rooms (RoomsService, ADR-057).
+// 「[Opus 5.5] IsRoomsProvider returns true if the plugin holds rooms (RoomsService, ADR-057).」
 func (c *ExternalDomainProxy) IsRoomsProvider() bool {
 	return c.roomsProvider.Load()
 }
 
-// RoomsServiceClient returns a RoomsServiceClient using this plugin's existing gRPC connection.
+// 「[Opus 5.5] RoomsServiceClient returns a RoomsServiceClient using this plugin's existing gRPC connection.」
 func (c *ExternalDomainProxy) RoomsServiceClient() protocol.RoomsServiceClient {
 	return protocol.NewRoomsServiceClient(c.conn)
 }
