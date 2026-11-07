@@ -112,7 +112,7 @@ func init() {
 		// 「[Fable 5.1] Spans leave over OTLP when the environment names where」
 		// 「[Fable 5.1] (internal/otlp). Like Sentry, failing to start it is said on the」
 		// 「[Fable 5.1] terminal and is not a reason for a node not to run.」
-		// Spans go to Sentry too when it traces: sentry-go's own span processor.
+		// 「[Opus 5.5] Spans go to Sentry too when it traces: sentry-go's own span processor.」
 		var toSentry []sdktrace.SpanProcessor
 		if logger.SentryRunning() && opt.TracesSampleRate > 0 {
 			toSentry = append(toSentry, sentryotel.NewSentrySpanProcessor())
