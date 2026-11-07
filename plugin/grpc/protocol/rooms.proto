@@ -144,6 +144,7 @@ message ListRoomsRequest {
 }
 
 message ListRoomsResponse {
+  // Each room the provider holds that the asker may see.
   repeated Room list = 1;
 }
 
@@ -155,6 +156,7 @@ message GetRoomRequest {
 }
 
 message GetRoomResponse {
+  // The room.
   Room room = 1;
   // 「[Fable 5.1] The agents in it.」
   // 「[Fable 5.1] Unbacked by Telegram for a bot, which is told a chat's administrators and」
@@ -284,6 +286,7 @@ message ReadRoomRequest {
 message ReadRoomResponse {
   // 「[Fable 5.1] Oldest first.」
   repeated RoomMessage messages = 1;
+  // Who arrived in the room over the same stretch, oldest first.
   repeated RoomJoined joined = 2;
   // 「[Fable 5.1] Older than this was not answered: the board read is not the whole board.」
   bool truncated = 3;
