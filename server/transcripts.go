@@ -63,9 +63,6 @@ type transcript struct {
 	Started  string
 	Ended    string
 	Turns    []transcriptTurn
-	// Events the store folded into sigmas (ADR-020): said, because no turn
-	// can be read back from a sigma.
-	Folded int
 	// The model its SessionStart names, and the effort.level its last Stop ran at.
 	Model  string
 	Effort string
@@ -80,7 +77,7 @@ func (t transcript) message() *protocol.Transcript {
 		turns = append(turns, &protocol.Turn{At: turn.At, Speaker: turn.Speaker, Text: turn.Text, Of: turn.Of})
 	}
 	return &protocol.Transcript{Session: t.Session, Subjects: t.Subjects, Started: t.Started, Ended: t.Ended,
-		Turns: turns, Folded: uint32(t.Folded), Model: t.Model, Effort: t.Effort}
+		Turns: turns, Model: t.Model, Effort: t.Effort}
 }
 
 func (s *QNTXServer) transcriptsSignum() sigil.Signum {
@@ -209,9 +206,8 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 		if session == "" {
 			continue
 		}
-		folded := as.Source == "distill"
 		turn, ok := turnOf(as)
-		if !folded && !ok {
+		if !ok {
 			continue
 		}
 		t, seen := bySession[session]
@@ -219,12 +215,6 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 			t = &transcript{Session: session, Subjects: []string{}, Turns: []transcriptTurn{}}
 			bySession[session] = t
 			subjects[session] = map[string]bool{}
-		}
-		if folded {
-			t.Folded += foldedCount(as.Attributes)
-			t.Started = earlier(t.Started, seenAt(as.Attributes, "_first_seen"))
-			t.Ended = later(t.Ended, seenAt(as.Attributes, "_last_seen"))
-			continue
 		}
 		t.Turns = append(t.Turns, turn)
 		ranOn(t, as)
@@ -237,11 +227,6 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 	}
 	out := make([]transcript, 0, len(bySession))
 	for _, t := range bySession {
-		if len(t.Turns) == 0 {
-			// Everything it had was folded: it is said by its count alone.
-			out = append(out, *t)
-			continue
-		}
 		sort.SliceStable(t.Turns, func(i, j int) bool {
 			if !t.Turns[i].when.Equal(t.Turns[j].when) {
 				return t.Turns[i].when.Before(t.Turns[j].when)
@@ -348,15 +333,6 @@ func toolTurn(tool, path, command string) (string, string) {
 	return "tool", tool
 }
 
-// seenAt is a sigma's first or last seen, as a turn's At is written, or empty.
-func seenAt(attrs map[string]any, key string) string {
-	at, err := time.Parse(time.RFC3339, attrString(attrs, key))
-	if err != nil {
-		return ""
-	}
-	return at.UTC().Format(time.RFC3339)
-}
-
 // earlier and later pick between two At times; empty is no time at all.
 func earlier(a, b string) string {
 	if a == "" || (b != "" && b < a) {
@@ -370,14 +346,6 @@ func later(a, b string) string {
 		return b
 	}
 	return a
-}
-
-// foldedCount is how many events a sigma holds: its _total, or 1.
-func foldedCount(attrs map[string]any) int {
-	if total, ok := attrs["_total"].(float64); ok && total > 0 {
-		return int(total)
-	}
-	return 1
 }
 
 // riteSaid is what a rite found: its name, its verdict and the code it read.

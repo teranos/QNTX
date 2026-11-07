@@ -160,3 +160,13 @@ message Reaches {
   // The paths asked that the person asking reaches. Empty is none of them.
   repeated string paths = 1;
 }
+
+// Named is what i name answers: the name the agent asking holds, and the DID
+// it is held by.
+message Named {
+  // The name the agent asking now holds. Never empty.
+  string name = 1;
+
+  // The agent's own did:key, which the name is held by.
+  string did = 2;
+}

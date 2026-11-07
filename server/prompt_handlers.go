@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/ai/provider"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -43,6 +44,11 @@ type PromptDirectRequest struct {
 	ParentElementID     string    `json:"parent_element_id,omitempty"`    // Parent element ID for conversation history assembly (stream elements send their parent)
 	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
 	FileIDs             []string  `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
+	// Socket is the caller's websocket, as the node named it in its first
+	// message there: the stream is sent to it and no other. A request naming
+	// none, or a socket that is not the caller's, is answered whole in the
+	// response and streamed to nobody.
+	Socket string `json:"socket,omitempty"`
 }
 
 // PromptDirectResponse represents the direct execution response
@@ -55,6 +61,13 @@ type PromptDirectResponse struct {
 	CompletionTokens int                   `json:"completion_tokens,omitempty"`
 	TotalTokens      int                   `json:"total_tokens,omitempty"`
 	Error            string                `json:"error,omitempty"`
+	// Served is how the call was served, when its provider reports it:
+	// requested provider and model beside the upstream that served it.
+	Served *provider.Served `json:"served,omitempty"`
+	// Streamed is whether the answer was also streamed to the socket the
+	// request named. False is said: a page that named its socket and was
+	// answered whole draws the answer from here, since no stream comes.
+	Streamed bool `json:"streamed"`
 }
 
 // Result represents the output of a prompt execution
@@ -273,21 +286,11 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 
 	chatReq := s.buildDirectChatRequest(r.Context(), req, promptText, modelName, doc)
 
-	// Execute prompt — use streaming if available, fall back to unary
-	var resp *provider.ChatResponse
-
-	if streamClient, ok := client.(provider.StreamingAIClient); ok && req.ElementID != "" {
-		resp = s.executeStreamingPrompt(r.Context(), streamClient, chatReq, req.ElementID, req.Provider)
-	} else {
-		resp, err = client.Chat(r.Context(), chatReq)
-		if err != nil {
-			s.logger.Errorw("Prompt direct execution failed",
-				"error", err,
-				"provider", req.Provider,
-			)
-			writeWrappedError(w, s.logger, err, "Prompt execution failed", http.StatusInternalServerError)
-			return
-		}
+	caller, gated := auth.AdmissionFrom(r.Context())
+	resp, streamed, err := s.answerDirect(r.Context(), client, chatReq, req, caller, gated)
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "Prompt execution failed", http.StatusInternalServerError)
+		return
 	}
 
 	// TODO(ATS): After stream completes, create attestation with signal summary
@@ -311,9 +314,32 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		PromptTokens:     resp.Usage.PromptTokens,
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
+		Served:           resp.Served,
+		Streamed:         streamed,
 	}
 
 	respond(w, s.logger, http.StatusOK, response)
+}
+
+// answerDirect answers a direct prompt, streaming it to the socket the request
+// names when that socket is the caller's and an element is named for the
+// stream, and whole otherwise. streamed says which.
+func (s *QNTXServer) answerDirect(ctx context.Context, client provider.AIClient, chatReq provider.ChatRequest, req PromptDirectRequest, caller auth.Admission, gated bool) (resp *provider.ChatResponse, streamed bool, err error) {
+	// "3. who? the receiver?": a stream is sent to the socket that asked for it.
+	receiver, received := s.receiverOf(req.Socket, caller, gated)
+	if req.Socket != "" && !received {
+		s.logger.Warnw("A prompt named a socket that is not the caller's, and is answered whole and streamed to nobody",
+			"socket", req.Socket, "identity", caller.Identity, "element_id", req.ElementID)
+	}
+	if streamClient, ok := client.(provider.StreamingAIClient); ok && req.ElementID != "" && received {
+		return s.executeStreamingPrompt(ctx, streamClient, chatReq, req.ElementID, req.Provider, receiver), true, nil
+	}
+	resp, err = client.Chat(ctx, chatReq)
+	if err != nil {
+		s.logger.Errorw("Prompt direct execution failed", "error", err, "provider", req.Provider)
+		return nil, false, errors.Wrap(err, "the prompt was not answered")
+	}
+	return resp, false, nil
 }
 
 // resolvePromptText interpolates the template body with an upstream attestation if provided,
@@ -477,6 +503,12 @@ func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, r
 		},
 		CreatedAt: now,
 	}
+	// What the provider reports of how the call was served, each under its
+	// own name: the subject stays the model asked for, and what answered is
+	// written beside it, never over it.
+	for key, value := range servedAttributes(resp.Served) {
+		as.Attributes[key] = value
+	}
 
 	if err := s.held.Served().CreateAttestation(as); err != nil {
 		s.logger.Warnw("Failed to create prompt-result attestation",
@@ -497,9 +529,31 @@ func (s *QNTXServer) storePromptResultAttestation(resp *provider.ChatResponse, r
 	return asid, createdAttestation
 }
 
-// executeStreamingPrompt runs the LLM call in streaming mode, broadcasting chunks
-// over WebSocket as they arrive. Returns the assembled full response.
-func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient provider.StreamingAIClient, chatReq provider.ChatRequest, elementID, providerName string) *provider.ChatResponse {
+// receiverOf is the socket a stream is sent to: the one named, when the node
+// holds it, it was admitted as the caller was, and it stands in the namespace
+// the caller asked in (nothing crosses, ADR-026). None is no receiver, and
+// nothing is sent to everyone instead.
+func (s *QNTXServer) receiverOf(socket string, caller auth.Admission, gated bool) (audience, bool) {
+	if socket == "" {
+		return audience{}, false
+	}
+	asked, err := s.universeFor(caller, gated)
+	if err != nil {
+		return audience{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for client := range s.clients {
+		if client.id == socket && client.admitted.Identity == caller.Identity && client.in == asked.Name() {
+			return toClient(socket), true
+		}
+	}
+	return audience{}, false
+}
+
+// executeStreamingPrompt runs the LLM call in streaming mode, sending chunks
+// over WebSocket to the receiver as they arrive. Returns the assembled full response.
+func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient provider.StreamingAIClient, chatReq provider.ChatRequest, elementID, providerName string, to audience) *provider.ChatResponse {
 	streamChan := make(chan provider.StreamChunk, 32)
 
 	go func() {
@@ -512,6 +566,7 @@ func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient pr
 	var content strings.Builder
 	var streamModel string
 	var promptTokens, completionTokens, totalTokens int
+	var served *provider.Served
 
 	for chunk := range streamChan {
 		if chunk.Error != nil {
@@ -533,6 +588,10 @@ func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient pr
 			msg.PromptTokens = chunk.PromptTokens
 			msg.CompletionTokens = chunk.CompletionTokens
 			msg.TotalTokens = chunk.TotalTokens
+		}
+		if chunk.Served != nil {
+			msg.Served = chunk.Served
+			served = chunk.Served
 		}
 
 		if chunk.Signal != nil {
@@ -566,7 +625,7 @@ func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient pr
 			}
 		}
 
-		s.broadcastLLMStream(msg)
+		s.sendLLMStream(to, msg)
 
 		if chunk.Done {
 			streamModel = chunk.Model
@@ -584,7 +643,42 @@ func (s *QNTXServer) executeStreamingPrompt(ctx context.Context, streamClient pr
 			CompletionTokens: completionTokens,
 			TotalTokens:      totalTokens,
 		},
+		Served: served,
 	}
+}
+
+// servedAttributes are a provider's report of how a call was served, as
+// attestation attributes; a field it did not report is left out.
+func servedAttributes(served *provider.Served) map[string]any {
+	attrs := map[string]any{}
+	if served == nil {
+		return attrs
+	}
+	for key, value := range map[string]string{
+		"requested_provider": served.RequestedProvider,
+		"requested_model":    served.RequestedModel,
+		"upstream_provider":  served.UpstreamProvider,
+		"executed_model":     served.ExecutedModel,
+		"response_model":     served.ResponseModel,
+		"request_id":         served.RequestID,
+		"pricing_source":     served.PricingSource,
+	} {
+		if value != "" {
+			attrs[key] = value
+		}
+	}
+	if served.CostUSD != nil {
+		attrs["cost_usd"] = *served.CostUSD
+	}
+	// A count reported says whether it fell back too; a fallback is reported
+	// with no count as well.
+	if served.AttemptCount > 0 {
+		attrs["attempt_count"] = served.AttemptCount
+	}
+	if served.AttemptCount > 0 || served.Fallback {
+		attrs["fallback"] = served.Fallback
+	}
+	return attrs
 }
 
 // PromptSaveRequest represents a request to save a prompt

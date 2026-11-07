@@ -1,12 +1,12 @@
-// The client side: what a client writes to an agent, and reads of what the agent sends. Each is the
-// mirror of what the agent side reads or writes of the same method, in v1 at schema-v1.26.0.
+// 「[Opus 5.5] The client side: what a client writes to an agent, and reads of what the agent sends. Each is the」
+// 「[Opus 5.5] mirror of what the agent side reads or writes of the same method, in v1 at schema-v1.26.0.」
 #include "internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-// A JSON value as text, copied; NULL for none. The caller frees it.
+// 「[Opus 5.5] A JSON value as text, copied; NULL for none. The caller frees it.」
 static char *json_text(json_object *value) {
     if (value == NULL) return NULL;
     const char *text = json_object_to_json_string_ext(value, JSON_C_TO_STRING_PLAIN | JSON_C_TO_STRING_NOSLASHESCAPE);
@@ -16,13 +16,13 @@ static char *json_text(json_object *value) {
     return copy;
 }
 
-// Whether a key is there at all, null among its values: a response's result may be null.
+// 「[Opus 5.5] Whether a key is there at all, null among its values: a response's result may be null.」
 static int present(json_object *object, const char *key) {
     return json_object_is_type(object, json_type_object) && json_object_object_get_ex(object, key, NULL);
 }
 
-// A request or a notification, whole: id is JSON text, or NULL for a notification. NULL when the id is
-// not JSON, and params is put.
+// 「[Opus 5.5] A request or a notification, whole: id is JSON text, or NULL for a notification. NULL when the id is」
+// 「[Opus 5.5] not JSON, and params is put.」
 static json_object *outgoing(const char *id, const char *method, json_object *params) {
     json_object *message = json_object_new_object();
     json_object_object_add(message, "jsonrpc", json_object_new_string("2.0"));
@@ -40,7 +40,7 @@ static json_object *outgoing(const char *id, const char *method, json_object *pa
     return message;
 }
 
-// A response, whole, to the request whose id is JSON text: its result, or its error.
+// 「[Opus 5.5] A response, whole, to the request whose id is JSON text: its result, or its error.」
 static json_object *response(const char *id, const char *key, json_object *value) {
     json_object *parsed = acp_parse(id, strlen(id));
     if (parsed == NULL) {
@@ -105,7 +105,7 @@ acp_status acp_client_error_write(const char *request_id, int code, const char *
     return send_or_refuse(response(request_id, "error", error), message_json);
 }
 
-// --- initialize ---
+// 「[Opus 5.5] --- initialize ---」
 
 static json_object *implementation(const char *name, const char *version) {
     json_object *info = json_object_new_object();
@@ -114,7 +114,7 @@ static json_object *implementation(const char *name, const char *version) {
     return info;
 }
 
-// What the client offers in version's shape, as acp_initialize_read reads it.
+// 「[Opus 5.5] What the client offers in version's shape, as acp_initialize_read reads it.」
 static json_object *offering(unsigned version, const acp_client_capabilities *offered) {
     acp_client_capabilities none = {0};
     const acp_client_capabilities *c = offered != NULL ? offered : &none;
@@ -173,7 +173,7 @@ acp_status acp_client_initialize_read(const char *message_json, size_t length, a
         if (v > 0 && v <= 65535) out->protocol_version = (unsigned) v;
     }
     if (out->protocol_version > 0) {
-        // The result is in the shape of the version it names.
+        // 「[Opus 5.5] The result is in the shape of the version it names.」
         int v2 = out->protocol_version >= 2;
         json_object *caps = acp_field(result, v2 ? "capabilities" : "agentCapabilities");
         json_object *info = acp_field(result, v2 ? "info" : "agentInfo");
@@ -207,9 +207,9 @@ acp_status acp_client_authenticate_write(const char *request_id, const char *met
     return send_or_refuse(outgoing(request_id, ACP_AGENT_AUTHENTICATE, params), message_json);
 }
 
-// --- sessions ---
+// 「[Opus 5.5] --- sessions ---」
 
-// The servers as McpServer's http shape, or NULL when one is not whole.
+// 「[Opus 5.5] The servers as McpServer's http shape, or NULL when one is not whole.」
 static json_object *servers_of(const acp_mcp_http *servers, size_t count) {
     if (count > 0 && servers == NULL) return NULL;
     for (size_t i = 0; i < count; i++) {
@@ -237,7 +237,7 @@ static json_object *servers_of(const acp_mcp_http *servers, size_t count) {
     return list;
 }
 
-// session/new, session/load or session/resume: the session for the latter two, the absolute cwd, the servers.
+// 「[Opus 5.5] session/new, session/load or session/resume: the session for the latter two, the absolute cwd, the servers.」
 static acp_status session_request(const char *method, const char *request_id, const char *session_id, const char *cwd,
     const acp_mcp_http *servers, size_t count, acp_buffer *message_json) {
     if (request_id == NULL || cwd == NULL || cwd[0] != '/' || message_json == NULL) return ACP_INVALID_ARGUMENT;
@@ -292,7 +292,7 @@ acp_status acp_client_session_set_config_option_write(const char *request_id, co
     return send_or_refuse(outgoing(request_id, ACP_AGENT_SESSION_SET_CONFIG_OPTION, params), message_json);
 }
 
-// --- prompts ---
+// 「[Opus 5.5] --- prompts ---」
 
 acp_status acp_client_session_prompt_write(const char *request_id, const char *session_id, const char *text, size_t length,
     acp_buffer *message_json) {
@@ -311,7 +311,7 @@ acp_status acp_client_session_prompt_write(const char *request_id, const char *s
 
 acp_status acp_client_session_prompt_read(const char *message_json, size_t length, int *stopped, acp_stop_reason *reason) {
     if (message_json == NULL || stopped == NULL || reason == NULL) return ACP_INVALID_ARGUMENT;
-    // StopReason, in the schema's order, as acp_stop_reason numbers them.
+    // 「[Opus 5.5] StopReason, in the schema's order, as acp_stop_reason numbers them.」
     static const char *const named[] = {"end_turn", "max_tokens", "max_turn_requests", "refusal", "cancelled"};
     *stopped = 0;
     json_object *message = acp_parse(message_json, length);
@@ -334,7 +334,7 @@ acp_status acp_client_session_cancel_write(const char *session_id, acp_buffer *m
     return send_or_refuse(outgoing(NULL, ACP_AGENT_SESSION_CANCEL, params), message_json);
 }
 
-// --- updates ---
+// 「[Opus 5.5] --- updates ---」
 
 static int uint64_of(json_object *value, unsigned long long *out) {
     if (!json_object_is_type(value, json_type_int)) return 0;
@@ -370,7 +370,7 @@ acp_status acp_client_session_update_read(const char *message_json, size_t lengt
             char *type = acp_string(content, "type");
             json_object *text = acp_field(content, "text");
             if (type != NULL && strcmp(type, "text") == 0 && json_object_is_type(text, json_type_string)) {
-                // Every byte, a NUL among them.
+                // 「[Opus 5.5] Every byte, a NUL among them.」
                 size_t n = (size_t) json_object_get_string_len(text);
                 if ((out->text = malloc(n + 1)) != NULL) {
                     memcpy(out->text, json_object_get_string(text), n);
@@ -413,7 +413,7 @@ void acp_update_free(acp_update *update) {
     memset(update, 0, sizeof *update);
 }
 
-// --- permission ---
+// 「[Opus 5.5] --- permission ---」
 
 acp_status acp_client_session_request_permission_read(const char *params_json, size_t length, acp_permission_asked *out) {
     if (params_json == NULL || out == NULL) return ACP_INVALID_ARGUMENT;

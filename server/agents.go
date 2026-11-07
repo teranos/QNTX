@@ -671,6 +671,6 @@ func (s *QNTXServer) namespacePiHarness(held aPiAgentHeld) *harness {
 	return &h
 }
 
-func notAHarness(sent sigil.Sent) *protocol.Refusal {
-	return &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "Node Agent harness is claude, pi or codex, got " + sent["harness"]}
+func notAHarness(hs []*harness, sent sigil.Sent) *protocol.Refusal {
+	return &protocol.Refusal{Why: sigil.NotOneOf, Param: "harness", Says: "Node Agent harness is one of " + strings.Join(harnessNames(hs), ", ") + ", got " + sent["harness"]}
 }

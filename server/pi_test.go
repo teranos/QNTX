@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "NOT BE ENTIRELY DEPENDENT ON ONE HARNESS"
@@ -174,6 +175,125 @@ func TestPiSaysWhoItIs(t *testing.T) {
 	assert.Equal(t, pi.PinnedVersion, am.GetPiVersion())
 	holds(t, s.nodeAgentSignum(), "am", &protocol.NodeAgentAm{Pi: am})
 	require.NoError(t, s.nodeAgentSignum().Check())
+}
+
+// "We shouldn't be displaying unavailable things to people"
+//
+// 「[Opus 5.5] am asked in no harness answers in every harness am.toml names the
+// Node Agent in, and in none other.」
+func TestAmInNoHarnessIsEveryHarnessItIsNamedIn(t *testing.T) {
+	alone, _ := runningTheNodeAgent(t, opusLow)
+	answer, refused := alone.nodeAgentSignum().Answers["am"](context.Background(), sigil.Sent{})
+	require.Nil(t, refused)
+	am := answer.(*protocol.NodeAgentAm)
+	assert.NotNil(t, am.GetClaude())
+	assert.Nil(t, am.GetPi(), "this node's am.toml names no Pi")
+	assert.Nil(t, am.GetCodex())
+	assert.Nil(t, am.GetAgy())
+	holds(t, alone.nodeAgentSignum(), "am", am)
+
+	withPi, _, _ := runningPiToo(t)
+	answer, refused = withPi.nodeAgentSignum().Answers["am"](context.Background(), sigil.Sent{})
+	require.Nil(t, refused)
+	am = answer.(*protocol.NodeAgentAm)
+	assert.NotNil(t, am.GetClaude())
+	assert.Equal(t, "anthropic/claude-sonnet-4.6", am.GetPi().GetModel())
+	holds(t, withPi.nodeAgentSignum(), "am", am)
+	require.NoError(t, withPi.nodeAgentSignum().Check())
+}
+
+// 「[Opus 5.5] A harness whose binary has not arrived, or failed to, is not in am
+// asked in no harness, and one still arriving is said to be; asked in it by
+// name, am still says why.」
+func TestAmInNoHarnessLeavesOutAHarnessNotReady(t *testing.T) {
+	for name, each := range map[string]struct {
+		held     *harnessHeld
+		arriving []string
+	}{
+		"still arriving": {&harnessHeld{name: "Pi", fetched: make(chan struct{})}, []string{"pi"}},
+		"failed to arrive": {func() *harnessHeld {
+			h := &harnessHeld{name: "Pi", fetched: make(chan struct{}), err: errors.New("the download was cut off")}
+			close(h.fetched)
+			return h
+		}(), nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, _, _ := runningPiToo(t)
+			s.holdHarness("pi", each.held)
+			answer, refused := s.nodeAgentSignum().Answers["am"](context.Background(), sigil.Sent{})
+			require.Nil(t, refused)
+			am := answer.(*protocol.NodeAgentAm)
+			assert.NotNil(t, am.GetClaude())
+			assert.Nil(t, am.GetPi())
+			assert.Equal(t, each.arriving, am.GetArriving())
+			holds(t, s.nodeAgentSignum(), "am", am)
+
+			named, refused := s.harnessAm(s.piHarness())
+			require.Nil(t, refused)
+			assert.NotEmpty(t, named.(*protocol.PiAm).GetNotReady())
+		})
+	}
+}
+
+// 「[Opus 5.5] An element asked am in no harness while no harness is ready is
+// answered in none, the one arriving named, and no agent of it is held. When
+// none is ready or arriving, it is refused, and still no agent is held.」
+func TestElementAmInNoHarnessReadyHoldsNoAgent(t *testing.T) {
+	s, _ := runningElementAgents(t)
+	s.holdHarness("claude", &harnessHeld{name: "Claude Code", fetched: make(chan struct{})})
+	answer, refused := s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "never-seen"})
+	require.Nil(t, refused)
+	am := answer.(*protocol.NodeAgentAm)
+	assert.Nil(t, am.GetClaude())
+	assert.Equal(t, []string{"claude"}, am.GetArriving())
+	_, held := s.elementAgents.of(elementPurpose("never-seen"))
+	assert.False(t, held)
+	_, refused = s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "../never-seen"})
+	require.NotNil(t, refused, "an element named by a path is refused, arriving or not")
+	assert.Equal(t, sigil.Invalid, refused.GetWhy())
+
+	failed := &harnessHeld{name: "Claude Code", fetched: make(chan struct{}), err: errors.New("the download was cut off")}
+	close(failed.fetched)
+	s.holdHarness("claude", failed)
+	_, refused = s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "never-seen"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "the download was cut off")
+	_, held = s.elementAgents.of(elementPurpose("never-seen"))
+	assert.False(t, held)
+}
+
+// 「[Opus 5.5] An element's agent, asked am in no harness, answers in the ones it can be spoken to in.」
+func TestElementAmInNoHarnessIsEveryHarnessItIsNamedIn(t *testing.T) {
+	s, _ := runningElementAgents(t)
+	answer, refused := s.elementsSignum().Answers["am"](context.Background(), sigil.Sent{"element": "ground-element"})
+	require.Nil(t, refused)
+	am := answer.(*protocol.NodeAgentAm)
+	assert.NotNil(t, am.GetClaude())
+	assert.Nil(t, am.GetPi(), "this node's am.toml names no Pi")
+	holds(t, s.elementsSignum(), "am", am)
+}
+
+// 「[Opus 5.5] The harnesses an agent's sigils take are the harnesses it runs in, said once.」
+func TestTheHarnessesTakenAreTheHarnessesItRunsIn(t *testing.T) {
+	s, _, _ := runningPiToo(t)
+	takes := func(signum *protocol.Signum, name string) []string {
+		for _, each := range signum.GetSigils() {
+			if each.GetName() == name {
+				for _, param := range each.GetTakes() {
+					if param.GetName() == "harness" {
+						return param.GetOneOf()
+					}
+				}
+			}
+		}
+		return nil
+	}
+	assert.Equal(t, []string{"claude", "pi", "codex", "agy"}, takes(s.nodeAgentSignum().Signum, "say"))
+	assert.Equal(t, []string{"claude", "pi", "codex", "agy"}, takes(s.nodeAgentSignum().Signum, "am"))
+	assert.Equal(t, []string{"claude", "pi"}, takes(s.elementsSignum().Signum, "am"))
+	_, refused := s.harnessNamed(sigil.Sent{"harness": "gemini"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "claude, pi, codex, agy")
 }
 
 // Only ROOT talks to it, in Pi as in Claude Code.

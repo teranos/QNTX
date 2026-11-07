@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -49,9 +48,9 @@ func (q *Queue) Enqueue(job *Job) error {
 // startJobSpan. No span in ctx means nothing is stamped, which is the honest
 // answer for a job nothing in particular asked for.
 func (q *Queue) EnqueueContext(ctx context.Context, job *Job) error {
-	if span := sentry.SpanFromContext(ctx); span != nil {
-		job.TraceContext = span.ToSentryTrace()
-		job.TraceBaggage = span.ToBaggage()
+	if traceparent, bag := traceparentOf(ctx); traceparent != "" {
+		job.TraceContext = traceparent
+		job.TraceBaggage = bag
 	}
 
 	// No span here, but a named parent, is the shape of a child created in

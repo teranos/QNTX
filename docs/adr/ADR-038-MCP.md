@@ -1,11 +1,11 @@
 # ADR-038: MCP
 
 Date: 2026-09-15
-Status: Proposed
+Status: Active and in use, how observable is this through sentry? Or through telemetry? I was thinking of taking OTel seriously throughout QNTX
 
 Is QNTX's role in MCP to be the host?
 
-"YES, AND THE MCP FOR QNTX ITSELF IS THE FIRST ONE TO OCCUPY, BUT WE COULD EVEN DO OTHER ONES"
+"YES, AND THE MCP FOR QNTX ITSELF IS THE FIRST ONE TO OCCUPY, BUT WE COULD EVEN DO OTHER ONES" -> which we do now, I have yet to confirm it per namespace though.
 
 Does an MCP client require dynamic client registration, or does it accept a client minted by hand?
 
@@ -19,9 +19,13 @@ Existing MCP servers can run on one box, behind QNTX.
 
 A token presented to QNTX is never passed on to an MCP server behind it; the MCP spec forbids passthrough.
 
-QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk), pinned at v1.8.0.
+QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk).
 
 "WE USE IT"
+
+Which version is [parity](https://github.com/teranos/QNTX/blob/main/server/parity/references.go)'s.
+
+"Parity owns it outright"
 
 The token the OAuth flow issues is the person who said yes at the passkey; what it reaches is the lines about its client's label, below.
 
@@ -86,3 +90,10 @@ ROOT's client is minted as one (`"root": true`) and names no namespace: only ROO
 ROOT's client answers at `/mcp`, the node's MCP server.
 
 "all clients can die"
+
+---
+
+> I do actually wonder, how we configure our Agent harnesses MCP today. Think QNTX being a client of MCP in addition to just being the server. 
+> So, I guess that means the Node itself, and each individual Namespace becomes a consumer of other systems MCP
+> Like the Obsidian MCP [[ADR-049-Obsidian]]
+> 

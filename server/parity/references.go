@@ -21,7 +21,7 @@ import (
 // The references a signum can be held to, each pinned in a directory named for
 // the reference, its version and the commit it was taken at, with SOURCE
 // saying where it came from: umami is umami_v3.3.1_ca661c7, a2a is
-// a2a_v1.0.1_3303592, mcp is mcp_2026-07-28_5f5440b, github is
+// held by a2a-go (sdk.go), mcp is mcp_2026-07-28_5f5440b, github is
 // github_2026-03-10_7bdf5f0, oasf is oasf_v1.1.3_243e9dd. A reference is read
 // as it is: a schema.prisma as Prisma, a .proto as the descriptors it compiles
 // to, a schema.json as JSON Schema, a .d.ts as the TypeScript types it
@@ -30,13 +30,19 @@ import (
 // oasf's are under agntcy/, its taxonomies under schema/, and the JSON Schema
 // 「[Fable 5.1] its server gives a Record is record.schema.json. TEI's ODD is pinned under」
 // 「[Fable 5.1] Specs/ as the Guidelines keep it: tei is tei_4.12.0_113e933 (odd.go).」
+// 「[Fable 5.1] OTLP's .proto files are under opentelemetry/, the path they import each」
+// 「[Fable 5.1] other by: otlp is otlp_v1.11.0_790608c, the commit go.mod's」
+// 「[Fable 5.1] go.opentelemetry.io/proto/otlp v1.11.0 is generated from.」
 //
-//go:embed */schema.prisma */*.proto */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema */record.schema.json */Specs
+//go:embed */schema.prisma */schema.json */openapi.words.json */words */*.d.ts */openapi.json */agntcy */schema */record.schema.json */Specs */opentelemetry
 var pinned embed.FS
 
-// Reference is the schema of the reference named, from the one directory
-// pinned for it.
+// Reference is the schema of the reference named: from the SDK that holds it,
+// or the one directory pinned for it.
 func Reference(name string) (Schema, *protocol.Refusal) {
+	if files, held := fromSDK[name]; held {
+		return sdkReference(files)
+	}
 	dir, files, refused := pinnedAt(name)
 	if refused != nil {
 		return Schema{}, refused
@@ -86,6 +92,9 @@ func Reference(name string) (Schema, *protocol.Refusal) {
 // Descriptors is the .proto files pinned for the reference named, as they
 // compile, for whatever reads more of a reference than its messages.
 func Descriptors(name string) ([]protoreflect.FileDescriptor, *protocol.Refusal) {
+	if files, held := fromSDK[name]; held {
+		return files, nil
+	}
 	dir, files, refused := pinnedAt(name)
 	if refused != nil {
 		return nil, refused
@@ -111,6 +120,13 @@ func Says(name string) (map[string]string, *protocol.Refusal) {
 		return nil, refused
 	}
 	says := map[string]string{}
+	// An SDK says more than its messages: what its client does, as make says
+	// read it.
+	if _, held := fromSDK[name]; held {
+		for said, words := range sdkSaid() {
+			says[said] = words
+		}
+	}
 	keep := func(d protoreflect.Descriptor) {
 		if said := saysOf(d); said != "" {
 			says[string(d.FullName())] = said
@@ -147,6 +163,9 @@ func pinnedAt(name string) (string, []string, *protocol.Refusal) {
 		return "", nil, failed("the pinned references did not read: %v", err)
 	}
 	var found, held []string
+	for reference := range fromSDK {
+		held = append(held, reference)
+	}
 	for _, entry := range entries {
 		reference, _, _ := strings.Cut(entry.Name(), "_")
 		held = append(held, reference)

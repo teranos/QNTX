@@ -109,8 +109,16 @@ func (s *QNTXServer) piSaid(agent *rootAgent, named appcfg.PiConfig, binary, ses
 
 // piMCP is the node's MCP as an agent in Pi reaches it, at own, with the
 // agent's own token.
+//
+// "THE NODE'S MCP NEEDS"
+//
+// 「[Opus 5.5] A node agent is given each MCP server the node consumes beside it.」
 func (s *QNTXServer) piMCP(agent *rootAgent, own string) []pi.MCPServer {
-	return []pi.MCPServer{{Name: nodeAgentMCP, URL: own + "/mcp", Bearer: agent.token}}
+	servers := []pi.MCPServer{{Name: nodeAgentMCP, URL: own + "/mcp", Bearer: agent.token}}
+	for _, consumed := range s.consumedForAgent(agent, own) {
+		servers = append(servers, pi.MCPServer{Name: consumed.Name, URL: consumed.URL, Bearer: agent.token})
+	}
+	return servers
 }
 
 // namespacePiPart is Pi's part of one turn of a namespace's agent: its model

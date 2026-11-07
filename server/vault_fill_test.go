@@ -25,16 +25,40 @@ func readNote(t *testing.T, vault Vault, place string) string {
 	return string(content)
 }
 
-// Binding a folder writes its repository folder's notes into it, folders and all.
+// Binding a folder writes its repository folder's notes into it.
 func TestBindingAFolderFillsItFromMain(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
 	require.Nil(t, refused, "%v", refused)
 
 	assert.Equal(t, mainNotes["docs/adr/ADR-001.md"], readNote(t, vault, "Course Material/ADR-001.md"))
-	assert.Equal(t, mainNotes["docs/adr/old/ADR-000.md"], readNote(t, vault, "Course Material/old/ADR-000.md"))
 	// Only notes: what is not one stays in the repository.
 	assert.NoFileExists(t, filepath.Join(vault.Path, "Course Material", "diagram.png"))
+}
+
+// "i DONT want the binding to include subdirs"
+// A folder inside a bound folder is not the binding's, at either end: its
+// notes on main do not reach the vault, the vault's do not reach the branch,
+// the branch's are not removed, and a push to one moves nothing.
+func TestABindingHoldsNoFolderInsideIt(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
+	require.Nil(t, refused, "%v", refused)
+	assert.NoFileExists(t, filepath.Join(vault.Path, "Course Material", "old", "ADR-000.md"))
+
+	deeper := filepath.Join(vault.Path, "Course Material", "drafts")
+	require.NoError(t, os.MkdirAll(deeper, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(deeper, "mine.md"), []byte("mine\n"), 0o644))
+	_, refused = askVault(t, s, "send", sigil.Sent{"name": "abcd", "place": "Course Material", "branch": "obsidian-abcd"})
+	require.Nil(t, refused, "%v", refused)
+	assert.Empty(t, stand.commits)
+	branch := stand.branches["obsidian-abcd"]
+	assert.NotContains(t, branch, "docs/adr/drafts/mine.md")
+	assert.Equal(t, "# ADR-000\n", branch["docs/adr/old/ADR-000.md"])
+
+	push := forge.Push{Ref: "refs/heads/main", Repo: onGitHubTest("abcd-nl/clean"), Changed: []string{"docs/adr/old/ADR-000.md"}}
+	assert.Empty(t, s.vaultsMovedBy(push))
+	assert.Equal(t, "mine\n", readNote(t, vault, "Course Material/drafts/mine.md"))
 }
 
 // "my word should supersede always no exception"
@@ -44,6 +68,7 @@ func TestBindingAFolderFillsItFromMain(t *testing.T) {
 func TestTheVaultsWordWins(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
+	mainNotes["docs/adr/ADR-002.md"] = "# ADR-002\n"
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "ADR-001.md"), []byte("# ADR-001\n\nAs the vault has it.\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "only here.md"), []byte("mine\n"), 0o644))
@@ -51,7 +76,7 @@ func TestTheVaultsWordWins(t *testing.T) {
 	filled := s.fillVault(t.Context(), "abcd", everyFolder)
 	require.Len(t, filled, 1)
 	require.NoError(t, filled[0].Refused)
-	assert.Equal(t, []string{"Course Material/old/ADR-000.md"}, filled[0].Wrote)
+	assert.Equal(t, []string{"Course Material/ADR-002.md"}, filled[0].Wrote)
 	assert.Equal(t, []string{"Course Material/ADR-001.md"}, filled[0].Kept)
 	assert.Equal(t, "# ADR-001\n\nAs the vault has it.\n", readNote(t, vault, "Course Material/ADR-001.md"))
 	assert.Equal(t, "mine\n", readNote(t, vault, "Course Material/only here.md"))
@@ -179,16 +204,17 @@ func TestAPushElsewhereLeavesTheVault(t *testing.T) {
 func TestANoteGoneFromMainIsGoneFromTheVault(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
+	mainNotes["docs/adr/ADR-002.md"] = "# ADR-002\n"
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "only here.md"), []byte("mine\n"), 0o644))
 	s.fillVault(t.Context(), "abcd", everyFolder)
 
-	delete(mainNotes, "docs/adr/old/ADR-000.md")
+	delete(mainNotes, "docs/adr/ADR-002.md")
 	filled := s.fillVault(t.Context(), "abcd", everyFolder)
 	require.Len(t, filled, 1)
 	require.NoError(t, filled[0].Refused)
-	assert.Equal(t, []string{"Course Material/old/ADR-000.md"}, filled[0].Removed)
-	assert.NoFileExists(t, filepath.Join(vault.Path, "Course Material", "old", "ADR-000.md"))
+	assert.Equal(t, []string{"Course Material/ADR-002.md"}, filled[0].Removed)
+	assert.NoFileExists(t, filepath.Join(vault.Path, "Course Material", "ADR-002.md"))
 	assert.Equal(t, mainNotes["docs/adr/ADR-001.md"], readNote(t, vault, "Course Material/ADR-001.md"))
 	assert.Equal(t, "mine\n", readNote(t, vault, "Course Material/only here.md"))
 }
@@ -197,17 +223,18 @@ func TestANoteGoneFromMainIsGoneFromTheVault(t *testing.T) {
 func TestANoteGoneFromMainThatTheVaultChangedStays(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	vault.Folders = []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material"}
+	mainNotes["docs/adr/ADR-002.md"] = "# ADR-002\n"
 	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
 	s.fillVault(t.Context(), "abcd", everyFolder)
-	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "old", "ADR-000.md"), []byte("# ADR-000\n\nStill mine.\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(vault.Path, "Course Material", "ADR-002.md"), []byte("# ADR-002\n\nStill mine.\n"), 0o644))
 
-	delete(mainNotes, "docs/adr/old/ADR-000.md")
+	delete(mainNotes, "docs/adr/ADR-002.md")
 	filled := s.fillVault(t.Context(), "abcd", everyFolder)
 	require.Len(t, filled, 1)
 	require.NoError(t, filled[0].Refused)
 	assert.Empty(t, filled[0].Removed)
-	assert.Equal(t, []string{"Course Material/old/ADR-000.md"}, filled[0].Kept)
-	assert.Equal(t, "# ADR-000\n\nStill mine.\n", readNote(t, vault, "Course Material/old/ADR-000.md"))
+	assert.Equal(t, []string{"Course Material/ADR-002.md"}, filled[0].Kept)
+	assert.Equal(t, "# ADR-002\n\nStill mine.\n", readNote(t, vault, "Course Material/ADR-002.md"))
 }
 
 // A folder that could not be filled says why, and writes nothing.

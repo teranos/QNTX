@@ -144,6 +144,11 @@
         "ROOT"
       ]
     },
+    "/api/anthropic/cap": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/anthropic/order": {
       "x-qntx-reach": [
         "ROOT"
@@ -432,6 +437,26 @@
         "ROOT"
       ]
     },
+    "/api/mcp": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mcp/drop": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mcp/servers/{name}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mcp/tools": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/namespaces": {
       "x-qntx-reach": [
         "ROOT",
@@ -689,6 +714,12 @@
         "SUPER"
       ]
     },
+    "/auth/agent": {
+      "x-qntx-reach": [
+        "TOKEN",
+        "ATTESTOR"
+      ]
+    },
     "/auth/authorize": {
       "x-qntx-reach": [
         "ANYONE"
@@ -836,6 +867,16 @@
         "ANYONE"
       ]
     },
+    "/auth/mcp/callback": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/auth/mcp/return": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/register/begin": {
       "x-qntx-reach": [
         "ANYONE"
@@ -935,6 +976,14 @@
     "/i/enable": {
       "x-qntx-reach": [
         "ANYONE"
+      ]
+    },
+    "/i/name": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR"
       ]
     },
     "/i/picture": {

@@ -15,10 +15,10 @@ type Source struct{ Owner, Repo, Branch string }
 
 func (s Source) String() string { return s.Owner + "/" + s.Repo + "@" + s.Branch }
 
-// Ground is where ground's own sources and global controls come from: libacp
-// while ground's main is held, since `make sand` is there and not on main.
+// Ground is where ground's own sources and global controls come from: ground's main, which holds
+// `make sand` since libacp was merged into it and left GitHub.
 // "12 for now yes"
-var Ground = Source{Owner: "teranos", Repo: "ground", Branch: "libacp"}
+var Ground = Source{Owner: "teranos", Repo: "ground", Branch: "main"}
 
 // Node is what a build asks of the node it runs on: where a source is now, its tarball,
 // a directory to build in, and a step run.
@@ -42,65 +42,76 @@ var building sync.Mutex
 
 // Build builds ground with its own controls and the project's, at both repositories' latest, and keeps it.
 // Each comet builds in a directory of its own, emptied when its next build begins: a failed build stays to be read until then.
-func (b Builder) Build(ctx context.Context, n Name) error {
+// It answers the engine ABI the comet is kept under.
+func (b Builder) Build(ctx context.Context, n Name) (string, error) {
 	building.Lock()
 	defer building.Unlock()
 	builds, err := b.Node.BuildsDir()
 	if err != nil {
-		return err
+		return "", err
 	}
 	work := filepath.Join(builds, "comet-"+n.Owner+"-"+n.Repo)
 	if err := os.RemoveAll(work); err != nil {
-		return errors.Wrapf(err, "the last build of the comet of %s in %s was not cleared", n.Key(), work)
+		return "", errors.Wrapf(err, "the last build of the comet of %s in %s was not cleared", n.Key(), work)
 	}
 	if err := os.MkdirAll(work, 0o755); err != nil {
-		return errors.Wrapf(err, "failed to make %s to build the comet of %s in", work, n.Key())
+		return "", errors.Wrapf(err, "failed to make %s to build the comet of %s in", work, n.Key())
 	}
 	return b.buildIn(ctx, n, work)
 }
 
-// buildIn builds the comet in work and keeps it, under the engine ABI the sand was built for.
-func (b Builder) buildIn(ctx context.Context, n Name, work string) error {
+// buildIn builds the comet in work and keeps it, under the engine ABI the sand was built for, and answers that ABI.
+// Its ground is the one n names, else ground's branch.
+func (b Builder) buildIn(ctx context.Context, n Name, work string) (string, error) {
 	checkout := filepath.Join(work, "project")
 	rev, err := b.unpack(ctx, Source{Owner: n.Owner, Repo: n.Repo}, work, checkout)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// "we can maintain the pbt for the ground comets that impact this laptop on l"
 	machineOwner, machineRepo, named := strings.Cut(n.Machine, "/")
 	if !named {
-		return errors.Newf("the comet of %s names no machine as owner/repo: %q", n.Key(), n.Machine)
+		return "", errors.Newf("the comet of %s names no machine as owner/repo: %q", n.Key(), n.Machine)
 	}
 	machine := filepath.Join(work, "machine")
 	machineRev, err := b.unpack(ctx, Source{Owner: machineOwner, Repo: machineRepo}, work, machine)
 	if err != nil {
-		return err
+		return "", err
 	}
 	sand, err := machineSand(machine, n.Machine)
 	if err != nil {
-		return err
+		return "", err
 	}
 	sand["comet.pbt"] = Declaration(checkout, n.Owner, n.Repo)
 	of := n.Owner + "/" + n.Repo + "@" + short(rev) + " " + n.Machine + "@" + short(machineRev)
 	// "only the compiled controls being their own thing shipped to the user"
 	// A comet is the sand alone, loaded by the ground that lands it (ground source/sandload.d).
-	src, env, err := b.prepare(ctx, work, sand, of)
+	ground := Ground
+	if n.GroundRev != "" {
+		ground.Branch = n.GroundRev
+	}
+	src, env, err := b.prepareFrom(ctx, ground, work, sand, of)
 	if err != nil {
-		return errors.Wrapf(err, "the comet of %s did not build", n.Base())
+		return "", errors.Wrapf(err, "the comet of %s did not build", n.Base())
 	}
 	abi, err := b.sandIn(ctx, src, env, n.Platform)
 	if err != nil {
-		return errors.Wrapf(err, "the comet of %s did not build", n.Base())
+		return "", errors.Wrapf(err, "the comet of %s did not build", n.Base())
+	}
+	// A ground an engine named that builds another ABI keeps nothing: the comet kept for that ABI
+	// was built for it. The caller says which ABI it built.
+	if n.GroundRev != "" && abi != n.ABI {
+		return abi, nil
 	}
 	n.ABI = abi
 	kept, err := Path(n)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := keepBuilt(src, filepath.Join("build", SandFile(n.Platform)), kept); err != nil {
-		return err
+		return "", err
 	}
-	return errors.Wrapf(os.WriteFile(kept+".machine", []byte(n.Machine), 0o644), "the comet of %s was kept, and the machine it carries was not written beside it", n.Key())
+	return abi, errors.Wrapf(os.WriteFile(kept+".machine", []byte(n.Machine), 0o644), "the comet of %s was kept, and the machine it carries was not written beside it", n.Key())
 }
 
 // machineSand is each pbt in the machine repository's controls/, by the name it lands under in
@@ -157,8 +168,13 @@ func (b Builder) unpack(ctx context.Context, source Source, work, dir string) (s
 // prepare unpacks ground's branch in work with sand beside its own controls, and answers where, and
 // the environment its steps run in. of names what the sand was built from, for its version.
 func (b Builder) prepare(ctx context.Context, work string, sand map[string]string, of string) (string, []string, error) {
+	return b.prepareFrom(ctx, Ground, work, sand, of)
+}
+
+// prepareFrom is prepare with ground's sources from ground, a branch or a revision.
+func (b Builder) prepareFrom(ctx context.Context, ground Source, work string, sand map[string]string, of string) (string, []string, error) {
 	src := filepath.Join(work, "ground")
-	groundRev, err := b.unpack(ctx, Ground, work, src)
+	groundRev, err := b.unpack(ctx, ground, work, src)
 	if err != nil {
 		return "", nil, err
 	}
@@ -279,7 +295,7 @@ var linuxTargets = map[string]string{
 }
 
 // sandCompiled is the LDC invocation that compiles the sand for platform into build/sand.o, as
-// ground's make sand compiles it: bin/sand.d with builtin_sand and sandview alone.
+// ground's make sand compiles it: bin/sand.d with sand.builtin and sand.view alone (ground Makefile, sand:).
 func sandCompiled(platform string) []string {
 	triple := linuxTargets[platform]
 	pic := []string{"-relocation-model=pic"}
@@ -289,7 +305,7 @@ func sandCompiled(platform string) []string {
 	args := []string{"ldc2", "-betterC", "--lowmem", "-mtriple=" + triple, "-O", "-release",
 		"-fvisibility=hidden", "--function-sections", "--data-sections"}
 	args = append(args, pic...)
-	return append(args, "-I=source", "-J=.", "-i=builtin_sand", "-i=sandview", "-c", "--singleobj", "-of=build/sand.o", "bin/sand.d")
+	return append(args, "-I=source", "-J=.", "-i=sand.builtin", "-i=sand.view", "-c", "--singleobj", "-of=build/sand.o", "bin/sand.d")
 }
 
 // sandLinked links build/sand.o into the library platform loads, against nothing.

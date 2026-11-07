@@ -36,7 +36,7 @@ acp_status acp_read_text_file_result_read(const char *message_json, size_t lengt
     out->not_found = json_object_is_type(code, json_type_int) && json_object_get_int64(code) == -32002;
     acp_status status = ACP_OK;
     if (json_object_is_type(content, json_type_string)) {
-        // Every byte, as the text may hold a NUL a C string would stop at.
+        // 「[Opus 5.5] Every byte, as the text may hold a NUL a C string would stop at.」
         int n = json_object_get_string_len(content);
         if ((out->content = malloc((size_t) n + 1)) == NULL) {
             status = ACP_NO_MEMORY;

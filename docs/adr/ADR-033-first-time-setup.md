@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-22
-**Related:** [[ADR-027-Permissions]] (Permissions), [[ADR-030-identity-providers]] (Identity Providers), [[ADR-031-the-user]] (The User)
+**Related:** [[ADR-027-Permissions]] (Permissions), [[ADR-030-identity-providers]] (Identity Providers), [[ADR-031-Users]] (The User)
 
 - The first User to prove they hold a root identity is the first User, and the first User is always the ROOT User. Proving a listed route is what creates them — there is no separate act, and nothing has to be seeded ahead of it.
 - A node is  the one thing that exists before any User does.
@@ -24,7 +24,7 @@ Seeing it is not passing it. The gate is the proof, not the visibility.
 "setting any of these isnt required for root identity acc creation, it aready happened when we proofed we own the acc set in root_identities."
 
 So the display name and the email are asked for, never required. Walking away from that
-page leaves you ROOT, signed in, and called `root` ([[ADR-031-the-user]]).
+page leaves you ROOT, signed in, and called `root` ([[ADR-031-Users]]).
 
 The device comes before the name. A `display_name` is settled once and can never be taken
 back, and the half-admission laye leaves behind is by definition an admission nobody has

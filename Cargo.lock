@@ -405,6 +405,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "ats-dev"
+version = "0.2.44"
+dependencies = [
+ "ats-sqlite",
+ "qntx-ats",
+ "sacred-error",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "ats-duckdb"
 version = "0.2.44"
 dependencies = [
@@ -415,11 +426,11 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "duckdb",
- "laye-error",
  "pretty_assertions",
  "qntx-ats",
  "qntx-ffi-common",
  "qntx-proto",
+ "sacred-error",
  "serde",
  "serde_json",
  "tempfile",
@@ -454,12 +465,12 @@ dependencies = [
 name = "ats-postgres"
 version = "0.2.44"
 dependencies = [
- "laye-error",
  "postgres",
  "qntx-ats",
  "qntx-ffi-common",
  "qntx-proto",
  "rustls",
+ "sacred-error",
  "serde",
  "serde_json",
  "tokio-postgres-rustls",
@@ -491,7 +502,6 @@ dependencies = [
  "sqlite-vec",
  "tempfile",
  "thiserror 2.0.19",
- "uuid",
  "zerocopy",
 ]
 
@@ -2567,14 +2577,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "laye-error"
-version = "0.0.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "laye-me"
 version = "0.0.0"
 dependencies = [
@@ -2610,10 +2612,10 @@ dependencies = [
  "bs58",
  "futures",
  "js-sys",
- "laye-error",
  "laye-me",
  "laye-net",
  "libp2p-identity",
+ "sacred-error",
  "serde",
  "serde_json",
  "thiserror 2.0.19",
@@ -3975,8 +3977,8 @@ dependencies = [
 name = "qntx-ffi-common"
 version = "0.2.44"
 dependencies = [
- "laye-error",
  "qntx-ats",
+ "sacred-error",
  "serde_json",
 ]
 
@@ -4428,6 +4430,14 @@ name = "ryu"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+
+[[package]]
+name = "sacred-error"
+version = "0.1.0"
+source = "git+https://github.com/teranos/sacred-error?rev=aaf9a743a2b9b0d22c6059dddbfdc4897f6528c7#aaf9a743a2b9b0d22c6059dddbfdc4897f6528c7"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "schannel"

@@ -25,10 +25,6 @@ The atomic unit of QNTX. A signed, immutable claim.
 
 Subject + predicate + context. The *content* of the claim, stripped of provenance. This is what users see and interact with. The [triplet element](elements/triplet.md) groups all attestations sharing a triplet.
 
-## The Sigma (Σ)
-
-When bounded storage evicts old attestations, they are distilled into sigmas — compressed aggregates that preserve statistical shape (min/max/sum/count, histograms, frequencies) while releasing individual events. Sigmas are attestations. They can be recursively meta-distilled.
-
 ## Attested Types (⊢)
 
 Types exist through attestation — `restaurant` is real because someone attested it, not because a schema declares it. See [attested-types.md](attested-types.md).

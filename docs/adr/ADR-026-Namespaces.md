@@ -20,7 +20,7 @@ proves you have access to that identity.
 
 ### Reach is granted
 
-A User can reach a namespace through REACH granted and struck by ROOT, [[ADR-031-the-user]] 
+A User can reach a namespace through REACH granted and struck by ROOT, [[ADR-031-Users]] 
 
 Disabling a namespace refuses reads by all non-owners and writes for everyone. 
 ### Namespaces are their own universes

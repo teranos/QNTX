@@ -46,7 +46,7 @@ const (
 //   - ?predicate=y  — filter by predicate(s), comma-separated
 //   - ?context=z    — filter by context(s), comma-separated
 //   - ?actor=a      — filter by actor(s), comma-separated
-//   - ?source=s     — filter by source (exact match, e.g. "cli", "distill")
+//   - ?source=s     — filter by source (exact match, e.g. "cli", "datapunt")
 //   - ?since=T      — attestations at or after T ("yesterday", "3 days ago", "2025-01-15")
 //   - ?until=T      — attestations at or before T (same expressions as since)
 //   - ?on=T         — attestations within the day T falls on (excludes since/until)

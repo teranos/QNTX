@@ -1,9 +1,14 @@
 # ADR-049: Obsidian
 
 Date: 2026-10-06
+Update: 2026-11-04
 Status: Developed in pr #1094 - I think its merged because i am using obsidian to write this now.
+pre-0.888.0-polish-blocker 
+
 
 "i want to integrate better with Obsidian's sync service if possible, and have Obsidian be a QNTX thing, I would rather have that than to reinvent everything Obsidian does, i tried that before actually, and i got somewhere, but truth be told is that Obsidian is really good at what it is and I like using it as is."
+
+TODO: see [[ADR-038-MCP]] for QNTX being a consumer to any MCP, this would apply to Obsidian as well. -> leads to-> us being able to continue to riff off the capabilities that MCP provides.
 
 "..., their sync service is great, it never fails me"
 
@@ -12,15 +17,10 @@ Status: Developed in pr #1094 - I think its merged because i am using obsidian t
 Both ways: what is written in the vault reaches QNTX, and what QNTX holds reaches the vault.
 
 "1. a persistent branch exists for all repo's that the Vault we assign directory space to."
-
 "2. meaning, for a given doc folder in one of our repositories, an indication of some sorts is made,"
-
 "3. QNTX receives webhooks on most events github dispatches"
-
 "4. And the persistent branch is obsidian-[nameofvault] and it always contains the abcdsync diff, and people may merge it at times"
-
 "5. And QNTX ensures changes flow back into the Obsidian Vault as well"
-
 "6. The Obsidian Vault is available to the ROOT agent on the machine"
 
 - A repository's docs are edited from any device the vault is on, the phone
@@ -30,20 +30,21 @@ Both ways: what is written in the vault reaches QNTX, and what QNTX holds reache
 
 ## On-Prem
 
+
+
 Obsidian Headless (`obsidian-headless`, open beta, Node.js 22 or later) is
 Obsidian's own client for Sync without the app: `ob login`, `ob sync-setup`,
 `ob sync --continuous`. On the box it keeps a copy of the vault, which is how the ROOT agent reaches it as files, and what is written into that copy reaches
 every device through Sync.
 
 "Fine, i will deal with this"
-
 - Sync is end-to-end encrypted, and the box is one of the ends: the vault is
   readable there, by the node and by the NODE agent ([[ADR-048-Node-Agent]]).
 
+TODO: figure out today state, the way the below text reads is as if the Node Agent is doing the syncing (spending a turn for nothing?), if that's true, that's not good. it seems like something we should be able to deal with mechanically, and we can deal with the probable merge conflict when we get to the point where we want to merge, as one of the things you do once per development cycle, the conflict should be talked about, not automatically judged upon and resolved by some Agent, these are the changes that are supposed to accrue in one PR, and modifications to ADR's should be blocked with a friendly reminder on cadence and scope and pacing and the process of the Obsidian Authoring Cycle. 
+
 "but you make a good point about NODE agent"
-
 "just make it do everything essentially"
-
 - The NODE agent sets the vault up on the box and keeps it syncing: `ob login`,
   `ob sync-setup`, `ob sync --continuous`. Each takes its answers as flags
   (`--email`, `--password`, `--mfa`, `--vault`, `--path`), so none of it waits
@@ -51,38 +52,60 @@ every device through Sync.
 
 ## The Obsidian element
 
-"you need to do some separate shit first before you can use your synced obsidian vault"
+"you need to do some separate shit first before you can use your synced obsidian vault" --> "check if we can link to the user story instead"
+
+TODO: link the userstories as an Obsidian managed thing, linked via the Element, it would be writing to QNTX-Web in this case.
 
 - `vault list` says per vault, as `setup`, that its copy is not on the box at its path, and nothing when it is. Setting it up there is by hand until #1091.
 
 "you would think there would be a Obsidian Element to make it a bit easier"
 
-"and i guess i want to do the docs tracking in that Element as well"
+"docs tracking configured in the Obsidian Element"
 - The vault is set up, and the folders it holds are named, from an element in
   the tray.
 
+"TODO: and to be able to say that some folder or file belongs to an Agent Room"
+
 ## Which folders are the vault's
 
-"So, we could do the Same for Obsidian"
+`github.com/owner/repo@branch:path`
+###### [[ADR-002-plugin-configuration]]
+The vault's folders are named on a record on the node, 
+and the folder itself carries nothing.
 
-As datapunt's inputs are named on its plugin record, `github.com/owner/repo@branch:path`
-([[ADR-002-plugin-configuration]]), the vault's folders are named on a record on the node, and the
-folder itself carries nothing.
-
-"name both ends"
-
-- A folder is `github.com/owner/repo@branch:path=place`, the place being where in the
-  vault it is. A place is inside the vault, and no place is another's or
+"name both ends:"
+- A folder is `github.com/owner/repo@branch:path=place`, the place being where in the vault it is. A place is inside the vault, and no place is another's or
   holds another, so a note is one folder's.
 
+"i DONT want the binding to include subdirs"
+- A folder holds the notes directly in it. A folder inside it is not its, nor are the notes in that one (#1507).
+
+## One file
+
+"i want inside of my obsidian:"
+"QNTX/AgentInstructions/QNTX/AGENTS.md"
+"QNTX/AgentInstructions/QNTX/CLAUDE.md"
+"QNTX/AgentInstructions/QNTX/README.md"
+"QNTX/AgentInstructions/QNTX-Web/CLAUDE.md"
+"QNTX/AgentInstructions/QNTX-App/CLADUE.md"
+"i want single file bindings that follow that format"
+- A binding can name one file: `github.com/owner/repo@branch:file=place`, the place being the note's own path in the vault, as `github.com/teranos/QNTX@main:AGENTS.md=QNTX/AgentInstructions/QNTX/AGENTS.md`.
+- A file at the repository's top can be bound. A folder still cannot be the top.
+- A path ending `.md` names one file, and its place ends `.md`.
 
 ## What reaches the vault
 
-- Only notes: `.md` files. What else the repository's folder holds stays there.
+- Only notes: `.md` files, and stories. What else the repository's folder holds stays there.
+
+"i see, but i want those .feature files to be authored in Obsidian"
+"yes, because i would love to author these things myself."
+- A story, a `.feature` file, is a note in the vault: `X.feature` is `X.feature.md`. What the vault changes in `X.feature.md` reaches the branch as `X.feature`.
+- A folder holding both `X.feature` and `X.feature.md` is not filled: they would be one note.
 - Asked whether a note deleted on main is deleted from the vault too:
 
 - A note main had and has no more is removed from the vault. A note main  never had is the vault's own and stays.
 
+- "wether an Agent can get to it via stories is done on a per binding basis"
 ## What reaches the repository
 
 "i don't want that to be automatically opted in, and i want to set what the name of the branch would be in the obsidian element in the binding."
@@ -99,3 +122,9 @@ folder itself carries nothing.
 "and as a USER, have the possibility to also set Obsidian per namespace"
 - One vault today, synced by a systemd unit on the box as root. Every vault  sigil is `of ROOT` (server/reach/table.go), and a VAULT line is a node  record (server/vault.go). 
 - A vault per namespace is that line in the  namespace, its reach lines there, and one sync process per vault.
+
+
+
+## Quotes
+
+TODO: Figure out how this interacts with [[QNTX-Quote]] [[ADR-056-Subsystems|Subsystem]]

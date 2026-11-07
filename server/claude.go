@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -329,6 +330,13 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			}
 			if s.ownURL != "" {
 				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
+				// "THE NODE'S MCP NEEDS"
+				for _, consumed := range s.consumedForAgent(agent, s.ownURL) {
+					said.MCP = append(said.MCP, claudecode.MCPServer{Name: consumed.Name, URL: consumed.URL, Bearer: agent.token})
+					// A server ROOT said yes to is one the agent may use, unasked:
+					// each of its tools, whatever its name holds.
+					said.Allow = append(slices.Clone(said.Allow), "mcp__"+consumed.Name, "mcp__"+consumed.Name+"__*")
+				}
 			}
 			answer, err := s.spend(agent, said, t.shot, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
 			if err != nil {

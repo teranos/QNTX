@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -80,11 +81,12 @@ func TestARefusedA2ARequestIsASentryLog(t *testing.T) {
 	srv.logger = zap.New(core).Sugar()
 	sent := toSentry(t)
 
-	r := asBearer(http.MethodPost, "/a2a/", tokens[auth.LevelRoot])
-	body := `{"jsonrpc": "2.0", "id": 1, "method": "SendMessage", "params": {"secret": "in-the-body"}}`
+	r := asBearer(http.MethodPost, "/a2a/tasks/nothing:cancel", tokens[auth.LevelRoot])
+	body := `{"secret": "in-the-body"}`
 	r.Body = io.NopCloser(strings.NewReader(body))
 	r.ContentLength = int64(len(body))
 	r.Header.Set("User-Agent", "a-client/1")
+	r.Header.Set("A2A-Version", "1.0")
 	w := httptest.NewRecorder()
 	srv.served.ServeHTTP(w, r)
 	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
@@ -97,8 +99,8 @@ func TestARefusedA2ARequestIsASentryLog(t *testing.T) {
 	l := logs[0]
 	assert.Equal(t, "An A2A request was refused", l.Body)
 	for key, want := range map[string]string{
-		"a2a.reason": "NOT_FOUND", "a2a.kind": "expected", "a2a.binding": "jsonrpc", "a2a.jsonrpc": "SendMessage",
-		"a2a.method": "POST", "a2a.path": "/a2a/", "user_agent.untrusted": "a-client/1", "request_id": id,
+		"a2a.reason": "TASK_NOT_FOUND", "a2a.kind": "expected", "a2a.binding": "http+json", "a2a.operation": "CancelTask",
+		"a2a.method": "POST", "a2a.path": "/a2a/tasks/nothing:cancel", "user_agent.untrusted": "a-client/1", "request_id": id,
 		"sentry.release": "test-release",
 	} {
 		got, held := logAttr(l, key)
@@ -215,21 +217,139 @@ func TestVersionsAndMethodsAreTheNodesWords(t *testing.T) {
 	assert.Equal(t, "a?b", bounded("a\x00b", 10))
 }
 
-// A refusal tells the A2A-Version the client said, whatever Major.Minor the
-// SDK is handed (§3.6).
-func TestARefusalTellsTheVersionTheClientSaid(t *testing.T) {
+// JSON-RPC answers a refusal with HTTP 200 and the error in the body; it is a Sentry log all the same.
+func TestARefusedJSONRPCRequestIsASentryLog(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	sent := toSentry(t)
 
-	r := asBearer(http.MethodGet, "/a2a/tasks/nothing", tokens[auth.LevelRoot])
-	r.Header.Set("A2A-Version", "1.0.1")
+	r := asBearer(http.MethodPost, "/a2a/", tokens[auth.LevelRoot])
+	body := `{"jsonrpc":"2.0","id":1,"method":"CancelTask","params":{"id":"nothing"}}`
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"error"`)
+
+	logs, _ := sent.said()
+	require.Len(t, logs, 1)
+	for key, want := range map[string]string{"a2a.reason": "TASK_NOT_FOUND", "a2a.binding": "jsonrpc", "a2a.operation": "CancelTask"} {
+		got, held := logAttr(logs[0], key)
+		assert.True(t, held, key)
+		assert.Equal(t, want, got, key)
+	}
+}
+
+// A message sent to an agent is the user's: one in the agent's role is refused.
+func TestAMessageInTheAgentsRoleIsRefused(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	r := asBearer(http.MethodPost, "/a2a/message:send", tokens[auth.LevelRoot])
+	body := `{"message":{"messageId":"m1","role":"ROLE_AGENT","parts":[{"text":"hello"}]}}`
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/a2a+json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "role")
+}
+
+// An agent at a tenant takes less than the Node Agent: a body over tenantBodyMost is refused there.
+func TestATenantsAgentTakesLessThanTheNodeAgent(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	text := strings.Repeat("a", tenantBodyMost)
+	body := `{"message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"` + text + `"}]}}`
+	r := asBearer(http.MethodPost, "/a2a/orchard/message:send", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/a2a+json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "an agent at a tenant takes")
+}
+
+// A JSON-RPC stream that is refused answers its error as an SSE event; it is a Sentry log all the same.
+func TestARefusedJSONRPCStreamIsASentryLog(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	sent := toSentry(t)
+
+	r := asBearer(http.MethodPost, "/a2a/", tokens[auth.LevelRoot])
+	body := `{"jsonrpc":"2.0","id":1,"method":"SendStreamingMessage","params":{"message":{"messageId":"m1","role":"ROLE_AGENT","parts":[{"text":"hello"}]}}}`
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Contains(t, w.Body.String(), `"error"`, w.Body.String())
+
+	logs, _ := sent.said()
+	require.Len(t, logs, 1, w.Header().Get("Content-Type")+" "+w.Body.String())
+	for key, want := range map[string]string{"a2a.binding": "jsonrpc", "a2a.operation": "SendStreamingMessage"} {
+		got, held := logAttr(logs[0], key)
+		assert.True(t, held, key)
+		assert.Equal(t, want, got, key)
+	}
+}
+
+// A stream's error is heard however much the stream said before it, and when
+// it arrives split across writes.
+func TestALateStreamedErrorIsStillARefusal(t *testing.T) {
+	answered := &a2aAnswered{ResponseWriter: httptest.NewRecorder(), keepsAll: true}
+	answered.Header().Set("Content-Type", "text/event-stream")
+	event := `data: {"jsonrpc":"2.0","id":1,"result":{"statusUpdate":{"taskId":"t","status":{"state":"TASK_STATE_WORKING"}}}}` + "\n\n"
+	require.Greater(t, len(event)*200, a2aSaidMost, "the stream before the error is not longer than what an answer keeps")
+	for range 200 {
+		_, _ = answered.Write([]byte(event))
+	}
+	refusal := `data: {"jsonrpc":"2.0","id":1,"error":{"code":-32001,"message":"no such task"}}` + "\n\n"
+	_, _ = answered.Write([]byte(refusal[:30]))
+	_, _ = answered.Write([]byte(refusal[30:]))
+
+	said, refused := jsonRPCRefusalOf(&a2aExchange{operation: "SendStreamingMessage", jsonRPC: true}, answered)
+	require.True(t, refused, "an error after %d bytes of stream was not heard", len(event)*200)
+	assert.Equal(t, "no such task", said.Message)
+	assert.Equal(t, "-32001", said.Reason)
+}
+
+// What a2a-go says went wrong is a Sentry log while Sentry runs, and is
+// written nowhere else: "Observability, this kind, needs to be owned by sentry/otel".
+func TestWhatA2AGoSaysIsASentryLog(t *testing.T) {
+	sent := toSentry(t)
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+
+	r := asBearer(http.MethodPost, "/a2a/tasks/nothing:cancel", tokens[auth.LevelRoot])
+	r.Header.Set("A2A-Version", "1.0")
 	w := httptest.NewRecorder()
 	srv.served.ServeHTTP(w, r)
 	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 
-	logs, _ := sent.said()
-	require.Len(t, logs, 1)
-	said, held := logAttr(logs[0], "a2a.version")
-	assert.True(t, held)
-	assert.Equal(t, "1.0.1", said)
+	require.Eventually(t, func() bool {
+		logs, _ := sent.said()
+		for _, l := range logs {
+			if l.Body == "canceler setup failed" {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 20*time.Millisecond, "a2a-go's error was not a Sentry log")
+}
+
+// "acceptedOutputModes": a client that takes no text is refused, since the agent answers in text.
+func TestAClientThatTakesNoTextIsRefused(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	code, refused := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send",
+		saidToTheNode("hi", `{"acceptedOutputModes": ["image/png"]}`), tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusBadRequest, code, refused)
+	said, _ := json.Marshal(refused)
+	assert.Contains(t, string(said), "CONTENT_TYPE_NOT_SUPPORTED")
+
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send",
+		saidToTheNode("hi", `{"acceptedOutputModes": ["image/png", "text/plain"]}`), tokens[auth.LevelRoot])
+	assert.Equal(t, http.StatusOK, code, sent)
 }
