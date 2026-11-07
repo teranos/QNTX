@@ -26,10 +26,6 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 		}
 	}
 
-	// Create and start storage events poller for broadcasting warnings/evictions
-	storagePoller := NewStorageEventsPoller(s.nodeDB, s, s.logger)
-	s.storageEventsPoller = storagePoller
-
 	// Index attestations into MeiliSearch when a search provider is available (ADR-015).
 	if s.servicesManager != nil {
 		richStore := s.held.ServedUniverse().Rich()
@@ -38,8 +34,6 @@ func (tickerSubsystem) Init(s *QNTXServer) error {
 		// it was built from. Nothing crosses (ADR-026).
 		storage.RegisterObserver(auth.NamespaceDefault, searchObserver)
 	}
-
-	s.wg.Go("storageEvents.poller", func() { storagePoller.Start(s.ctx) })
 
 	return nil
 }

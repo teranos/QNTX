@@ -68,6 +68,8 @@ type GitHubServer struct {
 	enabled func() bool
 	logger  *zap.SugaredLogger
 	client  *http.Client
+	// downloads reads a file GitHub serves, bounded by githubDownloadTimeout.
+	downloads *http.Client
 
 	mu            sync.Mutex
 	baseURL       string
@@ -75,26 +77,32 @@ type GitHubServer struct {
 	installations map[string]InstallationToken // By owner/repo: what the App minted and is still good.
 }
 
+// githubDownloadTimeout is how long a file GitHub serves, an artifact or a
+// repository's tarball, has to arrive whole: the 10 minutes the node gives the
+// tarball of a comet (server/comet.go), the other file it downloads from
+// GitHub. The 30 seconds of an API call stopped otaripy's 526,284,574-byte
+// artifact after 207,388,672.
+const githubDownloadTimeout = 10 * time.Minute
+
 // NewGitHubServer creates the GitHub service. enabled is asked on every call.
 func NewGitHubServer(creds GitHubCredentials, enabled func() bool, logger *zap.SugaredLogger) *GitHubServer {
+	// A route whose answer carries a location asks where GitHub points:
+	// that redirect is the answer. Any other (a renamed repository) is followed.
+	redirects := func(req *http.Request, via []*http.Request) error {
+		if noFollow, marked := req.Context().Value(githubNoFollow{}).(bool); marked && noFollow {
+			return http.ErrUseLastResponse
+		}
+		if len(via) >= 10 {
+			return errors.Newf("stopped after %d redirects at %s", len(via), req.URL)
+		}
+		return nil
+	}
 	return &GitHubServer{
-		creds:   creds,
-		enabled: enabled,
-		logger:  logger,
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-			// A route whose answer carries a location asks where GitHub points:
-			// that redirect is the answer. Any other (a renamed repository) is followed.
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				if noFollow, marked := req.Context().Value(githubNoFollow{}).(bool); marked && noFollow {
-					return http.ErrUseLastResponse
-				}
-				if len(via) >= 10 {
-					return errors.Newf("stopped after %d redirects at %s", len(via), req.URL)
-				}
-				return nil
-			},
-		},
+		creds:         creds,
+		enabled:       enabled,
+		logger:        logger,
+		client:        &http.Client{Timeout: 30 * time.Second, CheckRedirect: redirects},
+		downloads:     &http.Client{Timeout: githubDownloadTimeout, CheckRedirect: redirects},
 		baseURL:       "https://api.github.com",
 		limits:        map[string]GitHubLimit{},
 		installations: map[string]InstallationToken{},
@@ -168,7 +176,8 @@ func (s *GitHubServer) Artifact(ctx context.Context, owner, repo string, artifac
 }
 
 // download is what GitHub answers at path, read with token and its rate limit
-// kept under key, following where GitHub points.
+// kept under key, following where GitHub points. It is a file, and has
+// githubDownloadTimeout to arrive whole.
 func (s *GitHubServer) download(ctx context.Context, path, token, key string) (io.ReadCloser, error) {
 	s.mu.Lock()
 	target := s.baseURL + path
@@ -180,7 +189,7 @@ func (s *GitHubServer) download(ctx context.Context, path, token, key string) (i
 	httpReq.Header.Set("Authorization", "Bearer "+token)
 	httpReq.Header.Set("Accept", "application/vnd.github+json")
 	httpReq.Header.Set("X-GitHub-Api-Version", githubAPIVersion)
-	httpResp, err := s.client.Do(httpReq)
+	httpResp, err := s.downloads.Do(httpReq)
 	if err != nil {
 		return nil, errors.Wrapf(err, "GitHub GET %s failed", path)
 	}

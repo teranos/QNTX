@@ -67,7 +67,6 @@ parity: rust-sqlite ## Report whether SQLite, DuckDB and Postgres each hold ever
 says: ## Write what the specs and our protocol say of themselves for the parity sigil
 	@go run ./cmd/says
 	@nix eval --raw -f nix/references/umami.nix > server/parity/umami_v3.3.1_ca661c7/openapi.words.json
-	@nix eval --raw -f nix/references/a2a.nix > server/parity/a2a_v1.0.1_3303592/specification.md
 	@nix eval --raw -f nix/references/github.nix | jq . > server/parity/github_2026-03-10_7bdf5f0/openapi.json
 
 server: cli ## Start QNTX WebSocket server
@@ -164,8 +163,8 @@ proto: ## Generate Go code from protobuf definitions (via Nix)
 # "each plugin needs to move into their own respective repo as well"
 
 # "can't we build the client into libACP and make QNTX use it as an optional subsystem?"
-# libACP's C, the subtree in libacp/, into target/libacp, where internal/acp links it under
-# the build tag libacp. It needs a C11 compiler, make, pkg-config and json-c.
+# 「[Opus 5.5] libACP's C, the subtree in libacp/, into target/libacp, where internal/acp links it under」
+# 「[Opus 5.5] the build tag libacp. It needs a C11 compiler, make, pkg-config and json-c.」
 libacp: ## Build libACP, the ACP client an ACP harness runs through (build tag libacp)
 	@$(MAKE) -C libacp install PREFIX=$(CURDIR)/target/libacp
 	@echo "✓ libacp in target/libacp"

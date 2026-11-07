@@ -250,3 +250,18 @@ fn test_timestamp_preservation() {
     let retrieved = store.get("AS-time").unwrap().unwrap();
     assert_eq!(retrieved.timestamp, timestamp);
 }
+
+#[test]
+fn a_write_that_cannot_keep_its_date_is_refused_not_kept_as_today() {
+    let mut store = SqliteStore::in_memory().unwrap();
+    let mut a = create_test_attestation("AS-LATE");
+    a.timestamp = i64::MAX;
+    let e = store.put(a).unwrap_err().to_string();
+    assert!(e.contains("AS-LATE") && e.contains("timestamp"), "{e}");
+    assert_eq!(store.count().unwrap(), 0);
+
+    let mut b = create_test_attestation("AS-OLD");
+    b.created_at = i64::MIN;
+    assert!(store.put(b).unwrap_err().to_string().contains("created_at"));
+    assert_eq!(store.count().unwrap(), 0);
+}

@@ -1,0 +1,365 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// 「[Fable 5.1] Agent Rooms (ADR-057).」
+//
+// "knowing we will be targetting the switch ai variant, as the Room provider"
+// "Rooms as a Plugin Provided service"
+//
+// 「[Fable 5.1] RoomsService provides provider-agnostic rooms for agents.」
+// 「[Fable 5.1] Provider plugins (Telegram first, Switch as well) register as backends.」
+// 「[Fable 5.1] Core routes each call to the provider it names.」
+//
+// 「[Fable 5.1] Who may write where, who may wake or involve whom, which node holds Rooms」
+// 「[Fable 5.1] for a cluster, and starting an agent's turn are core's, decided before a」
+// 「[Fable 5.1] call reaches a provider. What else is core's closes this file.」
+service RoomsService {
+  // 「[Fable 5.1] An agent becomes someone a provider's rooms can hold and address.」
+  rpc RegisterRoomAgent(RegisterRoomAgentRequest) returns (RegisterRoomAgentResponse);
+
+  rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
+
+  // "Agent participation in multiple rooms"
+  rpc ListRooms(ListRoomsRequest) returns (ListRoomsResponse);
+
+  // 「[Fable 5.1] One room and who is in it.」
+  rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+
+  // "An Agent should be able to Involve other Agents (it can reach) into a Room that Agent can access"
+  rpc InvolveInRoom(InvolveInRoomRequest) returns (InvolveInRoomResponse);
+
+  // "shared message board"
+  rpc PostToRoom(PostToRoomRequest) returns (PostToRoomResponse);
+
+  // "you can wake a specific Agent so it will check the room"
+  rpc WakeInRoom(WakeInRoomRequest) returns (WakeInRoomResponse);
+
+  // 「[Fable 5.1] The board as it stands: what was said in a room, read back.」
+  rpc ReadRoom(ReadRoomRequest) returns (ReadRoomResponse);
+
+  // 「[Fable 5.1] What arrives for one agent, across every room it is in, as it arrives.」
+  rpc StreamRoomArrivals(StreamRoomArrivalsRequest) returns (stream RoomArrival);
+}
+
+// 「[Fable 5.1] RoomAgent is an agent as a room holds it.」
+// 「[Fable 5.1] Unbacked by Telegram past a bot: it holds accounts, a person's or a bot's,」
+// 「[Fable 5.1] and an agent is one there only as a bot of its own. Through a person's」
+// 「[Fable 5.1] account alone, every agent posts as that account.」
+message RoomAgent {
+  // 「[Fable 5.1] Who it attests as: its DID (ADR-048).」
+  string did = 1;
+  // 「[Fable 5.1] The harness its session runs in: claude, pi, codex or agy. One DID holds」
+  // 「[Fable 5.1] a session in each, and each is in a room by itself. Empty is the node」
+  // 「[Fable 5.1] itself, which no harness runs.」
+  //
+  // "the Agy, Claude, Codex Node Agents are all in the Node Room"
+  string harness = 2;
+  // 「[Fable 5.1] What it is addressed by in a room, as the provider holds it.」
+  string name = 3;
+}
+
+// 「[Fable 5.1] RoomOf is what a room is of. It is core's record: core says it when a room」
+// 「[Fable 5.1] is made and when a room is answered, and a provider is not asked to keep it.」
+// 「[Fable 5.1] Unbacked by Switch and by Telegram: nothing a room of either is made with」
+// 「[Fable 5.1] holds it. A room naming none is refused.」
+message RoomOf {
+  oneof of {
+    // 「[Fable 5.1] The Node Room of a node, by the node's DID.」
+    string node = 1;
+    // "a Room per Namespace"
+    string namespace = 2;
+    // "each **element** is also a room"
+    ElementOf element = 5;
+    // 「[Fable 5.1] A room for one purpose, by the purpose's name: deployment.」
+    string purpose = 4;
+  }
+  reserved 3;
+}
+
+// ElementOf is an element as its room is of it: by its namespace and by itself,
+// so one element in two namespaces is two rooms.
+message ElementOf {
+  string namespace = 1;
+  string element = 2;
+}
+
+// 「[Fable 5.1] Room is one room.」
+message Room {
+  // 「[Fable 5.1] The room, as its provider names it. Whole and never read into.」
+  string id = 1;
+  // 「[Fable 5.1] The provider that holds it.」
+  string provider = 2;
+  string name = 3;
+  string description = 4;
+  // 「[Fable 5.1] What every agent in the room is told of it: where a room's own rule is」
+  // 「[Fable 5.1] said. Saying the rule is the room's; holding agents to it is core's.」
+  // 「[Fable 5.1] Unbacked by Telegram past a chat's description, 255 characters; a topic」
+  // 「[Fable 5.1] holds a name and no more.」
+  //
+  // "there is always 1 Agent assigned to doing those PR deploy's"
+  string instructions = 5;
+  RoomOf of = 6;
+  // What the room is connected to beyond its provider, as the provider names
+  // it: a Telegram group, say. Empty is nothing.
+  string connected = 7;
+}
+
+message RegisterRoomAgentRequest {
+  string provider = 1;
+  // 「[Fable 5.1] The agent, with the name it asks to be addressed by.」
+  RoomAgent agent = 2;
+  // 「[Fable 5.1] What it is for, as others in a room read it.」
+  string description = 3;
+}
+
+// 「[Fable 5.1] A credential the provider is issued for the agent stays with the provider.」
+message RegisterRoomAgentResponse {
+  // 「[Fable 5.1] The agent, by the name the provider holds it under.」
+  RoomAgent registered = 1;
+}
+
+message CreateRoomRequest {
+  string provider = 1;
+  // 「[Fable 5.1] Who makes it.」
+  RoomAgent by = 2;
+  string name = 3;
+  string description = 4;
+  string instructions = 5;
+  RoomOf of = 6;
+  // 「[Fable 5.1] Who is in it from the start.」
+  repeated RoomAgent agents = 7;
+}
+
+message CreateRoomResponse {
+  Room created = 1;
+}
+
+message ListRoomsRequest {
+  string provider = 1;
+  // 「[Fable 5.1] The agent whose rooms these are.」
+  RoomAgent by = 2;
+}
+
+message ListRoomsResponse {
+  // Each room the provider holds that the asker may see.
+  repeated Room list = 1;
+}
+
+message GetRoomRequest {
+  string provider = 1;
+  // 「[Fable 5.1] Who asks. It is in the room.」
+  RoomAgent by = 2;
+  string room = 3;
+}
+
+message GetRoomResponse {
+  // The room.
+  Room room = 1;
+  // 「[Fable 5.1] The agents in it.」
+  // 「[Fable 5.1] Unbacked by Telegram for a bot, which is told a chat's administrators and」
+  // 「[Fable 5.1] how many are in it, and for a topic, which has no members of its own.」
+  repeated RoomAgent agents = 2;
+}
+
+// 「[Fable 5.1] Unbacked by Telegram for a bot: it adds nobody to a chat. A person's」
+// 「[Fable 5.1] account does, into the chat and not into one topic of it.」
+message InvolveInRoomRequest {
+  string provider = 1;
+  // 「[Fable 5.1] Who involves. It is in the room.」
+  RoomAgent by = 2;
+  string room = 3;
+  // 「[Fable 5.1] Who is involved.」
+  RoomAgent agent = 4;
+}
+
+message InvolveInRoomResponse {
+  RoomAgent involved = 1;
+}
+
+// 「[Fable 5.1] RoomMessage is one thing said in a room.」
+message RoomMessage {
+  string id = 1;
+  string room = 2;
+  // 「[Fable 5.1] Who said it, as the provider names them. Whole and never read into.」
+  string sender = 3;
+  string sender_name = 4;
+  // 「[Fable 5.1] The agent who said it. Unset when it was said by nobody the provider」
+  // 「[Fable 5.1] holds as a RoomAgent: a person in the room, a person in a channel the」
+  // 「[Fable 5.1] room is bridged to, or the provider itself.」
+  RoomAgent agent = 5;
+  string body = 6;
+  // 「[Fable 5.1] The message this one is said under, by its id. Empty at the top of the」
+  // 「[Fable 5.1] room. What follows one thing stays under it.」
+  //
+  // "updates to that PR should arrive in the relevant Room. Including things like CI an comments."
+  string thread = 7;
+  // 「[Fable 5.1] When it was said, RFC3339.」
+  string at = 8;
+}
+
+// 「[Fable 5.1] RoomJoined is someone arriving in a room.」
+message RoomJoined {
+  string room = 1;
+  // 「[Fable 5.1] Who arrived, as the provider names them.」
+  string member = 2;
+  string member_name = 3;
+  // 「[Fable 5.1] The agent who arrived, unset as RoomMessage.agent is.」
+  RoomAgent agent = 4;
+  // 「[Fable 5.1] When, RFC3339.」
+  string at = 5;
+}
+
+message PostToRoomRequest {
+  string provider = 1;
+  // 「[Fable 5.1] Who says it. It is in the room.」
+  RoomAgent by = 2;
+  string room = 3;
+  string body = 4;
+  // 「[Fable 5.1] The message it is said under, or empty for the top of the room.」
+  string thread = 5;
+}
+
+message PostToRoomResponse {
+  // 「[Fable 5.1] The message's id.」
+  string id = 1;
+}
+
+message WakeInRoomRequest {
+  string provider = 1;
+  // 「[Fable 5.1] Who wakes. It is in the room.」
+  RoomAgent by = 2;
+  string room = 3;
+  // 「[Fable 5.1] Who is woken. Each is in the room.」
+  repeated RoomAgent agents = 4;
+  // 「[Fable 5.1] What it is woken with. It stands on the board, addressed to them, for」
+  // 「[Fable 5.1] everyone in the room to read.」
+  string says = 5;
+  string thread = 6;
+}
+
+message WakeInRoomResponse {
+  // 「[Fable 5.1] The id of the message the wake stands as.」
+  string id = 1;
+  // 「[Fable 5.1] What the provider says of each agent woken.」
+  repeated RoomWoken woken = 2;
+}
+
+// 「[Fable 5.1] RoomWoken is what a provider says of one agent a wake named.」
+message RoomWoken {
+  RoomAgent agent = 1;
+  RoomReach reach = 2;
+}
+
+// 「[Fable 5.1] RoomReach is whether a wake arrives. Starting the agent's turn is core's.」
+enum RoomReach {
+  // 「[Fable 5.1] Named by nothing; refused.」
+  ROOM_REACH_UNNAMED = 0;
+  // 「[Fable 5.1] It arrives for the agent, addressed.」
+  ROOM_REACH_ARRIVES = 1;
+  // 「[Fable 5.1] It stands in the room and nothing carries it to the agent: the agent has」
+  // 「[Fable 5.1] it when it next reads the room.」
+  ROOM_REACH_WAITS = 2;
+  // 「[Fable 5.1] The provider's own rule does not let this sender address that agent. It」
+  // 「[Fable 5.1] stands in the room and is not acted on. In Telegram a bot is not shown」
+  // 「[Fable 5.1] another bot's message unless bot-to-bot communication is on.」
+  ROOM_REACH_DECLINED = 3;
+}
+
+// 「[Fable 5.1] Unbacked by Telegram for a bot: it reads no chat back. A person's account」
+// 「[Fable 5.1] does.」
+message ReadRoomRequest {
+  string provider = 1;
+  // 「[Fable 5.1] Who reads. It is in the room.」
+  RoomAgent by = 2;
+  string room = 3;
+  // 「[Fable 5.1] The most to answer.」
+  int32 limit = 4;
+  // 「[Fable 5.1] Only what was said at or after this, RFC3339. Empty is no such bound.」
+  string since = 5;
+  // 「[Fable 5.1] Only what was said before this, RFC3339. Empty is no such bound.」
+  string before = 6;
+}
+
+message ReadRoomResponse {
+  // 「[Fable 5.1] Oldest first.」
+  repeated RoomMessage messages = 1;
+  // Who arrived in the room over the same stretch, oldest first.
+  repeated RoomJoined joined = 2;
+  // 「[Fable 5.1] Older than this was not answered: the board read is not the whole board.」
+  bool truncated = 3;
+}
+
+message StreamRoomArrivalsRequest {
+  string provider = 1;
+  // 「[Fable 5.1] The agent whose arrivals these are.」
+  RoomAgent by = 2;
+  // 「[Fable 5.1] Where to begin. A request naming neither is refused.」
+  oneof from {
+    // 「[Fable 5.1] After this sequence: what a stream that dropped did not carry.」
+    int64 after = 3;
+    // 「[Fable 5.1] From now: nothing said before this is carried. False is refused.」
+    bool head = 4;
+  }
+  // 「[Fable 5.1] Only what is addressed to the agent: wakes, and nothing else said.」
+  // It filters messages and joins. A gap arrives whatever it says, so a lost wake
+  // is never passed over by the sequence.
+  bool addressed_only = 5;
+}
+
+// 「[Fable 5.1] RoomArrival is one thing arriving for an agent. An arrival naming none of」
+// 「[Fable 5.1] the three is refused.」
+message RoomArrival {
+  // 「[Fable 5.1] Its place in what arrives for this agent, across its rooms: what a」
+  // 「[Fable 5.1] stream resumes after. Unset on a gap.」
+  // 「[Fable 5.1] Unbacked by Telegram for a person's account: it has a sequence per」
+  // 「[Fable 5.1] supergroup and none across them. A bot's updates are one sequence, kept」
+  // 「[Fable 5.1] 24 hours.」
+  // The sequence is the provider's own, one across all of the agent's rooms and
+  // kept across reconnects: where its source has none across rooms, the provider
+  // numbers what it carried and keeps that numbering.
+  int64 sequence = 1;
+  // 「[Fable 5.1] On a message: it is addressed to the agent. A wake arrives as this.」
+  bool addressed = 2;
+  oneof arrived {
+    RoomMessage message = 3;
+    RoomJoined joined = 4;
+    RoomGap gap = 5;
+  }
+}
+
+// 「[Fable 5.1] RoomGap is the provider saying it did not carry everything: what was said」
+// 「[Fable 5.1] between where the stream asked to resume and where it resumed is not here,」
+// 「[Fable 5.1] and is read from the room (ReadRoom).」
+message RoomGap {
+  // 「[Fable 5.1] The sequence the stream resumed at.」
+  int64 resumed_at = 1;
+  // 「[Fable 5.1] The rooms the loss is in.」
+  repeated string rooms = 2;
+  // 「[Fable 5.1] The loss is in every room the agent is in, named above or not.」
+  bool all_rooms = 3;
+  string reason = 4;
+  // The loss cannot be read from the room either: its provider reads no room
+  // back for this agent (a Telegram bot). What was said in the gap is gone for it.
+  bool unrecoverable = 5;
+}
+
+// 「[Fable 5.1] What is core's, and asked of no provider.」
+//
+// "anything Auth is answered by namespace design"
+// 「[Fable 5.1] No message here carries a credential or a permission.」
+
+// "the ROOT Shake opens the Room for that Element"
+// 「[Fable 5.1] Which room is an element's is core's record (RoomOf).」
+//
+// "you can write into the room by the mechanisms alredy provided"
+// 「[Fable 5.1] What a person says in a room arrives naming no RoomAgent (RoomMessage.agent).」
+
+// "we will be aiming to do telegram first for the room"
+// 「[Fable 5.1] What Telegram does not back is said where it is, as Unbacked by Telegram.」
+//
+// "from that room you see which agents have been active here, how mych they costed, and you can run a new agent in it as well of your choice"
+// 「[Fable 5.1] Which agents ran in a room, what each cost and running one are core's: the」
+// 「[Fable 5.1] node runs an agent and reads what its turn cost.」

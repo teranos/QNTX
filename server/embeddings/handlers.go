@@ -302,7 +302,7 @@ func (h *Handler) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request) {
 
 	embeddingModels := []*storage.EmbeddingModel{}
 
-	richStore := storage.NewBoundedStore(h.DB, nil, h.Logger.Named("embeddings"))
+	richStore := storage.NewRichStore(h.DB, nil, h.Logger.Named("embeddings"))
 	richFields := richStore.GetDiscoveredRichFields()
 
 	for _, attestationID := range req.AttestationIDs {
@@ -729,15 +729,6 @@ func ExtractRichTextFromAttributes(attrs map[string]any, richFields []string) st
 			for _, item := range v {
 				if str, ok := item.(string); ok && str != "" {
 					parts = append(parts, str)
-				}
-			}
-		case map[string]any:
-			// Distilled aggregate — extract _text array preserved by merge_strings
-			if textArr, ok := v["_text"].([]any); ok {
-				for _, item := range textArr {
-					if str, ok := item.(string); ok && str != "" {
-						parts = append(parts, str)
-					}
 				}
 			}
 		}

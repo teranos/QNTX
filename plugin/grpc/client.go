@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -59,6 +60,10 @@ type ExternalDomainProxy struct {
 
 	// pythonProvider indicates this plugin can execute Python code (populated during Initialize)
 	pythonProvider bool
+
+	// roomsProvider indicates this plugin holds rooms (populated during Initialize).
+	// Atomic: a plugin initialized again while a room is asked for writes it.
+	roomsProvider atomic.Bool
 
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
@@ -253,6 +258,16 @@ func (c *ExternalDomainProxy) IsPythonProvider() bool {
 // Only meaningful when IsPythonProvider() is true.
 func (c *ExternalDomainProxy) PythonServiceClient() protocol.PythonServiceClient {
 	return protocol.NewPythonServiceClient(c.conn)
+}
+
+// IsRoomsProvider returns true if the plugin holds rooms (RoomsService, ADR-057).
+func (c *ExternalDomainProxy) IsRoomsProvider() bool {
+	return c.roomsProvider.Load()
+}
+
+// RoomsServiceClient returns a RoomsServiceClient using this plugin's existing gRPC connection.
+func (c *ExternalDomainProxy) RoomsServiceClient() protocol.RoomsServiceClient {
+	return protocol.NewRoomsServiceClient(c.conn)
 }
 
 // GetSigilsFrom returns where the plugin said, at Initialize, its sigils are
@@ -485,6 +500,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 
 	// Store Python provider capability
 	c.pythonProvider = resp.GetPythonProvider()
+	c.roomsProvider.Store(resp.GetRoomsProvider())
 
 	// Store and create watcher registrations. Declaring none withdraws
 	// every watcher the plugin declared before.

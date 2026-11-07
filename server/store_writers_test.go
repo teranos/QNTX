@@ -64,6 +64,12 @@ var storeWriters = map[string]string{
 	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
 		"Reached from the github sigils, which the reach table gives to ROOT",
 
+	"keepAgentName": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
+		"a name is one agent's on the whole node, and an agent acting in one namespace does not see system. " +
+		"Reached from i name, which the reach table gives to ROOT, SUPER and TOKEN, after itsOwnDID says the " +
+		"caller is a token asking as itself and iName says no other DID holds the name; the line's subject and " +
+		"actor are that DID and its predicate is agent:named, whatever was sent",
+
 	"sessionStoreOf": "where an agent's session lands (ADR-048): the Node Agent's in system, which is " +
 		"the node's own record whoever spoke to it, reached from the claude and pi sigils, which the " +
 		"reach table gives to ROOT; a namespace agent's in its namespace, through Write as the caller " +
@@ -75,9 +81,9 @@ var storeWriters = map[string]string{
 	"setAgentLine": "the AGENT line a namespace opts into its agent by (ADR-048), in the namespace's own " +
 		"store through Write as the setter is admitted, after maySetAgent says they own the namespace, " +
 		"or are ROOT or SUPER",
-	"keepAnthropicLine": "the node's ANTHROPIC line, the ids of the rule its identity token is traded at " +
-		"and what ROOT's agents spend first, in system through WriteWhatTheNodeKnowsOfItself: a line about " +
-		"the node, and the reach table names /api/anthropic and /api/anthropic/order of ROOT alone",
+	"keepAnthropicLine": "the node's ANTHROPIC line, the ids of the rule its identity token is traded at, " +
+		"and what ROOT's agents spend first and the cap on a Session at Anthropic, in system through WriteWhatTheNodeKnowsOfItself: a line about " +
+		"the node, and the reach table names /api/anthropic, /api/anthropic/order and /api/anthropic/cap of ROOT alone",
 	"keepGoogleCostLine": "the node's GOOGLE-COSTS, GOOGLE-BUDGET, GOOGLE-LIMIT, GOOGLE-DAY-LIMIT, GOOGLE-AGY and GOOGLE-SPEND lines, in system through " +
 		"WriteWhatTheNodeKnowsOfItself: ROOT's yes at Google or ROOT's limit, and what Google's budgets reported to the node",
 	"keepGoogleLine": "the node's GOOGLE line, what it was set up as at Google Cloud, in system through " +
@@ -87,6 +93,10 @@ var storeWriters = map[string]string{
 	"setKeyLine": "a KEY line of a namespace (ADR-051), in the namespace's own store through Write as " +
 		"the setter is admitted, after keysAsking refuses a token or a connector and mayHandleKeys says " +
 		"they own the namespace, or are ROOT or SUPER",
+	// 「[Opus 5.5] An MCP server the node consumes (ADR-038).」
+	"writeConsumedLine": "an MCP or MCP_CALL line of the node, in system through Write as the caller is admitted, " +
+		"after consumedUsing says they stand at ROOT, the node's agents included; a refreshed token is kept as " +
+		"whoever's call refreshed it",
 
 	"systemTasks": "a Task of the Node Agent or of an element's agent (A2A §3.4.2) lands in system, where " +
 		"their sessions are written, what the node knows of itself. Reached from the Task operations at no tenant " +
@@ -194,7 +204,6 @@ var nodeReaders = map[string]string{
 	"sub_config_watcher.go:Init":                  "am.toml is the node's configuration, and watching it is the node's",
 	"sub_nodedid.go:Init":                         "the node's own identity, the row keyed self",
 	"sub_plugins.go:Init":                         "the plugin service registry, and plugins are the node's",
-	"sub_ticker.go:Init":                          "the poller that reports warnings and evictions about the file itself",
 	"sub_ticker.go:openPulseReadDB":               "a second connection to the same file, so a read does not wait on a write",
 }
 

@@ -512,6 +512,9 @@ func (wp *WorkerPool) processNextJob() error {
 	execStart := time.Now()
 	span, execCtx := wp.startJobSpan(job)
 	defer wp.finishJobSpan(span, job)
+	// 「[Fable 5.1] Deferred after, so it runs before: the OpenTelemetry span reads」
+	// 「[Fable 5.1] how the execution ended off the Sentry span while it is open.」
+	defer finishOTelJobSpan(execCtx, span, job)
 	wp.writeTaskLog(job.ID, job.HandlerName, "info", fmt.Sprintf("Starting %s", job.HandlerName))
 
 	if err := wp.executor.Execute(execCtx, job); err != nil {
@@ -578,7 +581,7 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	// work — a queue consumer — and the handler rides as the description. A
 	// handler per op would be one group per handler and no way to ask about
 	// Pulse as a whole.
-	// ContinueFromHeaders is what makes a child job's execution land in its
+	// continueFrom is what makes a child job's execution land in its
 	// parent's trace rather than as a root of its own. A job with nothing
 	// stored — every job enqueued outside a span, and every row written before
 	// the trace columns existed — passes an empty header, which the SDK reads
@@ -587,7 +590,7 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 		sentry.WithOpName("queue.process"),
 		sentry.WithDescription(job.HandlerName),
 		sentry.WithTransactionSource(sentry.SourceTask),
-		sentry.ContinueFromHeaders(job.TraceContext, job.TraceBaggage),
+		continueFrom(job.TraceContext, job.TraceBaggage),
 	)
 
 	span.SetData("messaging.message.id", job.ID)
@@ -610,14 +613,18 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	//
 	// Only when the span is actually sampled: with tracing off there is nothing
 	// worth a write, and every job would pay for an UPDATE nobody reads.
-	if span.Sampled == sentry.SampledTrue {
-		if err := wp.queue.store.SetExecutionTrace(job.ID, span.ToSentryTrace(), span.ToBaggage()); err != nil {
+	// 「[Fable 5.1] Or when the OpenTelemetry span is recorded: a child then inherits」
+	// 「[Fable 5.1] this trace id whether or not Sentry sampled it.」
+	ctx = startOTelJobSpan(span, job)
+	if span.Sampled == sentry.SampledTrue || recordingOTel(ctx) {
+		traceparent, bag := traceparentOf(ctx)
+		if err := wp.queue.store.SetExecutionTrace(job.ID, traceparent, bag); err != nil {
 			wp.logger.SugaredLogger.Warnw("Execution trace not recorded; children of this job will start their own traces",
 				"job_id", job.ID, "handler", job.HandlerName, "error", err)
 		}
 	}
 
-	return span, span.Context()
+	return span, ctx
 }
 
 // finishJobSpan closes the span, reading the fields the handler moved while it

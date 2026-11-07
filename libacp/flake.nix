@@ -13,8 +13,8 @@
         "x86_64-darwin"
         "aarch64-darwin"
       ];
-      # A consumer that holds its own json-c builds libacp against that one. Clang 22.1.3 and later:
-      # an older compiler-rt deadlocks ASan at start on macOS 26.4 and later (llvm/llvm-project#182943).
+      # 「[Opus 5.5] A consumer that holds its own json-c builds libacp against that one. Clang 22.1.3 and later:」
+      # 「[Opus 5.5] an older compiler-rt deadlocks ASan at start on macOS 26.4 and later (llvm/llvm-project#182943).」
       libacpWith = pkgs: jsonC: pkgs.llvmPackages_22.stdenv.mkDerivation {
         pname = "libacp";
         version = self.shortRev or "dirty";
@@ -23,12 +23,12 @@
         buildInputs = [ jsonC ];
         buildPhase = "make";
         doCheck = true;
-        # The method names are generated from schema/v1/meta.json, which is the release's own, byte for byte.
+        # 「[Opus 5.5] The method names are generated from schema/v1/meta.json, which is the release's own, byte for byte.」
         checkPhase = "cmp schema/v1/meta.json ${meta pkgs} && make test";
         installPhase = "make install PREFIX=$out";
       };
-      # github.com/agentclientprotocol/agent-client-protocol schema-v1.26.0, the release's meta.json:
-      # every method by its name, as the TypeScript SDK generates its method tables from it.
+      # 「[Opus 5.5] github.com/agentclientprotocol/agent-client-protocol schema-v1.26.0, the release's meta.json:」
+      # 「[Opus 5.5] every method by its name, as the TypeScript SDK generates its method tables from it.」
       meta = pkgs: pkgs.fetchurl {
         name = "acp-1.26.0-meta.json";
         url = "https://github.com/agentclientprotocol/agent-client-protocol/releases/download/schema-v1.26.0/meta.json";

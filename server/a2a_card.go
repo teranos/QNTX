@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -9,16 +10,18 @@ import (
 	"slices"
 	"strings"
 
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2acrypto"
+	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/nodedid"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/server/a2a"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/syscap"
-	"google.golang.org/protobuf/encoding/protojson"
+	errors "github.com/teranos/sacred-error"
 )
 
 // agentCardPath is where an agent that has never seen the node finds it
@@ -36,24 +39,24 @@ const nodeExtensionURI = "https://github.com/teranos/QNTX/blob/main/docs/adr/ADR
 
 // cardBase is the card without its skills: what am.toml says of the node, the
 // ways it is reached, and the node extension.
-func (s *QNTXServer) cardBase(r *http.Request) a2a.Card {
-	return a2a.Card{
+func (s *QNTXServer) cardBase(r *http.Request) agentCard {
+	return agentCard{
 		Name:        appcfg.GetString("node.name"),
 		Description: appcfg.GetString("node.description"),
 		Version:     version.VersionTag,
 		URL:         a2aURL(r),
 		// "Implement default output types": what the node gives is JSON,
 		// everywhere, and the Node Agent's text is its skill's own.
-		OutputModes: a2a.Modes,
-		Skills:      []a2a.Skill{},
-		Extensions:  []a2a.Extension{s.nodeExtension(r)},
+		OutputModes: cardModes,
+		Skills:      []cardSkill{},
+		Extensions:  []a2asdk.AgentExtension{s.nodeExtension(r)},
 		Session:     auth.SessionCookie,
 	}
 }
 
 // nodeExtension is the node's DID, its health as /health says it, its
 // system capabilities as am syscap says them, and where its MCP answers.
-func (s *QNTXServer) nodeExtension(r *http.Request) a2a.Extension {
+func (s *QNTXServer) nodeExtension(r *http.Request) a2asdk.AgentExtension {
 	params := map[string]any{}
 	if node, held := s.nodeKey(); held {
 		params["did"] = node.DID
@@ -68,7 +71,7 @@ func (s *QNTXServer) nodeExtension(r *http.Request) a2a.Extension {
 			params["syscap"] = capabilities
 		}
 	}
-	return a2a.Extension{
+	return a2asdk.AgentExtension{
 		URI:         nodeExtensionURI,
 		Description: "The node's DID, its health, what this build can do, and where its MCP answers.",
 		Params:      params,
@@ -86,10 +89,10 @@ func (s *QNTXServer) nodeKey() (*nodedid.Handler, bool) {
 
 // skillOf is a signum as a skill. Its id is the signum. The Node Agent is what
 // a message sent to the node reaches, and it takes text and gives text.
-func skillOf(signum *protocol.Signum) a2a.Skill {
-	skill := a2a.Skill{ID: signum.GetName(), Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags()}
+func skillOf(signum *protocol.Signum) cardSkill {
+	skill := cardSkill{ID: signum.GetName(), Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags()}
 	if signum.GetName() == nodeAgentSignumName {
-		skill.Modes = []string{a2a.Text}
+		skill.Modes = []string{textPlain}
 	}
 	return skill
 }
@@ -97,13 +100,13 @@ func skillOf(signum *protocol.Signum) a2a.Skill {
 // a2aCard is the card the node can give the caller of r, with a skill per
 // signum the caller reaches over A2A (ADR-039). GetExtendedAgentCard answers
 // it (§3.1.11), and am node shows it.
-func (s *QNTXServer) a2aCard(r *http.Request) a2a.Card {
+func (s *QNTXServer) a2aCard(r *http.Request) agentCard {
 	admitted, known := auth.AdmissionFrom(r.Context())
 	return s.a2aCardOf(r, admitted, known)
 }
 
 // a2aCardOf is a2aCard for a caller already read off r.
-func (s *QNTXServer) a2aCardOf(r *http.Request, admitted auth.Admission, known bool) a2a.Card {
+func (s *QNTXServer) a2aCardOf(r *http.Request, admitted auth.Admission, known bool) agentCard {
 	card := s.cardBase(r)
 	for _, signum := range s.checkedSigna() {
 		// "make am the card, not a skill on it": the Agent Card describes the
@@ -129,7 +132,7 @@ func (s *QNTXServer) a2aCardOf(r *http.Request, admitted auth.Admission, known b
 
 // publicCard is the card at agentCardPath, read by somebody the node does not
 // know: the signa agentCardSigna names, each saying it takes the bearer token.
-func (s *QNTXServer) publicCard(r *http.Request) a2a.Card {
+func (s *QNTXServer) publicCard(r *http.Request) agentCard {
 	card := s.cardBase(r)
 	held := s.checkedSigna()
 	for _, name := range agentCardSigna {
@@ -144,64 +147,93 @@ func (s *QNTXServer) publicCard(r *http.Request) a2a.Card {
 	return card
 }
 
-// HandleAgentCard serves the public card. A card lacking a field the spec
-// requires is no AgentCard (§5.7), and the well-known URI answers an AgentCard
-// (§14.3), so a card that lacks one is refused, naming what it lacks.
+// HandleAgentCard serves the public card: a2a-go's card handler, the card
+// signed with the node's own key (§8.4) by a2a-go's signed card producer.
 func (s *QNTXServer) HandleAgentCard(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
-		writeError(w, http.StatusMethodNotAllowed, r.Method+" is not how the agent card is read")
-		return
+	producer := a2asrv.AgentCardProducerFn(func(context.Context) (*a2asdk.AgentCard, error) {
+		return s.publicCard(r).sdk(), nil
+	})
+	cardCached(a2asrv.NewAgentCardHandler(a2asrv.NewSignedCardProducer(producer, s.cardSigners))).ServeHTTP(w, r)
+}
+
+// cardMaxAge is how long a client keeps the public card: short, because health
+// is on the card (§8.6.1).
+const cardMaxAge = "60"
+
+// cardCached is the card a2a-go's handler answers, with how a client caches it:
+// a strong ETag of the card it would be sent, and 304 when it holds that one.
+func cardCached(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			handler.ServeHTTP(w, r)
+			return
+		}
+		held := &cardHeld{header: http.Header{}, status: http.StatusOK}
+		handler.ServeHTTP(held, r)
+		for name, values := range held.header {
+			w.Header()[name] = values
+		}
+		if held.status != http.StatusOK {
+			w.WriteHeader(held.status)
+			_, _ = w.Write(held.body.Bytes())
+			return
+		}
+		sum := sha256.Sum256(held.body.Bytes())
+		etag := `"` + hex.EncodeToString(sum[:]) + `"`
+		w.Header().Set("Cache-Control", "public, max-age="+cardMaxAge)
+		w.Header().Set("ETag", etag)
+		if etagMatches(r.Header.Get("If-None-Match"), etag) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		_, _ = w.Write(held.body.Bytes())
+	})
+}
+
+// cardHeld is what a2a-go's card handler answered, held until how it is
+// cached is known.
+type cardHeld struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (c *cardHeld) Header() http.Header         { return c.header }
+func (c *cardHeld) Write(b []byte) (int, error) { return c.body.Write(b) }
+func (c *cardHeld) WriteHeader(status int)      { c.status = status }
+
+// etagMatches is If-None-Match against one strong ETag (RFC 9110 §13.1.2): a
+// list of tags, a weak one compared by its opaque part, or *.
+func etagMatches(header, etag string) bool {
+	for _, tag := range strings.Split(header, ",") {
+		tag = strings.TrimPrefix(strings.TrimSpace(tag), "W/")
+		if tag == "*" || tag == etag {
+			return true
+		}
 	}
-	card, err := s.publicCard(r).Message()
-	if err != nil {
-		s.logger.Errorw("The agent card was not built", "error", err)
-		writeError(w, http.StatusInternalServerError, "the agent card was not built: "+err.Error())
-		return
-	}
-	if missing := a2a.Missing(card); len(missing) > 0 {
-		s.logger.Errorw("The agent card lacks what the spec requires, so it is not served", "missing", missing)
-		writeError(w, http.StatusInternalServerError, "the agent card lacks what the spec requires: "+strings.Join(missing, ", "))
-		return
-	}
-	// Signed with the node's own key (§8.4), under the key id its DID
-	// document names: a node that started has one, and a card it cannot sign
-	// is not served unsigned.
+	return false
+}
+
+// cardSigners is the node's own key, under the key id its DID document names
+// it by, so whoever holds the node's did:key holds what verifies its cards.
+func (s *QNTXServer) cardSigners(context.Context) ([]*a2acrypto.Signer, error) {
 	node, held := s.nodeKey()
 	if !held {
-		writeError(w, http.StatusInternalServerError, "the agent card is signed with the node's key, and this node holds none")
-		return
+		return nil, errors.New("a card is signed with the node's key, and this node holds none")
 	}
-	if err := a2a.Sign(card, node.PrivateKey, node.KeyID()); err != nil {
-		writeError(w, http.StatusInternalServerError, "the agent card was not signed: "+err.Error())
-		s.logger.Errorw("The agent card was not signed", "did", node.DID, "error", err)
-		return
-	}
-	marshalled, err := protojson.Marshal(card.Interface())
+	signer, err := a2acrypto.NewSigner(a2acrypto.SignerConfig{PrivateKey: node.PrivateKey, KeyID: node.KeyID()})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "the agent card did not marshal: "+err.Error())
-		return
+		return nil, errors.Wrap(err, "the node's key signs no card")
 	}
-	// protojson varies its whitespace on purpose; compacted, the ETag is the
-	// card's and not the encoder's.
-	var body bytes.Buffer
-	if err := json.Compact(&body, marshalled); err != nil {
-		writeError(w, http.StatusInternalServerError, "the agent card did not compact: "+err.Error())
-		return
-	}
-	sum := sha256.Sum256(body.Bytes())
-	etag := `"` + hex.EncodeToString(sum[:]) + `"`
-	// §8.6.1. Short, because health is on the card.
-	w.Header().Set("Cache-Control", "public, max-age=60")
-	w.Header().Set("ETag", etag)
-	if a2a.Matches(r.Header.Get("If-None-Match"), etag) {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if _, err := w.Write(body.Bytes()); err != nil {
-		s.logger.Warnw("The agent card was not delivered", "peer", r.RemoteAddr, "error", err)
-	}
+	return []*a2acrypto.Signer{signer}, nil
+}
+
+// signedCard is card signed with the node's key, as a2a-go's signed card
+// producer signs the public one.
+func (s *QNTXServer) signedCard(ctx context.Context, card *a2asdk.AgentCard) (*a2asdk.AgentCard, error) {
+	return a2asrv.NewSignedCardProducer(a2asrv.AgentCardProducerFn(func(context.Context) (*a2asdk.AgentCard, error) {
+		return card, nil
+	}), s.cardSigners).Card(ctx)
 }
 
 // mcpProtocolVersion is the newest MCP the go-sdk this node is built with
@@ -221,4 +253,76 @@ func nodeURL(r *http.Request) string {
 // a2aURL is where the caller of r reached the binding.
 func a2aURL(r *http.Request) string {
 	return nodeURL(r) + a2aPrefix[:len(a2aPrefix)-1]
+}
+
+// cardSkill is one signum as A2A sees it: "On the Agent Card a signum is
+// described as an AgentSkill" (ADR-039).
+type cardSkill struct {
+	ID, Name, Description string
+	Tags                  []string
+	// Bearer says calling the skill takes the node's bearer token, for a card
+	// that shows a skill to whoever reads it.
+	Bearer bool
+	// Modes is the media types the skill takes and gives, in place of the
+	// card's; nil holds the card's.
+	Modes []string
+}
+
+// cardModes is the media types the node takes and gives: JSON, everywhere.
+var cardModes = []string{"application/json"}
+
+// agentCard is what the node can say of itself to one caller.
+type agentCard struct {
+	Name, Description, Version string
+	// URL is where the binding answers, and Tenant the agent behind it.
+	URL, Tenant string
+	// OutputModes is the card's default output modes, which a skill's Modes
+	// override.
+	OutputModes []string
+	Skills      []cardSkill
+	Extensions  []a2asdk.AgentExtension
+	// Session is the cookie a person's passkey session is carried in, which
+	// the node admits as it admits the bearer token.
+	Session string
+}
+
+// sdk is the card as a2a-go's AgentCard. It is reached over HTTP+JSON and
+// JSON-RPC, both at its URL.
+func (c agentCard) sdk() *a2asdk.AgentCard {
+	bearer := a2asdk.SecurityRequirements{"bearer": {}}
+	card := &a2asdk.AgentCard{
+		Name: c.Name, Description: c.Description, Version: c.Version,
+		SupportedInterfaces: []*a2asdk.AgentInterface{
+			{URL: c.URL, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant},
+			{URL: c.URL, ProtocolBinding: a2asdk.TransportProtocolJSONRPC, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant},
+		},
+		Capabilities:         a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true, Extensions: c.Extensions},
+		SecuritySchemes:      a2asdk.NamedSecuritySchemes{"bearer": a2asdk.HTTPAuthSecurityScheme{Scheme: "Bearer"}},
+		SecurityRequirements: a2asdk.SecurityRequirementsOptions{bearer},
+		DefaultInputModes:    cardModes,
+		DefaultOutputModes:   c.OutputModes,
+		Skills:               []a2asdk.AgentSkill{},
+	}
+	if c.Session != "" {
+		card.SecuritySchemes["session"] = a2asdk.APIKeySecurityScheme{Description: "A person's passkey session", Location: a2asdk.APIKeySecuritySchemeLocationCookie, Name: c.Session}
+		card.SecurityRequirements = append(card.SecurityRequirements, a2asdk.SecurityRequirements{"session": {}})
+	}
+	for _, skill := range c.Skills {
+		tags := skill.Tags
+		if tags == nil {
+			tags = []string{}
+		}
+		held := a2asdk.AgentSkill{ID: skill.ID, Name: skill.Name, Description: skill.Description, Tags: tags, InputModes: skill.Modes, OutputModes: skill.Modes}
+		if skill.Bearer {
+			held.SecurityRequirements = a2asdk.SecurityRequirementsOptions{bearer}
+		}
+		card.Skills = append(card.Skills, held)
+	}
+	return card
+}
+
+// cardJSON is the card as a2a-go writes it.
+func cardJSON(card *a2asdk.AgentCard) (json.RawMessage, error) {
+	raw, err := json.Marshal(card)
+	return raw, errors.Wrap(err, "the card did not marshal")
 }

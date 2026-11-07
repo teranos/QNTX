@@ -100,34 +100,68 @@ func (s *QNTXServer) vaultSend(ctx context.Context, sent sigil.Sent) (any, *prot
 	return s.vaultList(ctx, sent)
 }
 
-// vaultNotesAt is every note under root, by its path below it, and its content.
+// "i DONT want the binding to include subdirs"
+
+// vaultNotesAt is every note directly in root, by its name, and its content.
+// A folder inside root is not the binding's, nor is a note in one.
 func vaultNotesAt(root string) (map[string][]byte, error) {
 	notes := map[string][]byte{}
-	err := filepath.WalkDir(root, func(at string, d fs.DirEntry, err error) error {
+	// A place that is a link is not a folder of the vault: what it points at
+	// is somewhere else's, and none of it is sent.
+	placed, err := os.Lstat(root)
+	if err != nil {
+		return notes, errors.Wrapf(err, "the notes in %s were not read", root)
+	}
+	if placed.Mode()&os.ModeSymlink != 0 {
+		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", root)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return notes, errors.Wrapf(err, "the notes in %s were not read", root)
+	}
+	for _, entry := range entries {
+		// A note is a file of the vault's own: a link to one is not.
+		if !entry.Type().IsRegular() || strings.HasPrefix(entry.Name(), ".") || !strings.HasSuffix(entry.Name(), noteSuffix) {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(root, entry.Name()))
 		if err != nil {
-			return err
+			return notes, errors.Wrapf(err, "the notes in %s were not read", root)
 		}
-		if at != root && strings.HasPrefix(d.Name(), ".") {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if d.IsDir() || !strings.HasSuffix(d.Name(), noteSuffix) {
-			return nil
-		}
-		under, err := filepath.Rel(root, at)
-		if err != nil {
-			return err
-		}
-		content, err := os.ReadFile(at)
-		if err != nil {
-			return err
-		}
-		notes[filepath.ToSlash(under)] = content
-		return nil
-	})
-	return notes, errors.Wrapf(err, "the notes under %s were not read", root)
+		notes[entry.Name()] = content
+	}
+	return notes, nil
+}
+
+// boundVaultNotes is every note a binding holds in the vault's copy: those
+// directly in its folder, or its one note when the vault has it as a file of
+// its own; a link to one is not.
+func boundVaultNotes(vaultPath string, b vaultBinding) (map[string][]byte, error) {
+	if !b.note {
+		return vaultNotesAt(b.rootIn(vaultPath))
+	}
+	notes := map[string][]byte{}
+	// A note's folder that is a link is not a folder of the vault, as a bound folder's is not.
+	if folder, err := os.Lstat(b.rootIn(vaultPath)); err == nil && folder.Mode()&os.ModeSymlink != 0 {
+		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", b.rootIn(vaultPath))
+	}
+	at := filepath.Join(b.rootIn(vaultPath), b.under())
+	placed, err := os.Lstat(at)
+	if errors.Is(err, fs.ErrNotExist) {
+		return notes, nil
+	}
+	if err != nil {
+		return notes, errors.Wrapf(err, "the note %s was not read", at)
+	}
+	if !placed.Mode().IsRegular() {
+		return notes, errors.Newf("%s is no file of the vault's own, so it is not sent", at)
+	}
+	content, err := os.ReadFile(at)
+	if err != nil {
+		return notes, errors.Wrapf(err, "the note %s was not read", at)
+	}
+	notes[b.under()] = content
+	return notes, nil
 }
 
 // vaultSent is what sending one folder did.
@@ -160,12 +194,12 @@ func (s *QNTXServer) branchHeld(ctx context.Context, source buildSource, branch 
 // and removes from branch each note the vault no longer has.
 func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, branch string, notes map[string][]byte) vaultSent {
 	sent := vaultSent{Folder: folder, Branch: branch, Committed: []string{}, Removed: []string{}}
-	repo, place, _ := strings.Cut(folder, "=")
-	source, err := parseBuildSource(repo, true)
+	binding, err := bindingOf(folder)
 	if err != nil {
 		sent.Refused = err
 		return sent
 	}
+	source, place := binding.source, binding.place
 	host, err := s.forges().For(source.Repo)
 	if err != nil {
 		sent.Refused = err
@@ -184,7 +218,7 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		sent.Refused = err
 		return sent
 	}
-	onBranch, err := s.repoNotes(ctx, source.Repo, branch, source.Path)
+	onBranch, err := s.boundNotes(ctx, binding, branch)
 	if err != nil {
 		sent.Refused = err
 		return sent
@@ -205,19 +239,20 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		if there && was.sha == gitBlobSHA(content) {
 			continue
 		}
-		file := path.Join(source.Path, under)
-		message := vault.Name + ": " + path.Join(place, under)
+		message := vault.Name + ": " + path.Join(binding.placeRoot(), under)
+		// A note the branch holds goes back where it is: its vault name may
+		// read as a story's (a note named X.feature.md) when it is not one.
 		if there {
-			edits = append(edits, forge.Replaced(file, content, was.sha, message))
+			edits = append(edits, forge.Replaced(was.path, content, was.sha, message))
 		} else {
-			edits = append(edits, forge.Added(file, content, message))
+			edits = append(edits, forge.Added(binding.repoFile(under), content, message))
 		}
 	}
 	for _, note := range onBranch {
 		if _, kept := notes[note.under]; kept {
 			continue
 		}
-		edits = append(edits, forge.Removed(note.path, note.sha, vault.Name+": "+path.Join(place, note.under)+" is gone from the vault"))
+		edits = append(edits, forge.Removed(note.path, note.sha, vault.Name+": "+path.Join(binding.placeRoot(), note.under)+" is gone from the vault"))
 	}
 	done, err := proposalOf(source, branch).Commit(ctx, host, forge.AsApp, edits)
 	sent.Committed, sent.Removed = done.Put, done.Removed
@@ -296,8 +331,12 @@ func (s *QNTXServer) sendVault(ctx context.Context, name string, only func(place
 		if !named || !sends || slices.Contains(vault.Disabled, place) || !only(place) {
 			continue
 		}
-		root := filepath.Join(vault.Path, filepath.FromSlash(place))
-		notes, err := vaultNotesAt(root)
+		binding, err := bindingOf(folder)
+		if err != nil {
+			logger.Errorw("A vault's folder was not read to be sent", "vault", vault.Name, "folder", folder, "error", err)
+			continue
+		}
+		notes, err := boundVaultNotes(vault.Path, binding)
 		if err != nil {
 			logger.Errorw("A vault's folder was not read to be sent", "vault", vault.Name, "folder", folder, "error", err)
 			continue

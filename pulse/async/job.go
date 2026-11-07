@@ -89,7 +89,9 @@ type Job struct {
 	// ExecTraceContext and ExecTraceBaggage are this job's own execution span,
 	// left on the row when it starts running so that a child created somewhere
 	// the span is not reachable — a plugin, over gRPC, holding only a parent id
-	// — has something to hang from. Sentry's headers, in their wire form.
+	// — has something to hang from.
+	// 「[Opus 5.5] All four are W3C trace context: the two context fields a」
+	// 「[Opus 5.5] traceparent, the two baggage fields a baggage header.」
 	ExecTraceContext string `json:"exec_trace_context,omitempty"`
 	ExecTraceBaggage string `json:"exec_trace_baggage,omitempty"`
 

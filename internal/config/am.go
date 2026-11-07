@@ -14,7 +14,6 @@ type Config struct {
 	Watcher    WatcherConfig    `mapstructure:"watcher"`
 	Fetch      FetchConfig      `mapstructure:"fetch"`
 	Mail       MailConfig       `mapstructure:"mail"`
-	Distill    DistillConfig    `mapstructure:"distill"`
 	Sentry     SentryConfig     `mapstructure:"sentry"`
 	Node       NodeConfig       `mapstructure:"node"`
 	Nodes      NodesConfig      `mapstructure:"nodes"`
@@ -166,16 +165,6 @@ type SentryConfig struct {
 	Project      string `mapstructure:"project"`      // The project's id: the last segment of the DSN
 }
 
-// DistillConfig configures age-based attestation distillation.
-// When enabled, a Pulse job periodically folds old attestations into
-// compressed summaries, keeping the database from growing unbounded.
-type DistillConfig struct {
-	IntervalSeconds *int `mapstructure:"interval_seconds"` // nil = disabled, 600 = 10m dev, 21600 = 6h prod
-	MaxAgeHours     int  `mapstructure:"max_age_hours"`    // Attestations older than this get distilled (default: 96 = 4d)
-	BatchSize       int  `mapstructure:"batch_size"`       // Max attestations to process per tick (default: 500)
-	DryRun          bool `mapstructure:"dry_run"`          // Log what would be distilled without doing it
-}
-
 // LLMConfig configures LLM request queuing and rate limiting at the core routing layer.
 type LLMConfig struct {
 	MaxConcurrent     int `mapstructure:"max_concurrent"`       // Max simultaneous provider calls (default: 1)
@@ -303,9 +292,8 @@ type StorageConfig struct {
 
 // SqliteConfig configures the SQLite backend.
 type SqliteConfig struct {
-	Path                  string               `mapstructure:"path"`
-	BackupIntervalSeconds int                  `mapstructure:"backup_interval_seconds"` // 0 = disabled, default 3600 (hourly)
-	BoundedStorage        BoundedStorageConfig `mapstructure:"bounded_storage"`
+	Path                  string `mapstructure:"path"`
+	BackupIntervalSeconds int    `mapstructure:"backup_interval_seconds"` // 0 = disabled, default 3600 (hourly)
 }
 
 // ParquetConfig configures the Parquet backend (see ADR-024).
@@ -321,14 +309,6 @@ type ParquetConfig struct {
 // sends to is its own, in its ns.toml; a path on one machine is not.
 type PostgresConfig struct {
 	CA string `mapstructure:"ca"`
-}
-
-// BoundedStorageConfig configures storage limits for attestations.
-// Omit fields for defaults: ActorContextLimit=32, ActorContextsLimit=64, EntityActorsLimit=64.
-type BoundedStorageConfig struct {
-	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair (default: 32)
-	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor (default: 64)
-	EntityActorsLimit  int `mapstructure:"entity_actors_limit"`  // actors per entity (default: 64)
 }
 
 // ServerConfig configures the QNTX web server

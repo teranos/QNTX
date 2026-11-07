@@ -68,8 +68,7 @@
     "rebuilt": true,
     "sites": [
       "ats/storage/query_builder.go",
-      "internal/testing/database.go",
-      "server/db_stats_cache.go"
+      "internal/testing/database.go"
     ]
   },
   {
@@ -293,38 +292,6 @@
     ]
   },
   {
-    "name": "enforcement_actor_context",
-    "sqlite": true,
-    "duckdb": false,
-    "postgres": false,
-    "rebuilt": false,
-    "sites": []
-  },
-  {
-    "name": "enforcement_actor_contexts",
-    "sqlite": true,
-    "duckdb": false,
-    "postgres": false,
-    "rebuilt": false,
-    "sites": []
-  },
-  {
-    "name": "enforcement_entity_actors",
-    "sqlite": true,
-    "duckdb": false,
-    "postgres": false,
-    "rebuilt": false,
-    "sites": []
-  },
-  {
-    "name": "enforcement_entity_actors_detail",
-    "sqlite": true,
-    "duckdb": false,
-    "postgres": false,
-    "rebuilt": false,
-    "sites": []
-  },
-  {
     "name": "invitation_accounts",
     "sqlite": true,
     "duckdb": false,
@@ -403,18 +370,6 @@
       "plugin/grpc/schedules.go",
       "pulse/schedule/store.go",
       "server/embeddings/pulse.go"
-    ]
-  },
-  {
-    "name": "storage_events",
-    "sqlite": true,
-    "duckdb": false,
-    "postgres": false,
-    "rebuilt": false,
-    "sites": [
-      "cmd/qntx/commands/db.go",
-      "server/db_stats_cache.go",
-      "server/storage_events.go"
     ]
   },
   {

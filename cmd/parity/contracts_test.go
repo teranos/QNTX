@@ -88,7 +88,7 @@ func (m *memTokenStore) Revoke(id string) error  { return nil }`,
 	}
 }
 
-// TestUnimplementedContracts_AbandonedInterfaceIsNotWork: ats.BoundedStore is
+// TestUnimplementedContracts_AbandonedInterfaceIsNotWork: an interface
 // declared and referenced by nothing. An interface no code depends on is dead,
 // and putting it on the picture invents a thing QNTX does not persist.
 func TestUnimplementedContracts_AbandonedInterfaceIsNotWork(t *testing.T) {
@@ -107,34 +107,33 @@ type AbandonedStore interface {
 	}
 }
 
-// TestUnimplementedContracts_SameNameDifferentPackage: ats.BoundedStore (an
-// interface nobody uses) and storage.BoundedStore (a struct used everywhere)
-// share a bare name. Matching on the name alone credits the interface with the
+// TestUnimplementedContracts_SameNameDifferentPackage: an interface nobody
+// uses in ats and a struct used everywhere in storage share a bare name. Matching on the name alone credits the interface with the
 // struct's popularity and puts a line on the picture for a thing that is not
 // one.
 func TestUnimplementedContracts_SameNameDifferentPackage(t *testing.T) {
 	root := fixture(t, map[string]string{
 		"ats/store.go": `package ats
 
-type BoundedStore interface {
+type RichStore interface {
 	Create(id string) error
 	Delete(id string) error
 }`,
-		"storage/bounded.go": `package storage
+		"storage/rich.go": `package storage
 
-type BoundedStore struct{}`,
+type RichStore struct{}`,
 		"server/wiring.go": `package server
 
 import "example.com/parityfixture/storage"
 
 type Server struct {
-	rich *storage.BoundedStore
+	rich *storage.RichStore
 }`,
 	})
 
 	names := contracts(t, root)
-	if slices.Contains(names, "boundeds") {
-		t.Errorf("boundeds reported in %v: the consumed BoundedStore is the struct in storage, not the interface in ats", names)
+	if slices.Contains(names, "richs") {
+		t.Errorf("richs reported in %v: the consumed RichStore is the struct in storage, not the interface in ats", names)
 	}
 }
 

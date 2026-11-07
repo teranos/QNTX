@@ -106,6 +106,12 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
+	// 「[Opus 5.5] An agent's token is the node's to write, named for the token it runs」
+	// 「[Opus 5.5] under: a label naming one would stand on that token's roles.」
+	if strings.HasPrefix(strings.TrimSpace(req.Label), agentOfLabel+":") {
+		h.writeError(w, http.StatusBadRequest, "a label starting "+agentOfLabel+": names an agent's token, which the node writes")
+		return
+	}
 	// The label is the token's name, and a grant hangs on it. Revoked ones
 	// count: revocation is a switch, and a switched-off token comes back.
 	held, err := h.tokens.List()
@@ -436,9 +442,23 @@ func (h *Handler) answerFor(info TokenInfo) tokenAnswer {
 		Roles:      map[string][]string{},
 		KnownRoles: map[string][]string{},
 	}
+	// 「[Opus 5.5] An agent's token holds what the token it runs under holds, where that」
+	// 「[Opus 5.5] token acts, as the gate admits it; one that does not stand holds nothing.」
+	holder, namespaces := info.Label, info.Namespaces
+	if asking, isAgents, stands := h.runsUnder(info.Label, info.DID); isAgents {
+		holder, namespaces = asking.Label, asking.Namespaces
+		if !stands {
+			namespaces = nil
+		}
+		// Shown acting where it acts now, beside the roles it holds there.
+		answer.Namespaces = namespaces
+		if answer.Namespaces == nil {
+			answer.Namespaces = []string{}
+		}
+	}
 	var held []string
-	for _, namespace := range info.Namespaces {
-		roles := h.RolesOfToken(info.Label, namespace)
+	for _, namespace := range namespaces {
+		roles := h.RolesOfToken(holder, namespace)
 		if roles == nil {
 			roles = []string{}
 		}

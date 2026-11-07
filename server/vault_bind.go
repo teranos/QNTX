@@ -110,6 +110,30 @@ func vaultHasDir(vault Vault, place string) (bool, error) {
 	return info.IsDir(), nil
 }
 
+// vaultPlaceRefused is why place is no place of the vault's copy to bind to,
+// or empty: a folder's place is a folder on the box; a note's is no folder,
+// and it and the folders it is in are written when it is filled.
+func vaultPlaceRefused(vault Vault, place string, note bool) (string, error) {
+	if !note {
+		there, err := vaultHasDir(vault, place)
+		if err != nil || there {
+			return "", err
+		}
+		return place + " is no folder of " + vault.Name + " at " + vault.Path, nil
+	}
+	if !strings.HasSuffix(place, noteSuffix) {
+		return place + " is no note's place: a note is bound to a place ending " + noteSuffix, nil
+	}
+	isDir, err := vaultHasDir(vault, place)
+	if err != nil {
+		return "", err
+	}
+	if isDir {
+		return place + " is a folder of " + vault.Name + ", not a note", nil
+	}
+	return "", nil
+}
+
 func (s *QNTXServer) vaultDirs(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	vault, refused := s.vaultNamed(sent["name"])
 	if refused != nil {
@@ -203,6 +227,37 @@ func (s *QNTXServer) repoDirs(ctx context.Context, repo forge.Repo, branch, dir 
 	return dirs, nil
 }
 
+// "in reality its still one story"
+
+// repoBindable is what directly inside dir of repo on branch can be bound:
+// its folders, and its notes and stories.
+func (s *QNTXServer) repoBindable(ctx context.Context, repo forge.Repo, branch, dir string) (dirs, files []string, err error) {
+	reader, err := s.forges().For(repo)
+	if err != nil {
+		return nil, nil, err
+	}
+	entries, err := reader.Entries(ctx, forge.AsApp, repo, branch, dir)
+	var notADirectory forge.NotADirectory
+	if errors.As(err, &notADirectory) {
+		return nil, nil, errors.Newf("%s is a %s of %s on %s, not a folder", dir, notADirectory.Kind, repo, branch)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	dirs, files = []string{}, []string{}
+	for _, entry := range entries {
+		switch {
+		case entry.Kind == forge.Dir:
+			dirs = append(dirs, entry.Path)
+		case entry.Kind == forge.File && (strings.HasSuffix(entry.Name, noteSuffix) || strings.HasSuffix(entry.Name, storySuffix)):
+			files = append(files, entry.Path)
+		}
+	}
+	slices.Sort(dirs)
+	slices.Sort(files)
+	return dirs, files, nil
+}
+
 func (s *QNTXServer) vaultSubdirs(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	repo, refused := repoOf(sent["repo"])
 	if refused != nil {
@@ -212,11 +267,11 @@ func (s *QNTXServer) vaultSubdirs(ctx context.Context, sent sigil.Sent) (any, *p
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	dirs, err := s.repoDirs(ctx, repo, branch, path.Clean(sent["path"]))
+	dirs, files, err := s.repoBindable(ctx, repo, branch, path.Clean(sent["path"]))
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	return &protocol.VaultSubdirs{Dirs: dirs, Branch: branch}, nil
+	return &protocol.VaultSubdirs{Dirs: dirs, Files: files, Branch: branch}, nil
 }
 
 func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -225,12 +280,13 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 		return nil, refused
 	}
 	place := sent["place"]
-	there, err := vaultHasDir(vault, place)
+	note := noteBound(sent["path"], place)
+	why, err := vaultPlaceRefused(vault, place, note)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	if !there {
-		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is no folder of " + vault.Name + " at " + vault.Path}
+	if why != "" {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: why}
 	}
 	repo, refused := repoOf(sent["repo"])
 	if refused != nil {
@@ -238,7 +294,7 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	}
 	// "oh, require it to be a dir in the repo , not in its root"
 	if dir := path.Clean(sent["path"]); dir == "." || dir == "/" || strings.HasPrefix(dir, "../") || strings.HasPrefix(dir, "/") {
-		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "path", Says: sent["path"] + " is not a folder inside " + sent["repo"] + "; a vault's folder is bound to one, never to the repository's top"}
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "path", Says: sent["path"] + " is not a folder or note inside " + sent["repo"] + "; a vault's folder is bound to a folder inside it, never to the repository's top"}
 	}
 	branch, err := s.repoDefaultBranch(ctx, repo)
 	if err != nil {
@@ -327,7 +383,8 @@ const (
 // "it should show red, and have you redo the binding"
 
 // foldersState is what an enabled folder whose place is on the box is now.
-func (s *QNTXServer) foldersState(ctx context.Context, vault Vault, source buildSource, place string, state *protocol.VaultFolderState) {
+func (s *QNTXServer) foldersState(ctx context.Context, vault Vault, binding vaultBinding, state *protocol.VaultFolderState) {
+	source, place := binding.source, binding.place
 	defaultBranch, err := s.repoDefaultBranch(ctx, source.Repo)
 	if err != nil {
 		state.State, state.Why = vaultInvalid, err.Error()
@@ -337,7 +394,17 @@ func (s *QNTXServer) foldersState(ctx context.Context, vault Vault, source build
 		state.State, state.Why = vaultInvalid, "the default branch of "+source.Repo.String()+" is now "+defaultBranch+", not "+source.Branch+": bind "+place+" again"
 		return
 	}
-	if _, err := s.repoDirs(ctx, source.Repo, source.Branch, source.Path); err != nil {
+	if binding.note {
+		notes, err := s.boundNotes(ctx, binding, source.Branch)
+		if err != nil {
+			state.State, state.Why = vaultInvalid, err.Error()
+			return
+		}
+		if len(notes) == 0 {
+			state.State, state.Why = vaultInvalid, source.Path+" is no note of "+source.Repo.String()+" on "+source.Branch
+			return
+		}
+	} else if _, err := s.repoDirs(ctx, source.Repo, source.Branch, source.Path); err != nil {
 		state.State, state.Why = vaultInvalid, err.Error()
 		return
 	}
@@ -366,30 +433,25 @@ func (s *QNTXServer) vaultStates(ctx context.Context, sent sigil.Sent) (any, *pr
 	}
 	states := []*protocol.VaultFolderState{}
 	for _, folder := range vault.Folders {
-		repo, place, named := strings.Cut(folder, "=")
+		_, place, _ := strings.Cut(folder, "=")
 		state := &protocol.VaultFolderState{Folder: folder, Place: place, State: vaultActive}
-		if !named {
-			state.State, state.Why = vaultInvalid, folder+" names no place in the vault: host/path@branch:path=place"
-			states = append(states, state)
-			continue
-		}
-		source, err := parseBuildSource(repo, true)
+		binding, err := bindingOf(folder)
 		if err != nil {
 			state.State, state.Why = vaultInvalid, err.Error()
 			states = append(states, state)
 			continue
 		}
-		there, err := vaultHasDir(vault, place)
+		why, err := vaultPlaceRefused(vault, place, binding.note)
 		switch {
 		case err != nil:
 			state.State, state.Why = vaultInvalid, err.Error()
-		case !there:
-			state.State, state.Why = vaultInvalid, place+" is no folder of "+vault.Name+" at "+vault.Path
+		case why != "":
+			state.State, state.Why = vaultInvalid, why
 		case slices.Contains(vault.Disabled, place):
 			// Disabled does nothing, so nothing is asked of GitHub for it.
 			state.State = vaultDisabled
 		default:
-			s.foldersState(ctx, vault, source, place, state)
+			s.foldersState(ctx, vault, binding, state)
 		}
 		states = append(states, state)
 	}

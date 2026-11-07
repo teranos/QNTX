@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -88,20 +90,215 @@ func (s *QNTXServer) fixtured(ctx context.Context, admitted auth.Admission, resu
 		if !ok {
 			continue
 		}
-		scrubbed, _, err := s.scrub(ctx, text.Text)
+		scrubbed, found, err := s.scrubSaid(ctx, text.Text)
 		if err != nil {
 			return refused("the answer was not handed on: it could not be made into fixtures: %v", err)
+		}
+		// What the scanner counted, by shape, is on the call's line: the calls
+		// of 6SION nobody answered were the ones whose answer carried a mail address.
+		if found != "" {
+			mcpAskedOf(ctx).says("fixtures_found", found)
 		}
 		result.Content[i] = &mcp.TextContent{Text: scrubbed}
 	}
 	if raw, ok := result.StructuredContent.(json.RawMessage); ok && len(raw) > 0 {
-		scrubbed, _, err := s.scrub(ctx, string(raw))
+		mcpAskedOf(ctx).now(mcpMakingStructuredFixtures)
+		scrubbed, _, err := s.scrubJSON(ctx, raw)
 		if err != nil {
 			return refused("the answer was not handed on: it could not be made into fixtures: %v", err)
 		}
 		result.StructuredContent = json.RawMessage(scrubbed)
 	}
 	return result
+}
+
+// scrubSaid is a tool's text with fixtures: JSON by its strings, and anything
+// else as the text it is.
+func (s *QNTXServer) scrubSaid(ctx context.Context, text string) (string, string, error) {
+	if json.Valid([]byte(text)) {
+		scrubbed, found, err := s.scrubJSON(ctx, []byte(text))
+		return string(scrubbed), found, err
+	}
+	return s.scrub(ctx, text)
+}
+
+// jsonBetween stands between the strings of a JSON value handed to the scanner
+// as one text: a line of its own that no shape the scanner knows runs across.
+const jsonBetween = "\n\x1f\n"
+
+// scrubJSON is a JSON value with fixtures in its strings, keys and values, and
+// what was found. The scanner reads the strings and never the JSON.
+//
+// 6SION: read as text, the escape before an address was taken for the
+// address's own letters. What was left of it was not JSON, the MCP server
+// could not marshal it, and it answered the caller nothing.
+func (s *QNTXServer) scrubJSON(ctx context.Context, raw []byte) ([]byte, string, error) {
+	read := json.NewDecoder(bytes.NewReader(raw))
+	read.UseNumber()
+	var held any
+	if err := read.Decode(&held); err != nil {
+		return nil, "", errors.Wrap(err, "the answer did not read as JSON")
+	}
+	words := jsonWords(held, nil)
+	if len(words) == 0 {
+		return raw, "", nil
+	}
+	// The unit separator is only ever the middle of jsonBetween: a string that
+	// holds it anywhere could meet a separator beside it and move the split.
+	// Such strings are handed to the scanner together apart from the rest,
+	// between a separator whose middle byte none of them holds: two scans for
+	// an answer, however many strings hold the byte.
+	back := make([]string, len(words))
+	var plain, holding []int
+	for i, word := range words {
+		if strings.Contains(word, "\x1f") {
+			holding = append(holding, i)
+		} else {
+			plain = append(plain, i)
+		}
+	}
+	var founds []string
+	if len(plain) > 0 {
+		found, err := s.scrubBetween(ctx, words, plain, jsonBetween, back)
+		if err != nil {
+			return nil, "", err
+		}
+		if found != "" {
+			founds = append(founds, found)
+		}
+	}
+	if len(holding) > 0 {
+		between, ok := jsonBetweenFor(words, holding)
+		if !ok {
+			return nil, "", errors.Newf("%d strings of the answer hold \\x1f, and between them they hold every other byte there is to stand between them for the scanner (%q)", len(holding), jsonOtherBetween)
+		}
+		found, err := s.scrubBetween(ctx, words, holding, between, back)
+		if err != nil {
+			return nil, "", err
+		}
+		if found != "" {
+			founds = append(founds, found)
+		}
+	}
+	found := strings.Join(founds, "; ")
+	with, err := jsonWith(held, &back)
+	if err != nil {
+		return nil, "", err
+	}
+	written, err := json.Marshal(with)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "the answer with its fixtures did not marshal")
+	}
+	return written, found, nil
+}
+
+// jsonOtherBetween are the bytes that stand in the middle of a separator for
+// strings that hold \x1f: the other ASCII separators. ground's scanner
+// (source/pii.d) reads none of them as part of a mail address, an IPv4
+// address, a postal code or a street, as it reads none of \x1f.
+const jsonOtherBetween = "\x1e\x1d\x1c"
+
+// jsonBetweenFor is a separator for the words at which, its middle byte one
+// that none of them holds, and false when they hold every one of
+// jsonOtherBetween.
+func jsonBetweenFor(words []string, which []int) (string, bool) {
+	for _, middle := range jsonOtherBetween {
+		held := slices.ContainsFunc(which, func(i int) bool { return strings.ContainsRune(words[i], middle) })
+		if !held {
+			return "\n" + string(middle) + "\n", true
+		}
+	}
+	return "", false
+}
+
+// scrubBetween hands the words at which to the scanner in one text, between,
+// whose middle byte none of them holds, and writes what came back into back.
+func (s *QNTXServer) scrubBetween(ctx context.Context, words []string, which []int, between string, back []string) (string, error) {
+	joined := make([]string, len(which))
+	for j, i := range which {
+		joined[j] = words[i]
+	}
+	scrubbed, found, err := s.scrub(ctx, strings.Join(joined, between))
+	if err != nil {
+		return "", err
+	}
+	split := strings.Split(scrubbed, between)
+	if len(split) != len(joined) {
+		return "", errors.Newf("the scanner was handed %d strings of the answer and gave %d back", len(joined), len(split))
+	}
+	for j, i := range which {
+		back[i] = split[j]
+	}
+	return found, nil
+}
+
+// jsonKeys are an object's keys in the one order its strings are read and
+// written back in.
+func jsonKeys(object map[string]any) []string {
+	keys := make([]string, 0, len(object))
+	for key := range object {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// jsonWords are every string of a JSON value, keys and values, after into.
+func jsonWords(value any, into []string) []string {
+	switch held := value.(type) {
+	case string:
+		into = append(into, held)
+	case []any:
+		for _, each := range held {
+			into = jsonWords(each, into)
+		}
+	case map[string]any:
+		for _, key := range jsonKeys(held) {
+			into = append(into, key)
+			into = jsonWords(held[key], into)
+		}
+	}
+	return into
+}
+
+// jsonWith is a JSON value with words in place of its strings, taken from the
+// front of words in the order jsonWords read them. Two keys of one object that
+// are one key with their fixtures are an error: one of them would be lost.
+func jsonWith(value any, words *[]string) (any, error) {
+	next := func() string {
+		word := (*words)[0]
+		*words = (*words)[1:]
+		return word
+	}
+	switch held := value.(type) {
+	case string:
+		return next(), nil
+	case []any:
+		with := make([]any, len(held))
+		for i, each := range held {
+			each, err := jsonWith(each, words)
+			if err != nil {
+				return nil, err
+			}
+			with[i] = each
+		}
+		return with, nil
+	case map[string]any:
+		with := make(map[string]any, len(held))
+		for _, key := range jsonKeys(held) {
+			named := next()
+			if _, taken := with[named]; taken {
+				return nil, errors.Newf("two keys of an object are both %q with their fixtures", named)
+			}
+			each, err := jsonWith(held[key], words)
+			if err != nil {
+				return nil, err
+			}
+			with[named] = each
+		}
+		return with, nil
+	}
+	return value, nil
 }
 
 // The parts of GitHub's deliveries that are words somebody wrote.

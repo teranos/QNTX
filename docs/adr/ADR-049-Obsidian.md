@@ -80,10 +80,27 @@ and the folder itself carries nothing.
 "i DONT want the binding to include subdirs"
 - A folder holds the notes directly in it. A folder inside it is not its, nor are the notes in that one (#1507).
 
+## One file
+
+"i want inside of my obsidian:"
+"QNTX/AgentInstructions/QNTX/AGENTS.md"
+"QNTX/AgentInstructions/QNTX/CLAUDE.md"
+"QNTX/AgentInstructions/QNTX/README.md"
+"QNTX/AgentInstructions/QNTX-Web/CLAUDE.md"
+"QNTX/AgentInstructions/QNTX-App/CLADUE.md"
+"i want single file bindings that follow that format"
+- A binding can name one file: `github.com/owner/repo@branch:file=place`, the place being the note's own path in the vault, as `github.com/teranos/QNTX@main:AGENTS.md=QNTX/AgentInstructions/QNTX/AGENTS.md`.
+- A file at the repository's top can be bound. A folder still cannot be the top.
+- A path ending `.md` names one file, and its place ends `.md`.
 
 ## What reaches the vault
 
-- Only notes: `.md` files. What else the repository's folder holds stays there.
+- Only notes: `.md` files, and stories. What else the repository's folder holds stays there.
+
+"i see, but i want those .feature files to be authored in Obsidian"
+"yes, because i would love to author these things myself."
+- A story, a `.feature` file, is a note in the vault: `X.feature` is `X.feature.md`. What the vault changes in `X.feature.md` reaches the branch as `X.feature`.
+- A folder holding both `X.feature` and `X.feature.md` is not filled: they would be one note.
 - Asked whether a note deleted on main is deleted from the vault too:
 
 - A note main had and has no more is removed from the vault. A note main  never had is the vault's own and stays.

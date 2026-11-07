@@ -297,3 +297,23 @@ func tarGz(t *testing.T, files map[string][]byte) []byte {
 
 	return buf.Bytes()
 }
+
+// A build read as it is unpacked is checked again as it is read: an archive
+// that is not the one its digest was taken of is not moved into place.
+func TestABuildUnpackedAsItIsReadIsTheOneChecked(t *testing.T) {
+	archive := tarGz(t, map[string][]byte{"qntx-duif-plugin": []byte("\x7fELF duif")})
+	dir := filepath.Join(t.TempDir(), "duif")
+
+	_, _, err := installFrom(bytes.NewReader(archive), strings.Repeat("0", 64), dir, "qntx-duif-plugin")
+	if err == nil || !strings.Contains(err.Error(), "nothing was installed") {
+		t.Fatalf("installFrom with another digest = %v", err)
+	}
+	if _, statErr := os.Stat(dir); !os.IsNotExist(statErr) {
+		t.Fatalf("%s was moved into place: %v", dir, statErr)
+	}
+
+	sum := sha256.Sum256(archive)
+	if _, _, err := installFrom(bytes.NewReader(archive), hex.EncodeToString(sum[:]), dir, "qntx-duif-plugin"); err != nil {
+		t.Fatalf("installFrom with its digest = %v", err)
+	}
+}

@@ -78,6 +78,10 @@ func renderReport(r Report) (services.NodeMail, error) {
 // The report is one window, drawn the way am draws the node: a section per
 // part, labelled rows in each.
 
+// sentryLeftOut is the one heading of everything Sentry would have filled,
+// when Sentry was not asked.
+const sentryLeftOut = "From Sentry: downtime, CPU, memory, swap, network, boot, queries, 4xx and 5xx, error events and error lines"
+
 func said(err string) services.MailRow {
 	return services.MailRow{Value: err, Unlabelled: true, State: services.RowUnwell}
 }
@@ -116,7 +120,7 @@ func reportWindow(r Report, drawn map[string]bool) services.MailWindow {
 	// section it would have filled.
 	if r.SentryErr != "" {
 		sections = append(sections, services.MailSection{
-			Title: "From Sentry: downtime, CPU, memory, swap, network, boot, queries, 4xx and 5xx",
+			Title: sentryLeftOut,
 			Rows:  []services.MailRow{said(r.SentryErr)},
 		})
 	} else {
@@ -135,6 +139,7 @@ func reportWindow(r Report, drawn map[string]bool) services.MailWindow {
 		}
 	}
 	sections = append(sections, failures)
+	sections = append(sections, linkedSections(r.Linked)...)
 
 	return services.MailWindow{
 		TitleAlone: true,
@@ -156,6 +161,28 @@ func countSection(title string, counts []namespaceCount, err string) services.Ma
 		}
 	}
 	return s
+}
+
+// linkedSections is what the linked subsystems said, each section as it was
+// handed over. A subsystem that failed is said under its name.
+func linkedSections(parts []linkedPart) []services.MailSection {
+	var sections []services.MailSection
+	for _, part := range parts {
+		for _, handed := range part.Sections {
+			s := services.MailSection{Title: handed.Title}
+			if len(handed.Rows) == 0 {
+				s.Rows = []services.MailRow{none()}
+			}
+			for _, row := range handed.Rows {
+				s.Rows = append(s.Rows, services.MailRow{Label: row.Label, Value: row.Value, Unlabelled: row.Label == ""})
+			}
+			sections = append(sections, s)
+		}
+		if part.Err != "" {
+			sections = append(sections, services.MailSection{Title: "From " + part.Subsystem, Rows: []services.MailRow{said(part.Err)}})
+		}
+	}
+	return sections
 }
 
 // sentrySections is the sections Sentry filled.
@@ -231,7 +258,51 @@ func sentrySections(r Report, drawn map[string]bool) []services.MailSection {
 		}
 		sections = append(sections, s)
 	}
+
+	events := services.MailSection{Title: errorEventsTitle}
+	switch {
+	case r.ErrorEvents.Err != "":
+		events.Rows = []services.MailRow{said(r.ErrorEvents.Err)}
+	case len(r.ErrorEvents.Outcomes) == 0:
+		events.Rows = []services.MailRow{none()}
+	default:
+		for _, o := range r.ErrorEvents.Outcomes {
+			state := services.RowUnwell
+			if o.Outcome == outcomeAccepted {
+				state = services.RowPlain
+			}
+			events.Rows = append(events.Rows, services.MailRow{Label: outcomeLabel(o) + ":", Value: fmt.Sprintf("%.0f", o.Count), State: state})
+		}
+	}
+	sections = append(sections, events)
+
+	lines := services.MailSection{Title: errorLinesTitle}
+	switch {
+	case r.ErrorLines.Err != "":
+		lines.Rows = []services.MailRow{said(r.ErrorLines.Err)}
+	case len(r.ErrorLines.Lines) == 0:
+		lines.Rows = []services.MailRow{none()}
+	default:
+		for _, line := range r.ErrorLines.Lines {
+			lines.Rows = append(lines.Rows, services.MailRow{Label: fmt.Sprintf("%d", line.Count), Value: line.Message, State: services.RowUnwell})
+		}
+	}
+	sections = append(sections, lines)
 	return sections
+}
+
+const (
+	errorEventsTitle = "Error events Sentry took and dropped over 7 days"
+	errorLinesTitle  = "Top 3 error lines"
+)
+
+// outcomeLabel is an outcome as Sentry names it, with its reason when it has
+// one: accepted, or rate_limited error_usage_exceeded.
+func outcomeLabel(o sentryread.Outcome) string {
+	if o.Reason == "" || o.Reason == "none" || o.Outcome == outcomeAccepted {
+		return o.Outcome
+	}
+	return o.Outcome + " " + o.Reason
 }
 
 // ---------------------------------------------------------------------------
@@ -272,7 +343,7 @@ func renderReportText(r Report) string {
 
 	// What Sentry holds is said once when Sentry was not asked.
 	if r.SentryErr != "" {
-		w("\nFrom Sentry: downtime, CPU, memory, swap, network, boot, queries, 4xx and 5xx")
+		w("\n%s", sentryLeftOut)
 		w("  %s", r.SentryErr)
 	}
 	sentry := func(title, err string, fn func()) {
@@ -309,6 +380,22 @@ func renderReportText(r Report) string {
 			w("  %d %s", rank.Status, rank.Path)
 		}
 	})
+	sentry(errorEventsTitle, r.ErrorEvents.Err, func() {
+		if len(r.ErrorEvents.Outcomes) == 0 {
+			w("  None.")
+		}
+		for _, o := range r.ErrorEvents.Outcomes {
+			w("  %s: %.0f", outcomeLabel(o), o.Count)
+		}
+	})
+	sentry(errorLinesTitle, r.ErrorLines.Err, func() {
+		if len(r.ErrorLines.Lines) == 0 {
+			w("  None.")
+		}
+		for _, line := range r.ErrorLines.Lines {
+			w("  %d %s", line.Count, line.Message)
+		}
+	})
 	w("\nTop 3 handler failures")
 	orSaid(r.FailuresErr, func() {
 		if len(r.Failures) == 0 {
@@ -318,6 +405,25 @@ func renderReportText(r Report) string {
 			w("  %s: %s", f.Handler, f.Error)
 		}
 	})
+	for _, part := range r.Linked {
+		for _, handed := range part.Sections {
+			w("\n%s", handed.Title)
+			if len(handed.Rows) == 0 {
+				w("  None.")
+			}
+			for _, row := range handed.Rows {
+				if row.Label == "" {
+					w("  %s", row.Value)
+				} else {
+					w("  %s %s", row.Label, row.Value)
+				}
+			}
+		}
+		if part.Err != "" {
+			w("\nFrom %s", part.Subsystem)
+			w("  %s", part.Err)
+		}
+	}
 	return b.String()
 }
 
