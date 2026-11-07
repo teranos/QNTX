@@ -331,14 +331,18 @@ func (s *QNTXServer) a2aCalled(op a2aOperation, input protoreflect.MessageDescri
 		defer func() { _ = client.Destroy() }()
 		span.SetAttributes(attribute.String("a2a.agent", bounded(agent, saidPathMost)))
 		// "Peer turn time limit of 45 sec", and an agent a card names the same.
-		ctx, cancel := context.WithTimeout(ctx, agentTurnTimeout)
+		ctx, cancel := context.WithTimeoutCause(ctx, agentTurnTimeout, errAgentTurnTimedOut)
 		defer cancel()
 		answered, err := op.call(ctx, client, request)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
-			if errors.Is(err, context.DeadlineExceeded) {
-				return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " did not answer " + op.rpc + " within " + agentTurnTimeout.String()}
+			// The agent's time ran out, or its caller stopped waiting first.
+			if cause := context.Cause(ctx); cause != nil {
+				if errors.Is(cause, errAgentTurnTimedOut) {
+					return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " did not answer " + op.rpc + " within " + agentTurnTimeout.String()}
+				}
+				return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " had not answered " + op.rpc + " when its caller stopped waiting: " + cause.Error()}
 			}
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: agent + " answered " + op.rpc + ": " + err.Error()}
 		}
@@ -350,6 +354,9 @@ func (s *QNTXServer) a2aCalled(op a2aOperation, input protoreflect.MessageDescri
 // given to answer one operation, its turn included: "Peer turn time limit of
 // 45 sec", and for a card's agent "yes".
 var agentTurnTimeout = 45 * time.Second
+
+// errAgentTurnTimedOut is agentTurnTimeout run out.
+var errAgentTurnTimedOut = errors.New("the agent's time to answer ran out")
 
 // cardResolveTimeout is how long a card is given to be read.
 const cardResolveTimeout = 30 * time.Second

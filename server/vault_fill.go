@@ -38,6 +38,29 @@ var goFill = sacred.Go
 // noteSuffix is what a note of a repository's folder ends with.
 const noteSuffix = ".md"
 
+// "i see, but i want those .feature files to be authored in Obsidian"
+
+// storySuffix is what a story of a repository's folder ends with. In the vault
+// a story is a note, named as the story with noteSuffix after it.
+const storySuffix = ".feature"
+
+// placedName is what a file of the repository is named in the vault.
+func placedName(name string) string {
+	if strings.HasSuffix(name, storySuffix) {
+		return name + noteSuffix
+	}
+	return name
+}
+
+// repoName is what a note of the vault is named in the repository: a story's
+// note is the story.
+func repoName(name string) string {
+	if story, ok := strings.CutSuffix(name, noteSuffix); ok && strings.HasSuffix(story, storySuffix) {
+		return story
+	}
+	return name
+}
+
 // repoNote is one note of a repository's folder, by its path under the folder.
 type repoNote struct {
 	under string
@@ -71,11 +94,18 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 		return nil, err
 	}
 	var notes []repoNote
+	placed := map[string]string{}
 	for _, entry := range entries {
-		if entry.Kind == forge.File && strings.HasSuffix(entry.Name, noteSuffix) {
-			under := strings.TrimPrefix(entry.Path, folder+"/")
-			notes = append(notes, repoNote{under: under, path: entry.Path, sha: entry.SHA})
+		if entry.Kind != forge.File || !(strings.HasSuffix(entry.Name, noteSuffix) || strings.HasSuffix(entry.Name, storySuffix)) {
+			continue
 		}
+		under := placedName(strings.TrimPrefix(entry.Path, folder+"/"))
+		// A story and a note named as its note would be one note in the vault.
+		if other, taken := placed[under]; taken {
+			return nil, errors.Newf("%s and %s of %s on %s are both %s in the vault", other, entry.Path, repo, branch, under)
+		}
+		placed[under] = entry.Path
+		notes = append(notes, repoNote{under: under, path: entry.Path, sha: entry.SHA})
 	}
 	return notes, nil
 }
