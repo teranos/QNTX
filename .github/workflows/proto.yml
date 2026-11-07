@@ -1,0 +1,51 @@
+{
+  "name": "Proto",
+  "on": {
+    "workflow_dispatch": {}
+  },
+  "jobs": {
+    "generate": {
+      "name": "Generate what the .proto files and the specs say, on the branch",
+      "permissions": {
+        "contents": "write"
+      },
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v26",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Set up Go",
+          "uses": "actions/setup-go@v5",
+          "with": {
+            "go-version-file": "go.mod"
+          }
+        },
+        {
+          "name": "make proto, make says",
+          "run": "make proto\nmake says\n"
+        },
+        {
+          "name": "Commit what changed to the branch",
+          "run": "git add -A\nif git diff --cached --quiet; then\n  echo \"nothing to regenerate\"\n  exit 0\nfi\ngit diff --cached --stat\ngit -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m \"Generated from the .proto files and the specs (make proto, make says)\"\ngit push origin HEAD:${GITHUB_REF#refs/heads/}\n"
+        }
+      ]
+    }
+  }
+}
