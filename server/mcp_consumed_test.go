@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -152,8 +154,21 @@ func sayingYes(t *testing.T, authorize string, admitted auth.Admission) *http.Re
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	back, err := url.Parse(resp.Header.Get("Location"))
 	require.NoError(t, err)
-	assert.Equal(t, ConsumedCallbackPath, back.Path, "the server sends the person back to the node's callback")
-	return httptest.NewRequest(http.MethodGet, back.RequestURI(), nil).WithContext(auth.WithAdmission(context.Background(), admitted))
+	assert.Equal(t, ConsumedReturnPath, back.Path, "the server sends the person back to the node's return")
+	return httptest.NewRequest(http.MethodGet, ConsumedCallbackPath+"?"+back.RawQuery, nil).WithContext(auth.WithAdmission(context.Background(), admitted))
+}
+
+// returned is what the server sent the person back with, as the return page is asked for it.
+func returned(t *testing.T, authorize string) url.Values {
+	t.Helper()
+	client := consumedClient()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Get(authorize)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	back, err := url.Parse(resp.Header.Get("Location"))
+	require.NoError(t, err)
+	return back.Query()
 }
 
 var asROOT = person("https://example.org/root", auth.LevelRoot)
@@ -262,8 +277,7 @@ func TestTheCodeGoesOnlyToWhoAskedForTheYes(t *testing.T) {
 
 // "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS AS ROOT FOR THE NODE"
 //
-// 「[Opus 5.5] Nobody below ROOT uses or handles what the node consumes; a token at ROOT uses it and does not」
-// 「[Opus 5.5] connect or drop it, and neither does a connector: the yes is a person's. A URL is https.」
+// 「[Opus 5.5] Nobody below ROOT uses or handles what the node consumes. A URL is https.」
 func TestTheMCPServersTheNodeConsumesAreROOTs(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 
@@ -275,18 +289,6 @@ func TestTheMCPServersTheNodeConsumesAreROOTs(t *testing.T) {
 			_, refused := consumedAs(s, admitted, sigilName, sigil.Sent{"name": "tracker", "url": "https://tracker.example/mcp", "tool": "issues"})
 			require.NotNil(t, refused, who+" "+sigilName)
 			assert.Equal(t, sigil.NotAllowed, refused.Why, who+" "+sigilName)
-		}
-	}
-
-	token := person("https://example.org/root", auth.LevelRoot)
-	token.Grant = &access.Grant{}
-	connector := person("https://example.org/root", auth.LevelRoot)
-	connector.ClientDID = "did:key:z6MkTheConnector"
-	for who, admitted := range map[string]auth.Admission{"a token": token, "the connector": connector} {
-		for _, handling := range []string{"connect", "drop"} {
-			_, refused := consumedAs(s, admitted, handling, sigil.Sent{"name": "tracker", "url": "https://tracker.example/mcp"})
-			require.NotNil(t, refused, who+" "+handling)
-			assert.Contains(t, refused.Says, who, handling)
 		}
 	}
 
@@ -400,6 +402,7 @@ func TestTheTableGivesTheMCPServersTheNodeConsumesToROOT(t *testing.T) {
 		assert.Equal(t, []string{"ROOT"}, compiled[held.GetHttp().GetPath()], held.GetHttp().GetPath())
 	}
 	assert.Equal(t, []string{"ROOT"}, compiled[ConsumedCallbackPath])
+	assert.Equal(t, []string{"ANYONE"}, compiled[ConsumedReturnPath], "the browser a yes comes back to may hold no session here")
 	require.NoError(t, s.consumedSignum().Check())
 }
 
@@ -514,4 +517,98 @@ func TestAnElementsAgentIsGivenTheServerAsAROOTAccessibleAgent(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listed.Tools, 1)
 	assert.Equal(t, "issues", listed.Tools[0].Name)
+}
+
+// "Keeps deferring to a human who doesn't have the tools"
+//
+// 「[Opus 5.5] The Node Agent connects the node itself: a server that asks for no yes is connected there and」
+// 「[Opus 5.5] then; for one that asks, the agent is handed the link, a person at ROOT says yes in the browser」
+// 「[Opus 5.5] logged in here, and the grant is kept. A token bringing the code back is refused: the yes is a person's.」
+func TestTheNodeAgentConnectsTheNodeAndAPersonAtROOTSaysYes(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	agent := person("https://example.org/root", auth.LevelRoot)
+	agent.Grant = &access.Grant{DID: "did:key:z6MkTheNodeAgent"}
+
+	open := standingUpstream(t)
+	open.open = true
+	connecting, refused := consumedAs(s, agent, "connect", sigil.Sent{"name": "wiki", "url": open.at + "/mcp"})
+	require.Nil(t, refused)
+	assert.Empty(t, connecting.(consumedConnecting).Authorize)
+	assert.Equal(t, []string{"issues"}, connecting.(consumedConnecting).Tools)
+
+	up := standingUpstream(t)
+	connecting, refused = consumedAs(s, agent, "connect", sigil.Sent{"name": "tracker", "url": up.at + "/mcp"})
+	require.Nil(t, refused)
+	authorize := connecting.(consumedConnecting).Authorize
+	require.NotEmpty(t, authorize, "the agent is handed where a person says yes")
+
+	byToken := httptest.NewRecorder()
+	s.handleConsumedCallback(byToken, sayingYes(t, authorize, agent))
+	assert.Equal(t, http.StatusForbidden, byToken.Code, "a token does not bring the yes back")
+	byUser := httptest.NewRecorder()
+	s.handleConsumedCallback(byUser, sayingYes(t, authorize, person(gardener, auth.LevelUser, "garden")))
+	assert.Equal(t, http.StatusForbidden, byUser.Code, "nobody below ROOT brings it back")
+
+	back := httptest.NewRecorder()
+	s.handleConsumedCallback(back, sayingYes(t, authorize, person("https://example.org/root-on-the-phone", auth.LevelRoot)))
+	require.Equal(t, http.StatusOK, back.Code, back.Body.String())
+
+	listed, refused := consumedAs(s, agent, "list", sigil.Sent{})
+	require.Nil(t, refused)
+	names := []string{}
+	for _, server := range listed.([]consumedServer) {
+		names = append(names, server.Name)
+	}
+	assert.Equal(t, []string{"tracker", "wiki"}, names)
+
+	_, refused = consumedAs(s, agent, "drop", sigil.Sent{"name": "wiki"})
+	assert.Nil(t, refused, "the agent drops what it connected")
+}
+
+// "the QNTX app is here on my phone, I am talking to you through it"
+//
+// The yes comes back to a browser with no session here: the return page hands the code to the app, and the
+// app, logged in as a person at ROOT, finishes it. A token posting the same code is refused.
+func TestAYesComesBackThroughTheApp(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	agent := person("https://example.org/root", auth.LevelRoot)
+	agent.Grant = &access.Grant{DID: "did:key:z6MkTheNodeAgent"}
+	up := standingUpstream(t)
+	connecting, refused := consumedAs(s, agent, "connect", sigil.Sent{"name": "tracker", "url": up.at + "/mcp"})
+	require.Nil(t, refused)
+	q := returned(t, connecting.(consumedConnecting).Authorize)
+
+	page := httptest.NewRecorder()
+	s.handleConsumedReturn(page, httptest.NewRequest(http.MethodGet, ConsumedReturnPath+"?"+q.Encode(), nil))
+	require.Equal(t, http.StatusOK, page.Code, page.Body.String())
+	assert.Contains(t, page.Body.String(), html.EscapeString(consumedAppReturn+"?"+q.Encode()), "the page hands the code to the app")
+	assert.Contains(t, page.Body.String(), html.EscapeString(ConsumedCallbackPath+"?"+q.Encode()), "and to this browser, when it is logged in here")
+
+	posted := func(admitted auth.Admission) *httptest.ResponseRecorder {
+		body, err := json.Marshal(map[string]string{"state": q.Get("state"), "code": q.Get("code"), "iss": q.Get("iss")})
+		require.NoError(t, err)
+		r := httptest.NewRequest(http.MethodPost, ConsumedCallbackPath, bytes.NewReader(body)).WithContext(auth.WithAdmission(context.Background(), admitted))
+		w := httptest.NewRecorder()
+		s.handleConsumedCallback(w, r)
+		return w
+	}
+	byToken := posted(agent)
+	assert.Equal(t, http.StatusForbidden, byToken.Code, "a token does not bring the yes back")
+	back := posted(person("https://example.org/root-on-the-phone", auth.LevelRoot))
+	require.Equal(t, http.StatusOK, back.Code, back.Body.String())
+	assert.Contains(t, back.Body.String(), `"connected":true`)
+
+	listed, refused := consumedAs(s, agent, "list", sigil.Sent{})
+	require.Nil(t, refused)
+	require.Len(t, listed.([]consumedServer), 1)
+	assert.Equal(t, "tracker", listed.([]consumedServer)[0].Name)
+}
+
+// A return page is shown only for a yes the node waits on: an unknown state carries nothing on.
+func TestAReturnForNoYesShowsNothing(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	page := httptest.NewRecorder()
+	s.handleConsumedReturn(page, httptest.NewRequest(http.MethodGet, ConsumedReturnPath+"?state=nothing&code=c", nil))
+	assert.Equal(t, http.StatusBadRequest, page.Code)
+	assert.NotContains(t, page.Body.String(), consumedAppReturn)
 }

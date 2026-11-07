@@ -872,6 +872,11 @@
         "ROOT"
       ]
     },
+    "/auth/mcp/return": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/register/begin": {
       "x-qntx-reach": [
         "ANYONE"
