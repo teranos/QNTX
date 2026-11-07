@@ -132,20 +132,17 @@ func (q *Queue) Dequeue() (*Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	// Get the oldest queued job
-	queuedStatus := JobStatusQueued
-	jobs, err := q.store.ListJobs(queuedStatus, 1)
+	// "we also need to fix the actual issue, why is pulse failing in the first place"
+	//
+	// The oldest queued job, not the newest: ListJobs reads newest first, and a
+	// worker that dequeued from it starved whatever was not taken at once.
+	job, err := q.store.OldestQueued()
 	if err != nil {
-		err = errors.Wrap(err, "failed to get queued jobs")
-		err = errors.WithDetail(err, fmt.Sprintf("Status filter: %s", queuedStatus))
-		return nil, err
+		if errors.Is(err, ErrJobNotFound) {
+			return nil, err
+		}
+		return nil, errors.Wrap(err, "failed to get queued jobs")
 	}
-
-	if len(jobs) == 0 {
-		return nil, errors.Wrap(ErrJobNotFound, "no queued jobs")
-	}
-
-	job := jobs[0]
 	job.Start()
 
 	if err := q.store.UpdateJob(job); err != nil {

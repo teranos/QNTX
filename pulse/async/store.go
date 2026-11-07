@@ -214,6 +214,24 @@ func (s *Store) UpdateJob(job *Job) error {
 // newestInStatus is where ListJobs reads, read in order from an index rather than sorted.
 const newestInStatus = `FROM async_ix_jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?`
 
+// oldestInStatus is the same index read the other way: what has waited longest.
+const oldestInStatus = `FROM async_ix_jobs WHERE status = ? ORDER BY created_at ASC LIMIT ?`
+
+// OldestQueued is the queued job that has waited longest, and ErrJobNotFound
+// when none is queued. The worker takes this one: on q the hourly wal-checkpoint
+// run JB-WALCHECK-PROCES--ZRK5KZKG sat queued from 2026-11-04 16:31 while the
+// worker took every newer job first, and 12,915 forwards sat with it.
+func (s *Store) OldestQueued() (*Job, error) {
+	jobs, err := s.listJobs(`SELECT `+StandardJobSelectColumns()+` `+oldestInStatus, JobStatusQueued, 1)
+	if err != nil {
+		return nil, err
+	}
+	if len(jobs) == 0 {
+		return nil, errors.Wrap(ErrJobNotFound, "no queued jobs")
+	}
+	return jobs[0], nil
+}
+
 // ListJobs is the newest jobs in one status, up to limit.
 func (s *Store) ListJobs(status JobStatus, limit int) ([]*Job, error) {
 	return s.listJobs(`SELECT `+StandardJobSelectColumns()+` `+newestInStatus, status, limit)

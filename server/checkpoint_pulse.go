@@ -248,6 +248,12 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 
 	s.ensureCheckpointSchedule(s.held.ServedUniverse().Schedules())
 	s.keepCheckpointing(handler)
+	// Before the worker takes its first job: it takes the oldest, and on q the
+	// oldest were 12,915 forwards from five weeks that the far node must not
+	// get replayed at it.
+	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
+		s.logger.Named("jobs").Errorw("Stale forwards were not dropped at boot", "error", err)
+	}
 	s.keepCleaningJobs()
 }
 

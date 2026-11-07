@@ -1088,3 +1088,35 @@ func TestOneCountAnswersEveryAskUntilAWrite(t *testing.T) {
 		t.Fatalf("queued after a write = %d, want 2: the write did not forget the held count", stats.Queued)
 	}
 }
+
+// "we also need to fix the actual issue, why is pulse failing in the first place"
+//
+// The worker takes the job that waited longest; a newer one does not jump it.
+func TestYugiDrawsTheOldestQueuedJob(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	queue := NewQueue(db)
+	mk := func(id string, at time.Time) {
+		t.Helper()
+		j := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+			ID: id, HandlerName: "test.order", Source: id, Status: JobStatusQueued, CreatedAt: at, UpdatedAt: at}
+		if err := queue.Enqueue(j); err != nil {
+			t.Fatalf("Enqueue(%s): %v", id, err)
+		}
+	}
+	mk("JOB_WAITED_LONGEST", time.Now().Add(-3*time.Hour))
+	mk("JOB_WAITED_LESS", time.Now().Add(-time.Hour))
+	mk("JOB_JUST_NOW", time.Now())
+
+	for _, want := range []string{"JOB_WAITED_LONGEST", "JOB_WAITED_LESS", "JOB_JUST_NOW"} {
+		job, err := queue.Dequeue()
+		if err != nil {
+			t.Fatalf("Dequeue: %v", err)
+		}
+		if job.ID != want {
+			t.Fatalf("dequeued %s, want %s", job.ID, want)
+		}
+	}
+	if _, err := queue.Dequeue(); !errors.Is(err, ErrJobNotFound) {
+		t.Fatalf("an empty queue answered %v, want ErrJobNotFound", err)
+	}
+}
