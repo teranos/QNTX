@@ -213,23 +213,10 @@ func (s *QNTXServer) a2aClientSignum() (sigil.Signum, error) {
 		if err != nil {
 			return sigil.Signum{}, err
 		}
-		takes := []*protocol.Param{
-			{Name: "peer", Says: "The node the agent is served at, by its label in nodes.peers; or card."},
-			{Name: "card", Says: says[resolveSays]},
-		}
-		fields := method.Input().Fields()
-		for i := 0; i < fields.Len(); i++ {
-			field := fields.Get(i)
-			param := &protocol.Param{Name: string(field.Name()), Required: parity.Required(field), Says: says[string(field.FullName())]}
-			if field.Kind() == protoreflect.Int32Kind && !field.IsList() {
-				param.Kind = sigil.Count
-			}
-			takes = append(takes, param)
-		}
 		signum.Sigils = append(signum.Sigils, &protocol.Sigil{
 			Name:   op.rpc,
 			Does:   says[string(method.FullName())],
-			Takes:  takes,
+			Takes:  a2aTakes(method, says),
 			Answer: string(method.Output().FullName()),
 			Http:   &protocol.Endpoint{Method: verb, Path: "/api/a2a/" + op.rpc},
 		})
@@ -265,6 +252,25 @@ func (s *QNTXServer) a2aClientSignum() (sigil.Signum, error) {
 		return s.nodePeers(), nil
 	}
 	return sigil.Signum{Signum: signum, Answers: answers}, nil
+}
+
+// a2aTakes is what an operation takes: the agent, by peer or by card, and the
+// fields of its request as the pinned spec says them.
+func a2aTakes(method protoreflect.MethodDescriptor, says map[string]string) []*protocol.Param {
+	takes := []*protocol.Param{
+		{Name: "peer", Says: "The node the agent is served at, by its label in nodes.peers; or card."},
+		{Name: "card", Says: says[resolveSays]},
+	}
+	fields := method.Input().Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		param := &protocol.Param{Name: string(field.Name()), Required: parity.Required(field), Says: says[string(field.FullName())]}
+		if field.Kind() == protoreflect.Int32Kind && !field.IsList() {
+			param.Kind = sigil.Count
+		}
+		takes = append(takes, param)
+	}
+	return takes
 }
 
 // nodePeers is what Peers answers.
