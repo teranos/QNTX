@@ -19,7 +19,7 @@ import (
 // "is the most elegant way of exposing Room, perhaps via the MCP say ?"
 // "so my ChatGPT can also reach into a Room if wanted"
 
-// roomsPath is where the node answers for the rooms its plugins hold (ADR-057).
+// 「[Opus 5.5] roomsPath is where the node answers for the rooms its plugins hold (ADR-057).」
 const roomsPath = "/api/rooms"
 
 func (s *QNTXServer) roomsSignum() sigil.Signum {
@@ -80,13 +80,13 @@ func (s *QNTXServer) roomsSignum() sigil.Signum {
 	}
 }
 
-// roomsHolder is one plugin that holds rooms.
+// 「[Opus 5.5] roomsHolder is one plugin that holds rooms.」
 type roomsHolder struct {
 	name  string
 	rooms protocol.RoomsServiceClient
 }
 
-// roomsHolders is every plugin that holds rooms, by name.
+// 「[Opus 5.5] roomsHolders is every plugin that holds rooms, by name.」
 func (s *QNTXServer) roomsHolders() ([]roomsHolder, *protocol.Refusal) {
 	pm, err := s.getPluginManager()
 	if err != nil {
@@ -107,8 +107,8 @@ func (s *QNTXServer) roomsHolders() ([]roomsHolder, *protocol.Refusal) {
 	return holders, nil
 }
 
-// roomsOf is the plugin that holds rooms under name, or the one plugin that
-// holds rooms when name is empty.
+// 「[Opus 5.5] roomsOf is the plugin that holds rooms under name, or the one plugin that」
+// 「[Opus 5.5] holds rooms when name is empty.」
 func (s *QNTXServer) roomsOf(name string) (string, protocol.RoomsServiceClient, *protocol.Refusal) {
 	held, refused := s.roomsHolders()
 	if refused != nil {
@@ -133,8 +133,8 @@ func (s *QNTXServer) roomsOf(name string) (string, protocol.RoomsServiceClient, 
 	return name, client, nil
 }
 
-// roomsBy is who asks, as a room holds them: an agent by its token, and a
-// person, or a connector a person said yes to, as no agent.
+// 「[Opus 5.5] roomsBy is who asks, as a room holds them: an agent by its token, and a」
+// 「[Opus 5.5] person, or a connector a person said yes to, as no agent.」
 func roomsBy(ctx context.Context) *protocol.RoomAgent {
 	admitted, known := auth.AdmissionFrom(ctx)
 	if !known || admitted.Grant == nil {
@@ -147,7 +147,7 @@ func roomsFailed(err error) *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 }
 
-// roomsList answers one provider's rooms, or, none named, every provider's.
+// 「[Opus 5.5] roomsList answers one provider's rooms, or, none named, every provider's.」
 func (s *QNTXServer) roomsList(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	if sent["provider"] != "" {
 		provider, rooms, refused := s.roomsOf(sent["provider"])
