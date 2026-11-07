@@ -95,12 +95,12 @@ and the folder itself carries nothing.
 
 ## What reaches the vault
 
-- Only notes: `.md` files, and stories. What else the repository's folder holds stays there.
+- 「[Opus 5.5] Only notes: `.md` files, and stories. What else the repository's folder holds stays there.」
 
 "i see, but i want those .feature files to be authored in Obsidian"
 "yes, because i would love to author these things myself."
-- A story, a `.feature` file, is a note in the vault: `X.feature` is `X.feature.md`. What the vault changes in `X.feature.md` reaches the branch as `X.feature`.
-- A folder holding both `X.feature` and `X.feature.md` is not filled: they would be one note.
+- 「[Opus 5.5] A story, a `.feature` file, is a note in the vault: `X.feature` is `X.feature.md`. What the vault changes in `X.feature.md` reaches the branch as `X.feature`.」
+- 「[Opus 5.5] A folder holding both `X.feature` and `X.feature.md` is not filled: they would be one note.」
 - Asked whether a note deleted on main is deleted from the vault too:
 
 - A note main had and has no more is removed from the vault. A note main  never had is the vault's own and stays.
