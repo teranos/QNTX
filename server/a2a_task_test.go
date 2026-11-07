@@ -510,6 +510,64 @@ func TestCancelingAWorkingTaskStopsItsTurn(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_CANCELED", at(got, "status.state"), "the turn ending wrote over its cancel")
 }
 
+// What a turn says as it moves is streamed as its "said" artifact, chunk by
+// chunk and masked, and the Task completed holds it whole beside its answer.
+func TestWhatATurnSaysIsStreamedAsItSaysIt(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	srv.harnessBinaries.mu.Lock()
+	held := srv.harnessBinaries.held["claude"]
+	srv.harnessBinaries.mu.Unlock()
+	says := filepath.Join(filepath.Dir(held.path), "claude-saying")
+	require.NoError(t, os.WriteFile(says, []byte("#!/bin/sh\n"+
+		`echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Looking at uptime."}]}}'`+"\n"+
+		`echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{}}]}}'`+"\n"+
+		`echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Found ghp_abcdefghijklmnopqrstuvwxyz0123 in env."}]}}'`+"\n"+
+		"sleep 0.3\nexec '"+held.path+"' \"$@\"\n"), 0o755))
+	srv.holdHarness("claude", &harnessHeld{fetched: held.fetched, path: says})
+
+	body := saidToTheNode("how long has the box been up?", "")
+	r := asBearer(http.MethodPost, "/a2a/message:stream", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("A2A-Version", "1.0")
+	r.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var chunks []string
+	var appends []bool
+	var final map[string]any
+	for _, line := range strings.Split(w.Body.String(), "\n") {
+		data, isData := strings.CutPrefix(line, "data: ")
+		if !isData {
+			continue
+		}
+		var event map[string]any
+		require.NoError(t, json.Unmarshal([]byte(data), &event), data)
+		if update, held := event["artifactUpdate"].(map[string]any); held {
+			assert.Equal(t, "said", at(update, "artifact.artifactId"))
+			chunks = append(chunks, at(update, "artifact.parts.0.text").(string))
+			appending, _ := update["append"].(bool)
+			appends = append(appends, appending)
+		}
+		if task, held := event["task"].(map[string]any); held {
+			final = task
+		}
+	}
+	require.Len(t, chunks, 2, w.Body.String())
+	assert.Equal(t, "Looking at uptime.", chunks[0])
+	assert.NotContains(t, chunks[1], "ghp_abcdefghijklmnopqrstuvwxyz0123", "a secret was streamed")
+	assert.Equal(t, []bool{false, true}, appends)
+
+	require.NotNil(t, final, w.Body.String())
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(final, "status.state"))
+	assert.Equal(t, "answer", at(final, "artifacts.0.artifactId"))
+	assert.Equal(t, "said", at(final, "artifacts.1.artifactId"))
+	assert.Equal(t, chunks[0], at(final, "artifacts.1.parts.0.text"))
+	assert.Equal(t, chunks[1], at(final, "artifacts.1.parts.1.text"))
+}
+
 // A turn Claude Code prints in past turnQuietMost is working, not quiet: it is
 // left to answer.
 func TestATurnThatPrintsPastItsQuietTimeIsNotStopped(t *testing.T) {

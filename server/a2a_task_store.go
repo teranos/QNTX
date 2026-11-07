@@ -93,6 +93,11 @@ func (t tasksOnLines) Update(ctx context.Context, update *taskstore.UpdateReques
 		(task.Status.Message == nil || task.Status.Message.ID != id+"-failed") {
 		return taskstore.TaskVersionMissing, errors.Newf("the node is stopping, and the node after it settles task %s from its turn's stream", id)
 	}
+	// A chunk of what a turn says is streamed, not written: the Task's next
+	// line holds it, and its last line holds all of it.
+	if _, chunk := update.Event.(*a2asdk.TaskArtifactUpdateEvent); chunk {
+		return taskstore.TaskVersion(version), nil
+	}
 	by, also := ta.did, []string(nil)
 	switch event := update.Event.(type) {
 	case *a2asdk.Message:

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"iter"
 	"mime"
 	"path/filepath"
@@ -102,11 +103,14 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 
 		// A turn Claude Code still prints in is working, and is told so once
 		// in each quarter of turnQuietMost it printed in: the turn is quiet
-		// when Claude Code is, not when the Task has no news.
-		printed := make(chan struct{}, 1)
+		// when Claude Code is, not when the Task has no news. What it says as
+		// it goes is the Task's "said" artifact, chunk by chunk (§3.7), so a
+		// stream shows the turn as it happens.
+		printed := make(chan []string)
 		told := time.NewTicker(turnQuietMost / 4)
 		defer told.Stop()
 		moved := false
+		var said []*a2asdk.Part
 		for {
 			select {
 			case stream := <-started:
@@ -114,18 +118,28 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 					stop()
 					return
 				}
-				sacred.Go("the stream of a task's turn, read for whether it moves", func() {
-					if _, _, err := claudecode.Tail(turn, stream, 0, func([]byte, int64) {
+				sacred.Go("the stream of a task's turn, read as it moves", func() {
+					if _, _, err := claudecode.Tail(turn, stream, 0, func(line []byte, _ int64) {
 						select {
-						case printed <- struct{}{}:
-						default:
+						case printed <- textsIn(line):
+						case <-turn.Done():
 						}
 					}); err != nil {
-						e.s.logger.Warnw("a task's turn was not read for whether it moves", "agent", ta.did, "task", id, "stream", stream, "error", err)
+						e.s.logger.Warnw("a task's turn was not read as it moves", "agent", ta.did, "task", id, "stream", stream, "error", err)
 					}
 				})
-			case <-printed:
+			case texts := <-printed:
 				moved = true
+				for _, text := range texts {
+					chunk := a2asdk.NewArtifactUpdateEvent(ec, saidArtifactID, textPart(masked(text)))
+					chunk.Append = len(said) > 0
+					chunk.Artifact.Name = saidArtifactID
+					if !yield(chunk, nil) {
+						stop()
+						return
+					}
+					said = append(said, chunk.Artifact.Parts...)
+				}
 			case <-told.C:
 				if !moved {
 					continue
@@ -139,15 +153,35 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 				stop()
 				return
 			case answer := <-answered:
-				e.ended(ec, ta, submitted, answer, yield)
+				e.ended(ec, ta, submitted, answer, said, yield)
 				return
 			}
 		}
 	}
 }
 
-// ended is how the turn ended, as the events of the Task's end.
-func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted *a2asdk.Task, answered sigil.Asked, yield func(a2asdk.Event, error) bool) {
+// saidArtifactID is the artifact of what a turn said as it moved.
+const saidArtifactID = "said"
+
+// textsIn is the text a line of Claude Code's stream says: an assistant
+// message's text blocks, none for any other line.
+func textsIn(line []byte) []string {
+	var m claudecode.Message
+	if json.Unmarshal(line, &m) != nil || m.Type != "assistant" {
+		return nil
+	}
+	var texts []string
+	for _, block := range m.Blocks() {
+		if block.Type == "text" && block.Text != "" {
+			texts = append(texts, block.Text)
+		}
+	}
+	return texts
+}
+
+// ended is how the turn ended, as the events of the Task's end: its answer,
+// and what it said as it moved when it said anything.
+func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted *a2asdk.Task, answered sigil.Asked, moving []*a2asdk.Part, yield func(a2asdk.Event, error) bool) {
 	failed := func(why string) {
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(ec.TaskID, ec.ContextID, why)), nil)
 	}
@@ -189,6 +223,9 @@ func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted 
 		now := time.Now()
 		completed.Status = a2asdk.TaskStatus{State: a2asdk.TaskStateCompleted, Timestamp: &now}
 		completed.Artifacts = []*a2asdk.Artifact{answerArtifact(masked(claude.GetAnswer()))}
+		if len(moving) > 0 {
+			completed.Artifacts = append(completed.Artifacts, &a2asdk.Artifact{ID: saidArtifactID, Name: saidArtifactID, Parts: moving})
+		}
 		yield(&completed, nil)
 	}
 }
