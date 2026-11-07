@@ -204,23 +204,23 @@ message RoomMessage {
   string thread = 7;
   // 「[Fable 5.1] When it was said, RFC3339.」
   string at = 8;
-  // What was sent with it: an image, a file.
+  // 「[Opus 5.5] What was sent with it: an image, a file.」
   repeated RoomAttachment attachments = 9;
 }
 
-// RoomAttachment is a file said in a room, read back where the node serves it.
+// 「[Opus 5.5] RoomAttachment is a file said in a room, read back where the node serves it.」
 message RoomAttachment {
   string name = 1;
-  // Its media type, as image/png.
+  // 「[Opus 5.5] Its media type, as image/png.」
   string type = 2;
-  // Where the node serves its bytes, as the provider names it.
+  // 「[Opus 5.5] Where the node serves its bytes, as the provider names it.」
   string url = 3;
 }
 
-// RoomFile is a file posted into a room, whole.
+// 「[Opus 5.5] RoomFile is a file posted into a room, whole.」
 message RoomFile {
   string name = 1;
-  // Its media type, as image/png.
+  // 「[Opus 5.5] Its media type, as image/png.」
   string type = 2;
   bytes data = 3;
 }
@@ -245,7 +245,7 @@ message PostToRoomRequest {
   string body = 4;
   // 「[Fable 5.1] The message it is said under, or empty for the top of the room.」
   string thread = 5;
-  // What is sent with it, the body its caption.
+  // 「[Opus 5.5] What is sent with it, the body its caption.」
   repeated RoomFile files = 6;
 }
 
