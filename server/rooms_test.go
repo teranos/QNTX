@@ -30,7 +30,7 @@ func TestNoPluginHoldingRoomsIsSaid(t *testing.T) {
 }
 
 
-// "i want all Node Agents to be in the Node Room"
+// "「[Opus 5.5] i want all Node Agents to be in the Node Room」"
 func TestTheNodeRoomIsOfThisNode(t *testing.T) {
 	s := &QNTXServer{nodeDID: &nodedid.Handler{DID: "did:key:z6Mknode"}}
 	node, other := &protocol.Room{Name: nodeRoomName}, &protocol.Room{Name: "pond"}
