@@ -1037,7 +1037,7 @@
   "protocol.StoredThing": "StoredThing is one thing QNTX persists, as make parity read it. Mirrors parity.Stored.",
   "protocol.StoredThing.rebuilt": "Rebuilt rows cascade from attestations, so a take-in rebuilds them.",
   "protocol.StoredThing.sites": "The Go files that reach this thing with hand-written SQL.",
-  "protocol.StreamRoomArrivalsRequest.addressed_only": "「[Fable 5.1] Only what is addressed to the agent: wakes, and nothing else said.」",
+  "protocol.StreamRoomArrivalsRequest.addressed_only": "「[Fable 5.1] Only what is addressed to the agent: wakes, and nothing else said.」 It filters messages and joins. A gap arrives whatever it says, so a lost wake is never passed over by the sequence.",
   "protocol.StreamRoomArrivalsRequest.after": "「[Fable 5.1] After this sequence: what a stream that dropped did not carry.」",
   "protocol.StreamRoomArrivalsRequest.by": "「[Fable 5.1] The agent whose arrivals these are.」",
   "protocol.StreamRoomArrivalsRequest.head": "「[Fable 5.1] From now: nothing said before this is carried. False is refused.」",

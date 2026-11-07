@@ -1669,6 +1669,8 @@ type StreamRoomArrivalsRequest struct {
 	//	*StreamRoomArrivalsRequest_Head
 	From isStreamRoomArrivalsRequest_From `protobuf_oneof:"from"`
 	// 「[Fable 5.1] Only what is addressed to the agent: wakes, and nothing else said.」
+	// It filters messages and joins. A gap arrives whatever it says, so a lost wake
+	// is never passed over by the sequence.
 	AddressedOnly bool `protobuf:"varint,5,opt,name=addressed_only,json=addressedOnly,proto3" json:"addressed_only,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
