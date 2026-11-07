@@ -526,18 +526,23 @@ func (wp *WorkerPool) processNextJob() error {
 			// Context was cancelled - requeue job with checkpoint intact (don't fail it)
 			wp.logger.Closing("Job cancelled during execution, re-queuing with checkpoint", "job_id", job.ID)
 			markSpan(span, sentry.SpanStatusAborted, "requeued_shutdown")
-			job.Status = JobStatusQueued
+			job.Status, job.UpdatedAt = JobStatusQueued, time.Now()
 			if updateErr := wp.queue.UpdateJob(job); updateErr != nil {
 				wp.logger.SugaredLogger.Errorw("Failed to re-queue cancelled job", "job_id", job.ID, "error", updateErr)
 			}
 			return nil // Return nil to avoid logging as error
 		default:
-			// Handler not registered yet (e.g. plugins still loading) — re-queue
-			if errors.Is(err, ErrHandlerNotRegistered) {
+			// Handler not registered yet (e.g. plugins still loading) — re-queue,
+			// touched, so it stands behind every other queued job. A handler that
+			// has not registered within HandlerGrace of the job's creation is not
+			// loading; the job fails below, with that as its error, instead of
+			// being taken again forever. On q, plugin.update had no handler since
+			// 2026-10-01 and its one queued row held the worker.
+			if errors.Is(err, ErrHandlerNotRegistered) && time.Since(job.CreatedAt) < HandlerGrace {
 				wp.logger.SugaredLogger.Debugw("Handler not registered yet, re-queuing job",
 					"job_id", job.ID, "handler", job.HandlerName)
 				markSpan(span, sentry.SpanStatusUnavailable, "requeued_no_handler")
-				job.Status = JobStatusQueued
+				job.Status, job.UpdatedAt = JobStatusQueued, time.Now()
 				if updateErr := wp.queue.UpdateJob(job); updateErr != nil {
 					wp.logger.SugaredLogger.Errorw("Failed to re-queue job for missing handler",
 						"job_id", job.ID, "error", updateErr)
