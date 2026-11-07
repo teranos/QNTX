@@ -485,8 +485,17 @@ func textPart(text string) *a2asdk.Part {
 	return part
 }
 
-// textPlain is the media type the agents take and give.
+// textPlain is the media type the agents answer in.
 const textPlain = "text/plain"
+
+// turnModes are the media types a turn takes and gives (§4.4.5): text, JSON,
+// and the files Claude Code reads, a PDF and an image among them. Any other is
+// refused, as "Agents SHOULD sanitize or validate file content types and
+// reject unexpected media types" (§13.4).
+var turnModes = []string{
+	textPlain, "text/markdown", "text/csv", "application/json",
+	"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
+}
 
 // endTask writes that task id ended in state, as by, unless it ended already:
 // a Task ends once, by its turn, a restart or a cancel, whichever is first.

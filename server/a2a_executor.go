@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"iter"
 	"mime"
+	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,7 +46,21 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 			return
 		}
 		ta, id := call.agent, ec.TaskID
-		says, err := saidIn(ec.Message)
+		// What is sent and given back as files lies in the turn's work, under
+		// the Task, and goes once the Task ends; a turn the next node reads
+		// on (settleLeftTask) keeps it.
+		files := filepath.Join(ta.agent.home, "work", "a2a", string(id))
+		in, out := filepath.Join(files, "in"), filepath.Join(files, "out")
+		defer func() {
+			if e.s.ctx.Err() == nil {
+				_ = os.RemoveAll(files)
+			}
+		}()
+		if err := os.MkdirAll(out, 0o700); err != nil {
+			yield(nil, a2aRefusal(a2asdk.ErrInternalError, "where the turn writes its files was not made: "+err.Error()))
+			return
+		}
+		says, err := saidIn(ec.Message, in, out)
 		if err != nil {
 			yield(nil, err)
 			return
@@ -153,7 +169,7 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 				stop()
 				return
 			case answer := <-answered:
-				e.ended(ec, ta, submitted, answer, said, yield)
+				e.ended(ec, ta, submitted, answer, said, e.filesOut(out, call.accepts), yield)
 				return
 			}
 		}
@@ -181,7 +197,7 @@ func textsIn(line []byte) []string {
 
 // ended is how the turn ended, as the events of the Task's end: its answer,
 // and what it said as it moved when it said anything.
-func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted *a2asdk.Task, answered sigil.Asked, moving []*a2asdk.Part, yield func(a2asdk.Event, error) bool) {
+func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted *a2asdk.Task, answered sigil.Asked, moving []*a2asdk.Part, files []*a2asdk.Artifact, yield func(a2asdk.Event, error) bool) {
 	failed := func(why string) {
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(ec.TaskID, ec.ContextID, why)), nil)
 	}
@@ -226,6 +242,7 @@ func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted 
 		if len(moving) > 0 {
 			completed.Artifacts = append(completed.Artifacts, &a2asdk.Artifact{ID: saidArtifactID, Name: saidArtifactID, Parts: moving})
 		}
+		completed.Artifacts = append(completed.Artifacts, files...)
 		yield(&completed, nil)
 	}
 }
@@ -277,25 +294,108 @@ func (e turnExecutor) Cleanup(_ context.Context, ec *a2asrv.ExecutorContext, _ a
 	e.s.taskStreams.Delete(string(ec.TaskID))
 }
 
-// saidIn is what a message's text parts say, one after another. A part that is
-// not text, or text in another media type than text/plain, is refused: the
-// agent takes text and nothing else (ContentTypeNotSupportedError).
-func saidIn(message *a2asdk.Message) (string, error) {
+// saidIn is what a message says, part after part, as the turn reads it:
+// text as it is; JSON data as its JSON (§4.1.6); a URL as the URL, which the
+// node does not fetch, as "File references within A2A messages MUST be
+// validated to prevent server-side request forgery" (§14.1.1); and a file's
+// bytes written into in, named where it lies. out, when named, is where a file
+// the turn writes is given back with its answer (§3.7, §6.7).
+func saidIn(message *a2asdk.Message, in, out string) (string, error) {
 	if message == nil {
 		return "", a2aRefusal(a2asdk.ErrInvalidParams, "a SendMessageRequest carries a message")
 	}
-	texts := make([]string, 0, len(message.Parts))
+	says := make([]string, 0, len(message.Parts)+1)
+	var files []string
 	for i, part := range message.Parts {
-		text, isText := part.Content.(a2asdk.Text)
-		if !isText {
-			return "", a2aRefusal(a2asdk.ErrUnsupportedContentType, "part "+strconv.Itoa(i)+" carries no text, and the agent takes "+textPlain+" alone")
+		switch content := part.Content.(type) {
+		case a2asdk.Text:
+			says = append(says, string(content))
+		case a2asdk.Data:
+			data, err := json.Marshal(content.Value)
+			if err != nil {
+				return "", a2aRefusal(a2asdk.ErrInvalidParams, "part "+strconv.Itoa(i)+" is data that is no JSON: "+err.Error())
+			}
+			says = append(says, string(data))
+		case a2asdk.URL:
+			says = append(says, "A file is at "+string(content)+partNamed(part)+".")
+		case a2asdk.Raw:
+			name, err := fileIn(in, i, part, content)
+			if err != nil {
+				return "", err
+			}
+			files = append(files, filepath.Join(in, name)+partNamed(part))
+		default:
+			return "", a2aRefusal(a2asdk.ErrUnsupportedContentType, "part "+strconv.Itoa(i)+" carries nothing a turn reads")
 		}
-		if part.MediaType != "" && !isTextPlain(part.MediaType) {
-			return "", a2aRefusal(a2asdk.ErrUnsupportedContentType, "part "+strconv.Itoa(i)+" is "+part.MediaType+", and the agent takes "+textPlain+" alone")
-		}
-		texts = append(texts, string(text))
 	}
-	return strings.Join(texts, "\n"), nil
+	if len(files) > 0 {
+		says = append(says, "Files sent with this: "+strings.Join(files, ", ")+".")
+	}
+	if out != "" {
+		says = append(says, "A file you write into "+out+" is given back with your answer.")
+	}
+	return strings.Join(says, "\n"), nil
+}
+
+// partNamed is what a part says of the file it carries: its name and media type.
+func partNamed(part *a2asdk.Part) string {
+	var named []string
+	if part.Filename != "" {
+		named = append(named, part.Filename)
+	}
+	if part.MediaType != "" {
+		named = append(named, part.MediaType)
+	}
+	if len(named) == 0 {
+		return ""
+	}
+	return " (" + strings.Join(named, ", ") + ")"
+}
+
+// fileIn writes part i's bytes into in, through in so its name leaves it
+// never, as the name it was sent with when that is a plain name, and part-i
+// otherwise.
+func fileIn(in string, i int, part *a2asdk.Part, raw a2asdk.Raw) (string, error) {
+	if err := os.MkdirAll(in, 0o700); err != nil {
+		return "", a2aRefusal(a2asdk.ErrInternalError, "the files of the message were not written: "+err.Error())
+	}
+	root, err := os.OpenRoot(in)
+	if err != nil {
+		return "", a2aRefusal(a2asdk.ErrInternalError, "the files of the message were not written: "+err.Error())
+	}
+	defer root.Close()
+	name := filepath.Base(part.Filename)
+	if part.Filename == "" || name != part.Filename || strings.HasPrefix(name, ".") {
+		name = "part-" + strconv.Itoa(i)
+		if extensions, _ := mime.ExtensionsByType(part.MediaType); len(extensions) > 0 {
+			name += extensions[0]
+		}
+	}
+	if _, err := root.Stat(name); err == nil {
+		name = strconv.Itoa(i) + "-" + name
+	}
+	if err := root.WriteFile(name, raw, 0o600); err != nil {
+		return "", a2aRefusal(a2asdk.ErrInternalError, "part "+strconv.Itoa(i)+" was not written: "+err.Error())
+	}
+	return name, nil
+}
+
+// filesOut is what a turn wrote into out, each an artifact of the Task (§3.7)
+// as its bytes, name and media type (§6.7), the most answerFiles carries into a
+// room, and only of a media type the agent gives and the client takes.
+func (e turnExecutor) filesOut(out string, accepts []string) []*a2asdk.Artifact {
+	var artifacts []*a2asdk.Artifact
+	for _, file := range e.s.answerFiles(out) {
+		kind, _, err := mime.ParseMediaType(file.GetType())
+		if err != nil || !slices.Contains(turnModes, kind) || (len(accepts) > 0 && !slices.Contains(accepts, kind)) {
+			e.s.logger.Warnw("a file a turn wrote is no media type its Task gives", "file", file.GetName(), "type", file.GetType())
+			continue
+		}
+		part := a2asdk.NewRawPart(file.GetData())
+		part.Filename, part.MediaType = file.GetName(), kind
+		artifacts = append(artifacts, &a2asdk.Artifact{ID: a2asdk.ArtifactID("file-" + file.GetName()), Name: file.GetName(), Parts: a2asdk.ContentParts{part}})
+	}
+	return artifacts
 }
 
 // isTextPlain is whether a media type is text/plain, whatever its parameters

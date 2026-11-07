@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -267,11 +268,11 @@ func TestWhatTheNodeAgentDoesNotTakeIsRefused(t *testing.T) {
 		code       int
 		says       string
 	}{
-		{"a part that is not text",
-			`{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [{"url": "https://example.org/a.png", "mediaType": "image/png"}]}}`,
+		{"a file of a media type no skill takes",
+			`{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [{"raw": "UEsDBA==", "filename": "a.zip", "mediaType": "application/zip"}]}}`,
 			http.StatusBadRequest, "CONTENT_TYPE_NOT_SUPPORTED"},
-		{"text in another media type",
-			`{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [{"text": "{}", "mediaType": "application/json"}]}}`,
+		{"a file that says no media type",
+			`{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [{"url": "https://example.org/a"}]}}`,
 			http.StatusBadRequest, "CONTENT_TYPE_NOT_SUPPORTED"},
 		{"a context that is not its session",
 			`{"message": {"messageId": "m", "role": "ROLE_USER", "contextId": "another", "parts": [{"text": "hi"}]}}`,
@@ -302,9 +303,9 @@ func TestATaskNoIdNamesIsNotFound(t *testing.T) {
 	assert.Contains(t, string(said), "TASK_NOT_FOUND")
 }
 
-// The card says the Node Agent takes text and gives text: what a client reads
-// before it sends (§3.3.4).
-func TestTheNodeAgentsSkillTakesText(t *testing.T) {
+// The card says what the Node Agent takes and gives, turnModes: what a client
+// reads before it sends (§3.3.4).
+func TestTheNodeAgentsSkillTakesWhatATurnReads(t *testing.T) {
 	namedNode(t)
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	code, card := a2aAsked(t, srv, http.MethodGet, "/a2a/extendedAgentCard", "", tokens[auth.LevelRoot])
@@ -317,8 +318,12 @@ func TestTheNodeAgentsSkillTakesText(t *testing.T) {
 		}
 	}
 	require.NotNil(t, agent, "ROOT's card has no skill for the Node Agent")
-	assert.Equal(t, []any{"text/plain"}, at(agent, "inputModes"))
-	assert.Equal(t, []any{"text/plain"}, at(agent, "outputModes"))
+	modes := make([]any, 0, len(turnModes))
+	for _, mode := range turnModes {
+		modes = append(modes, mode)
+	}
+	assert.Equal(t, modes, at(agent, "inputModes"))
+	assert.Equal(t, modes, at(agent, "outputModes"))
 }
 
 // leftTurn is a turn the node's last process left in agent's home: its stream,
@@ -729,4 +734,70 @@ func TestJSONRPCIsAnsweredWhereTheCardNamesIt(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answered), w.Body.String())
 	assert.Equal(t, "2.0", answered["jsonrpc"])
 	assert.NotNil(t, answered["error"], "a task no id names is not found")
+}
+
+// A message carries a file, a URL and JSON data, and the turn reads them all:
+// the file written where the turn works, the URL and data in what it is told.
+// What the turn writes for its answer comes back as the Task's artifacts, each
+// its bytes, name and media type (§6.7), of the media types the client takes.
+func TestFilesGoInAndComeBackOut(t *testing.T) {
+	srv, tokens, ran := nodeAgentOverA2A(t, "")
+	srv.harnessBinaries.mu.Lock()
+	held := srv.harnessBinaries.held["claude"]
+	srv.harnessBinaries.mu.Unlock()
+	seen := t.TempDir()
+	writes := filepath.Join(filepath.Dir(held.path), "claude-writing")
+	require.NoError(t, os.WriteFile(writes, []byte("#!/bin/sh\n"+
+		"cp a2a/*/in/* '"+seen+"'/\n"+
+		"printf 'the harvest is in' > a2a/*/out/report.txt 2>/dev/null || for d in a2a/*/out; do printf 'the harvest is in' > $d/report.txt; done\n"+
+		"for d in a2a/*/out; do printf 'PNGBYTES' > $d/chart.png; done\n"+
+		"exec '"+held.path+"' \"$@\"\n"), 0o755))
+	srv.holdHarness("claude", &harnessHeld{fetched: held.fetched, path: writes})
+
+	sent := func(id, accepts string) map[string]any {
+		body := `{"message": {"messageId": "` + id + `", "role": "ROLE_USER", "parts": [` +
+			`{"text": "what do these say?"},` +
+			`{"raw": "` + base64.StdEncoding.EncodeToString([]byte("apples,3")) + `", "filename": "crop.csv", "mediaType": "text/csv"},` +
+			`{"url": "https://example.org/orchard.png", "mediaType": "image/png"},` +
+			`{"data": {"rows": 2}}]}`
+		if accepts != "" {
+			body += `, "configuration": {"acceptedOutputModes": ["text/plain"` + accepts + `]}`
+		}
+		code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", body+`}`, tokens[auth.LevelRoot])
+		require.Equal(t, http.StatusOK, code, answered)
+		require.Equal(t, "TASK_STATE_COMPLETED", at(answered, "task.status.state"), answered)
+		return answered
+	}
+
+	answered := sent("m-1", "")
+	read, err := os.ReadFile(filepath.Join(seen, "crop.csv"))
+	require.NoError(t, err, "the file sent was not where the turn works")
+	assert.Equal(t, "apples,3", string(read))
+	args, err := os.ReadFile(filepath.Join(ran, "0", "args"))
+	require.NoError(t, err)
+	assert.Contains(t, string(args), "crop.csv (crop.csv, text/csv)")
+	assert.Contains(t, string(args), "A file is at https://example.org/orchard.png (image/png).")
+	assert.Contains(t, string(args), `{"rows":2}`)
+
+	byName := map[string]any{}
+	for _, artifact := range at(answered, "task.artifacts").([]any) {
+		byName[at(artifact, "name").(string)] = artifact
+	}
+	require.Contains(t, byName, "report.txt", answered)
+	require.Contains(t, byName, "chart.png", answered)
+	assert.Equal(t, base64.StdEncoding.EncodeToString([]byte("the harvest is in")), at(byName["report.txt"], "parts.0.raw"))
+	assert.Equal(t, "report.txt", at(byName["report.txt"], "parts.0.filename"))
+	assert.Equal(t, "text/plain", at(byName["report.txt"], "parts.0.mediaType"))
+	assert.Equal(t, "image/png", at(byName["chart.png"], "parts.0.mediaType"))
+
+	// "Agents SHOULD use this to tailor their output" (acceptedOutputModes).
+	answered = sent("m-2", `, "text/csv"`)
+	for _, artifact := range at(answered, "task.artifacts").([]any) {
+		assert.NotEqual(t, "chart.png", at(artifact, "name"), "a file the client does not take was given")
+	}
+
+	// The files went with the Task.
+	left, err := filepath.Glob(filepath.Join(srv.nodeAgent.home, "work", "a2a", "*"))
+	require.NoError(t, err)
+	assert.Empty(t, left, "a Task's files stayed after it ended")
 }
