@@ -298,6 +298,8 @@ message StreamRoomArrivalsRequest {
     bool head = 4;
   }
   // 「[Fable 5.1] Only what is addressed to the agent: wakes, and nothing else said.」
+  // It filters messages and joins. A gap arrives whatever it says, so a lost wake
+  // is never passed over by the sequence.
   bool addressed_only = 5;
 }
 
