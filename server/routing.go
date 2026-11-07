@@ -74,7 +74,18 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// This allows routes to be registered immediately while plugins load asynchronously
 	// A plugin registers its own routes over gRPC and the host never sees
 	// them, so no row here can describe one. Every plugin route is ROOT's.
+	ownPaths := map[string]bool{}
+	for _, signum := range s.signa() {
+		for _, held := range signum.GetSigils() {
+			ownPaths[held.GetHttp().GetPath()] = true
+		}
+	}
 	for _, name := range s.pluginRegistry.ListEnabled() {
+		// A plugin named as a path the node answers itself (rooms) does not take it over.
+		if ownPaths["/api/"+name] {
+			s.logger.Errorw("A plugin is named as a path the node answers itself; its HTTP routes are not served", "plugin", name, "path", "/api/"+name)
+			continue
+		}
 		// Register exact match for /api/{plugin} (e.g., /api/code)
 		exactPattern := "/api/" + name
 		s.answer(exactPattern, s.handlePluginRequest)
