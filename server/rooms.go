@@ -133,14 +133,27 @@ func (s *QNTXServer) roomsOf(name string) (string, protocol.RoomsServiceClient, 
 	return name, client, nil
 }
 
-// roomsBy is who asks, as a room holds them: an agent by its token, and a
-// person, or a connector a person said yes to, as no agent.
+// roomsBy is who asks, as a room holds them: an agent by its token, by the
+// token's DID and label; a person by their identity and what they are called,
+// so what they say in a room is said under their name and not the node's.
+//
+// "What is weird is that it's not showing my name, root"
 func roomsBy(ctx context.Context) *protocol.RoomAgent {
 	admitted, known := auth.AdmissionFrom(ctx)
-	if !known || admitted.Grant == nil {
+	if !known {
 		return nil
 	}
-	return &protocol.RoomAgent{Did: admitted.Grant.DID, Name: admitted.Grant.Label}
+	if admitted.Grant != nil {
+		return &protocol.RoomAgent{Did: admitted.Grant.DID, Name: admitted.Grant.Label}
+	}
+	if admitted.Identity == "" {
+		return nil
+	}
+	name := admitted.DisplayName
+	if name == "" {
+		name = admitted.Identity
+	}
+	return &protocol.RoomAgent{Did: admitted.Identity, Name: name}
 }
 
 func roomsFailed(err error) *protocol.Refusal {
