@@ -224,13 +224,13 @@ func (x *RoomOf) GetNamespace() string {
 	return ""
 }
 
-func (x *RoomOf) GetElement() string {
+func (x *RoomOf) GetElement() *ElementOf {
 	if x != nil {
 		if x, ok := x.Of.(*RoomOf_Element); ok {
 			return x.Element
 		}
 	}
-	return ""
+	return nil
 }
 
 func (x *RoomOf) GetPurpose() string {
@@ -258,7 +258,7 @@ type RoomOf_Namespace struct {
 
 type RoomOf_Element struct {
 	// "each **element** is also a room"
-	Element string `protobuf:"bytes,3,opt,name=element,proto3,oneof"`
+	Element *ElementOf `protobuf:"bytes,5,opt,name=element,proto3,oneof"`
 }
 
 type RoomOf_Purpose struct {
@@ -273,6 +273,60 @@ func (*RoomOf_Namespace) isRoomOf_Of() {}
 func (*RoomOf_Element) isRoomOf_Of() {}
 
 func (*RoomOf_Purpose) isRoomOf_Of() {}
+
+// ElementOf is an element as its room is of it: by its namespace and by itself,
+// so one element in two namespaces is two rooms.
+type ElementOf struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Element       string                 `protobuf:"bytes,2,opt,name=element,proto3" json:"element,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ElementOf) Reset() {
+	*x = ElementOf{}
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ElementOf) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ElementOf) ProtoMessage() {}
+
+func (x *ElementOf) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ElementOf.ProtoReflect.Descriptor instead.
+func (*ElementOf) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ElementOf) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *ElementOf) GetElement() string {
+	if x != nil {
+		return x.Element
+	}
+	return ""
+}
 
 // 「[Fable 5.1] Room is one room.」
 type Room struct {
@@ -297,7 +351,7 @@ type Room struct {
 
 func (x *Room) Reset() {
 	*x = Room{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -309,7 +363,7 @@ func (x *Room) String() string {
 func (*Room) ProtoMessage() {}
 
 func (x *Room) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -322,7 +376,7 @@ func (x *Room) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Room.ProtoReflect.Descriptor instead.
 func (*Room) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{2}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Room) GetId() string {
@@ -380,7 +434,7 @@ type RegisterRoomAgentRequest struct {
 
 func (x *RegisterRoomAgentRequest) Reset() {
 	*x = RegisterRoomAgentRequest{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -392,7 +446,7 @@ func (x *RegisterRoomAgentRequest) String() string {
 func (*RegisterRoomAgentRequest) ProtoMessage() {}
 
 func (x *RegisterRoomAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -405,7 +459,7 @@ func (x *RegisterRoomAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRoomAgentRequest.ProtoReflect.Descriptor instead.
 func (*RegisterRoomAgentRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{3}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *RegisterRoomAgentRequest) GetProvider() string {
@@ -440,7 +494,7 @@ type RegisterRoomAgentResponse struct {
 
 func (x *RegisterRoomAgentResponse) Reset() {
 	*x = RegisterRoomAgentResponse{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -452,7 +506,7 @@ func (x *RegisterRoomAgentResponse) String() string {
 func (*RegisterRoomAgentResponse) ProtoMessage() {}
 
 func (x *RegisterRoomAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -465,7 +519,7 @@ func (x *RegisterRoomAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRoomAgentResponse.ProtoReflect.Descriptor instead.
 func (*RegisterRoomAgentResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RegisterRoomAgentResponse) GetRegistered() *RoomAgent {
@@ -492,7 +546,7 @@ type CreateRoomRequest struct {
 
 func (x *CreateRoomRequest) Reset() {
 	*x = CreateRoomRequest{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -504,7 +558,7 @@ func (x *CreateRoomRequest) String() string {
 func (*CreateRoomRequest) ProtoMessage() {}
 
 func (x *CreateRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -517,7 +571,7 @@ func (x *CreateRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRoomRequest.ProtoReflect.Descriptor instead.
 func (*CreateRoomRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CreateRoomRequest) GetProvider() string {
@@ -578,7 +632,7 @@ type CreateRoomResponse struct {
 
 func (x *CreateRoomResponse) Reset() {
 	*x = CreateRoomResponse{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -590,7 +644,7 @@ func (x *CreateRoomResponse) String() string {
 func (*CreateRoomResponse) ProtoMessage() {}
 
 func (x *CreateRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -603,7 +657,7 @@ func (x *CreateRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRoomResponse.ProtoReflect.Descriptor instead.
 func (*CreateRoomResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{6}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CreateRoomResponse) GetCreated() *Room {
@@ -624,7 +678,7 @@ type ListRoomsRequest struct {
 
 func (x *ListRoomsRequest) Reset() {
 	*x = ListRoomsRequest{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -636,7 +690,7 @@ func (x *ListRoomsRequest) String() string {
 func (*ListRoomsRequest) ProtoMessage() {}
 
 func (x *ListRoomsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +703,7 @@ func (x *ListRoomsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRoomsRequest.ProtoReflect.Descriptor instead.
 func (*ListRoomsRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{7}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListRoomsRequest) GetProvider() string {
@@ -675,7 +729,7 @@ type ListRoomsResponse struct {
 
 func (x *ListRoomsResponse) Reset() {
 	*x = ListRoomsResponse{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -687,7 +741,7 @@ func (x *ListRoomsResponse) String() string {
 func (*ListRoomsResponse) ProtoMessage() {}
 
 func (x *ListRoomsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[8]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -700,7 +754,7 @@ func (x *ListRoomsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRoomsResponse.ProtoReflect.Descriptor instead.
 func (*ListRoomsResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{8}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListRoomsResponse) GetList() []*Room {
@@ -722,7 +776,7 @@ type GetRoomRequest struct {
 
 func (x *GetRoomRequest) Reset() {
 	*x = GetRoomRequest{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -734,7 +788,7 @@ func (x *GetRoomRequest) String() string {
 func (*GetRoomRequest) ProtoMessage() {}
 
 func (x *GetRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -747,7 +801,7 @@ func (x *GetRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomRequest.ProtoReflect.Descriptor instead.
 func (*GetRoomRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{9}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetRoomRequest) GetProvider() string {
@@ -784,7 +838,7 @@ type GetRoomResponse struct {
 
 func (x *GetRoomResponse) Reset() {
 	*x = GetRoomResponse{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -796,7 +850,7 @@ func (x *GetRoomResponse) String() string {
 func (*GetRoomResponse) ProtoMessage() {}
 
 func (x *GetRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -809,7 +863,7 @@ func (x *GetRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRoomResponse.ProtoReflect.Descriptor instead.
 func (*GetRoomResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{10}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetRoomResponse) GetRoom() *Room {
@@ -842,7 +896,7 @@ type InvolveInRoomRequest struct {
 
 func (x *InvolveInRoomRequest) Reset() {
 	*x = InvolveInRoomRequest{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -854,7 +908,7 @@ func (x *InvolveInRoomRequest) String() string {
 func (*InvolveInRoomRequest) ProtoMessage() {}
 
 func (x *InvolveInRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -867,7 +921,7 @@ func (x *InvolveInRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvolveInRoomRequest.ProtoReflect.Descriptor instead.
 func (*InvolveInRoomRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{11}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *InvolveInRoomRequest) GetProvider() string {
@@ -907,7 +961,7 @@ type InvolveInRoomResponse struct {
 
 func (x *InvolveInRoomResponse) Reset() {
 	*x = InvolveInRoomResponse{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -919,7 +973,7 @@ func (x *InvolveInRoomResponse) String() string {
 func (*InvolveInRoomResponse) ProtoMessage() {}
 
 func (x *InvolveInRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -932,7 +986,7 @@ func (x *InvolveInRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvolveInRoomResponse.ProtoReflect.Descriptor instead.
 func (*InvolveInRoomResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{12}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *InvolveInRoomResponse) GetInvolved() *RoomAgent {
@@ -968,7 +1022,7 @@ type RoomMessage struct {
 
 func (x *RoomMessage) Reset() {
 	*x = RoomMessage{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -980,7 +1034,7 @@ func (x *RoomMessage) String() string {
 func (*RoomMessage) ProtoMessage() {}
 
 func (x *RoomMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[13]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -993,7 +1047,7 @@ func (x *RoomMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomMessage.ProtoReflect.Descriptor instead.
 func (*RoomMessage) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{13}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RoomMessage) GetId() string {
@@ -1069,7 +1123,7 @@ type RoomJoined struct {
 
 func (x *RoomJoined) Reset() {
 	*x = RoomJoined{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1081,7 +1135,7 @@ func (x *RoomJoined) String() string {
 func (*RoomJoined) ProtoMessage() {}
 
 func (x *RoomJoined) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[14]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1094,7 +1148,7 @@ func (x *RoomJoined) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomJoined.ProtoReflect.Descriptor instead.
 func (*RoomJoined) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{14}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RoomJoined) GetRoom() string {
@@ -1147,7 +1201,7 @@ type PostToRoomRequest struct {
 
 func (x *PostToRoomRequest) Reset() {
 	*x = PostToRoomRequest{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1159,7 +1213,7 @@ func (x *PostToRoomRequest) String() string {
 func (*PostToRoomRequest) ProtoMessage() {}
 
 func (x *PostToRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[15]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1172,7 +1226,7 @@ func (x *PostToRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PostToRoomRequest.ProtoReflect.Descriptor instead.
 func (*PostToRoomRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{15}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PostToRoomRequest) GetProvider() string {
@@ -1220,7 +1274,7 @@ type PostToRoomResponse struct {
 
 func (x *PostToRoomResponse) Reset() {
 	*x = PostToRoomResponse{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1232,7 +1286,7 @@ func (x *PostToRoomResponse) String() string {
 func (*PostToRoomResponse) ProtoMessage() {}
 
 func (x *PostToRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[16]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1245,7 +1299,7 @@ func (x *PostToRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PostToRoomResponse.ProtoReflect.Descriptor instead.
 func (*PostToRoomResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{16}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PostToRoomResponse) GetId() string {
@@ -1273,7 +1327,7 @@ type WakeInRoomRequest struct {
 
 func (x *WakeInRoomRequest) Reset() {
 	*x = WakeInRoomRequest{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1285,7 +1339,7 @@ func (x *WakeInRoomRequest) String() string {
 func (*WakeInRoomRequest) ProtoMessage() {}
 
 func (x *WakeInRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[17]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1298,7 +1352,7 @@ func (x *WakeInRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WakeInRoomRequest.ProtoReflect.Descriptor instead.
 func (*WakeInRoomRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{17}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *WakeInRoomRequest) GetProvider() string {
@@ -1355,7 +1409,7 @@ type WakeInRoomResponse struct {
 
 func (x *WakeInRoomResponse) Reset() {
 	*x = WakeInRoomResponse{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[18]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1367,7 +1421,7 @@ func (x *WakeInRoomResponse) String() string {
 func (*WakeInRoomResponse) ProtoMessage() {}
 
 func (x *WakeInRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[18]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1380,7 +1434,7 @@ func (x *WakeInRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WakeInRoomResponse.ProtoReflect.Descriptor instead.
 func (*WakeInRoomResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{18}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *WakeInRoomResponse) GetId() string {
@@ -1408,7 +1462,7 @@ type RoomWoken struct {
 
 func (x *RoomWoken) Reset() {
 	*x = RoomWoken{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[19]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1420,7 +1474,7 @@ func (x *RoomWoken) String() string {
 func (*RoomWoken) ProtoMessage() {}
 
 func (x *RoomWoken) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[19]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1433,7 +1487,7 @@ func (x *RoomWoken) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomWoken.ProtoReflect.Descriptor instead.
 func (*RoomWoken) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{19}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RoomWoken) GetAgent() *RoomAgent {
@@ -1470,7 +1524,7 @@ type ReadRoomRequest struct {
 
 func (x *ReadRoomRequest) Reset() {
 	*x = ReadRoomRequest{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[20]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1482,7 +1536,7 @@ func (x *ReadRoomRequest) String() string {
 func (*ReadRoomRequest) ProtoMessage() {}
 
 func (x *ReadRoomRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[20]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1495,7 +1549,7 @@ func (x *ReadRoomRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadRoomRequest.ProtoReflect.Descriptor instead.
 func (*ReadRoomRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{20}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ReadRoomRequest) GetProvider() string {
@@ -1553,7 +1607,7 @@ type ReadRoomResponse struct {
 
 func (x *ReadRoomResponse) Reset() {
 	*x = ReadRoomResponse{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[21]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1565,7 +1619,7 @@ func (x *ReadRoomResponse) String() string {
 func (*ReadRoomResponse) ProtoMessage() {}
 
 func (x *ReadRoomResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[21]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1578,7 +1632,7 @@ func (x *ReadRoomResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadRoomResponse.ProtoReflect.Descriptor instead.
 func (*ReadRoomResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{21}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ReadRoomResponse) GetMessages() []*RoomMessage {
@@ -1622,7 +1676,7 @@ type StreamRoomArrivalsRequest struct {
 
 func (x *StreamRoomArrivalsRequest) Reset() {
 	*x = StreamRoomArrivalsRequest{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[22]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1634,7 +1688,7 @@ func (x *StreamRoomArrivalsRequest) String() string {
 func (*StreamRoomArrivalsRequest) ProtoMessage() {}
 
 func (x *StreamRoomArrivalsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[22]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1647,7 +1701,7 @@ func (x *StreamRoomArrivalsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamRoomArrivalsRequest.ProtoReflect.Descriptor instead.
 func (*StreamRoomArrivalsRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{22}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *StreamRoomArrivalsRequest) GetProvider() string {
@@ -1723,6 +1777,9 @@ type RoomArrival struct {
 	// 「[Fable 5.1] Unbacked by Telegram for a person's account: it has a sequence per」
 	// 「[Fable 5.1] supergroup and none across them. A bot's updates are one sequence, kept」
 	// 「[Fable 5.1] 24 hours.」
+	// The sequence is the provider's own, one across all of the agent's rooms and
+	// kept across reconnects: where its source has none across rooms, the provider
+	// numbers what it carried and keeps that numbering.
 	Sequence int64 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
 	// 「[Fable 5.1] On a message: it is addressed to the agent. A wake arrives as this.」
 	Addressed bool `protobuf:"varint,2,opt,name=addressed,proto3" json:"addressed,omitempty"`
@@ -1738,7 +1795,7 @@ type RoomArrival struct {
 
 func (x *RoomArrival) Reset() {
 	*x = RoomArrival{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[23]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1750,7 +1807,7 @@ func (x *RoomArrival) String() string {
 func (*RoomArrival) ProtoMessage() {}
 
 func (x *RoomArrival) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[23]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1763,7 +1820,7 @@ func (x *RoomArrival) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomArrival.ProtoReflect.Descriptor instead.
 func (*RoomArrival) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{23}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RoomArrival) GetSequence() int64 {
@@ -1846,15 +1903,18 @@ type RoomGap struct {
 	// 「[Fable 5.1] The rooms the loss is in.」
 	Rooms []string `protobuf:"bytes,2,rep,name=rooms,proto3" json:"rooms,omitempty"`
 	// 「[Fable 5.1] The loss is in every room the agent is in, named above or not.」
-	AllRooms      bool   `protobuf:"varint,3,opt,name=all_rooms,json=allRooms,proto3" json:"all_rooms,omitempty"`
-	Reason        string `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	AllRooms bool   `protobuf:"varint,3,opt,name=all_rooms,json=allRooms,proto3" json:"all_rooms,omitempty"`
+	Reason   string `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	// The loss cannot be read from the room either: its provider reads no room
+	// back for this agent (a Telegram bot). What was said in the gap is gone for it.
+	Unrecoverable bool `protobuf:"varint,5,opt,name=unrecoverable,proto3" json:"unrecoverable,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RoomGap) Reset() {
 	*x = RoomGap{}
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[24]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1866,7 +1926,7 @@ func (x *RoomGap) String() string {
 func (*RoomGap) ProtoMessage() {}
 
 func (x *RoomGap) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[24]
+	mi := &file_plugin_grpc_protocol_rooms_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1879,7 +1939,7 @@ func (x *RoomGap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomGap.ProtoReflect.Descriptor instead.
 func (*RoomGap) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{24}
+	return file_plugin_grpc_protocol_rooms_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *RoomGap) GetResumedAt() int64 {
@@ -1910,6 +1970,13 @@ func (x *RoomGap) GetReason() string {
 	return ""
 }
 
+func (x *RoomGap) GetUnrecoverable() bool {
+	if x != nil {
+		return x.Unrecoverable
+	}
+	return false
+}
+
 var File_plugin_grpc_protocol_rooms_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_rooms_proto_rawDesc = "" +
@@ -1918,13 +1985,16 @@ const file_plugin_grpc_protocol_rooms_proto_rawDesc = "" +
 	"\tRoomAgent\x12\x10\n" +
 	"\x03did\x18\x01 \x01(\tR\x03did\x12\x18\n" +
 	"\aharness\x18\x02 \x01(\tR\aharness\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"|\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"\x97\x01\n" +
 	"\x06RoomOf\x12\x14\n" +
 	"\x04node\x18\x01 \x01(\tH\x00R\x04node\x12\x1e\n" +
-	"\tnamespace\x18\x02 \x01(\tH\x00R\tnamespace\x12\x1a\n" +
-	"\aelement\x18\x03 \x01(\tH\x00R\aelement\x12\x1a\n" +
+	"\tnamespace\x18\x02 \x01(\tH\x00R\tnamespace\x12/\n" +
+	"\aelement\x18\x05 \x01(\v2\x13.protocol.ElementOfH\x00R\aelement\x12\x1a\n" +
 	"\apurpose\x18\x04 \x01(\tH\x00R\apurposeB\x04\n" +
-	"\x02of\"\xae\x01\n" +
+	"\x02ofJ\x04\b\x03\x10\x04\"C\n" +
+	"\tElementOf\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x18\n" +
+	"\aelement\x18\x02 \x01(\tR\aelement\"\xae\x01\n" +
 	"\x04Room\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12\x12\n" +
@@ -2032,13 +2102,14 @@ const file_plugin_grpc_protocol_rooms_proto_rawDesc = "" +
 	"\amessage\x18\x03 \x01(\v2\x15.protocol.RoomMessageH\x00R\amessage\x12.\n" +
 	"\x06joined\x18\x04 \x01(\v2\x14.protocol.RoomJoinedH\x00R\x06joined\x12%\n" +
 	"\x03gap\x18\x05 \x01(\v2\x11.protocol.RoomGapH\x00R\x03gapB\t\n" +
-	"\aarrived\"s\n" +
+	"\aarrived\"\x99\x01\n" +
 	"\aRoomGap\x12\x1d\n" +
 	"\n" +
 	"resumed_at\x18\x01 \x01(\x03R\tresumedAt\x12\x14\n" +
 	"\x05rooms\x18\x02 \x03(\tR\x05rooms\x12\x1b\n" +
 	"\tall_rooms\x18\x03 \x01(\bR\ballRooms\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason*j\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12$\n" +
+	"\runrecoverable\x18\x05 \x01(\bR\runrecoverable*j\n" +
 	"\tRoomReach\x12\x16\n" +
 	"\x12ROOM_REACH_UNNAMED\x10\x00\x12\x16\n" +
 	"\x12ROOM_REACH_ARRIVES\x10\x01\x12\x14\n" +
@@ -2071,89 +2142,91 @@ func file_plugin_grpc_protocol_rooms_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_rooms_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_rooms_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_plugin_grpc_protocol_rooms_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_plugin_grpc_protocol_rooms_proto_goTypes = []any{
 	(RoomReach)(0),                    // 0: protocol.RoomReach
 	(*RoomAgent)(nil),                 // 1: protocol.RoomAgent
 	(*RoomOf)(nil),                    // 2: protocol.RoomOf
-	(*Room)(nil),                      // 3: protocol.Room
-	(*RegisterRoomAgentRequest)(nil),  // 4: protocol.RegisterRoomAgentRequest
-	(*RegisterRoomAgentResponse)(nil), // 5: protocol.RegisterRoomAgentResponse
-	(*CreateRoomRequest)(nil),         // 6: protocol.CreateRoomRequest
-	(*CreateRoomResponse)(nil),        // 7: protocol.CreateRoomResponse
-	(*ListRoomsRequest)(nil),          // 8: protocol.ListRoomsRequest
-	(*ListRoomsResponse)(nil),         // 9: protocol.ListRoomsResponse
-	(*GetRoomRequest)(nil),            // 10: protocol.GetRoomRequest
-	(*GetRoomResponse)(nil),           // 11: protocol.GetRoomResponse
-	(*InvolveInRoomRequest)(nil),      // 12: protocol.InvolveInRoomRequest
-	(*InvolveInRoomResponse)(nil),     // 13: protocol.InvolveInRoomResponse
-	(*RoomMessage)(nil),               // 14: protocol.RoomMessage
-	(*RoomJoined)(nil),                // 15: protocol.RoomJoined
-	(*PostToRoomRequest)(nil),         // 16: protocol.PostToRoomRequest
-	(*PostToRoomResponse)(nil),        // 17: protocol.PostToRoomResponse
-	(*WakeInRoomRequest)(nil),         // 18: protocol.WakeInRoomRequest
-	(*WakeInRoomResponse)(nil),        // 19: protocol.WakeInRoomResponse
-	(*RoomWoken)(nil),                 // 20: protocol.RoomWoken
-	(*ReadRoomRequest)(nil),           // 21: protocol.ReadRoomRequest
-	(*ReadRoomResponse)(nil),          // 22: protocol.ReadRoomResponse
-	(*StreamRoomArrivalsRequest)(nil), // 23: protocol.StreamRoomArrivalsRequest
-	(*RoomArrival)(nil),               // 24: protocol.RoomArrival
-	(*RoomGap)(nil),                   // 25: protocol.RoomGap
+	(*ElementOf)(nil),                 // 3: protocol.ElementOf
+	(*Room)(nil),                      // 4: protocol.Room
+	(*RegisterRoomAgentRequest)(nil),  // 5: protocol.RegisterRoomAgentRequest
+	(*RegisterRoomAgentResponse)(nil), // 6: protocol.RegisterRoomAgentResponse
+	(*CreateRoomRequest)(nil),         // 7: protocol.CreateRoomRequest
+	(*CreateRoomResponse)(nil),        // 8: protocol.CreateRoomResponse
+	(*ListRoomsRequest)(nil),          // 9: protocol.ListRoomsRequest
+	(*ListRoomsResponse)(nil),         // 10: protocol.ListRoomsResponse
+	(*GetRoomRequest)(nil),            // 11: protocol.GetRoomRequest
+	(*GetRoomResponse)(nil),           // 12: protocol.GetRoomResponse
+	(*InvolveInRoomRequest)(nil),      // 13: protocol.InvolveInRoomRequest
+	(*InvolveInRoomResponse)(nil),     // 14: protocol.InvolveInRoomResponse
+	(*RoomMessage)(nil),               // 15: protocol.RoomMessage
+	(*RoomJoined)(nil),                // 16: protocol.RoomJoined
+	(*PostToRoomRequest)(nil),         // 17: protocol.PostToRoomRequest
+	(*PostToRoomResponse)(nil),        // 18: protocol.PostToRoomResponse
+	(*WakeInRoomRequest)(nil),         // 19: protocol.WakeInRoomRequest
+	(*WakeInRoomResponse)(nil),        // 20: protocol.WakeInRoomResponse
+	(*RoomWoken)(nil),                 // 21: protocol.RoomWoken
+	(*ReadRoomRequest)(nil),           // 22: protocol.ReadRoomRequest
+	(*ReadRoomResponse)(nil),          // 23: protocol.ReadRoomResponse
+	(*StreamRoomArrivalsRequest)(nil), // 24: protocol.StreamRoomArrivalsRequest
+	(*RoomArrival)(nil),               // 25: protocol.RoomArrival
+	(*RoomGap)(nil),                   // 26: protocol.RoomGap
 }
 var file_plugin_grpc_protocol_rooms_proto_depIdxs = []int32{
-	2,  // 0: protocol.Room.of:type_name -> protocol.RoomOf
-	1,  // 1: protocol.RegisterRoomAgentRequest.agent:type_name -> protocol.RoomAgent
-	1,  // 2: protocol.RegisterRoomAgentResponse.registered:type_name -> protocol.RoomAgent
-	1,  // 3: protocol.CreateRoomRequest.by:type_name -> protocol.RoomAgent
-	2,  // 4: protocol.CreateRoomRequest.of:type_name -> protocol.RoomOf
-	1,  // 5: protocol.CreateRoomRequest.agents:type_name -> protocol.RoomAgent
-	3,  // 6: protocol.CreateRoomResponse.created:type_name -> protocol.Room
-	1,  // 7: protocol.ListRoomsRequest.by:type_name -> protocol.RoomAgent
-	3,  // 8: protocol.ListRoomsResponse.list:type_name -> protocol.Room
-	1,  // 9: protocol.GetRoomRequest.by:type_name -> protocol.RoomAgent
-	3,  // 10: protocol.GetRoomResponse.room:type_name -> protocol.Room
-	1,  // 11: protocol.GetRoomResponse.agents:type_name -> protocol.RoomAgent
-	1,  // 12: protocol.InvolveInRoomRequest.by:type_name -> protocol.RoomAgent
-	1,  // 13: protocol.InvolveInRoomRequest.agent:type_name -> protocol.RoomAgent
-	1,  // 14: protocol.InvolveInRoomResponse.involved:type_name -> protocol.RoomAgent
-	1,  // 15: protocol.RoomMessage.agent:type_name -> protocol.RoomAgent
-	1,  // 16: protocol.RoomJoined.agent:type_name -> protocol.RoomAgent
-	1,  // 17: protocol.PostToRoomRequest.by:type_name -> protocol.RoomAgent
-	1,  // 18: protocol.WakeInRoomRequest.by:type_name -> protocol.RoomAgent
-	1,  // 19: protocol.WakeInRoomRequest.agents:type_name -> protocol.RoomAgent
-	20, // 20: protocol.WakeInRoomResponse.woken:type_name -> protocol.RoomWoken
-	1,  // 21: protocol.RoomWoken.agent:type_name -> protocol.RoomAgent
-	0,  // 22: protocol.RoomWoken.reach:type_name -> protocol.RoomReach
-	1,  // 23: protocol.ReadRoomRequest.by:type_name -> protocol.RoomAgent
-	14, // 24: protocol.ReadRoomResponse.messages:type_name -> protocol.RoomMessage
-	15, // 25: protocol.ReadRoomResponse.joined:type_name -> protocol.RoomJoined
-	1,  // 26: protocol.StreamRoomArrivalsRequest.by:type_name -> protocol.RoomAgent
-	14, // 27: protocol.RoomArrival.message:type_name -> protocol.RoomMessage
-	15, // 28: protocol.RoomArrival.joined:type_name -> protocol.RoomJoined
-	25, // 29: protocol.RoomArrival.gap:type_name -> protocol.RoomGap
-	4,  // 30: protocol.RoomsService.RegisterRoomAgent:input_type -> protocol.RegisterRoomAgentRequest
-	6,  // 31: protocol.RoomsService.CreateRoom:input_type -> protocol.CreateRoomRequest
-	8,  // 32: protocol.RoomsService.ListRooms:input_type -> protocol.ListRoomsRequest
-	10, // 33: protocol.RoomsService.GetRoom:input_type -> protocol.GetRoomRequest
-	12, // 34: protocol.RoomsService.InvolveInRoom:input_type -> protocol.InvolveInRoomRequest
-	16, // 35: protocol.RoomsService.PostToRoom:input_type -> protocol.PostToRoomRequest
-	18, // 36: protocol.RoomsService.WakeInRoom:input_type -> protocol.WakeInRoomRequest
-	21, // 37: protocol.RoomsService.ReadRoom:input_type -> protocol.ReadRoomRequest
-	23, // 38: protocol.RoomsService.StreamRoomArrivals:input_type -> protocol.StreamRoomArrivalsRequest
-	5,  // 39: protocol.RoomsService.RegisterRoomAgent:output_type -> protocol.RegisterRoomAgentResponse
-	7,  // 40: protocol.RoomsService.CreateRoom:output_type -> protocol.CreateRoomResponse
-	9,  // 41: protocol.RoomsService.ListRooms:output_type -> protocol.ListRoomsResponse
-	11, // 42: protocol.RoomsService.GetRoom:output_type -> protocol.GetRoomResponse
-	13, // 43: protocol.RoomsService.InvolveInRoom:output_type -> protocol.InvolveInRoomResponse
-	17, // 44: protocol.RoomsService.PostToRoom:output_type -> protocol.PostToRoomResponse
-	19, // 45: protocol.RoomsService.WakeInRoom:output_type -> protocol.WakeInRoomResponse
-	22, // 46: protocol.RoomsService.ReadRoom:output_type -> protocol.ReadRoomResponse
-	24, // 47: protocol.RoomsService.StreamRoomArrivals:output_type -> protocol.RoomArrival
-	39, // [39:48] is the sub-list for method output_type
-	30, // [30:39] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	3,  // 0: protocol.RoomOf.element:type_name -> protocol.ElementOf
+	2,  // 1: protocol.Room.of:type_name -> protocol.RoomOf
+	1,  // 2: protocol.RegisterRoomAgentRequest.agent:type_name -> protocol.RoomAgent
+	1,  // 3: protocol.RegisterRoomAgentResponse.registered:type_name -> protocol.RoomAgent
+	1,  // 4: protocol.CreateRoomRequest.by:type_name -> protocol.RoomAgent
+	2,  // 5: protocol.CreateRoomRequest.of:type_name -> protocol.RoomOf
+	1,  // 6: protocol.CreateRoomRequest.agents:type_name -> protocol.RoomAgent
+	4,  // 7: protocol.CreateRoomResponse.created:type_name -> protocol.Room
+	1,  // 8: protocol.ListRoomsRequest.by:type_name -> protocol.RoomAgent
+	4,  // 9: protocol.ListRoomsResponse.list:type_name -> protocol.Room
+	1,  // 10: protocol.GetRoomRequest.by:type_name -> protocol.RoomAgent
+	4,  // 11: protocol.GetRoomResponse.room:type_name -> protocol.Room
+	1,  // 12: protocol.GetRoomResponse.agents:type_name -> protocol.RoomAgent
+	1,  // 13: protocol.InvolveInRoomRequest.by:type_name -> protocol.RoomAgent
+	1,  // 14: protocol.InvolveInRoomRequest.agent:type_name -> protocol.RoomAgent
+	1,  // 15: protocol.InvolveInRoomResponse.involved:type_name -> protocol.RoomAgent
+	1,  // 16: protocol.RoomMessage.agent:type_name -> protocol.RoomAgent
+	1,  // 17: protocol.RoomJoined.agent:type_name -> protocol.RoomAgent
+	1,  // 18: protocol.PostToRoomRequest.by:type_name -> protocol.RoomAgent
+	1,  // 19: protocol.WakeInRoomRequest.by:type_name -> protocol.RoomAgent
+	1,  // 20: protocol.WakeInRoomRequest.agents:type_name -> protocol.RoomAgent
+	21, // 21: protocol.WakeInRoomResponse.woken:type_name -> protocol.RoomWoken
+	1,  // 22: protocol.RoomWoken.agent:type_name -> protocol.RoomAgent
+	0,  // 23: protocol.RoomWoken.reach:type_name -> protocol.RoomReach
+	1,  // 24: protocol.ReadRoomRequest.by:type_name -> protocol.RoomAgent
+	15, // 25: protocol.ReadRoomResponse.messages:type_name -> protocol.RoomMessage
+	16, // 26: protocol.ReadRoomResponse.joined:type_name -> protocol.RoomJoined
+	1,  // 27: protocol.StreamRoomArrivalsRequest.by:type_name -> protocol.RoomAgent
+	15, // 28: protocol.RoomArrival.message:type_name -> protocol.RoomMessage
+	16, // 29: protocol.RoomArrival.joined:type_name -> protocol.RoomJoined
+	26, // 30: protocol.RoomArrival.gap:type_name -> protocol.RoomGap
+	5,  // 31: protocol.RoomsService.RegisterRoomAgent:input_type -> protocol.RegisterRoomAgentRequest
+	7,  // 32: protocol.RoomsService.CreateRoom:input_type -> protocol.CreateRoomRequest
+	9,  // 33: protocol.RoomsService.ListRooms:input_type -> protocol.ListRoomsRequest
+	11, // 34: protocol.RoomsService.GetRoom:input_type -> protocol.GetRoomRequest
+	13, // 35: protocol.RoomsService.InvolveInRoom:input_type -> protocol.InvolveInRoomRequest
+	17, // 36: protocol.RoomsService.PostToRoom:input_type -> protocol.PostToRoomRequest
+	19, // 37: protocol.RoomsService.WakeInRoom:input_type -> protocol.WakeInRoomRequest
+	22, // 38: protocol.RoomsService.ReadRoom:input_type -> protocol.ReadRoomRequest
+	24, // 39: protocol.RoomsService.StreamRoomArrivals:input_type -> protocol.StreamRoomArrivalsRequest
+	6,  // 40: protocol.RoomsService.RegisterRoomAgent:output_type -> protocol.RegisterRoomAgentResponse
+	8,  // 41: protocol.RoomsService.CreateRoom:output_type -> protocol.CreateRoomResponse
+	10, // 42: protocol.RoomsService.ListRooms:output_type -> protocol.ListRoomsResponse
+	12, // 43: protocol.RoomsService.GetRoom:output_type -> protocol.GetRoomResponse
+	14, // 44: protocol.RoomsService.InvolveInRoom:output_type -> protocol.InvolveInRoomResponse
+	18, // 45: protocol.RoomsService.PostToRoom:output_type -> protocol.PostToRoomResponse
+	20, // 46: protocol.RoomsService.WakeInRoom:output_type -> protocol.WakeInRoomResponse
+	23, // 47: protocol.RoomsService.ReadRoom:output_type -> protocol.ReadRoomResponse
+	25, // 48: protocol.RoomsService.StreamRoomArrivals:output_type -> protocol.RoomArrival
+	40, // [40:49] is the sub-list for method output_type
+	31, // [31:40] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_rooms_proto_init() }
@@ -2167,11 +2240,11 @@ func file_plugin_grpc_protocol_rooms_proto_init() {
 		(*RoomOf_Element)(nil),
 		(*RoomOf_Purpose)(nil),
 	}
-	file_plugin_grpc_protocol_rooms_proto_msgTypes[22].OneofWrappers = []any{
+	file_plugin_grpc_protocol_rooms_proto_msgTypes[23].OneofWrappers = []any{
 		(*StreamRoomArrivalsRequest_After)(nil),
 		(*StreamRoomArrivalsRequest_Head)(nil),
 	}
-	file_plugin_grpc_protocol_rooms_proto_msgTypes[23].OneofWrappers = []any{
+	file_plugin_grpc_protocol_rooms_proto_msgTypes[24].OneofWrappers = []any{
 		(*RoomArrival_Message)(nil),
 		(*RoomArrival_Joined)(nil),
 		(*RoomArrival_Gap)(nil),
@@ -2182,7 +2255,7 @@ func file_plugin_grpc_protocol_rooms_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_rooms_proto_rawDesc), len(file_plugin_grpc_protocol_rooms_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
