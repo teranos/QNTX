@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"io"
 	"mime"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
+	errors "github.com/teranos/sacred-error"
 )
 
 // "i want all Node Agents to be in the Node Room"
@@ -135,32 +137,76 @@ func (s *QNTXServer) wakeNodeAgents(ctx context.Context, provider string, rooms 
 	}
 }
 
-// roomFilesMost is the most a woken Node Agent's files carry into a room together.
-const roomFilesMost = 25 << 20
+// roomFilesMost is the most a woken Node Agent's files carry into a room
+// together, names and types counted: under the 4 MiB a provider's gRPC server
+// takes by default (pyre's does). roomFilesMany is the most files.
+const (
+	roomFilesMost = 3 << 20
+	roomFilesMany = 10
+)
 
-// answerFiles is what a turn wrote into dir, sent with its answer: each file
-// up to roomFilesMost together; what does not fit is named in the log.
+// answerFiles is what a turn wrote into dir, sent with its answer, up to
+// roomFilesMost and roomFilesMany; what does not fit is named in the log. A file
+// is read through dir, so a link out of it is never followed.
 func (s *QNTXServer) answerFiles(dir string) []*protocol.RoomFile {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil
+	}
+	defer root.Close()
 	entries, _ := os.ReadDir(dir)
 	var files []*protocol.RoomFile
-	total := 0
+	left := roomFilesMost
 	for _, entry := range entries {
-		if !entry.Type().IsRegular() {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
-		if err != nil || total+len(data) > roomFilesMost {
+		file, err := s.answerFile(root, entry.Name(), left)
+		if err != nil {
 			s.logger.Warnw("A woken Node Agent's file was not sent into its room", "file", entry.Name(), "error", err)
 			continue
 		}
-		total += len(data)
-		kind := mime.TypeByExtension(filepath.Ext(entry.Name()))
-		if kind == "" {
-			kind = http.DetectContentType(data)
+		if file == nil {
+			continue
 		}
-		files = append(files, &protocol.RoomFile{Name: entry.Name(), Type: kind, Data: data})
+		if len(files) == roomFilesMany {
+			s.logger.Warnw("A woken Node Agent wrote more files than go into a room", "most", roomFilesMany)
+			break
+		}
+		left -= len(file.Data) + len(file.Name) + len(file.Type)
+		files = append(files, file)
 	}
 	return files
+}
+
+// answerFile is one regular file of root, when it fits in left; nil, nil when
+// it is no regular file.
+func (s *QNTXServer) answerFile(root *os.Root, name string, left int) (*protocol.RoomFile, error) {
+	f, err := root.Open(name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "%s did not open", name)
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, errors.Wrapf(err, "%s did not stat", name)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, nil
+	}
+	kind := mime.TypeByExtension(filepath.Ext(name))
+	room := left - len(name) - len(kind)
+	if info.Size() > int64(room) {
+		return nil, errors.Newf("%s is %d bytes, and %d are left", name, info.Size(), room)
+	}
+	data, err := io.ReadAll(io.LimitReader(f, int64(room)+1))
+	if err != nil {
+		return nil, errors.Wrapf(err, "%s was not read", name)
+	}
+	if len(data) > room {
+		return nil, errors.Newf("%s grew past the %d bytes left", name, room)
+	}
+	if kind == "" {
+		kind = http.DetectContentType(data)
+	}
+	return &protocol.RoomFile{Name: name, Type: kind, Data: data}, nil
 }
 
 // answerInRoom runs one Node Agent turn and posts what it answered, or why it
