@@ -2240,8 +2240,8 @@ type VaultSubdirs struct {
 	// The repository's default branch, which the folders are read on and a
 	// folder is bound to.
 	Branch string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
-	// Each note and story directly in the folder, by its path from the
-	// repository's top: what a note of the vault can be bound to.
+	// 「[Opus 5.5] Each note and story directly in the folder, by its path from the」
+	// 「[Opus 5.5] repository's top: what a note of the vault can be bound to.」
 	Files         []string `protobuf:"bytes,3,rep,name=files,proto3" json:"files,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
