@@ -132,20 +132,17 @@ func (q *Queue) Dequeue() (*Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	// Get the oldest queued job
-	queuedStatus := JobStatusQueued
-	jobs, err := q.store.ListJobs(queuedStatus, 1)
+	// "we also need to fix the actual issue, why is pulse failing in the first place"
+	//
+	// The oldest queued job, not the newest: ListJobs reads newest first, and a
+	// worker that dequeued from it starved whatever was not taken at once.
+	job, err := q.store.OldestQueued()
 	if err != nil {
-		err = errors.Wrap(err, "failed to get queued jobs")
-		err = errors.WithDetail(err, fmt.Sprintf("Status filter: %s", queuedStatus))
-		return nil, err
+		if errors.Is(err, ErrJobNotFound) {
+			return nil, err
+		}
+		return nil, errors.Wrap(err, "failed to get queued jobs")
 	}
-
-	if len(jobs) == 0 {
-		return nil, errors.Wrap(ErrJobNotFound, "no queued jobs")
-	}
-
-	job := jobs[0]
 	job.Start()
 
 	if err := q.store.UpdateJob(job); err != nil {
@@ -474,6 +471,23 @@ func (q *Queue) Cleanup(ctx context.Context, olderThan time.Duration, atMost int
 
 	q.forgetCounts()
 	return q.store.CleanupOldJobs(olderThan, atMost, keep...)
+}
+
+// CancelQueuedBefore cancels at most atMost queued jobs of handler older than
+// olderThan, with reason as their error, tells the subscribers of each, and
+// says how many.
+func (q *Queue) CancelQueuedBefore(handler string, olderThan time.Duration, reason string, atMost int) (int, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	cancelled, err := q.store.CancelQueuedBefore(handler, time.Now().Add(-olderThan), reason, atMost)
+	if err != nil {
+		return 0, err
+	}
+	for _, job := range cancelled {
+		q.notifySubscribers(job)
+	}
+	return len(cancelled), nil
 }
 
 // QueueStats returns statistics about the queue
