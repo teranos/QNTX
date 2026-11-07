@@ -59,8 +59,8 @@ func Said() (string, bool) {
 // 「[Fable 5.1] release is the build, as service.version. service.name is qntx unless」
 // 「[Fable 5.1] OTEL_SERVICE_NAME or OTEL_RESOURCE_ATTRIBUTES says another.」
 //
-// also is where else each span goes, Sentry's span processor among them when
-// Sentry traces: given one, the provider starts with no endpoint said.
+// 「[Opus 5.5] also is where else each span goes, Sentry's span processor among them when」
+// 「[Opus 5.5] Sentry traces: given one, the provider starts with no endpoint said.」
 func Start(ctx context.Context, release string, also ...sdktrace.SpanProcessor) error {
 	endpoint, said := Said()
 	if !said && len(also) == 0 {
@@ -81,7 +81,7 @@ func Start(ctx context.Context, release string, also ...sdktrace.SpanProcessor) 
 			return errors.Wrapf(err, "failed to start the OTLP trace exporter (endpoint=%q)", endpoint)
 		}
 		if err != nil {
-			// The other processors still start: an endpoint that fails is no reason Sentry gets no spans.
+			// 「[Opus 5.5] The other processors still start: an endpoint that fails is no reason Sentry gets no spans.」
 			unexported = errors.Wrapf(err, "failed to start the OTLP trace exporter (endpoint=%q); spans go to the other processors alone", endpoint)
 		} else {
 			options = append(options, sdktrace.WithBatcher(exporter))
