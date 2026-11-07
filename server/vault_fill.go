@@ -44,6 +44,12 @@ const noteSuffix = ".md"
 // a story is a note, named as the story with noteSuffix after it.
 const storySuffix = ".feature"
 
+// noteFile says whether a file of the repository is one note in the vault:
+// a note, or a story.
+func noteFile(name string) bool {
+	return strings.HasSuffix(name, noteSuffix) || strings.HasSuffix(name, storySuffix)
+}
+
 // placedName is what a file of the repository is named in the vault.
 func placedName(name string) string {
 	if strings.HasSuffix(name, storySuffix) {
@@ -96,7 +102,7 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 	var notes []repoNote
 	placed := map[string]string{}
 	for _, entry := range entries {
-		if entry.Kind != forge.File || !(strings.HasSuffix(entry.Name, noteSuffix) || strings.HasSuffix(entry.Name, storySuffix)) {
+		if entry.Kind != forge.File || !noteFile(entry.Name) {
 			continue
 		}
 		under := placedName(strings.TrimPrefix(entry.Path, folder+"/"))
@@ -457,7 +463,7 @@ func (s *QNTXServer) fillPlaceSoon(name, place string) {
 func movedBy(push forge.Push) folderMoved {
 	return func(source buildSource, _ string) bool {
 		touched := push.TouchedIn(source.Path)
-		if strings.HasSuffix(source.Path, noteSuffix) {
+		if noteFile(source.Path) {
 			touched = push.Touched(source.Path)
 		}
 		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && touched

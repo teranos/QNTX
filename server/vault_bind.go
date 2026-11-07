@@ -249,7 +249,7 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 		return nil, refused
 	}
 	place := sent["place"]
-	note := strings.HasSuffix(sent["path"], noteSuffix)
+	note := noteFile(sent["path"])
 	why, err := vaultPlaceRefused(vault, place, note)
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
