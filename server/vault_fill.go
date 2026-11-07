@@ -50,6 +50,12 @@ func noteFile(name string) bool {
 	return strings.HasSuffix(name, noteSuffix) || strings.HasSuffix(name, storySuffix)
 }
 
+// noteBound says whether the repository's path, bound at place, is one note:
+// a note, or a story placed as a note. A folder may be named as a story is.
+func noteBound(repoPath, place string) bool {
+	return strings.HasSuffix(repoPath, noteSuffix) || (strings.HasSuffix(repoPath, storySuffix) && strings.HasSuffix(place, noteSuffix))
+}
+
 // placedName is what a file of the repository is named in the vault.
 func placedName(name string) string {
 	if strings.HasSuffix(name, storySuffix) {
@@ -461,9 +467,9 @@ func (s *QNTXServer) fillPlaceSoon(name, place string) {
 // movedBy is whether push changed a file directly in source's folder on its
 // branch, or the one note source names.
 func movedBy(push forge.Push) folderMoved {
-	return func(source buildSource, _ string) bool {
+	return func(source buildSource, place string) bool {
 		touched := push.TouchedIn(source.Path)
-		if noteFile(source.Path) {
+		if noteBound(source.Path, place) {
 			touched = push.Touched(source.Path)
 		}
 		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && touched
