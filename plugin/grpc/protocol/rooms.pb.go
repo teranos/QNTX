@@ -96,7 +96,13 @@ type RoomAgent struct {
 	// "the Agy, Claude, Codex Node Agents are all in the Node Room"
 	Harness string `protobuf:"bytes,2,opt,name=harness,proto3" json:"harness,omitempty"`
 	// 「[Fable 5.1] What it is addressed by in a room, as the provider holds it.」
-	Name          string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// The model it runs on, as the node runs it. Empty where the node runs no
+	// agent of that name.
+	Model string `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`
+	// The effort it runs at: claude's effort, pi's thinking. Empty where its
+	// harness has none.
+	Effort        string `protobuf:"bytes,5,opt,name=effort,proto3" json:"effort,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -148,6 +154,20 @@ func (x *RoomAgent) GetHarness() string {
 func (x *RoomAgent) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *RoomAgent) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *RoomAgent) GetEffort() string {
+	if x != nil {
+		return x.Effort
 	}
 	return ""
 }
@@ -1996,11 +2016,13 @@ var File_plugin_grpc_protocol_rooms_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_rooms_proto_rawDesc = "" +
 	"\n" +
-	" plugin/grpc/protocol/rooms.proto\x12\bprotocol\"K\n" +
+	" plugin/grpc/protocol/rooms.proto\x12\bprotocol\"y\n" +
 	"\tRoomAgent\x12\x10\n" +
 	"\x03did\x18\x01 \x01(\tR\x03did\x12\x18\n" +
 	"\aharness\x18\x02 \x01(\tR\aharness\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"\x97\x01\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
+	"\x05model\x18\x04 \x01(\tR\x05model\x12\x16\n" +
+	"\x06effort\x18\x05 \x01(\tR\x06effort\"\x97\x01\n" +
 	"\x06RoomOf\x12\x14\n" +
 	"\x04node\x18\x01 \x01(\tH\x00R\x04node\x12\x1e\n" +
 	"\tnamespace\x18\x02 \x01(\tH\x00R\tnamespace\x12/\n" +
