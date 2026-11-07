@@ -38,6 +38,14 @@
           }
         },
         {
+          "name": "Install Rust toolchain",
+          "uses": "dtolnay/rust-toolchain@stable"
+        },
+        {
+          "name": "Build Rust SQLite library, which make says links",
+          "run": "make rust-sqlite"
+        },
+        {
           "name": "make proto, make says",
           "run": "# make proto writes the TypeScript too, into a QNTX-Web beside this checkout.\ngit clone --depth 1 https://github.com/teranos/QNTX-Web.git ../QNTX-Web\nmake proto\nmake says\n"
         },
