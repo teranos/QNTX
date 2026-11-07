@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/teranos/QNTX/internal/sacred"
@@ -126,18 +129,51 @@ func (s *QNTXServer) wakeNodeAgents(ctx context.Context, provider string, rooms 
 		h, _ := s.nodeAgentIn(woken.GetAgent().GetName())
 		woken.Reach = protocol.RoomReach_ROOM_REACH_ARRIVES
 		name := h.name
-		turn := "In the " + nodeRoomName + ", " + waker + " woke you (" + name + ") with:\n\n" + says +
-			"\n\nWhat you answer is posted into the room as " + name + "."
 		sacred.Go("rooms.wake."+name, func() {
-			s.answerInRoom(caller, provider, rooms, room, thread, name, turn)
+			s.answerInRoom(caller, provider, rooms, room, thread, name, waker, says)
 		})
 	}
 }
 
+// roomFilesMost is the most a woken Node Agent's files carry into a room together.
+const roomFilesMost = 25 << 20
+
+// answerFiles is what a turn wrote into dir, sent with its answer: each file
+// up to roomFilesMost together; what does not fit is named in the log.
+func (s *QNTXServer) answerFiles(dir string) []*protocol.RoomFile {
+	entries, _ := os.ReadDir(dir)
+	var files []*protocol.RoomFile
+	total := 0
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if err != nil || total+len(data) > roomFilesMost {
+			s.logger.Warnw("A woken Node Agent's file was not sent into its room", "file", entry.Name(), "error", err)
+			continue
+		}
+		total += len(data)
+		kind := mime.TypeByExtension(filepath.Ext(entry.Name()))
+		if kind == "" {
+			kind = http.DetectContentType(data)
+		}
+		files = append(files, &protocol.RoomFile{Name: entry.Name(), Type: kind, Data: data})
+	}
+	return files
+}
+
 // answerInRoom runs one Node Agent turn and posts what it answered, or why it
-// did not, into the room as that agent.
-func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms protocol.RoomsServiceClient, room, thread, harness, turn string) {
+// did not, into the room as that agent, with the files it wrote for the room.
+func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms protocol.RoomsServiceClient, room, thread, harness, waker, says string) {
 	lifetime := s.lifetime()
+	turn := "In the " + nodeRoomName + ", " + waker + " woke you (" + harness + ") with:\n\n" + says +
+		"\n\nWhat you answer is posted into the room as " + harness + "."
+	dir, err := os.MkdirTemp("", "room-answer-")
+	if err == nil {
+		defer os.RemoveAll(dir)
+		turn += " A file you write into " + dir + " is posted with it."
+	}
 	said, refused := s.nodeAgentSay(sigil.WithCaller(lifetime, caller), sigil.Sent{"harness": harness, "says": turn})
 	body := ""
 	if refused != nil {
@@ -147,10 +183,14 @@ func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms p
 	} else if answered, ok := said.(*protocol.NodeAgentSaid); ok {
 		body = strings.TrimSpace(saidText(answered))
 	}
-	if body == "" {
+	var files []*protocol.RoomFile
+	if dir != "" && refused == nil {
+		files = s.answerFiles(dir)
+	}
+	if body == "" && len(files) == 0 {
 		body = harness + " was woken and answered nothing"
 	}
-	if _, err := rooms.PostToRoom(lifetime, &protocol.PostToRoomRequest{Provider: provider, By: &protocol.RoomAgent{Did: s.nodeAgent.did, Harness: harness, Name: harness}, Room: room, Body: body, Thread: thread}); err != nil {
+	if _, err := rooms.PostToRoom(lifetime, &protocol.PostToRoomRequest{Provider: provider, By: &protocol.RoomAgent{Did: s.nodeAgent.did, Harness: harness, Name: harness}, Room: room, Body: body, Thread: thread, Files: files}); err != nil {
 		s.logger.Errorw("A woken Node Agent's answer was not posted into its room", "harness", harness, "room", room, "error", err)
 	}
 }
