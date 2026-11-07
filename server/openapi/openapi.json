@@ -594,6 +594,31 @@
         "SUPER"
       ]
     },
+    "/api/rooms": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}/post": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}/read": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}/wake": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/search/semantic": {
       "x-qntx-reach": [
         "ROOT"

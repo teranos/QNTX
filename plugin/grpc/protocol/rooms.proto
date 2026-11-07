@@ -102,6 +102,9 @@ message Room {
   // "there is always 1 Agent assigned to doing those PR deploy's"
   string instructions = 5;
   RoomOf of = 6;
+  // What the room is connected to beyond its provider, as the provider names
+  // it: a Telegram group, say. Empty is nothing.
+  string connected = 7;
 }
 
 message RegisterRoomAgentRequest {
