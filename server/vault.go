@@ -122,7 +122,7 @@ func (b vaultBinding) repoFile(under string) string {
 	if b.note {
 		return b.source.Path
 	}
-	return path.Join(b.source.Path, under)
+	return path.Join(b.source.Path, repoName(under))
 }
 
 // vaultFolders reads folders separated by spaces, each a build's input, = and
