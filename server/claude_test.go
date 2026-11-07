@@ -153,7 +153,7 @@ func runningTheNodeAgent(t *testing.T, named appcfg.NodeAgentConfig) (s *QNTXSer
 	underGround(t, agent.home)
 
 	t.Setenv("QNTX_TEST_PLAN_TOKEN", "the-plan-token")
-	named.TokenRef = "env:QNTX_TEST_PLAN_TOKEN"
+	named.Claude.TokenRef = "env:QNTX_TEST_PLAN_TOKEN"
 	held := servingOne(db, store)
 	system, _ := createTestStore(t)
 	held.SetSystem(oneNamespace("system", &handed{AttestationStore: system}))
@@ -179,9 +179,9 @@ func saying(s *QNTXServer, sent sigil.Sent) (*protocol.ClaudeSaid, *protocol.Ref
 	return answer.(*protocol.ClaudeSaid), nil
 }
 
-var opusLow = appcfg.NodeAgentConfig{
+var opusLow = appcfg.NodeAgentConfig{Claude: appcfg.ClaudeConfig{
 	Model: "claude-opus-5-5", Effort: "low", Mode: "dontAsk", Allow: []string{"Bash", "Read", "mcp__qntx"},
-}
+}}
 
 // What is said to the node is said to Claude Code, run as am.toml names it,
 // and what it answered is given back (ADR-048).
@@ -307,7 +307,7 @@ func TestThePermissionModeIsNamedByWhoeverSpeaks(t *testing.T) {
 	assert.Equal(t, "plan", after(ranWith(t, ran, "0", "args"), "--permission-mode"))
 
 	// am.toml that gives none leaves it to the speaker, and nothing is assumed.
-	bare, _ := runningTheNodeAgent(t, appcfg.NodeAgentConfig{Model: "claude-opus-5-5", Effort: "low"})
+	bare, _ := runningTheNodeAgent(t, appcfg.NodeAgentConfig{Claude: appcfg.ClaudeConfig{Model: "claude-opus-5-5", Effort: "low"}})
 	_, refused = saying(bare, sigil.Sent{"says": "hello"})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.Missing, refused.GetWhy())

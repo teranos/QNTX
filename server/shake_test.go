@@ -187,7 +187,7 @@ func TestEachElementIsItsOwnAgentAndItsOwnConversation(t *testing.T) {
 	args := ranWith(t, ran, theRunSaying(t, ran), "args")
 	assert.Contains(t, after(args, "--append-system-prompt"), "You are the element note-1")
 	assert.Contains(t, after(args, "--append-system-prompt"), note.did)
-	assert.Equal(t, opusLow.Model, after(args, "--model"))
+	assert.Equal(t, opusLow.Claude.Model, after(args, "--model"))
 	assert.Contains(t, ranWith(t, ran, theRunSaying(t, ran), "env"), "CLAUDE_CODE_OAUTH_TOKEN=the-plan-token")
 
 	// Its conversation is the node's own record, and each row names the element.

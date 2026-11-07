@@ -110,7 +110,7 @@ func TestASecondSignInEndsTheFirst(t *testing.T) {
 // sign-in, so a turn before it is signed in is not run, and says what to do.
 func TestATurnWithNoCredentialIsToldToSignIn(t *testing.T) {
 	s, ran := runningTheNodeAgent(t, opusLow)
-	s.deps.cfg.Agent.Root.TokenRef = ""
+	s.deps.cfg.Agent.Root.Claude.TokenRef = ""
 
 	_, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.NotNil(t, refused)

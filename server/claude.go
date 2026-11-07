@@ -60,7 +60,7 @@ type rootAgent struct {
 	sessionDir string
 }
 
-// agentSpec is how an agent runs in Claude Code: am.toml's [agent.root] for
+// agentSpec is how an agent runs in Claude Code: am.toml's [agent.root.claude] for
 // ROOT's, and the namespace's AGENT line for a namespace agent.
 type agentSpec struct {
 	Model, Effort, Mode string
@@ -71,7 +71,7 @@ type agentSpec struct {
 }
 
 // specOf is how am.toml says the Node Agent runs in Claude Code.
-func specOf(root appcfg.NodeAgentConfig) agentSpec {
+func specOf(root appcfg.ClaudeConfig) agentSpec {
 	return agentSpec{Model: root.Model, Effort: root.Effort, Mode: root.Mode, Allow: root.Allow, TokenRef: root.TokenRef}
 }
 
@@ -204,16 +204,16 @@ func (a *rootAgent) isSaidToBe() string {
 
 // claudeHarness is the Node Agent in Claude Code.
 func (s *QNTXServer) claudeHarness() *harness {
-	named := func() appcfg.NodeAgentConfig { return s.deps.cfg.Agent.Root }
+	named := func() appcfg.ClaudeConfig { return s.deps.cfg.Agent.Root.Claude }
 	h := &harness{
 		name: "claude", called: "Claude Code", file: claudeSessionFile,
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs this in. Not sent, it is the one am.toml gives."},
 			{Name: "model", OneOf: claudeModels, Says: "The model it answers with. Not sent, it is the one am.toml gives."},
 		},
-		// am.toml naming the Node Agent names it in Claude Code.
-		named:    func() bool { return true },
-		absent:   s.thereIsNoNodeAgent,
+		// "Let's say that I don't like how it's putting Claude on a pedestal."
+		named:    func() bool { return named().Named() },
+		absent:   s.thereIsNoClaude,
 		fetching: "Claude Code is still being fetched",
 		spec:     func() agentSpec { return specOf(named()) },
 		part: func(ctx context.Context, sent sigil.Sent, agent *rootAgent, spec agentSpec) (aTurn, *protocol.Refusal) {
@@ -261,6 +261,15 @@ func (s *QNTXServer) thereIsNoNodeAgent() *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Node Agent ([agent.root]), so there is none to speak to"}
 }
 
+// 「[Opus 5.5] thereIsNoClaude is why the Node Agent cannot be spoken to in
+// Claude Code: there is no Node Agent, or am.toml names it in other harnesses only.」
+func (s *QNTXServer) thereIsNoClaude() *protocol.Refusal {
+	if s.nodeAgent == nil || !s.deps.cfg.Agent.Root.Named() {
+		return s.thereIsNoNodeAgent()
+	}
+	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Claude Code for the Node Agent ([agent.root.claude]), so it does not run in Claude Code"}
+}
+
 // claudeModels is every model a turn can be said to answer with.
 // After a tool result, Opus 5.5, Sonnet 5.5 and Fable 5.1 hold their text and
 // print it whole (anthropics/claude-code#96439); Sonnet 5 and Haiku 4.5 stream
@@ -281,7 +290,7 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 	}
 	if mode == "" {
 		return aTurn{}, &protocol.Refusal{Why: sigil.Missing, Param: "permission_mode",
-			Says: "no permission mode was named, and none is set for " + agent.called + " (am.toml gives it under [agent.root])"}
+			Says: "no permission mode was named, and none is set for " + agent.called + " (am.toml gives it under [agent.root.claude])"}
 	}
 
 	var binary, plan string
