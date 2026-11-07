@@ -51,11 +51,12 @@ type operation struct {
 
 // routeTool is whether a served route is a tool: not a socket, which a call
 // cannot hold open, not a path sigils answer, not the MCP endpoint itself, and
-// not what answers with a credential, which no model is handed.
+// not what answers with a credential, which no model is handed, and not the
+// code an element is (/g/), which a browser imports.
 //
 // 「[Opus 5.5] Nor an MCP server the node consumes, which is an MCP server of its own and not a tool of this one.」
 func routeTool(route reach.Route) bool {
-	return !route.Socket && !route.Gates && route.Path != "/mcp" && route.Path != "/mcp/" && route.Path != githubCredentialPath &&
+	return !route.Socket && !route.Gates && route.Path != "/mcp" && route.Path != "/mcp/" && route.Path != githubCredentialPath && route.Path != elementPathPrefix &&
 		!strings.HasPrefix(route.Path, ConsumedServedAt)
 }
 

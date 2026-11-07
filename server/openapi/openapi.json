@@ -967,7 +967,12 @@
     },
     "/g/": {
       "x-qntx-reach": [
-        "ANYONE"
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION",
+        "USER"
       ],
       "x-qntx-prefix": true
     },
