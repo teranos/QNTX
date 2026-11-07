@@ -55,6 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "ElementOf",
         "Room",
         "RoomMessage",
+        "RoomAttachment",
         "RoomJoined",
         "RoomWoken",
         "RoomGap",

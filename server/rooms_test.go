@@ -1,6 +1,9 @@
 package server
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,7 +31,6 @@ func TestNoPluginHoldingRoomsIsSaid(t *testing.T) {
 		assert.Contains(t, refused.GetSays(), "no plugin holds rooms on this node", name)
 	}
 }
-
 
 // "i want all Node Agents to be in the Node Room"
 func TestTheNodeRoomIsOfThisNode(t *testing.T) {
@@ -63,4 +65,36 @@ func TestANamesakeUnderAnotherDIDIsNotTheNodeAgent(t *testing.T) {
 	s.roomAgentAs(agent)
 	assert.Equal(t, "switch", agent.GetHarness())
 	assert.Equal(t, "did:key:z6Mkother", agent.GetDid())
+}
+
+// A file a woken Node Agent writes for the room is sent with its answer.
+func TestAWokenNodeAgentsFileGoesIntoTheRoom(t *testing.T) {
+	s := servedForTest(t)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "plot.png"), []byte("\x89PNG"), 0o600))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "nested"), 0o700))
+	files := s.answerFiles(dir)
+	require.Len(t, files, 1)
+	assert.Equal(t, "plot.png", files[0].GetName())
+	assert.Equal(t, "image/png", files[0].GetType())
+	assert.Equal(t, []byte("\x89PNG"), files[0].GetData())
+}
+
+// A file too large for the room, a link out of the directory, and files past
+// the most a room takes are not sent.
+func TestAWokenNodeAgentsFilesAreBounded(t *testing.T) {
+	s := servedForTest(t)
+	dir, outside := t.TempDir(), t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "huge.bin"), make([]byte, roomFilesMost+1), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(outside, "secret"), []byte("no"), 0o600))
+	require.NoError(t, os.Symlink(filepath.Join(outside, "secret"), filepath.Join(dir, "link")))
+	for i := range roomFilesMany + 2 {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("z%02d.txt", i)), nil, 0o600))
+	}
+	files := s.answerFiles(dir)
+	require.Len(t, files, roomFilesMany)
+	for _, file := range files {
+		assert.NotEqual(t, "huge.bin", file.GetName())
+		assert.NotEqual(t, "link", file.GetName())
+	}
 }
