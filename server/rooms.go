@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"slices"
 	"strconv"
@@ -49,7 +50,11 @@ func (s *QNTXServer) roomsSignum() sigil.Signum {
 				{
 					Name:   "read",
 					Does:   "What was said in a room, oldest first.",
-					Takes:  []*protocol.Param{room, provider, {Name: "limit", Kind: sigil.Count, Says: "The most to answer."}},
+					Takes: []*protocol.Param{room, provider,
+						{Name: "limit", Kind: sigil.Count, Says: "The most to answer."},
+						{Name: "since", Says: "Only what was said at or after this, RFC3339."},
+						{Name: "before", Says: "Only what was said before this, RFC3339."},
+					},
 					Answer: "protocol.ReadRoomResponse",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: roomsPath + "/{room}/read"},
 				},
@@ -75,27 +80,45 @@ func (s *QNTXServer) roomsSignum() sigil.Signum {
 	}
 }
 
-// roomsOf is the plugin that holds rooms under name, or the one plugin that
-// holds rooms when name is empty.
-func (s *QNTXServer) roomsOf(name string) (string, protocol.RoomsServiceClient, *protocol.Refusal) {
+// roomsHolder is one plugin that holds rooms.
+type roomsHolder struct {
+	name  string
+	rooms protocol.RoomsServiceClient
+}
+
+// roomsHolders is every plugin that holds rooms, by name.
+func (s *QNTXServer) roomsHolders() ([]roomsHolder, *protocol.Refusal) {
 	pm, err := s.getPluginManager()
 	if err != nil {
-		return "", nil, &protocol.Refusal{Why: sigil.Failed, Says: "no plugin holds rooms on this node: " + err.Error()}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "no plugin holds rooms on this node: " + err.Error()}
 	}
-	var holders []string
-	clients := map[string]protocol.RoomsServiceClient{}
+	var holders []roomsHolder
 	for _, p := range pm.GetAllPlugins() {
 		proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
 		if !ok || !proxy.IsRoomsProvider() {
 			continue
 		}
-		holder := p.Metadata().Name
-		holders = append(holders, holder)
-		clients[holder] = proxy.RoomsServiceClient()
+		holders = append(holders, roomsHolder{name: p.Metadata().Name, rooms: proxy.RoomsServiceClient()})
 	}
-	slices.Sort(holders)
+	slices.SortFunc(holders, func(a, b roomsHolder) int { return strings.Compare(a.name, b.name) })
 	if len(holders) == 0 {
-		return "", nil, &protocol.Refusal{Why: sigil.NotFound, Says: "no plugin holds rooms on this node: a plugin holds them by declaring rooms_provider"}
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "no plugin holds rooms on this node: a plugin holds them by declaring rooms_provider"}
+	}
+	return holders, nil
+}
+
+// roomsOf is the plugin that holds rooms under name, or the one plugin that
+// holds rooms when name is empty.
+func (s *QNTXServer) roomsOf(name string) (string, protocol.RoomsServiceClient, *protocol.Refusal) {
+	held, refused := s.roomsHolders()
+	if refused != nil {
+		return "", nil, refused
+	}
+	var holders []string
+	clients := map[string]protocol.RoomsServiceClient{}
+	for _, holder := range held {
+		holders = append(holders, holder.name)
+		clients[holder.name] = holder.rooms
 	}
 	if name == "" {
 		if len(holders) > 1 {
@@ -103,8 +126,8 @@ func (s *QNTXServer) roomsOf(name string) (string, protocol.RoomsServiceClient, 
 		}
 		name = holders[0]
 	}
-	client, held := clients[name]
-	if !held {
+	client, holds := clients[name]
+	if !holds {
 		return "", nil, &protocol.Refusal{Why: sigil.NotFound, Param: "provider", Says: name + " holds no rooms; " + strings.Join(holders, ", ") + " does"}
 	}
 	return name, client, nil
@@ -124,16 +147,32 @@ func roomsFailed(err error) *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 }
 
+// roomsList answers one provider's rooms, or, none named, every provider's.
 func (s *QNTXServer) roomsList(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	provider, rooms, refused := s.roomsOf(sent["provider"])
+	if sent["provider"] != "" {
+		provider, rooms, refused := s.roomsOf(sent["provider"])
+		if refused != nil {
+			return nil, refused
+		}
+		answer, err := rooms.ListRooms(ctx, &protocol.ListRoomsRequest{Provider: provider, By: roomsBy(ctx)})
+		if err != nil {
+			return nil, roomsFailed(err)
+		}
+		return answer, nil
+	}
+	holders, refused := s.roomsHolders()
 	if refused != nil {
 		return nil, refused
 	}
-	answer, err := rooms.ListRooms(ctx, &protocol.ListRoomsRequest{Provider: provider, By: roomsBy(ctx)})
-	if err != nil {
-		return nil, roomsFailed(err)
+	all := &protocol.ListRoomsResponse{}
+	for _, holder := range holders {
+		answer, err := holder.rooms.ListRooms(ctx, &protocol.ListRoomsRequest{Provider: holder.name, By: roomsBy(ctx)})
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: holder.name + " did not list its rooms: " + err.Error()}
+		}
+		all.List = append(all.List, answer.GetList()...)
 	}
-	return answer, nil
+	return all, nil
 }
 
 func (s *QNTXServer) roomsGet(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -149,18 +188,18 @@ func (s *QNTXServer) roomsGet(ctx context.Context, sent sigil.Sent) (any, *proto
 }
 
 func (s *QNTXServer) roomsRead(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	limit := 0
+	if sent["limit"] != "" {
+		var err error
+		if limit, err = strconv.Atoi(sent["limit"]); err != nil || limit < 0 || limit > math.MaxInt32 {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "limit", Says: "limit is a whole number from 0 to " + strconv.Itoa(math.MaxInt32) + ", and " + sent["limit"] + " is not"}
+		}
+	}
 	provider, rooms, refused := s.roomsOf(sent["provider"])
 	if refused != nil {
 		return nil, refused
 	}
-	limit := 0
-	if sent["limit"] != "" {
-		var err error
-		if limit, err = strconv.Atoi(sent["limit"]); err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "limit", Says: "limit is a whole number, and " + sent["limit"] + " is not"}
-		}
-	}
-	answer, err := rooms.ReadRoom(ctx, &protocol.ReadRoomRequest{Provider: provider, By: roomsBy(ctx), Room: sent["room"], Limit: int32(limit)})
+	answer, err := rooms.ReadRoom(ctx, &protocol.ReadRoomRequest{Provider: provider, By: roomsBy(ctx), Room: sent["room"], Limit: int32(limit), Since: sent["since"], Before: sent["before"]})
 	if err != nil {
 		return nil, roomsFailed(err)
 	}
