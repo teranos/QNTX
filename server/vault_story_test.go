@@ -63,3 +63,44 @@ func TestAStoryAndItsNoteNameAreNotBothFilled(t *testing.T) {
 	assert.Contains(t, filled[0].Refused.Error(), "are both 13-user-connects-obsidian.feature.md in the vault")
 	assert.NoFileExists(t, filepath.Join(vault.Path, "Course Material", "13-user-connects-obsidian.feature.md"))
 }
+
+// A note the repository names X.feature.md is a note, and goes back to the branch as itself.
+func TestANoteNamedAsAStorysNoteIsSentBackAsItself(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	mainNotes["docs/adr/13-user-connects-obsidian.feature.md"] = "# a note\n"
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr"})
+	require.Nil(t, refused, "%v", refused)
+	_, refused = askVault(t, s, "send", sigil.Sent{"name": "abcd", "place": "Course Material", "branch": "obsidian-abcd"})
+	require.Nil(t, refused, "%v", refused)
+
+	at := filepath.Join(vault.Path, "Course Material", "13-user-connects-obsidian.feature.md")
+	require.NoError(t, os.WriteFile(at, []byte("# a note, edited\n"), 0o644))
+
+	sent := s.sendVault(t.Context(), "abcd", everyPlace)
+	require.Len(t, sent, 1)
+	require.NoError(t, sent[0].Refused)
+	assert.Equal(t, []string{"docs/adr/13-user-connects-obsidian.feature.md"}, sent[0].Committed)
+	branch := stand.branches["obsidian-abcd"]
+	assert.Equal(t, "# a note, edited\n", branch["docs/adr/13-user-connects-obsidian.feature.md"])
+	assert.NotContains(t, branch, "docs/adr/13-user-connects-obsidian.feature")
+}
+
+// One story is bound as one note of the vault.
+func TestOneStoryIsBoundAsANote(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	mainNotes["docs/adr/13-user-connects-obsidian.feature"] = story
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material/13-user-connects-obsidian.feature.md", "repo": "github.com/abcd-nl/clean", "path": "docs/adr/13-user-connects-obsidian.feature"})
+	require.Nil(t, refused, "%v", refused)
+
+	assert.Equal(t, story, readNote(t, vault, "Course Material/13-user-connects-obsidian.feature.md"))
+}
+
+// A folder may be named as a story is, and is bound as a folder.
+func TestAFolderNamedAsAStoryIsBoundAsAFolder(t *testing.T) {
+	s, vault := vaultBindingServer(t)
+	mainNotes["docs/adr/stories.feature/13-user-connects-obsidian.feature"] = story
+	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "docs/adr/stories.feature"})
+	require.Nil(t, refused, "%v", refused)
+
+	assert.Equal(t, story, readNote(t, vault, "Course Material/13-user-connects-obsidian.feature.md"))
+}

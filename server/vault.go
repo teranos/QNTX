@@ -93,7 +93,7 @@ func bindingOf(folder string) (vaultBinding, error) {
 	if err != nil {
 		return vaultBinding{}, err
 	}
-	note := strings.HasSuffix(source.Path, noteSuffix)
+	note := noteBound(source.Path, place)
 	if note != strings.HasSuffix(place, noteSuffix) {
 		return vaultBinding{}, errors.Newf("%q binds a note to a folder: a note's place is a note, and a folder's a folder", folder)
 	}

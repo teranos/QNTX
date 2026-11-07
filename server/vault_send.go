@@ -233,12 +233,13 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		if there && was.sha == gitBlobSHA(content) {
 			continue
 		}
-		file := binding.repoFile(under)
 		message := vault.Name + ": " + path.Join(binding.placeRoot(), under)
+		// A note the branch holds goes back where it is: its vault name may
+		// read as a story's (a note named X.feature.md) when it is not one.
 		if there {
-			edits = append(edits, forge.Replaced(file, content, was.sha, message))
+			edits = append(edits, forge.Replaced(was.path, content, was.sha, message))
 		} else {
-			edits = append(edits, forge.Added(file, content, message))
+			edits = append(edits, forge.Added(binding.repoFile(under), content, message))
 		}
 	}
 	for _, note := range onBranch {
