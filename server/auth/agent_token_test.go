@@ -38,11 +38,11 @@ func presentedAs(h *Handler, raw string) (Admission, bool) {
 	return h.admissionOf(h.presented(req))
 }
 
-// agentOfToken is what an agent-of token held from before carries.
+// 「[Opus 5.5] agentOfToken is what an agent-of token held from before carries.」
 type agentOfToken struct{ Token, DID, Label string }
 
-// agentOf is an agent-of token already held, as the node derived and wrote it
-// before it stopped handing them out.
+// 「[Opus 5.5] agentOf is an agent-of token already held, as the node derived and wrote it」
+// 「[Opus 5.5] before it stopped handing them out.」
 func agentOf(t *testing.T, h *Handler, store *memTokenStore, asking Grant, agent string) agentOfToken {
 	t.Helper()
 	label := agentOfLabel + ":" + asking.DID + ":" + agent
