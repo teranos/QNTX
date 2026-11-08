@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
@@ -122,6 +124,30 @@ func (h linkedHost) StoreFor(ctx context.Context) (ats.AttestationStore, error) 
 		return nil, errors.New("the asking carried no request to find the caller's namespace by")
 	}
 	return h.s.storeFor(caller)
+}
+
+func (h linkedHost) OfStandingRow(namespace string) (ats.AttestationStore, error) {
+	if h.s.held == nil {
+		return nil, errors.New("no namespaces are held to write in")
+	}
+	return h.s.held.OfStandingRow(namespace)
+}
+
+func (h linkedHost) Held(name string, migrations []subsystem.Migration) (subsystem.Held, error) {
+	path, err := heldPath(h.s.dbPath, name)
+	if err != nil {
+		return nil, err
+	}
+	return openHeld(path, migrations)
+}
+
+// heldPath is where a subsystem's own DuckDB is kept: subsystems/<name>.duckdb
+// beside the node's database. The name is one segment of a path.
+func heldPath(dbPath, name string) (string, error) {
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\'`) {
+		return "", errors.Newf("%q names no file a subsystem's DuckDB can be kept in", name)
+	}
+	return filepath.Join(filepath.Dir(dbPath), "subsystems", name+".duckdb"), nil
 }
 
 func (h linkedHost) Registry() *async.HandlerRegistry { return h.s.daemon.Registry() }

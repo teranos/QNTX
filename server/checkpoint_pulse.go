@@ -182,8 +182,8 @@ func (s *QNTXServer) keepCleaningJobs() {
 // cleanJobsOnce runs the passes of one cleanup, until a pass takes fewer than it
 // may or the node stops.
 func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
-	// First, and apart from how the rest goes: a stale forward queued is a
-	// stale forward the worker may run.
+	// 「[Fable 5.1] First, and apart from how the rest goes: a stale forward queued is a」
+	// 「[Fable 5.1] stale forward the worker may run.」
 	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
 		log.Errorw("Stale forwards were not dropped", "error", err)
 	}
@@ -250,9 +250,9 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 
 	s.ensureCheckpointSchedule(s.held.ServedUniverse().Schedules())
 	s.keepCheckpointing(handler)
-	// Before the worker takes its first job: it takes the oldest, and on q the
-	// oldest were 12,915 forwards from five weeks that the far node must not
-	// get replayed at it.
+	// 「[Fable 5.1] Before the worker takes its first job: it takes the oldest, and on q the」
+	// 「[Fable 5.1] oldest were 12,915 forwards from five weeks that the far node must not」
+	// 「[Fable 5.1] get replayed at it.」
 	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
 		s.logger.Named("jobs").Errorw("Stale forwards were not dropped at boot", "error", err)
 	}
