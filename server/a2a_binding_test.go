@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Which of a2a-go's handlers a request is handed to.
+// 「[Opus 5.5] Which of a2a-go's handlers a request is handed to.」
 
 // A path that is an operation without a tenant names none; any other's first
 // segment is a tenant, a namespace named after an operation among them.
