@@ -3,12 +3,14 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/teranos/QNTX/internal/sqlclose"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"runtime"
 	"time"
+
+	"github.com/teranos/QNTX/internal/sqlclose"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/teranos/QNTX/internal/sacred"
 	errors "github.com/teranos/sacred-error"
@@ -152,7 +154,9 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		// The node's own mux. Anything registered on http.DefaultServeMux —
 		// net/http/pprof's init, or a route someone forgot to declare — is not
 		// on this one and answers 404.
-		Handler:           strictTransport(s.served),
+		// Every request served is a span, so a caller's journey through the
+		// node is read in Sentry; the gate names it by its route.
+		Handler:           otelhttp.NewHandler(strictTransport(s.served), "served"),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill

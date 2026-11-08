@@ -52,10 +52,10 @@ func (h *Handler) AskPeers(ctx context.Context, admitted Admission, path string)
 	return answers
 }
 
-// AskPeerIn asks one peer one GET of path as the person admitted here, acting
-// in namespace there: the signature names that one, so the peer reads where it
-// is asked to. It waits as long as within and reads at most most bytes of the
-// answer; an answer past that is an error, not an answer cut short.
+// 「[Opus 5.5] AskPeerIn asks one peer one GET of path as the person admitted here, acting」
+// 「[Opus 5.5] in namespace there: the signature names that one, so the peer reads where it」
+// 「[Opus 5.5] is asked to. It waits as long as within and reads at most most bytes of the」
+// 「[Opus 5.5] answer; an answer past that is an error, not an answer cut short.」
 func (h *Handler) AskPeerIn(ctx context.Context, admitted Admission, peer Client, namespace, path string, within time.Duration, most int64) PeerAnswer {
 	if !peer.Serves(namespace) {
 		return PeerAnswer{Name: peer.Label, Err: errors.Newf("%s serves %v, and %s is not one of them", peer.Label, peer.Namespaces, namespace)}
