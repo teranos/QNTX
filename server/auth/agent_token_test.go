@@ -1,14 +1,13 @@
 package auth
 
 import (
-	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/teranos/QNTX/internal/access"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,74 +33,39 @@ func agentsNode(t *testing.T) (h *Handler, store *memTokenStore, raw string, ask
 
 // 「[Opus 5.5] presentedAs is what the gate makes of a bearer: false when it admits nobody.」
 func presentedAs(h *Handler, raw string) (Admission, bool) {
-	req := httptest.NewRequest(http.MethodPost, agentTokenPath, nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer "+raw)
 	return h.admissionOf(h.presented(req))
 }
 
-// 「[Opus 5.5] asksForAgent is POST /auth/agent as admitted, the way Middleware hands it on.」
-func asksForAgent(h *Handler, admitted Admission, body string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(http.MethodPost, agentTokenPath, strings.NewReader(body))
-	rec := httptest.NewRecorder()
-	h.handleAgentToken(rec, req.WithContext(WithAdmission(context.Background(), admitted)))
-	return rec
-}
+// agentOfToken is what an agent-of token held from before carries.
+type agentOfToken struct{ Token, DID, Label string }
 
-// 「[Opus 5.5] agentHanded is what the node answered an agent with.」
-type agentHanded struct {
-	Token     string `json:"token"`
-	DID       string `json:"did"`
-	Label     string `json:"label"`
-	Agent     string `json:"agent"`
-	DerivedBy string `json:"derived_by"`
-}
-
-func handedTo(t *testing.T, h *Handler, raw, agent string) agentHanded {
+// agentOf is an agent-of token already held, as the node derived and wrote it
+// before it stopped handing them out.
+func agentOf(t *testing.T, h *Handler, store *memTokenStore, asking Grant, agent string) agentOfToken {
 	t.Helper()
-	admitted, ok := presentedAs(h, raw)
-	require.True(t, ok, "the asking token was not admitted")
-	rec := asksForAgent(h, admitted, `{"agent":"`+agent+`"}`)
-	require.Contains(t, []int{http.StatusCreated, http.StatusOK}, rec.Code, rec.Body.String())
-	var handed agentHanded
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &handed))
-	return handed
+	label := agentOfLabel + ":" + asking.DID + ":" + agent
+	raw, did, err := access.DeriveToken(h.nodeKey, label)
+	require.NoError(t, err)
+	_, err = store.Issue(IssuedToken{Hash: sha256Hex(raw), DID: did, Label: label,
+		MintedBy: asking.MintedBy, Level: asking.Level, Namespaces: asking.Namespaces, ExpiresAt: NeverEnds()})
+	require.NoError(t, err)
+	return agentOfToken{Token: raw, DID: did, Label: label}
 }
 
-// 「[Opus 5.5] Each agent started under one token is its own DID, and the same agent」
-// 「[Opus 5.5] asking again is the same token: nothing is kept for it but the token record.」
-func TestEachAgentATokenStartsHoldsATokenOfItsOwn(t *testing.T) {
-	h, store, raw, asking := agentsNode(t)
-
-	otari := handedTo(t, h, raw, "otari")
-	assert.NotEqual(t, asking.DID, otari.DID, "the agent asks as the token it ran under")
-	assert.Equal(t, asking.DID, otari.DerivedBy)
-	assert.Equal(t, "otari", otari.Agent)
-
-	again := handedTo(t, h, raw, "otari")
-	assert.Equal(t, otari.Token, again.Token, "the same agent was handed another token")
-	assert.Equal(t, otari.DID, again.DID)
-
-	sion := handedTo(t, h, raw, "6sion")
-	assert.NotEqual(t, otari.DID, sion.DID, "two agents are one DID")
-
-	held, err := store.List()
-	require.NoError(t, err)
-	assert.Len(t, held, 3, "the asking token and one per agent")
-
-	admitted, ok := presentedAs(h, otari.Token)
-	require.True(t, ok, "the agent's token admits nobody")
-	assert.Equal(t, otari.DID, admitted.ActsAs(), "the agent attests as itself")
-	assert.Equal(t, mastodonAccount, admitted.Identity, "it speaks for whoever minted the asking token")
-	assert.Equal(t, string(LevelAttestor), admitted.LevelName())
-	assert.Equal(t, []string{"ground"}, admitted.Namespaces)
-	assert.Empty(t, admitted.ClientDID, "i name refuses a client's token, and this is none")
+// "Tokens are to be removed from QNTX except for third-party OAuth clients"
+func TestNoAgentIsHandedAToken(t *testing.T) {
+	h, _, _, _ := agentsNode(t)
+	_, served := h.Routes()["/auth/agent"]
+	assert.False(t, served, "/auth/agent still hands an agent a token")
 }
 
 // 「[Opus 5.5] It holds what the asking token's label holds, and a grant naming the」
 // 「[Opus 5.5] agent's own label widens nothing: it reaches no more than the token it ran under.」
 func TestAnAgentsTokenHoldsWhatTheAskingTokenHolds(t *testing.T) {
-	h, _, raw, _ := agentsNode(t)
-	otari := handedTo(t, h, raw, "otari")
+	h, store, _, asking := agentsNode(t)
+	otari := agentOf(t, h, store, asking, "otari")
 	now := time.Now()
 	h.SetRoleReader(&memRoles{lines: map[string][]RoleLine{"ground": {
 		{Routes: []string{"ground-token"}, Roles: []string{"GROUND"}, Granted: true, Actor: mastodonAccount, At: now},
@@ -116,8 +80,8 @@ func TestAnAgentsTokenHoldsWhatTheAskingTokenHolds(t *testing.T) {
 // 「[Opus 5.5] It ends with the token it ran under: revoked, it is refused; turned back on,」
 // 「[Opus 5.5] it works again; past its end, it is refused.」
 func TestAnAgentsTokenEndsWithTheAskingToken(t *testing.T) {
-	h, store, raw, asking := agentsNode(t)
-	otari := handedTo(t, h, raw, "otari")
+	h, store, _, asking := agentsNode(t)
+	otari := agentOf(t, h, store, asking, "otari")
 
 	require.NoError(t, store.Revoke(asking.ID))
 	_, ok := presentedAs(h, otari.Token)
@@ -130,96 +94,6 @@ func TestAnAgentsTokenEndsWithTheAskingToken(t *testing.T) {
 	store.expire(asking.ID, time.Now().Add(-time.Minute))
 	_, ok = presentedAs(h, otari.Token)
 	assert.False(t, ok, "the agent's token outlived the expired token it ran under")
-}
-
-// 「[Opus 5.5] Its end is the asking token's end, on the record it is listed by.」
-func TestAnAgentsTokenEndsWhenTheAskingTokenDoes(t *testing.T) {
-	h, store, _, _ := agentsNode(t)
-	ends := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
-	raw, _, err := store.Create(NewToken{Label: "for-an-hour", MintedBy: mastodonAccount,
-		Level: LevelToken, Namespaces: []string{"ground"}, ExpiresAt: &ends})
-	require.NoError(t, err)
-
-	otari := handedTo(t, h, raw, "otari")
-	held, err := store.List()
-	require.NoError(t, err)
-	for _, info := range held {
-		if info.DID == otari.DID {
-			require.NotNil(t, info.ExpiresAt)
-			at, err := time.Parse(time.RFC3339Nano, *info.ExpiresAt)
-			require.NoError(t, err)
-			assert.True(t, at.Equal(ends), "it ends at %s, and the asking token at %s", at, ends)
-			assert.Equal(t, LevelToken, info.Level)
-			return
-		}
-	}
-	t.Fatal("the agent's token is not listed")
-}
-
-// 「[Opus 5.5] Who is handed nothing: ROOT's kind, SUPER, a token issued through a client,」
-// 「[Opus 5.5] an agent's own token, and a session.」
-func TestWhoIsHandedNoAgentToken(t *testing.T) {
-	h, store, raw, _ := agentsNode(t)
-
-	rootRaw, rootDID := nodeAgentToken(t)
-	require.NoError(t, h.HoldNodeAgent(rootRaw, rootDID))
-	superRaw, _, err := store.Create(NewToken{Label: "mbp", MintedBy: mastodonAccount, Level: LevelSuper, ExpiresAt: NeverEnds()})
-	require.NoError(t, err)
-	clientsRaw := "qntx_" + strings.Repeat("c", 64)
-	_, err = store.Issue(IssuedToken{Hash: sha256Hex(clientsRaw), DID: "did:key:z6Mkissued", Label: "app",
-		MintedBy: mastodonAccount, Level: LevelToken, Namespaces: []string{"ground"},
-		ClientDID: "did:key:z6Mkclient", ExpiresAt: NeverEnds()})
-	require.NoError(t, err)
-	otari := handedTo(t, h, raw, "otari")
-
-	before, err := store.List()
-	require.NoError(t, err)
-	for asked, token := range map[string]string{"ROOT's kind": rootRaw, "SUPER": superRaw, "a client's token": clientsRaw, "an agent's token": otari.Token} {
-		admitted, ok := presentedAs(h, token)
-		require.True(t, ok, asked)
-		rec := asksForAgent(h, admitted, `{"agent":"hazel"}`)
-		assert.Equal(t, http.StatusForbidden, rec.Code, "%s: %s", asked, rec.Body.String())
-	}
-	session := Admitted(LevelRoot)
-	session.Identity = mastodonAccount
-	rec := asksForAgent(h, session, `{"agent":"hazel"}`)
-	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
-
-	after, err := store.List()
-	require.NoError(t, err)
-	assert.Len(t, after, len(before), "a token was handed to who is handed none")
-}
-
-// 「[Opus 5.5] An agent is named by one line of text.」
-func TestAnAgentNamedByNoLineIsRefused(t *testing.T) {
-	h, store, raw, _ := agentsNode(t)
-	admitted, ok := presentedAs(h, raw)
-	require.True(t, ok)
-	for _, body := range []string{`{}`, `{"agent":"  "}`, `{"agent":"two\nlines"}`, `{"agent":"` + strings.Repeat("n", MaxName+1) + `"}`, `not json`} {
-		rec := asksForAgent(h, admitted, body)
-		assert.Equal(t, http.StatusBadRequest, rec.Code, body)
-	}
-	held, err := store.List()
-	require.NoError(t, err)
-	assert.Len(t, held, 1)
-}
-
-// 「[Opus 5.5] The record says which token it was derived for, by whom, and for which agent.」
-func TestAnAgentsTokenIsAttestedWithWhoDerivedIt(t *testing.T) {
-	h, _, raw, asking := agentsNode(t)
-	kept := &memAttestor{}
-	h.SetAttestor(kept)
-
-	otari := handedTo(t, h, raw, "otari")
-	handedTo(t, h, raw, "otari")
-
-	require.Len(t, kept.wrote, 1, "asking again wrote the token down again")
-	line := kept.wrote[0]
-	assert.Equal(t, []string{PredicateMinted}, line.Predicates)
-	assert.Equal(t, []string{mastodonAccount}, line.Subjects)
-	assert.Equal(t, asking.DID, line.Attributes["derived_by"])
-	assert.Equal(t, "otari", line.Attributes["agent"])
-	assert.Equal(t, otari.DID, line.Attributes["did"])
 }
 
 // 「[Opus 5.5] A derived token's label is the node's to write: a session mints none.」
@@ -249,7 +123,7 @@ func TestALabelAloneMakesNoAgentsToken(t *testing.T) {
 		{Routes: []string{"ground-token"}, Roles: []string{"GROUND"}, Granted: true, Actor: mastodonAccount, At: time.Now()},
 	}}})
 	// 「[Opus 5.5] Minted before a session was refused such a label, the way one already held is.」
-	named, _, err := store.Create(NewToken{Label: agentLabel(asking.DID, "otari"), MintedBy: mastodonAccount,
+	named, _, err := store.Create(NewToken{Label: agentOfLabel + ":" + asking.DID + ":otari", MintedBy: mastodonAccount,
 		Level: LevelAttestor, Namespaces: []string{"ground"}, ExpiresAt: NeverEnds()})
 	require.NoError(t, err)
 
@@ -257,63 +131,14 @@ func TestALabelAloneMakesNoAgentsToken(t *testing.T) {
 	assert.False(t, ok, "a token the node did not derive stood on the asking token's roles")
 }
 
-// 「[Opus 5.5] Agents asking at once are handed one token, and it is written down once:」
-// 「[Opus 5.5] two asks that both found it absent would both write it, and the second write」
-// 「[Opus 5.5] would turn back on a token switched off in between.」
-func TestAgentsAskingAtOnceAreHandedOneToken(t *testing.T) {
-	h, store, raw, _ := agentsNode(t)
-	kept := &memAttestor{}
-	h.SetAttestor(kept)
-	admitted, ok := presentedAs(h, raw)
-	require.True(t, ok)
-	// 「[Opus 5.5] Each look holds until the other has looked too, or until it is plain」
-	// 「[Opus 5.5] the other cannot look while this one asks.」
-	both := &lookingTogether{memTokenStore: store, looked: make(chan struct{}, 2)}
-	h.tokens = both
-
-	codes := make(chan int, 2)
-	for range 2 {
-		go func() { codes <- asksForAgent(h, admitted, `{"agent":"otari"}`).Code }()
-	}
-	created := 0
-	for range 2 {
-		if <-codes == http.StatusCreated {
-			created++
-		}
-	}
-	assert.Equal(t, 1, created, "both asks found the token absent and wrote it")
-	assert.Len(t, kept.wrote, 1, "the token was attested as minted more than once")
-}
-
-// 「[Opus 5.5] lookingTogether is a store whose LookupSpent waits for a second look, so two」
-// 「[Opus 5.5] asks that may look at once do.」
-type lookingTogether struct {
-	*memTokenStore
-	looked chan struct{}
-}
-
-func (l *lookingTogether) LookupSpent(hash string) (Grant, bool, bool) {
-	grant, live, held := l.memTokenStore.LookupSpent(hash)
-	l.looked <- struct{}{}
-	deadline := time.After(200 * time.Millisecond)
-	for len(l.looked) < 2 {
-		select {
-		case <-deadline:
-			return grant, live, held
-		case <-time.After(time.Millisecond):
-		}
-	}
-	return grant, live, held
-}
-
 // 「[Opus 5.5] What the tokens element shows of an agent's token is what the gate admits it」
 // 「[Opus 5.5] as: the asking token's namespaces and roles, and none once that token is off.」
 func TestAnAgentsTokenIsShownAsTheGateAdmitsIt(t *testing.T) {
-	h, store, raw, asking := agentsNode(t)
+	h, store, _, asking := agentsNode(t)
 	h.SetRoleReader(&memRoles{lines: map[string][]RoleLine{"ground": {
 		{Routes: []string{"ground-token"}, Roles: []string{"GROUND"}, Granted: true, Actor: mastodonAccount, At: time.Now()},
 	}}})
-	otari := handedTo(t, h, raw, "otari")
+	otari := agentOf(t, h, store, asking, "otari")
 	info := listed(t, store, otari.DID)
 
 	assert.Equal(t, map[string][]string{"ground": {"GROUND"}}, h.answerFor(info).Roles)
@@ -339,11 +164,11 @@ func listed(t *testing.T, store *memTokenStore, did string) TokenInfo {
 // Where an agent's token is shown acting is where the token it runs under acts
 // now, beside the roles it holds there; nowhere once that token is off.
 func TestAnAgentsTokenIsShownWhereItActsNow(t *testing.T) {
-	h, store, raw, asking := agentsNode(t)
+	h, store, _, asking := agentsNode(t)
 	h.SetRoleReader(&memRoles{lines: map[string][]RoleLine{"orchard": {
 		{Routes: []string{"ground-token"}, Roles: []string{"PICKER"}, Granted: true, Actor: mastodonAccount, At: time.Now()},
 	}}})
-	otari := handedTo(t, h, raw, "otari")
+	otari := agentOf(t, h, store, asking, "otari")
 	require.NoError(t, store.SetNamespaces(asking.ID, []string{"orchard"}))
 	info := listed(t, store, otari.DID)
 	require.Equal(t, []string{"ground"}, info.Namespaces, "the record keeps where it was handed")
