@@ -39,14 +39,14 @@ const (
 	forwardsSwept = 1000
 	// "unresponsive far node needs to be more ok with how QNTX works"
 	//
-	// forwardKeptFor is how long a queued forward waits for the far node. On q
-	// 12,915 forwards sat queued since 2026-10-01, starved by newest-first
-	// dequeue, and would have been replayed onto the far node all at once had
-	// it ever reached them. Past this they are dropped, and the drop is said.
+	// 「[Fable 5.1] forwardKeptFor is how long a queued forward waits for the far node. On q」
+	// 「[Fable 5.1] 12,915 forwards sat queued since 2026-10-01, starved by newest-first」
+	// 「[Fable 5.1] dequeue, and would have been replayed onto the far node all at once had」
+	// 「[Fable 5.1] it ever reached them. Past this they are dropped, and the drop is said.」
 	forwardKeptFor = 24 * time.Hour
-	// forwardsDroppedPerPass is how many one statement cancels.
+	// 「[Fable 5.1] forwardsDroppedPerPass is how many one statement cancels.」
 	forwardsDroppedPerPass = 1000
-	// forwardDropped is the error on a forward dropped at its horizon.
+	// 「[Fable 5.1] forwardDropped is the error on a forward dropped at its horizon.」
 	forwardDropped = "the far node did not take it within 24h, dropped"
 )
 
@@ -192,9 +192,9 @@ func sweepForwards(queue *async.Queue, logger *zap.SugaredLogger) (int, error) {
 		if job.HandlerName != forwardHandlerName || !strings.Contains(job.Error, forwardUnanswered) {
 			continue
 		}
-		// A forward the far node did not take within forwardKeptFor is not
-		// queued again from here either: the horizon holds for failed and
-		// queued alike.
+		// 「[Fable 5.1] A forward the far node did not take within forwardKeptFor is not」
+		// 「[Fable 5.1] queued again from here either: the horizon holds for failed and」
+		// 「[Fable 5.1] queued alike.」
 		if job.CreatedAt.Before(horizon) {
 			job.Cancel(forwardDropped)
 			if err := queue.UpdateJob(job); err != nil {
@@ -218,9 +218,9 @@ func sweepForwards(queue *async.Queue, logger *zap.SugaredLogger) (int, error) {
 	return swept, nil
 }
 
-// dropStaleForwards cancels every queued forward older than forwardKeptFor, in
-// passes, and says how many went. A far node that is down for a day does not
-// get the day replayed at it when it is back.
+// 「[Fable 5.1] dropStaleForwards cancels every queued forward older than forwardKeptFor, in」
+// 「[Fable 5.1] passes, and says how many went. A far node that is down for a day does not」
+// 「[Fable 5.1] get the day replayed at it when it is back.」
 func dropStaleForwards(ctx context.Context, queue *async.Queue, logger *zap.SugaredLogger) (int, error) {
 	dropped := 0
 	for {
