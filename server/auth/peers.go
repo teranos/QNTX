@@ -54,7 +54,7 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 			h.writeError(w, http.StatusUnauthorized, "the session here admits nobody")
 			return
 		}
-		signed, err := h.carriedSignature(admitted.Identity, p.DisplayName, peer, time.Now())
+		signed, err := h.carriedSignature(admitted.Identity, p.DisplayName, peer, peer.Namespaces, time.Now())
 		if err != nil {
 			h.writeError(w, http.StatusInternalServerError, "this node did not sign to carry you to "+peer.Label+": "+err.Error())
 			return
@@ -95,10 +95,11 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 
 // carriedSignature is the Authorization a request carrying identity to peer
 // goes with: this node signing, as its own did:key, who the person is, for that
-// peer alone and for one request.
+// peer alone and for one request. What it names is where the peer lets them act:
+// the namespaces handed in, of those the peer serves.
 //
 // "A signature proves the key, and nothing reusable leaves the node."
-func (h *Handler) carriedSignature(identity, name string, peer Client, now time.Time) (string, error) {
+func (h *Handler) carriedSignature(identity, name string, peer Client, namespaces []string, now time.Time) (string, error) {
 	did, err := h.ownDID()
 	if err != nil {
 		return "", err
@@ -118,7 +119,7 @@ func (h *Handler) carriedSignature(identity, name string, peer Client, now time.
 		},
 		Name:       name,
 		Level:      string(h.levelOf(identity)),
-		Namespaces: peer.Namespaces,
+		Namespaces: namespaces,
 		Label:      peer.Label,
 		Client:     peer.DID,
 	}).SignedString(h.nodeKey)

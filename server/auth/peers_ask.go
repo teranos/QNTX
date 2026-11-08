@@ -47,30 +47,35 @@ func (h *Handler) AskPeers(ctx context.Context, admitted Admission, path string)
 	peers := h.Peers()
 	answers := make([]PeerAnswer, 0, len(peers))
 	for _, peer := range peers {
-		answers = append(answers, h.askPeer(ctx, admitted, peer, path))
+		answers = append(answers, h.askPeer(ctx, admitted, peer, peer.Namespaces, path, peerAskTimeout, issuerAnswerBytes))
 	}
 	return answers
 }
 
-// AskPeer asks one peer one GET of path as the person admitted here, as
-// AskPeers asks each.
-func (h *Handler) AskPeer(ctx context.Context, admitted Admission, peer Client, path string) PeerAnswer {
-	return h.askPeer(ctx, admitted, peer, path)
+// AskPeerIn asks one peer one GET of path as the person admitted here, acting
+// in namespace there: the signature names that one, so the peer reads where it
+// is asked to. It waits as long as within and reads at most most bytes of the
+// answer; an answer past that is an error, not an answer cut short.
+func (h *Handler) AskPeerIn(ctx context.Context, admitted Admission, peer Client, namespace, path string, within time.Duration, most int64) PeerAnswer {
+	if !peer.Serves(namespace) {
+		return PeerAnswer{Name: peer.Label, Err: errors.Newf("%s serves %v, and %s is not one of them", peer.Label, peer.Namespaces, namespace)}
+	}
+	return h.askPeer(ctx, admitted, peer, []string{namespace}, path, within, most)
 }
 
-func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, path string) PeerAnswer {
+func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, namespaces []string, path string, within time.Duration, most int64) PeerAnswer {
 	answer := PeerAnswer{Name: peer.Label}
 	person, err := named.TextOf("the person asking", admitted.Identity)
 	if err != nil {
 		answer.Err = errors.Wrapf(err, "nobody to carry to %s", peer.Label)
 		return answer
 	}
-	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, peer, time.Now())
+	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, peer, namespaces, time.Now())
 	if err != nil {
 		answer.Err = errors.Wrapf(err, "this node did not sign to carry you to %s", peer.Label)
 		return answer
 	}
-	ctx, cancel := context.WithTimeout(ctx, peerAskTimeout)
+	ctx, cancel := context.WithTimeout(ctx, within)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, peer.Origin.String()+path, nil)
 	if err != nil {
@@ -83,13 +88,17 @@ func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, 
 		answer.Err = errors.Wrapf(err, "%s did not answer", peer.Label)
 		return answer
 	}
-	body, readErr := io.ReadAll(io.LimitReader(resp.Body, issuerAnswerBytes))
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, most+1))
 	if closeErr := resp.Body.Close(); closeErr != nil {
 		answer.Err = errors.Wrapf(closeErr, "the answer of %s did not close", peer.Label)
 		return answer
 	}
 	if readErr != nil {
 		answer.Err = errors.Wrapf(readErr, "the answer of %s did not read", peer.Label)
+		return answer
+	}
+	if int64(len(body)) > most {
+		answer.Err = errors.Newf("%s answered %s with more than %d bytes", peer.Label, path, most)
 		return answer
 	}
 	answer.Status, answer.Body = resp.StatusCode, body
@@ -104,6 +113,6 @@ func (h *Handler) CarriedAs(admitted Admission, peer Client) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "nobody to carry to %s", peer.Label)
 	}
-	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, peer, time.Now())
+	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, peer, peer.Namespaces, time.Now())
 	return carriedAs, errors.Wrapf(err, "this node did not sign to carry you to %s", peer.Label)
 }

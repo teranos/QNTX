@@ -14,9 +14,11 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	"go.uber.org/zap/zaptest"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // One event as Ground streams it (ground source/stream.d): subject is
@@ -243,4 +245,60 @@ func TestTranscriptsFollowTEI(t *testing.T) {
 		"q.who: a list in the schema, and protocol.Turn.speaker is one value",
 		"q.source: a list in the schema, and protocol.Turn.of is one value",
 	}, departed)
+}
+
+// A session held nowhere here is read where it lives: each namespace a peer
+// serves is asked as the caller, signed for that namespace, and the one that
+// holds it answers.
+func TestASessionHeldAtAPeerIsReadThere(t *testing.T) {
+	var asked []string
+	held := &protocol.Transcripts{Transcripts: []*protocol.Transcript{{Session: "s-9", Turns: []*protocol.Turn{{Speaker: "human", Text: "read it"}}}}}
+	peerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.Path+"?"+r.URL.RawQuery)
+		if r.URL.Query().Get("session") != "s-9" {
+			http.NotFound(w, r)
+			return
+		}
+		body, err := protojson.Marshal(held)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(peerServer.Close)
+	namedNode(t)
+	srv, _ := pluginServingServer(t, "fake")
+	keyedNode(srv)
+	store, db := qntxtest.CreateTestStore(t)
+	srv.held = servingOne(db, store)
+	require.NoError(t, srv.authHandler.DeclarePeer("k", "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", []string{"Ground"}, peerServer.URL, peerServer.URL))
+	caller := auth.Admitted(auth.LevelRoot)
+	caller.Identity = "person:root"
+
+	answer, refused := srv.transcriptsRead(sigil.WithCaller(context.Background(), requestAs(caller)), sigil.Sent{"session": "s-9"})
+	require.Nil(t, refused, "%v", refused)
+	read := answer.(*protocol.Transcripts).GetTranscripts()
+	require.Len(t, read, 1)
+	assert.Equal(t, "s-9", read[0].GetSession())
+	assert.Equal(t, "read it", read[0].GetTurns()[0].GetText())
+	assert.Equal(t, []string{"/api/transcripts?session=s-9"}, asked)
+}
+
+// A peer that could not be asked is said: it is not taken for one that holds nothing.
+func TestAPeerThatCouldNotBeAskedIsSaid(t *testing.T) {
+	gone := httptest.NewServer(http.NotFoundHandler())
+	gone.Close()
+	namedNode(t)
+	srv, _ := pluginServingServer(t, "fake")
+	keyedNode(srv)
+	store, db := qntxtest.CreateTestStore(t)
+	srv.held = servingOne(db, store)
+	require.NoError(t, srv.authHandler.DeclarePeer("k", "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", []string{"Ground"}, gone.URL, gone.URL))
+	caller := auth.Admitted(auth.LevelRoot)
+	caller.Identity = "person:root"
+
+	_, refused := srv.transcriptsRead(sigil.WithCaller(context.Background(), requestAs(caller)), sigil.Sent{"session": "s-9"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "k/Ground")
 }
