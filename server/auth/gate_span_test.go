@@ -13,8 +13,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
-// servedSpan is the one span a request served through otelhttp and the gate
-// leaves.
+// 「[Opus 5.5] servedSpan is the one span a request served through otelhttp and the gate」
+// 「[Opus 5.5] leaves.」
 func servedSpan(t *testing.T, gate http.Handler, req *http.Request) (sdktrace.ReadOnlySpan, int) {
 	t.Helper()
 	recorder := tracetest.NewSpanRecorder()
@@ -35,8 +35,8 @@ func attributeOf(span sdktrace.ReadOnlySpan, key string) (string, bool) {
 	return "", false
 }
 
-// A request with no credential is refused, and its span says its route and
-// why it was refused.
+// 「[Opus 5.5] A request with no credential is refused, and its span says its route and」
+// 「[Opus 5.5] why it was refused.」
 func TestARefusalIsReadInItsSpan(t *testing.T) {
 	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), logger: testLogger()}
 	gate := h.Middleware("/mcp", everyLevel, func(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +54,7 @@ func TestARefusalIsReadInItsSpan(t *testing.T) {
 	assert.Equal(t, "no-session", why)
 }
 
-// An admitted request's span says its route and the level it was admitted at.
+// 「[Opus 5.5] An admitted request's span says its route and the level it was admitted at.」
 func TestAnAdmissionIsReadInItsSpan(t *testing.T) {
 	sessions := newSessionStore(1)
 	token, _ := sessions.create(mastodonAccount, User{})
