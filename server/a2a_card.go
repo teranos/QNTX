@@ -147,8 +147,8 @@ func (s *QNTXServer) publicCard(r *http.Request) agentCard {
 	return card
 }
 
-// HandleAgentCard serves the public card: a2a-go's card handler, the card
-// signed with the node's own key (§8.4) by a2a-go's signed card producer.
+// 「[Opus 5.5] HandleAgentCard serves the public card: a2a-go's card handler, the card」
+// 「[Opus 5.5] signed with the node's own key (§8.4) by a2a-go's signed card producer.」
 func (s *QNTXServer) HandleAgentCard(w http.ResponseWriter, r *http.Request) {
 	producer := a2asrv.AgentCardProducerFn(func(context.Context) (*a2asdk.AgentCard, error) {
 		return s.publicCard(r).sdk(), nil
@@ -214,8 +214,8 @@ func etagMatches(header, etag string) bool {
 	return false
 }
 
-// cardSigners is the node's own key, under the key id its DID document names
-// it by, so whoever holds the node's did:key holds what verifies its cards.
+// 「[Opus 5.5] cardSigners is the node's own key, under the key id its DID document names」
+// 「[Opus 5.5] it by, so whoever holds the node's did:key holds what verifies its cards.」
 func (s *QNTXServer) cardSigners(context.Context) ([]*a2acrypto.Signer, error) {
 	node, held := s.nodeKey()
 	if !held {
@@ -228,8 +228,8 @@ func (s *QNTXServer) cardSigners(context.Context) ([]*a2acrypto.Signer, error) {
 	return []*a2acrypto.Signer{signer}, nil
 }
 
-// signedCard is card signed with the node's key, as a2a-go's signed card
-// producer signs the public one.
+// 「[Opus 5.5] signedCard is card signed with the node's key, as a2a-go's signed card」
+// 「[Opus 5.5] producer signs the public one.」
 func (s *QNTXServer) signedCard(ctx context.Context, card *a2asdk.AgentCard) (*a2asdk.AgentCard, error) {
 	return a2asrv.NewSignedCardProducer(a2asrv.AgentCardProducerFn(func(context.Context) (*a2asdk.AgentCard, error) {
 		return card, nil
@@ -255,39 +255,39 @@ func a2aURL(r *http.Request) string {
 	return nodeURL(r) + a2aPrefix[:len(a2aPrefix)-1]
 }
 
-// cardSkill is one signum as A2A sees it: "On the Agent Card a signum is
-// described as an AgentSkill" (ADR-039).
+// 「[Opus 5.5] cardSkill is one signum as A2A sees it: "On the Agent Card a signum is」
+// 「[Opus 5.5] described as an AgentSkill" (ADR-039).」
 type cardSkill struct {
 	ID, Name, Description string
 	Tags                  []string
-	// Bearer says calling the skill takes the node's bearer token, for a card
-	// that shows a skill to whoever reads it.
+	// 「[Opus 5.5] Bearer says calling the skill takes the node's bearer token, for a card」
+	// 「[Opus 5.5] that shows a skill to whoever reads it.」
 	Bearer bool
-	// Modes is the media types the skill takes and gives, in place of the
-	// card's; nil holds the card's.
+	// 「[Opus 5.5] Modes is the media types the skill takes and gives, in place of the」
+	// 「[Opus 5.5] card's; nil holds the card's.」
 	Modes []string
 }
 
-// cardModes is the media types the node takes and gives: JSON, everywhere.
+// 「[Opus 5.5] cardModes is the media types the node takes and gives: JSON, everywhere.」
 var cardModes = []string{"application/json"}
 
-// agentCard is what the node can say of itself to one caller.
+// 「[Opus 5.5] agentCard is what the node can say of itself to one caller.」
 type agentCard struct {
 	Name, Description, Version string
-	// URL is where the binding answers, and Tenant the agent behind it.
+	// 「[Opus 5.5] URL is where the binding answers, and Tenant the agent behind it.」
 	URL, Tenant string
-	// OutputModes is the card's default output modes, which a skill's Modes
-	// override.
+	// 「[Opus 5.5] OutputModes is the card's default output modes, which a skill's Modes」
+	// 「[Opus 5.5] override.」
 	OutputModes []string
 	Skills      []cardSkill
 	Extensions  []a2asdk.AgentExtension
-	// Session is the cookie a person's passkey session is carried in, which
-	// the node admits as it admits the bearer token.
+	// 「[Opus 5.5] Session is the cookie a person's passkey session is carried in, which」
+	// 「[Opus 5.5] the node admits as it admits the bearer token.」
 	Session string
 }
 
-// sdk is the card as a2a-go's AgentCard. It is reached over HTTP+JSON and
-// JSON-RPC, both at its URL.
+// 「[Opus 5.5] sdk is the card as a2a-go's AgentCard. It is reached over HTTP+JSON and」
+// 「[Opus 5.5] JSON-RPC, both at its URL.」
 func (c agentCard) sdk() *a2asdk.AgentCard {
 	bearer := a2asdk.SecurityRequirements{"bearer": {}}
 	card := &a2asdk.AgentCard{
@@ -321,7 +321,7 @@ func (c agentCard) sdk() *a2asdk.AgentCard {
 	return card
 }
 
-// cardJSON is the card as a2a-go writes it.
+// 「[Opus 5.5] cardJSON is the card as a2a-go writes it.」
 func cardJSON(card *a2asdk.AgentCard) (json.RawMessage, error) {
 	raw, err := json.Marshal(card)
 	return raw, errors.Wrap(err, "the card did not marshal")
