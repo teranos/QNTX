@@ -44,10 +44,6 @@ REACH is '/auth/token'                                                    of ANY
 # An agent asks to be signed in and holds no session: the person's yes at the
 # passkey, at home, is the credential, checked at the endpoints themselves.
 REACH is '/auth/device' '/auth/device/approve' '/auth/device/done'        of ANYONE
-# An agent a token starts is handed a token of its own (ADR-025): the token
-# asking is the credential, and the handler hands one to a TOKEN or an
-# ATTESTOR minted rather than issued through a client, and to nobody else.
-REACH is '/auth/agent'                                                    of TOKEN ATTESTOR
 # Another node asks whether a token this one issued is live, holding no session:
 # its signed assertion is the credential, checked at the endpoint itself.
 REACH is '/auth/introspect'                                               of ANYONE

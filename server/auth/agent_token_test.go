@@ -57,6 +57,7 @@ func agentOf(t *testing.T, h *Handler, store *memTokenStore, asking Grant, agent
 // "Tokens are to be removed from QNTX except for third-party OAuth clients"
 func TestNoAgentIsHandedAToken(t *testing.T) {
 	h, _, _, _ := agentsNode(t)
+	h.corsWrap = func(next http.HandlerFunc) http.HandlerFunc { return next }
 	_, served := h.Routes()["/auth/agent"]
 	assert.False(t, served, "/auth/agent still hands an agent a token")
 }
