@@ -337,7 +337,7 @@ func (s *QNTXServer) holdNamespaceAgent(namespace, model, setBy string) (*rootAg
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + namespace + " has no key of its own: " + err.Error()}
 	}
 	agent.namespace, agent.called = namespace, "the agent of "+namespace
-	// Its door is what keeps it in its namespace at the gate. A node without
+	// 「[Opus 5.5] Its door is what keeps it in its namespace at the gate. A node without」
 	// auth has no gate to hold it, and would admit it as the node's one caller,
 	// everywhere: it runs no namespace agent.
 	if s.authHandler == nil {
