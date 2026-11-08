@@ -76,8 +76,8 @@ namespace is not served to another.`,
 var (
 	elementFile string
 	elementTo   string
-	// atDoor is --to being the door the node opened for the agent asking,
-	// which admits that agent and is presented nothing.
+	// 「[Opus 5.5] atDoor is --to being the door the node opened for the agent asking,」
+	// 「[Opus 5.5] which admits that agent and is presented nothing.」
 	atDoor bool
 )
 
@@ -111,17 +111,17 @@ func nodeURL() (string, error) {
 	return fmt.Sprintf("http://127.0.0.1:%d", port), nil
 }
 
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 //
-// A request is signed for itself by the key kept in ~/.qntx/key, the one ground
-// signs with, made out to the node it goes to (QNTX server/auth/signed.go): what
-// crosses the wire is spent once, and the key never does.
+// 「[Opus 5.5] A request is signed for itself by the key kept in ~/.qntx/key, the one ground」
+// 「[Opus 5.5] signs with, made out to the node it goes to (QNTX server/auth/signed.go): what」
+// 「[Opus 5.5] crosses the wire is spent once, and the key never does.」
 
-// signedLife is how long a signature lasts: long enough to reach the node,
-// well inside the five minutes the node allows one.
+// 「[Opus 5.5] signedLife is how long a signature lasts: long enough to reach the node,」
+// 「[Opus 5.5] well inside the five minutes the node allows one.」
 const signedLife = time.Minute
 
-// keyPath is where the key is kept.
+// 「[Opus 5.5] keyPath is where the key is kept.」
 func keyPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -130,8 +130,8 @@ func keyPath() (string, error) {
 	return filepath.Join(home, ".qntx", "key"), nil
 }
 
-// signedFor is the Authorization a request to url goes with: a JWT the kept
-// key signs as its did:key, for the node's origin, once.
+// 「[Opus 5.5] signedFor is the Authorization a request to url goes with: a JWT the kept」
+// 「[Opus 5.5] key signs as its did:key, for the node's origin, once.」
 func signedFor(url string) (string, error) {
 	path, err := keyPath()
 	if err != nil {
