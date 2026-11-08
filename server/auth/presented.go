@@ -80,14 +80,12 @@ func (h *Handler) presented(r *http.Request) Presented {
 	if signed, ok := signedAssertion(r); ok {
 		p.bearerPresented = true
 		h.asBecome(&p)
-		if h.tokens != nil {
-			grant, err := h.signedGrant(signed, time.Now())
-			if err != nil {
-				h.logger.Infow("a signature was refused at the gate", "error", err)
-				return p
-			}
-			p.Bearer = &grant
+		grant, err := h.signedGrant(signed, time.Now())
+		if err != nil {
+			h.logger.Infow("a signature was refused at the gate", "error", err)
+			return p
 		}
+		p.Bearer = &grant
 		return p
 	}
 

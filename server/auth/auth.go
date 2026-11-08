@@ -106,7 +106,9 @@ type Handler struct {
 	assertions spentAssertions
 	// nodes.primary: whose tokens this one also accepts, and what it said of each.
 	issuers []string
-	issued  issuedAnswers
+	// The did:key each issuer says it signs as, asked once (signed.go).
+	issuerDIDs sync.Map
+	issued     issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
 	logsInElsewhere bool
@@ -114,9 +116,7 @@ type Handler struct {
 	// How this primary asks GitHub for a peer (github_for_peers.go).
 	githubForPeers         GitHubGet
 	githubLocationForPeers GitHubLocate
-	// nodes.peers: this primary's peers, by did:key and by name, and the
-	// tokens people are carried to them with.
-	carried  carriedTokens
+	// nodes.peers: this primary's peers, by did:key and by name.
 	nodes    map[string]Client
 	tokens   TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor Attestor   // records admissions; nil until the store is up
