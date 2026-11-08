@@ -10,8 +10,8 @@ import (
 	"github.com/teranos/QNTX/internal/access"
 )
 
-// namespaceAgentDID is the DID the node derives a namespace agent's key under:
-// from its key, for the namespace and the model.
+// 「[Opus 5.5] namespaceAgentDID is the DID the node derives a namespace agent's key under:」
+// 「[Opus 5.5] from its key, for the namespace and the model.」
 func namespaceAgentDID(t *testing.T) string {
 	t.Helper()
 	key, err := access.DeriveKey(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)), "agent:garden:claude-sonnet-5-5")
@@ -22,7 +22,7 @@ func namespaceAgentDID(t *testing.T) string {
 const theGardener = "https://example.org/theGardener"
 
 // namespaceAgentHandler is nodeAgentHandler with the theGardener a USER the node
-// invited: an agent speaks for whoever set it up, and the gate asks that they
+// 「[Opus 5.5] invited: an agent speaks for whoever set it up, and the gate asks that they」
 // are still admitted.
 func namespaceAgentHandler() (*Handler, *memTokenStore) {
 	h, store := nodeAgentHandler(mastodonAccount)
@@ -31,9 +31,9 @@ func namespaceAgentHandler() (*Handler, *memTokenStore) {
 	return h, store
 }
 
-// A namespace agent acts in its namespace and nowhere else, speaking for
-// whoever opted the namespace into it (ADR-048): it attests as its own DID,
-// acts in the namespace, sees no system, and no token is written.
+// 「[Opus 5.5] A namespace agent acts in its namespace and nowhere else, speaking for」
+// 「[Opus 5.5] whoever opted the namespace into it (ADR-048): it attests as its own DID,」
+// 「[Opus 5.5] acts in the namespace, sees no system, and no token is written.」
 func TestANamespaceAgentActsInItsNamespaceAlone(t *testing.T) {
 	h, store := namespaceAgentHandler()
 	did := namespaceAgentDID(t)
@@ -65,7 +65,7 @@ func TestANamespaceAgentSpeaksForWhoeverSetItUp(t *testing.T) {
 	require.Error(t, err)
 }
 
-// A bearer is not a door: nothing presented in a header reaches an agent's grant.
+// 「[Opus 5.5] A bearer is not a door: nothing presented in a header reaches an agent's grant.」
 func TestNothingPresentedReachesAnAgentsGrant(t *testing.T) {
 	h, _ := namespaceAgentHandler()
 	did := namespaceAgentDID(t)
