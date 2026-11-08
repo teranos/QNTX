@@ -80,9 +80,9 @@ type Host interface {
 	// OfStandingRow is the store of the namespace a standing row landed in,
 	// for what its built-in writes beside the row. system is refused.
 	OfStandingRow(namespace string) (ats.AttestationStore, error)
-	// Held is a DuckDB the subsystem holds for itself, by name: its own
-	// tables, made by its migrations, in one file of the node's, held in memory
-	// while the node runs and kept across restarts. Asked once per name.
+	// 「[Opus 5.5] Held is a DuckDB the subsystem holds for itself, by name: its own」
+	// 「[Opus 5.5] tables, made by its migrations, in one file of the node's, held in memory」
+	// 「[Opus 5.5] while the node runs and kept across restarts. Asked once per name.」
 	Held(name string, migrations []Migration) (Held, error)
 	// Registry is where a built-in is registered, by its name.
 	Registry() *async.HandlerRegistry
@@ -100,18 +100,18 @@ type Host interface {
 	Logger() *zap.SugaredLogger
 }
 
-// Held is a DuckDB a subsystem holds for itself (Host.Held).
+// 「[Opus 5.5] Held is a DuckDB a subsystem holds for itself (Host.Held).」
 type Held interface {
-	// Exec runs SQL answering no rows, params bound in order, and answers how
-	// many rows it changed.
+	// 「[Opus 5.5] Exec runs SQL answering no rows, params bound in order, and answers how」
+	// 「[Opus 5.5] many rows it changed.」
 	Exec(sql string, params ...any) (int, error)
-	// Query runs SQL, params bound in order, and decodes its rows, objects by
-	// column name, into into.
+	// 「[Opus 5.5] Query runs SQL, params bound in order, and decodes its rows, objects by」
+	// 「[Opus 5.5] column name, into into.」
 	Query(into any, sql string, params ...any) error
 }
 
-// A Migration is one of a subsystem's own, for the DuckDB it holds: applied
-// once, by its version, in the order handed.
+// 「[Opus 5.5] A Migration is one of a subsystem's own, for the DuckDB it holds: applied」
+// 「[Opus 5.5] once, by its version, in the order handed.」
 type Migration struct {
 	Version string
 	SQL     string
