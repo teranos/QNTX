@@ -46,7 +46,6 @@ type Handler struct {
 	creating sync.Mutex
 	// 「[Opus 5.5] Held across the look-then-write that hands an agent its token, for the」
 	// 「[Opus 5.5] same reason and with the same reach.」
-	handingAgents  sync.Mutex
 	sessions       *sessionStore
 	becomings      becomings
 	layeChallenges layeChallenges
@@ -616,8 +615,6 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
 	mux.answer(deviceApprovePath, h.handleDeviceApprove)
 	mux.answer(deviceDonePath, h.handleDeviceDone)
-	// 「[Opus 5.5] An agent a token starts is handed a token of its own (ADR-025).」
-	mux.answer(agentTokenPath, h.handleAgentToken)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
 	// A peer asks for the lines about the namespaces it serves, signing as itself.
