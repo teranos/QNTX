@@ -45,9 +45,9 @@ func TestThePublicCardDeclaresTheExtendedCard(t *testing.T) {
 	assert.True(t, card.Capabilities.ExtendedAgentCard)
 }
 
-// GetExtendedAgentCard is the card its caller reaches: a skill per signum
-// ROOT's lines reach over A2A, signed with the node's key. It is the card am
-// node shows.
+// 「[Opus 5.5] GetExtendedAgentCard is the card its caller reaches: a skill per signum」
+// 「[Opus 5.5] ROOT's lines reach over A2A, signed with the node's key. It is the card am」
+// 「[Opus 5.5] node shows.」
 func TestTheExtendedCardIsWhatTheCallerReaches(t *testing.T) {
 	namedNode(t)
 	srv, tokens := pluginServingServer(t, "fake")
@@ -81,7 +81,7 @@ func TestTheExtendedCardIsWhatTheCallerReaches(t *testing.T) {
 	assert.NotContains(t, ids, amSignumName, "am is the card, not a skill on it")
 }
 
-// The node serves no agent at a tenant no namespace opted into (§3.3.2).
+// 「[Opus 5.5] The node serves no agent at a tenant no namespace opted into (§3.3.2).」
 func TestNoAgentIsServedAtATenantNamedAnywhere(t *testing.T) {
 	namedNode(t)
 	srv, tokens := pluginServingServer(t, "fake")
