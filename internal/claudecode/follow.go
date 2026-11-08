@@ -155,7 +155,10 @@ func follow(ctx context.Context, stream string, runs func() bool, each func(Mess
 			var m Message
 			// A line that is not a message is nothing the stream promised.
 			if unmarshalErr := json.Unmarshal(partial, &m); unmarshalErr == nil {
-				resulted = resulted || answerFrom(&answer, m)
+				// Every result is taken in: the last one is the answer.
+				if answerFrom(&answer, m) {
+					resulted = true
+				}
 				each(m)
 			}
 			read += int64(len(partial))
@@ -178,6 +181,11 @@ func follow(ctx context.Context, stream string, runs func() bool, each func(Mess
 		gone = !runs()
 		select {
 		case <-ctx.Done():
+			// The node stopping is no reason to drop a result already read: it is
+			// the answer as far as the stream went.
+			if resulted {
+				return answer, ended(stream)
+			}
 			return Answer{}, errors.Wrapf(ctx.Err(), "the stream %s was left to be read on", stream)
 		case <-time.After(followEvery):
 		}

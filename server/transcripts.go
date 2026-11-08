@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,10 +12,12 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // Transcripts are loom's job, done by the node.
@@ -139,11 +142,64 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 	if refused != nil {
 		return nil, refused
 	}
+	if sent["session"] != "" && len(read) == 0 {
+		return s.transcriptAtPeers(caller, sent["session"])
+	}
 	answer := &protocol.Transcripts{Transcripts: make([]*protocol.Transcript, 0, len(read))}
 	for _, t := range read {
 		answer.Transcripts = append(answer.Transcripts, t.message())
 	}
 	return answer, nil
+}
+
+// How long a peer is given to read a session from its own disk, and the most
+// of it that is read back: one session whole.
+const (
+	transcriptAskWithin = 2 * time.Minute
+	transcriptAskBytes  = 256 << 20
+)
+
+// transcriptAtPeers is one session asked for by id and held nowhere here: it is
+// read where it lives. Each namespace a peer serves is asked as the caller,
+// signed for that namespace alone (auth.Handler.AskPeerIn), and the first that
+// holds the session answers. A peer that could not be asked is said, not taken
+// for one that holds nothing.
+func (s *QNTXServer) transcriptAtPeers(caller *http.Request, session string) (any, *protocol.Refusal) {
+	none := &protocol.Transcripts{Transcripts: []*protocol.Transcript{}}
+	if s.authHandler == nil {
+		return none, nil
+	}
+	admitted, gated := auth.AdmissionFrom(caller.Context())
+	if !gated {
+		return none, nil
+	}
+	path := "/api/transcripts?session=" + url.QueryEscape(session)
+	var unasked []string
+	for _, peer := range s.authHandler.Peers() {
+		for _, namespace := range peer.Namespaces {
+			asked := s.authHandler.AskPeerIn(caller.Context(), admitted, peer, namespace, path, transcriptAskWithin, transcriptAskBytes)
+			if asked.Err != nil {
+				unasked = append(unasked, peer.Label+"/"+namespace+": "+asked.Err.Error())
+				continue
+			}
+			if asked.Status != http.StatusOK {
+				unasked = append(unasked, peer.Label+"/"+namespace+" answered "+strconv.Itoa(asked.Status)+": "+string(asked.Body))
+				continue
+			}
+			held := &protocol.Transcripts{}
+			if err := protojson.Unmarshal(asked.Body, held); err != nil {
+				unasked = append(unasked, peer.Label+"/"+namespace+" answered what is no transcript: "+err.Error())
+				continue
+			}
+			if len(held.GetTranscripts()) > 0 {
+				return held, nil
+			}
+		}
+	}
+	if len(unasked) > 0 {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "session " + session + " is held nowhere here, and not every peer could be asked: " + strings.Join(unasked, "; ")}
+	}
+	return none, nil
 }
 
 // humanPredicates are the events a transcript reads as the person speaking.
