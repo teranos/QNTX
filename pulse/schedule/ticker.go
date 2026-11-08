@@ -516,10 +516,10 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 	}
 
 	if err == nil {
-		// Job already exists and is active - return existing job ID. A run still
-		// queued a whole interval later was never taken: on q the wal-checkpoint
-		// run of 2026-11-04 16:31 was found here every hour for three days, and
-		// the schedule recorded a completed execution each time. That is said.
+		// 「[Fable 5.1] Job already exists and is active - return existing job ID. A run still」
+		// 「[Fable 5.1] queued a whole interval later was never taken: on q the wal-checkpoint」
+		// 「[Fable 5.1] run of 2026-11-04 16:31 was found here every hour for three days, and」
+		// 「[Fable 5.1] the schedule recorded a completed execution each time. That is said.」
 		waited := time.Since(existingJob.CreatedAt)
 		if existingJob.Status == async.JobStatusQueued && waited > time.Duration(scheduled.IntervalSeconds)*time.Second {
 			t.pulseLog.Warnw("A scheduled run is still queued from an earlier tick; nothing ran",
