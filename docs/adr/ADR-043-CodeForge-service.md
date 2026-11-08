@@ -74,3 +74,7 @@ none. A run counts for the plugin only on that repository and that branch.
 "depending on who does it, the namespace will take it from that user"
 
 
+---
+
+- REPO1: Explore [[Repository Agent]] idea
+- REPO2: The Repository as a proper abstraction for interacting with, for Agents alike. 
