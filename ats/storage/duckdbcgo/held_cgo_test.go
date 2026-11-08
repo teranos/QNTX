@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// A subsystem's own table, made by its migration, holds what was written
-// across a close and an open.
+// 「[Opus 5.5] A subsystem's own table, made by its migration, holds what was written」
+// 「[Opus 5.5] across a close and an open.」
 func TestAHeldDuckDBKeepsItsRowsAcrossOpens(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "subsystems", "quotes.duckdb")
 	migrations := []HeldMigration{{Version: "quotes-001", SQL: "CREATE TABLE reads (id VARCHAR PRIMARY KEY, doc VARCHAR, read_at BIGINT);"}}
@@ -39,7 +39,7 @@ func TestAHeldDuckDBKeepsItsRowsAcrossOpens(t *testing.T) {
 	}
 }
 
-// What DuckDB refused rides back as the error.
+// 「[Opus 5.5] What DuckDB refused rides back as the error.」
 func TestAHeldDuckDBSaysWhatItRefused(t *testing.T) {
 	held, err := OpenHeld(filepath.Join(t.TempDir(), "q.duckdb"), nil)
 	if err != nil {
