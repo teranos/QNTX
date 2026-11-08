@@ -50,8 +50,8 @@ func TestANodeWithNoPeersAsksNobody(t *testing.T) {
 	assert.Empty(t, primary.AskPeers(context.Background(), admitted, "/am/statusline?format=json"))
 }
 
-// A peer is asked as the person acting in one namespace it serves: what the
-// primary signs names that one, so the peer reads where it was asked to.
+// 「[Opus 5.5] A peer is asked as the person acting in one namespace it serves: what the」
+// 「[Opus 5.5] primary signs names that one, so the peer reads where it was asked to.」
 func TestAPeerIsAskedInOneNamespaceItServes(t *testing.T) {
 	primary, got, _ := anyPeer(t)
 	admitted := Admitted(LevelRoot)
@@ -72,7 +72,7 @@ func TestAPeerIsAskedInOneNamespaceItServes(t *testing.T) {
 	assert.Equal(t, []string{NamespaceDefault}, claims.Namespaces)
 }
 
-// A namespace the peer is not declared serving is not asked in.
+// 「[Opus 5.5] A namespace the peer is not declared serving is not asked in.」
 func TestAPeerIsNotAskedInANamespaceItDoesNotServe(t *testing.T) {
 	primary, got, _ := anyPeer(t)
 	admitted := Admitted(LevelRoot)
@@ -83,7 +83,7 @@ func TestAPeerIsNotAskedInANamespaceItDoesNotServe(t *testing.T) {
 	assert.Empty(t, got.path, "the peer was asked in a namespace it does not serve")
 }
 
-// An answer longer than the most asked for is an error, never an answer cut short.
+// 「[Opus 5.5] An answer longer than the most asked for is an error, never an answer cut short.」
 func TestAnAnswerPastWhatWasAskedForIsAnError(t *testing.T) {
 	_, did := otherNode(t)
 	primary, _, _ := authorizingHandler(t)
