@@ -12,8 +12,8 @@ import (
 	"github.com/teranos/QNTX/internal/access"
 )
 
-// "find a way to sign the request?"
-// qntx sign prints what one request to a node goes with, for curl's -H.
+// "「[Sonnet 5.5] find a way to sign the request?」"
+// 「[Sonnet 5.5] qntx sign prints what one request to a node goes with, for curl's -H.」
 func TestSignPrintsWhatOneRequestGoesWith(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
