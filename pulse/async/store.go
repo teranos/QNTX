@@ -214,18 +214,18 @@ func (s *Store) UpdateJob(job *Job) error {
 // newestInStatus is where ListJobs reads, read in order from an index rather than sorted.
 const newestInStatus = `FROM async_ix_jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?`
 
-// longestUntouchedInStatus is what has gone longest since anything touched it,
-// read in order from idx_async_ix_jobs_status_updated (090). A job just put
-// back in the queue has a fresh updated_at and so stands behind every other.
+// 「[Fable 5.1] longestUntouchedInStatus is what has gone longest since anything touched it,」
+// 「[Fable 5.1] read in order from idx_async_ix_jobs_status_updated (090). A job just put」
+// 「[Fable 5.1] back in the queue has a fresh updated_at and so stands behind every other.」
 const longestUntouchedInStatus = `FROM async_ix_jobs WHERE status = ? ORDER BY updated_at ASC LIMIT ?`
 
-// OldestQueued is the queued job that has waited longest since it was last
-// touched, and ErrJobNotFound when none is queued. The worker takes this one:
-// on q the hourly wal-checkpoint run JB-WALCHECK-PROCES--ZRK5KZKG sat queued
-// from 2026-11-04 16:31 while the worker took every newer job first, and 12,915
-// forwards sat with it. Oldest by created_at alone was the next failure: a job
-// put back for a handler that never registers (plugin.update, dead since
-// 2026-10-01) was taken again every five seconds and nothing behind it ran.
+// 「[Fable 5.1] OldestQueued is the queued job that has waited longest since it was last」
+// 「[Fable 5.1] touched, and ErrJobNotFound when none is queued. The worker takes this one:」
+// 「[Fable 5.1] on q the hourly wal-checkpoint run JB-WALCHECK-PROCES--ZRK5KZKG sat queued」
+// 「[Fable 5.1] from 2026-11-04 16:31 while the worker took every newer job first, and 12,915」
+// 「[Fable 5.1] forwards sat with it. Oldest by created_at alone was the next failure: a job」
+// 「[Fable 5.1] put back for a handler that never registers (plugin.update, dead since」
+// 「[Fable 5.1] 2026-10-01) was taken again every five seconds and nothing behind it ran.」
 func (s *Store) OldestQueued() (*Job, error) {
 	jobs, err := s.listJobs(`SELECT `+StandardJobSelectColumns()+` `+longestUntouchedInStatus, JobStatusQueued, 1)
 	if err != nil {
