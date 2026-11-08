@@ -95,8 +95,8 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 
 // carriedSignature is the Authorization a request carrying identity to peer
 // goes with: this node signing, as its own did:key, who the person is, for that
-// peer alone and for one request. What it names is where the peer lets them act:
-// the namespaces handed in, of those the peer serves.
+// 「[Opus 5.5] peer alone and for one request. What it names is where the peer lets them act:」
+// 「[Opus 5.5] the namespaces handed in, of those the peer serves.」
 //
 // "A signature proves the key, and nothing reusable leaves the node."
 func (h *Handler) carriedSignature(identity, name string, peer Client, namespaces []string, now time.Time) (string, error) {
