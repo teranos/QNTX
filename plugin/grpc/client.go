@@ -409,6 +409,18 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		config[key] = pluginConfig.GetString(key)
 	}
 
+	// The node's Sentry goes to a plugin whose schema names it. A plugin that
+	// cannot say its schema is handed no DSN; its events are not worth failing
+	// the Initialize for.
+	if node := nodeTelemetry(); node.DSN != "" && c.client != nil {
+		if schema, err := c.ConfigSchema(ctx); err != nil {
+			c.logger.Warnw("The node's Sentry was not handed: the plugin's config schema was not read",
+				"plugin", c.metadata.Name, "error", err)
+		} else {
+			handNodeTelemetry(config, schema.GetFields(), node)
+		}
+	}
+
 	// The services every plugin is joined by, and the token, as the node's
 	// config hands them: one the node is not running fails Err below.
 	atsStoreEndpoint := pluginConfig.GetString("_ats_store_endpoint")
