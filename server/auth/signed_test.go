@@ -14,12 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 
 const signedNodeOrigin = "https://node.example"
 
-// signingNode is a node holding a grant for a key that never left its holder:
-// the record names the DID and nothing that can be presented.
+// 「[Opus 5.5] signingNode is a node holding a grant for a key that never left its holder:」
+// 「[Opus 5.5] the record names the DID and nothing that can be presented.」
 func signingNode(t *testing.T) (h *Handler, store *memTokenStore, key ed25519.PrivateKey, did string, id string) {
 	t.Helper()
 	store = newMemTokenStore()
@@ -35,7 +35,7 @@ func signingNode(t *testing.T) (h *Handler, store *memTokenStore, key ed25519.Pr
 	return h, store, key, did, id
 }
 
-// signature is what a holder of key sends: a fresh JWT for one request.
+// 「[Opus 5.5] signature is what a holder of key sends: a fresh JWT for one request.」
 func signature(t *testing.T, key ed25519.PrivateKey, did, audience string, lasts time.Duration) string {
 	t.Helper()
 	jti := make([]byte, assertionIDBytes)
@@ -110,7 +110,7 @@ func TestASignatureOfASwitchedOffGrantIsRefused(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// A grant held for a signature names nothing a bearer can present.
+// 「[Opus 5.5] A grant held for a signature names nothing a bearer can present.」
 func TestAGrantHeldForASignatureAdmitsNoBearer(t *testing.T) {
 	h, _, _, did, _ := signingNode(t)
 	for _, presented := range []string{signedOnly(did), did, "signed:" + did} {
