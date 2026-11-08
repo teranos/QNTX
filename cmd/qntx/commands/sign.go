@@ -6,12 +6,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// "find a way to sign the request?"
+// "「[Sonnet 5.5] find a way to sign the request?」"
 //
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 
-// SignCmd prints the Authorization one request to a node goes with: a JWT the
-// key kept in ~/.qntx/key signs for that node, spent once there.
+// 「[Sonnet 5.5] SignCmd prints the Authorization one request to a node goes with: a JWT the」
+// 「[Sonnet 5.5] key kept in ~/.qntx/key signs for that node, spent once there.」
 var SignCmd = &cobra.Command{
 	Use:   "sign URL",
 	Short: "What one request to a node is signed with, for curl -H",
