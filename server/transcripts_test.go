@@ -247,9 +247,9 @@ func TestTranscriptsFollowTEI(t *testing.T) {
 	}, departed)
 }
 
-// A session held nowhere here is read where it lives: each namespace a peer
-// serves is asked as the caller, signed for that namespace, and the one that
-// holds it answers.
+// 「[Opus 5.5] A session held nowhere here is read where it lives: each namespace a peer」
+// 「[Opus 5.5] serves is asked as the caller, signed for that namespace, and the one that」
+// 「[Opus 5.5] holds it answers.」
 func TestASessionHeldAtAPeerIsReadThere(t *testing.T) {
 	var asked []string
 	held := &protocol.Transcripts{Transcripts: []*protocol.Transcript{{Session: "s-9", Turns: []*protocol.Turn{{Speaker: "human", Text: "read it"}}}}}
@@ -285,7 +285,7 @@ func TestASessionHeldAtAPeerIsReadThere(t *testing.T) {
 	assert.Equal(t, []string{"/api/transcripts?session=s-9"}, asked)
 }
 
-// A peer that could not be asked is said: it is not taken for one that holds nothing.
+// 「[Opus 5.5] A peer that could not be asked is said: it is not taken for one that holds nothing.」
 func TestAPeerThatCouldNotBeAskedIsSaid(t *testing.T) {
 	gone := httptest.NewServer(http.NotFoundHandler())
 	gone.Close()
