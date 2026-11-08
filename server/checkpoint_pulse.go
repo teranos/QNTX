@@ -156,10 +156,10 @@ func (s *QNTXServer) keepCheckpointing(handler *checkpointHandler) {
 
 // keepCleaningJobs removes completed and failed jobs older than jobsKeptFor, in
 // passes of jobsRemovedPerPass, and the pulse executions of the same age, so an
-// execution never points at a job that is gone. A forward goes with them: its
-// row refuses a redelivery, and GitHub redelivers only what it sent within
-// three days; a forward is dropped or done within forwardKeptFor. On q the rows
-// kept for every forward stood at 31,054 on 2026-11-08 (#1586).
+// 「[Opus 5.5] execution never points at a job that is gone. A forward goes with them: its」
+// 「[Opus 5.5] row refuses a redelivery, and GitHub redelivers only what it sent within」
+// 「[Opus 5.5] three days; a forward is dropped or done within forwardKeptFor. On q the rows」
+// 「[Opus 5.5] kept for every forward stood at 31,054 on 2026-11-08 (#1586).」
 func (s *QNTXServer) keepCleaningJobs() {
 	if s.daemon == nil {
 		return
