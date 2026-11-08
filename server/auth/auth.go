@@ -288,8 +288,8 @@ func (h *Handler) SetNodeKey(key ed25519.PrivateKey) {
 func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) http.HandlerFunc {
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
-		// The served request's span is named by its route, so what a caller
-		// was answered is read in the trace and not in the node's log.
+		// 「[Opus 5.5] The served request's span is named by its route, so what a caller」
+		// 「[Opus 5.5] was answered is read in the trace and not in the node's log.」
 		span := trace.SpanFromContext(r.Context())
 		span.SetName(r.Method + " " + route)
 		span.SetAttributes(attribute.String("http.route", route))
@@ -834,7 +834,7 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 	http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.String()), http.StatusSeeOther)
 }
 
-// refusedOn puts why the gate refused a request on the request's span.
+// 「[Opus 5.5] refusedOn puts why the gate refused a request on the request's span.」
 func refusedOn(r *http.Request, why string) {
 	trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("qntx.refused", why))
 }
