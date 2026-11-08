@@ -86,7 +86,7 @@ func TestGitAsksTheHelperTheNodeConfigured(t *testing.T) {
 
 	args, err := os.ReadFile(filepath.Join(dir, "args"))
 	require.NoError(t, err)
-	assert.Equal(t, "git\ncredential\n--to\nhttp://127.0.0.1:8770\nget\n", string(args))
+	assert.Equal(t, "git\ncredential\n--door\n--to\nhttp://127.0.0.1:8770\nget\n", string(args))
 	asked, err := os.ReadFile(filepath.Join(dir, "asked"))
 	require.NoError(t, err)
 	assert.Contains(t, string(asked), "host=github.com\n")

@@ -361,7 +361,10 @@ func TestTheNodeAgentIsGivenTheServerROOTConnectedAndCallsIt(t *testing.T) {
 	require.Nil(t, refused)
 	require.Len(t, listedServers.([]consumedServer), 1, "a call line is no server: the server the node consumes is still listed")
 
-	stranger, err := http.Post(given[0].URL, "application/json", strings.NewReader(`{}`))
+	// At the node's own address nobody reaches the server without a credential.
+	// The agent's door admits whoever reaches its loopback port: what arrives
+	// there is taken to be the agent (agent_door.go).
+	stranger, err := http.Post(node.URL+ConsumedServedAt+"tracker", "application/json", strings.NewReader(`{}`))
 	require.NoError(t, err)
 	_ = stranger.Body.Close()
 	assert.Equal(t, http.StatusUnauthorized, stranger.StatusCode, "nobody reaches the server the node consumes without a credential")

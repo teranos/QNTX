@@ -165,16 +165,15 @@ func TestANamespaceOptsIntoAnAgentOfItsOwn(t *testing.T) {
 	assert.Equal(t, am.GetAgent().GetDid(), again.GetAgent().GetDid(), "one agent per namespace and model, wherever it is asked for")
 	holds(t, s.agentsSignum(), "am", again)
 
-	// Its token is held at the gate: a TOKEN in garden alone, speaking for
-	// whoever set it up, attesting as the agent.
+	// It reaches the node at a door of its own, and no token is written for it.
+	//
+	// "i dont want agents to ever thing they are blcoked"
 	held, err := in.tokens.List()
 	require.NoError(t, err)
-	require.Len(t, held, 1)
-	assert.Equal(t, "agent:garden:claude-sonnet-5-5", held[0].Label)
-	assert.Equal(t, auth.LevelToken, held[0].Level)
-	assert.Equal(t, []string{"garden"}, held[0].Namespaces)
-	assert.Equal(t, am.GetAgent().GetDid(), held[0].DID)
-	assert.Equal(t, "https://example.org/root", held[0].MintedBy)
+	assert.Empty(t, held, "a token was written for the namespace agent")
+	agent, opened := s.namespaceAgents.of(agentPurpose("garden", "claude-sonnet-5-5"))
+	require.True(t, opened)
+	assert.True(t, strings.HasPrefix(agent.door, "http://127.0.0.1:"), "the namespace agent has no door: %q", agent.door)
 }
 
 // A node without auth has no gate to hold the agent's token, and would admit
