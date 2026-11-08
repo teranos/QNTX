@@ -156,6 +156,7 @@ func init() {
 	rootCmd.AddCommand(commands.HandlerCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
+	rootCmd.AddCommand(commands.SignCmd)
 	rootCmd.AddCommand(commands.VersionCmd)
 }
 
