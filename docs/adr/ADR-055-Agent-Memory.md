@@ -94,3 +94,5 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 "there needs to be a process"
 「[Fable] Every row of ground's own attestations table carries qntx_at, qntx_status and qntx_reason: what ground sees is written to a node.」
 
+---
+
