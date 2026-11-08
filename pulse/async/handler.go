@@ -131,9 +131,9 @@ func NewRegistryExecutor(registry *HandlerRegistry, fallback JobExecutor) *Regis
 	}
 }
 
-// HandlerGrace is how long after a job's creation its handler may still be
-// absent and the job put back: plugins register their handlers after the node
-// starts taking jobs. Past it, a job with no handler fails.
+// 「[Fable 5.1] HandlerGrace is how long after a job's creation its handler may still be」
+// 「[Fable 5.1] absent and the job put back: plugins register their handlers after the node」
+// 「[Fable 5.1] starts taking jobs. Past it, a job with no handler fails.」
 const HandlerGrace = time.Hour
 
 // ErrHandlerNotRegistered is returned when no handler exists for a job's handler name.

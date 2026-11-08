@@ -1123,8 +1123,8 @@ func TestYugiDrawsTheOldestQueuedJob(t *testing.T) {
 	}
 }
 
-// A job put back in the queue is touched, and stands behind every other queued
-// job: the worker does not take it again at once.
+// 「[Fable 5.1] A job put back in the queue is touched, and stands behind every other queued」
+// 「[Fable 5.1] job: the worker does not take it again at once.」
 func TestAJobPutBackStandsBehindTheOthers(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
@@ -1143,7 +1143,7 @@ func TestAJobPutBackStandsBehindTheOthers(t *testing.T) {
 	if err != nil || first.ID != "JOB_NO_HANDLER" {
 		t.Fatalf("first Dequeue = %v, %v; want JOB_NO_HANDLER", first, err)
 	}
-	// What the worker does for a handler not yet registered.
+	// 「[Fable 5.1] What the worker does for a handler not yet registered.」
 	first.Status, first.UpdatedAt = JobStatusQueued, time.Now()
 	if err := queue.UpdateJob(first); err != nil {
 		t.Fatalf("UpdateJob: %v", err)
