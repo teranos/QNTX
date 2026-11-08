@@ -8,6 +8,8 @@ this doc has an identity crisis
 Access Tokens for Machine and Agent Access
 
 
+I WANT TO KILL THIS IDEA, I DONT WANT TO MAINTAIN TOKENS, AGENNTS KEEP R
+
 
 ## Context
 
