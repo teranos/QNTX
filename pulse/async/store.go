@@ -439,9 +439,9 @@ func (s *Store) CleanupOldJobs(olderThan time.Duration, atMost int, keep ...stri
 	return int(rows), nil
 }
 
-// CancelQueuedBefore cancels at most atMost queued jobs of handler created before
-// cutoff, with reason as their error, and answers them as they now stand. A
-// queued job the worker never reached is not run late; it is dropped, and said.
+// 「[Fable 5.1] CancelQueuedBefore cancels at most atMost queued jobs of handler created before」
+// 「[Fable 5.1] cutoff, with reason as their error, and answers them as they now stand. A」
+// 「[Fable 5.1] queued job the worker never reached is not run late; it is dropped, and said.」
 func (s *Store) CancelQueuedBefore(handler string, cutoff time.Time, reason string, atMost int) ([]*Job, error) {
 	jobs, err := s.listJobs(`SELECT `+StandardJobSelectColumns()+`
 		FROM async_ix_jobs WHERE handler_name = ? AND status = ? AND created_at < ?
@@ -463,8 +463,8 @@ func (s *Store) CancelQueuedBefore(handler string, cutoff time.Time, reason stri
 		marks = append(marks, "?")
 		args = append(args, job.ID)
 	}
-	// status = queued again: a job the worker took between the read and here is
-	// its, not this pass's.
+	// 「[Fable 5.1] status = queued again: a job the worker took between the read and here is」
+	// 「[Fable 5.1] its, not this pass's.」
 	args = append(args, JobStatusQueued)
 	result, err := s.db.Exec(`
 		UPDATE async_ix_jobs
