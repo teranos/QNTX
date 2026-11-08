@@ -47,7 +47,7 @@ func aPeer(t *testing.T, answer func(p *standInPeer, w http.ResponseWriter, orig
 	return p
 }
 
-// orchardsCard is orchard's agent card as the peer serves it.
+// 「[Opus 5.5] orchardsCard is orchard's agent card as the peer serves it.」
 func orchardsCard(origin string) *a2asdk.AgentCard {
 	return agentCard{Name: "the agent of orchard, claude-sonnet-5-5", Description: "The namespace agent.", Version: "1.0.0",
 		URL: origin + "/a2a", Tenant: "orchard", OutputModes: cardModes,
@@ -55,7 +55,7 @@ func orchardsCard(origin string) *a2asdk.AgentCard {
 	}.sdk()
 }
 
-// signed is card signed by key under the peer's key id, as a2a-go signs it.
+// 「[Opus 5.5] signed is card signed by key under the peer's key id, as a2a-go signs it.」
 func (p *standInPeer) signed(t *testing.T, card *a2asdk.AgentCard, key ed25519.PrivateKey) *a2asdk.AgentCard {
 	t.Helper()
 	signer, err := a2acrypto.NewSigner(a2acrypto.SignerConfig{PrivateKey: key, KeyID: nodedid.KeyIDOf(p.did)})
