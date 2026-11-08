@@ -141,8 +141,8 @@ func (h linkedHost) Held(name string, migrations []subsystem.Migration) (subsyst
 	return openHeld(path, migrations)
 }
 
-// heldPath is where a subsystem's own DuckDB is kept: subsystems/<name>.duckdb
-// beside the node's database. The name is one segment of a path.
+// 「[Opus 5.5] heldPath is where a subsystem's own DuckDB is kept: subsystems/<name>.duckdb」
+// 「[Opus 5.5] beside the node's database. The name is one segment of a path.」
 func heldPath(dbPath, name string) (string, error) {
 	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\'`) {
 		return "", errors.Newf("%q names no file a subsystem's DuckDB can be kept in", name)
