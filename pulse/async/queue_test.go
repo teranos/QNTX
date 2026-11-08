@@ -93,8 +93,8 @@ func TestYugiDequeuesJob(t *testing.T) {
 	t.Log("  'It's time to duel!' *drew card job successfully*")
 }
 
-// TestTASBotJobPriority tests that the job that waited longest is dequeued first.
-// There is no priority on a job; what TAS Bot enqueued first, Yugi draws first.
+// 「[Fable 5.1] TestTASBotJobPriority tests that the job that waited longest is dequeued first.」
+// 「[Fable 5.1] There is no priority on a job; what TAS Bot enqueued first, Yugi draws first.」
 func TestTASBotJobPriority(t *testing.T) {
 	t.Log("🎮 TAS Bot tests job ordering...")
 	t.Log("   'The job that waited longest executes first'")
@@ -128,7 +128,7 @@ func TestTASBotJobPriority(t *testing.T) {
 	}
 	queue.Enqueue(highPriorityJob)
 
-	// Yugi dequeues - the job enqueued first has waited longest and comes first
+	// 「[Fable 5.1] Yugi dequeues - the job enqueued first has waited longest and comes first」
 	firstJob, err := queue.Dequeue()
 	if err != nil {
 		t.Fatalf("Failed to dequeue first job: %v", err)
@@ -370,7 +370,7 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
-	// TAS Bot enqueues multiple jobs in sequence; Yugi draws them in that order.
+	// 「[Fable 5.1] TAS Bot enqueues multiple jobs in sequence; Yugi draws them in that order.」
 	jobs := []Job{
 		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CreatedAt: time.Now().Add(time.Millisecond), UpdatedAt: time.Now().Add(time.Millisecond)},
@@ -386,7 +386,7 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 		time.Sleep(5 * time.Millisecond) // Ensure distinct timestamps
 	}
 
-	// Yugi processes jobs in the order they were enqueued: the one that waited longest first
+	// 「[Fable 5.1] Yugi processes jobs in the order they were enqueued: the one that waited longest first」
 	processedOrder := []string{}
 	for i := 0; i < 3; i++ {
 		job, err := queue.Dequeue()
@@ -400,7 +400,7 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 		t.Logf("  Yugi: Processed %s", job.ID)
 	}
 
-	// Verify the order: first enqueued is first dequeued
+	// 「[Fable 5.1] Verify the order: first enqueued is first dequeued」
 	expectedOrder := []string{"JOB_INT_001", "JOB_INT_002", "JOB_INT_003"}
 	for i, expected := range expectedOrder {
 		if processedOrder[i] != expected {
@@ -1093,7 +1093,7 @@ func TestOneCountAnswersEveryAskUntilAWrite(t *testing.T) {
 
 // "we also need to fix the actual issue, why is pulse failing in the first place"
 //
-// The worker takes the job that waited longest; a newer one does not jump it.
+// 「[Fable 5.1] The worker takes the job that waited longest; a newer one does not jump it.」
 func TestYugiDrawsTheOldestQueuedJob(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
