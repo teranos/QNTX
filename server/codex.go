@@ -92,8 +92,8 @@ func (s *QNTXServer) codexPart(named appcfg.CodexConfig, agent *rootAgent) (aTur
 		return aTurn{}, &protocol.Refusal{Why: sigil.Failed, Says: "this node knows no URL of its own, where codex reaches its gateway"}
 	}
 	var binary string
-	// Codex names a key for the gateway, and is handed the agent's DID, which is
-	// no secret: the door admits the agent, not what it presents.
+	// 「[Opus 5.5] Codex names a key for the gateway, and is handed the agent's DID, which is」
+	// 「[Opus 5.5] no secret: the door admits the agent, not what it presents.」
 	key := agent.did
 	threads := filepath.Join(agent.home, codexThreadFile)
 	return aTurn{
