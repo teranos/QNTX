@@ -165,7 +165,7 @@ func TestANamespaceOptsIntoAnAgentOfItsOwn(t *testing.T) {
 	assert.Equal(t, am.GetAgent().GetDid(), again.GetAgent().GetDid(), "one agent per namespace and model, wherever it is asked for")
 	holds(t, s.agentsSignum(), "am", again)
 
-	// It reaches the node at a door of its own, and no token is written for it.
+	// 「[Opus 5.5] It reaches the node at a door of its own, and no token is written for it.」
 	//
 	// "i dont want agents to ever thing they are blcoked"
 	held, err := in.tokens.List()
@@ -259,7 +259,7 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 
 	// "i wanted ground for the namespace agent under claude first"
 
-	// Its hooks run its own ground, first on its PATH, and ground reports at the agent's door, presenting nothing.
+	// 「[Opus 5.5] Its hooks run its own ground, first on its PATH, and ground reports at the agent's door, presenting nothing.」
 	_, held := s.namespaceAgents.of(agentPurpose("garden", "claude-sonnet-5-5"))
 	require.True(t, held)
 	for _, line := range env {
