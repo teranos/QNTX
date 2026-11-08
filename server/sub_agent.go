@@ -138,8 +138,8 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 }
 
 // nameNodeAgent makes the Node Agent this node's: a key of its own from the
-// node's, and a door of its own the gate admits it at. A node with no login
-// has no gate to open one at.
+// 「[Opus 5.5] node's, and a door of its own the gate admits it at. A node with no login」
+// 「[Opus 5.5] has no gate to open one at.」
 func (s *QNTXServer) nameNodeAgent(home string) error {
 	agent, err := theNodeAgent(s.nodeDID.PrivateKey, home)
 	if err != nil {
