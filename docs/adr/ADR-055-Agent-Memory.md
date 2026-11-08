@@ -13,9 +13,9 @@ https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/CO.html#COHQQ
 https://platform.claude.com/dashboard
 
 - [ ] Integrate with Claude Console API's 'Memory store'
-- And later 'dreams' as well
+- [ ] And later 'dreams' as well
 
-- Interesting to think about an [[ADR-049-Obsidian|Obsidian]] linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory.
+- [ ] Interesting to think about an [[ADR-049-Obsidian|Obsidian]] linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory.
 
 bidirectional sync between our abstraction of the memory store.
 
