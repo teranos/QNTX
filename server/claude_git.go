@@ -47,8 +47,8 @@ func (a *rootAgent) writeGitConfig(name, email, qntx, node string) (string, erro
 }
 
 // gitEnvironment is what the agent's process is handed so that its git is its
-// own: the configuration above, whose credential helper asks the node at the
-// agent's door and presents nothing.
+// 「[Opus 5.5] own: the configuration above, whose credential helper asks the node at the」
+// 「[Opus 5.5] agent's door and presents nothing.」
 func (s *QNTXServer) gitEnvironment(agent *rootAgent) ([]string, error) {
 	qntx, err := os.Executable()
 	if err != nil {
