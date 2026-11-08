@@ -156,8 +156,10 @@ func (s *QNTXServer) keepCheckpointing(handler *checkpointHandler) {
 
 // keepCleaningJobs removes completed and failed jobs older than jobsKeptFor, in
 // passes of jobsRemovedPerPass, and the pulse executions of the same age, so an
-// execution never points at a job that is gone. Forwards stay: their rows are
-// the ledger of what a delivery already reached.
+// execution never points at a job that is gone. A forward goes with them: its
+// row refuses a redelivery, and GitHub redelivers only what it sent within
+// three days; a forward is dropped or done within forwardKeptFor. On q the rows
+// kept for every forward stood at 31,054 on 2026-11-08 (#1586).
 func (s *QNTXServer) keepCleaningJobs() {
 	if s.daemon == nil {
 		return
@@ -187,7 +189,7 @@ func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
 	}
 	removed := 0
 	for {
-		n, err := s.daemon.GetQueue().Cleanup(s.ctx, jobsKeptFor, jobsRemovedPerPass, forwardHandlerName)
+		n, err := s.daemon.GetQueue().Cleanup(s.ctx, jobsKeptFor, jobsRemovedPerPass)
 		if err != nil {
 			log.Errorw("Old jobs were not removed", "kept_for", jobsKeptFor.String(), "removed_before", removed, "error", err)
 			return
