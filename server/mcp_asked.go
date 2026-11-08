@@ -16,6 +16,11 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/teranos/QNTX/internal/measure"
 	"go.uber.org/zap"
@@ -99,7 +104,13 @@ func (a *mcpAsked) recording(tool string, handler mcp.ToolHandler) mcp.ToolHandl
 			traceparent, _ = req.Params.Meta["traceparent"].(string)
 		}
 		a.begins(tool, traceparent)
+		ctx, span := otel.Tracer("qntx/mcp").Start(ctx, "mcp "+tool,
+			trace.WithAttributes(attribute.String("mcp.tool.name", tool)))
+		defer span.End()
 		result, err := handler(withMCPAsked(ctx, a), req)
+		if result != nil && result.IsError {
+			span.SetStatus(codes.Error, "the tool answered an error")
+		}
 		// An answer the MCP server cannot marshal is answered to nobody: it
 		// writes no response at all, and the caller waits until it gives up.
 		if result != nil {
