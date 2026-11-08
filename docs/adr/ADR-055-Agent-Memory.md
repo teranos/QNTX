@@ -89,10 +89,8 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 - [ ] 「[Fable 5.1] The signum that keeps a Quote, so the node holds it to tei.」
 - [ ] 「[Fable 5.1] C2PA, for the material a quote arrives in, pinned as TEI is.」
 
-## 「[Opus 5.5] The process」
+---
 
 "there needs to be a process"
-
-"「[Opus 5.5] it doesnt run one today」"
 「[Fable] Every row of ground's own attestations table carries qntx_at, qntx_status and qntx_reason: what ground sees is written to a node.」
 
