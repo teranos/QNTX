@@ -77,7 +77,7 @@ func TestWhatIsSaidToCodexIsAnsweredByCodex(t *testing.T) {
 	home := s.nodeAgent.home
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "CODEX_HOME="+filepath.Join(home, "codex"))
-	// Codex names a key for the gateway, and is handed the agent's DID: no secret.
+	// 「[Opus 5.5] Codex names a key for the gateway, and is handed the agent's DID: no secret.」
 	assert.Contains(t, env, "CODEX_API_KEY="+s.nodeAgent.did)
 
 	config, err := os.ReadFile(filepath.Join(home, "codex", "config.toml"))
