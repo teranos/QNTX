@@ -84,6 +84,12 @@ func (s *QNTXServer) openDoor(agent *rootAgent, grant auth.Grant, keepIn string)
 	door.grant.store(grant)
 	served := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// The door opens when the agent is named, which is before the node
+			// serves anything: until it does, the agent is told so.
+			if s.served == nil {
+				http.Error(w, "the node does not serve yet", http.StatusServiceUnavailable)
+				return
+			}
 			s.served.ServeHTTP(w, r.WithContext(auth.ThroughDoor(r.Context(), door.grant.load())))
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
