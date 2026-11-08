@@ -38,8 +38,8 @@ func namedNode(t *testing.T) {
 	})
 }
 
-// A stranger is served the card whole: the signa named for it in their
-// order, each requiring the bearer token, and the node extension.
+// 「[Opus 5.5] A stranger is served the card whole: the signa named for it in their」
+// 「[Opus 5.5] order, each requiring the bearer token, and the node extension.」
 func TestTheAgentCardIsServedToAnyone(t *testing.T) {
 	namedNode(t)
 	srv, _ := pluginServingServer(t, "fake")
