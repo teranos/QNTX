@@ -365,9 +365,9 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 	}
 	// "Tokens are to be removed from QNTX except for third-party OAuth clients"
 	//
-	// Anthropic reaches the node from outside, as a third party: what its Vault
-	// holds is an OAuth client's credential (mcp_oauth), and none is issued to
-	// an element agent at Anthropic yet. Nothing is handed over in its place.
+	// 「[Opus 5.5] Anthropic reaches the node from outside, as a third party: what its Vault」
+	// 「[Opus 5.5] holds is an OAuth client's credential (mcp_oauth), and none is issued to」
+	// 「[Opus 5.5] an element agent at Anthropic yet. Nothing is handed over in its place.」
 	if held.Vault == "" {
 		return managedOf{}, errors.Newf("the element %s at Anthropic reaches the node as a third-party OAuth client, and no OAuth credential is issued to it yet: no token is put in a Vault for it", agent.element)
 	}
