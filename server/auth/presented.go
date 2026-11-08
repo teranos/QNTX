@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"time"
 )
 
 // What a request carries, and the only place a request is read for it.
@@ -74,6 +75,20 @@ func (h *Handler) presented(r *http.Request) Presented {
 	p.pendingToken = heldPending(r)
 	if half, live := h.pendingLogins.peek(p.pendingToken); live {
 		p.Pending, p.PendingLive, p.pending = half.identity, true, half
+	}
+
+	if signed, ok := signedAssertion(r); ok {
+		p.bearerPresented = true
+		h.asBecome(&p)
+		if h.tokens != nil {
+			grant, err := h.signedGrant(signed, time.Now())
+			if err != nil {
+				h.logger.Infow("a signature was refused at the gate", "error", err)
+				return p
+			}
+			p.Bearer = &grant
+		}
+		return p
 	}
 
 	if raw, ok := bearerToken(r); ok {
