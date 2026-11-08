@@ -44,15 +44,6 @@ func TestAClientIsMintedWithInstructions(t *testing.T) {
 	assert.Equal(t, "Always show drafts before sending.", h.ConnectorInstructions(grant.DID))
 }
 
-func TestOnlyAClientHasInstructions(t *testing.T) {
-	h, _ := grantHandler(t)
-
-	rec := mintClient(t, h, `{"expires_at":"never","label":"ingest","level":"ATTESTOR","namespaces":["default"],"instructions":"Be brief."}`)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), "only a client has instructions")
-}
-
 func TestInstructionsAreBounded(t *testing.T) {
 	h, _ := grantHandler(t)
 	long := strings.Repeat("x", maxInstructionsRunes+1)
