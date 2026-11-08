@@ -73,8 +73,8 @@ func (s *QNTXServer) groundTheAgents() {
 	}
 }
 
-// groundAgent builds the ground of the agent in home, unless it runs under one
-// that reaches the node where the agent does, whose settings it then writes again.
+// 「[Opus 5.5] groundAgent builds the ground of the agent in home, unless it runs under one」
+// 「[Opus 5.5] that reaches the node where the agent does, whose settings it then writes again.」
 func (s *QNTXServer) groundAgent(home string) {
 	reach := s.groundReach(home)
 	build := func() {
@@ -86,9 +86,9 @@ func (s *QNTXServer) groundAgent(home string) {
 		build()
 		return
 	}
-	// "A signature proves the key, and nothing reusable leaves the node."
-	// Ground holds no token: it reaches the node at the agent's door, so one
-	// built to reach it elsewhere is built again.
+	// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
+	// 「[Opus 5.5] Ground holds no token: it reaches the node at the agent's door, so one」
+	// 「[Opus 5.5] built to reach it elsewhere is built again.」
 	if built, readErr := os.ReadFile(filepath.Join(home, groundReachFile)); readErr != nil || strings.TrimSpace(string(built)) != reach {
 		s.logger.Named("comet").Infow("An agent's ground is built again: it reaches the node elsewhere", "home", home, "reach", reach)
 		build()
@@ -107,10 +107,10 @@ func (s *QNTXServer) groundAgent(home string) {
 	}
 }
 
-// groundReachFile is where the address an agent's ground was built to reach the node at is kept, beside it.
+// 「[Opus 5.5] groundReachFile is where the address an agent's ground was built to reach the node at is kept, beside it.」
 const groundReachFile = "ground-reach"
 
-// keepGroundReaching is keepAgentGround, and then where the ground built reaches the node, kept.
+// 「[Opus 5.5] keepGroundReaching is keepAgentGround, and then where the ground built reaches the node, kept.」
 func (s *QNTXServer) keepGroundReaching(reach string) func(home string) error {
 	return func(home string) error {
 		if err := s.keepAgentGround(home); err != nil {
