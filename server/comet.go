@@ -73,25 +73,51 @@ func (s *QNTXServer) groundTheAgents() {
 	}
 }
 
-// groundAgent builds the ground of the agent in home, unless it runs under one, whose settings
-// it then writes again.
+// groundAgent builds the ground of the agent in home, unless it runs under one
+// that reaches the node where the agent does, whose settings it then writes again.
 func (s *QNTXServer) groundAgent(home string) {
+	reach := s.groundReach(home)
+	build := func() {
+		s.cometHandler().Builder.GroundAgent(s.ctx, home, reach, s.keepGroundReaching(reach), s.logger.Named("comet").Infow)
+	}
 	err := comet.Under(home)
 	if err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built", "home", home, "because", err.Error())
-		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
+		build()
+		return
+	}
+	// "A signature proves the key, and nothing reusable leaves the node."
+	// Ground holds no token: it reaches the node at the agent's door, so one
+	// built to reach it elsewhere is built again.
+	if built, readErr := os.ReadFile(filepath.Join(home, groundReachFile)); readErr != nil || strings.TrimSpace(string(built)) != reach {
+		s.logger.Named("comet").Infow("An agent's ground is built again: it reaches the node elsewhere", "home", home, "reach", reach)
+		build()
 		return
 	}
 	// A ground that stands loads from the store a deploy collects (plugin_roots.go): kept, or built again.
 	if err := s.keepAgentGround(home); err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built again: what it loads from was not kept", "home", home, "because", err.Error())
-		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
+		build()
 		return
 	}
 	// A ground that stands is run by the settings this node writes, not by those an older one wrote.
 	if err := comet.AgentSettings(home); err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built again: its settings did not write", "home", home, "because", err.Error())
-		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
+		build()
+	}
+}
+
+// groundReachFile is where the address an agent's ground was built to reach the node at is kept, beside it.
+const groundReachFile = "ground-reach"
+
+// keepGroundReaching is keepAgentGround, and then where the ground built reaches the node, kept.
+func (s *QNTXServer) keepGroundReaching(reach string) func(home string) error {
+	return func(home string) error {
+		if err := s.keepAgentGround(home); err != nil {
+			return err
+		}
+		return errors.Wrapf(os.WriteFile(filepath.Join(home, groundReachFile), []byte(reach+"\n"), 0o600),
+			"where the ground in %s reaches the node was not kept", home)
 	}
 }
 
@@ -131,7 +157,8 @@ func (s *QNTXServer) cometsMovedBy(push forge.Push) []string {
 	// An agent's ground is built from ground's branch as every comet is.
 	if strings.EqualFold(push.Repo.Path, comet.Ground.Owner+"/"+comet.Ground.Repo) && push.Branch() == comet.Ground.Branch {
 		for _, home := range s.underGround.all() {
-			s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
+			reach := s.groundReach(home)
+			s.cometHandler().Builder.GroundAgent(s.ctx, home, reach, s.keepGroundReaching(reach), s.logger.Named("comet").Infow)
 			rebuilding = append(rebuilding, "the ground of the agent in "+home)
 		}
 	}

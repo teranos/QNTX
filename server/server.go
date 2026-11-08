@@ -61,6 +61,7 @@ type QNTXServer struct {
 	consuming             consumedFlows                 // 「[Opus 5.5] Each yes at an MCP server the node consumes, waiting on its callback (mcp_consumed.go)」
 	agentsDir             string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL                string                        // Where this node answers on its own machine; empty until it listens
+	doors                 agentDoors                    // The door each agent the node runs reaches it at (agent_door.go)
 	anthropicBaseURL      string                        // Where Anthropic's API is; empty is api.anthropic.com
 	anthropicInUse        inUse                         // What ROOT's agents last ran on at Anthropic
 	identityTokensRenewed identityTokens                // Each ROOT agent home whose identity token is renewed

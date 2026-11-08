@@ -62,6 +62,13 @@ type Presented struct {
 func (h *Handler) presented(r *http.Request) Presented {
 	var p Presented
 
+	// An agent the node runs, at the door the node opened for it alone.
+	if grant, through := doorGrant(r.Context()); through {
+		p.bearerPresented = true
+		p.Bearer = &grant
+		return p
+	}
+
 	if cookie, err := r.Cookie(sessionCookieName); err == nil {
 		p.sessionToken = cookie.Value
 		// identityOf is the expiry check as well as the lookup, so a session

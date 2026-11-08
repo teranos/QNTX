@@ -72,6 +72,9 @@ var (
 	elementFile  string
 	elementTo    string
 	elementToken string
+	// atDoor is --to being the door the node opened for the agent asking,
+	// which admits that agent and is presented nothing.
+	atDoor bool
 )
 
 func init() {
@@ -130,16 +133,20 @@ func bearer() (token string, from string, err error) {
 
 // ask sends one request to the node and hands back what it answered.
 func ask(method, url string, body []byte) (answer []byte, err error) {
-	token, from, err := bearer()
-	if err != nil {
-		return nil, err
+	token, from := "", "the door"
+	if !atDoor {
+		if token, from, err = bearer(); err != nil {
+			return nil, err
+		}
 	}
 
 	req, err := http.NewRequest(method, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not build the request to %s", url)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

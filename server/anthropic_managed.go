@@ -363,20 +363,13 @@ func (s *QNTXServer) managedElement(ctx context.Context, client anthropic.Client
 			return managedOf{}, err
 		}
 	}
+	// "Tokens are to be removed from QNTX except for third-party OAuth clients"
+	//
+	// Anthropic reaches the node from outside, as a third party: what its Vault
+	// holds is an OAuth client's credential (mcp_oauth), and none is issued to
+	// an element agent at Anthropic yet. Nothing is handed over in its place.
 	if held.Vault == "" {
-		vault, err := client.Beta.Vaults.New(ctx, anthropic.BetaVaultNewParams{DisplayName: "qntx-element-" + agent.element})
-		if err != nil {
-			return managedOf{}, errors.Wrapf(err, "no Vault was made at Anthropic for the element %s", agent.element)
-		}
-		if _, err := client.Beta.Vaults.Credentials.New(ctx, vault.ID, anthropic.BetaVaultCredentialNewParams{
-			Auth: anthropic.BetaVaultCredentialNewParamsAuthUnion{OfStaticBearer: &anthropic.BetaManagedAgentsStaticBearerCreateParams{Token: agent.token, MCPServerURL: mcp}},
-		}); err != nil {
-			return managedOf{}, errors.Wrapf(err, "the element %s's token for %s was not put in Vault %s", agent.element, mcp, vault.ID)
-		}
-		held.Vault = vault.ID
-		if err := keep(); err != nil {
-			return managedOf{}, err
-		}
+		return managedOf{}, errors.Newf("the element %s at Anthropic reaches the node as a third-party OAuth client, and no OAuth credential is issued to it yet: no token is put in a Vault for it", agent.element)
 	}
 	// Told something new, or on another model: its Agent becomes a new version, and a Session
 	// stays on the version it started with, so it goes on in a new one; its Memory carries over.
