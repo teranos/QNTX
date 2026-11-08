@@ -41,8 +41,8 @@ func (h *Handler) Peers() []Client {
 }
 
 // AskPeers asks every peer one GET of path as the person admitted here, and
-// answers what each said. The person goes as handlePeer carries them: this
-// node's signature, for that peer and one request.
+// 「[Opus 5.5] answers what each said. The person goes as handlePeer carries them: this」
+// 「[Opus 5.5] node's signature, for that peer and one request.」
 func (h *Handler) AskPeers(ctx context.Context, admitted Admission, path string) []PeerAnswer {
 	peers := h.Peers()
 	answers := make([]PeerAnswer, 0, len(peers))
@@ -96,9 +96,9 @@ func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, 
 	return answer
 }
 
-// CarriedAs is the Authorization one request carrying the person admitted
-// here to peer goes with, for a client that speaks to the peer itself: a
-// fresh signature each time it is asked, since the peer spends each once.
+// 「[Opus 5.5] CarriedAs is the Authorization one request carrying the person admitted」
+// 「[Opus 5.5] here to peer goes with, for a client that speaks to the peer itself: a」
+// 「[Opus 5.5] fresh signature each time it is asked, since the peer spends each once.」
 func (h *Handler) CarriedAs(admitted Admission, peer Client) (string, error) {
 	person, err := named.TextOf("the person asking", admitted.Identity)
 	if err != nil {

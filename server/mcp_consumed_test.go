@@ -361,9 +361,9 @@ func TestTheNodeAgentIsGivenTheServerROOTConnectedAndCallsIt(t *testing.T) {
 	require.Nil(t, refused)
 	require.Len(t, listedServers.([]consumedServer), 1, "a call line is no server: the server the node consumes is still listed")
 
-	// At the node's own address nobody reaches the server without a credential.
-	// The agent's door admits whoever reaches its loopback port: what arrives
-	// there is taken to be the agent (agent_door.go).
+	// 「[Opus 5.5] At the node's own address nobody reaches the server without a credential.」
+	// 「[Opus 5.5] The agent's door admits whoever reaches its loopback port: what arrives」
+	// 「[Opus 5.5] there is taken to be the agent (agent_door.go).」
 	stranger, err := http.Post(node.URL+ConsumedServedAt+"tracker", "application/json", strings.NewReader(`{}`))
 	require.NoError(t, err)
 	_ = stranger.Body.Close()

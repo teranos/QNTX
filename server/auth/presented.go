@@ -62,7 +62,7 @@ type Presented struct {
 func (h *Handler) presented(r *http.Request) Presented {
 	var p Presented
 
-	// An agent the node runs, at the door the node opened for it alone.
+	// 「[Opus 5.5] An agent the node runs, at the door the node opened for it alone.」
 	if grant, through := doorGrant(r.Context()); through {
 		p.bearerPresented = true
 		p.Bearer = &grant

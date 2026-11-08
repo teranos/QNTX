@@ -18,12 +18,12 @@ import (
 // peerPath is where a request for a peer arrives: /n/<name>/<path on the peer>.
 const peerPath = "/n/"
 
-// carriedLife is how long the primary's signature for one carried request
-// lasts: long enough to cross to the peer, and spent there once.
+// 「[Opus 5.5] carriedLife is how long the primary's signature for one carried request」
+// 「[Opus 5.5] lasts: long enough to cross to the peer, and spent there once.」
 const carriedLife = time.Minute
 
-// carriedClaims is what the primary signs about the person it carries: who
-// they are here, and where the peer may let them act.
+// 「[Opus 5.5] carriedClaims is what the primary signs about the person it carries: who」
+// 「[Opus 5.5] they are here, and where the peer may let them act.」
 type carriedClaims struct {
 	jwt.RegisteredClaims
 	Name       string   `json:"name,omitempty"`
@@ -93,11 +93,11 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
-// carriedSignature is the Authorization a request carrying identity to peer
-// goes with: this node signing, as its own did:key, who the person is, for that
-// peer alone and for one request.
+// 「[Opus 5.5] carriedSignature is the Authorization a request carrying identity to peer」
+// 「[Opus 5.5] goes with: this node signing, as its own did:key, who the person is, for that」
+// 「[Opus 5.5] peer alone and for one request.」
 //
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 func (h *Handler) carriedSignature(identity, name string, peer Client, now time.Time) (string, error) {
 	did, err := h.ownDID()
 	if err != nil {

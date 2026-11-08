@@ -16,9 +16,9 @@ import (
 	"github.com/teranos/QNTX/internal/access"
 )
 
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 
-// heardBy is a node that keeps the Authorization each request carried.
+// 「[Sonnet 5.5] heardBy is a node that keeps the Authorization each request carried.」
 func heardBy(t *testing.T) (*httptest.Server, *[]string) {
 	t.Helper()
 	var heard []string
@@ -30,7 +30,7 @@ func heardBy(t *testing.T) (*httptest.Server, *[]string) {
 	return node, &heard
 }
 
-// keyIn keeps the zero seed in home's ~/.qntx/key and answers its key.
+// 「[Sonnet 5.5] keyIn keeps the zero seed in home's ~/.qntx/key and answers its key.」
 func keyIn(t *testing.T, home string) ed25519.PrivateKey {
 	t.Helper()
 	seed := make([]byte, ed25519.SeedSize)
@@ -39,7 +39,7 @@ func keyIn(t *testing.T, home string) ed25519.PrivateKey {
 	return ed25519.NewKeyFromSeed(seed)
 }
 
-// Each request is signed for itself by the key in ~/.qntx/key, made out to the node it goes to.
+// 「[Sonnet 5.5] Each request is signed for itself by the key in ~/.qntx/key, made out to the node it goes to.」
 func TestARequestIsSignedByTheKeyKept(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -64,7 +64,7 @@ func TestARequestIsSignedByTheKeyKept(t *testing.T) {
 	assert.Equal(t, did, claims.Subject)
 }
 
-// With no key kept there is nothing to sign with, and nothing is sent.
+// 「[Sonnet 5.5] With no key kept there is nothing to sign with, and nothing is sent.」
 func TestNoKeyKeptIsSaid(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	node, heard := heardBy(t)
@@ -74,7 +74,7 @@ func TestNoKeyKeptIsSaid(t *testing.T) {
 	assert.Empty(t, *heard)
 }
 
-// At the door the node opened for the agent asking, nothing is presented.
+// 「[Sonnet 5.5] At the door the node opened for the agent asking, nothing is presented.」
 func TestAtADoorNothingIsPresented(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	atDoor = true

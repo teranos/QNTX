@@ -203,7 +203,7 @@ func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-// Minting names the kind, and a body that names none is told the one there is.
+// 「[Opus 5.5] Minting names the kind, and a body that names none is told the one there is.」
 func TestMintingNamesTheKind(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()

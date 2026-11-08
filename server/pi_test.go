@@ -83,7 +83,7 @@ func TestWhatIsSaidToPiIsAnsweredByPi(t *testing.T) {
 	for _, line := range env {
 		assert.False(t, strings.HasPrefix(line, "QNTX_MCP_BEARER_"), "the Node Agent was handed a bearer: %s", line)
 	}
-	// Pi names a key for its provider, and is handed the agent's DID: no secret.
+	// 「[Opus 5.5] Pi names a key for its provider, and is handed the agent's DID: no secret.」
 	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.nodeAgent.did)
 
 	var models struct {

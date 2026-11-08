@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The primary asks a peer for its row as the person, signing for them as
-// itself, so the peer files and finds news under the same person.
+// 「[Opus 5.5] The primary asks a peer for its row as the person, signing for them as」
+// 「[Opus 5.5] itself, so the peer files and finds news under the same person.」
 func TestAPeerIsAskedAsThePerson(t *testing.T) {
 	primary, got, _ := anyPeer(t)
 	admitted := Admitted(LevelRoot)

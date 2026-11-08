@@ -208,7 +208,7 @@ func TestWhatIsSaidToTheNodeAgentIsAnsweredByClaudeCode(t *testing.T) {
 
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "CLAUDE_CODE_OAUTH_TOKEN=the-plan-token")
-	// It reaches the node's own MCP presenting nothing.
+	// 「[Opus 5.5] It reaches the node's own MCP presenting nothing.」
 	for _, line := range env {
 		assert.False(t, strings.HasPrefix(line, "QNTX_MCP_BEARER_"), "the Node Agent was handed a bearer: %s", line)
 	}

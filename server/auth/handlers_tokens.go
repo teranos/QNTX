@@ -15,8 +15,8 @@ import (
 // tokenNeverEnds is what a mint says for a token that does not end.
 const tokenNeverEnds = "never"
 
-// mintable resolves what kind of token was asked for: a third-party OAuth
-// client's, the one kind minting names.
+// 「[Opus 5.5] mintable resolves what kind of token was asked for: a third-party OAuth」
+// 「[Opus 5.5] client's, the one kind minting names.」
 //
 // "Tokens are to be removed from QNTX except for third-party OAuth clients"
 func mintable(asked string) (Level, bool) {
@@ -154,9 +154,9 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			"ROOT's client answers at /mcp, the node's, and this named "+strconv.Itoa(len(namespaces))+" namespaces")
 		return
 	}
-	// A client is a door: ROOT writes its return address here the way it
-	// writes a door's origin in am.toml. Its connector acts in the one
-	// namespace picked here (ADR-038).
+	// 「[Opus 5.5] A client is a door: ROOT writes its return address here the way it」
+	// 「[Opus 5.5] writes a door's origin in am.toml. Its connector acts in the one」
+	// 「[Opus 5.5] namespace picked here (ADR-038).」
 	if len(namespaces) != 1 && !req.Root {
 		h.writeError(w, http.StatusBadRequest,
 			"a client acts in one namespace, picked at minting, and this named "+strconv.Itoa(len(namespaces)))

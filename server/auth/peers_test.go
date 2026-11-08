@@ -55,9 +55,9 @@ func toPeer(path string) *http.Request {
 }
 
 // Somebody with a session here reaches the peer as themselves, and the session
-// cookie stays here. The primary signs for them as itself, and mints nothing.
+// 「[Opus 5.5] cookie stays here. The primary signs for them as itself, and mints nothing.」
 //
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 func TestASessionIsCarriedToThePeerAsThePerson(t *testing.T) {
 	primary, got, _ := anyPeer(t)
 	before, err := primary.tokens.List()
@@ -114,7 +114,7 @@ func TestThePeerAdmitsThePersonCarried(t *testing.T) {
 	assert.False(t, admitted, "a carried signature was admitted twice")
 }
 
-// A node that is not the peer named is not reached by what the primary carried there.
+// 「[Opus 5.5] A node that is not the peer named is not reached by what the primary carried there.」
 func TestACarriedSignatureIsForThePeerItNames(t *testing.T) {
 	_, did := otherNode(t)
 	primary, served, got := primaryAndPeer(t, did)

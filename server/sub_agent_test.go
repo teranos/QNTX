@@ -118,7 +118,7 @@ func TestTheNodeNamesItsNodeAgentAndTheGateKnowsIt(t *testing.T) {
 	assert.True(t, admitted.IsRoot())
 	assert.Equal(t, s.nodeAgent.did, admitted.ActsAs())
 
-	// A second start finds its door open, and opens no other.
+	// 「[Opus 5.5] A second start finds its door open, and opens no other.」
 	door := s.nodeAgent.door
 	require.NoError(t, s.nameNodeAgent(t.TempDir()))
 	assert.Equal(t, door, s.nodeAgent.door)

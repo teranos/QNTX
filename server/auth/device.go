@@ -14,11 +14,11 @@ import (
 )
 
 // "yes, i want this"
-// An agent asks for a sign-in naming its own did:key, prints a link, and the
-// person approves it with the passkey at home; the agent's key is then the
-// person, as a client's is (RFC 8628). Nothing is handed back.
+// 「[Opus 5.5] An agent asks for a sign-in naming its own did:key, prints a link, and the」
+// 「[Opus 5.5] person approves it with the passkey at home; the agent's key is then the」
+// 「[Opus 5.5] person, as a client's is (RFC 8628). Nothing is handed back.」
 //
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 
 // deviceAuthorizationPath is where an agent asks for a sign-in (RFC 8628 §3.1).
 const deviceAuthorizationPath = "/auth/device"
@@ -35,7 +35,7 @@ const deviceCodeGrant = "urn:ietf:params:oauth:grant-type:device_code"
 // devicePollSeconds is how long an agent waits between asks (RFC 8628 §3.2 interval).
 const devicePollSeconds = 5
 
-// deviceTokenTTL is how long a yes lasts: thirty days, as a refresh's does.
+// 「[Opus 5.5] deviceTokenTTL is how long a yes lasts: thirty days, as a refresh's does.」
 const deviceTokenTTL = refreshTokenTTL
 
 // userCodeAlphabet is RFC 8628 §6.1's base-20 set: no vowels, nothing read two ways.
@@ -233,7 +233,7 @@ func (h *Handler) deviceAnswer(w http.ResponseWriter, code, said string) {
 }
 
 // handleDeviceToken is the agent asking whether its yes came (RFC 8628 §3.4): waiting,
-// over, or its key held as the person, once, through itself as client.
+// 「[Opus 5.5] over, or its key held as the person, once, through itself as client.」
 func (h *Handler) handleDeviceToken(w http.ResponseWriter, form url.Values) {
 	deviceCode := form.Get("device_code")
 	val, ok := h.devices.Load(deviceCode)

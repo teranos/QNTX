@@ -124,7 +124,7 @@ func (s *QNTXServer) holdElementAgent(element string) (*rootAgent, *protocol.Ref
 	if err := agent.keepIn(filepath.Join(agent.sessionDir, elementNameFile), element); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + element + " was not written down: " + err.Error()}
 	}
-	// It is ROOT's kind, as the Node Agent is: the element is ROOT's to shake.
+	// 「[Opus 5.5] It is ROOT's kind, as the Node Agent is: the element is ROOT's to shake.」
 	if s.authHandler != nil {
 		grant, err := s.authHandler.ElementAgentGrant(agent.did, element)
 		if err != nil {

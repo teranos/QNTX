@@ -90,9 +90,9 @@ func (s *QNTXServer) piTurn(thinking string, said func(binary, session, says str
 }
 
 // piSaid is how one turn is run in Pi: the node's MCP and its gateway, each
-// reached at the agent's own door. Pi names a key for its provider, and is
-// handed the agent's DID, which is no secret: the door admits the agent, not
-// what it presents.
+// 「[Opus 5.5] reached at the agent's own door. Pi names a key for its provider, and is」
+// 「[Opus 5.5] handed the agent's DID, which is no secret: the door admits the agent, not」
+// 「[Opus 5.5] what it presents.」
 func (s *QNTXServer) piSaid(agent *rootAgent, named appcfg.PiConfig, binary, session, says string, env []string) pi.Said {
 	said := pi.Said{
 		Binary: binary, Home: agent.home, Session: session, Says: says,
@@ -109,7 +109,7 @@ func (s *QNTXServer) piSaid(agent *rootAgent, named appcfg.PiConfig, binary, ses
 	return said
 }
 
-// piMCP is the node's MCP as an agent in Pi reaches it, at own: its door.
+// 「[Opus 5.5] piMCP is the node's MCP as an agent in Pi reaches it, at own: its door.」
 //
 // "THE NODE'S MCP NEEDS"
 //

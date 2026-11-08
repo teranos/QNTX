@@ -38,8 +38,8 @@ const nodeAgentMCP = "qntx"
 type rootAgent struct {
 	did    string
 	signer *signing.Signer
-	// door is where it reaches the node: a listener opened for it alone
-	// (agent_door.go). Empty on a node with no gate to open one at.
+	// 「[Opus 5.5] door is where it reaches the node: a listener opened for it alone」
+	// 「[Opus 5.5] (agent_door.go). Empty on a node with no gate to open one at.」
 	door string
 	home string
 	// sessions is its session in each harness, by the harness's name.
@@ -128,9 +128,9 @@ func theNodeAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
 	return agent, nil
 }
 
-// theAgent is an agent of the node holding this key: its own key derived from
-// the node's for purpose, so it is the same DID wherever the node is rebuilt
-// from its record, working in home.
+// 「[Opus 5.5] theAgent is an agent of the node holding this key: its own key derived from」
+// 「[Opus 5.5] the node's for purpose, so it is the same DID wherever the node is rebuilt」
+// 「[Opus 5.5] from its record, working in home.」
 func theAgent(node ed25519.PrivateKey, purpose, home string) (*rootAgent, error) {
 	key, err := access.DeriveKey(node, purpose)
 	if err != nil {

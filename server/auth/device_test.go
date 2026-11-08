@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// agentKey is a key an agent holds and never hands over.
+// 「[Opus 5.5] agentKey is a key an agent holds and never hands over.」
 func agentKey(t *testing.T) string {
 	t.Helper()
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
@@ -22,7 +22,7 @@ func agentKey(t *testing.T) string {
 	return EncodeDIDKey(pub)
 }
 
-// askForSignIn is an agent asking for a sign-in under label, naming its did:key.
+// 「[Opus 5.5] askForSignIn is an agent asking for a sign-in under label, naming its did:key.」
 func askForSignIn(t *testing.T, h *Handler, label, did string) map[string]any {
 	t.Helper()
 	form := url.Values{"label": {label}, "did": {did}}
@@ -51,9 +51,9 @@ func pollForToken(t *testing.T, h *Handler, deviceCode string) (int, map[string]
 
 // "yes, i want this"
 // The agent prints a link, the person says yes at the passkey, and the agent's
-// key is that person: ROOT here, since the passkey is a root identity's.
+// 「[Opus 5.5] key is that person: ROOT here, since the passkey is a root identity's.」
 //
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 func TestAnAgentIsSignedInByThePersonsPasskey(t *testing.T) {
 	h, store, _ := authorizingHandler(t)
 	did := agentKey(t)
@@ -110,7 +110,7 @@ func TestAnAgentIsSignedInByThePersonsPasskey(t *testing.T) {
 	assert.Equal(t, "invalid_grant", said["error"], "a sign-in is answered once")
 }
 
-// An agent that names no key of its own has nothing to sign with.
+// 「[Opus 5.5] An agent that names no key of its own has nothing to sign with.」
 func TestASignInNamingNoKeyIsRefused(t *testing.T) {
 	h, _, _ := authorizingHandler(t)
 	for _, did := range []string{"", "not-a-did", "did:web:example.com"} {

@@ -40,8 +40,8 @@ const assertionIDBytes = 16
 // captured assertion presented again is refused (RFC 7523 §3, item 7).
 type spentAssertions struct {
 	until sync.Map
-	// swept is when ids past their exp were last let go: once a second at
-	// most, so a request does not walk every id kept.
+	// 「[Opus 5.5] swept is when ids past their exp were last let go: once a second at」
+	// 「[Opus 5.5] most, so a request does not walk every id kept.」
 	mu    sync.Mutex
 	swept time.Time
 }

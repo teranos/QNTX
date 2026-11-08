@@ -24,7 +24,7 @@ func keyedNode(srv *QNTXServer) ed25519.PublicKey {
 	key := ed25519.NewKeyFromSeed(append(make([]byte, ed25519.SeedSize-1), 7))
 	public := key.Public().(ed25519.PublicKey)
 	srv.nodeDID = &nodedid.Handler{DID: access.EncodeDIDKey(public), PublicKey: public, PrivateKey: key}
-	// The node signs as this key wherever it signs, carrying a person to a peer too.
+	// 「[Opus 5.5] The node signs as this key wherever it signs, carrying a person to a peer too.」
 	if srv.authHandler != nil {
 		srv.authHandler.SetNodeKey(key)
 	}

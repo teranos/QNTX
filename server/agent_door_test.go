@@ -14,10 +14,10 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 
-// doorOfTheNodeAgent is a node not serving yet, and its Node Agent's door: a
-// request the door lets through is told the node does not serve yet.
+// 「[Opus 5.5] doorOfTheNodeAgent is a node not serving yet, and its Node Agent's door: a」
+// 「[Opus 5.5] request the door lets through is told the node does not serve yet.」
 func doorOfTheNodeAgent(t *testing.T) (*QNTXServer, string) {
 	t.Helper()
 	_, db := createTestStore(t)
@@ -45,19 +45,19 @@ func knock(t *testing.T, door string, dress func(*http.Request)) int {
 	return resp.StatusCode
 }
 
-// Its agent, which names no origin, is let through.
+// 「[Opus 5.5] Its agent, which names no origin, is let through.」
 func TestAnAgentIsLetThroughItsDoor(t *testing.T) {
 	_, door := doorOfTheNodeAgent(t)
 	assert.Equal(t, http.StatusServiceUnavailable, knock(t, door, func(*http.Request) {}), "the agent was not let through to the node")
 }
 
-// A page in a browser names where it came from, and is not let through.
+// 「[Opus 5.5] A page in a browser names where it came from, and is not let through.」
 func TestAPageIsNotLetThroughAnAgentsDoor(t *testing.T) {
 	_, door := doorOfTheNodeAgent(t)
 	assert.Equal(t, http.StatusForbidden, knock(t, door, func(r *http.Request) { r.Header.Set("Origin", "https://evil.example") }))
 }
 
-// A name made to resolve to loopback is not the door's own, and is not let through.
+// 「[Opus 5.5] A name made to resolve to loopback is not the door's own, and is not let through.」
 func TestANameReboundToLoopbackIsNotLetThrough(t *testing.T) {
 	_, door := doorOfTheNodeAgent(t)
 	assert.Equal(t, http.StatusForbidden, knock(t, door, func(r *http.Request) { r.Host = "evil.example" }))
