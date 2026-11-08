@@ -31,8 +31,10 @@ func TestTheNodeAgentHasAGitUserOfItsOwn(t *testing.T) {
 	config := filepath.Join(s.nodeAgent.home, "gitconfig")
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "GIT_CONFIG_GLOBAL="+config)
-	// What its git asks the node, it asks as itself.
-	assert.Contains(t, env, "QNTX_TOKEN="+s.nodeAgent.token)
+	// What its git asks the node, it asks as itself, at its door, presenting nothing.
+	for _, line := range env {
+		assert.False(t, strings.HasPrefix(line, "QNTX_TOKEN="), "its git was handed a token: %s", line)
+	}
 
 	// Its author is itself: its DID, at the node it is the agent of.
 	assert.Equal(t, "Node Agent", gitSays(t, config, "user.name"))
@@ -84,7 +86,7 @@ func TestGitAsksTheHelperTheNodeConfigured(t *testing.T) {
 
 	args, err := os.ReadFile(filepath.Join(dir, "args"))
 	require.NoError(t, err)
-	assert.Equal(t, "git\ncredential\n--to\nhttp://127.0.0.1:8770\nget\n", string(args))
+	assert.Equal(t, "git\ncredential\n--door\n--to\nhttp://127.0.0.1:8770\nget\n", string(args))
 	asked, err := os.ReadFile(filepath.Join(dir, "asked"))
 	require.NoError(t, err)
 	assert.Contains(t, string(asked), "host=github.com\n")

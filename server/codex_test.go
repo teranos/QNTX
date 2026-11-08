@@ -77,7 +77,8 @@ func TestWhatIsSaidToCodexIsAnsweredByCodex(t *testing.T) {
 	home := s.nodeAgent.home
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "CODEX_HOME="+filepath.Join(home, "codex"))
-	assert.Contains(t, env, "CODEX_API_KEY="+s.nodeAgent.token)
+	// Codex names a key for the gateway, and is handed the agent's DID: no secret.
+	assert.Contains(t, env, "CODEX_API_KEY="+s.nodeAgent.did)
 
 	config, err := os.ReadFile(filepath.Join(home, "codex", "config.toml"))
 	require.NoError(t, err)
@@ -165,7 +166,7 @@ func TestCodexReachesAnotherGatewayWithTheTokenNamedForIt(t *testing.T) {
 	require.Nil(t, refused)
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "CODEX_API_KEY=q-knows-this-one")
-	assert.NotContains(t, env, "CODEX_API_KEY="+s.nodeAgent.token)
+	assert.NotContains(t, env, "CODEX_API_KEY="+s.nodeAgent.did)
 }
 
 // A node whose am.toml names no codex has none to speak to, and says where.

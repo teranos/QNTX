@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/ed25519"
 	"net/http"
 	"net/http/httptest"
@@ -11,12 +12,14 @@ import (
 	"github.com/teranos/QNTX/internal/access"
 )
 
-// nodeAgentToken is a token derived the way the node derives the Node Agent's.
-func nodeAgentToken(t *testing.T) (raw, did string) {
+// "A signature proves the key, and nothing reusable leaves the node."
+
+// nodeAgentDID is the DID the node derives the Node Agent's key under.
+func nodeAgentDID(t *testing.T) string {
 	t.Helper()
-	raw, did, err := access.DeriveToken(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)), "agent:root")
+	key, err := access.DeriveKey(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)), "agent:root")
 	require.NoError(t, err)
-	return raw, did
+	return EncodeDIDKey(key.Public().(ed25519.PublicKey))
 }
 
 func nodeAgentHandler(roots ...string) (*Handler, *memTokenStore) {
@@ -26,94 +29,76 @@ func nodeAgentHandler(roots ...string) (*Handler, *memTokenStore) {
 	return h, store
 }
 
-// presenting asks a route no line grants to anybody, which is ROOT's alone,
-// with a bearer, and gives the status and what was admitted.
-func presenting(h *Handler, raw string) (int, Admission) {
+// throughDoor asks a route reach grants, as a request arriving at the door the
+// node opened for the agent whose grant this is: nothing presented.
+func throughDoor(h *Handler, grant Grant, reach Reach) (int, Admission) {
 	var admitted Admission
-	gated := h.Middleware("/test", Reach{}, func(w http.ResponseWriter, r *http.Request) {
+	gated := h.Middleware("/test", reach, func(w http.ResponseWriter, r *http.Request) {
 		admitted, _ = AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
 	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
-	req.Header.Set("Authorization", "Bearer "+raw)
+	req = req.WithContext(ThroughDoor(context.Background(), grant))
 	rec := httptest.NewRecorder()
 	gated.ServeHTTP(rec, req)
 	return rec.Code, admitted
 }
 
-// The Node Agent's token is ROOT's kind, written down by the node for the
-// agent it runs (ADR-048). It reaches what ROOT reaches, and what it writes is
-// its own DID's.
-func TestTheNodeAgentsTokenIsRootsKindAndItsOwnDID(t *testing.T) {
-	h, _ := nodeAgentHandler(mastodonAccount)
-	raw, did := nodeAgentToken(t)
-	require.NoError(t, h.HoldNodeAgent(raw, did))
+// The Node Agent is ROOT's kind at its own door (ADR-048). It reaches what
+// ROOT reaches, what it writes is its own DID's, and no token is written.
+func TestTheNodeAgentIsRootsKindAndItsOwnDID(t *testing.T) {
+	h, store := nodeAgentHandler(mastodonAccount)
+	did := nodeAgentDID(t)
+	grant, err := h.NodeAgentGrant(did)
+	require.NoError(t, err)
 
-	status, admitted := presenting(h, raw)
+	status, admitted := throughDoor(h, grant, Reach{})
 	require.Equal(t, http.StatusOK, status)
 	assert.Equal(t, did, admitted.ActsAs(), "the Node Agent attests as itself")
 	assert.Equal(t, mastodonAccount, admitted.Identity, "it speaks for ROOT")
 	assert.True(t, admitted.MaySeeSystem())
 	assert.True(t, admitted.MayWrite("anything at all"), "no line narrows what ROOT's kind may write")
 	assert.True(t, admitted.MayRead("anything at all"))
-}
-
-// The node holds it at every start, and it stays the one token.
-func TestHoldingTheNodeAgentAgainWritesNothingMore(t *testing.T) {
-	h, store := nodeAgentHandler(mastodonAccount)
-	raw, did := nodeAgentToken(t)
-	require.NoError(t, h.HoldNodeAgent(raw, did))
-	require.NoError(t, h.HoldNodeAgent(raw, did))
 
 	held, err := store.List()
 	require.NoError(t, err)
-	require.Len(t, held, 1)
-	assert.Equal(t, NodeAgentLabel, held[0].Label)
-	assert.Equal(t, LevelRoot, held[0].Level)
-	assert.Equal(t, did, held[0].DID)
-}
-
-// Revocation is a switch (ADR-025), and ROOT's hand on it holds: a start does
-// not turn the Node Agent back on.
-func TestANodeAgentSwitchedOffStaysOff(t *testing.T) {
-	h, store := nodeAgentHandler(mastodonAccount)
-	raw, did := nodeAgentToken(t)
-	require.NoError(t, h.HoldNodeAgent(raw, did))
-	held, err := store.List()
-	require.NoError(t, err)
-	require.NoError(t, store.setRevoked(held[0].ID, true))
-
-	err = h.HoldNodeAgent(raw, did)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "switched off")
-	status, _ := presenting(h, raw)
-	assert.Equal(t, http.StatusUnauthorized, status)
-	held, err = store.List()
-	require.NoError(t, err)
-	assert.Len(t, held, 1, "a second token was written for an agent that was switched off")
+	assert.Empty(t, held, "a token was written for the Node Agent")
 }
 
 // It speaks for ROOT, so a node that lists nobody has nobody for it to speak for.
 func TestTheNodeAgentSpeaksForSomebodyListed(t *testing.T) {
-	h, store := nodeAgentHandler()
-	raw, did := nodeAgentToken(t)
-	err := h.HoldNodeAgent(raw, did)
+	h, _ := nodeAgentHandler()
+	_, err := h.NodeAgentGrant(nodeAgentDID(t))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "auth.root_identities")
-	held, listErr := store.List()
-	require.NoError(t, listErr)
-	assert.Empty(t, held)
 }
 
-func TestANodeThatKeepsNoTokensHoldsNoNodeAgent(t *testing.T) {
-	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), logger: testLogger()}
-	h.SetIdentities([]string{mastodonAccount}, nil)
-	raw, did := nodeAgentToken(t)
-	require.Error(t, h.HoldNodeAgent(raw, did))
+// ROOT struck out of am.toml takes the Node Agent with it at the next request.
+func TestTheNodeAgentStopsWithWhoItSpeaksFor(t *testing.T) {
+	h, _ := nodeAgentHandler(mastodonAccount)
+	grant, err := h.NodeAgentGrant(nodeAgentDID(t))
+	require.NoError(t, err)
+	h.SetIdentities(nil, nil)
+	status, _ := throughDoor(h, grant, Reach{})
+	assert.Equal(t, http.StatusUnauthorized, status)
 }
 
-// Minting hands ROOT's kind to nobody, as before: the node writing it down for
-// the agent it runs is the one way one comes to be.
+// An element agent is ROOT's kind as the Node Agent is, named for its element.
+func TestAnElementAgentIsRootsKindNamedForItsElement(t *testing.T) {
+	h, store := nodeAgentHandler(mastodonAccount)
+	did := nodeAgentDID(t)
+	grant, err := h.ElementAgentGrant(did, "tokens-element")
+	require.NoError(t, err)
+	assert.Equal(t, ElementAgentLabel+":tokens-element", grant.Label)
+	status, admitted := throughDoor(h, grant, Reach{})
+	require.Equal(t, http.StatusOK, status)
+	assert.Equal(t, did, admitted.ActsAs())
+	held, err := store.List()
+	require.NoError(t, err)
+	assert.Empty(t, held, "a token was written for an element agent")
+}
+
+// Minting hands ROOT's kind to nobody.
 func TestMintingStillHandsRootToNobody(t *testing.T) {
 	_, minted := mintable("ROOT")
 	assert.False(t, minted)

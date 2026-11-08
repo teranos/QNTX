@@ -35,7 +35,7 @@ func (a *rootAgent) writeGitConfig(name, email, qntx, node string) (string, erro
 		return "", errors.Wrapf(err, "could not create %s", a.home)
 	}
 	// git runs a helper that starts with ! through the shell.
-	helper := "!" + strconv.Quote(qntx) + " git credential --to " + strconv.Quote(node)
+	helper := "!" + strconv.Quote(qntx) + " git credential --door --to " + strconv.Quote(node)
 	config := "[user]\n" +
 		"\tname = " + strconv.Quote(name) + "\n" +
 		"\temail = " + strconv.Quote(email) + "\n" +
@@ -47,8 +47,8 @@ func (a *rootAgent) writeGitConfig(name, email, qntx, node string) (string, erro
 }
 
 // gitEnvironment is what the agent's process is handed so that its git is its
-// own: the configuration above, and the token it is to the node, which is what
-// the credential helper presents.
+// own: the configuration above, whose credential helper asks the node at the
+// agent's door and presents nothing.
 func (s *QNTXServer) gitEnvironment(agent *rootAgent) ([]string, error) {
 	qntx, err := os.Executable()
 	if err != nil {
@@ -59,9 +59,9 @@ func (s *QNTXServer) gitEnvironment(agent *rootAgent) ([]string, error) {
 		origin = s.authHandler.PublicOrigin()
 	}
 	name, email := gitIdentityOf(agent.did, s.deps.cfg.Node.Name, origin)
-	config, err := agent.writeGitConfig(name, email, qntx, s.ownURL)
+	config, err := agent.writeGitConfig(name, email, qntx, s.reachOf(agent))
 	if err != nil {
 		return nil, err
 	}
-	return []string{"GIT_CONFIG_GLOBAL=" + config, "QNTX_TOKEN=" + agent.token}, nil
+	return []string{"GIT_CONFIG_GLOBAL=" + config}, nil
 }

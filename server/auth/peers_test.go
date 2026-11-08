@@ -3,6 +3,7 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,9 +55,13 @@ func toPeer(path string) *http.Request {
 }
 
 // Somebody with a session here reaches the peer as themselves, and the session
-// cookie stays here.
+// cookie stays here. The primary signs for them as itself, and mints nothing.
+//
+// "A signature proves the key, and nothing reusable leaves the node."
 func TestASessionIsCarriedToThePeerAsThePerson(t *testing.T) {
-	primary, got, peerDID := anyPeer(t)
+	primary, got, _ := anyPeer(t)
+	before, err := primary.tokens.List()
+	require.NoError(t, err)
 	session, err := primary.sessions.create(mastodonAccount, User{})
 	require.NoError(t, err)
 
@@ -69,17 +74,18 @@ func TestASessionIsCarriedToThePeerAsThePerson(t *testing.T) {
 	assert.Equal(t, "/api/attestations", got.path)
 	assert.Equal(t, "limit=1", got.query)
 	assert.Empty(t, got.cookie, "the session cookie left the primary")
-	raw, bears := bearerToken(&http.Request{Header: http.Header{"Authorization": {got.authorization}}})
-	require.True(t, bears, "the person was not carried")
-	grant, live := primary.tokens.Lookup(sha256Hex(raw))
-	require.True(t, live)
-	assert.Equal(t, mastodonAccount, grant.MintedBy)
-	assert.Equal(t, peerDID, grant.ClientDID)
+	first, signed := strings.CutPrefix(got.authorization, signedScheme)
+	require.True(t, signed, "the person was not carried by a signature: %q", got.authorization)
 
 	again := toPeer("/health")
 	again.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
 	primary.handlePeer(httptest.NewRecorder(), again)
-	assert.Equal(t, "Bearer "+raw, got.authorization, "a second request wrote a second token")
+	second, _ := strings.CutPrefix(got.authorization, signedScheme)
+	assert.NotEqual(t, first, second, "one signature was carried twice")
+
+	after, err := primary.tokens.List()
+	require.NoError(t, err)
+	assert.Len(t, after, len(before), "carrying a person minted a token")
 }
 
 // The peer admits the person it was carried, by asking the primary and by its own list.
@@ -101,6 +107,32 @@ func TestThePeerAdmitsThePersonCarried(t *testing.T) {
 	admission, admitted := node.admissionOf(node.presented(carriedReq))
 	require.True(t, admitted, "the peer did not admit the person the primary carried")
 	assert.Equal(t, mastodonAccount, admission.Identity)
+
+	again := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	again.Header.Set("Authorization", got.authorization)
+	_, admitted = node.admissionOf(node.presented(again))
+	assert.False(t, admitted, "a carried signature was admitted twice")
+}
+
+// A node that is not the peer named is not reached by what the primary carried there.
+func TestACarriedSignatureIsForThePeerItNames(t *testing.T) {
+	_, did := otherNode(t)
+	primary, served, got := primaryAndPeer(t, did)
+	session, err := primary.sessions.create(mastodonAccount, User{})
+	require.NoError(t, err)
+	r := toPeer("/api/attestations")
+	r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: session})
+	primary.handlePeer(httptest.NewRecorder(), r)
+
+	elsewhere, _ := otherNode(t)
+	node := handlerWithDoors(t)
+	node.tokens = newMemTokenStore()
+	node.nodeKey = elsewhere
+	require.NoError(t, node.SetPrimary(served))
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.Header.Set("Authorization", got.authorization)
+	_, admitted := node.admissionOf(node.presented(req))
+	assert.False(t, admitted)
 }
 
 // The person the primary carried is this node's own User for their route, or

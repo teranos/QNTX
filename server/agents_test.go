@@ -165,16 +165,15 @@ func TestANamespaceOptsIntoAnAgentOfItsOwn(t *testing.T) {
 	assert.Equal(t, am.GetAgent().GetDid(), again.GetAgent().GetDid(), "one agent per namespace and model, wherever it is asked for")
 	holds(t, s.agentsSignum(), "am", again)
 
-	// Its token is held at the gate: a TOKEN in garden alone, speaking for
-	// whoever set it up, attesting as the agent.
+	// It reaches the node at a door of its own, and no token is written for it.
+	//
+	// "i dont want agents to ever thing they are blcoked"
 	held, err := in.tokens.List()
 	require.NoError(t, err)
-	require.Len(t, held, 1)
-	assert.Equal(t, "agent:garden:claude-sonnet-5-5", held[0].Label)
-	assert.Equal(t, auth.LevelToken, held[0].Level)
-	assert.Equal(t, []string{"garden"}, held[0].Namespaces)
-	assert.Equal(t, am.GetAgent().GetDid(), held[0].DID)
-	assert.Equal(t, "https://example.org/root", held[0].MintedBy)
+	assert.Empty(t, held, "a token was written for the namespace agent")
+	agent, opened := s.namespaceAgents.of(agentPurpose("garden", "claude-sonnet-5-5"))
+	require.True(t, opened)
+	assert.True(t, strings.HasPrefix(agent.door, "http://127.0.0.1:"), "the namespace agent has no door: %q", agent.door)
 }
 
 // A node without auth has no gate to hold the agent's token, and would admit
@@ -251,17 +250,21 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 	assert.Contains(t, after(args, "--append-system-prompt"), am.GetAgent().GetDid())
 	env := ranWith(t, ran, run, "env")
 	assert.NotContains(t, env, "CLAUDE_CODE_OAUTH_TOKEN=the-plan-token", "ROOT's plan token is not the namespace agent's")
-	assert.NotContains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token, "ROOT's token is not the namespace agent's")
+	for _, line := range env {
+		assert.False(t, strings.HasPrefix(line, "QNTX_MCP_BEARER_"), "the namespace agent was handed a bearer: %s", line)
+	}
 	for _, line := range env {
 		assert.False(t, len(line) > 13 && line[:13] == "GIT_CONFIG_GL", "the namespace agent holds no git: %s", line)
 	}
 
 	// "i wanted ground for the namespace agent under claude first"
 
-	// Its hooks run its own ground, first on its PATH, and ground reports with the agent's own token.
-	agent, held := s.namespaceAgents.of(agentPurpose("garden", "claude-sonnet-5-5"))
+	// Its hooks run its own ground, first on its PATH, and ground reports at the agent's door, presenting nothing.
+	_, held := s.namespaceAgents.of(agentPurpose("garden", "claude-sonnet-5-5"))
 	require.True(t, held)
-	assert.Contains(t, env, "QNTX_TOKEN="+agent.token)
+	for _, line := range env {
+		assert.False(t, strings.HasPrefix(line, "QNTX_TOKEN="), "ground was handed a token: %s", line)
+	}
 	assert.Contains(t, strings.Join(env, "\n"), "PATH="+filepath.Dir(comet.AgentGround(home))+":")
 
 	// Written in garden by the agent, signed as itself; not in system, not in orchard.
@@ -434,7 +437,9 @@ func TestThePiAgentOfANamespaceAnswersOnTheNamespacesKey(t *testing.T) {
 	assert.Contains(t, args, "--no-builtin-tools", "none of Pi's own tools: the node's MCP alone")
 	env := ranWith(t, piRan, "0", "env")
 	assert.Contains(t, env, "OPENROUTER_API_KEY=sk-or-the-gardeners", "the namespace's key, handed to the process")
-	assert.NotContains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token, "ROOT's token is not the namespace agent's")
+	for _, line := range env {
+		assert.False(t, strings.HasPrefix(line, "QNTX_MCP_BEARER_"), "the namespace agent was handed a bearer: %s", line)
+	}
 	home := filepath.Join(s.agentsDir, "garden", slug.Of("anthropic/claude-opus-4.6"), "pi")
 	mcp, err := os.ReadFile(filepath.Join(home, "mcp.json"))
 	require.NoError(t, err)

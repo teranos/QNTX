@@ -41,8 +41,8 @@ func (h *Handler) Peers() []Client {
 }
 
 // AskPeers asks every peer one GET of path as the person admitted here, and
-// answers what each said. The person goes as handlePeer carries them: a token
-// issued here for the peer, which asks here who it is.
+// answers what each said. The person goes as handlePeer carries them: this
+// node's signature, for that peer and one request.
 func (h *Handler) AskPeers(ctx context.Context, admitted Admission, path string) []PeerAnswer {
 	peers := h.Peers()
 	answers := make([]PeerAnswer, 0, len(peers))
@@ -65,10 +65,9 @@ func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, 
 		answer.Err = errors.Wrapf(err, "nobody to carry to %s", peer.Label)
 		return answer
 	}
-	presented := Presented{UserID: admitted.UserID, DisplayName: admitted.DisplayName}
-	bearer, err := h.carriedFor(person.String(), presented, peer, time.Now())
+	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, peer, time.Now())
 	if err != nil {
-		answer.Err = errors.Wrapf(err, "no token was written to carry you to %s", peer.Label)
+		answer.Err = errors.Wrapf(err, "this node did not sign to carry you to %s", peer.Label)
 		return answer
 	}
 	ctx, cancel := context.WithTimeout(ctx, peerAskTimeout)
@@ -78,7 +77,7 @@ func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, 
 		answer.Err = errors.Wrapf(err, "%s is not a path %s answers", path, peer.Label)
 		return answer
 	}
-	req.Header.Set("Authorization", "Bearer "+bearer)
+	req.Header.Set("Authorization", carriedAs)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		answer.Err = errors.Wrapf(err, "%s did not answer", peer.Label)
@@ -97,14 +96,14 @@ func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, 
 	return answer
 }
 
-// BearerFor is the token that carries the person admitted here to peer, for a
-// client that speaks to the peer itself.
-func (h *Handler) BearerFor(admitted Admission, peer Client) (string, error) {
+// CarriedAs is the Authorization one request carrying the person admitted
+// here to peer goes with, for a client that speaks to the peer itself: a
+// fresh signature each time it is asked, since the peer spends each once.
+func (h *Handler) CarriedAs(admitted Admission, peer Client) (string, error) {
 	person, err := named.TextOf("the person asking", admitted.Identity)
 	if err != nil {
 		return "", errors.Wrapf(err, "nobody to carry to %s", peer.Label)
 	}
-	presented := Presented{UserID: admitted.UserID, DisplayName: admitted.DisplayName}
-	bearer, err := h.carriedFor(person.String(), presented, peer, time.Now())
-	return bearer, errors.Wrapf(err, "no token was written to carry you to %s", peer.Label)
+	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, peer, time.Now())
+	return carriedAs, errors.Wrapf(err, "this node did not sign to carry you to %s", peer.Label)
 }

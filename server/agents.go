@@ -337,14 +337,18 @@ func (s *QNTXServer) holdNamespaceAgent(namespace, model, setBy string) (*rootAg
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + namespace + " has no key of its own: " + err.Error()}
 	}
 	agent.namespace, agent.called = namespace, "the agent of "+namespace
-	// Its token is what keeps it in its namespace at the gate. A node without
+	// Its door is what keeps it in its namespace at the gate. A node without
 	// auth has no gate to hold it, and would admit it as the node's one caller,
 	// everywhere: it runs no namespace agent.
 	if s.authHandler == nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node runs without auth, so the agent of " + namespace + " would have no token keeping it in " + namespace + ": it runs none"}
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node runs without auth, so nothing would keep the agent of " + namespace + " in " + namespace + ": it runs none"}
 	}
-	if err := s.authHandler.HoldNamespaceAgent(agent.token, agent.did, purpose, setBy, namespace); err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the token of the agent of " + namespace + " is not held, so it would reach none of the node's sigils: " + err.Error()}
+	grant, err := s.authHandler.NamespaceAgentGrant(agent.did, purpose, setBy, namespace)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + namespace + " speaks for nobody, so it would reach none of the node's sigils: " + err.Error()}
+	}
+	if err := s.openDoor(agent, grant, home); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + namespace + " has no door to the node: " + err.Error()}
 	}
 	held := s.namespaceAgents.hold(purpose, agent)
 	// It runs under ground as the Node Agent does: its ground built in its home (ADR-050).

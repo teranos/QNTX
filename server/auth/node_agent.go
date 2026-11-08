@@ -1,116 +1,89 @@
 package auth
 
 import (
+	"context"
+
 	errors "github.com/teranos/sacred-error"
 )
 
-// NodeAgentLabel is the Node Agent's token by name: what the tokens list shows
-// it as, and what a line names it by.
+// "A signature proves the key, and nothing reusable leaves the node."
+//
+// An agent the node runs reaches the node at a door of its own: a listener the
+// node opened on its own machine for that agent alone. What arrives there is
+// that agent, so nothing is handed to it, written down for it, or presented.
+
+// NodeAgentLabel is the Node Agent's name: what a line names it by.
 const NodeAgentLabel = "root-agent"
 
-// ElementAgentLabel heads an element agent's token by name: element-agent:<element> (ADR-054).
+// ElementAgentLabel heads an element agent's name: element-agent:<element> (ADR-054).
 const ElementAgentLabel = "element-agent"
 
-// HoldNamespaceAgent writes down a namespace agent's token, when the node does
-// not hold it yet (ADR-048): a token, acting in its namespace and nowhere else,
-// speaking for whoever opted the namespace into it. Held once; a start or a
-// first use after a restart finds it held.
-func (h *Handler) HoldNamespaceAgent(raw, did, label, mintedBy, namespace string) error {
-	if h.tokens == nil {
-		return errors.New("this node keeps no tokens, so the agent has none to present at the gate")
-	}
-	hash := sha256Hex(raw)
-	if grant, live, held := h.tokens.LookupSpent(hash); held {
-		if !live {
-			return errors.Newf("the agent's token %s is switched off", grant.ID)
-		}
-		if !h.stillAdmitted(grant.MintedBy) {
-			return errors.Newf("the agent's token %s speaks for %s, which the node no longer admits", grant.ID, quoteIdentity(grant.MintedBy))
-		}
-		return nil
-	}
+// doorKey is where a request that came through an agent's door carries the grant of that agent.
+type doorKey struct{}
+
+// ThroughDoor is ctx for a request that arrived at the door the node opened
+// for the agent whose grant this is. Only the node's own listener sets it.
+func ThroughDoor(ctx context.Context, grant Grant) context.Context {
+	return context.WithValue(ctx, doorKey{}, grant)
+}
+
+// doorGrant is the grant of the agent whose door a request came through.
+func doorGrant(ctx context.Context) (Grant, bool) {
+	grant, ok := ctx.Value(doorKey{}).(Grant)
+	return grant, ok
+}
+
+// NamespaceAgentGrant is a namespace agent (ADR-048): acting in its namespace
+// and nowhere else, speaking for whoever opted the namespace into it.
+func (h *Handler) NamespaceAgentGrant(did, label, mintedBy, namespace string) (Grant, error) {
 	if mintedBy == "" {
-		return errors.Newf("nobody opted %s into its agent, so there is nobody for its token to speak for", namespace)
+		return Grant{}, errors.Newf("nobody opted %s into its agent, so there is nobody for it to speak for", namespace)
 	}
-	// Derived from the node's key, so it is the same token for as long as the
-	// namespace keeps its agent: it does not end.
-	issued := IssuedToken{Hash: hash, DID: did, Label: label, MintedBy: mintedBy, Level: LevelToken, Namespaces: []string{namespace}, ExpiresAt: NeverEnds()}
-	u, found, err := h.users.ByRoute(mintedBy)
-	if err != nil {
-		return errors.Wrapf(err, "the User %s reaches was not read, so the agent's token was not written", quoteIdentity(mintedBy))
-	}
-	if found {
-		issued.MintedByUser, issued.MintedByDisplayName = u.ID, u.DisplayName
-	}
-	id, err := h.tokens.Issue(issued)
-	if err != nil {
-		h.attest(PredicateUnanswered, mintedBy, map[string]any{
-			"asked": "token store", "doing": "hold the agent of " + namespace, "error": err.Error(),
-		})
-		return errors.Wrapf(err, "the token of the agent of %s was not written", namespace)
-	}
-	h.attest(PredicateMinted, mintedBy, map[string]any{
-		"token": id, "label": label, "level": string(LevelToken), "did": did, "namespace": namespace,
-	})
-	return nil
+	return h.agentGrant(Grant{DID: did, Label: label, MintedBy: mintedBy, Level: LevelToken, Namespaces: []string{namespace}})
 }
 
-// HoldNodeAgent writes down the Node Agent's token, when the node does not
-// hold it yet (ADR-048). The token is ROOT's kind, which minting hands to
-// nobody: the node holds it for the one agent it runs as itself.
-func (h *Handler) HoldNodeAgent(raw, did string) error {
-	return h.holdRootsAgent(raw, did, NodeAgentLabel, "the Node Agent")
+// NodeAgentGrant is the Node Agent (ADR-048): ROOT's kind, which minting hands
+// to nobody; the node runs it as itself.
+func (h *Handler) NodeAgentGrant(did string) (Grant, error) {
+	return h.rootsAgent(did, NodeAgentLabel, "the Node Agent")
 }
 
-// HoldElementAgent writes down an element agent's token, when the node does
-// not hold it yet (ADR-054). It is ROOT's kind, as the Node Agent's is: the
-// element is ROOT's to shake.
-func (h *Handler) HoldElementAgent(raw, did, element string) error {
-	return h.holdRootsAgent(raw, did, ElementAgentLabel+":"+element, "the element "+element)
+// ElementAgentGrant is an element agent (ADR-054): ROOT's kind, as the Node
+// Agent is, since the element is ROOT's to shake.
+func (h *Handler) ElementAgentGrant(did, element string) (Grant, error) {
+	return h.rootsAgent(did, ElementAgentLabel+":"+element, "the element "+element)
 }
 
-// holdRootsAgent writes down the token of an agent that is ROOT's: labelled
-// label, and called as a sentence names it.
-func (h *Handler) holdRootsAgent(raw, did, label, called string) error {
-	if h.tokens == nil {
-		return errors.Newf("this node keeps no tokens, so %s has none to present at the gate", called)
-	}
-	hash := sha256Hex(raw)
-	if grant, live, held := h.tokens.LookupSpent(hash); held {
-		// Revocation is a switch, and it is ROOT's hand on it. A start does
-		// not turn back on what ROOT turned off.
-		if !live {
-			return errors.Newf("%s's token %s is switched off", called, grant.ID)
-		}
-		if !h.stillAdmitted(grant.MintedBy) {
-			return errors.Newf("%s's token %s speaks for %s, which auth.root_identities no longer lists", called, grant.ID, quoteIdentity(grant.MintedBy))
-		}
-		return nil
-	}
-
-	// A token speaks for whoever minted it (ADR-025), and this one speaks for
-	// ROOT: every entry reaches the one User that is ROOT (ADR-031).
+// rootsAgent is an agent that is ROOT's, labelled label and called as a sentence names it.
+func (h *Handler) rootsAgent(did, label, called string) (Grant, error) {
+	// Every entry reaches the one User that is ROOT (ADR-031).
 	roots := h.identities.roots()
 	if len(roots) == 0 {
-		return errors.Newf("auth.root_identities names nobody, so there is no ROOT for %s to speak for", called)
+		return Grant{}, errors.Newf("auth.root_identities names nobody, so there is no ROOT for %s to speak for", called)
 	}
-	issued := IssuedToken{Hash: hash, DID: did, Label: label, MintedBy: roots[0], Level: LevelRoot, ExpiresAt: NeverEnds()}
-	u, found, err := h.users.ByRoute(roots[0])
+	return h.agentGrant(Grant{DID: did, Label: label, MintedBy: roots[0], Level: LevelRoot})
+}
+
+// SwitchedOff is whether ROOT switched off the agent whose DID this is: a
+// record the node holds for it, revoked. An agent the node holds no record
+// for has nothing switched.
+func (h *Handler) SwitchedOff(did string) bool {
+	if h.tokens == nil {
+		return false
+	}
+	held, found := h.tokenOf(did)
+	return found && held.RevokedAt != nil
+}
+
+// agentGrant is grant with the person it speaks for resolved, as a session
+// resolves them when it is made.
+func (h *Handler) agentGrant(grant Grant) (Grant, error) {
+	u, found, err := h.users.ByRoute(grant.MintedBy)
 	if err != nil {
-		return errors.Wrapf(err, "the User %s reaches was not read, so %s's token was not written", quoteIdentity(roots[0]), called)
+		return Grant{}, errors.Wrapf(err, "the User %s reaches was not read", quoteIdentity(grant.MintedBy))
 	}
 	if found {
-		issued.MintedByUser, issued.MintedByDisplayName = u.ID, u.DisplayName
+		grant.MintedByUser, grant.MintedByDisplayName = u.ID, u.DisplayName
 	}
-	id, err := h.tokens.Issue(issued)
-	if err != nil {
-		h.attest(PredicateUnanswered, roots[0], map[string]any{
-			"asked": "token store", "doing": "hold " + called, "error": err.Error(),
-		})
-		return errors.Wrapf(err, "%s's token was not written", called)
-	}
-	h.attest(PredicateMinted, roots[0], map[string]any{
-		"token": id, "label": label, "level": string(LevelRoot), "did": did,
-	})
-	return nil
+	return grant, nil
 }
