@@ -38,7 +38,7 @@ func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant st
 	}
 	client, err := a2aclient.NewFromEndpoints(ctx,
 		[]*a2asdk.AgentInterface{{URL: at, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: tenant}},
-		// The person's signature goes to the peer and nowhere else: a redirect is
+		// 「[Opus 5.5] The person's signature goes to the peer and nowhere else: a redirect is」
 		// the peer's answer, not a place to follow it to.
 		a2aclient.WithRESTTransport(&http.Client{Transport: carried,
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}),
@@ -78,8 +78,8 @@ func (c *cardHeard) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// carriedTo is a2a-go's call interceptor that carries the person on each call
-// with a signature of its own, since the peer spends each once.
+// 「[Opus 5.5] carriedTo is a2a-go's call interceptor that carries the person on each call」
+// 「[Opus 5.5] with a signature of its own, since the peer spends each once.」
 type carriedTo struct{ carry func() (string, error) }
 
 func (c carriedTo) Before(ctx context.Context, req *a2aclient.Request) (context.Context, any, error) {
