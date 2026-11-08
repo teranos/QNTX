@@ -17,7 +17,7 @@ https://platform.claude.com/dashboard
 
 - [ ] Interesting to think about an [[ADR-049-Obsidian|Obsidian]] linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory.
 
-bidirectional sync between our abstraction of the memory store.
+- [ ] bidirectional sync between our abstraction of the memory store.
 
 
 Allow all Agent Harnesses to leverage memories created in Managed Agents.
@@ -94,8 +94,6 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 "there needs to be a process"
 
 "「[Opus 5.5] it doesnt run one today」"
-
-"dealing with the ground namespace"
 
 「[Fable] Every row of ground's own attestations table carries qntx_at, qntx_status and qntx_reason: what ground sees is written to a node. What the namespace holds there I have not read.」
 
