@@ -80,6 +80,10 @@ type Host interface {
 	// OfStandingRow is the store of the namespace a standing row landed in,
 	// for what its built-in writes beside the row. system is refused.
 	OfStandingRow(namespace string) (ats.AttestationStore, error)
+	// Held is a DuckDB the subsystem holds for itself, by name: its own
+	// tables, made by its migrations, in one file of the node's, held in memory
+	// while the node runs and kept across restarts. Asked once per name.
+	Held(name string, migrations []Migration) (Held, error)
 	// Registry is where a built-in is registered, by its name.
 	Registry() *async.HandlerRegistry
 	// Enqueue hands a job to the daemon, for a built-in to run off the
@@ -94,6 +98,23 @@ type Host interface {
 	AskGitHub(ctx context.Context, operation string, request any) ([]byte, error)
 	// Logger is the node's, for the subsystem to name its own under.
 	Logger() *zap.SugaredLogger
+}
+
+// Held is a DuckDB a subsystem holds for itself (Host.Held).
+type Held interface {
+	// Exec runs SQL answering no rows, params bound in order, and answers how
+	// many rows it changed.
+	Exec(sql string, params ...any) (int, error)
+	// Query runs SQL, params bound in order, and decodes its rows, objects by
+	// column name, into into.
+	Query(into any, sql string, params ...any) error
+}
+
+// A Migration is one of a subsystem's own, for the DuckDB it holds: applied
+// once, by its version, in the order handed.
+type Migration struct {
+	Version string
+	SQL     string
 }
 
 // Delivered is a subsystem that reads the App's webhook deliveries. The node
