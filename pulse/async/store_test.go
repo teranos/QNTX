@@ -591,9 +591,9 @@ func TestCleanupSparesForwardsLiveParentsAndTheRecent(t *testing.T) {
 	}
 }
 
-// A queued job older than the horizon is cancelled with the reason as its error;
-// a newer one, a running one, and another handler's are not touched. A pass
-// takes at most atMost.
+// 「[Fable 5.1] A queued job older than the horizon is cancelled with the reason as its error;」
+// 「[Fable 5.1] a newer one, a running one, and another handler's are not touched. A pass」
+// 「[Fable 5.1] takes at most atMost.」
 func TestCancelQueuedBeforeDropsOnlyTheOldQueuedOfTheHandler(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
