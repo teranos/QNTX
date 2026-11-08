@@ -138,16 +138,20 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 }
 
 // nameNodeAgent makes the Node Agent this node's: a key of its own from the
-// node's, and its token written down where the gate reads tokens. A node with
-// no login has no gate to tell.
+// node's, and a door of its own the gate admits it at. A node with no login
+// has no gate to open one at.
 func (s *QNTXServer) nameNodeAgent(home string) error {
 	agent, err := theNodeAgent(s.nodeDID.PrivateKey, home)
 	if err != nil {
 		return errors.Wrap(err, "the Node Agent has no key of its own")
 	}
 	if s.authHandler != nil {
-		if err := s.authHandler.HoldNodeAgent(agent.token, agent.did); err != nil {
-			return errors.Wrap(err, "the Node Agent's token is not held, so it would reach none of the node's sigils")
+		grant, err := s.authHandler.NodeAgentGrant(agent.did)
+		if err != nil {
+			return errors.Wrap(err, "the Node Agent speaks for nobody, so it would reach none of the node's sigils")
+		}
+		if err := s.openDoor(agent, grant, home); err != nil {
+			return errors.Wrap(err, "the Node Agent has no door to the node")
 		}
 	}
 	s.nodeAgent = agent

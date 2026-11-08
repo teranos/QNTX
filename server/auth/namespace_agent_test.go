@@ -3,7 +3,6 @@ package auth
 import (
 	"crypto/ed25519"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,19 +10,19 @@ import (
 	"github.com/teranos/QNTX/internal/access"
 )
 
-// namespaceAgentToken is a token derived the way the node derives a namespace
-// agent's: from its key, for the namespace and the model.
-func namespaceAgentToken(t *testing.T) (raw, did string) {
+// namespaceAgentDID is the DID the node derives a namespace agent's key under:
+// from its key, for the namespace and the model.
+func namespaceAgentDID(t *testing.T) string {
 	t.Helper()
-	raw, did, err := access.DeriveToken(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)), "agent:garden:claude-sonnet-5-5")
+	key, err := access.DeriveKey(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)), "agent:garden:claude-sonnet-5-5")
 	require.NoError(t, err)
-	return raw, did
+	return EncodeDIDKey(key.Public().(ed25519.PublicKey))
 }
 
 const theGardener = "https://example.org/theGardener"
 
 // namespaceAgentHandler is nodeAgentHandler with the theGardener a USER the node
-// invited: a token speaks for whoever minted it, and the gate asks that they
+// invited: an agent speaks for whoever set it up, and the gate asks that they
 // are still admitted.
 func namespaceAgentHandler() (*Handler, *memTokenStore) {
 	h, store := nodeAgentHandler(mastodonAccount)
@@ -32,18 +31,19 @@ func namespaceAgentHandler() (*Handler, *memTokenStore) {
 	return h, store
 }
 
-// A namespace agent's token is a token in its namespace and nowhere else,
-// speaking for whoever opted the namespace into it (ADR-048): it attests as
-// its own DID, acts in the namespace, and sees no system.
-func TestANamespaceAgentsTokenActsInItsNamespaceAlone(t *testing.T) {
+// A namespace agent acts in its namespace and nowhere else, speaking for
+// whoever opted the namespace into it (ADR-048): it attests as its own DID,
+// acts in the namespace, sees no system, and no token is written.
+func TestANamespaceAgentActsInItsNamespaceAlone(t *testing.T) {
 	h, store := namespaceAgentHandler()
-	raw, did := namespaceAgentToken(t)
-	require.NoError(t, h.HoldNamespaceAgent(raw, did, "agent:garden:claude-sonnet-5-5", theGardener, "garden"))
+	did := namespaceAgentDID(t)
+	grant, err := h.NamespaceAgentGrant(did, "agent:garden:claude-sonnet-5-5", theGardener, "garden")
+	require.NoError(t, err)
 
 	// A route ROOT alone reaches is out of its reach: it is a TOKEN, not ROOT's kind.
-	status, _ := presenting(h, raw)
+	status, _ := throughDoor(h, grant, Reach{})
 	assert.Equal(t, http.StatusForbidden, status)
-	status, admitted := presentingAt(h, raw, Also(LevelToken))
+	status, admitted := throughDoor(h, grant, Also(LevelToken))
 	require.Equal(t, http.StatusOK, status)
 	assert.Equal(t, did, admitted.ActsAs(), "the agent attests as itself")
 	assert.Equal(t, theGardener, admitted.Identity, "it speaks for whoever set it up")
@@ -54,55 +54,25 @@ func TestANamespaceAgentsTokenActsInItsNamespaceAlone(t *testing.T) {
 
 	held, err := store.List()
 	require.NoError(t, err)
-	require.Len(t, held, 1)
-	assert.Equal(t, "agent:garden:claude-sonnet-5-5", held[0].Label)
-	assert.Equal(t, LevelToken, held[0].Level)
-	assert.Equal(t, []string{"garden"}, held[0].Namespaces)
-
-	// Held again, it is the one token still.
-	require.NoError(t, h.HoldNamespaceAgent(raw, did, "agent:garden:claude-sonnet-5-5", theGardener, "garden"))
-	held, err = store.List()
-	require.NoError(t, err)
-	assert.Len(t, held, 1)
-}
-
-// Switched off, it stays off: a use after a restart does not turn it back on.
-func TestANamespaceAgentSwitchedOffStaysOff(t *testing.T) {
-	h, store := namespaceAgentHandler()
-	raw, did := namespaceAgentToken(t)
-	require.NoError(t, h.HoldNamespaceAgent(raw, did, "agent:garden:claude-sonnet-5-5", theGardener, "garden"))
-	held, err := store.List()
-	require.NoError(t, err)
-	require.NoError(t, store.setRevoked(held[0].ID, true))
-
-	err = h.HoldNamespaceAgent(raw, did, "agent:garden:claude-sonnet-5-5", theGardener, "garden")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "switched off")
-	status, _ := presentingAt(h, raw, Also(LevelToken))
-	assert.Equal(t, http.StatusUnauthorized, status)
-}
-
-// presentingAt is presenting, on a route a line grants to reach.
-func presentingAt(h *Handler, raw string, reach Reach) (int, Admission) {
-	var admitted Admission
-	gated := h.Middleware("/test", reach, func(w http.ResponseWriter, r *http.Request) {
-		admitted, _ = AdmissionFrom(r.Context())
-		w.WriteHeader(http.StatusOK)
-	})
-	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
-	req.Header.Set("Authorization", "Bearer "+raw)
-	rec := httptest.NewRecorder()
-	gated.ServeHTTP(rec, req)
-	return rec.Code, admitted
+	assert.Empty(t, held, "a token was written for a namespace agent")
 }
 
 // It speaks for whoever opted the namespace in, so a line that names nobody
 // gives it nobody to speak for.
 func TestANamespaceAgentSpeaksForWhoeverSetItUp(t *testing.T) {
-	h, store := nodeAgentHandler(mastodonAccount)
-	raw, did := namespaceAgentToken(t)
-	require.Error(t, h.HoldNamespaceAgent(raw, did, "agent:garden:claude-sonnet-5-5", "", "garden"))
-	held, err := store.List()
+	h, _ := nodeAgentHandler(mastodonAccount)
+	_, err := h.NamespaceAgentGrant(namespaceAgentDID(t), "agent:garden:claude-sonnet-5-5", "", "garden")
+	require.Error(t, err)
+}
+
+// A bearer is not a door: nothing presented in a header reaches an agent's grant.
+func TestNothingPresentedReachesAnAgentsGrant(t *testing.T) {
+	h, _ := namespaceAgentHandler()
+	did := namespaceAgentDID(t)
+	_, err := h.NamespaceAgentGrant(did, "agent:garden:claude-sonnet-5-5", theGardener, "garden")
 	require.NoError(t, err)
-	assert.Empty(t, held)
+	for _, presented := range []string{did, "agent:garden:claude-sonnet-5-5", signedOnly(did)} {
+		_, ok := presentedAs(h, presented)
+		assert.False(t, ok, presented)
+	}
 }

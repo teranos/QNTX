@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,10 +14,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// askForSignIn is an agent asking for a sign-in under label.
-func askForSignIn(t *testing.T, h *Handler, label string) map[string]any {
+// agentKey is a key an agent holds and never hands over.
+func agentKey(t *testing.T) string {
 	t.Helper()
-	form := url.Values{"label": {label}}
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	return EncodeDIDKey(pub)
+}
+
+// askForSignIn is an agent asking for a sign-in under label, naming its did:key.
+func askForSignIn(t *testing.T, h *Handler, label, did string) map[string]any {
+	t.Helper()
+	form := url.Values{"label": {label}, "did": {did}}
 	r := httptest.NewRequest(http.MethodPost, deviceAuthorizationPath, strings.NewReader(form.Encode()))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
@@ -41,10 +51,13 @@ func pollForToken(t *testing.T, h *Handler, deviceCode string) (int, map[string]
 
 // "yes, i want this"
 // The agent prints a link, the person says yes at the passkey, and the agent's
-// token is that person: ROOT here, since the passkey is a root identity's.
+// key is that person: ROOT here, since the passkey is a root identity's.
+//
+// "A signature proves the key, and nothing reusable leaves the node."
 func TestAnAgentIsSignedInByThePersonsPasskey(t *testing.T) {
 	h, store, _ := authorizingHandler(t)
-	asked := askForSignIn(t, h, "Coding Agent on l")
+	did := agentKey(t)
+	asked := askForSignIn(t, h, "Coding Agent on l", did)
 	deviceCode, _ := asked["device_code"].(string)
 	userCode, _ := asked["user_code"].(string)
 	require.NotEmpty(t, deviceCode)
@@ -82,11 +95,11 @@ func TestAnAgentIsSignedInByThePersonsPasskey(t *testing.T) {
 
 	code, said = pollForToken(t, h, deviceCode)
 	require.Equal(t, http.StatusOK, code, said)
-	raw, _ := said["access_token"].(string)
-	require.True(t, strings.HasPrefix(raw, tokenPrefix))
+	assert.NotContains(t, said, "access_token", "a sign-in handed the agent a token")
+	assert.Equal(t, did, said["did"])
 
-	grant, ok := store.Lookup(sha256Hex(raw))
-	require.True(t, ok)
+	grant, ok := store.Lookup(signedOnly(did))
+	require.True(t, ok, "the person's yes was not held for the agent's key")
 	admitted, in := h.admissionOf(Presented{Bearer: &grant})
 	require.True(t, in)
 	assert.Equal(t, string(LevelRoot), admitted.LevelName())
@@ -94,7 +107,21 @@ func TestAnAgentIsSignedInByThePersonsPasskey(t *testing.T) {
 
 	code, said = pollForToken(t, h, deviceCode)
 	assert.Equal(t, http.StatusBadRequest, code)
-	assert.Equal(t, "invalid_grant", said["error"], "a sign-in's token is issued once")
+	assert.Equal(t, "invalid_grant", said["error"], "a sign-in is answered once")
+}
+
+// An agent that names no key of its own has nothing to sign with.
+func TestASignInNamingNoKeyIsRefused(t *testing.T) {
+	h, _, _ := authorizingHandler(t)
+	for _, did := range []string{"", "not-a-did", "did:web:example.com"} {
+		form := url.Values{"label": {"Coding Agent on l"}, "did": {did}}
+		r := httptest.NewRequest(http.MethodPost, deviceAuthorizationPath, strings.NewReader(form.Encode()))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		h.handleDeviceAuthorization(w, r)
+		assert.Equal(t, http.StatusBadRequest, w.Code, did)
+		assert.Contains(t, w.Body.String(), "did", did)
+	}
 }
 
 // An agent that does not say who it is is not shown to anybody.

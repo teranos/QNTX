@@ -90,33 +90,34 @@ func (s *QNTXServer) piTurn(thinking string, said func(binary, session, says str
 }
 
 // piSaid is how one turn is run in Pi: the node's MCP and its gateway, each
-// reached with the agent's own token.
+// reached at the agent's own door. Pi names a key for its provider, and is
+// handed the agent's DID, which is no secret: the door admits the agent, not
+// what it presents.
 func (s *QNTXServer) piSaid(agent *rootAgent, named appcfg.PiConfig, binary, session, says string, env []string) pi.Said {
 	said := pi.Said{
 		Binary: binary, Home: agent.home, Session: session, Says: says,
 		Model: piGatewayProvider + "/" + named.Model, Thinking: named.Thinking,
 		System: agent.isSaidToBe(), Env: env, Tools: pi.PisOwnTools,
 	}
-	if s.ownURL != "" {
-		said.MCP = s.piMCP(agent, s.ownURL)
+	if reach := s.reachOf(agent); reach != "" {
+		said.MCP = s.piMCP(agent, reach)
 		said.Provider = &pi.Provider{
-			Name: piGatewayProvider, BaseURL: s.ownURL + "/api/" + named.Gateway + "/v1",
-			Key: agent.token, Models: []string{named.Model},
+			Name: piGatewayProvider, BaseURL: reach + "/api/" + named.Gateway + "/v1",
+			Key: agent.did, Models: []string{named.Model},
 		}
 	}
 	return said
 }
 
-// piMCP is the node's MCP as an agent in Pi reaches it, at own, with the
-// agent's own token.
+// piMCP is the node's MCP as an agent in Pi reaches it, at own: its door.
 //
 // "THE NODE'S MCP NEEDS"
 //
 // 「[Opus 5.5] A node agent is given each MCP server the node consumes beside it.」
 func (s *QNTXServer) piMCP(agent *rootAgent, own string) []pi.MCPServer {
-	servers := []pi.MCPServer{{Name: nodeAgentMCP, URL: own + "/mcp", Bearer: agent.token}}
+	servers := []pi.MCPServer{{Name: nodeAgentMCP, URL: own + "/mcp"}}
 	for _, consumed := range s.consumedForAgent(agent, own) {
-		servers = append(servers, pi.MCPServer{Name: consumed.Name, URL: consumed.URL, Bearer: agent.token})
+		servers = append(servers, pi.MCPServer{Name: consumed.Name, URL: consumed.URL})
 	}
 	return servers
 }
@@ -130,7 +131,7 @@ func (s *QNTXServer) namespacePiPart(held aPiAgentHeld) (aTurn, *protocol.Refusa
 	if !known {
 		return aTurn{}, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + agent.namespace + " in Pi names provider " + line.provider + ", which is none Pi is run at"}
 	}
-	own, err := named.TextOf("this node's own URL, where the agent of "+agent.namespace+" reaches its MCP,", s.ownURL)
+	own, err := named.TextOf("the door where the agent of "+agent.namespace+" reaches its MCP,", s.reachOf(agent))
 	if err != nil {
 		return aTurn{}, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}

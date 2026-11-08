@@ -3,16 +3,17 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// The primary asks a peer for its row as the person, with a token issued here
-// for that peer, so the peer files and finds news under the same person.
+// The primary asks a peer for its row as the person, signing for them as
+// itself, so the peer files and finds news under the same person.
 func TestAPeerIsAskedAsThePerson(t *testing.T) {
-	primary, got, peerDID := anyPeer(t)
+	primary, got, _ := anyPeer(t)
 	admitted := Admitted(LevelRoot)
 	admitted.Identity = mastodonAccount
 
@@ -25,12 +26,7 @@ func TestAPeerIsAskedAsThePerson(t *testing.T) {
 
 	assert.Equal(t, "/am/statusline", got.path)
 	assert.Equal(t, "format=json", got.query)
-	raw, bears := bearerToken(&http.Request{Header: http.Header{"Authorization": {got.authorization}}})
-	require.True(t, bears, "the person was not carried")
-	grant, live := primary.tokens.Lookup(sha256Hex(raw))
-	require.True(t, live)
-	assert.Equal(t, mastodonAccount, grant.MintedBy)
-	assert.Equal(t, peerDID, grant.ClientDID)
+	assert.True(t, strings.HasPrefix(got.authorization, signedScheme), "the person was not carried by a signature")
 }
 
 // Nobody is carried to a peer: a caller with no identity is answered with why.

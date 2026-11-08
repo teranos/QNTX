@@ -119,8 +119,12 @@ func pidRuns(stream string) bool {
 	return err == nil
 }
 
-// follow reads stream from its .read mark until a result, or until runs says
-// the process is gone and nothing more is in it.
+// follow reads stream from its .read mark until runs says the process is gone
+// and nothing more is in it, and answers with the last result. A resumed session
+// answers what was queued before what was said, each with a result of its own:
+// the first result is not the turn's answer.
+//
+// "i actually think the node agent got it, i can see it now. but weirdly enough, it did not respond"
 func follow(ctx context.Context, stream string, runs func() bool, each func(Message)) (answered Answer, err error) {
 	file, err := os.Open(stream)
 	if err != nil {
@@ -144,14 +148,17 @@ func follow(ctx context.Context, stream string, runs func() bool, each func(Mess
 	resulted, gone := false, false
 	lines := bufio.NewReader(file)
 	var partial []byte
-	for !resulted {
+	for {
 		line, readErr := lines.ReadBytes('\n')
 		partial = append(partial, line...)
 		if readErr == nil {
 			var m Message
 			// A line that is not a message is nothing the stream promised.
 			if unmarshalErr := json.Unmarshal(partial, &m); unmarshalErr == nil {
-				resulted = resulted || answerFrom(&answer, m)
+				// Every result is taken in: the last one is the answer.
+				if answerFrom(&answer, m) {
+					resulted = true
+				}
 				each(m)
 			}
 			read += int64(len(partial))
@@ -165,17 +172,24 @@ func follow(ctx context.Context, stream string, runs func() bool, each func(Mess
 			return Answer{}, errors.Wrapf(readErr, "the stream %s did not read", stream)
 		}
 		if gone {
+			if resulted {
+				return answer, ended(stream)
+			}
 			return Answer{}, endedUnanswered(stream)
 		}
 		// Gone is read once more: what it printed before it went is in the file.
 		gone = !runs()
 		select {
 		case <-ctx.Done():
+			// The node stopping is no reason to drop a result already read: it is
+			// the answer as far as the stream went.
+			if resulted {
+				return answer, ended(stream)
+			}
 			return Answer{}, errors.Wrapf(ctx.Err(), "the stream %s was left to be read on", stream)
 		case <-time.After(followEvery):
 		}
 	}
-	return answer, ended(stream)
 }
 
 // Tail reads stream from mark on as a second reader: the turn's own follow

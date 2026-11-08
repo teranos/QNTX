@@ -35,6 +35,9 @@ type authorizationServerMetadata struct {
 	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
 	// A node signs its assertion with its did:key, which is ed25519.
 	TokenEndpointAuthSigningAlgValuesSupported []string `json:"token_endpoint_auth_signing_alg_values_supported"`
+	// DID is the did:key this node signs as: what a peer checks the person it
+	// carries against.
+	DID string `json:"did,omitempty"`
 }
 
 // protectedResourceMetadata is RFC 9728 §2, the members this node has an
@@ -60,16 +63,19 @@ func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *ht
 		return
 	}
 	issuer := h.publicOrigin()
+	// A node with no key of its own signs for nobody, and says no DID.
+	did, _ := h.ownDID()
 	h.writeJSON(w, http.StatusOK, authorizationServerMetadata{
-		Issuer:                                     issuer,
-		AuthorizationEndpoint:                      issuer + authorizePath,
-		TokenEndpoint:                              issuer + tokenPath,
-		IntrospectionEndpoint:                      issuer + introspectPath,
-		DeviceAuthorizationEndpoint:                issuer + deviceAuthorizationPath,
-		ResponseTypesSupported:                     []string{"code"},
-		GrantTypesSupported:                        []string{"authorization_code", "refresh_token", "client_credentials", deviceCodeGrant},
-		TokenEndpointAuthMethodsSupported:          []string{"client_secret_basic", "client_secret_post", "private_key_jwt"},
-		CodeChallengeMethodsSupported:              []string{"S256"},
+		DID:                               did,
+		Issuer:                            issuer,
+		AuthorizationEndpoint:             issuer + authorizePath,
+		TokenEndpoint:                     issuer + tokenPath,
+		IntrospectionEndpoint:             issuer + introspectPath,
+		DeviceAuthorizationEndpoint:       issuer + deviceAuthorizationPath,
+		ResponseTypesSupported:            []string{"code"},
+		GrantTypesSupported:               []string{"authorization_code", "refresh_token", "client_credentials", deviceCodeGrant},
+		TokenEndpointAuthMethodsSupported: []string{"client_secret_basic", "client_secret_post", "private_key_jwt"},
+		CodeChallengeMethodsSupported:     []string{"S256"},
 		TokenEndpointAuthSigningAlgValuesSupported: []string{jwt.SigningMethodEdDSA.Alg()},
 	})
 }

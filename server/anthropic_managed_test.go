@@ -161,6 +161,39 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 	return c, served.URL
 }
 
+// aVaultHeld is a Vault the element already holds at Anthropic, made before the
+// node stopped putting tokens in one.
+func aVaultHeld(t *testing.T, home, element string) {
+	t.Helper()
+	dir := filepath.Join(home, elementsDir, element)
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, managedElementFile), []byte(`{"vault":"vlt_1"}`), 0o600))
+}
+
+// "Tokens are to be removed from QNTX except for third-party OAuth clients"
+// An element new at Anthropic is put in no Vault: nothing is handed over.
+func TestANewElementAtAnthropicIsHandedNoToken(t *testing.T) {
+	s, _, _ := runningNamespaceAgents(t)
+	console, base := standInConsole(t)
+	s.anthropicBaseURL = base
+	if s.nodeAgent == nil {
+		s.nodeAgent = &rootAgent{home: t.TempDir()}
+	}
+	for _, given := range []sigil.Sent{anOrganization, aServiceAcct, aRule} {
+		rootAsksAnthropic(t, s, "set", given)
+	}
+	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole})
+	home := t.TempDir()
+	agent := &rootAgent{home: home, namespace: auth.NamespaceSystem, element: "canvas-1", sessionDir: filepath.Join(elementsDir, "canvas-1"), did: "did:key:element"}
+	_, err := s.spend(agent, rootSaid(filepath.Join(t.TempDir(), "no-claude-code-is-run"), home), shaken{}, func(claudecode.Message) {})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "OAuth")
+	console.mu.Lock()
+	defer console.mu.Unlock()
+	assert.Zero(t, console.made["vault"], "a Vault was made")
+	assert.Zero(t, console.made["credential"], "a token was put in a Vault")
+}
+
 // "so we can have an agent, that isnt hosted on the same box as QNTX"
 // "if we use their infra, we use their infra"
 func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *testing.T) {
@@ -175,7 +208,8 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	}
 	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole})
 	home := t.TempDir()
-	agent := &rootAgent{home: home, namespace: auth.NamespaceSystem, element: "canvas-1", sessionDir: filepath.Join(elementsDir, "canvas-1"), did: "did:key:element", token: "the-element-token"}
+	agent := &rootAgent{home: home, namespace: auth.NamespaceSystem, element: "canvas-1", sessionDir: filepath.Join(elementsDir, "canvas-1"), did: "did:key:element"}
+	aVaultHeld(t, home, "canvas-1")
 	said := rootSaid(filepath.Join(t.TempDir(), "no-claude-code-is-run"), home)
 
 	var seen []claudecode.Message
@@ -197,8 +231,6 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	assert.Contains(t, agentMade["system"], "You run at Anthropic")
 	servers := agentMade["mcp_servers"].([]any)
 	assert.Equal(t, s.authHandler.PublicOrigin()+"/mcp", servers[0].(map[string]any)["url"], "it reaches the node's MCP at its public origin")
-	credential := console.bodies["credential"][0]["auth"].(map[string]any)
-	assert.Equal(t, map[string]any{"type": "static_bearer", "token": "the-element-token", "mcp_server_url": s.authHandler.PublicOrigin() + "/mcp"}, credential, "with its own token")
 	assert.Equal(t, []any{"vlt_1"}, console.bodies["session"][0]["vault_ids"])
 	assert.Equal(t, []any{map[string]any{"type": "memory_store", "memory_store_id": "memstore_1"}}, console.bodies["session"][0]["resources"], "its Memory, in every Session")
 	console.mu.Unlock()
@@ -207,7 +239,7 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_1", again.Session, "shaken again: the same Session")
 	console.mu.Lock()
-	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "memory": 1, "session": 1}, console.made, "each made once")
+	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "memory": 1, "session": 1}, console.made, "each made once")
 	console.mu.Unlock()
 
 	// A screenshot reaches it as a picture, not as a path on the node it cannot open.
@@ -238,7 +270,7 @@ func TestAnElementsAgentOnTheConsoleRunsAtAnthropicAndGoesOnInItsOneSession(t *t
 	require.NoError(t, err)
 	assert.Equal(t, "sesn_2", anew.Session)
 	console.mu.Lock()
-	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "vault": 1, "credential": 1, "memory": 1, "session": 2}, console.made)
+	assert.Equal(t, map[string]int{"environment": 1, "agent": 1, "memory": 1, "session": 2}, console.made)
 	assert.Equal(t, console.bodies["session"][0]["resources"], console.bodies["session"][1]["resources"], "the new Session has the Memory the ended one had")
 	console.mu.Unlock()
 
@@ -299,7 +331,8 @@ func TestAnElementsSessionAtAnthropicIsMadeWithTheCapRootSet(t *testing.T) {
 	}
 	rootAsksAnthropic(t, s, "order", sigil.Sent{"first": anthropicConsole})
 	home := t.TempDir()
-	agent := &rootAgent{home: home, namespace: auth.NamespaceSystem, element: "llm-provider-element", sessionDir: filepath.Join(elementsDir, "llm-provider-element"), did: "did:key:element", token: "the-element-token"}
+	agent := &rootAgent{home: home, namespace: auth.NamespaceSystem, element: "llm-provider-element", sessionDir: filepath.Join(elementsDir, "llm-provider-element"), did: "did:key:element"}
+	aVaultHeld(t, home, "llm-provider-element")
 	said := rootSaid(filepath.Join(t.TempDir(), "no-claude-code-is-run"), home)
 	budget := func(cents string) any {
 		return map[string]any{"type": "limit", "max_list_cost": map[string]any{"amount": cents, "currency": anthropicCapCurrency}}

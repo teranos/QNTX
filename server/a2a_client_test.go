@@ -274,7 +274,7 @@ func TestAPeersAgentIsSpokenToAsTheSpecSays(t *testing.T) {
 	require.Len(t, agent.tenant, 1)
 	assert.Equal(t, "orchard", agent.tenant[0])
 	require.NotEmpty(t, agent.bearer)
-	assert.True(t, strings.HasPrefix(agent.bearer[0], "Bearer "), "the peer was not spoken to as the person")
+	assert.True(t, strings.HasPrefix(agent.bearer[0], "Signed "), "the peer was not spoken to as the person")
 
 	code, refused := a2aCalledOver(t, srv, root, http.MethodGet, "GetTask", map[string]any{"peer": "orchardnode", "tenant": "orchard", "id": "no-such-task"})
 	assert.NotEqual(t, http.StatusOK, code, refused)

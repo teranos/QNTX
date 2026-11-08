@@ -318,20 +318,22 @@ func TestTheNodeAgentIsGivenTheServerROOTConnectedAndCallsIt(t *testing.T) {
 
 	agent, err := theNodeAgent(s.nodeDID.PrivateKey, t.TempDir())
 	require.NoError(t, err)
-	require.NoError(t, s.authHandler.HoldNodeAgent(agent.token, agent.did))
+	grant, err := s.authHandler.NodeAgentGrant(agent.did)
+	require.NoError(t, err)
+	require.NoError(t, s.openDoor(agent, grant, ""))
 
-	given := s.consumedForAgent(agent, node.URL)
+	given := s.consumedForAgent(agent, agent.door)
 	require.Len(t, given, 1)
 	assert.Equal(t, "tracker", given[0].Name)
-	assert.Equal(t, node.URL+ConsumedServedAt+"tracker", given[0].URL, "the agent reaches the server at the node, never at the upstream")
+	assert.Equal(t, agent.door+ConsumedServedAt+"tracker", given[0].URL, "the agent reaches the server at its door, never at the upstream")
 	assert.NotContains(t, given[0].URL, up.at)
-	for _, server := range s.piMCP(agent, node.URL) {
-		assert.Equal(t, agent.token, server.Bearer, "every server the agent is given is reached with its own token: %s", server.Name)
+	for _, server := range s.piMCP(agent, agent.door) {
+		assert.Empty(t, server.Bearer, "a server the agent is given was handed a bearer: %s", server.Name)
 	}
 
 	ctx := context.Background()
 	client := mcp.NewClient(&mcp.Implementation{Name: "node-agent", Version: "0"}, nil)
-	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: given[0].URL, HTTPClient: &http.Client{Transport: bearing{token: agent.token}}}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: given[0].URL}, nil)
 	require.NoError(t, err, "the node did not serve the server ROOT connected to its agent")
 	t.Cleanup(func() { _ = session.Close() })
 	listed, err := session.ListTools(ctx, nil)
@@ -359,7 +361,10 @@ func TestTheNodeAgentIsGivenTheServerROOTConnectedAndCallsIt(t *testing.T) {
 	require.Nil(t, refused)
 	require.Len(t, listedServers.([]consumedServer), 1, "a call line is no server: the server the node consumes is still listed")
 
-	stranger, err := http.Post(given[0].URL, "application/json", strings.NewReader(`{}`))
+	// At the node's own address nobody reaches the server without a credential.
+	// The agent's door admits whoever reaches its loopback port: what arrives
+	// there is taken to be the agent (agent_door.go).
+	stranger, err := http.Post(node.URL+ConsumedServedAt+"tracker", "application/json", strings.NewReader(`{}`))
 	require.NoError(t, err)
 	_ = stranger.Body.Close()
 	assert.Equal(t, http.StatusUnauthorized, stranger.StatusCode, "nobody reaches the server the node consumes without a credential")
@@ -505,12 +510,12 @@ func TestAnElementsAgentIsGivenTheServerAsAROOTAccessibleAgent(t *testing.T) {
 
 	element, refused := s.holdElementAgent("phone")
 	require.Nil(t, refused)
-	given := s.consumedForAgent(element, node.URL)
+	given := s.consumedForAgent(element, element.door)
 	require.Len(t, given, 1)
 
 	ctx := context.Background()
 	session, err := mcp.NewClient(&mcp.Implementation{Name: "element", Version: "0"}, nil).Connect(ctx,
-		&mcp.StreamableClientTransport{Endpoint: given[0].URL, HTTPClient: &http.Client{Transport: bearing{token: element.token}}}, nil)
+		&mcp.StreamableClientTransport{Endpoint: given[0].URL}, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = session.Close() })
 	listed, err := session.ListTools(ctx, nil)

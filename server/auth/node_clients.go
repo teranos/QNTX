@@ -40,17 +40,29 @@ const assertionIDBytes = 16
 // captured assertion presented again is refused (RFC 7523 §3, item 7).
 type spentAssertions struct {
 	until sync.Map
+	// swept is when ids past their exp were last let go: once a second at
+	// most, so a request does not walk every id kept.
+	mu    sync.Mutex
+	swept time.Time
 }
 
 // spend records jti as used until exp. A jti already held is answered with
 // when it was kept until, and is not fresh.
 func (s *spentAssertions) spend(jti string, exp, now time.Time) (any, bool) {
-	s.until.Range(func(id, at any) bool {
-		if kept, isTime := at.(time.Time); !isTime || now.After(kept) {
-			s.until.Delete(id)
-		}
-		return true
-	})
+	s.mu.Lock()
+	sweep := now.Sub(s.swept) >= time.Second
+	if sweep {
+		s.swept = now
+	}
+	s.mu.Unlock()
+	if sweep {
+		s.until.Range(func(id, at any) bool {
+			if kept, isTime := at.(time.Time); !isTime || now.After(kept) {
+				s.until.Delete(id)
+			}
+			return true
+		})
+	}
 	prior, loaded := s.until.LoadOrStore(jti, exp)
 	return prior, !loaded
 }

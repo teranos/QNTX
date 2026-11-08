@@ -46,7 +46,6 @@ type Handler struct {
 	creating sync.Mutex
 	// 「[Opus 5.5] Held across the look-then-write that hands an agent its token, for the」
 	// 「[Opus 5.5] same reason and with the same reach.」
-	handingAgents  sync.Mutex
 	sessions       *sessionStore
 	becomings      becomings
 	layeChallenges layeChallenges
@@ -107,7 +106,9 @@ type Handler struct {
 	assertions spentAssertions
 	// nodes.primary: whose tokens this one also accepts, and what it said of each.
 	issuers []string
-	issued  issuedAnswers
+	// The did:key each issuer says it signs as, asked once (signed.go).
+	issuerDIDs sync.Map
+	issued     issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
 	logsInElsewhere bool
@@ -115,9 +116,7 @@ type Handler struct {
 	// How this primary asks GitHub for a peer (github_for_peers.go).
 	githubForPeers         GitHubGet
 	githubLocationForPeers GitHubLocate
-	// nodes.peers: this primary's peers, by did:key and by name, and the
-	// tokens people are carried to them with.
-	carried  carriedTokens
+	// nodes.peers: this primary's peers, by did:key and by name.
 	nodes    map[string]Client
 	tokens   TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor Attestor   // records admissions; nil until the store is up
@@ -616,8 +615,6 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
 	mux.answer(deviceApprovePath, h.handleDeviceApprove)
 	mux.answer(deviceDonePath, h.handleDeviceDone)
-	// 「[Opus 5.5] An agent a token starts is handed a token of its own (ADR-025).」
-	mux.answer(agentTokenPath, h.handleAgentToken)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
 	// A peer asks for the lines about the namespaces it serves, signing as itself.
