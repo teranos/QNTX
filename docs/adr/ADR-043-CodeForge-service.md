@@ -76,5 +76,5 @@ none. A run counts for the plugin only on that repository and that branch.
 
 ---
 
-- REPO1: Explore [[Repository Agent]] idea
-- REPO2: The Repository as a proper abstraction for interacting with, for Agents alike. 
+- Explore [[CodeForge Agent]] idea
+- The Repository as a proper abstraction for interacting with, for Agents alike. 
