@@ -152,18 +152,18 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 	return answer, nil
 }
 
-// How long a peer is given to read a session from its own disk, and the most
-// of it that is read back: one session whole.
+// 「[Opus 5.5] How long a peer is given to read a session from its own disk, and the most」
+// 「[Opus 5.5] of it that is read back: one session whole.」
 const (
 	transcriptAskWithin = 2 * time.Minute
 	transcriptAskBytes  = 256 << 20
 )
 
-// transcriptAtPeers is one session asked for by id and held nowhere here: it is
-// read where it lives. Each namespace a peer serves is asked as the caller,
-// signed for that namespace alone (auth.Handler.AskPeerIn), and the first that
-// holds the session answers. A peer that could not be asked is said, not taken
-// for one that holds nothing.
+// 「[Opus 5.5] transcriptAtPeers is one session asked for by id and held nowhere here: it is」
+// 「[Opus 5.5] read where it lives. Each namespace a peer serves is asked as the caller,」
+// 「[Opus 5.5] signed for that namespace alone (auth.Handler.AskPeerIn), and the first that」
+// 「[Opus 5.5] holds the session answers. A peer that could not be asked is said, not taken」
+// 「[Opus 5.5] for one that holds nothing.」
 func (s *QNTXServer) transcriptAtPeers(caller *http.Request, session string) (any, *protocol.Refusal) {
 	none := &protocol.Transcripts{Transcripts: []*protocol.Transcript{}}
 	if s.authHandler == nil {
