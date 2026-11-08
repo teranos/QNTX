@@ -19,9 +19,9 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-// peerClient is a2a-go's client of the agent peer serves at tenant, its own
-// Node Agent at none, carrying the person asking here to the peer: their
-// token rides each call as a2a-go's client sends it.
+// 「[Opus 5.5] peerClient is a2a-go's client of the agent peer serves at tenant, its own」
+// 「[Opus 5.5] Node Agent at none, carrying the person asking here to the peer: their」
+// 「[Opus 5.5] token rides each call as a2a-go's client sends it.」
 func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant string, heard *cardHeard) (*a2aclient.Client, error) {
 	admitted, gated := auth.AdmissionFrom(ctx)
 	if !gated {
@@ -50,18 +50,18 @@ func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant st
 	return client, nil
 }
 
-// peerCardTimeout is how long a peer is given to hand over a card. Its turn
-// is given agentTurnTimeout.
+// 「[Opus 5.5] peerCardTimeout is how long a peer is given to hand over a card. Its turn」
+// 「[Opus 5.5] is given agentTurnTimeout.」
 var peerCardTimeout = 15 * time.Second
 
-// cardHeard keeps the body of the extended card a peer answers, the bytes it
-// signed, which a card a2a-go decoded and wrote out again is not.
+// 「[Opus 5.5] cardHeard keeps the body of the extended card a peer answers, the bytes it」
+// 「[Opus 5.5] signed, which a card a2a-go decoded and wrote out again is not.」
 type cardHeard struct {
 	http.RoundTripper
 	body []byte
 }
 
-// cardHeardMost is the most of a card's body kept to verify it.
+// 「[Opus 5.5] cardHeardMost is the most of a card's body kept to verify it.」
 const cardHeardMost = 1 << 20
 
 func (c *cardHeard) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -79,7 +79,7 @@ func (c *cardHeard) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// bearerOf is a2a-go's call interceptor that carries token as the bearer.
+// 「[Opus 5.5] bearerOf is a2a-go's call interceptor that carries token as the bearer.」
 type bearerOf string
 
 func (b bearerOf) Before(ctx context.Context, req *a2aclient.Request) (context.Context, any, error) {
@@ -89,9 +89,9 @@ func (b bearerOf) Before(ctx context.Context, req *a2aclient.Request) (context.C
 
 func (bearerOf) After(context.Context, *a2aclient.Response) error { return nil }
 
-// peersAgentCard is the card of the agent a peer serves at namespace, asked of
-// the peer with a2a-go's client as the person asking here, and verified by
-// a2a-go's verifier against the did:key nodes.peers pins (§8.4.3).
+// 「[Opus 5.5] peersAgentCard is the card of the agent a peer serves at namespace, asked of」
+// 「[Opus 5.5] the peer with a2a-go's client as the person asking here, and verified by」
+// 「[Opus 5.5] a2a-go's verifier against the did:key nodes.peers pins (§8.4.3).」
 func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace string) (*a2asdk.AgentCard, error) {
 	ctx, cancel := context.WithTimeout(r.Context(), peerCardTimeout)
 	defer cancel()
@@ -114,8 +114,8 @@ func (s *QNTXServer) peersAgentCard(r *http.Request, peer auth.Client, namespace
 	return card, nil
 }
 
-// verifiedByPeer is whether one of card's signatures is the peer's, by the key
-// its did:key names.
+// 「[Opus 5.5] verifiedByPeer is whether one of card's signatures is the peer's, by the key」
+// 「[Opus 5.5] its did:key names.」
 func verifiedByPeer(ctx context.Context, card []byte, peer auth.Client) error {
 	key, err := auth.DecodeUserDID(peer.DID)
 	if err != nil {
@@ -124,8 +124,8 @@ func verifiedByPeer(ctx context.Context, card []byte, peer auth.Client) error {
 	return verifiedBy(ctx, card, key, nodedid.KeyIDOf(peer.DID))
 }
 
-// verifiedBy is whether one of the signatures of card, as its bytes came, is
-// key's, under kid, as a2a-go's verifier reads it (§8.4.3).
+// 「[Opus 5.5] verifiedBy is whether one of the signatures of card, as its bytes came, is」
+// 「[Opus 5.5] key's, under kid, as a2a-go's verifier reads it (§8.4.3).」
 func verifiedBy(ctx context.Context, card []byte, key crypto.PublicKey, kid string) error {
 	verifier := a2acrypto.NewVerifier(a2acrypto.VerifierConfig{KeyResolver: a2acrypto.KeyResolverFunc(func(_ context.Context, asked string) (crypto.PublicKey, error) {
 		if asked != kid {
