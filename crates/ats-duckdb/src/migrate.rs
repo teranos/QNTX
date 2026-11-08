@@ -44,9 +44,9 @@ pub fn schema_tables() -> Result<Vec<String>> {
     Ok(tables)
 }
 
-/// Apply a subsystem's own migrations to the DuckDB it holds (crate::held):
-/// `schema_migrations` first, as every DuckDB here has it, then each of the
-/// subsystem's once, in the order handed.
+/// 「[Opus 5.5] Apply a subsystem's own migrations to the DuckDB it holds (crate::held):」
+/// 「[Opus 5.5] `schema_migrations` first, as every DuckDB here has it, then each of the」
+/// 「[Opus 5.5] subsystem's once, in the order handed.」
 pub(crate) fn migrate_held(conn: &Connection, migrations: &[(String, String)]) -> Result<()> {
     for (version, sql) in MIGRATIONS.iter().take(1) {
         apply_migration(conn, version, sql)?;
