@@ -15,35 +15,35 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 //
 // "i dont want agents to ever thing they are blcoked"
 //
-// An agent the node runs reaches the node at a door of its own: a listener on
-// this machine's loopback, opened for that agent alone. What arrives there is
-// that agent. Nothing is handed to it, so nothing it holds reaches the node
-// from anywhere else.
+// 「[Opus 5.5] An agent the node runs reaches the node at a door of its own: a listener on」
+// 「[Opus 5.5] this machine's loopback, opened for that agent alone. What arrives there is」
+// 「[Opus 5.5] that agent. Nothing is handed to it, so nothing it holds reaches the node」
+// 「[Opus 5.5] from anywhere else.」
 
-// doorFile is where the port of an agent's door is kept in its home, so its
-// ground, built once with where the node is, finds the node at the same door
-// after a restart.
+// 「[Opus 5.5] doorFile is where the port of an agent's door is kept in its home, so its」
+// 「[Opus 5.5] ground, built once with where the node is, finds the node at the same door」
+// 「[Opus 5.5] after a restart.」
 const doorFile = "door"
 
-// agentDoors is every door this node opened, by the DID of the agent it is for.
+// 「[Opus 5.5] agentDoors is every door this node opened, by the DID of the agent it is for.」
 type agentDoors struct {
 	mu    sync.Mutex
 	byDID map[string]*agentDoor
-	// byHome is the door an agent's ground reaches the node at, by its home.
+	// 「[Opus 5.5] byHome is the door an agent's ground reaches the node at, by its home.」
 	byHome map[string]string
 }
 
-// agentDoor is one agent's door: where it answers, and the agent it admits.
+// 「[Opus 5.5] agentDoor is one agent's door: where it answers, and the agent it admits.」
 type agentDoor struct {
 	url   string
 	grant atomicGrant
 }
 
-// atomicGrant is the grant a door admits, replaced when the agent is named again.
+// 「[Opus 5.5] atomicGrant is the grant a door admits, replaced when the agent is named again.」
 type atomicGrant struct {
 	mu    sync.RWMutex
 	grant auth.Grant
@@ -61,10 +61,10 @@ func (g *atomicGrant) store(grant auth.Grant) {
 	g.grant = grant
 }
 
-// openDoor gives agent a door admitting grant, or the one it already has with
-// grant admitted from now. keepIn is the home its port is kept in, so the door
-// stays where its ground was built to reach it; empty, the door is wherever
-// loopback has room.
+// 「[Opus 5.5] openDoor gives agent a door admitting grant, or the one it already has with」
+// 「[Opus 5.5] grant admitted from now. keepIn is the home its port is kept in, so the door」
+// 「[Opus 5.5] stays where its ground was built to reach it; empty, the door is wherever」
+// 「[Opus 5.5] loopback has room.」
 func (s *QNTXServer) openDoor(agent *rootAgent, grant auth.Grant, keepIn string) error {
 	s.doors.mu.Lock()
 	defer s.doors.mu.Unlock()
@@ -85,9 +85,9 @@ func (s *QNTXServer) openDoor(agent *rootAgent, grant auth.Grant, keepIn string)
 	door.grant.store(grant)
 	served := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// A page in a browser names where it came from; an agent's harness
-			// names nothing. A Host other than the door's own is a name that
-			// was made to resolve here.
+			// 「[Opus 5.5] A page in a browser names where it came from; an agent's harness」
+			// 「[Opus 5.5] names nothing. A Host other than the door's own is a name that」
+			// 「[Opus 5.5] was made to resolve here.」
 			if r.Header.Get("Origin") != "" || r.Host != at {
 				http.Error(w, "this door is reached by its agent alone", http.StatusForbidden)
 				return
@@ -97,8 +97,8 @@ func (s *QNTXServer) openDoor(agent *rootAgent, grant auth.Grant, keepIn string)
 				http.Error(w, "ROOT switched this agent off", http.StatusForbidden)
 				return
 			}
-			// The door opens when the agent is named, which is before the node
-			// serves anything: until it does, the agent is told so.
+			// 「[Opus 5.5] The door opens when the agent is named, which is before the node」
+			// 「[Opus 5.5] serves anything: until it does, the agent is told so.」
 			if s.served == nil {
 				http.Error(w, "the node does not serve yet", http.StatusServiceUnavailable)
 				return
@@ -133,8 +133,8 @@ func (s *QNTXServer) openDoor(agent *rootAgent, grant auth.Grant, keepIn string)
 	return nil
 }
 
-// listenAtKept listens on loopback at the port kept in home, or anywhere on
-// loopback when none is kept or it is taken, and keeps the port it got.
+// 「[Opus 5.5] listenAtKept listens on loopback at the port kept in home, or anywhere on」
+// 「[Opus 5.5] loopback when none is kept or it is taken, and keeps the port it got.」
 func listenAtKept(home string) (net.Listener, error) {
 	at := "127.0.0.1:0"
 	kept := ""
@@ -167,8 +167,8 @@ func listenAtKept(home string) (net.Listener, error) {
 	return listener, nil
 }
 
-// reachOf is where agent reaches the node: its door, or, on a node with no
-// gate to open one at, the node itself.
+// 「[Opus 5.5] reachOf is where agent reaches the node: its door, or, on a node with no」
+// 「[Opus 5.5] gate to open one at, the node itself.」
 func (s *QNTXServer) reachOf(agent *rootAgent) string {
 	if agent.door != "" {
 		return agent.door
@@ -176,8 +176,8 @@ func (s *QNTXServer) reachOf(agent *rootAgent) string {
 	return s.ownURL
 }
 
-// groundReach is where the ground of the agent in home reaches the node: the
-// door kept in that home, or the node itself.
+// 「[Opus 5.5] groundReach is where the ground of the agent in home reaches the node: the」
+// 「[Opus 5.5] door kept in that home, or the node itself.」
 func (s *QNTXServer) groundReach(home string) string {
 	s.doors.mu.Lock()
 	defer s.doors.mu.Unlock()
