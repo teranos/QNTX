@@ -33,7 +33,7 @@ import (
 type anotherAgent struct {
 	tenant []string
 	bearer []string
-	// thinks is how long its turn takes.
+	// 「[Opus 5.5] thinks is how long its turn takes.」
 	thinks time.Duration
 }
 
@@ -220,7 +220,7 @@ func a2aCalledOver(t *testing.T, srv *QNTXServer, token, method, rpc string, sen
 	return w.Code, answered
 }
 
-// A call whose caller stops waiting first is not the agent's time run out.
+// 「[Opus 5.5] A call whose caller stops waiting first is not the agent's time run out.」
 func TestACallItsCallerStopsWaitingOnIsNotTheAgentsTimeRunOut(t *testing.T) {
 	allowingLoopback(t)
 	agent := &anotherAgent{thinks: 2 * time.Second}
@@ -308,8 +308,8 @@ func TestEachA2ASigilIsAnOperationOfThePinnedSpec(t *testing.T) {
 	assert.Len(t, signum.GetSigils(), pinned.service.Methods().Len()-2+2, "every operation but the two that stream, Resolve and Peers")
 }
 
-// allowingLoopback lets the node speak to httptest, which is on loopback, for
-// an agent found by its card.
+// 「[Opus 5.5] allowingLoopback lets the node speak to httptest, which is on loopback, for」
+// 「[Opus 5.5] an agent found by its card.」
 func allowingLoopback(t *testing.T) {
 	t.Helper()
 	allowed := publicAddress
@@ -317,8 +317,8 @@ func allowingLoopback(t *testing.T) {
 	t.Cleanup(func() { publicAddress = allowed })
 }
 
-// cardServing is an agent a2a-go serves, its card at the well-known path and
-// its HTTP+JSON binding at /a2a.
+// 「[Opus 5.5] cardServing is an agent a2a-go serves, its card at the well-known path and」
+// 「[Opus 5.5] its HTTP+JSON binding at /a2a.」
 func cardServing(t *testing.T, agent *anotherAgent) *httptest.Server {
 	t.Helper()
 	rest := a2asrv.NewRESTHandler(a2asrv.NewHandler(agent.executor()))
@@ -340,7 +340,7 @@ func cardServing(t *testing.T, agent *anotherAgent) *httptest.Server {
 	return served
 }
 
-// spansRecorded is the spans the node opens for one test.
+// 「[Opus 5.5] spansRecorded is the spans the node opens for one test.」
 func spansRecorded(t *testing.T) *tracetest.SpanRecorder {
 	t.Helper()
 	recorder := tracetest.NewSpanRecorder()
@@ -350,7 +350,7 @@ func spansRecorded(t *testing.T) *tracetest.SpanRecorder {
 	return recorder
 }
 
-// spansNamed is the ended spans called name.
+// 「[Opus 5.5] spansNamed is the ended spans called name.」
 func spansNamed(recorder *tracetest.SpanRecorder, name string) []sdktrace.ReadOnlySpan {
 	var named []sdktrace.ReadOnlySpan
 	for _, span := range recorder.Ended() {
@@ -361,7 +361,7 @@ func spansNamed(recorder *tracetest.SpanRecorder, name string) []sdktrace.ReadOn
 	return named
 }
 
-// attributeOf is span's attribute key, as text.
+// 「[Opus 5.5] attributeOf is span's attribute key, as text.」
 func attributeOf(span sdktrace.ReadOnlySpan, key string) string {
 	for _, held := range span.Attributes() {
 		if string(held.Key) == key {
@@ -371,9 +371,9 @@ func attributeOf(span sdktrace.ReadOnlySpan, key string) string {
 	return ""
 }
 
-// Discovery (§8.2): a card is resolved by a2a-go's resolver from the agent's
-// base URL, the agent it names is spoken to as no one, and each resolution
-// and operation is a span.
+// 「[Opus 5.5] Discovery (§8.2): a card is resolved by a2a-go's resolver from the agent's」
+// 「[Opus 5.5] base URL, the agent it names is spoken to as no one, and each resolution」
+// 「[Opus 5.5] and operation is a span.」
 func TestTheAgentACardNamesIsFoundAndSpokenTo(t *testing.T) {
 	allowingLoopback(t)
 	agent := &anotherAgent{}
@@ -407,8 +407,8 @@ func TestTheAgentACardNamesIsFoundAndSpokenTo(t *testing.T) {
 	assert.Equal(t, sends[0].SpanContext().TraceID(), resolved[1].SpanContext().TraceID(), "the resolution is part of the operation's trace")
 }
 
-// A card is read from what the internet routes to alone, over http or https:
-// a2a-go's resolver would read a file:// card from the node's own disk.
+// 「[Opus 5.5] A card is read from what the internet routes to alone, over http or https:」
+// 「[Opus 5.5] a2a-go's resolver would read a file:// card from the node's own disk.」
 func TestACardIsReadFromThePublicInternetAlone(t *testing.T) {
 	agent := &anotherAgent{}
 	served := cardServing(t, agent)
@@ -433,9 +433,9 @@ func TestACardIsReadFromThePublicInternetAlone(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, code, refused, "an agent is named by a peer or a card, not both")
 }
 
-// "make it ship to sentry": a resolution is a span, and sentry-go's span
-// processor, which the node starts when Sentry traces, ships it to Sentry as
-// a transaction.
+// 「[Opus 5.5] "make it ship to sentry": a resolution is a span, and sentry-go's span」
+// 「[Opus 5.5] processor, which the node starts when Sentry traces, ships it to Sentry as」
+// 「[Opus 5.5] a transaction.」
 func TestAResolutionShipsToSentry(t *testing.T) {
 	allowingLoopback(t)
 	served := cardServing(t, &anotherAgent{})
@@ -474,8 +474,8 @@ func TestAResolutionShipsToSentry(t *testing.T) {
 	assert.Equal(t, "a2a.Resolve", shipped[0].Transaction)
 }
 
-// The nodes this one knows are the agent's to see: each peer by the label
-// peer names it by, and the primary its people log in at.
+// 「[Opus 5.5] The nodes this one knows are the agent's to see: each peer by the label」
+// 「[Opus 5.5] peer names it by, and the primary its people log in at.」
 func TestTheNodesThisOneKnowsAreTheAgentsToSee(t *testing.T) {
 	namedNode(t)
 	srv, tokens := pluginServingServer(t, "fake")
@@ -495,8 +495,8 @@ func TestTheNodesThisOneKnowsAreTheAgentsToSee(t *testing.T) {
 	assert.Equal(t, []any{"orchard"}, peer["namespaces"])
 }
 
-// An agent that still speaks A2A 0.3, its card in 0.3's shape, is found and
-// spoken to in 0.3, by a2a-go's own compat parser and transports.
+// 「[Opus 5.5] An agent that still speaks A2A 0.3, its card in 0.3's shape, is found and」
+// 「[Opus 5.5] spoken to in 0.3, by a2a-go's own compat parser and transports.」
 func TestAnAgentSpeaking03IsFoundAndSpokenTo(t *testing.T) {
 	allowingLoopback(t)
 	agent := &anotherAgent{}
@@ -531,8 +531,8 @@ func TestAnAgentSpeaking03IsFoundAndSpokenTo(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_COMPLETED", answered["task"].(map[string]any)["status"].(map[string]any)["state"])
 }
 
-// A message waits on the peer's turn however long it takes: what bounds a peer
-// is the card it hands over, not the turn it is asked for.
+// 「[Opus 5.5] A message waits on the peer's turn however long it takes: what bounds a peer」
+// 「[Opus 5.5] is the card it hands over, not the turn it is asked for.」
 func TestAPeersTurnIsWaitedOnPastTheCardsBound(t *testing.T) {
 	bound := peerCardTimeout
 	peerCardTimeout = 50 * time.Millisecond
@@ -554,7 +554,7 @@ func TestAPeersTurnIsWaitedOnPastTheCardsBound(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_COMPLETED", sent["task"].(map[string]any)["status"].(map[string]any)["state"])
 }
 
-// A peer is given agentTurnTimeout to answer, its turn included, and is told so when it does not.
+// 「[Opus 5.5] A peer is given agentTurnTimeout to answer, its turn included, and is told so when it does not.」
 func TestAPeerThatDoesNotAnswerWithinItsTimeIsLeft(t *testing.T) {
 	bound := agentTurnTimeout
 	agentTurnTimeout = 100 * time.Millisecond
@@ -579,7 +579,7 @@ func TestAPeerThatDoesNotAnswerWithinItsTimeIsLeft(t *testing.T) {
 	assert.Contains(t, string(said), "did not answer SendMessage within 100ms")
 }
 
-// An agent a card names is given agentTurnTimeout, the same as a peer.
+// 「[Opus 5.5] An agent a card names is given agentTurnTimeout, the same as a peer.」
 func TestACardsAgentThatDoesNotAnswerWithinItsTimeIsLeft(t *testing.T) {
 	allowingLoopback(t)
 	bound := agentTurnTimeout
