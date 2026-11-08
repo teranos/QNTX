@@ -98,7 +98,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: t.effort, element: t.element, screenshot: t.screenshot}
 	write, unwritten := s.sessionRows(agent, store, session, t.called)
 	// The Node Agent's git is its own (ADR-048, Its git). A namespace agent has
-	// none: its ground reaches the node at the agent's door, and writes in its namespace.
+	// 「[Opus 5.5] none: its ground reaches the node at the agent's door, and writes in its namespace.」
 	itsGit := []string{}
 	if agent.namespace == auth.NamespaceSystem {
 		if itsGit, err = s.gitEnvironment(agent); err != nil {
