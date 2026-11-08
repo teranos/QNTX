@@ -532,12 +532,12 @@ func (wp *WorkerPool) processNextJob() error {
 			}
 			return nil // Return nil to avoid logging as error
 		default:
-			// Handler not registered yet (e.g. plugins still loading) — re-queue,
-			// touched, so it stands behind every other queued job. A handler that
-			// has not registered within HandlerGrace of the job's creation is not
-			// loading; the job fails below, with that as its error, instead of
-			// being taken again forever. On q, plugin.update had no handler since
-			// 2026-10-01 and its one queued row held the worker.
+			// 「[Fable 5.1] Handler not registered yet (e.g. plugins still loading) — re-queue,」
+			// 「[Fable 5.1] touched, so it stands behind every other queued job. A handler that」
+			// 「[Fable 5.1] has not registered within HandlerGrace of the job's creation is not」
+			// 「[Fable 5.1] loading; the job fails below, with that as its error, instead of」
+			// 「[Fable 5.1] being taken again forever. On q, plugin.update had no handler since」
+			// 「[Fable 5.1] 2026-10-01 and its one queued row held the worker.」
 			if errors.Is(err, ErrHandlerNotRegistered) && time.Since(job.CreatedAt) < HandlerGrace {
 				wp.logger.SugaredLogger.Debugw("Handler not registered yet, re-queuing job",
 					"job_id", job.ID, "handler", job.HandlerName)
