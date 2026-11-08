@@ -12,9 +12,9 @@ import (
 	"github.com/teranos/QNTX/internal/access"
 )
 
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 
-// nodeAgentDID is the DID the node derives the Node Agent's key under.
+// 「[Opus 5.5] nodeAgentDID is the DID the node derives the Node Agent's key under.」
 func nodeAgentDID(t *testing.T) string {
 	t.Helper()
 	key, err := access.DeriveKey(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)), "agent:root")
@@ -29,8 +29,8 @@ func nodeAgentHandler(roots ...string) (*Handler, *memTokenStore) {
 	return h, store
 }
 
-// throughDoor asks a route reach grants, as a request arriving at the door the
-// node opened for the agent whose grant this is: nothing presented.
+// 「[Opus 5.5] throughDoor asks a route reach grants, as a request arriving at the door the」
+// 「[Opus 5.5] node opened for the agent whose grant this is: nothing presented.」
 func throughDoor(h *Handler, grant Grant, reach Reach) (int, Admission) {
 	var admitted Admission
 	gated := h.Middleware("/test", reach, func(w http.ResponseWriter, r *http.Request) {
@@ -44,8 +44,8 @@ func throughDoor(h *Handler, grant Grant, reach Reach) (int, Admission) {
 	return rec.Code, admitted
 }
 
-// The Node Agent is ROOT's kind at its own door (ADR-048). It reaches what
-// ROOT reaches, what it writes is its own DID's, and no token is written.
+// 「[Opus 5.5] The Node Agent is ROOT's kind at its own door (ADR-048). It reaches what」
+// 「[Opus 5.5] ROOT reaches, what it writes is its own DID's, and no token is written.」
 func TestTheNodeAgentIsRootsKindAndItsOwnDID(t *testing.T) {
 	h, store := nodeAgentHandler(mastodonAccount)
 	did := nodeAgentDID(t)
@@ -73,7 +73,7 @@ func TestTheNodeAgentSpeaksForSomebodyListed(t *testing.T) {
 	assert.Contains(t, err.Error(), "auth.root_identities")
 }
 
-// ROOT struck out of am.toml takes the Node Agent with it at the next request.
+// 「[Opus 5.5] ROOT struck out of am.toml takes the Node Agent with it at the next request.」
 func TestTheNodeAgentStopsWithWhoItSpeaksFor(t *testing.T) {
 	h, _ := nodeAgentHandler(mastodonAccount)
 	grant, err := h.NodeAgentGrant(nodeAgentDID(t))
@@ -83,7 +83,7 @@ func TestTheNodeAgentStopsWithWhoItSpeaksFor(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, status)
 }
 
-// An element agent is ROOT's kind as the Node Agent is, named for its element.
+// 「[Opus 5.5] An element agent is ROOT's kind as the Node Agent is, named for its element.」
 func TestAnElementAgentIsRootsKindNamedForItsElement(t *testing.T) {
 	h, store := nodeAgentHandler(mastodonAccount)
 	did := nodeAgentDID(t)
@@ -98,7 +98,7 @@ func TestAnElementAgentIsRootsKindNamedForItsElement(t *testing.T) {
 	assert.Empty(t, held, "a token was written for an element agent")
 }
 
-// Minting hands ROOT's kind to nobody.
+// 「[Opus 5.5] Minting hands ROOT's kind to nobody.」
 func TestMintingStillHandsRootToNobody(t *testing.T) {
 	_, minted := mintable("ROOT")
 	assert.False(t, minted)
