@@ -64,6 +64,17 @@ func (h *Handler) rootsAgent(did, label, called string) (Grant, error) {
 	return h.agentGrant(Grant{DID: did, Label: label, MintedBy: roots[0], Level: LevelRoot})
 }
 
+// SwitchedOff is whether ROOT switched off the agent whose DID this is: a
+// record the node holds for it, revoked. An agent the node holds no record
+// for has nothing switched.
+func (h *Handler) SwitchedOff(did string) bool {
+	if h.tokens == nil {
+		return false
+	}
+	held, found := h.tokenOf(did)
+	return found && held.RevokedAt != nil
+}
+
 // agentGrant is grant with the person it speaks for resolved, as a session
 // resolves them when it is made.
 func (h *Handler) agentGrant(grant Grant) (Grant, error) {

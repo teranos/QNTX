@@ -80,17 +80,30 @@ func (s *QNTXServer) openDoor(agent *rootAgent, grant auth.Grant, keepIn string)
 	if err != nil {
 		return err
 	}
-	door := &agentDoor{url: "http://" + listener.Addr().String()}
+	at := listener.Addr().String()
+	door := &agentDoor{url: "http://" + at}
 	door.grant.store(grant)
 	served := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// A page in a browser names where it came from; an agent's harness
+			// names nothing. A Host other than the door's own is a name that
+			// was made to resolve here.
+			if r.Header.Get("Origin") != "" || r.Host != at {
+				http.Error(w, "this door is reached by its agent alone", http.StatusForbidden)
+				return
+			}
+			held := door.grant.load()
+			if s.authHandler != nil && s.authHandler.SwitchedOff(held.DID) {
+				http.Error(w, "ROOT switched this agent off", http.StatusForbidden)
+				return
+			}
 			// The door opens when the agent is named, which is before the node
 			// serves anything: until it does, the agent is told so.
 			if s.served == nil {
 				http.Error(w, "the node does not serve yet", http.StatusServiceUnavailable)
 				return
 			}
-			s.served.ServeHTTP(w, r.WithContext(auth.ThroughDoor(r.Context(), door.grant.load())))
+			s.served.ServeHTTP(w, r.WithContext(auth.ThroughDoor(r.Context(), held)))
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,

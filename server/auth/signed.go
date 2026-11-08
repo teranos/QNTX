@@ -72,18 +72,24 @@ func (h *Handler) signedGrant(signed string, now time.Time) (Grant, error) {
 	if !slices.Contains(claims.Audience, audience) {
 		return Grant{}, errors.Newf("the signature is for %v, and this node is %s", claims.Audience, audience)
 	}
-	if carried && !h.signsForItsPeople(claims.Issuer) {
-		return Grant{}, errors.Newf("%s signed for %q, and it is not this node's primary", claims.Issuer, claims.Subject)
+	// Whose signature this is is asked before its id is kept: a key nobody
+	// granted anything fills nothing here.
+	var held TokenInfo
+	if carried {
+		if !h.signsForItsPeople(claims.Issuer) {
+			return Grant{}, errors.Newf("%s signed for %q, and it is not this node's primary", claims.Issuer, claims.Subject)
+		}
+	} else {
+		var live bool
+		if held, live = h.askingToken(claims.Issuer); !live {
+			return Grant{}, errors.Newf("this node holds no live grant for %s", claims.Issuer)
+		}
 	}
 	if prior, fresh := h.assertions.spend(claims.ID, claims.ExpiresAt.Time, now); !fresh {
 		return Grant{}, errors.Newf("the signature %s was already presented, and is kept until %v", claims.ID, prior)
 	}
 	if carried {
 		return h.carriedGrant(claims)
-	}
-	held, live := h.askingToken(claims.Issuer)
-	if !live {
-		return Grant{}, errors.Newf("this node holds no live grant for %s", claims.Issuer)
 	}
 	return grantOfInfo(held), nil
 }
@@ -111,26 +117,46 @@ func (h *Handler) carriedGrant(claims carriedClaims) (Grant, error) {
 }
 
 // signsForItsPeople is whether did is this node's primary (nodes.primary), as
-// the primary says of itself where this node already asks it about tokens.
+// the primary says of itself where this node already asks it about tokens. A
+// signer other than the one kept is asked about again, once the kept answer is
+// older than primaryDIDFresh: a primary whose key changed is heard.
 func (h *Handler) signsForItsPeople(did string) bool {
 	for _, issuer := range h.issuers {
-		if said, err := h.primaryDID(issuer); err == nil && said == did {
-			return true
-		} else if err != nil {
+		said, err := h.primaryDID(issuer, false)
+		if err == nil && said != did {
+			said, err = h.primaryDID(issuer, true)
+		}
+		if err != nil {
 			h.logger.Errorw("The primary did not say its DID, so what it signed is not admitted", "issuer", issuer, "error", err)
+			continue
+		}
+		if said == did {
+			return true
 		}
 	}
 	return false
 }
 
-// primaryDID is the did:key an issuer says it signs as, asked once and kept.
-func (h *Handler) primaryDID(issuer string) (string, error) {
+// primaryDIDFresh is how long the DID a primary said is kept before a signer
+// other than it makes the node ask again.
+const primaryDIDFresh = time.Minute
+
+// saidDID is what a primary said it signs as, and when.
+type saidDID struct {
+	did string
+	at  time.Time
+}
+
+// primaryDID is the did:key an issuer says it signs as: kept, or asked when
+// again is set and what is kept is older than primaryDIDFresh. A redirect is
+// not followed: the answer comes from the origin nodes.primary names.
+func (h *Handler) primaryDID(issuer string, again bool) (string, error) {
 	if held, found := h.issuerDIDs.Load(issuer); found {
-		if did, isDID := held.(string); isDID {
-			return did, nil
+		if kept, isKept := held.(saidDID); isKept && (!again || time.Since(kept.at) < primaryDIDFresh) {
+			return kept.did, nil
 		}
 	}
-	client := http.Client{Timeout: issuerTimeout}
+	client := http.Client{Timeout: issuerTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, err := client.Get(issuer + authorizationServerPath)
 	if err != nil {
 		return "", errors.Wrapf(err, "%s did not answer", issuer+authorizationServerPath)
@@ -154,7 +180,7 @@ func (h *Handler) primaryDID(issuer string) (string, error) {
 	if _, err := DecodeUserDID(said.DID); err != nil {
 		return "", errors.Wrapf(err, "%s names no did:key it signs as", issuer)
 	}
-	h.issuerDIDs.Store(issuer, said.DID)
+	h.issuerDIDs.Store(issuer, saidDID{did: said.DID, at: time.Now()})
 	return said.DID, nil
 }
 
