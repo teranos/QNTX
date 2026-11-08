@@ -7,7 +7,7 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// openHeld has no DuckDB to open in this build: it links none.
+// 「[Opus 5.5] openHeld has no DuckDB to open in this build: it links none.」
 func openHeld(path string, _ []subsystem.Migration) (subsystem.Held, error) {
 	return nil, errors.Newf("this build links no DuckDB, so none is held at %s", path)
 }
