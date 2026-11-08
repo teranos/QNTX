@@ -127,15 +127,15 @@ func vaultNotesAt(root string) (map[string][]byte, error) {
 	return notes, nil
 }
 
-// boundVaultNotes is every note a binding holds in the vault's copy: those
-// directly in its folder, or its one note when the vault has it as a file of
-// its own; a link to one is not.
+// 「[Opus 5.5] boundVaultNotes is every note a binding holds in the vault's copy: those」
+// 「[Opus 5.5] directly in its folder, or its one note when the vault has it as a file of」
+// 「[Opus 5.5] its own; a link to one is not.」
 func boundVaultNotes(vaultPath string, b vaultBinding) (map[string][]byte, error) {
 	if !b.note {
 		return vaultNotesAt(b.rootIn(vaultPath))
 	}
 	notes := map[string][]byte{}
-	// A note's folder that is a link is not a folder of the vault, as a bound folder's is not.
+	// 「[Opus 5.5] A note's folder that is a link is not a folder of the vault, as a bound folder's is not.」
 	if folder, err := os.Lstat(b.rootIn(vaultPath)); err == nil && folder.Mode()&os.ModeSymlink != 0 {
 		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", b.rootIn(vaultPath))
 	}
