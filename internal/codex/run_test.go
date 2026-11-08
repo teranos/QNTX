@@ -160,8 +160,8 @@ cat <<'JSON'
 	}
 }
 
-// "A signature proves the key, and nothing reusable leaves the node."
-// An agent at its own door presents nothing, and codex is told of no bearer.
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
+// 「[Opus 5.5] An agent at its own door presents nothing, and codex is told of no bearer.」
 func TestRunAtADoorNamesNoBearer(t *testing.T) {
 	home := t.TempDir()
 	binary := fake(t, `printf '%s\n' "$@" > args
