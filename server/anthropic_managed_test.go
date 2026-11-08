@@ -161,8 +161,8 @@ func standInConsole(t *testing.T) (*consoleStandIn, string) {
 	return c, served.URL
 }
 
-// aVaultHeld is a Vault the element already holds at Anthropic, made before the
-// node stopped putting tokens in one.
+// 「[Opus 5.5] aVaultHeld is a Vault the element already holds at Anthropic, made before the」
+// 「[Opus 5.5] node stopped putting tokens in one.」
 func aVaultHeld(t *testing.T, home, element string) {
 	t.Helper()
 	dir := filepath.Join(home, elementsDir, element)
@@ -171,7 +171,7 @@ func aVaultHeld(t *testing.T, home, element string) {
 }
 
 // "Tokens are to be removed from QNTX except for third-party OAuth clients"
-// An element new at Anthropic is put in no Vault: nothing is handed over.
+// 「[Opus 5.5] An element new at Anthropic is put in no Vault: nothing is handed over.」
 func TestANewElementAtAnthropicIsHandedNoToken(t *testing.T) {
 	s, _, _ := runningNamespaceAgents(t)
 	console, base := standInConsole(t)
