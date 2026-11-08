@@ -94,6 +94,5 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 "there needs to be a process"
 
 "「[Opus 5.5] it doesnt run one today」"
-
-「[Fable] Every row of ground's own attestations table carries qntx_at, qntx_status and qntx_reason: what ground sees is written to a node. What the namespace holds there I have not read.」
+「[Fable] Every row of ground's own attestations table carries qntx_at, qntx_status and qntx_reason: what ground sees is written to a node.」
 
