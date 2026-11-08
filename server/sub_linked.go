@@ -124,6 +124,13 @@ func (h linkedHost) StoreFor(ctx context.Context) (ats.AttestationStore, error) 
 	return h.s.storeFor(caller)
 }
 
+func (h linkedHost) OfStandingRow(namespace string) (ats.AttestationStore, error) {
+	if h.s.held == nil {
+		return nil, errors.New("no namespaces are held to write in")
+	}
+	return h.s.held.OfStandingRow(namespace)
+}
+
 func (h linkedHost) Registry() *async.HandlerRegistry { return h.s.daemon.Registry() }
 
 func (h linkedHost) Enqueue(job *async.Job) error {

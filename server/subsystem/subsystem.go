@@ -77,6 +77,9 @@ type Host interface {
 	// StoreFor is the store of the namespace the caller of a sigil stands in,
 	// from the context the sigil's Answer was handed.
 	StoreFor(ctx context.Context) (ats.AttestationStore, error)
+	// OfStandingRow is the store of the namespace a standing row landed in,
+	// for what its built-in writes beside the row. system is refused.
+	OfStandingRow(namespace string) (ats.AttestationStore, error)
 	// Registry is where a built-in is registered, by its name.
 	Registry() *async.HandlerRegistry
 	// Enqueue hands a job to the daemon, for a built-in to run off the
