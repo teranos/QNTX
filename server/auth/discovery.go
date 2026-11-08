@@ -35,8 +35,8 @@ type authorizationServerMetadata struct {
 	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
 	// A node signs its assertion with its did:key, which is ed25519.
 	TokenEndpointAuthSigningAlgValuesSupported []string `json:"token_endpoint_auth_signing_alg_values_supported"`
-	// DID is the did:key this node signs as: what a peer checks the person it
-	// carries against.
+	// 「[Opus 5.5] DID is the did:key this node signs as: what a peer checks the person it」
+	// 「[Opus 5.5] carries against.」
 	DID string `json:"did,omitempty"`
 }
 
@@ -63,7 +63,7 @@ func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *ht
 		return
 	}
 	issuer := h.publicOrigin()
-	// A node with no key of its own signs for nobody, and says no DID.
+	// 「[Opus 5.5] A node with no key of its own signs for nobody, and says no DID.」
 	did, _ := h.ownDID()
 	h.writeJSON(w, http.StatusOK, authorizationServerMetadata{
 		DID:                               did,
