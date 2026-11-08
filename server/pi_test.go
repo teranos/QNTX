@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,8 +80,11 @@ func TestWhatIsSaidToPiIsAnsweredByPi(t *testing.T) {
 	assert.NotContains(t, args, "--no-builtin-tools", "the Node Agent runs Pi's own tools")
 
 	env := ranWith(t, ran, "0", "env")
-	assert.Contains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token)
-	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.nodeAgent.token)
+	for _, line := range env {
+		assert.False(t, strings.HasPrefix(line, "QNTX_MCP_BEARER_"), "the Node Agent was handed a bearer: %s", line)
+	}
+	// Pi names a key for its provider, and is handed the agent's DID: no secret.
+	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.nodeAgent.did)
 
 	var models struct {
 		Providers map[string]struct {
@@ -314,7 +318,7 @@ func TestATurnInPiCarriesOnlyItsOwnCredential(t *testing.T) {
 	require.Nil(t, refused)
 
 	env := ranWith(t, ran, "0", "env")
-	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.nodeAgent.token)
+	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.nodeAgent.did)
 	assert.NotContains(t, env, "QNTX_TEST_PLAN_TOKEN=the-plan-token")
 	assert.NotContains(t, env, "QNTX_NODE_SECRET=the node's")
 }

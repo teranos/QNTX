@@ -251,17 +251,21 @@ func TestWhatIsSaidToANamespaceAgentIsWrittenInTheNamespace(t *testing.T) {
 	assert.Contains(t, after(args, "--append-system-prompt"), am.GetAgent().GetDid())
 	env := ranWith(t, ran, run, "env")
 	assert.NotContains(t, env, "CLAUDE_CODE_OAUTH_TOKEN=the-plan-token", "ROOT's plan token is not the namespace agent's")
-	assert.NotContains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token, "ROOT's token is not the namespace agent's")
+	for _, line := range env {
+		assert.False(t, strings.HasPrefix(line, "QNTX_MCP_BEARER_"), "the namespace agent was handed a bearer: %s", line)
+	}
 	for _, line := range env {
 		assert.False(t, len(line) > 13 && line[:13] == "GIT_CONFIG_GL", "the namespace agent holds no git: %s", line)
 	}
 
 	// "i wanted ground for the namespace agent under claude first"
 
-	// Its hooks run its own ground, first on its PATH, and ground reports with the agent's own token.
-	agent, held := s.namespaceAgents.of(agentPurpose("garden", "claude-sonnet-5-5"))
+	// Its hooks run its own ground, first on its PATH, and ground reports at the agent's door, presenting nothing.
+	_, held := s.namespaceAgents.of(agentPurpose("garden", "claude-sonnet-5-5"))
 	require.True(t, held)
-	assert.Contains(t, env, "QNTX_TOKEN="+agent.token)
+	for _, line := range env {
+		assert.False(t, strings.HasPrefix(line, "QNTX_TOKEN="), "ground was handed a token: %s", line)
+	}
 	assert.Contains(t, strings.Join(env, "\n"), "PATH="+filepath.Dir(comet.AgentGround(home))+":")
 
 	// Written in garden by the agent, signed as itself; not in system, not in orchard.
@@ -434,7 +438,9 @@ func TestThePiAgentOfANamespaceAnswersOnTheNamespacesKey(t *testing.T) {
 	assert.Contains(t, args, "--no-builtin-tools", "none of Pi's own tools: the node's MCP alone")
 	env := ranWith(t, piRan, "0", "env")
 	assert.Contains(t, env, "OPENROUTER_API_KEY=sk-or-the-gardeners", "the namespace's key, handed to the process")
-	assert.NotContains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token, "ROOT's token is not the namespace agent's")
+	for _, line := range env {
+		assert.False(t, strings.HasPrefix(line, "QNTX_MCP_BEARER_"), "the namespace agent was handed a bearer: %s", line)
+	}
 	home := filepath.Join(s.agentsDir, "garden", slug.Of("anthropic/claude-opus-4.6"), "pi")
 	mcp, err := os.ReadFile(filepath.Join(home, "mcp.json"))
 	require.NoError(t, err)

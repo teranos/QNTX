@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"strings"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
@@ -106,8 +107,10 @@ func TestTheNodeNamesItsNodeAgentAndTheGateKnowsIt(t *testing.T) {
 		admitted, _ = auth.AdmissionFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
-	asked := httptest.NewRequest(http.MethodPost, "/mcp", nil)
-	asked.Header.Set("Authorization", "Bearer "+s.nodeAgent.token)
+	assert.True(t, strings.HasPrefix(s.nodeAgent.door, "http://127.0.0.1:"), "the Node Agent has no door on loopback: %q", s.nodeAgent.door)
+	grant, err := h.NodeAgentGrant(s.nodeAgent.did)
+	require.NoError(t, err)
+	asked := httptest.NewRequest(http.MethodPost, "/mcp", nil).WithContext(auth.ThroughDoor(context.Background(), grant))
 	answered := httptest.NewRecorder()
 	gated.ServeHTTP(answered, asked)
 
@@ -115,8 +118,10 @@ func TestTheNodeNamesItsNodeAgentAndTheGateKnowsIt(t *testing.T) {
 	assert.True(t, admitted.IsRoot())
 	assert.Equal(t, s.nodeAgent.did, admitted.ActsAs())
 
-	// A second start finds the token held, and holds it once.
+	// A second start finds its door open, and opens no other.
+	door := s.nodeAgent.door
 	require.NoError(t, s.nameNodeAgent(t.TempDir()))
+	assert.Equal(t, door, s.nodeAgent.door)
 }
 
 // A node with no login has no gate to know the agent, and names it all the same.

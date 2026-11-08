@@ -208,8 +208,10 @@ func TestWhatIsSaidToTheNodeAgentIsAnsweredByClaudeCode(t *testing.T) {
 
 	env := ranWith(t, ran, "0", "env")
 	assert.Contains(t, env, "CLAUDE_CODE_OAUTH_TOKEN=the-plan-token")
-	// It reaches the node's own MCP with its own token.
-	assert.Contains(t, env, "QNTX_MCP_BEARER_QNTX="+s.nodeAgent.token)
+	// It reaches the node's own MCP presenting nothing.
+	for _, line := range env {
+		assert.False(t, strings.HasPrefix(line, "QNTX_MCP_BEARER_"), "the Node Agent was handed a bearer: %s", line)
+	}
 	written, err := os.ReadFile(after(args, "--mcp-config"))
 	require.NoError(t, err)
 	assert.Contains(t, string(written), "http://127.0.0.1:8770/mcp")
