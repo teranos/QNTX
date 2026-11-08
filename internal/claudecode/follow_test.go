@@ -63,7 +63,7 @@ func TestATurnTheNodeStoppedReadingIsReadOnByTheNext(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The turn's process is gone by now, as Claude Code is once it printed its last result.
+	// 「[Opus 5.5] The turn's process is gone by now, as Claude Code is once it printed its last result.」
 	ended := exec.Command("true")
 	if err := ended.Run(); err != nil {
 		t.Fatal(err)
@@ -92,9 +92,9 @@ func TestATurnTheNodeStoppedReadingIsReadOnByTheNext(t *testing.T) {
 }
 
 // "i actually think the node agent got it, i can see it now. but weirdly enough, it did not respond"
-// A resumed session answers what was queued before what was said: background
-// tasks that ended between turns are a prompt of their own, with a result of
-// their own. The turn's answer is its last result, read once the process is gone.
+// 「[Opus 5.5] A resumed session answers what was queued before what was said: background」
+// 「[Opus 5.5] tasks that ended between turns are a prompt of their own, with a result of」
+// 「[Opus 5.5] their own. The turn's answer is its last result, read once the process is gone.」
 func TestATurnIsAnsweredByItsLastResult(t *testing.T) {
 	home := t.TempDir()
 	if err := os.MkdirAll(turnsDir(home), 0o700); err != nil {
