@@ -13,29 +13,29 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "A signature proves the key, and nothing reusable leaves the node."
+// "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 
-// signedScheme is the Authorization scheme a signed request carries: a JWT its
-// holder signed for this one request, with the key its did:key names.
+// 「[Opus 5.5] signedScheme is the Authorization scheme a signed request carries: a JWT its」
+// 「[Opus 5.5] holder signed for this one request, with the key its did:key names.」
 const signedScheme = "Signed "
 
-// signedOnly is the hash a grant is held under when nothing was handed out
-// for it: no presented string hashes to it, so only a signature reaches it.
+// 「[Opus 5.5] signedOnly is the hash a grant is held under when nothing was handed out」
+// 「[Opus 5.5] for it: no presented string hashes to it, so only a signature reaches it.」
 func signedOnly(did string) string {
 	return "signed:" + did
 }
 
-// signedAssertion is the JWT a request carries under the Signed scheme.
+// 「[Opus 5.5] signedAssertion is the JWT a request carries under the Signed scheme.」
 func signedAssertion(r *http.Request) (string, bool) {
 	signed, ok := strings.CutPrefix(r.Header.Get("Authorization"), signedScheme)
 	signed = strings.TrimSpace(signed)
 	return signed, ok && signed != ""
 }
 
-// signedGrant is the grant a signature stands on. A key signing as itself
-// stands on the grant this node holds for its DID; the primary signing for a
-// person stands on what it signed, admitted by this node's own lines. Either
-// way: EdDSA by the key its issuer's did:key names, short-lived, presented once.
+// 「[Opus 5.5] signedGrant is the grant a signature stands on. A key signing as itself」
+// 「[Opus 5.5] stands on the grant this node holds for its DID; the primary signing for a」
+// 「[Opus 5.5] person stands on what it signed, admitted by this node's own lines. Either」
+// 「[Opus 5.5] way: EdDSA by the key its issuer's did:key names, short-lived, presented once.」
 func (h *Handler) signedGrant(signed string, now time.Time) (Grant, error) {
 	var claims carriedClaims
 	parsed, err := jwt.ParseWithClaims(signed, &claims, func(token *jwt.Token) (any, error) {
@@ -72,8 +72,8 @@ func (h *Handler) signedGrant(signed string, now time.Time) (Grant, error) {
 	if !slices.Contains(claims.Audience, audience) {
 		return Grant{}, errors.Newf("the signature is for %v, and this node is %s", claims.Audience, audience)
 	}
-	// Whose signature this is is asked before its id is kept: a key nobody
-	// granted anything fills nothing here.
+	// 「[Opus 5.5] Whose signature this is is asked before its id is kept: a key nobody」
+	// 「[Opus 5.5] granted anything fills nothing here.」
 	var held TokenInfo
 	if carried {
 		if !h.signsForItsPeople(claims.Issuer) {
@@ -94,8 +94,8 @@ func (h *Handler) signedGrant(signed string, now time.Time) (Grant, error) {
 	return grantOfInfo(held), nil
 }
 
-// carriedGrant is the person the primary signed for, as this node's own User
-// for their route: the primary's User is the primary's record.
+// 「[Opus 5.5] carriedGrant is the person the primary signed for, as this node's own User」
+// 「[Opus 5.5] for their route: the primary's User is the primary's record.」
 func (h *Handler) carriedGrant(claims carriedClaims) (Grant, error) {
 	here, found, err := h.users.ByRoute(claims.Subject)
 	if err != nil {
@@ -116,10 +116,10 @@ func (h *Handler) carriedGrant(claims carriedClaims) (Grant, error) {
 	}, nil
 }
 
-// signsForItsPeople is whether did is this node's primary (nodes.primary), as
-// the primary says of itself where this node already asks it about tokens. A
-// signer other than the one kept is asked about again, once the kept answer is
-// older than primaryDIDFresh: a primary whose key changed is heard.
+// 「[Opus 5.5] signsForItsPeople is whether did is this node's primary (nodes.primary), as」
+// 「[Opus 5.5] the primary says of itself where this node already asks it about tokens. A」
+// 「[Opus 5.5] signer other than the one kept is asked about again, once the kept answer is」
+// 「[Opus 5.5] older than primaryDIDFresh: a primary whose key changed is heard.」
 func (h *Handler) signsForItsPeople(did string) bool {
 	for _, issuer := range h.issuers {
 		said, err := h.primaryDID(issuer, false)
@@ -137,19 +137,19 @@ func (h *Handler) signsForItsPeople(did string) bool {
 	return false
 }
 
-// primaryDIDFresh is how long the DID a primary said is kept before a signer
-// other than it makes the node ask again.
+// 「[Opus 5.5] primaryDIDFresh is how long the DID a primary said is kept before a signer」
+// 「[Opus 5.5] other than it makes the node ask again.」
 const primaryDIDFresh = time.Minute
 
-// saidDID is what a primary said it signs as, and when.
+// 「[Opus 5.5] saidDID is what a primary said it signs as, and when.」
 type saidDID struct {
 	did string
 	at  time.Time
 }
 
-// primaryDID is the did:key an issuer says it signs as: kept, or asked when
-// again is set and what is kept is older than primaryDIDFresh. A redirect is
-// not followed: the answer comes from the origin nodes.primary names.
+// 「[Opus 5.5] primaryDID is the did:key an issuer says it signs as: kept, or asked when」
+// 「[Opus 5.5] again is set and what is kept is older than primaryDIDFresh. A redirect is」
+// 「[Opus 5.5] not followed: the answer comes from the origin nodes.primary names.」
 func (h *Handler) primaryDID(issuer string, again bool) (string, error) {
 	if held, found := h.issuerDIDs.Load(issuer); found {
 		if kept, isKept := held.(saidDID); isKept && (!again || time.Since(kept.at) < primaryDIDFresh) {
@@ -184,7 +184,7 @@ func (h *Handler) primaryDID(issuer string, again bool) (string, error) {
 	return said.DID, nil
 }
 
-// grantOfInfo is a listed record as the gate reads it.
+// 「[Opus 5.5] grantOfInfo is a listed record as the gate reads it.」
 func grantOfInfo(t TokenInfo) Grant {
 	return Grant{
 		ID:                  t.ID,
