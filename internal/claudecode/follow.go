@@ -119,10 +119,10 @@ func pidRuns(stream string) bool {
 	return err == nil
 }
 
-// follow reads stream from its .read mark until runs says the process is gone
-// and nothing more is in it, and answers with the last result. A resumed session
-// answers what was queued before what was said, each with a result of its own:
-// the first result is not the turn's answer.
+// 「[Opus 5.5] follow reads stream from its .read mark until runs says the process is gone」
+// 「[Opus 5.5] and nothing more is in it, and answers with the last result. A resumed session」
+// 「[Opus 5.5] answers what was queued before what was said, each with a result of its own:」
+// 「[Opus 5.5] the first result is not the turn's answer.」
 //
 // "i actually think the node agent got it, i can see it now. but weirdly enough, it did not respond"
 func follow(ctx context.Context, stream string, runs func() bool, each func(Message)) (answered Answer, err error) {
@@ -155,7 +155,7 @@ func follow(ctx context.Context, stream string, runs func() bool, each func(Mess
 			var m Message
 			// A line that is not a message is nothing the stream promised.
 			if unmarshalErr := json.Unmarshal(partial, &m); unmarshalErr == nil {
-				// Every result is taken in: the last one is the answer.
+				// 「[Opus 5.5] Every result is taken in: the last one is the answer.」
 				if answerFrom(&answer, m) {
 					resulted = true
 				}
@@ -181,8 +181,8 @@ func follow(ctx context.Context, stream string, runs func() bool, each func(Mess
 		gone = !runs()
 		select {
 		case <-ctx.Done():
-			// The node stopping is no reason to drop a result already read: it is
-			// the answer as far as the stream went.
+			// 「[Opus 5.5] The node stopping is no reason to drop a result already read: it is」
+			// 「[Opus 5.5] the answer as far as the stream went.」
 			if resulted {
 				return answer, ended(stream)
 			}
