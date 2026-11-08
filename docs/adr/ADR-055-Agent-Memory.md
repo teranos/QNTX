@@ -85,7 +85,7 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 
 "the backfill will happen at some point, that feature will exist, but is not in scope now."
 
-- [ ] 「[Fable 5.1] Old text is traced: each span to the human words it came from, exact or by how many corrections, or marked as the agent's. Not in scope now.」
+- [ ] 「[Fable 5.1] Old text is traced: each span to the human words it came from, exact or by how many corrections, or marked as the agent's..」
 - [ ] 「[Fable 5.1] The signum that keeps a Quote, so the node holds it to tei.」
 - [ ] 「[Fable 5.1] C2PA, for the material a quote arrives in, pinned as TEI is.」
 
