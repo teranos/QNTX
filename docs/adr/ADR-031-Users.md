@@ -62,12 +62,6 @@ one that isn't ROOT, but also be able to go back."
 
 "So, yes, this can be destructive in the sense that a session may get revoked."
 
-"But for tokens its tmp access loss."
-
-- Becoming ends the User's own sessions. Their tokens are refused until ROOT
-  unbecomes them, and work again after.
-- A token minted while ROOT is them lives as long as the becoming.
-
 "and to become or unbecome, is actually in the specific User in the Users Element, the i element is to get back to ROOT"
 
 "And the Becoming and Unbecoming of another User, will be removed, the entire feature and capability will be removed before we can 1.0.0 this repo"
