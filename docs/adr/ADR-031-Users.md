@@ -17,8 +17,6 @@ Status: Implemented mostly, Next up is to be more clear in this document about w
   one and enables it again. Data never leaves, and a person is not an exception.
 - "user should be able to disable their acc, but reawaken (enable) it later as well"
 - The record says who switched a User off, and only they switch it on. What a person did  to themselves is theirs to undo; what ROOT did is not.
-- A disabled User is admitted at no gate. They still prove a route and still get a session, because the switch is the one thing a disabled User has to reach. What they  minted stops with them — a token speaks for whoever minted it ([[ADR-025-access-tokens]]), so it is
-  disabled by the same switch, read on every request rather than at login.
 - That switch is why revoking a person is one act. Striking a route out of
   `auth.root_identities` closes one way in, and a User holds several; disabling the User
   is the person, not the door.
