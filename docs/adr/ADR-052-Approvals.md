@@ -118,9 +118,10 @@ A human being that is having lunch, also cannot, and we aren't supposed to disru
 
 **Not Started** 
 
+- Indirect to Room
 
 ### Via Agent
 
 **Not Started** 
 
-- D
+- Direct to human
