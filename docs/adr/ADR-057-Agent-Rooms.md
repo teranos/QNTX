@@ -23,7 +23,7 @@ think telegram, slack, etc.
 
 think shared message board
 
-think Agent participation in one or multiple rooms
+think Agent participation in one or multiple rooms (at the same time)
 
 
 
