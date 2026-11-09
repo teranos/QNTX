@@ -211,3 +211,60 @@ func TestSetupPluginSchedules_MultipleSchedules(t *testing.T) {
 	assert.Equal(t, schedule.StateActive, job1.State)
 	assert.Equal(t, schedule.StatePaused, job2.State)
 }
+
+// A plugin switched off has its schedules paused, and switched on again they
+// run: what was paused by declaration stays paused.
+func TestPluginSchedulesFollowThePlugin(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zaptest.NewLogger(t).Sugar()
+	declared := []*protocol.ScheduleInfo{
+		{HandlerName: "poll", IntervalSeconds: 120, EnabledByDefault: true, Description: "polls"},
+		{HandlerName: "held", IntervalSeconds: 120, EnabledByDefault: false, Description: "declared paused"},
+	}
+	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
+	other := []*protocol.ScheduleInfo{{HandlerName: "poll", IntervalSeconds: 60, EnabledByDefault: true}}
+	require.NoError(t, SetupPluginSchedules(db, "other", other, logger))
+
+	states := func() map[string]string {
+		jobs, err := schedule.NewStore(db).ListAllScheduledJobs()
+		require.NoError(t, err)
+		got := map[string]string{}
+		for _, j := range jobs {
+			got[j.HandlerName] = j.State
+		}
+		return got
+	}
+
+	require.NoError(t, PausePluginSchedules(db, "duif", logger))
+	assert.Equal(t, map[string]string{
+		"duif/poll":  schedule.StatePaused,
+		"duif/held":  schedule.StatePaused,
+		"other/poll": schedule.StateActive,
+	}, states())
+
+	// Back: the one the switch-off paused runs; the one declared paused does not.
+	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
+	assert.Equal(t, map[string]string{
+		"duif/poll":  schedule.StateActive,
+		"duif/held":  schedule.StatePaused,
+		"other/poll": schedule.StateActive,
+	}, states())
+}
+
+// A plugin taken off the node has no schedules left, and is added again with none.
+func TestDeletePluginSchedules(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zaptest.NewLogger(t).Sugar()
+	declared := []*protocol.ScheduleInfo{{HandlerName: "poll", IntervalSeconds: 120, EnabledByDefault: true}}
+	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
+	require.NoError(t, SetupPluginSchedules(db, "other", declared, logger))
+
+	require.NoError(t, DeletePluginSchedules(db, "duif", logger))
+
+	jobs, err := schedule.NewStore(db).ListAllScheduledJobs()
+	require.NoError(t, err)
+	for _, j := range jobs {
+		assert.NotEqual(t, "duif/poll", j.HandlerName, "a deleted schedule is not listed")
+	}
+	assert.Len(t, jobs, 1)
+}

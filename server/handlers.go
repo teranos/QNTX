@@ -436,6 +436,13 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 		if err := written(); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 		}
+		// Its schedules go with it, loaded or not: a plugin that is off has
+		// nothing to run them, and they would fail at every tick.
+		kept := map[string]func(string) error{"disable": pm.PauseSchedules, "archive": pm.DeleteSchedules}[action]
+		if err := kept(name); err != nil {
+			s.logger.Warnw("A plugin was switched off and its schedules were not", "plugin", name, "action", action, "error", err)
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		}
 		if _, loaded := pm.GetPlugin(name); !loaded {
 			return &protocol.PluginAction{Name: name, State: string(plugin.StateStopped), Action: action}, nil
 		}
