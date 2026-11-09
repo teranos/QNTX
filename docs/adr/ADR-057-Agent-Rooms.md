@@ -24,7 +24,6 @@ think shared message board, a shared place for [[ADR-058-Media-Assets]]
 think Agent participation in one or multiple rooms (at the same time)
 
 
-
 think, creating a new abstraction about Rooms as a Plugin Provided service
 
 think, switch core + adapter as a plugin that provides us the Room abstraction.
