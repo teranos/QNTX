@@ -100,3 +100,6 @@ A human being that sleeps can obviously not approve anything.
 
 A human being that is having lunch, also cannot, and we aren't supposed to disrupt it's lunch or dinner.
 
+---
+
+https://github.com/teranos/QNTX-Web/pull/22
