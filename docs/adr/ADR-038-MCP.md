@@ -87,7 +87,7 @@ QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://githu
 
 ---
 
-I do actually wonder, how we configure our Agent harnesses MCP today. Think QNTX being a client of MCP in addition to just being the server. 
+I do actually wonder, how we configure our Agent harnesses MCP today. Think QNTX being a client of MCP in addition to just being the server. —> and I think this actually 
 
 So, I guess that means the Node itself, and each individual Namespace becomes a consumer of other systems MCP.
 
