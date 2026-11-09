@@ -116,10 +116,13 @@ fn a_signed_attestation_without_actors_is_refused_not_authored_over_its_signatur
     assert!(err(&o).contains("signed attestation must name its actors"), "{}", err(&o));
     assert_eq!(out(&o), "");
     assert_eq!(count(&p), "0");
-    // named actors under a signature stand, untouched
-    let o = run(&p, &["put", "-"], "{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"actors\":[\"bob\"],\"signature\":[1,2,3]}\n");
+    // named actors under a real signature stand, untouched
+    let (_d2, q) = db();
+    let line = out(&run(&q, &["put", "ALICE is author of GITHUB by BOB"], "")).lines().next().unwrap().to_string();
+    let o = run(&p, &["put", "-"], &line);
     assert!(o.status.success(), "{}", err(&o));
     assert_eq!(count(&p), "1");
+    assert!(out(&run(&p, &["actors"], "")).trim() == "BOB");
 }
 
 fn id_of(o: &Output) -> String {
@@ -198,4 +201,83 @@ fn an_alias_makes_ax_find_the_other_name_and_rm_takes_it_back() {
     assert_eq!(out(&run(&p, &["alias", "ls"], "")).lines().count(), 2);
     assert!(run(&p, &["alias", "rm", "ALICE", "ALIS"], "").status.success());
     assert!(out(&run(&p, &["ax", "ALIS"], "")).is_empty());
+}
+
+fn verdicts(p: &std::path::Path) -> Vec<serde_json::Value> {
+    out(&run(p, &["verify"], "")).lines().map(|l| serde_json::from_str(l).unwrap()).collect()
+}
+
+#[test]
+fn put_signs_with_a_key_minted_beside_the_db_and_the_same_key_signs_again() {
+    let (_d, p) = db();
+    let key_file = std::path::PathBuf::from(format!("{}.key", p.display()));
+    assert!(!key_file.exists());
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(key_file.exists());
+    let did1: serde_json::Value = serde_json::from_str(out(&run(&p, &["key"], "")).trim()).unwrap();
+    run(&p, &["put", "CAROL is author of GITHUB by BOB"], "");
+    let v = verdicts(&p);
+    assert_eq!(v.len(), 2);
+    for x in &v {
+        assert_eq!(x["signature"], "valid");
+        assert_eq!(x["signer"], did1["did"]);
+    }
+    assert!(did1["did"].as_str().unwrap().starts_with("did:key:z"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(std::fs::metadata(&key_file).unwrap().permissions().mode() & 0o777, 0o600);
+    }
+}
+
+#[test]
+fn unsigned_writes_no_signature_and_mints_no_key() {
+    let (_d, p) = db();
+    run(&p, &["--unsigned", "put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(!std::path::PathBuf::from(format!("{}.key", p.display())).exists());
+    assert_eq!(verdicts(&p)[0]["signature"], "unsigned");
+}
+
+#[test]
+fn a_signature_given_that_does_not_hold_is_refused_and_one_that_holds_is_kept() {
+    let (d, p) = db();
+    let other = d.path().join("other.key");
+    let o = run(&p, &["--key", other.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(o.status.success(), "{}", err(&o));
+    let line = out(&o).lines().next().unwrap().to_string();
+    let (_d2, p2) = db();
+    // carried to another db, the signature holds and the signer stays the other key's
+    assert!(run(&p2, &["put", "-"], &line).status.success());
+    assert_eq!(verdicts(&p2)[0]["signature"], "valid");
+    // one field changed under the signature
+    let tampered = line.replace("ALICE", "MALLORY");
+    let (_d3, p3) = db();
+    let o = run(&p3, &["put", "-"], &tampered);
+    assert!(!o.status.success() && err(&o).contains("does not hold"), "{}", err(&o));
+    assert_eq!(count(&p3), "0");
+}
+
+#[test]
+fn update_re_signs_what_its_own_key_signed_and_refuses_another_signers() {
+    let (d, p) = db();
+    let id = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
+    let o = run(&p, &["update", &format!("{{\"id\":\"{id}\",\"subjects\":[\"ZED\"]}}")], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert_eq!(verdicts(&p)[0]["signature"], "valid");
+
+    let other = d.path().join("other.key");
+    let id2 = id_of(&run(&p, &["--key", other.to_str().unwrap(), "put", "CAROL is author of GITHUB by BOB"], ""));
+    let o = run(&p, &["update", &format!("{{\"id\":\"{id2}\",\"subjects\":[\"MALLORY\"]}}")], "");
+    assert!(!o.status.success() && err(&o).contains("cannot make"), "{}", err(&o));
+    assert!(verdicts(&p).iter().all(|v| v["signature"] == "valid"));
+}
+
+#[test]
+fn a_file_that_is_not_a_key_is_never_replaced() {
+    let (d, p) = db();
+    let f = d.path().join("not.key");
+    std::fs::write(&f, b"hello").unwrap();
+    let o = run(&p, &["--key", f.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(!o.status.success() && err(&o).contains("not a key"), "{}", err(&o));
+    assert_eq!(std::fs::read(&f).unwrap(), b"hello");
 }

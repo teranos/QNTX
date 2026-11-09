@@ -16,7 +16,10 @@ path = "src/main.rs"
 
 [dependencies]
 ats.workspace = true
+ats-sign = { path = "../ats-sign" }
 ats-sqlite = { path = "../ats-sqlite" }
+laye-me = { path = "../laye-me" }
+libp2p-identity = { version = "=0.2.14", features = ["ed25519"] }
 sacred-error.workspace = true
 serde_json.workspace = true
 

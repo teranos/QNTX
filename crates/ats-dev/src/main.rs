@@ -3,7 +3,7 @@
 //! Tablet of Reach. It reads and writes attestations in one SQLite file.
 //!
 //! ```text
-//! ats-dev [--db FILE] [--sync full|normal|off] put "ALICE is author of GITHUB by BOB" [--attr k=v]...
+//! ats-dev [--db FILE] [--sync full|normal|off] [--key FILE] [--unsigned] put "ALICE is author of GITHUB by BOB" [--attr k=v]...
 //! ats-dev [--db FILE] [--sync …] put -          # JSON attestations, one per line, on stdin
 //! ats-dev [--db FILE] ax "ALICE is author of GITHUB since last month" [--limit N]
 //! ats-dev [--db FILE] get ID
@@ -15,12 +15,20 @@
 //! ats-dev [--db FILE] clear --yes
 //! ats-dev [--db FILE] subjects | predicates | contexts | actors   # distinct values, one per line
 //! ats-dev [--db FILE] stats
+//! ats-dev [--db FILE] key                       # the signing key's did:key and file (minted if there is none)
+//! ats-dev [--db FILE] verify [ID]               # valid / invalid / unsigned, one line each; exit 1 if any is invalid
 //! ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X
 //! ```
+//!
+//! `put` signs with ats-dev's own ed25519 key (`--key`, else `$ATS_DEV_KEY`, else
+//! `<db>.key`, minted on first use) over the bytes `ats/signing` signs in Go.
+//! `--unsigned` writes without a signature. This is not the node's key.
 //!
 //! `--db` defaults to `$ATS_DEV_DB`, else `ats-dev.db`. Rows come out as JSON,
 //! one attestation per line. A failure goes to stderr as a sacred-error `Error`
 //! and exits 1.
+
+mod sign;
 
 use std::io::{BufRead, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -92,12 +100,16 @@ fn new_id() -> Result<String, Box<Error>> {
 struct Opts {
     db: String,
     sync: Option<String>,
+    key: Option<String>,
+    unsigned: bool,
     rest: Vec<String>,
 }
 
 fn opts(args: &[String]) -> Result<Opts, Box<Error>> {
     let mut db = std::env::var("ATS_DEV_DB").unwrap_or_else(|_| "ats-dev.db".into());
     let mut sync = None;
+    let mut key = None;
+    let mut unsigned = false;
     let mut rest = Vec::new();
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -110,10 +122,12 @@ fn opts(args: &[String]) -> Result<Opts, Box<Error>> {
                 }
                 sync = Some(v.clone());
             }
+            "--key" => key = Some(it.next().ok_or_else(|| fail("--key needs a file", "none given"))?.clone()),
+            "--unsigned" => unsigned = true,
             _ => rest.push(a.clone()),
         }
     }
-    Ok(Opts { db, sync, rest })
+    Ok(Opts { db, sync, key, unsigned, rest })
 }
 
 fn open(o: &Opts) -> Result<SqliteStore, Box<Error>> {
@@ -126,10 +140,33 @@ fn open(o: &Opts) -> Result<SqliteStore, Box<Error>> {
     Ok(s)
 }
 
+/// The signer, unless `--unsigned`. The key is minted here if it must be.
+fn signer(o: &Opts) -> Result<Option<sign::Signer>, Box<Error>> {
+    if o.unsigned {
+        return Ok(None);
+    }
+    sign::Signer::load_or_mint(&sign::key_path(o.key.as_deref(), &o.db)).map(Some)
+}
+
+/// What is written: a signature already given is checked and kept, none given
+/// is made with ats-dev's key.
+fn seal(signer: &Option<sign::Signer>, a: Attestation) -> Result<Attestation, Box<Error>> {
+    if a.signature.is_some() {
+        return match sign::verify(&a) {
+            sign::Verdict::Invalid(why) => Err(fail("the signature given does not hold", format!("{}: {why}", a.id))),
+            _ => Ok(a),
+        };
+    }
+    match signer {
+        Some(sg) => sg.sign(a),
+        None => Ok(a),
+    }
+}
+
 fn run(args: &[String]) -> Result<(), Box<Error>> {
     let o = opts(args)?;
     let mut it = o.rest.iter();
-    let cmd = it.next().ok_or_else(|| fail("no command", "put | ax | get | count | exists | ids | update | delete | clear | subjects | predicates | contexts | actors | stats | alias"))?;
+    let cmd = it.next().ok_or_else(|| fail("no command", "key | verify | put | ax | get | count | exists | ids | update | delete | clear | subjects | predicates | contexts | actors | stats | alias"))?;
     let tail: Vec<&String> = it.collect();
     match cmd.as_str() {
         "put" => put(&o, &tail),
@@ -187,6 +224,13 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
             open(&o)?.clear().map_err(|e| fail("clear failed", e))
         }
         "update" => update(&o, &tail),
+        "key" => {
+            let path = sign::key_path(o.key.as_deref(), &o.db);
+            let sg = sign::Signer::load_or_mint(&path)?;
+            println!("{}", serde_json::json!({ "did": sg.did, "file": path.display().to_string() }));
+            Ok(())
+        }
+        "verify" => verify(&o, &tail),
         "alias" => alias(&o, &tail),
         other => Err(fail("unknown command", other)),
     }
@@ -219,7 +263,23 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
             m.insert(k.clone(), x.clone());
         }
     }
-    let a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
+    let mut a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
+    // A signature covers what was just changed. It stays only if it still
+    // holds; else ats-dev re-signs what its own key signed, and refuses the rest.
+    if stored.signature.is_some() && !matches!(sign::verify(&a), sign::Verdict::Valid(_)) {
+        let sg = signer(o)?.ok_or_else(|| {
+            fail("the update breaks the signature", format!("{id}: --unsigned cannot keep a signed attestation signed"))
+        })?;
+        if stored.signer_did.as_deref() != Some(sg.did.as_str()) {
+            return Err(fail(
+                "the update breaks a signature ats-dev cannot make",
+                format!("{id} is signed by {}, ats-dev's key is {}", stored.signer_did.as_deref().unwrap_or("?"), sg.did),
+            ));
+        }
+        a.signature = None;
+        a.signer_did = None;
+        a = sg.sign(a)?;
+    }
     s.update(a.clone()).map_err(|e| fail("update failed", e))?;
     emit(&a)
 }
@@ -270,8 +330,9 @@ fn emit(a: &Attestation) -> Result<(), Box<Error>> {
 fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let what = tail.first().ok_or_else(|| fail("put needs a sentence or -", "ats-dev put \"A is p of C by X\""))?;
     let mut s = open(o)?;
+    let sg = signer(o)?;
     if what.as_str() == "-" {
-        return put_stdin(&mut s);
+        return put_stdin(&mut s, &sg);
     }
     let parsed = Parser::parse(what).map_err(|e| fail("could not parse the sentence", e))?;
     if parsed.has_temporal() {
@@ -307,6 +368,7 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
             other => return Err(fail("unknown put flag", other)),
         }
     }
+    let a = seal(&sg, a)?;
     s.put(a.clone()).map_err(|e| fail("put failed", e))?;
     emit(&a)
 }
@@ -356,14 +418,14 @@ fn complete(line: &str) -> Result<Attestation, Box<Error>> {
     Ok(a.authored_by(ACTOR))
 }
 
-fn put_stdin(s: &mut SqliteStore) -> Result<(), Box<Error>> {
+fn put_stdin(s: &mut SqliteStore, sg: &Option<sign::Signer>) -> Result<(), Box<Error>> {
     let mut batch: Vec<String> = Vec::new();
     let mut total = 0usize;
     for (n, line) in std::io::stdin().lock().lines().enumerate() {
         let line = line.map_err(|e| fail("could not read stdin", e))?;
         if line.trim().is_empty() { continue; }
         let at = n + 1;
-        let a = match complete(&line) {
+        let a = match complete(&line).and_then(|a| seal(sg, a)) {
             Ok(a) => a,
             Err(e) => return abandon(s, &batch, fail(&format!("line {at}: {}", e.title), e.why)),
         };
@@ -434,5 +496,31 @@ fn query(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         emit(a)?;
     }
     eprintln!("ats-dev: {} attestations", res.attestations.len());
+    Ok(())
+}
+
+fn verify(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
+    let s = open(o)?;
+    let ids = match tail.first() {
+        Some(id) => vec![id.to_string()],
+        None => s.ids().map_err(|e| fail("ids failed", e))?,
+    };
+    let mut bad = 0usize;
+    let mut out = std::io::stdout().lock();
+    for id in ids {
+        let a = s.get(&id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", &id))?;
+        let line = match sign::verify(&a) {
+            sign::Verdict::Unsigned => serde_json::json!({ "id": id, "signature": "unsigned" }),
+            sign::Verdict::Valid(did) => serde_json::json!({ "id": id, "signature": "valid", "signer": did }),
+            sign::Verdict::Invalid(why) => {
+                bad += 1;
+                serde_json::json!({ "id": id, "signature": "invalid", "why": why })
+            }
+        };
+        writeln!(out, "{line}").map_err(|e| fail("could not write stdout", e))?;
+    }
+    if bad > 0 {
+        return Err(fail("signatures that do not hold", format!("{bad}")));
+    }
     Ok(())
 }
