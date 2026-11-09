@@ -9,7 +9,7 @@ Status: Active and in use, how observable is this through sentry? Or through tel
 
 > Does an MCP client require dynamic client registration, or does it accept a client minted by hand?
 
-"CLAUDE. ACCEPTS PREMINTED ID AND SECRET I KNOW IT."
+"CLAUDE.AI ACCEPTS PREMINTED ID AND SECRET I KNOW IT."
 
 A client minted in QNTX is what the [MCP authorization spec](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization) calls pre-registration, so QNTX needs no dynamic client registration.
 
