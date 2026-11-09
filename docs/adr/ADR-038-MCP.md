@@ -13,7 +13,7 @@ Status: Active and in use, how observable is this through sentry? Or through tel
 
 A client minted in QNTX is what the [MCP authorization spec](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization) calls pre-registration, so QNTX needs no dynamic client registration.
 
-Existing MCP servers can run on one box, behind QNTX.
+> Existing MCP servers can run on one box, behind QNTX.
 
 "SO, I COULD HAVE THIS BE THE 1 POINT WHERE I SET UP ALL MY MCP NEEDS"
 
