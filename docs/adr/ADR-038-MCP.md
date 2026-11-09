@@ -63,26 +63,23 @@ QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://githu
 
 "i wish it was easier to find out, when logged in, what the mcp url is."
 
-The MCP element in [QNTX-Web](https://github.com/teranos/QNTX-Web) is where a person finds the servers they reach and mints a connector for one.
+> The MCP element in [QNTX-Web](https://github.com/teranos/QNTX-Web) is where a person finds the servers they reach and mints a connector for one.
 
 "guide your agent is easy to add"
 
-A client carries instructions, set at minting and changed at `POST /auth/tokens/{id}/instructions`; its connector's server says them to the agent on initialize, and nobody else is told anything.
+> A client carries instructions, set at minting and changed at `POST /auth/tokens/{id}/instructions`; its connector's server says them to the agent on initialize, and nobody else is told anything.
 
-A connector stands at CONNECTOR, a rung no line names, and is offered what REACH lines grant the roles its client's label holds ([ADR-034](./ADR-034-roles-as-attestations.md)): a client whose label holds nothing is a connector offered nothing, however the person who said yes stands. Picking what a connector reaches is two lines, `REACH is 'staands' of APP` and `app is APP of <namespace>`.
+> A connector stands at CONNECTOR, a rung no line names, and is offered what REACH lines grant the roles its client's label holds ([ADR-034](./ADR-034-roles-as-attestations.md)): a client whose label holds nothing is a connector offered nothing, however the person who said yes stands. Picking what a connector reaches is two lines, `REACH is 'staands' of APP` and `app is APP of <namespace>`.
 
 "but i want a MCP specifically for the Node, only for ROOT"
 
 "as ROOT, everything ROOT reaches"
 
-ROOT's client is minted as one (`"root": true`) and names no namespace: only ROOT mints it, only ROOT's yes at the passkey sends it a code, and every token it is issued is ROOT, the one it asks for itself included.
+> ROOT's client is minted as one (`"root": true`) and names no namespace: only ROOT mints it, only ROOT's yes at the passkey sends it a code, and every token it is issued is ROOT, the one it asks for itself included.
 
 "THIS IS MY TOKEN"
-
 "MY RISK TO TAKE"
-
 "ROOT gets all"
-
 "THE WHOLE THING"
 
 ROOT's client answers at `/mcp`, the node's MCP server.
