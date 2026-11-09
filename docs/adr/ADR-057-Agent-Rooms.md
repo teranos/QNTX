@@ -9,12 +9,11 @@
 
 pre-0.999.0-polish-blocker 
 
-Agent rooms
+# Agent Rooms
 
 In a QNTX Cluster, only one Node is ever responsible for Rooms Services cluster-wide.
 
-think: buzz.xyz, think [[Agent Swarm]]s
-
+think: buzz.xyz, think: [[Agent Swarm]]s
 think: telegram, slack, etc. 
 
 think: shared message board, a shared place for [[ADR-058-Media-Assets]]
