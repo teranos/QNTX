@@ -10,7 +10,7 @@ pre-0.999.0-polish-blocker
 
 Agent rooms
 
-Inside of a QNTX Cluster, only one node is ever responsible for Rooms cluster-wide
+Inside of a QNTX Cluster, only one Node is ever responsible for Rooms Servicees cluster-wide
 
 think buzz.xyz
 
