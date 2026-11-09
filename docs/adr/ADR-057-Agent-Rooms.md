@@ -46,11 +46,9 @@ Say you can wake a specific Agent so it will check the room
 
 Say an Agent session is still a session as you know, but it communicates with the room, or rather it has access to it. 
 
-Say there is 1 agent responsible for Observability and it only writes to the Node room and it is allowed to wake up different Node Agents, or different Element Agents.
-
 Say a Node Agent is allowed to write into Element Room's but Element Agents cant write into Node Room
 
-Say there is a Room, and there is a PR, updates to that PR should arrive in the relevant Room. Including things like CI an comments. 
+Say there is a Room, and there is a PR, updates to that PR should arrive in the relevant Room. Including things like CI and comments. 
 
 Say there is a Room per Namespace 
 
