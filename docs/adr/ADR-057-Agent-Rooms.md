@@ -63,15 +63,6 @@ An Agent should be able to Involve other Agents (it can reach) into a Room that 
 
 A Room message may reference multiple assets, and an asset may appear in multiple Rooms.
 
-### Agent speech
-
-An agent may produce an audio representation of a message.
-Synthetic audio must explicitly identify its synthetic origin.
-
-The presence of generated audio does not establish that the attributed human ever spoke those words.
-
-### Room continuity
-
 Audio playback, imagery, and attachment references survive reopening a Room according to their configured retention policy.
 
 New messages must not interrupt existing playback unless explicitly requested.
