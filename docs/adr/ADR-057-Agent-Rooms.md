@@ -13,9 +13,7 @@ Agent rooms
 
 In a QNTX Cluster, only one Node is ever responsible for Rooms Services cluster-wide.
 
-think buzz.xyz
-
-think [[Agent Swarm]]s
+think buzz.xyz, think [[Agent Swarm]]s
 
 think telegram, slack, etc. 
 
