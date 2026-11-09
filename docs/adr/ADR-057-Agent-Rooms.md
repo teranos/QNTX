@@ -49,6 +49,7 @@ Say an Agent session is still a session as you know, but it communicates with th
 Say a Node Agent is allowed to write into Element Room's but Element Agents cant write into Node Room
 
 Say there is a Room, and there is a PR, updates to that PR should arrive in the relevant Room. Including things like CI and comments. 
+	- https://github.com/teranos/QNTX/pull/1607
 
 Say there is a Room per Namespace 
 
