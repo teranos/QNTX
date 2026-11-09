@@ -2,6 +2,7 @@ package forge
 
 import (
 	"context"
+	"strings"
 
 	errors "github.com/teranos/sacred-error"
 )
@@ -78,11 +79,16 @@ type Forges struct {
 // ForgesOf are the forges named, by the host each is on.
 func ForgesOf(by map[string]Forge) Forges { return Forges{by: by} }
 
-// For is the forge repo is on, or why there is none.
+// For is the forge repo is on, or why there is none. A host is a name case
+// does not tell apart.
 func (f Forges) For(repo Repo) (Forge, error) {
-	forge, ok := f.by[repo.Host]
-	if !ok {
-		return nil, errors.Newf("the node reaches no repositories on %s, and %s is on it", repo.Host, repo)
+	if forge, ok := f.by[repo.Host]; ok {
+		return forge, nil
 	}
-	return forge, nil
+	for host, forge := range f.by {
+		if strings.EqualFold(host, repo.Host) {
+			return forge, nil
+		}
+	}
+	return nil, errors.Newf("the node reaches no repositories on %s, and %s is on it", repo.Host, repo)
 }

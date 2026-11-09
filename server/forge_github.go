@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/base64"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/teranos/QNTX/internal/forge"
@@ -190,14 +191,16 @@ func (r gitHubForge) Entries(ctx context.Context, as forge.Acting, repo forge.Re
 	if err != nil {
 		return nil, err
 	}
-	answered, err := r.service().GetRepositoryContent(ctx, &protocol.GitHubGetRepositoryContentRequest{
+	// 「[Opus 5.5] Only GitHub answering 404 is a folder it has none of; any other no is said as it is.」
+	answeredWith := 0
+	answered, err := r.service().GetRepositoryContent(services.AnsweredWith(ctx, &answeredWith), &protocol.GitHubGetRepositoryContentRequest{
 		Namespace: namespace, Owner: on.Owner, Repo: on.Name, Path: dir, Ref: ref,
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "%s of %s on %s was not asked", dir, on, ref)
 	}
 	if !answered.GetSuccess() {
-		return nil, forge.Refused{Says: answered.GetError()}
+		return nil, forge.Refused{Says: answered.GetError(), Absent: answeredWith == http.StatusNotFound}
 	}
 	switch answered.GetAnswered() {
 	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY:
@@ -215,6 +218,39 @@ func (r gitHubForge) Entries(ctx context.Context, as forge.Acting, repo forge.Re
 }
 
 // entryKind is what GitHub calls a thing in a directory, as an EntryKind.
+// 「[Opus 5.5] EntryAt asks GitHub for path alone: "This API has an upper limit of 1,000 files for a」
+// 「[Opus 5.5] directory" (server/parity/github_2026-03-10_7bdf5f0/openapi.json, GET contents/{path}).」
+func (r gitHubForge) EntryAt(ctx context.Context, as forge.Acting, repo forge.Repo, ref, path string) (forge.Entry, error) {
+	on, err := onGitHub(repo)
+	if err != nil {
+		return forge.Entry{}, err
+	}
+	ctx, namespace, err := r.who(ctx, as)
+	if err != nil {
+		return forge.Entry{}, err
+	}
+	answeredWith := 0
+	answered, err := r.service().GetRepositoryContent(services.AnsweredWith(ctx, &answeredWith), &protocol.GitHubGetRepositoryContentRequest{
+		Namespace: namespace, Owner: on.Owner, Repo: on.Name, Path: path, Ref: ref,
+	})
+	if err != nil {
+		return forge.Entry{}, errors.Wrapf(err, "%s of %s on %s was not asked", path, on, ref)
+	}
+	if !answered.GetSuccess() {
+		return forge.Entry{}, forge.Refused{Says: answered.GetError(), Absent: answeredWith == http.StatusNotFound}
+	}
+	switch answered.GetAnswered() {
+	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_DIRECTORY:
+		return forge.Entry{Name: path[strings.LastIndex(path, "/")+1:], Path: path, Kind: forge.Dir}, nil
+	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_ONE:
+		// 「[Opus 5.5] Said at the path asked: GitHub answers a symlink to a file with the file it points at.」
+		return forge.Entry{Name: path[strings.LastIndex(path, "/")+1:], Path: path, SHA: answered.GetSha(), Kind: entryKind(answered.GetType())}, nil
+	case protocol.GitHubReposContentsAnswer_GITHUB_REPOS_CONTENTS_ANSWER_UNNAMED:
+		return forge.Entry{}, errors.Newf("%s of %s on %s is answered by GitHubService without saying what GitHub answered with", path, on, ref)
+	}
+	return forge.Entry{}, errors.Newf("%s of %s on %s is answered by GitHubService as %d, which this node does not know", path, on, ref, answered.GetAnswered())
+}
+
 func entryKind(github string) forge.EntryKind {
 	if github == "file" {
 		return forge.File

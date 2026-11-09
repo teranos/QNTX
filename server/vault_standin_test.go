@@ -22,6 +22,10 @@ type standInRepo struct {
 	commits       []string
 	// refuseRef is a branch GitHub will not make, as it will not beside one under it.
 	refuseRef string
+	// refuseList is a folder GitHub will not list for the App, though the branch holds it.
+	refuseList string
+	// listsAtMost is how many entries of a folder GitHub lists, as it lists 1,000; zero is all.
+	listsAtMost int
 }
 
 // stand is the repository the stand-in GitHub of vaultBindingServer holds.
@@ -129,7 +133,11 @@ func (repo *standInRepo) serve(w http.ResponseWriter, r *http.Request) bool {
 
 // contents answers a folder or a note under docs/adr on a branch.
 func (repo *standInRepo) contents(asked, ref string, give func(int, any)) {
-	notes, held := repo.branches[ref]
+	if asked == repo.refuseList {
+		give(http.StatusForbidden, map[string]string{"message": "Resource not accessible by integration"})
+		return
+	}
+	notes, held := repo.branches[strings.TrimPrefix(ref, "sha-of-")]
 	if !held {
 		give(http.StatusNotFound, map[string]string{"message": "No commit found for the ref " + ref})
 		return
@@ -157,6 +165,12 @@ func (repo *standInRepo) contents(asked, ref string, give func(int, any)) {
 	if len(entries) == 0 {
 		give(http.StatusNotFound, map[string]string{"message": "Not Found"})
 		return
+	}
+	slices.SortFunc(entries, func(a, b any) int {
+		return strings.Compare(a.(map[string]any)["path"].(string), b.(map[string]any)["path"].(string))
+	})
+	if repo.listsAtMost > 0 && len(entries) > repo.listsAtMost {
+		entries = entries[:repo.listsAtMost]
 	}
 	give(http.StatusOK, entries)
 }

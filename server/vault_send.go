@@ -38,9 +38,15 @@ const vaultRetryAfter = 5 * time.Minute
 
 // branchRefused is why a name is no branch to send to, or empty.
 func branchRefused(name, defaultBranch string) string {
-	switch {
-	case name == defaultBranch:
+	if name == defaultBranch {
 		return name + " is the default branch, which changes reach the vault from; a folder sends to a branch of its own"
+	}
+	return notABranchName(name)
+}
+
+// notABranchName is why git takes no branch of this name, or empty.
+func notABranchName(name string) string {
+	switch {
 	case strings.HasPrefix(name, "-"), strings.HasPrefix(name, "/"), strings.HasSuffix(name, "/"),
 		strings.HasSuffix(name, ".lock"), strings.HasSuffix(name, "."), strings.Contains(name, ".."),
 		strings.Contains(name, "//"), strings.Contains(name, "@{"), name == "@":

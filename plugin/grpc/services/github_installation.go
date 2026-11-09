@@ -24,6 +24,11 @@ type githubAsInstallation struct{}
 // with: a *int in the context, left as it is when GitHub did not answer.
 type githubStatus struct{}
 
+// 「[Opus 5.5] AnsweredWith is ctx for a call that tells status what GitHub answered it with.」
+func AnsweredWith(ctx context.Context, status *int) context.Context {
+	return context.WithValue(ctx, githubStatus{}, status)
+}
+
 // AsInstallation is ctx for a call spent as the App's installation where the
 // repository the call names is, in place of a namespace's token.
 func AsInstallation(ctx context.Context) context.Context {
