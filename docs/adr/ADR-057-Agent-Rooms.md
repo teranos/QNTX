@@ -13,15 +13,15 @@ Agent rooms
 
 In a QNTX Cluster, only one Node is ever responsible for Rooms Services cluster-wide.
 
-think buzz.xyz, think [[Agent Swarm]]s
+think: buzz.xyz, think [[Agent Swarm]]s
 
-think telegram, slack, etc. 
+think: telegram, slack, etc. 
 
-think shared message board, a shared place for [[ADR-058-Media-Assets]]
-think Agent participation in one or multiple rooms (at the same time)
-think, creating a new abstraction about Rooms as a Plugin Provided service
-think, switch core + adapter as a plugin that provides us the Room abstraction.
-think, same thing for buzz.xyz
+think: shared message board, a shared place for [[ADR-058-Media-Assets]]
+think: Agent participation in one or multiple rooms (at the same time)
+think: creating a new abstraction about Rooms as a Plugin Provided service
+think: switch core + adapter as a plugin that provides us the Room abstraction.
+
 
 https://docs.switchagents.ai/switch-rooms/internals/agent-connection#connect-over-the-websocket
 
