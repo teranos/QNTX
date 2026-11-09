@@ -59,11 +59,11 @@ An Agent should be able to Involve other Agents (it can reach) into a Room that 
 
 ---
 
-## Media Assets
+## [[ADR-058-Media-Assets|Media Assets]]
 
 A Room message may reference multiple assets, and an asset may appear in multiple Rooms.
 
-### 5.1 Human speech
+### Human speech
 
 A human opens QNTX on a phone and speaks into a Room or to an Agent.
 The client captures the original microphone audio.
