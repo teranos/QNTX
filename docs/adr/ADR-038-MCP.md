@@ -39,11 +39,11 @@ QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://githu
 
 "a new thing is a new handler is a new mcp tool is a new api endpoint"
 
-A tool call is a request on the served API carrying the caller's own credential, so it meets the gate its path's line sets and no second one.
+> A tool call is a request on the served API carrying the caller's own credential, so it meets the gate its path's line sets and no second one.
 
-Every tool takes the path, the query and the JSON body until a handler declares its own shape where it is offered on the mux.
+> Every tool takes the path, the query and the JSON body until a handler declares its own shape where it is offered on the mux.
 
-A connector acts in the one namespace its client was minted in, chosen in the mint element and nowhere else.
+> A connector acts in the one namespace its client was minted in, chosen in the mint element and nowhere else.
 
 "i want to set the namespace there and there only"
 
