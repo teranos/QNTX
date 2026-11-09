@@ -94,4 +94,5 @@ Approval's are Human
 
 Human time is expensive
 
-There is 
+There is a cost to putting something in front of a Human being.
+
