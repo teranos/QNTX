@@ -85,4 +85,6 @@ it depends on if you are looking at a Chat right now
 it depends on if you are in a Room and are okay with that Room Participants requesting Approval for something. 
 
 
-Approval
+Approval's should only really be for things that only a human can resolve.
+
+It means that not every little PR ne
