@@ -95,7 +95,7 @@ func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments
 		return
 	}
 	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, "github-app:"+c.App, func(speaker string) {
-		if err := s.tellAgentTheRoom(target, wakeAgent, speaker); err != nil {
+		if err := s.tellAgentTheRoom(target, wakeAgent, speaker, c.At); err != nil {
 			s.logger.Errorw("A PR comment was said into the Node Room and the agent was not told", "agent", wakeAgent, "room", target.Room, "error", err)
 		}
 	})
@@ -105,7 +105,10 @@ func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments
 // room since it was last told, and posts its answer into the room as it. What
 // it was told is kept before the turn runs: what is said during the turn is
 // the next one's.
-func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker string) error {
+//
+// An agent never told is told from since, the time of the comment that woke it:
+// a room reads oldest first, so reading it all would tell the oldest.
+func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker, since string) error {
 	if s.nodeDB == nil {
 		return errors.New("the node has no operational store for what an agent was told")
 	}
@@ -120,24 +123,28 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 		return errors.Newf("%s is no Node Agent in the Node Room", agent)
 	}
 	told := roomcomments.Told{DB: s.nodeDB}
-	at, id, err := told.Mark(ctx, target.Room, agent)
+	marked, err := told.Mark(ctx, target.Room, agent)
 	if err != nil {
 		return err
 	}
-	read, err := rooms.ReadRoom(ctx, &protocol.ReadRoomRequest{Provider: target.Provider, Room: target.Room, Since: at, Limit: 100})
+	from := since
+	if marked != "" {
+		if from, err = roomcomments.ReadFrom(marked); err != nil {
+			return err
+		}
+	}
+	read, err := rooms.ReadRoom(ctx, &protocol.ReadRoomRequest{Provider: target.Provider, Room: target.Room, Since: from, Limit: 100})
 	if err != nil {
 		return errors.Wrap(err, "the Node Room was not read")
 	}
 	var said []roomcomments.Said
 	for _, m := range read.GetMessages() {
-		said = append(said, roomcomments.Said{ID: m.GetId(), Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()})
+		said = append(said, roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()})
 	}
-	said = roomcomments.After(said, id)
 	if len(said) == 0 {
 		return nil
 	}
-	last := said[len(said)-1]
-	if err := told.Keep(ctx, target.Room, agent, last.At, last.ID); err != nil {
+	if err := told.Keep(ctx, target.Room, agent, said[len(said)-1].At); err != nil {
 		return err
 	}
 	request, err := http.NewRequestWithContext(withSpeaker(lifetime, speaker), http.MethodPost, "/github/comments", nil)
