@@ -11,7 +11,7 @@ pre-0.999.0-polish-blocker
 
 # Agent Rooms
 
-In a QNTX Cluster, only one Node is ever responsible for Rooms Services cluster-wide, and 
+In a QNTX Cluster, only one Node is ever responsible for Rooms Services cluster-wide, and Rooms continue to exist when no Agent session is ru
 
 think: buzz.xyz, think: [[Agent Swarm]]s
 think: telegram, slack, etc. 
