@@ -21,14 +21,13 @@ A token presented to QNTX is never passed on to an MCP server behind it; the MCP
 
 QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk).
 
-
 > Which version is [parity](https://github.com/teranos/QNTX/blob/main/server/parity/references.go)'s.
 
 "Parity owns it outright"
 
 The token the OAuth flow issues is the person who said yes at the passkey; what it reaches is the lines about its client's label, below.
 
-"my oauth should hjust have that permission"
+"my oauth should just have that permission"
 
 A refresh token is an ordinary token row, thirty days, rotated — so a connector in use never returns to the passkey and one left alone for a month is finished.
 
