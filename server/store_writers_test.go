@@ -200,6 +200,8 @@ var nodeReaders = map[string]string{
 	"operational_watchdog.go:askOperationalStore": "the same ping on a tick, so a node that has stopped answering says so",
 	"operational_watchdog.go:operationalPool":     "where the connections to the node's own file are while a ping waits on it",
 	"lifecycle.go:Stop":                           "shutdown compares the pulse read connection with the node's own",
+	"rooms_github.go:keepRoomComment":             "the comments waiting to be said into the Node Room, kept in the node's own file until the Room has them",
+	"rooms_github.go:sayWaitingRoomComments":      "the sweep that says those waiting comments into the Node Room, from the node's own file",
 	"sub_auth.go:Init":                            "the doors, which are the node's edge: am.toml says which namespace is behind each",
 	"sub_config_watcher.go:Init":                  "am.toml is the node's configuration, and watching it is the node's",
 	"sub_nodedid.go:Init":                         "the node's own identity, the row keyed self",
