@@ -49,17 +49,17 @@ QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://githu
 
 "no, the connector should not follow the person, the connector should stay where i selected the namespace to and only stay there"
 
-To a connector the namespace does not exist: it is offered no namespace tool, and no answer names one.
+> To a connector the namespace does not exist: it is offered no namespace tool, and no answer names one.
 
 "the conenctor, to the connector, the namespace should be invisible"
 
-The server is stateless, so a tool is served under the context of the request that carried it and acts as the caller in front of it rather than as whoever opened the session.
+> The server is stateless, so a tool is served under the context of the request that carried it and acts as the caller in front of it rather than as whoever opened the session.
 
 "I actually think this part should be split up into, Node MCP server and Namespace MCP server's"
 
-The node's MCP server is `/mcp`, and a namespace's is `/mcp/<namespace>`, as A2A's node is `/a2a/` and a namespace's agent `/a2a/<tenant>/`.
+> The node's MCP server is `/mcp`, and a namespace's is `/mcp/<namespace>`, as A2A's node is `/a2a/` and a namespace's agent `/a2a/<tenant>/`.
 
-A connector answers at the server of the namespace its client was minted in, and anywhere else is refused with where its own is. Anyone else is the node's.
+> A connector answers at the server of the namespace its client was minted in, and anywhere else is refused with where its own is. Anyone else is the node's.
 
 "i wish it was easier to find out, when logged in, what the mcp url is."
 
