@@ -121,3 +121,81 @@ fn a_signed_attestation_without_actors_is_refused_not_authored_over_its_signatur
     assert!(o.status.success(), "{}", err(&o));
     assert_eq!(count(&p), "1");
 }
+
+fn id_of(o: &Output) -> String {
+    let v: serde_json::Value = serde_json::from_str(out(o).lines().next().unwrap()).unwrap();
+    v["id"].as_str().unwrap().to_string()
+}
+
+#[test]
+fn exists_delete_and_ids_agree_with_count() {
+    let (_d, p) = db();
+    let id = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
+    assert_eq!(out(&run(&p, &["exists", &id], "")).trim(), "true");
+    assert_eq!(out(&run(&p, &["ids"], "")).trim(), id);
+    assert!(run(&p, &["delete", &id], "").status.success());
+    assert_eq!(out(&run(&p, &["exists", &id], "")).trim(), "false");
+    assert_eq!(count(&p), "0");
+    let again = run(&p, &["delete", &id], "");
+    assert!(!again.status.success() && err(&again).contains("no such attestation"));
+}
+
+#[test]
+fn update_replaces_the_given_fields_and_ax_follows() {
+    let (_d, p) = db();
+    let id = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
+    let patch = format!("{{\"id\":\"{id}\",\"subjects\":[\"ZED\"]}}");
+    let o = run(&p, &["update", &patch], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert!(out(&run(&p, &["ax", "ZED"], "")).contains(&id));
+    assert!(!out(&run(&p, &["ax", "ALICE"], "")).contains(&id));
+    assert_eq!(out(&run(&p, &["subjects"], "")).trim(), "ZED");
+    // fields not named stay as they were
+    assert!(out(&run(&p, &["get", &id], "")).contains("\"author\""));
+}
+
+#[test]
+fn update_refuses_a_missing_id_an_unknown_id_and_an_unknown_field() {
+    let (_d, p) = db();
+    assert!(err(&run(&p, &["update", "{\"source\":\"x\"}"], "")).contains("needs an"));
+    assert!(err(&run(&p, &["update", "{\"id\":\"AS-nope\"}"], "")).contains("no such attestation"));
+    let id = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
+    let o = run(&p, &["update", &format!("{{\"id\":\"{id}\",\"bogus\":1}}")], "");
+    assert!(err(&o).contains("not an attestation field"));
+}
+
+#[test]
+fn clear_wants_to_be_told_to() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(!run(&p, &["clear"], "").status.success());
+    assert_eq!(count(&p), "1");
+    assert!(run(&p, &["clear", "--yes"], "").status.success());
+    assert_eq!(count(&p), "0");
+}
+
+#[test]
+fn the_listings_and_stats_read_what_was_written() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    assert_eq!(out(&run(&p, &["subjects"], "")).trim(), "ALICE");
+    assert_eq!(out(&run(&p, &["predicates"], "")).trim(), "author");
+    assert_eq!(out(&run(&p, &["contexts"], "")).trim(), "GITHUB");
+    assert_eq!(out(&run(&p, &["actors"], "")).trim(), "BOB");
+    let st: serde_json::Value = serde_json::from_str(out(&run(&p, &["stats"], "")).trim()).unwrap();
+    assert_eq!(st["total_attestations"], 1);
+    assert_eq!(st["unique_subjects"], 1);
+}
+
+#[test]
+fn an_alias_makes_ax_find_the_other_name_and_rm_takes_it_back() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(out(&run(&p, &["ax", "ALIS"], "")).is_empty());
+    assert!(run(&p, &["alias", "add", "ALICE", "ALIS"], "").status.success());
+    assert!(out(&run(&p, &["ax", "ALIS"], "")).contains("\"ALICE\""));
+    assert!(out(&run(&p, &["alias", "resolve", "ALIS"], "")).contains("ALICE"));
+    assert_eq!(out(&run(&p, &["alias", "ls"], "")).lines().count(), 2);
+    assert!(run(&p, &["alias", "rm", "ALICE", "ALIS"], "").status.success());
+    assert!(out(&run(&p, &["ax", "ALIS"], "")).is_empty());
+}

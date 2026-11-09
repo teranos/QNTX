@@ -8,6 +8,14 @@
 //! ats-dev [--db FILE] ax "ALICE is author of GITHUB since last month" [--limit N]
 //! ats-dev [--db FILE] get ID
 //! ats-dev [--db FILE] count
+//! ats-dev [--db FILE] exists ID                 # prints true or false
+//! ats-dev [--db FILE] ids
+//! ats-dev [--db FILE] update '{"id":"AS-…","attributes":{…}}'   # the given fields replace the stored ones
+//! ats-dev [--db FILE] delete ID
+//! ats-dev [--db FILE] clear --yes
+//! ats-dev [--db FILE] subjects | predicates | contexts | actors   # distinct values, one per line
+//! ats-dev [--db FILE] stats
+//! ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X
 //! ```
 //!
 //! `--db` defaults to `$ATS_DEV_DB`, else `ats-dev.db`. Rows come out as JSON,
@@ -17,7 +25,7 @@
 use std::io::{BufRead, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ats::{ax, AttestationStore, TemporalConfig};
+use ats::{ax, AliasStore, AttestationStore, QueryStore, TemporalConfig};
 use ats::{Attestation, Parser};
 use ats_sqlite::SqliteStore;
 use sacred_error::{Context, Error, Severity};
@@ -121,7 +129,7 @@ fn open(o: &Opts) -> Result<SqliteStore, Box<Error>> {
 fn run(args: &[String]) -> Result<(), Box<Error>> {
     let o = opts(args)?;
     let mut it = o.rest.iter();
-    let cmd = it.next().ok_or_else(|| fail("no command", "put | ax | get | count"))?;
+    let cmd = it.next().ok_or_else(|| fail("no command", "put | ax | get | count | exists | ids | update | delete | clear | subjects | predicates | contexts | actors | stats | alias"))?;
     let tail: Vec<&String> = it.collect();
     match cmd.as_str() {
         "put" => put(&o, &tail),
@@ -139,7 +147,118 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
             println!("{n}");
             Ok(())
         }
+        "exists" => {
+            let id = tail.first().ok_or_else(|| fail("exists needs an id", "ats-dev exists ID"))?;
+            let yes = open(&o)?.exists(id).map_err(|e| fail("exists failed", e))?;
+            println!("{yes}");
+            Ok(())
+        }
+        "ids" => lines(open(&o)?.ids().map_err(|e| fail("ids failed", e))?),
+        "subjects" => lines(open(&o)?.subjects().map_err(|e| fail("subjects failed", e))?),
+        "predicates" => lines(open(&o)?.predicates().map_err(|e| fail("predicates failed", e))?),
+        "contexts" => lines(open(&o)?.contexts().map_err(|e| fail("contexts failed", e))?),
+        "actors" => lines(open(&o)?.actors().map_err(|e| fail("actors failed", e))?),
+        "stats" => {
+            let st = open(&o)?.stats().map_err(|e| fail("stats failed", e))?;
+            println!(
+                "{}",
+                serde_json::json!({
+                    "total_attestations": st.total_attestations,
+                    "unique_subjects": st.unique_subjects,
+                    "unique_predicates": st.unique_predicates,
+                    "unique_contexts": st.unique_contexts,
+                    "unique_actors": st.unique_actors,
+                })
+            );
+            Ok(())
+        }
+        "delete" => {
+            let id = tail.first().ok_or_else(|| fail("delete needs an id", "ats-dev delete ID"))?;
+            if open(&o)?.delete(id).map_err(|e| fail("delete failed", e))? {
+                Ok(())
+            } else {
+                Err(fail("no such attestation", id))
+            }
+        }
+        "clear" => {
+            if tail.first().map(|f| f.as_str()) != Some("--yes") {
+                return Err(fail("clear removes every attestation", "say so: ats-dev clear --yes"));
+            }
+            open(&o)?.clear().map_err(|e| fail("clear failed", e))
+        }
+        "update" => update(&o, &tail),
+        "alias" => alias(&o, &tail),
         other => Err(fail("unknown command", other)),
+    }
+}
+
+fn lines(v: Vec<String>) -> Result<(), Box<Error>> {
+    let mut out = std::io::stdout().lock();
+    for x in v {
+        writeln!(out, "{x}").map_err(|e| fail("could not write stdout", e))?;
+    }
+    Ok(())
+}
+
+/// The stored attestation with the given JSON fields laid over it. An update
+/// that named only `attributes` leaves everything else as it was.
+fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
+    let given = tail.first().ok_or_else(|| fail("update needs JSON", "ats-dev update '{\"id\":\"AS-…\",\"source\":\"x\"}'"))?;
+    let patch: serde_json::Value = serde_json::from_str(given).map_err(|e| fail("not JSON", e))?;
+    let patch = patch.as_object().ok_or_else(|| fail("not an object", given))?;
+    let unknown: Vec<&str> = patch.keys().map(String::as_str).filter(|k| !FIELDS.contains(k)).collect();
+    if !unknown.is_empty() {
+        return Err(fail("not an attestation field", unknown.join(", ")));
+    }
+    let id = patch.get("id").and_then(|v| v.as_str()).ok_or_else(|| fail("update needs an \"id\"", given))?;
+    let mut s = open(o)?;
+    let stored = s.get(id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", id))?;
+    let mut v = serde_json::to_value(&stored).map_err(|e| fail("could not encode an attestation", e))?;
+    if let Some(m) = v.as_object_mut() {
+        for (k, x) in patch {
+            m.insert(k.clone(), x.clone());
+        }
+    }
+    let a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
+    s.update(a.clone()).map_err(|e| fail("update failed", e))?;
+    emit(&a)
+}
+
+fn alias(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
+    let usage = "ats-dev alias add A B | rm A B | ls | resolve X";
+    let sub = tail.first().ok_or_else(|| fail("alias needs a subcommand", usage))?;
+    let mut s = open(o)?;
+    let pair = || -> Result<(&str, &str), Box<Error>> {
+        match (tail.get(1), tail.get(2)) {
+            (Some(a), Some(b)) => Ok((a.as_str(), b.as_str())),
+            _ => Err(fail("needs two names", usage)),
+        }
+    };
+    match sub.as_str() {
+        "add" => {
+            let (a, b) = pair()?;
+            s.create_alias(a, b, ACTOR).map_err(|e| fail("could not add the alias", e))
+        }
+        "rm" => {
+            let (a, b) = pair()?;
+            s.remove_alias(a, b).map_err(|e| fail("could not remove the alias", e))
+        }
+        "ls" => {
+            let all = s.all_aliases().map_err(|e| fail("could not list aliases", e))?;
+            let mut keys: Vec<_> = all.keys().collect();
+            keys.sort();
+            let mut out = std::io::stdout().lock();
+            for k in keys {
+                let line = serde_json::json!({ "alias": k, "targets": all.get(k) });
+                writeln!(out, "{line}").map_err(|e| fail("could not write stdout", e))?;
+            }
+            Ok(())
+        }
+        "resolve" => {
+            let x = tail.get(1).ok_or_else(|| fail("resolve needs a name", usage))?;
+            lines(s.resolve_alias(x).map_err(|e| fail("could not resolve", e))?)
+        }
+        other => Err(fail("unknown alias subcommand", other)),
     }
 }
 
@@ -309,7 +428,7 @@ fn query(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let now = now_ms();
     let req = ax::ax_filter(q, now, limit).map_err(|e| fail("could not read the query", e))?;
     let s = open(o)?;
-    let res = ax::execute(&s, &req.filter, &TemporalConfig::default(), now)
+    let res = ax::execute_with_aliases(&s, &req.filter, &TemporalConfig::default(), now)
         .map_err(|e| fail("query failed", e))?;
     for a in &res.attestations {
         emit(a)?;
