@@ -78,4 +78,8 @@ Multiple places where an Approval Request can pop-up.
 
 it depends
 
+it depends on if you are using the App or not
+
+it depends on if you are looking at a Chat right now
+
 it depends on 
