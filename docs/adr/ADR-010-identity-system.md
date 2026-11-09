@@ -31,11 +31,7 @@ holds one ed25519 keypair per node under `id = 'self'`, and no ADR specifies it.
 ADR-012 made that gap load-bearing by accepting the browser as a node.
 Tracked in #840.
 
-A browser takes its signer identity from `laye-p2p` (`teranos/laye`), which
-ships with QNTX web. laye-p2p mints an ed25519 keypair and persists it to
-IndexedDB, so a tab holds the same key across reloads. That key is what a node
-DID names — `did:key:z` + base58btc(`0xed 0x01` ‖ pubkey) — so a browser's
-node DID is an encoding of its peer key, not a second identity.
+A browser takes its signer identity from `laye-p2p` (`teranos/laye`), which ships with QNTX web. laye-p2p mints an ed25519 keypair and persists it to IndexedDB, so a tab holds the same key across reloads. That key is what a node DID names — `did:key:z` + base58btc(`0xed 0x01` ‖ pubkey) — so a browser's node DID is an encoding of its peer key, not a second identity.
 
 ### Vanity IDs
 
