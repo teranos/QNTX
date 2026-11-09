@@ -84,9 +84,7 @@ it depends on if you are looking at a Chat right now
 
 it depends on if you are in a Room and are okay with that Room Participants requesting Approval for something. 
 
-
 Approval's should only really be for things that only a human can resolve.
-
 It means that not every little PR needs to go through Human Approval.
 ChatGPT: The current [`server/approvals.go`](https://github.com/teranos/QNTX/blob/main/server/approvals.go?utm_source=chatgpt.com) follows the earlier model.
 
