@@ -96,3 +96,4 @@ Human time is expensive
 
 There is a cost to putting something in front of a Human being.
 
+A human being that sleeps can obviously not approve anything.
