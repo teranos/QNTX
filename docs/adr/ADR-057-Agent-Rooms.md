@@ -66,7 +66,6 @@ A Room message may reference multiple assets, and an asset may appear in multipl
 ### Agent speech
 
 An agent may produce an audio representation of a message.
-
 Synthetic audio must explicitly identify its synthetic origin.
 
 The presence of generated audio does not establish that the attributed human ever spoke those words.
