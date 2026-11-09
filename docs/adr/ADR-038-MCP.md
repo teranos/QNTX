@@ -29,11 +29,11 @@ QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://githu
 
 "my oauth should just have that permission"
 
-A refresh token is an ordinary token row, thirty days, rotated — so a connector in use never returns to the passkey and one left alone for a month is finished.
+> A refresh token is an ordinary token row, thirty days, rotated — so a connector in use never returns to the passkey and one left alone for a month is finished.
 
-The MCP surface is a mirror of the server handlers, the way the HTTP API is, so a tool is a handler and nothing is built for MCP alone.
+> The MCP surface is a mirror of the server handlers, the way the HTTP API is, so a tool is a handler and nothing is built for MCP alone.
 
-The handlers are the source, and MCP is not made from the API: the two are mirrors of the same handlers.
+> The handlers are the source, and MCP is not made from the API: the two are mirrors of the same handlers.
 
 "we dont need to reinvent every single endpoint"
 
