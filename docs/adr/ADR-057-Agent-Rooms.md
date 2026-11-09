@@ -43,7 +43,7 @@ Say there is a Room, and there is a PR, updates to that PR should arrive in the 
 	- https://github.com/teranos/QNTX-Web/pull/100
 	- 
 
-Say there is a Room per Namespace, the Name
+Say there is a Room per Namespace, the Namespace Room
 
 
 An Agent should be able to Involve other Agents (it can reach) into a Room that Agent can access
