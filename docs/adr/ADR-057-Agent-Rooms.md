@@ -4,6 +4,7 @@
 [[ADR-052-Approvals]]
 [[ADR-053-Namespace-Agents]]
 [[ADR-055-Agent-Memory]]
+[[ADR-058-Media-Assets]]
 
 
 pre-0.999.0-polish-blocker 
