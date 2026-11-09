@@ -63,17 +63,7 @@ An Agent should be able to Involve other Agents (it can reach) into a Room that 
 
 A Room message may reference multiple assets, and an asset may appear in multiple Rooms.
 
-### Human speech
-
-A human opens QNTX on a phone and speaks into a Room or to an Agent.
-The client captures the original microphone audio.
-An STT provider produces a transcript, optionally incrementally.
-The human may review and edit that transcript before sending.
-The Room receives a message containing both the submitted text and the reference to the original recording.
-
-Machine transcription, human corrections, and original audio remain distinguishable.
-
-### 5.2 Agent speech
+### Agent speech
 
 An agent may produce an audio representation of a message.
 
@@ -81,7 +71,7 @@ Synthetic audio must explicitly identify its synthetic origin.
 
 The presence of generated audio does not establish that the attributed human ever spoke those words.
 
-### 5.3 Room continuity
+### Room continuity
 
 Audio playback, imagery, and attachment references survive reopening a Room according to their configured retention policy.
 
