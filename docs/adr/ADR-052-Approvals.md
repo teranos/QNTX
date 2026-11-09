@@ -87,4 +87,11 @@ it depends on if you are in a Room and are okay with that Room Participants requ
 
 Approval's should only really be for things that only a human can resolve.
 
-It means that not every little PR ne
+It means that not every little PR needs to go through Human Approval.
+
+
+Approval's are Human
+
+Human time is expensive
+
+There is 
