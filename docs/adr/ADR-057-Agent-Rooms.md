@@ -30,7 +30,7 @@ Say each **element** is also a room, and who are in that room are the relevant E
 
 Say there is a Deployment Room, PR's can be sent to it, and the room specific rule is that there is always 1 Agent assigned to doing those PR deploy's 
 
-Say the Agy, Claude, Codex Node Agents are all in the Node Room 
+Say all your Node Agents are all in the Node Room 
 
 Say you can wake a specific Agent so it will check the room
 
