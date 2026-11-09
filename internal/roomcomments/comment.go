@@ -30,6 +30,11 @@ type Comment struct {
 	Action string
 	Path   string
 	Line   int64
+	// App is the slug of the GitHub App the comment was written through, empty
+	// for a person. GitHub sets it; a person cannot.
+	App string
+	// PRBody is the description of the pull request the comment is on.
+	PRBody string
 }
 
 // "For example given the Qodo comments we see on many of our PR’s"
@@ -48,6 +53,9 @@ func Parse(event string, body []byte) (*Comment, error) {
 		User      struct {
 			Login string `json:"login"`
 		} `json:"user"`
+		App struct {
+			Slug string `json:"slug"`
+		} `json:"performed_via_github_app"`
 	}
 	var sent struct {
 		Action     string `json:"action"`
@@ -56,10 +64,12 @@ func Parse(event string, body []byte) (*Comment, error) {
 		} `json:"repository"`
 		Issue struct {
 			Number int64           `json:"number"`
+			Body   string          `json:"body"`
 			PR     json.RawMessage `json:"pull_request"`
 		} `json:"issue"`
 		PR struct {
-			Number int64 `json:"number"`
+			Number int64  `json:"number"`
+			Body   string `json:"body"`
 		} `json:"pull_request"`
 		Comment words `json:"comment"`
 		Review  words `json:"review"`
@@ -76,12 +86,12 @@ func Parse(event string, body []byte) (*Comment, error) {
 	if repo == "" {
 		return nil, nil
 	}
-	w, number, fragment := sent.Comment, sent.PR.Number, "discussion_r"
+	w, number, fragment, prBody := sent.Comment, sent.PR.Number, "discussion_r", sent.PR.Body
 	if event == "issue_comment" {
 		if len(sent.Issue.PR) == 0 || string(sent.Issue.PR) == "null" {
 			return nil, nil
 		}
-		number, fragment = sent.Issue.Number, "issuecomment-"
+		number, fragment, prBody = sent.Issue.Number, "issuecomment-", sent.Issue.Body
 	}
 	if event == "pull_request_review" {
 		if sent.Action != "submitted" && sent.Action != "edited" {
@@ -110,7 +120,7 @@ func Parse(event string, body []byte) (*Comment, error) {
 	if _, err := time.Parse(time.RFC3339Nano, at); err != nil {
 		return nil, errors.Wrap(err, "the PR comment's time did not read")
 	}
-	c := &Comment{Repo: repo, Number: number, ID: w.ID, Author: w.User.Login, Body: w.Body, At: at, Action: sent.Action, Path: w.Path, Line: w.Line}
+	c := &Comment{Repo: repo, Number: number, ID: w.ID, Author: w.User.Login, Body: w.Body, At: at, Action: sent.Action, Path: w.Path, Line: w.Line, App: w.App.Slug, PRBody: prBody}
 	c.URL = fmt.Sprintf("https://github.com/%s/pull/%d#%s%d", repo, number, fragment, w.ID)
 	// A redelivery has the same key; an edit is a new version, including a
 	// later edit restoring earlier words. Delivery IDs need not be retained.
