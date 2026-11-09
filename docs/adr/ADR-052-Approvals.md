@@ -82,4 +82,7 @@ it depends on if you are using the App or not
 
 it depends on if you are looking at a Chat right now
 
-it depends on if you are in a Room and are okay with that Room notif
+it depends on if you are in a Room and are okay with that Room Participants requesting Approval for something. 
+
+
+Approval
