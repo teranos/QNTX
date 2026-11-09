@@ -20,4 +20,4 @@ In this repository:
 - [[ADR-022-python-as-plugin-provided-service]]
 - [[ADR-041-mail-service]]
 - [[ADR-046-a-plugin-stands-in-a-namespace]]
-- 
+- [[Rooms]]
