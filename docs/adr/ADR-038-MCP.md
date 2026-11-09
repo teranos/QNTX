@@ -1,7 +1,7 @@
 # ADR-038: MCP
 
 Date: 2026-09-15
-Status: Active and in use, how observable is this through sentry? Or through telemetry? I was thinking of taking OTel seriously throughout QNTX, 2026-11-08: this doc definitely needs an update, split off into three docs probably, this one, and one for MCP Client, another one for the QNTX 
+Status: Active and in use, how observable is this through sentry? Or through telemetry? I was thinking of taking OTel seriously throughout QNTX, 2026-11-08: this doc definitely needs an update, split off into three docs probably, this one, and one for MCP Client, another one for the CONNECTOR QNTX is in other applications like 
 
 Is QNTX's role in MCP to be the host?
 
