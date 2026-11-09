@@ -18,4 +18,6 @@ In this repository:
 - [[ADR-017-embedding-as-plugin-provided-service]]
 - [[ADR-021-graph-database-as-plugin-service]]
 - [[ADR-022-python-as-plugin-provided-service]]
-- [[041]]
+- [[ADR-041-mail-service]]
+- [[ADR-046-a-plugin-stands-in-a-namespace]]
+- 
