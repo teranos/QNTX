@@ -102,6 +102,9 @@ A human being that is having lunch, also cannot, and we aren't supposed to disru
 
 ---
 
-Magic Island Approval:
+"Push notifications is something I want though, especially for approvals"
+"the magic island"
+- https://github.com/teranos/QNTX-App/issues/10
+- 
 - https://github.com/teranos/QNTX-Web/pull/22
 - 
