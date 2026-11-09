@@ -25,7 +25,7 @@ QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://githu
 
 "Parity owns it outright"
 
-The token the OAuth flow issues is the person who said yes at the passkey; what it reaches is the lines about its client's label, below.
+> The token the OAuth flow issues is the person who said yes at the passkey; what it reaches is the lines about its client's label, below.
 
 "my oauth should just have that permission"
 
