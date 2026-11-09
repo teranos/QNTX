@@ -34,9 +34,7 @@ think, same thing for buzz.xyz
 
 https://docs.switchagents.ai/switch-rooms/internals/agent-connection#connect-over-the-websocket
 
-think, making our Agent Harnesses work with switch
-
-Rooms as a Plugin Provided service 
+A Plugin Provided Rooms Service can use the existing QNTX managed harnesses.
 
 Say each **element** is also a room, and who are in that room are the relevant Element Agent and its Story Elements.
 
