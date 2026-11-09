@@ -59,9 +59,7 @@ An Agent should be able to Involve other Agents (it can reach) into a Room that 
 
 ---
 
-## 5. Rooms
-
-[[ADR-057-Agent-Rooms|Rooms]] become first-class producers and consumers of Media Assets.
+## Media Assets
 
 A Room message may reference multiple assets, and an asset may appear in multiple Rooms.
 
