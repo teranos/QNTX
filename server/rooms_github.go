@@ -55,7 +55,11 @@ func (s *QNTXServer) sayRoomComment(ctx context.Context, target roomcomments.Tar
 	if refused != nil {
 		return "", errors.New(refused.Says)
 	}
-	return sayRoomComment(ctx, rooms, target, c)
+	said, err := sayRoomComment(ctx, rooms, target, c)
+	if err == nil {
+		s.wakeAfterComment(target, c)
+	}
+	return said, err
 }
 
 func sayRoomComment(ctx context.Context, rooms protocol.RoomsServiceClient, target roomcomments.Target, c roomcomments.Comment) (string, error) {
@@ -66,10 +70,11 @@ func sayRoomComment(ctx context.Context, rooms protocol.RoomsServiceClient, targ
 	if found.GetRoom().GetName() != nodeRoomName {
 		return "", errors.New("the comment's destination is no longer the Node Room")
 	}
-	// By nil is the provider's node identity, not the GitHub author and not
-	// a harness. Posting comment text never asks an agent to act on it.
+	// It is said by whoever wrote it, as the provider registers them in the
+	// room, not by the node, which did not say it. Posting comment text does
+	// not ask an agent to act on it: waking one is wakeAfterComment's.
 	said, err := rooms.PostToRoom(ctx, &protocol.PostToRoomRequest{
-		Provider: target.Provider, Room: target.Room, Body: c.Message(),
+		Provider: target.Provider, Room: target.Room, By: &protocol.RoomAgent{Name: c.Poster()}, Body: c.Message(),
 		Files: []*protocol.RoomFile{{Name: fmt.Sprintf("github-comment-%d.md", c.ID), Type: "text/markdown", Data: []byte(c.Body)}},
 	})
 	if err != nil {

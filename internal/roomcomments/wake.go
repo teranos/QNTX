@@ -1,9 +1,6 @@
 package roomcomments
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // "it's like a VIP room: you need to be on the list"
 // "if it comes from an App I authorised"
@@ -50,14 +47,11 @@ func (c Comment) Wakes(g Guests, room string) bool {
 	return c.OfClaude() && g.Admits(room, c.App)
 }
 
-// Says is what the turn is told.
-func (c Comment) Says() string {
-	where := ""
-	if c.Path != "" {
-		where = fmt.Sprintf(" on %s", c.Path)
-		if c.Line > 0 {
-			where += fmt.Sprintf(" line %d", c.Line)
-		}
+// Poster is who the Room shows as having said the comment: the app that wrote
+// it, or the person, by the name GitHub gives them.
+func (c Comment) Poster() string {
+	if c.App != "" {
+		return c.App
 	}
-	return fmt.Sprintf("%s commented%s on %s #%d: %s\n\n%s", c.App, where, c.Repo, c.Number, c.URL, c.Body)
+	return strings.TrimSuffix(c.Author, "[bot]")
 }

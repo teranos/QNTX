@@ -158,7 +158,6 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
-		g.host.wakeForComment(comment)
 	}
 	if event == "workflow_run" {
 		var run gitHubWorkflowRun

@@ -68,7 +68,6 @@ type gitHubHost interface {
 	cometsMovedBy(forge.Push) []string
 	enqueueForward(*async.Job) error
 	keepRoomComment(context.Context, *roomcomments.Comment) error
-	wakeForComment(*roomcomments.Comment)
 }
 
 // TODO(forge): Credentials per forge host (see GitHubKeeper).

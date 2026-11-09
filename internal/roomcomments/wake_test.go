@@ -47,10 +47,3 @@ func TestWhoIsOnTheList(t *testing.T) {
 	assert.False(t, Comment{App: "", PRBody: claude}.Wakes(Guests{Everyone: {""}}, "Node Room"), "a person has no app, and an empty slug is no guest")
 	assert.False(t, Comment{App: "qodo-code-review", PRBody: "Not Claude's."}.Wakes(Guests{Everyone: {"qodo-code-review"}}, "Node Room"), "a pull request Claude Code did not open")
 }
-
-func TestWhatTheTurnIsTold(t *testing.T) {
-	c := Comment{App: "qodo-code-review", Repo: "teranos/QNTX", Number: 1607, URL: "https://github.com/teranos/QNTX/pull/1607#issuecomment-1", Body: "Server tests fail.", Path: "server/rooms_github.go", Line: 17}
-	assert.Equal(t, "qodo-code-review commented on server/rooms_github.go line 17 on teranos/QNTX #1607: https://github.com/teranos/QNTX/pull/1607#issuecomment-1\n\nServer tests fail.", c.Says())
-	c.Path, c.Line = "", 0
-	assert.Equal(t, "qodo-code-review commented on teranos/QNTX #1607: https://github.com/teranos/QNTX/pull/1607#issuecomment-1\n\nServer tests fail.", c.Says())
-}
