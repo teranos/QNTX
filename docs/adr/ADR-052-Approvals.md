@@ -118,10 +118,10 @@ A human being that is having lunch, also cannot, and we aren't supposed to disru
 
 **Not Started** 
 
-- Indirect to Room
+- Indirect to Room, any human approval will do.
 
 ### Via Agent
 
 **Not Started** 
 
-- Direct to human
+- Direct to specifc human.
