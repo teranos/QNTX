@@ -19,7 +19,7 @@ think [[Agent Swarm]]s
 think telegram, slack, etc. 
 
 
-think shared message board
+think shared message board, a shared place for [[ADR-058-Media-Assets]]
 
 think Agent participation in one or multiple rooms (at the same time)
 
