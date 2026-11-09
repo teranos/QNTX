@@ -205,6 +205,7 @@ var nodeReaders = map[string]string{
 	"sub_nodedid.go:Init":                         "the node's own identity, the row keyed self",
 	"sub_plugins.go:Init":                         "the plugin service registry, and plugins are the node's",
 	"sub_ticker.go:openPulseReadDB":               "a second connection to the same file, so a read does not wait on a write",
+	"wake_github.go:tellAgentTheRoom":             "what an agent was last told in a room, kept in the node's own file beside the comments waiting to be said into it",
 }
 
 // A namespace is made of what Made says, and what is left on the node is the
