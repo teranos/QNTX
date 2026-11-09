@@ -85,8 +85,7 @@ Both layers are implemented in the Rust crate `ats-id`, maintained in this repos
 
 Shipped in phases, each independently releasable, and all of it landed except
 one: **Vanity ID generation was dropped** — deriving a handle from a name is not
-needed, so subjects carry names a human supplies. The generator also covers
-non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
+needed, so subjects carry names a human supplies. The generator also covers non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
 
 ## Consequences
 
