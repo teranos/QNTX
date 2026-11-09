@@ -21,7 +21,6 @@ A token presented to QNTX is never passed on to an MCP server behind it; the MCP
 
 QNTX serves MCP through [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk).
 
-"WE USE IT"
 
 Which version is [parity](https://github.com/teranos/QNTX/blob/main/server/parity/references.go)'s.
 
