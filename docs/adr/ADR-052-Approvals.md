@@ -98,4 +98,5 @@ There is a cost to putting something in front of a Human being.
 
 A human being that sleeps can obviously not approve anything.
 
-A human being that is having lunch, also cannot, and we arent supposed to disrupt it's lunch
+A human being that is having lunch, also cannot, and we aren't supposed to disrupt it's lunch or dinner.
+
