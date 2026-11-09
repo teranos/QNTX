@@ -58,3 +58,36 @@ An Agent should be able to Involve other Agents (it can reach) into a Room that 
 
 
 
+---
+
+## 5. Rooms
+
+[[ADR-057-Agent-Rooms|Rooms]] become first-class producers and consumers of Media Assets.
+
+A Room message may reference multiple assets, and an asset may appear in multiple Rooms.
+
+### 5.1 Human speech
+
+A human opens QNTX on a phone and speaks into a Room or to an Agent.
+The client captures the original microphone audio.
+An STT provider produces a transcript, optionally incrementally.
+The human may review and edit that transcript before sending.
+The Room receives a message containing both the submitted text and the reference to the original recording.
+
+Machine transcription, human corrections, and original audio remain distinguishable.
+
+### 5.2 Agent speech
+
+An agent may produce an audio representation of a message.
+
+Synthetic audio must explicitly identify its synthetic origin.
+
+The presence of generated audio does not establish that the attributed human ever spoke those words.
+
+### 5.3 Room continuity
+
+Audio playback, imagery, and attachment references survive reopening a Room according to their configured retention policy.
+
+New messages must not interrupt existing playback unless explicitly requested.
+
+A Room's lifetime does not determine an asset's lifetime.
