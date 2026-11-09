@@ -1,4 +1,2 @@
 # ADRs
 
-## Whose words
-
