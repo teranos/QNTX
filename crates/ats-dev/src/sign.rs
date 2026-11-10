@@ -49,6 +49,15 @@ impl Signer {
         }
     }
 
+    /// The key at `path` if there is one; none is not minted.
+    pub fn load_existing(path: &Path) -> Result<Option<Self>, Box<Error>> {
+        match std::fs::read(path) {
+            Ok(bytes) => Self::from_file(path, &bytes).map(Some),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(fail("could not read the key file", format!("{}: {e}", path.display()))),
+        }
+    }
+
     fn from_file(path: &Path, bytes: &[u8]) -> Result<Self, Box<Error>> {
         let key = laye_me::load(bytes)
             .map_err(|e| fail("the key file is not a key", format!("{}: {e}", path.display())))?;
@@ -113,9 +122,15 @@ pub fn canonical(a: &Attestation) -> Result<String, Box<Error>> {
 /// The key, written whole to a private temporary file beside `path` and then
 /// linked into place, which fails if `path` exists: a reader never sees half a
 /// key, and nothing is replaced. `false` means someone else's key is there.
+/// The temporary name is this attempt's alone, and only a file this attempt
+/// created is removed.
 fn publish_new(path: &Path, bytes: &[u8]) -> Result<bool, Box<Error>> {
     use std::io::Write;
-    let tmp = PathBuf::from(format!("{}.{}.tmp", path.display(), std::process::id()));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp = PathBuf::from(format!("{}.{}.{nanos}.tmp", path.display(), std::process::id()));
     let mut open = std::fs::OpenOptions::new();
     open.write(true).create_new(true);
     #[cfg(unix)]
@@ -123,16 +138,43 @@ fn publish_new(path: &Path, bytes: &[u8]) -> Result<bool, Box<Error>> {
         use std::os::unix::fs::OpenOptionsExt;
         open.mode(0o600);
     }
-    let wrote = open.open(&tmp).and_then(|mut f| f.write_all(bytes).and_then(|()| f.sync_all()));
-    let linked = wrote.and_then(|()| std::fs::hard_link(&tmp, path));
+    let mut f = open
+        .open(&tmp)
+        .map_err(|e| fail("could not create the key's temporary file", format!("{}: {e}", tmp.display())))?;
+    let wrote = f.write_all(bytes).and_then(|()| f.sync_all());
+    drop(f);
+    let linked = match wrote {
+        Ok(()) => std::fs::hard_link(&tmp, path),
+        Err(e) => Err(e),
+    };
     let cleaned = std::fs::remove_file(&tmp);
     match linked {
-        Ok(()) => cleaned
-            .map(|()| true)
-            .map_err(|e| fail("the key is written but its temporary copy is left", format!("{}: {e}", tmp.display()))),
+        Ok(()) => {
+            cleaned.map_err(|e| fail("the key is written but its temporary copy is left", format!("{}: {e}", tmp.display())))?;
+            sync_dir_of(path)?;
+            Ok(true)
+        }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
         Err(e) => Err(fail("could not write the key file", format!("{}: {e}", path.display()))),
     }
+}
+
+/// Make the key's directory entry durable before anything is signed with it:
+/// rows signed by a key that a power loss un-links could never be re-signed.
+#[cfg(unix)]
+fn sync_dir_of(path: &Path) -> Result<(), Box<Error>> {
+    let dir = match path.parent() {
+        Some(d) if !d.as_os_str().is_empty() => d,
+        _ => Path::new("."),
+    };
+    std::fs::File::open(dir)
+        .and_then(|d| d.sync_all())
+        .map_err(|e| fail("could not make the key durable", format!("{}: {e}", dir.display())))
+}
+
+#[cfg(not(unix))]
+fn sync_dir_of(_path: &Path) -> Result<(), Box<Error>> {
+    Ok(())
 }
 
 #[cfg(test)]

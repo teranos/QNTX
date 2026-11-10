@@ -153,6 +153,17 @@ impl Keys {
         Keys { path: sign::key_path(o.key.as_deref(), &o.db), unsigned: o.unsigned, loaded: std::cell::OnceCell::new() }
     }
 
+    /// The key if one exists already; nothing is minted to find out.
+    fn existing(&self) -> Result<Option<&sign::Signer>, Box<Error>> {
+        if self.unsigned {
+            return Ok(None);
+        }
+        if let Some(s) = self.loaded.get() {
+            return Ok(Some(s));
+        }
+        Ok(sign::Signer::load_existing(&self.path)?.map(|s| self.loaded.get_or_init(|| s)))
+    }
+
     fn signer(&self) -> Result<Option<&sign::Signer>, Box<Error>> {
         if self.unsigned {
             return Ok(None);
@@ -293,16 +304,27 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     // holds; else ats-dev re-signs what its own key signed, and refuses the rest.
     if stored.signature.is_some() {
         if !matches!(sign::verify(&a), sign::Verdict::Valid(_)) {
+            // Whose key it must be is known from the stored row; no key is minted to find out.
             let keys = Keys::of(o);
-            let sg = keys.signer()?.ok_or_else(|| {
-                fail("the update breaks the signature", format!("{id}: --unsigned cannot keep a signed attestation signed"))
-            })?;
-            if stored.signer_did.as_deref() != Some(sg.did.as_str()) {
-                return Err(fail(
-                    "the update breaks a signature ats-dev cannot make",
-                    format!("{id} is signed by {}, ats-dev's key is {}", stored.signer_did.as_deref().unwrap_or("?"), sg.did),
-                ));
-            }
+            let sg = match keys.existing()? {
+                Some(sg) if stored.signer_did.as_deref() == Some(sg.did.as_str()) => sg,
+                _ if o.unsigned => {
+                    return Err(fail(
+                        "the update breaks the signature",
+                        format!("{id}: --unsigned cannot keep a signed attestation signed"),
+                    ))
+                }
+                other => {
+                    return Err(fail(
+                        "the update breaks a signature ats-dev cannot make",
+                        format!(
+                            "{id} is signed by {}, ats-dev's key is {}",
+                            stored.signer_did.as_deref().unwrap_or("?"),
+                            other.map(|k| k.did.as_str()).unwrap_or("not made yet"),
+                        ),
+                    ))
+                }
+            };
             // The actors are under the signature; a signed row with none is out of every actor's claims.
             if a.actors.is_empty() {
                 return Err(fail("a signed attestation must name its actors", format!("{id}: the update would leave none")));

@@ -391,3 +391,36 @@ fn an_update_that_empties_the_actors_authors_them_and_reports_what_is_on_disk() 
     assert_eq!(said["created_at"], got["created_at"]);
     assert_ne!(got["created_at"], 1);
 }
+
+#[test]
+fn refusing_an_edit_to_a_foreign_signed_row_mints_no_key() {
+    let (_d, p) = db();
+    assert!(run(&p, &["put", "-"], SIGNED).status.success());
+    let key = std::path::PathBuf::from(format!("{}.key", p.display()));
+    assert!(!key.exists(), "importing a signed row minted a key");
+    let id = serde_json::from_str::<serde_json::Value>(SIGNED).unwrap()["id"].as_str().unwrap().to_string();
+    let o = run(&p, &["update", &format!("{{\"id\":\"{id}\",\"subjects\":[\"ZED\"]}}")], "");
+    assert!(!o.status.success() && err(&o).contains("not made yet"), "{}", err(&o));
+    assert!(!key.exists(), "a refused edit minted a key");
+}
+
+#[test]
+fn a_leftover_temporary_file_does_not_stop_a_key_being_made_and_is_not_removed() {
+    let d = tempfile::tempdir().unwrap();
+    let key = d.path().join("k.key");
+    let stale: Vec<_> = ["k.key.1.tmp", format!("k.key.{}.tmp", std::process::id()).as_str()]
+        .iter()
+        .map(|n| {
+            let f = d.path().join(n);
+            std::fs::write(&f, b"left by something else").unwrap();
+            f
+        })
+        .collect();
+    let db = d.path().join("a.db");
+    let o = run(&db, &["--key", key.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert!(key.exists());
+    for f in stale {
+        assert_eq!(std::fs::read(&f).unwrap(), b"left by something else", "{}", f.display());
+    }
+}
