@@ -44,7 +44,21 @@ func (c Comment) OfClaude() bool {
 // pull request: an app on the room's list wrote it, on a pull request Claude
 // Code opened.
 func (c Comment) Wakes(g Guests, room string) bool {
+	if c.Kind == "pull_request" {
+		// Ready for review wakes whoever changed it; back to a draft is said
+		// into the room and wakes no one.
+		return c.Action == "ready_for_review" && c.OfClaude()
+	}
 	return c.OfClaude() && g.Admits(room, c.App)
+}
+
+// Speaker is who the turn it starts is said by: the app, or the person who
+// changed the pull request.
+func (c Comment) Speaker() string {
+	if c.App != "" {
+		return "github-app:" + c.App
+	}
+	return "github:" + c.Poster()
 }
 
 // Poster is who the Room shows as having said the comment: the app that wrote
@@ -59,5 +73,5 @@ func (c Comment) Poster() string {
 // Quiet is whether the comment is a review's: it wakes the agent when the room
 // has gone quiet, not at once, because a review arrives as many comments.
 func (c Comment) Quiet() bool {
-	return c.Kind == "pull_request_review_comment" || c.Kind == "pull_request_review"
+	return c.Kind == "pull_request_review_comment" || c.Kind == "pull_request_review" || c.Kind == "pull_request"
 }

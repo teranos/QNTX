@@ -94,7 +94,7 @@ func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments
 	if !c.Wakes(wakeApps(), nodeRoomName) {
 		return
 	}
-	speaker := "github-app:" + c.App
+	speaker := c.Speaker()
 	if c.Quiet() {
 		// A review is many comments: the agent is told when none has come for
 		// the quiet stretch, and each one that does moves that later.

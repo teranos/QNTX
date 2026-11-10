@@ -42,7 +42,7 @@ type Comment struct {
 
 // "For example given the Qodo comments we see on many of our PR’s"
 func Parse(event string, body []byte) (*Comment, error) {
-	if event != "issue_comment" && event != "pull_request_review_comment" && event != "pull_request_review" {
+	if event != "issue_comment" && event != "pull_request_review_comment" && event != "pull_request_review" && event != "pull_request" {
 		return nil, nil
 	}
 	type words struct {
@@ -71,9 +71,14 @@ func Parse(event string, body []byte) (*Comment, error) {
 			PR     json.RawMessage `json:"pull_request"`
 		} `json:"issue"`
 		PR struct {
-			Number int64  `json:"number"`
-			Body   string `json:"body"`
+			ID      int64  `json:"id"`
+			Number  int64  `json:"number"`
+			Body    string `json:"body"`
+			Updated string `json:"updated_at"`
 		} `json:"pull_request"`
+		Sender struct {
+			Login string `json:"login"`
+		} `json:"sender"`
 		Comment words `json:"comment"`
 		Review  words `json:"review"`
 	}
@@ -88,6 +93,9 @@ func Parse(event string, body []byte) (*Comment, error) {
 	}
 	if repo == "" {
 		return nil, nil
+	}
+	if event == "pull_request" {
+		return draftChange(repo, sent.Action, sent.PR.Number, sent.PR.ID, sent.PR.Updated, sent.PR.Body, sent.Sender.Login)
 	}
 	w, number, fragment, prBody := sent.Comment, sent.PR.Number, "discussion_r", sent.PR.Body
 	if event == "issue_comment" {
@@ -136,11 +144,44 @@ func Parse(event string, body []byte) (*Comment, error) {
 	return c, nil
 }
 
+// "Draft->Ready change that should wake. but, Ready->Draft needs not wake, but
+// should still enter the room."
+//
+// draftChange is a pull request going from a draft to ready for review, or
+// back. It has no words of its own: the room is told who changed it.
+func draftChange(repo, action string, number, id int64, at, prBody, who string) (*Comment, error) {
+	if action != "ready_for_review" && action != "converted_to_draft" {
+		return nil, nil
+	}
+	if id <= 0 || number <= 0 || who == "" {
+		return nil, errors.New("the pull request needs its ID, number and who changed it")
+	}
+	if _, err := time.Parse(time.RFC3339Nano, at); err != nil {
+		return nil, errors.Wrap(err, "the pull request's time did not read")
+	}
+	c := &Comment{Repo: repo, Number: number, ID: id, Author: who, At: at, Kind: "pull_request", Action: action, PRBody: prBody}
+	c.URL = fmt.Sprintf("https://github.com/%s/pull/%d", repo, number)
+	key, err := json.Marshal([]string{"pull_request", c.URL, at, action})
+	if err != nil {
+		return nil, errors.Wrap(err, "the pull request change's identity did not encode")
+	}
+	digest := sha256.Sum256(key)
+	c.Key = hex.EncodeToString(digest[:])
+	return c, nil
+}
+
 func escape(s string) string {
 	return strings.NewReplacer("\\", "\\\\", "[", "\\[", "]", "\\]", "*", "\\*", "_", "\\_", "`", "\\`").Replace(s)
 }
 
 func (c Comment) Message() string {
+	if c.Kind == "pull_request" {
+		what := "marked the pull request ready for review"
+		if c.Action == "converted_to_draft" {
+			what = "converted the pull request to a draft"
+		}
+		return fmt.Sprintf("### [%s #%d](https://github.com/%s/pull/%d)\n\n**%s** %s · %s\n\n[View pull request](%s)", c.Repo, c.Number, c.Repo, c.Number, escape(c.Author), what, c.At, c.URL)
+	}
 	action := "commented"
 	if c.Action == "edited" {
 		action = "updated their comment"

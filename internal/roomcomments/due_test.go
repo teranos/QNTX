@@ -1,6 +1,7 @@
 package roomcomments
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -80,4 +81,57 @@ func TestWhichCommentsWaitForAQuietRoom(t *testing.T) {
 		assert.Equal(t, event, c.Kind)
 		assert.Equal(t, quiet, c.Quiet(), event)
 	}
+}
+
+func draftDelivery(t *testing.T, action string) []byte {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{
+		"action":       action,
+		"repository":   map[string]any{"full_name": "teranos/QNTX"},
+		"pull_request": map[string]any{"id": 55, "number": 1609, "body": "Why.\n\n🤖 " + ClaudeFooter + "(https://claude.com/claude-code)", "updated_at": "2026-11-10T09:00:00Z"},
+		"sender":       map[string]any{"login": "teranos"},
+	})
+	require.NoError(t, err)
+	return b
+}
+
+// "Draft->Ready change that should wake. but, Ready->Draft needs not wake, but
+// should still enter the room."
+func TestAPullRequestReadyForReviewWakesAndBackToDraftDoesNot(t *testing.T) {
+	ready, err := Parse("pull_request", draftDelivery(t, "ready_for_review"))
+	require.NoError(t, err)
+	require.NotNil(t, ready)
+	assert.True(t, ready.Wakes(nil, "Node Room"), "no list of apps: a person changed it")
+	assert.True(t, ready.Quiet(), "after the same quiet stretch as a review")
+	assert.Equal(t, "github:teranos", ready.Speaker())
+	assert.Equal(t, "teranos", ready.Poster())
+	assert.Contains(t, ready.Message(), "**teranos** marked the pull request ready for review")
+	assert.Contains(t, ready.Message(), "https://github.com/teranos/QNTX/pull/1609")
+	assert.Empty(t, ready.Body, "no words to attach")
+
+	draft, err := Parse("pull_request", draftDelivery(t, "converted_to_draft"))
+	require.NoError(t, err)
+	require.NotNil(t, draft, "it enters the room")
+	assert.False(t, draft.Wakes(Guests{Everyone: {"teranos"}}, "Node Room"), "and wakes no one")
+	assert.Contains(t, draft.Message(), "**teranos** converted the pull request to a draft")
+	assert.NotEqual(t, ready.Key, draft.Key)
+
+	for _, action := range []string{"opened", "synchronize", "closed", "edited"} {
+		other, err := Parse("pull_request", draftDelivery(t, action))
+		require.NoError(t, err)
+		assert.Nil(t, other, action)
+	}
+}
+
+// Only a pull request Claude Code opened wakes the agent that opened it.
+func TestAReadyPullRequestThatIsNotClaudesWakesNoOne(t *testing.T) {
+	var sent map[string]any
+	require.NoError(t, json.Unmarshal(draftDelivery(t, "ready_for_review"), &sent))
+	sent["pull_request"].(map[string]any)["body"] = "Somebody else's."
+	b, err := json.Marshal(sent)
+	require.NoError(t, err)
+	c, err := Parse("pull_request", b)
+	require.NoError(t, err)
+	require.NotNil(t, c)
+	assert.False(t, c.Wakes(nil, "Node Room"))
 }

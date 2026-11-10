@@ -73,9 +73,14 @@ func sayRoomComment(ctx context.Context, rooms protocol.RoomsServiceClient, targ
 	// It is said by whoever wrote it, as the provider registers them in the
 	// room, not by the node, which did not say it. Posting comment text does
 	// not ask an agent to act on it: waking one is wakeAfterComment's.
+	// A pull request going to a draft or to ready has no words to attach.
+	var files []*protocol.RoomFile
+	if c.Body != "" {
+		files = []*protocol.RoomFile{{Name: fmt.Sprintf("github-comment-%d.md", c.ID), Type: "text/markdown", Data: []byte(c.Body)}}
+	}
 	said, err := rooms.PostToRoom(ctx, &protocol.PostToRoomRequest{
 		Provider: target.Provider, Room: target.Room, By: &protocol.RoomAgent{Name: c.Poster()}, Body: c.Message(),
-		Files: []*protocol.RoomFile{{Name: fmt.Sprintf("github-comment-%d.md", c.ID), Type: "text/markdown", Data: []byte(c.Body)}},
+		Files: files,
 	})
 	if err != nil {
 		return "", errors.Wrap(err, "the PR comment was not posted")
