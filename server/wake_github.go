@@ -94,9 +94,82 @@ func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments
 	if !c.Wakes(wakeApps(), nodeRoomName) {
 		return
 	}
-	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, "github-app:"+c.App, func(speaker string) {
-		if err := s.tellAgentTheRoom(target, wakeAgent, speaker, c.At); err != nil {
+	speaker := "github-app:" + c.App
+	if c.Quiet() {
+		// A review is many comments: the agent is told when none has come for
+		// the quiet stretch, and each one that does moves that later.
+		if err := s.dueWakes().Defer(s.lifetime(), target, wakeAgent, speaker, c.At, time.Now().Add(wakeQuiet())); err != nil {
+			s.logger.Errorw("A review comment was said into the Node Room and the agent's wake was not kept", "agent", wakeAgent, "room", target.Room, "error", err)
+		}
+		return
+	}
+	s.tellNow(target, speaker, c.At)
+}
+
+// tellNow tells the agent the room, one wake of it at a time.
+func (s *QNTXServer) tellNow(target roomcomments.Target, speaker, since string) {
+	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, speaker, func(speaker string) {
+		if err := s.tellAgentTheRoom(target, wakeAgent, speaker, since); err != nil {
 			s.logger.Errorw("A PR comment was said into the Node Room and the agent was not told", "agent", wakeAgent, "room", target.Room, "error", err)
+		}
+	})
+}
+
+// wakeQuiet is how long the room is to go without a review comment before the
+// agent is told them. The config key is github.wake_quiet, as a duration.
+func wakeQuiet() time.Duration {
+	if quiet := config.GetViper().GetDuration("github.wake_quiet"); quiet > 0 {
+		return quiet
+	}
+	return 30 * time.Minute
+}
+
+// dueWakes is the wakes waiting for a quiet room, in the node's own file.
+func (s *QNTXServer) dueWakes() roomcomments.Due {
+	return roomcomments.Due{DB: s.nodeDB}
+}
+
+// tellDueAgents tells each agent whose room has been quiet long enough. A wake
+// that could not be carried out waits another quiet stretch.
+func (s *QNTXServer) tellDueAgents() {
+	for {
+		select {
+		case <-s.lifetime().Done():
+			return
+		case <-time.After(30 * time.Second):
+		}
+		if s.nodeDB == nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(s.lifetime(), 10*time.Second)
+		due := s.dueWakes()
+		ready, err := due.Ready(ctx, time.Now())
+		if err != nil {
+			s.logger.Errorw("The wakes waiting for a quiet room were not read", "error", err)
+		}
+		for _, w := range ready {
+			took, err := due.Take(ctx, w)
+			if err != nil {
+				s.logger.Errorw("A wake waiting for a quiet room was not taken", "room", w.Target.Room, "agent", w.Agent, "error", err)
+				continue
+			}
+			if took {
+				s.tellWhenQuiet(w)
+			}
+		}
+		cancel()
+	}
+}
+
+func (s *QNTXServer) tellWhenQuiet(w roomcomments.Wake) {
+	wakes.ask(w.Target.Provider+"/"+w.Target.Room+"/"+w.Agent, w.Speaker, func(speaker string) {
+		err := s.tellAgentTheRoom(w.Target, w.Agent, speaker, w.Since)
+		if err == nil {
+			return
+		}
+		s.logger.Errorw("The room went quiet and the agent was not told", "agent", w.Agent, "room", w.Target.Room, "error", err)
+		if err := s.dueWakes().Defer(s.lifetime(), w.Target, w.Agent, speaker, w.Since, time.Now().Add(wakeQuiet())); err != nil {
+			s.logger.Errorw("The wake that failed was not kept to try again", "agent", w.Agent, "room", w.Target.Room, "error", err)
 		}
 	})
 }

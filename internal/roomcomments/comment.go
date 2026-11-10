@@ -28,8 +28,11 @@ type Comment struct {
 	Body   string
 	At     string
 	Action string
-	Path   string
-	Line   int64
+	// Kind is the event it came in: issue_comment, pull_request_review_comment
+	// or pull_request_review.
+	Kind string
+	Path string
+	Line int64
 	// App is the slug of the GitHub App the comment was written through, empty
 	// for a person. GitHub sets it; a person cannot.
 	App string
@@ -120,7 +123,7 @@ func Parse(event string, body []byte) (*Comment, error) {
 	if _, err := time.Parse(time.RFC3339Nano, at); err != nil {
 		return nil, errors.Wrap(err, "the PR comment's time did not read")
 	}
-	c := &Comment{Repo: repo, Number: number, ID: w.ID, Author: w.User.Login, Body: w.Body, At: at, Action: sent.Action, Path: w.Path, Line: w.Line, App: w.App.Slug, PRBody: prBody}
+	c := &Comment{Repo: repo, Number: number, ID: w.ID, Author: w.User.Login, Body: w.Body, At: at, Kind: event, Action: sent.Action, Path: w.Path, Line: w.Line, App: w.App.Slug, PRBody: prBody}
 	c.URL = fmt.Sprintf("https://github.com/%s/pull/%d#%s%d", repo, number, fragment, w.ID)
 	// A redelivery has the same key; an edit is a new version, including a
 	// later edit restoring earlier words. Delivery IDs need not be retained.

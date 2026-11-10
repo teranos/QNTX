@@ -55,3 +55,9 @@ func (c Comment) Poster() string {
 	}
 	return strings.TrimSuffix(c.Author, "[bot]")
 }
+
+// Quiet is whether the comment is a review's: it wakes the agent when the room
+// has gone quiet, not at once, because a review arrives as many comments.
+func (c Comment) Quiet() bool {
+	return c.Kind == "pull_request_review_comment" || c.Kind == "pull_request_review"
+}
