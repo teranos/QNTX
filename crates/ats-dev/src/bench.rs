@@ -251,7 +251,8 @@ fn probe(o: &Opts, n: Option<&String>) -> Result<(), Box<Error>> {
     }
     let mut s = open(o)?;
     let rows = s.count().map_err(|e| fail("count failed", e))?;
-    let subjects = (rows as u64 / 10).max(100);
+    // the subject pool a load of the resulting size would draw from
+    let subjects = ((rows as u64 + n) / 10).max(100);
     let mut rng = Rng(SEED);
     // The series goes on where the load left off: ids and timestamps of rows
     // `rows`.., so the queries, which are timed by the row count, read the same

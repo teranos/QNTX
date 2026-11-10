@@ -16,6 +16,11 @@ ats-dev --db FILE bench query
   transaction. It deletes the database file (and `-wal`, `-shm`), so it refuses
   one that exists unless you say `--replace`.
 - `probe` does N per-put writes onto an existing database, then the queries.
+  Its rows continue the load's series (ids, timestamps, subject pool), but are
+  drawn from a fresh random stream, so after `load 2000` + `probe 20` the
+  time-window and actor queries return what `load 2020` returns, and the
+  subject and predicate queries return rows of the same kind, not the same
+  count (17 against 12 for `by_subject(rare)` in one measurement).
 - `query` runs the queries on an existing database.
 - `--sync full|normal|off` sets `PRAGMA synchronous` first.
 
