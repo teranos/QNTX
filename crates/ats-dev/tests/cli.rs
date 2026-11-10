@@ -354,3 +354,40 @@ fn processes_minting_at_once_end_with_one_key_and_leave_nothing_behind() {
     let left: Vec<_> = std::fs::read_dir(d.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).filter(|n| n.ends_with(".tmp")).collect();
     assert!(left.is_empty(), "{left:?}");
 }
+
+/// A row signed by ats-dev's key on the signing build, carried here as text: this
+/// build has no key, and a signature stays valid wherever the row is put.
+const SIGNED: &str = r##"{"id":"AS-75847316-caac-45d6-b819-06eecbf8be07","subjects":["ALICE"],"predicates":["author"],"contexts":["GITHUB"],"actors":["BOB"],"timestamp":1794266294644,"source":"ats-dev","attributes":{"n":3,"note":"<a & \"b\">"},"created_at":1794266294644,"signature":[154,101,30,4,174,33,231,130,163,19,62,221,216,85,196,207,112,183,156,27,24,248,47,250,137,19,188,22,86,184,215,151,35,6,77,164,172,202,97,80,81,54,127,39,244,108,1,4,35,240,67,118,113,106,175,97,208,66,119,80,181,32,18,8],"signer_did":"did:key:z6Mkofs97sbDZBoGXR6im4Po2zJmwGdjJe2LQpAudzVx2ekp"}"##;
+
+fn signed_line() -> String {
+    SIGNED.to_string()
+}
+
+#[test]
+fn a_signed_row_is_not_edited_under_its_signature_and_a_patch_names_none() {
+    let (_d, p) = db();
+    let line = signed_line();
+    assert!(run(&p, &["put", "-"], &line).status.success());
+    let id = serde_json::from_str::<serde_json::Value>(&line).unwrap()["id"].as_str().unwrap().to_string();
+    let o = run(&p, &["update", &format!("{{\"id\":\"{id}\",\"subjects\":[\"ZED\"]}}")], "");
+    assert!(!o.status.success() && err(&o).contains("ats-dev cannot make"), "{}", err(&o));
+    assert!(out(&run(&p, &["get", &id], "")).contains("\"ALICE\""));
+    let o = run(&p, &["update", &format!("{{\"id\":\"{id}\",\"signature\":[1]}}")], "");
+    assert!(!o.status.success() && err(&o).contains("cannot name a signature"), "{}", err(&o));
+}
+
+#[test]
+fn an_update_that_empties_the_actors_authors_them_and_reports_what_is_on_disk() {
+    let (_d, p) = db();
+    let id = id_of(&run(&p, &["--unsigned", "put", "CAROL is author of GITHUB by BOB"], ""));
+    let o = run(&p, &["update", &format!("{{\"id\":\"{id}\",\"actors\":[]}}")], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert!(out(&run(&p, &["ax", "CAROL"], "")).contains(&id), "the row vanished from ax");
+    assert_eq!(out(&run(&p, &["actors"], "")).trim(), "ats-dev");
+
+    let said = out(&run(&p, &["update", &format!("{{\"id\":\"{id}\",\"created_at\":1}}")], ""));
+    let said: serde_json::Value = serde_json::from_str(said.lines().next().unwrap()).unwrap();
+    let got: serde_json::Value = serde_json::from_str(out(&run(&p, &["get", &id], "")).trim()).unwrap();
+    assert_eq!(said["created_at"], got["created_at"]);
+    assert_ne!(got["created_at"], 1);
+}

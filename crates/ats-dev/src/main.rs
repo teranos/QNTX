@@ -291,27 +291,35 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let mut a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
     // A signature covers what was just changed. It stays only if it still
     // holds; else ats-dev re-signs what its own key signed, and refuses the rest.
-    if stored.signature.is_some() && !matches!(sign::verify(&a), sign::Verdict::Valid(_)) {
-        let keys = Keys::of(o);
-        let sg = keys.signer()?.ok_or_else(|| {
-            fail("the update breaks the signature", format!("{id}: --unsigned cannot keep a signed attestation signed"))
-        })?;
-        if stored.signer_did.as_deref() != Some(sg.did.as_str()) {
-            return Err(fail(
-                "the update breaks a signature ats-dev cannot make",
-                format!("{id} is signed by {}, ats-dev's key is {}", stored.signer_did.as_deref().unwrap_or("?"), sg.did),
-            ));
+    if stored.signature.is_some() {
+        if !matches!(sign::verify(&a), sign::Verdict::Valid(_)) {
+            let keys = Keys::of(o);
+            let sg = keys.signer()?.ok_or_else(|| {
+                fail("the update breaks the signature", format!("{id}: --unsigned cannot keep a signed attestation signed"))
+            })?;
+            if stored.signer_did.as_deref() != Some(sg.did.as_str()) {
+                return Err(fail(
+                    "the update breaks a signature ats-dev cannot make",
+                    format!("{id} is signed by {}, ats-dev's key is {}", stored.signer_did.as_deref().unwrap_or("?"), sg.did),
+                ));
+            }
+            // The actors are under the signature; a signed row with none is out of every actor's claims.
+            if a.actors.is_empty() {
+                return Err(fail("a signed attestation must name its actors", format!("{id}: the update would leave none")));
+            }
+            a.signature = None;
+            a.signer_did = None;
+            a = sg.sign(a)?;
         }
-        // The actors are under the signature; a signed row with none is out of every actor's claims.
-        if a.actors.is_empty() {
-            return Err(fail("a signed attestation must name its actors", format!("{id}: the update would leave none")));
-        }
-        a.signature = None;
-        a.signer_did = None;
-        a = sg.sign(a)?;
+    } else {
+        // An unsigned row is authored as put authors it: an update that empties
+        // the actors would otherwise hide the row from every actor's claims.
+        a = a.authored_by(ACTOR);
     }
-    s.update(a.clone()).map_err(|e| fail("update failed", e))?;
-    emit(&a)
+    s.update(a).map_err(|e| fail("update failed", e))?;
+    // What is on disk, not what was asked for: `created_at` is kept as it was.
+    let kept = s.get(id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", id))?;
+    emit(&kept)
 }
 
 fn alias(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
