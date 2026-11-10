@@ -223,7 +223,6 @@ fn put_signs_with_a_key_minted_beside_the_db_and_the_same_key_signs_again() {
         assert_eq!(x["signer"], did1["did"]);
     }
     assert!(did1["did"].as_str().unwrap().starts_with("did:key:z"));
-    #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         assert_eq!(std::fs::metadata(&key_file).unwrap().permissions().mode() & 0o777, 0o600);

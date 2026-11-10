@@ -2,7 +2,7 @@
 //! keeps in a file beside the database. The bytes signed are `ats-sign`'s, the
 //! ones Go's `ats/signing` signs and verifies; the signer is named by its
 //! `did:key`, as the node names itself. This is not the node's key and its DID
-//! is not in the node's DID document.
+//! is not in the node's DID document. Unix only, as QNTX is (ADR-029).
 
 use std::path::{Path, PathBuf};
 
@@ -126,19 +126,16 @@ pub fn canonical(a: &Attestation) -> Result<String, Box<Error>> {
 /// created is removed.
 fn publish_new(path: &Path, bytes: &[u8]) -> Result<bool, Box<Error>> {
     use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let tmp = PathBuf::from(format!("{}.{}.{nanos}.tmp", path.display(), std::process::id()));
-    let mut open = std::fs::OpenOptions::new();
-    open.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        open.mode(0o600);
-    }
-    let mut f = open
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
         .open(&tmp)
         .map_err(|e| fail("could not create the key's temporary file", format!("{}: {e}", tmp.display())))?;
     let wrote = f.write_all(bytes).and_then(|()| f.sync_all());
@@ -161,7 +158,6 @@ fn publish_new(path: &Path, bytes: &[u8]) -> Result<bool, Box<Error>> {
 
 /// Make the key's directory entry durable before anything is signed with it:
 /// rows signed by a key that a power loss un-links could never be re-signed.
-#[cfg(unix)]
 fn sync_dir_of(path: &Path) -> Result<(), Box<Error>> {
     let dir = match path.parent() {
         Some(d) if !d.as_os_str().is_empty() => d,
@@ -170,11 +166,6 @@ fn sync_dir_of(path: &Path) -> Result<(), Box<Error>> {
     std::fs::File::open(dir)
         .and_then(|d| d.sync_all())
         .map_err(|e| fail("could not make the key durable", format!("{}: {e}", dir.display())))
-}
-
-#[cfg(not(unix))]
-fn sync_dir_of(_path: &Path) -> Result<(), Box<Error>> {
-    Ok(())
 }
 
 #[cfg(test)]
