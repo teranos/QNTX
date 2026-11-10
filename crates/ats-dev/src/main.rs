@@ -210,6 +210,9 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     if !unknown.is_empty() {
         return Err(fail("not an attestation field", unknown.join(", ")));
     }
+    if let Some(k) = ["signature", "signer_did"].into_iter().find(|k| patch.contains_key(*k)) {
+        return Err(fail("an update cannot name a signature", k));
+    }
     let id = patch.get("id").and_then(|v| v.as_str()).ok_or_else(|| fail("update needs an \"id\"", given))?;
     let mut s = open(o)?;
     let stored = s.get(id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", id))?;
@@ -220,8 +223,32 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         }
     }
     let a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
-    s.update(a.clone()).map_err(|e| fail("update failed", e))?;
-    emit(&a)
+    // The signature covers these fields; ats-dev has no key to sign what it changes.
+    if stored.signature.is_some() && !same_signed_fields(&stored, &a) {
+        return Err(fail(
+            "a signed attestation cannot be edited",
+            format!("{id}: the signature covers what the update changes"),
+        ));
+    }
+    // An unsigned row is authored as put authors it: an update that empties
+    // the actors would otherwise hide the row from every actor's claims.
+    let a = if stored.signature.is_some() { a } else { a.authored_by(ACTOR) };
+    s.update(a).map_err(|e| fail("update failed", e))?;
+    // What is on disk, not what was asked for: `created_at` is kept as it was.
+    let kept = s.get(id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", id))?;
+    emit(&kept)
+}
+
+/// What a signature covers: everything but `created_at` and the signature itself.
+fn same_signed_fields(a: &Attestation, b: &Attestation) -> bool {
+    a.id == b.id
+        && a.subjects == b.subjects
+        && a.predicates == b.predicates
+        && a.contexts == b.contexts
+        && a.actors == b.actors
+        && a.timestamp == b.timestamp
+        && a.source == b.source
+        && a.attributes == b.attributes
 }
 
 fn alias(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
