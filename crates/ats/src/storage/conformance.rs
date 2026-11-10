@@ -175,6 +175,37 @@ impl<S: AttestationStore> Run<'_, S> {
         Ok(())
     }
 
+    /// What `Attestation::writable` refuses, no store takes: not on `put`, not
+    /// on `update`, and a refused one leaves nothing and changes nothing.
+    fn refuses_unwritable(&mut self) -> Result<(), Lost> {
+        let mut bad = self.make(0);
+        bad.subjects.clear();
+        match self.s()?.put(bad.clone()) {
+            Err(StoreError::Unwritable(_)) => {}
+            other => self.miss("put with no subject", "Err(Unwritable)", other),
+        }
+        let exists = self.s()?.exists(&bad.id);
+        if self.ok("exists", exists) == Some(true) {
+            self.miss("a refused put stores nothing", false, true);
+        }
+        let good = self.make(1);
+        let put = self.s()?.put(good.clone());
+        self.ok("put", put);
+        let mut worse = good.clone();
+        worse.predicates.clear();
+        match self.s()?.update(worse) {
+            Err(StoreError::Unwritable(_)) => {}
+            other => self.miss("update to no predicate", "Err(Unwritable)", other),
+        }
+        let got = self.s()?.get(&good.id);
+        if let Some(got) = self.ok("get", got) {
+            if got.as_ref() != Some(&good) {
+                self.miss("a refused update changes nothing", format!("{good:?}"), got);
+            }
+        }
+        Ok(())
+    }
+
     fn kept_across_reopen(&mut self) -> Result<(), Lost> {
         let a = self.make(0);
         let put = self.s()?.put(a.clone());
@@ -340,7 +371,10 @@ pub fn check<S: AttestationStore>(
     // moved rows into files, a later case's store holds rows it did not write,
     // and a gap the first reopen exposed would be blamed on every case after it.
     let mut cases: Vec<Case<S>> =
-        vec![("put_get".to_string(), Box::new(|r| r.put_get()))];
+        vec![
+            ("put_get".to_string(), Box::new(|r| r.put_get())),
+            ("refuses_unwritable".to_string(), Box::new(|r| r.refuses_unwritable())),
+        ];
     for (name, reopen) in [("same_session", false), ("after_reopen", true)] {
         if reopen {
             cases.push(("kept_across_reopen".to_string(), Box::new(|r| r.kept_across_reopen())));
@@ -380,10 +414,15 @@ mod tests {
     struct Buffered {
         files: HashMap<String, Attestation>,
         buffer: HashMap<String, Attestation>,
+        /// Takes what `writable` refuses, as Postgres did.
+        lax: bool,
     }
 
     impl AttestationStore for Buffered {
         fn put(&mut self, a: Attestation) -> StoreResult<()> {
+            if !self.lax {
+                a.writable()?;
+            }
             if self.exists(&a.id)? {
                 return Err(StoreError::AlreadyExists(a.id));
             }
@@ -397,6 +436,9 @@ mod tests {
             Ok(self.buffer.remove(id).is_some())
         }
         fn update(&mut self, a: Attestation) -> StoreResult<()> {
+            if !self.lax {
+                a.writable()?;
+            }
             if !self.exists(&a.id)? {
                 return Err(StoreError::NotFound(a.id));
             }
@@ -436,6 +478,14 @@ mod tests {
             ["clear/after_reopen", "delete/after_reopen", "ids_and_count/after_reopen", "update/after_reopen"],
             "{found:#?}"
         );
+    }
+
+    #[test]
+    fn a_store_that_takes_what_writable_refuses_is_reported_in_the_session() {
+        let mut same = |s: Buffered| Ok(s);
+        let found = check(Buffered { lax: true, ..Buffered::default() }, &mut same, "lax", false);
+        let cases: std::collections::BTreeSet<&str> = found.iter().map(|v| v.case.as_str()).collect();
+        assert_eq!(cases.into_iter().collect::<Vec<_>>(), ["refuses_unwritable"], "{found:#?}");
     }
 
     #[test]
