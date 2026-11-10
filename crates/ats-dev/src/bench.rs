@@ -22,7 +22,7 @@ use ats_sqlite::store::build_query_sql;
 use ats_sqlite::SqliteStore;
 use sacred_error::Error;
 
-use crate::{fail, open, Opts};
+use crate::{fail, open_sqlite, Opts};
 
 /// xorshift64: fixed seed, no dependency, the same stream on every machine.
 struct Rng(u64);
@@ -148,7 +148,7 @@ pub fn run(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         "load" => load(o, &rest),
         "probe" => probe(o, rest.first().copied().copied()),
         "query" => {
-            let s = open(o)?;
+            let s = open_sqlite(o)?;
             let rows = s.count().map_err(|e| fail("count failed", e))?;
             queries(&s, rows as i64)
         }
@@ -186,7 +186,7 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
     }
 
     let subjects = (total / 10).max(100);
-    let mut s = open(o)?;
+    let mut s = open_sqlite(o)?;
     let mut rng = Rng(SEED);
     let mode = batch.map_or_else(|| "put".to_string(), |k| format!("batch:{k}"));
     println!("# mode={mode} total={total} step={step} subjects={subjects} sync={}", o.sync.as_deref().unwrap_or("db default"));
@@ -249,7 +249,7 @@ fn probe(o: &Opts, n: Option<&String>) -> Result<(), Box<Error>> {
     if n == 0 {
         return Err(fail("N must be at least 1", "0 given"));
     }
-    let mut s = open(o)?;
+    let mut s = open_sqlite(o)?;
     let rows = s.count().map_err(|e| fail("count failed", e))?;
     // the subject pool a load of the resulting size would draw from
     let subjects = ((rows as u64 + n) / 10).max(100);

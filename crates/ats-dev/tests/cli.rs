@@ -552,3 +552,206 @@ fn the_bytes_written_are_printed_to_two_decimals_not_rounded_to_whole_megabytes(
     let (whole, frac) = written.split_once('.').unwrap_or((written, ""));
     assert!(frac.len() == 2 && whole.parse::<u64>().is_ok(), "{row}");
 }
+
+/// `run` for a backend: the global flags go before `--db`, and `db` is whatever
+/// that backend calls its location (a path, a url, a connection string).
+fn run_on(backend: &[&str], db: &str, args: &[&str], stdin: &str) -> Output {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_ats-dev"))
+        .args(backend)
+        .arg("--db")
+        .arg(db)
+        .args(args)
+        .env_remove("QNTX_POSTGRES_URL")
+        .env_remove("ATS_DEV_DB")
+        .env_remove("ATS_DEV_BACKEND")
+        .env_remove("ATS_DEV_KEY")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    c.stdin.take().unwrap().write_all(stdin.as_bytes()).unwrap();
+    c.wait_with_output().unwrap()
+}
+
+#[test]
+fn a_backend_that_does_not_exist_is_refused() {
+    let (_d, p) = db();
+    let o = run_on(&["--backend", "mysql"], p.to_str().unwrap(), &["count"], "");
+    assert!(!o.status.success() && err(&o).contains("--backend takes sqlite, duckdb or postgres"), "{}", err(&o));
+}
+
+#[test]
+fn what_is_sqlites_is_refused_on_another_backend_before_anything_is_opened() {
+    let (_d, p) = db();
+    let db = p.to_str().unwrap();
+    for (flags, command, why) in [
+        (vec!["--backend", "duckdb", "--sync", "off"], vec!["count"], "--sync is SQLite's"),
+        (vec!["--backend", "postgres", "--sync", "off"], vec!["count"], "--sync is SQLite's"),
+        (vec!["--backend", "sqlite", "--ca", "x.pem"], vec!["count"], "--ca is Postgres's"),
+        (vec!["--backend", "duckdb", "--ca", "x.pem"], vec!["count"], "--ca is Postgres's"),
+        (vec!["--backend", "duckdb"], vec!["bench", "query"], "this command is SQLite's"),
+        (vec!["--backend", "postgres"], vec!["bench", "query"], "this command is SQLite's"),
+    ] {
+        let o = run_on(&flags, db, &command, "");
+        assert!(!o.status.success() && err(&o).contains(why), "{flags:?} {command:?}: {}", err(&o));
+    }
+    assert!(!p.exists(), "nothing was created");
+}
+
+#[test]
+fn a_url_has_no_file_for_the_key_to_sit_beside_and_a_duckdb_path_does() {
+    let d = tempfile::tempdir().unwrap();
+    for (backend, db) in [("postgres", "host=/nowhere user=x"), ("duckdb", "s3://bucket/prefix"), ("duckdb", "file:///x")] {
+        let o = run_on(&["--backend", backend], db, &["key"], "");
+        assert!(!o.status.success() && err(&o).contains("no key file to default to"), "{backend} {db}: {}", err(&o));
+    }
+    // named, it is made
+    let key = d.path().join("k");
+    let o = run_on(&["--backend", "postgres", "--key", key.to_str().unwrap()], "host=/nowhere", &["key"], "");
+    assert!(o.status.success() && out(&o).contains("did:key:"), "{}", err(&o));
+    // a plain path is a place on this machine, so the default is beside it
+    let loc = d.path().join("parquet");
+    let o = run_on(&["--backend", "duckdb"], loc.to_str().unwrap(), &["key"], "");
+    assert!(o.status.success() && out(&o).contains("parquet.key"), "{}", err(&o));
+    assert!(d.path().join("parquet.key").exists());
+}
+
+#[cfg(not(feature = "duckdb"))]
+#[test]
+fn a_build_without_duckdb_says_how_to_get_it() {
+    let d = tempfile::tempdir().unwrap();
+    let o = run_on(&["--backend", "duckdb"], d.path().to_str().unwrap(), &["count"], "");
+    assert!(!o.status.success() && err(&o).contains("built without duckdb") && err(&o).contains("--features duckdb"), "{}", err(&o));
+}
+
+#[cfg(not(feature = "postgres"))]
+#[test]
+fn a_build_without_postgres_says_how_to_get_it() {
+    let o = run_on(&["--backend", "postgres"], "host=/nowhere", &["count"], "");
+    assert!(!o.status.success() && err(&o).contains("built without postgres") && err(&o).contains("--features postgres"), "{}", err(&o));
+}
+
+#[test]
+fn postgres_without_a_url_says_where_one_comes_from() {
+    let o = Command::new(env!("CARGO_BIN_EXE_ats-dev"))
+        .args(["--backend", "postgres", "count"])
+        .env_remove("QNTX_POSTGRES_URL")
+        .env_remove("ATS_DEV_DB")
+        .output()
+        .unwrap();
+    assert!(!o.status.success() && err(&o).contains("QNTX_POSTGRES_URL"), "{}", err(&o));
+}
+
+/// What every backend must do for the commands `AttestationStore` has, run
+/// against one location. A change is either made or refused, never reported
+/// as made and not there: the property that holds whichever backend answers.
+#[cfg(any(feature = "duckdb", feature = "postgres"))]
+fn holds_what_attestation_store_promises(backend: &[&str], db: &str, key: &str) {
+    let r = |args: &[&str]| {
+        let mut b = backend.to_vec();
+        b.extend(["--key", key]);
+        run_on(&b, db, args, "")
+    };
+    let put = r(&["put", "ALICE is author of GITHUB by BOB"]);
+    assert!(put.status.success(), "{}", err(&put));
+    let id = out(&put).split("\"id\":\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+    // a new process each time: what one wrote is what the next reads
+    assert_eq!(out(&r(&["count"])).trim(), "1");
+    assert_eq!(out(&r(&["exists", &id])).trim(), "true");
+    assert!(out(&r(&["get", &id])).contains("\"source\":\"ats-dev\""));
+    let v = r(&["verify", &id]);
+    assert!(v.status.success() && out(&v).contains("\"valid\""), "{}{}", out(&v), err(&v));
+
+    // update: changed, or refused; never Ok with the old row left
+    let patch = format!("{{\"id\":\"{id}\",\"source\":\"changed\"}}");
+    let u = r(&["update", &patch]);
+    let now_changed = out(&r(&["get", &id])).contains("\"source\":\"changed\"");
+    assert_eq!(u.status.success(), now_changed, "update exit {} but stored changed={now_changed}: {}", u.status, err(&u));
+
+    // delete: removed, or refused; never Ok with the row still there
+    let d = r(&["delete", &id]);
+    let still = out(&r(&["exists", &id])).trim() == "true";
+    assert_eq!(d.status.success(), !still, "delete exit {} but exists={still}: {}", d.status, err(&d));
+
+    // and what only SqliteStore implements is refused by name, not answered from nothing
+    for (args, needs) in [
+        (vec!["ax", "ALICE"], "QueryStore and AliasStore"),
+        (vec!["subjects"], "QueryStore"),
+        (vec!["stats"], "QueryStore"),
+        (vec!["alias", "ls"], "AliasStore"),
+    ] {
+        let o = r(&args);
+        assert!(!o.status.success() && err(&o).contains(&format!("does not implement {needs}")), "{args:?}: {}", err(&o));
+    }
+}
+
+#[cfg(feature = "duckdb")]
+#[test]
+fn duckdb_keeps_across_processes_what_put_wrote_and_reports_only_changes_it_made() {
+    let d = tempfile::tempdir().unwrap();
+    let loc = d.path().join("parquet");
+    let key = d.path().join("k");
+    holds_what_attestation_store_promises(&["--backend", "duckdb"], loc.to_str().unwrap(), key.to_str().unwrap());
+}
+
+#[cfg(feature = "duckdb")]
+#[test]
+fn duckdb_says_the_ids_of_put_stdin_only_once_they_are_in_a_file() {
+    let d = tempfile::tempdir().unwrap();
+    let loc = d.path().join("parquet");
+    let b = ["--backend", "duckdb", "--unsigned"];
+    let o = run_on(&b, loc.to_str().unwrap(), &["put", "-"], "{\"subjects\":[\"A\"]}\n{\"subjects\":[\"B\"]}\n{\"subjects\":[\"C\"]}\n");
+    assert!(o.status.success(), "{}", err(&o));
+    assert_eq!(out(&o).lines().count(), 3);
+    assert_eq!(out(&run_on(&b, loc.to_str().unwrap(), &["count"], "")).trim(), "3");
+}
+
+#[cfg(feature = "duckdb")]
+#[test]
+fn duckdb_put_stdin_stops_at_a_bad_line_and_keeps_and_says_what_came_before() {
+    let d = tempfile::tempdir().unwrap();
+    let loc = d.path().join("parquet");
+    let b = ["--backend", "duckdb", "--unsigned"];
+    let o = run_on(&b, loc.to_str().unwrap(), &["put", "-"], "{\"subjects\":[\"A\"]}\nnot json\n{\"subjects\":[\"C\"]}\n");
+    assert!(!o.status.success() && err(&o).contains("line 2"), "{}", err(&o));
+    assert!(err(&o).contains("no batch to roll back"), "{}", err(&o));
+    // the id said is a row stored, and the line after the bad one was never read
+    assert_eq!(out(&o).lines().count(), 1);
+    assert_eq!(out(&run_on(&b, loc.to_str().unwrap(), &["count"], "")).trim(), "1");
+}
+
+#[cfg(feature = "postgres")]
+fn postgres() -> (String, String, tempfile::TempDir) {
+    let url = std::env::var("QNTX_POSTGRES_URL").expect("QNTX_POSTGRES_URL names the server (scripts/with-postgres.sh)");
+    let ns = format!("t{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    (url, ns, tempfile::tempdir().unwrap())
+}
+
+#[cfg(feature = "postgres")]
+#[test]
+fn postgres_keeps_across_processes_what_put_wrote_and_reports_only_changes_it_made() {
+    let (url, ns, d) = postgres();
+    let key = d.path().join("k");
+    holds_what_attestation_store_promises(&["--backend", "postgres", "--namespace", &ns], &url, key.to_str().unwrap());
+}
+
+#[cfg(feature = "postgres")]
+#[test]
+fn postgres_changes_what_it_is_asked_to_and_a_namespace_is_its_own() {
+    let (url, ns, _d) = postgres();
+    let a = ["--backend", "postgres", "--unsigned", "--namespace", &ns];
+    let other = format!("{ns}-other");
+    let b = ["--backend", "postgres", "--unsigned", "--namespace", &other];
+    let put = run_on(&a, &url, &["put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(put.status.success(), "{}", err(&put));
+    let id = out(&put).split("\"id\":\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+    let patch = format!("{{\"id\":\"{id}\",\"source\":\"changed\"}}");
+    let u = run_on(&a, &url, &["update", &patch], "");
+    assert!(u.status.success() && out(&u).contains("\"source\":\"changed\""), "{}", err(&u));
+    assert_eq!(out(&run_on(&b, &url, &["count"], "")).trim(), "0");
+    assert!(run_on(&a, &url, &["delete", &id], "").status.success());
+    assert_eq!(out(&run_on(&a, &url, &["count"], "")).trim(), "0");
+    let gone = run_on(&a, &url, &["delete", &id], "");
+    assert!(!gone.status.success() && err(&gone).contains("no such attestation"), "{}", err(&gone));
+}

@@ -19,12 +19,17 @@ pub struct Signer {
     pub did: String,
 }
 
-/// Where the key lives: `--key`, else `$ATS_DEV_KEY`, else `<db>.key`.
-pub fn key_path(flag: Option<&str>, db: &str) -> PathBuf {
-    match (flag, std::env::var("ATS_DEV_KEY")) {
-        (Some(f), _) => PathBuf::from(f),
-        (None, Ok(e)) => PathBuf::from(e),
-        (None, Err(_)) => PathBuf::from(format!("{db}.key")),
+/// Where the key lives: `--key`, else `$ATS_DEV_KEY`, else `<db>.key` when the
+/// database is a path (`beside`). A url has no file to sit beside, so it is told.
+pub fn key_path(flag: Option<&str>, beside: Option<&str>, backend: &str) -> Result<PathBuf, Box<Error>> {
+    match (flag, std::env::var("ATS_DEV_KEY"), beside) {
+        (Some(f), _, _) => Ok(PathBuf::from(f)),
+        (None, Ok(e), _) => Ok(PathBuf::from(e)),
+        (None, Err(_), Some(db)) => Ok(PathBuf::from(format!("{db}.key"))),
+        (None, Err(_), None) => Err(fail(
+            "no key file to default to",
+            format!("a {backend} database is not a file the key can sit beside: --key FILE or $ATS_DEV_KEY, or --unsigned"),
+        )),
     }
 }
 
