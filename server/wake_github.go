@@ -103,8 +103,8 @@ func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments
 
 // tellAgentTheRoom runs a turn of the Node Agent told everything said in the
 // room since it was last told, and posts its answer into the room as it. What
-// it was told is kept before the turn runs: what is said during the turn is
-// the next one's.
+// it was told is kept once it took the turn, not before: a turn it refused
+// leaves it to be told again.
 //
 // An agent never told is told from since, the time of the comment that woke it:
 // a room reads oldest first, so reading it all would tell the oldest.
@@ -144,13 +144,13 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 	if len(said) == 0 {
 		return nil
 	}
-	if err := told.Keep(ctx, target.Room, agent, said[len(said)-1].At); err != nil {
-		return err
-	}
 	request, err := http.NewRequestWithContext(withSpeaker(lifetime, speaker), http.MethodPost, "/github/comments", nil)
 	if err != nil {
 		return errors.Wrap(err, "the asking did not build")
 	}
-	s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", roomcomments.Digest(said, read.GetTruncated()))
-	return nil
+	if !s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", roomcomments.Digest(said, read.GetTruncated())) {
+		return errors.Newf("%s did not take the turn, so what it was to be told is told again with the next", agent)
+	}
+	// Kept once the agent took the turn: what is said during it is the next one's.
+	return told.Keep(context.WithoutCancel(ctx), target.Room, agent, said[len(said)-1].At)
 }

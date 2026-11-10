@@ -211,7 +211,8 @@ func (s *QNTXServer) answerFile(root *os.Root, name string, left int) (*protocol
 
 // answerInRoom runs one Node Agent turn and posts what it answered, or why it
 // did not, into the room as that agent, with the files it wrote for the room.
-func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms protocol.RoomsServiceClient, room, thread, harness, waker, says string) {
+// It says whether the agent took the turn: a refusal is posted and is not one.
+func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms protocol.RoomsServiceClient, room, thread, harness, waker, says string) (took bool) {
 	lifetime := s.lifetime()
 	turn := "In the " + nodeRoomName + ", " + waker + " woke you (" + harness + ") with:\n\n" + says +
 		"\n\nWhat you answer is posted into the room as " + harness + "."
@@ -239,4 +240,5 @@ func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms p
 	if _, err := rooms.PostToRoom(lifetime, &protocol.PostToRoomRequest{Provider: provider, By: &protocol.RoomAgent{Did: s.nodeAgent.did, Harness: harness, Name: harness}, Room: room, Body: body, Thread: thread, Files: files}); err != nil {
 		s.logger.Errorw("A woken Node Agent's answer was not posted into its room", "harness", harness, "room", room, "error", err)
 	}
+	return refused == nil
 }
