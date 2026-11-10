@@ -276,6 +276,7 @@ fn a_file_that_is_not_a_key_is_never_replaced() {
     let (d, p) = db();
     let f = d.path().join("not.key");
     std::fs::write(&f, b"hello").unwrap();
+    std::fs::set_permissions(&f, std::os::unix::fs::PermissionsExt::from_mode(0o600)).unwrap();
     let o = run(&p, &["--key", f.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
     assert!(!o.status.success() && err(&o).contains("not a key"), "{}", err(&o));
     assert_eq!(std::fs::read(&f).unwrap(), b"hello");
@@ -422,4 +423,38 @@ fn a_leftover_temporary_file_does_not_stop_a_key_being_made_and_is_not_removed()
     for f in stale {
         assert_eq!(std::fs::read(&f).unwrap(), b"left by something else", "{}", f.display());
     }
+}
+
+#[test]
+fn a_key_file_open_to_group_or_other_is_refused_by_every_command_that_reads_it() {
+    use std::os::unix::fs::PermissionsExt;
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    let key = std::path::PathBuf::from(format!("{}.key", p.display()));
+    let id = out(&run(&p, &["ids"], "")).trim().to_string();
+    for mode in [0o644, 0o640, 0o604, 0o660] {
+        std::fs::set_permissions(&key, std::fs::Permissions::from_mode(mode)).unwrap();
+        for args in [
+            vec!["put", "CAROL is author of GITHUB by BOB"],
+            vec!["key"],
+        ] {
+            let o = run(&p, &args, "");
+            assert!(!o.status.success() && err(&o).contains("open to other users"), "{mode:o} {args:?}: {}", err(&o));
+            assert!(err(&o).contains("chmod 600"), "{}", err(&o));
+        }
+        let patch = format!("{{\"id\":\"{id}\",\"subjects\":[\"ZED\"]}}");
+        let o = run(&p, &["update", &patch], "");
+        assert!(!o.status.success() && err(&o).contains("open to other users"), "{mode:o}: {}", err(&o));
+    }
+    assert_eq!(count(&p), "1");
+    // reading and `--unsigned` need no key
+    assert!(run(&p, &["ax", "ALICE"], "").status.success());
+    assert!(run(&p, &["--unsigned", "put", "DAVE is author of GITHUB by BOB"], "").status.success());
+    // and the fix is the one the error names
+    std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(run(&p, &["put", "CAROL is author of GITHUB by BOB"], "").status.success());
+    // a key that is not a regular file is not a key
+    let d = tempfile::tempdir().unwrap();
+    let o = run(&p, &["--key", d.path().to_str().unwrap(), "key"], "");
+    assert!(!o.status.success() && err(&o).contains("not a regular file"), "{}", err(&o));
 }

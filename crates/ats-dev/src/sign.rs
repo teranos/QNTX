@@ -33,29 +33,25 @@ impl Signer {
     /// A file that exists and is not a key is an error, never replaced. Two
     /// processes minting at once end with one key: the loser loads the winner's.
     pub fn load_or_mint(path: &Path) -> Result<Self, Box<Error>> {
-        match std::fs::read(path) {
-            Ok(bytes) => Self::from_file(path, &bytes),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+        match read_key(path) {
+            Ok(Some(bytes)) => Self::from_file(path, &bytes),
+            Ok(None) => {
                 let k = laye_me::fresh();
                 let bytes = laye_me::to_bytes(&k).map_err(|e| fail("could not encode the key", e))?;
                 if publish_new(path, &bytes)? {
                     return Self::from_keypair(k);
                 }
-                let bytes = std::fs::read(path)
-                    .map_err(|e| fail("could not read the key file", format!("{}: {e}", path.display())))?;
+                let bytes = read_key(path)?
+                    .ok_or_else(|| fail("the key file vanished", path.display()))?;
                 Self::from_file(path, &bytes)
             }
-            Err(e) => Err(fail("could not read the key file", format!("{}: {e}", path.display()))),
+            Err(e) => Err(e),
         }
     }
 
     /// The key at `path` if there is one; none is not minted.
     pub fn load_existing(path: &Path) -> Result<Option<Self>, Box<Error>> {
-        match std::fs::read(path) {
-            Ok(bytes) => Self::from_file(path, &bytes).map(Some),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(fail("could not read the key file", format!("{}: {e}", path.display()))),
-        }
+        read_key(path)?.map(|bytes| Self::from_file(path, &bytes)).transpose()
     }
 
     fn from_file(path: &Path, bytes: &[u8]) -> Result<Self, Box<Error>> {
@@ -117,6 +113,31 @@ pub fn canonical(a: &Attestation) -> Result<String, Box<Error>> {
     Signable::from_wire_json(&wire)
         .and_then(|s| s.canonical_json())
         .map_err(|e| fail("could not produce the bytes to sign", e))
+}
+
+/// The bytes of the key file, `None` if there is none. A key that group or
+/// other can reach is refused, as ssh refuses one: whoever can read it can sign
+/// as this identity.
+fn read_key(path: &Path) -> Result<Option<Vec<u8>>, Box<Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let meta = match std::fs::metadata(path) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(fail("could not read the key file", format!("{}: {e}", path.display()))),
+    };
+    if !meta.is_file() {
+        return Err(fail("the key file is not a regular file", path.display()));
+    }
+    let mode = meta.permissions().mode() & 0o777;
+    if mode & 0o077 != 0 {
+        return Err(fail(
+            "the key file is open to other users",
+            format!("{} is mode {mode:03o}; chmod 600 {}", path.display(), path.display()),
+        ));
+    }
+    std::fs::read(path)
+        .map(Some)
+        .map_err(|e| fail("could not read the key file", format!("{}: {e}", path.display())))
 }
 
 /// The key, written whole to a private temporary file beside `path` and then

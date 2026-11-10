@@ -22,7 +22,8 @@
 //!
 //! `put` signs with ats-dev's own ed25519 key (`--key`, else `$ATS_DEV_KEY`, else
 //! `<db>.key`, minted on first use) over the bytes `ats/signing` signs in Go.
-//! `--unsigned` writes without a signature. This is not the node's key.
+//! `--unsigned` writes without a signature. This is not the node's key. An existing
+//! key file that group or other can reach (mode other than 0600) is refused.
 //!
 //! `--db` defaults to `$ATS_DEV_DB`, else `ats-dev.db`. Rows come out as JSON,
 //! one attestation per line. A failure goes to stderr as a sacred-error `Error`
