@@ -16,6 +16,7 @@
 //! ats-dev [--db FILE] subjects | predicates | contexts | actors   # distinct values, one per line
 //! ats-dev [--db FILE] stats
 //! ats-dev [--db FILE] key                       # the signing key's did:key and file (minted if there is none)
+//! ats-dev [--db FILE] bench load N [--step S] [--batch K] [--replace] | probe N | query   # see bench/README.md
 //! ats-dev [--db FILE] verify [ID]               # valid / invalid / unsigned, one line each; exit 1 if any is invalid
 //! ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X
 //! ```
@@ -29,6 +30,7 @@
 //! one attestation per line. A failure goes to stderr as a sacred-error `Error`
 //! and exits 1.
 
+mod bench;
 mod sign;
 
 use std::io::{BufRead, Write};
@@ -198,7 +200,7 @@ fn seal(keys: &Keys, a: Attestation) -> Result<Attestation, Box<Error>> {
 fn run(args: &[String]) -> Result<(), Box<Error>> {
     let o = opts(args)?;
     let mut it = o.rest.iter();
-    let cmd = it.next().ok_or_else(|| fail("no command", "key | verify | put | ax | get | count | exists | ids | update | delete | clear | subjects | predicates | contexts | actors | stats | alias"))?;
+    let cmd = it.next().ok_or_else(|| fail("no command", "key | verify | bench | put | ax | get | count | exists | ids | update | delete | clear | subjects | predicates | contexts | actors | stats | alias"))?;
     let tail: Vec<&String> = it.collect();
     match cmd.as_str() {
         "put" => put(&o, &tail),
@@ -263,6 +265,7 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
             Ok(())
         }
         "verify" => verify(&o, &tail),
+        "bench" => bench::run(&o, &tail),
         "alias" => alias(&o, &tail),
         other => Err(fail("unknown command", other)),
     }

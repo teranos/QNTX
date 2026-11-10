@@ -458,3 +458,71 @@ fn a_key_file_open_to_group_or_other_is_refused_by_every_command_that_reads_it()
     let o = run(&p, &["--key", d.path().to_str().unwrap(), "key"], "");
     assert!(!o.status.success() && err(&o).contains("not a regular file"), "{}", err(&o));
 }
+
+fn bench_lines(o: &Output) -> Vec<String> {
+    out(o).lines().map(str::to_string).collect()
+}
+
+#[test]
+fn bench_load_prints_a_line_per_step_and_the_queries_and_keeps_its_workload_fixed() {
+    let (_d, p) = db();
+    let o = run(&p, &["bench", "load", "300", "--step", "100"], "");
+    assert!(o.status.success(), "{}", err(&o));
+    let lines = bench_lines(&o);
+    let header = lines.iter().position(|l| l.starts_with("n_done,")).unwrap();
+    let steps: Vec<&String> = lines[header + 1..].iter().take_while(|l| !l.starts_with('#')).collect();
+    assert_eq!(steps.len(), 3, "{lines:?}");
+    assert!(steps[2].starts_with("300,"), "{}", steps[2]);
+    assert!(lines.iter().any(|l| l.starts_with("# final db_bytes=")), "{lines:?}");
+    assert_eq!(count(&p), "300");
+    // the query rows are a function of the workload, so a second load of the same size agrees
+    let rows = |lines: &[String]| -> Vec<String> {
+        let q = lines.iter().position(|l| l.starts_with("# queries")).unwrap();
+        lines[q + 1..].iter().map(|l| l.split(',').take(2).collect::<Vec<_>>().join(",")).collect()
+    };
+    let again = bench_lines(&run(&p, &["bench", "load", "300", "--step", "100", "--replace"], ""));
+    assert_eq!(rows(&lines), rows(&again));
+    assert_eq!(rows(&lines).len(), 7);
+}
+
+#[test]
+fn bench_load_refuses_to_replace_a_database_unasked_and_leaves_it_alone() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    let o = run(&p, &["bench", "load", "50"], "");
+    assert!(!o.status.success() && err(&o).contains("--replace"), "{}", err(&o));
+    assert_eq!(count(&p), "1");
+    assert!(run(&p, &["bench", "load", "50", "--replace"], "").status.success());
+    assert_eq!(count(&p), "50");
+}
+
+#[test]
+fn bench_batch_probe_and_query_run_on_what_load_made() {
+    let (_d, p) = db();
+    let o = run(&p, &["bench", "load", "200", "--batch", "50"], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert!(out(&o).contains("# mode=batch:50"), "{}", out(&o));
+    assert_eq!(count(&p), "200");
+    let o = run(&p, &["bench", "probe", "20"], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert!(out(&o).contains("# probe 20 per-put writes"), "{}", out(&o));
+    assert_eq!(count(&p), "220");
+    let o = run(&p, &["bench", "query"], "");
+    assert!(o.status.success() && out(&o).contains("by_subject(rare)"), "{}", err(&o));
+}
+
+#[test]
+fn bench_refuses_what_it_cannot_run() {
+    let (_d, p) = db();
+    for (args, why) in [
+        (vec!["bench"], "needs load"),
+        (vec!["bench", "nope"], "unknown bench subcommand"),
+        (vec!["bench", "load"], "N needs a number"),
+        (vec!["bench", "load", "0"], "at least 1"),
+        (vec!["bench", "load", "abc"], "not a number"),
+        (vec!["bench", "load", "10", "--bogus"], "unknown bench load flag"),
+    ] {
+        let o = run(&p, &args, "");
+        assert!(!o.status.success() && err(&o).contains(why), "{args:?}: {}", err(&o));
+    }
+}
