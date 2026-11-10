@@ -140,24 +140,44 @@ fn open(o: &Opts) -> Result<SqliteStore, Box<Error>> {
     Ok(s)
 }
 
-/// The signer, unless `--unsigned`. The key is minted here if it must be.
-fn signer(o: &Opts) -> Result<Option<sign::Signer>, Box<Error>> {
-    if o.unsigned {
-        return Ok(None);
+/// ats-dev's signing key, loaded (or minted) the first time something needs a
+/// signature made, never for reading, `--unsigned`, or a signature already given.
+struct Keys {
+    path: std::path::PathBuf,
+    unsigned: bool,
+    loaded: std::cell::OnceCell<sign::Signer>,
+}
+
+impl Keys {
+    fn of(o: &Opts) -> Self {
+        Keys { path: sign::key_path(o.key.as_deref(), &o.db), unsigned: o.unsigned, loaded: std::cell::OnceCell::new() }
     }
-    sign::Signer::load_or_mint(&sign::key_path(o.key.as_deref(), &o.db)).map(Some)
+
+    fn signer(&self) -> Result<Option<&sign::Signer>, Box<Error>> {
+        if self.unsigned {
+            return Ok(None);
+        }
+        if let Some(s) = self.loaded.get() {
+            return Ok(Some(s));
+        }
+        let s = sign::Signer::load_or_mint(&self.path)?;
+        Ok(Some(self.loaded.get_or_init(|| s)))
+    }
 }
 
 /// What is written: a signature already given is checked and kept, none given
 /// is made with ats-dev's key.
-fn seal(signer: &Option<sign::Signer>, a: Attestation) -> Result<Attestation, Box<Error>> {
+fn seal(keys: &Keys, a: Attestation) -> Result<Attestation, Box<Error>> {
+    if a.signature.is_none() && a.signer_did.is_some() {
+        return Err(fail("a signer without a signature", format!("{}: name a signature too, or neither", a.id)));
+    }
     if a.signature.is_some() {
         return match sign::verify(&a) {
             sign::Verdict::Invalid(why) => Err(fail("the signature given does not hold", format!("{}: {why}", a.id))),
             _ => Ok(a),
         };
     }
-    match signer {
+    match keys.signer()? {
         Some(sg) => sg.sign(a),
         None => Ok(a),
     }
@@ -254,6 +274,11 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     if !unknown.is_empty() {
         return Err(fail("not an attestation field", unknown.join(", ")));
     }
+    // A signature is made, not edited: a patch that names one could swap the
+    // signer of a row, or store one that does not hold.
+    if let Some(k) = ["signature", "signer_did"].into_iter().find(|k| patch.contains_key(*k)) {
+        return Err(fail("an update cannot name a signature", format!("{k}: ats-dev signs what it changes")));
+    }
     let id = patch.get("id").and_then(|v| v.as_str()).ok_or_else(|| fail("update needs an \"id\"", given))?;
     let mut s = open(o)?;
     let stored = s.get(id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", id))?;
@@ -267,7 +292,8 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     // A signature covers what was just changed. It stays only if it still
     // holds; else ats-dev re-signs what its own key signed, and refuses the rest.
     if stored.signature.is_some() && !matches!(sign::verify(&a), sign::Verdict::Valid(_)) {
-        let sg = signer(o)?.ok_or_else(|| {
+        let keys = Keys::of(o);
+        let sg = keys.signer()?.ok_or_else(|| {
             fail("the update breaks the signature", format!("{id}: --unsigned cannot keep a signed attestation signed"))
         })?;
         if stored.signer_did.as_deref() != Some(sg.did.as_str()) {
@@ -275,6 +301,10 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
                 "the update breaks a signature ats-dev cannot make",
                 format!("{id} is signed by {}, ats-dev's key is {}", stored.signer_did.as_deref().unwrap_or("?"), sg.did),
             ));
+        }
+        // The actors are under the signature; a signed row with none is out of every actor's claims.
+        if a.actors.is_empty() {
+            return Err(fail("a signed attestation must name its actors", format!("{id}: the update would leave none")));
         }
         a.signature = None;
         a.signer_did = None;
@@ -330,9 +360,9 @@ fn emit(a: &Attestation) -> Result<(), Box<Error>> {
 fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let what = tail.first().ok_or_else(|| fail("put needs a sentence or -", "ats-dev put \"A is p of C by X\""))?;
     let mut s = open(o)?;
-    let sg = signer(o)?;
+    let keys = Keys::of(o);
     if what.as_str() == "-" {
-        return put_stdin(&mut s, &sg);
+        return put_stdin(&mut s, &keys);
     }
     let parsed = Parser::parse(what).map_err(|e| fail("could not parse the sentence", e))?;
     if parsed.has_temporal() {
@@ -368,7 +398,7 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
             other => return Err(fail("unknown put flag", other)),
         }
     }
-    let a = seal(&sg, a)?;
+    let a = seal(&keys, a)?;
     s.put(a.clone()).map_err(|e| fail("put failed", e))?;
     emit(&a)
 }
@@ -418,14 +448,14 @@ fn complete(line: &str) -> Result<Attestation, Box<Error>> {
     Ok(a.authored_by(ACTOR))
 }
 
-fn put_stdin(s: &mut SqliteStore, sg: &Option<sign::Signer>) -> Result<(), Box<Error>> {
+fn put_stdin(s: &mut SqliteStore, keys: &Keys) -> Result<(), Box<Error>> {
     let mut batch: Vec<String> = Vec::new();
     let mut total = 0usize;
     for (n, line) in std::io::stdin().lock().lines().enumerate() {
         let line = line.map_err(|e| fail("could not read stdin", e))?;
         if line.trim().is_empty() { continue; }
         let at = n + 1;
-        let a = match complete(&line).and_then(|a| seal(sg, a)) {
+        let a = match complete(&line).and_then(|a| seal(keys, a)) {
             Ok(a) => a,
             Err(e) => return abandon(s, &batch, fail(&format!("line {at}: {}", e.title), e.why)),
         };

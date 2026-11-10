@@ -281,3 +281,76 @@ fn a_file_that_is_not_a_key_is_never_replaced() {
     assert!(!o.status.success() && err(&o).contains("not a key"), "{}", err(&o));
     assert_eq!(std::fs::read(&f).unwrap(), b"hello");
 }
+
+#[test]
+fn an_update_cannot_leave_a_signed_row_without_actors_or_name_a_signature() {
+    let (_d, p) = db();
+    let id = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
+    let o = run(&p, &["update", &format!("{{\"id\":\"{id}\",\"actors\":[]}}")], "");
+    assert!(!o.status.success() && err(&o).contains("must name its actors"), "{}", err(&o));
+    assert_eq!(out(&run(&p, &["actors"], "")).trim(), "BOB");
+    assert_eq!(verdicts(&p)[0]["signature"], "valid");
+
+    // a signature is made, not edited: not on a signed row, not on an unsigned one
+    for patch in [
+        format!("{{\"id\":\"{id}\",\"signer_did\":\"did:key:zFAKE\"}}"),
+        format!("{{\"id\":\"{id}\",\"signature\":[1,2,3]}}"),
+    ] {
+        let o = run(&p, &["update", &patch], "");
+        assert!(!o.status.success() && err(&o).contains("cannot name a signature"), "{}", err(&o));
+    }
+    let un = id_of(&run(&p, &["--unsigned", "put", "CAROL is author of GITHUB by BOB"], ""));
+    let o = run(&p, &["update", &format!("{{\"id\":\"{un}\",\"signature\":[1,2,3],\"signer_did\":\"did:key:zFAKE\"}}")], "");
+    assert!(!o.status.success());
+    assert!(verdicts(&p).iter().all(|v| v["signature"] != "invalid"));
+}
+
+#[test]
+fn a_signer_without_a_signature_is_refused_signed_or_not() {
+    let (_d, p) = db();
+    let line = "{\"subjects\":[\"X\"],\"predicates\":[\"p\"],\"actors\":[\"a\"],\"signer_did\":\"did:key:zFAKE\"}\n";
+    for flags in [vec!["--unsigned", "put", "-"], vec!["put", "-"]] {
+        let o = run(&p, &flags, line);
+        assert!(!o.status.success() && err(&o).contains("signer without a signature"), "{}", err(&o));
+    }
+    assert_eq!(count(&p), "0");
+}
+
+#[test]
+fn a_signature_already_made_needs_no_key_and_a_refused_input_mints_none() {
+    let (d, p) = db();
+    let line = out(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], "")).lines().next().unwrap().to_string();
+    let (_d2, q) = db();
+    let no_key = d.path().join("no-such-dir").join("k.key");
+    let o = run(&q, &["--key", no_key.to_str().unwrap(), "put", "-"], &line);
+    assert!(o.status.success(), "{}", err(&o));
+    assert_eq!(verdicts(&q)[0]["signature"], "valid");
+
+    let (_d3, r) = db();
+    let key = std::path::PathBuf::from(format!("{}.key", r.display()));
+    let o = run(&r, &["put", "-"], "{\"nonsense\":1}\n");
+    assert!(!o.status.success());
+    assert!(!key.exists(), "a refused input minted a key");
+}
+
+#[test]
+fn processes_minting_at_once_end_with_one_key_and_leave_nothing_behind() {
+    let d = tempfile::tempdir().unwrap();
+    let key = d.path().join("shared.key");
+    let handles: Vec<_> = (0..8)
+        .map(|i| {
+            let db = d.path().join(format!("{i}.db"));
+            let key = key.clone();
+            std::thread::spawn(move || {
+                let o = run(&db, &["--key", key.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
+                assert!(o.status.success(), "{}", err(&o));
+                let k = run(&db, &["--key", key.to_str().unwrap(), "key"], "");
+                serde_json::from_str::<serde_json::Value>(out(&k).trim()).unwrap()["did"].as_str().unwrap().to_string()
+            })
+        })
+        .collect();
+    let dids: Vec<String> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+    assert!(dids.iter().all(|x| x == &dids[0]), "{dids:?}");
+    let left: Vec<_> = std::fs::read_dir(d.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).filter(|n| n.ends_with(".tmp")).collect();
+    assert!(left.is_empty(), "{left:?}");
+}

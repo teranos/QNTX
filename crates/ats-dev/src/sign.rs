@@ -30,19 +30,28 @@ pub fn key_path(flag: Option<&str>, db: &str) -> PathBuf {
 
 impl Signer {
     /// The key at `path`, or a fresh one written there (0600) if there is none.
-    /// A file that exists and is not a key is an error, never replaced.
+    /// A file that exists and is not a key is an error, never replaced. Two
+    /// processes minting at once end with one key: the loser loads the winner's.
     pub fn load_or_mint(path: &Path) -> Result<Self, Box<Error>> {
-        let key = match std::fs::read(path) {
-            Ok(bytes) => laye_me::load(&bytes)
-                .map_err(|e| fail("the key file is not a key", format!("{}: {e}", path.display())))?,
+        match std::fs::read(path) {
+            Ok(bytes) => Self::from_file(path, &bytes),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 let k = laye_me::fresh();
                 let bytes = laye_me::to_bytes(&k).map_err(|e| fail("could not encode the key", e))?;
-                write_private(path, &bytes)?;
-                k
+                if publish_new(path, &bytes)? {
+                    return Self::from_keypair(k);
+                }
+                let bytes = std::fs::read(path)
+                    .map_err(|e| fail("could not read the key file", format!("{}: {e}", path.display())))?;
+                Self::from_file(path, &bytes)
             }
-            Err(e) => return Err(fail("could not read the key file", format!("{}: {e}", path.display()))),
-        };
+            Err(e) => Err(fail("could not read the key file", format!("{}: {e}", path.display()))),
+        }
+    }
+
+    fn from_file(path: &Path, bytes: &[u8]) -> Result<Self, Box<Error>> {
+        let key = laye_me::load(bytes)
+            .map_err(|e| fail("the key file is not a key", format!("{}: {e}", path.display())))?;
         Self::from_keypair(key)
     }
 
@@ -101,23 +110,29 @@ pub fn canonical(a: &Attestation) -> Result<String, Box<Error>> {
         .map_err(|e| fail("could not produce the bytes to sign", e))
 }
 
-#[cfg(unix)]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), Box<Error>> {
+/// The key, written whole to a private temporary file beside `path` and then
+/// linked into place, which fails if `path` exists: a reader never sees half a
+/// key, and nothing is replaced. `false` means someone else's key is there.
+fn publish_new(path: &Path, bytes: &[u8]) -> Result<bool, Box<Error>> {
     use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)
-        .and_then(|mut f| f.write_all(bytes))
-        .map_err(|e| fail("could not write the key file", format!("{}: {e}", path.display())))
-}
-
-#[cfg(not(unix))]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), Box<Error>> {
-    std::fs::write(path, bytes)
-        .map_err(|e| fail("could not write the key file", format!("{}: {e}", path.display())))
+    let tmp = PathBuf::from(format!("{}.{}.tmp", path.display(), std::process::id()));
+    let mut open = std::fs::OpenOptions::new();
+    open.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        open.mode(0o600);
+    }
+    let wrote = open.open(&tmp).and_then(|mut f| f.write_all(bytes).and_then(|()| f.sync_all()));
+    let linked = wrote.and_then(|()| std::fs::hard_link(&tmp, path));
+    let cleaned = std::fs::remove_file(&tmp);
+    match linked {
+        Ok(()) => cleaned
+            .map(|()| true)
+            .map_err(|e| fail("the key is written but its temporary copy is left", format!("{}: {e}", tmp.display()))),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+        Err(e) => Err(fail("could not write the key file", format!("{}: {e}", path.display()))),
+    }
 }
 
 #[cfg(test)]
