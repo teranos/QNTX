@@ -119,12 +119,17 @@ pub fn canonical(a: &Attestation) -> Result<String, Box<Error>> {
 /// other can reach is refused, as ssh refuses one: whoever can read it can sign
 /// as this identity.
 fn read_key(path: &Path) -> Result<Option<Vec<u8>>, Box<Error>> {
+    use std::io::Read;
     use std::os::unix::fs::PermissionsExt;
-    let meta = match std::fs::metadata(path) {
-        Ok(m) => m,
+    let unreadable = |e: std::io::Error| fail("could not read the key file", format!("{}: {e}", path.display()));
+    // One open, then the checks and the read through that handle: the file
+    // that was checked is the file that is read, whatever happens to the path.
+    let mut file = match std::fs::File::open(path) {
+        Ok(f) => f,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(fail("could not read the key file", format!("{}: {e}", path.display()))),
+        Err(e) => return Err(unreadable(e)),
     };
+    let meta = file.metadata().map_err(unreadable)?;
     if !meta.is_file() {
         return Err(fail("the key file is not a regular file", path.display()));
     }
@@ -135,9 +140,9 @@ fn read_key(path: &Path) -> Result<Option<Vec<u8>>, Box<Error>> {
             format!("{} is mode {mode:03o}; chmod 600 {}", path.display(), path.display()),
         ));
     }
-    std::fs::read(path)
-        .map(Some)
-        .map_err(|e| fail("could not read the key file", format!("{}: {e}", path.display())))
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).map_err(unreadable)?;
+    Ok(Some(bytes))
 }
 
 /// The key, written whole to a private temporary file beside `path` and then
