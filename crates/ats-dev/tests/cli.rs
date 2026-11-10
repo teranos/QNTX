@@ -526,3 +526,29 @@ fn bench_refuses_what_it_cannot_run() {
         assert!(!o.status.success() && err(&o).contains(why), "{args:?}: {}", err(&o));
     }
 }
+
+#[test]
+fn a_probe_continues_the_series_so_its_queries_read_what_a_load_of_that_size_reads() {
+    let line = |o: &Output, label: &str| -> String {
+        out(o).lines().find(|l| l.starts_with(label)).unwrap().split(',').take(2).collect::<Vec<_>>().join(",")
+    };
+    let (_d, p) = db();
+    run(&p, &["bench", "load", "300"], "");
+    let after_probe = run(&p, &["bench", "probe", "20"], "");
+    assert!(after_probe.status.success(), "{}", err(&after_probe));
+    let (_d2, q) = db();
+    let plain = run(&q, &["bench", "load", "320"], "");
+    for label in ["window(newest 1%)", "window(oldest 1%)", "by_actor(common)"] {
+        assert_eq!(line(&after_probe, label), line(&plain, label), "{label}");
+    }
+}
+
+#[test]
+fn the_bytes_written_are_printed_to_two_decimals_not_rounded_to_whole_megabytes() {
+    let (_d, p) = db();
+    let o = run(&p, &["bench", "load", "20", "--step", "20"], "");
+    let row = out(&o).lines().find(|l| l.starts_with("20,")).unwrap().to_string();
+    let written = row.split(',').nth(7).unwrap();
+    let (whole, frac) = written.split_once('.').unwrap_or((written, ""));
+    assert!(frac.len() == 2 && whole.parse::<u64>().is_ok(), "{row}");
+}

@@ -234,7 +234,7 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
             quantile(&mut lat, 0.99),
             file_mb(&o.db),
             file_mb(&format!("{}-wal", o.db)),
-            col(used.map(|u| u.write_bytes as f64 / 1e6), 0),
+            col(used.map(|u| u.write_bytes as f64 / 1e6), 2),
             used.map_or_else(|| "-".into(), |u| u.write_syscalls.to_string()),
         );
     }
@@ -253,8 +253,10 @@ fn probe(o: &Opts, n: Option<&String>) -> Result<(), Box<Error>> {
     let rows = s.count().map_err(|e| fail("count failed", e))?;
     let subjects = (rows as u64 / 10).max(100);
     let mut rng = Rng(SEED);
-    // ids that cannot meet the load's
-    let first = rows as u64 + 10_000_000;
+    // The series goes on where the load left off: ids and timestamps of rows
+    // `rows`.., so the queries, which are timed by the row count, read the same
+    // kind of rows after a probe as after a load of that many.
+    let first = rows as u64;
     let (io0, t0) = (io(), Instant::now());
     let mut lat = Vec::new();
     for i in (first..).take(usize::try_from(n).unwrap_or(usize::MAX)) {
