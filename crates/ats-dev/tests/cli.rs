@@ -658,6 +658,11 @@ fn holds_what_attestation_store_promises(backend: &[&str], db: &str, key: &str) 
     let id = out(&put).split("\"id\":\"").nth(1).unwrap().split('"').next().unwrap().to_string();
     // a new process each time: what one wrote is what the next reads
     assert_eq!(out(&r(&["count"])).trim(), "1");
+    // ids and verify list what count counts, or say they cannot; never fewer with an exit 0
+    for args in [vec!["ids"], vec!["verify"]] {
+        let o = r(&args);
+        assert!(!o.status.success() || out(&o).lines().count() == 1, "{args:?} exit {} listed {:?} of 1: {}", o.status, out(&o), err(&o));
+    }
     assert_eq!(out(&r(&["exists", &id])).trim(), "true");
     assert!(out(&r(&["get", &id])).contains("\"source\":\"ats-dev\""));
     let v = r(&["verify", &id]);
@@ -673,6 +678,13 @@ fn holds_what_attestation_store_promises(backend: &[&str], db: &str, key: &str) 
     let d = r(&["delete", &id]);
     let still = out(&r(&["exists", &id])).trim() == "true";
     assert_eq!(d.status.success(), !still, "delete exit {} but exists={still}: {}", d.status, err(&d));
+
+    // clear: cleared, or refused; never Ok with rows left
+    let again = r(&["put", "BOB is author of GITHUB by ALICE"]);
+    assert!(again.status.success(), "{}", err(&again));
+    let c = r(&["clear", "--yes"]);
+    let left = out(&r(&["count"])).trim().to_string();
+    assert_eq!(c.status.success(), left == "0", "clear exit {} but {left} left: {}", c.status, err(&c));
 
     // and what only SqliteStore implements is refused by name, not answered from nothing
     for (args, needs) in [
@@ -754,4 +766,27 @@ fn postgres_changes_what_it_is_asked_to_and_a_namespace_is_its_own() {
     assert_eq!(out(&run_on(&a, &url, &["count"], "")).trim(), "0");
     let gone = run_on(&a, &url, &["delete", &id], "");
     assert!(!gone.status.success() && err(&gone).contains("no such attestation"), "{}", err(&gone));
+}
+
+#[test]
+fn a_refused_bench_load_replace_deletes_nothing() {
+    let (d, p) = db();
+    assert!(run(&p, &["--unsigned", "put", "ALICE is author of GITHUB by BOB"], "").status.success());
+    let db = p.to_str().unwrap();
+    for backend in ["duckdb", "postgres"] {
+        let o = run_on(&["--backend", backend], db, &["bench", "load", "10", "--replace"], "");
+        assert!(!o.status.success() && err(&o).contains("this command is SQLite's"), "{backend}: {}", err(&o));
+        assert!(p.exists(), "{backend}: the SQLite file named by --db was deleted by a refused command");
+    }
+    assert_eq!(count(&p), "1");
+    drop(d);
+}
+
+#[test]
+fn a_duckdb_location_with_an_apostrophe_is_refused_before_anything_is_written() {
+    let d = tempfile::tempdir().unwrap();
+    let loc = d.path().join("O'Brien");
+    let o = run_on(&["--backend", "duckdb", "--unsigned"], loc.to_str().unwrap(), &["put", "ALICE is author of GITHUB"], "");
+    assert!(!o.status.success() && err(&o).contains("cannot contain an apostrophe"), "{}", err(&o));
+    assert!(!loc.exists(), "nothing was created");
 }

@@ -22,6 +22,7 @@ use ats_sqlite::store::build_query_sql;
 use ats_sqlite::SqliteStore;
 use sacred_error::Error;
 
+use crate::backend::Kind;
 use crate::{fail, open_sqlite, Opts};
 
 /// xorshift64: fixed seed, no dependency, the same stream on every machine.
@@ -172,6 +173,11 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
         }
     }
     let step = step.unwrap_or((total / 10).max(1));
+    // Before anything is looked at or removed: `--replace` deletes the files named by
+    // `--db`, and what another backend calls `--db` is not a SQLite file to replace.
+    if o.backend != Kind::Sqlite {
+        return Err(fail("this command is SQLite's", format!("--backend {} given", o.backend.name())));
+    }
     for suffix in ["", "-wal", "-shm"] {
         let f = format!("{}{suffix}", o.db);
         if std::path::Path::new(&f).exists() {

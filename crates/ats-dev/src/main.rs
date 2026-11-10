@@ -42,6 +42,10 @@
 //! is Postgres's CA file when the url is TLS; `--namespace` (default
 //! `ats-dev`) is the namespace both open. The signing key goes beside a path
 //! `--db`; for a url, name it with `--key` or `$ATS_DEV_KEY`.
+//!
+//! `duckdb` is one writer per location (ADR-024: "One node writes a namespace
+//! prefix"). `ats-dev` does not coordinate two processes writing the same one,
+//! and two that put the same id at once can both succeed.
 
 mod backend;
 mod bench;
@@ -195,6 +199,14 @@ fn open(o: &Opts) -> Result<Store, Box<Error>> {
     if o.backend != Kind::Postgres && o.ca.is_some() {
         return Err(fail("--ca is Postgres's", format!("--backend {} given", o.backend.name())));
     }
+    // ats-duckdb writes a file's path into a COPY statement inside quotes and does
+    // not escape it, so a location with an apostrophe fails at the first flush.
+    if o.backend == Kind::Duckdb && o.db.contains('\'') {
+        return Err(fail(
+            "a DuckDB location cannot contain an apostrophe",
+            format!("{}: ats-duckdb puts it inside a quoted SQL string, unescaped", o.db),
+        ));
+    }
     match o.backend {
         Kind::Sqlite => Ok(Store::Sqlite(open_sqlite(o)?)),
         #[cfg(feature = "duckdb")]
@@ -319,7 +331,7 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
             println!("{yes}");
             Ok(())
         }
-        "ids" => lines(open(&o)?.ids().map_err(|e| fail("ids failed", e))?),
+        "ids" => lines(listed(&open(&o)?)?),
         "subjects" => lines(open(&o)?.sqlite("QueryStore")?.subjects().map_err(|e| fail("subjects failed", e))?),
         "predicates" => lines(open(&o)?.sqlite("QueryStore")?.predicates().map_err(|e| fail("predicates failed", e))?),
         "contexts" => lines(open(&o)?.sqlite("QueryStore")?.contexts().map_err(|e| fail("contexts failed", e))?),
@@ -360,7 +372,16 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
             }
             let mut s = open(&o)?;
             s.clear().map_err(|e| fail("clear failed", e))?;
-            s.persist()
+            s.persist()?;
+            // Cleared, or said so: Ok with rows left is a clear that did not reach them.
+            let left = s.count().map_err(|e| fail("count failed", e))?;
+            if left != 0 {
+                return Err(fail(
+                    "clear returned Ok, and the store still holds attestations",
+                    format!("{left} left ({})", s.kind().name()),
+                ));
+            }
+            Ok(())
         }
         "update" => update(&o, &tail),
         "key" => {
@@ -374,6 +395,22 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
         "alias" => alias(&o, &tail),
         other => Err(fail("unknown command", other)),
     }
+}
+
+/// Every id the store holds, or a refusal. `ids` and `count` are two questions
+/// to a store, and one that answers fewer ids than it counts (DuckDB's `ids` reads
+/// its buffer, `count` the Parquet files too) would make `verify` check nothing
+/// and say so with an exit 0.
+fn listed(s: &Store) -> Result<Vec<String>, Box<Error>> {
+    let ids = s.ids().map_err(|e| fail("ids failed", e))?;
+    let count = s.count().map_err(|e| fail("count failed", e))?;
+    if ids.len() != count {
+        return Err(fail(
+            "ids does not list every stored attestation",
+            format!("ids lists {}, count says {count} ({})", ids.len(), s.kind().name()),
+        ));
+    }
+    Ok(ids)
 }
 
 fn lines(v: Vec<String>) -> Result<(), Box<Error>> {
@@ -705,7 +742,7 @@ fn verify(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let s = open(o)?;
     let ids = match tail.first() {
         Some(id) => vec![id.to_string()],
-        None => s.ids().map_err(|e| fail("ids failed", e))?,
+        None => listed(&s)?,
     };
     let mut bad = 0usize;
     let mut out = std::io::stdout().lock();
