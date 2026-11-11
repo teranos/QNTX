@@ -4,7 +4,7 @@ package server
 //
 // 「[Opus 5.5] The wire is the pinned one, server/parity/otlp_v1.11.0_790608c: a sender's OTLP」
 // 「[Opus 5.5] base endpoint is <node>/ix/otel, and the specification appends the signal's path,」
-// 「[Opus 5.5] v1/traces or v1/metrics, to it. Binary protobuf and JSON bodies, gzip or not, answered in the」
+// 「[Opus 5.5] v1/traces, v1/metrics or v1/logs, to it. Binary protobuf and JSON bodies, gzip or not, answered in the」
 // 「[Opus 5.5] Content-Type they came in.」
 //
 // 「[Opus 5.5] Who may send is the reach table's line and the token's own namespace and WRITE」
@@ -28,6 +28,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
+	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -41,6 +42,7 @@ const (
 	ixOtelPrefix  = "/ix/otel/"
 	ixOtelTraces  = ixOtelPrefix + "v1/traces"
 	ixOtelMetrics = ixOtelPrefix + "v1/metrics"
+	ixOtelLogs    = ixOtelPrefix + "v1/logs"
 )
 
 // 「[Opus 5.5] The two encodings OTLP/HTTP carries, by the Content-Type each MUST be sent with.」
@@ -93,8 +95,25 @@ func (s *QNTXServer) HandleIxOtel(w http.ResponseWriter, r *http.Request) {
 			}
 			return answer, nil
 		})
+	case ixOtelLogs:
+		s.takeIn(w, r, encoding, &collogspb.ExportLogsServiceRequest{}, func(admitted auth.Admission, store ats.AttestationStore, export proto.Message) (proto.Message, error) {
+			logs, isLogs := export.(*collogspb.ExportLogsServiceRequest)
+			if !isLogs {
+				return nil, errors.Newf("ix/otel decoded %T for logs", export)
+			}
+			rejected, why, err := s.keepRecords(admitted, store, logs)
+			if err != nil {
+				return nil, err
+			}
+			answer := &collogspb.ExportLogsServiceResponse{}
+			if rejected > 0 {
+				answer.PartialSuccess = &collogspb.ExportLogsPartialSuccess{RejectedLogRecords: rejected, ErrorMessage: why}
+				s.logger.Warnw("ix/otel rejected log records of an export", "rejected", rejected, "why", why)
+			}
+			return answer, nil
+		})
 	default:
-		otlpRefuse(w, s, encoding, http.StatusNotFound, fmt.Sprintf("ix/otel takes %s and %s, and %s is no signal it takes", ixOtelTraces, ixOtelMetrics, r.URL.Path))
+		otlpRefuse(w, s, encoding, http.StatusNotFound, fmt.Sprintf("ix/otel takes %s, %s and %s, and %s is no signal it takes", ixOtelTraces, ixOtelMetrics, ixOtelLogs, r.URL.Path))
 	}
 }
 
