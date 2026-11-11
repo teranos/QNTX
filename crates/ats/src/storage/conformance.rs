@@ -257,9 +257,22 @@ impl<S: AttestationStore> Run<'_, S> {
         let put = self.s()?.put(a.clone());
         self.ok("put", put);
         self.boundary(reopen)?;
+        // Every field an update can change, so a store that drops one is seen.
+        // `created_at` stays as it was: whether an update may rewrite it is not
+        // the trait's to say yet, and both answers then agree.
         let mut changed = a.clone();
-        changed.source = "changed".to_string();
         changed.subjects = vec!["ZED".to_string()];
+        changed.predicates = vec!["knew".to_string()];
+        changed.contexts = vec!["home".to_string()];
+        changed.actors = vec!["human:carol".to_string()];
+        changed.timestamp += 1_000;
+        changed.source = "changed".to_string();
+        changed.attributes = HashMap::from([
+            ("k".to_string(), serde_json::json!({ "n": 2.5 })),
+            ("z".to_string(), serde_json::json!("text")),
+        ]);
+        changed.signature = Some(vec![1, 2, 3]);
+        changed.signer_did = Some("did:key:zconformance".to_string());
         let upd = self.s()?.update(changed.clone());
         let upd_ok = self.ok("update", upd).is_some();
         // What is stored is what is asked about: now, and in a case that crosses
@@ -274,8 +287,8 @@ impl<S: AttestationStore> Run<'_, S> {
                 continue;
             };
             let at = if after { "after update and reopen" } else { "after update" };
-            if upd_ok && (got.source != changed.source || got.subjects != changed.subjects) {
-                self.miss(at, format!("source {:?}, subjects {:?}", changed.source, changed.subjects), (got.source, got.subjects));
+            if upd_ok && got != changed {
+                self.miss(at, format!("{changed:?}"), got);
             }
         }
         let mut gone = self.make(1);
@@ -416,6 +429,8 @@ mod tests {
         buffer: HashMap<String, Attestation>,
         /// Takes what `writable` refuses, as Postgres did.
         lax: bool,
+        /// Keeps the old predicates on update, as a store that persists only some fields.
+        lossy: bool,
     }
 
     impl AttestationStore for Buffered {
@@ -443,7 +458,11 @@ mod tests {
                 return Err(StoreError::NotFound(a.id));
             }
             if let Some(slot) = self.buffer.get_mut(&a.id) {
+                let kept = slot.predicates.clone();
                 *slot = a;
+                if self.lossy {
+                    slot.predicates = kept;
+                }
             }
             Ok(())
         }
@@ -486,6 +505,14 @@ mod tests {
         let found = check(Buffered { lax: true, ..Buffered::default() }, &mut same, "lax", false);
         let cases: std::collections::BTreeSet<&str> = found.iter().map(|v| v.case.as_str()).collect();
         assert_eq!(cases.into_iter().collect::<Vec<_>>(), ["refuses_unwritable"], "{found:#?}");
+    }
+
+    #[test]
+    fn a_store_that_persists_only_some_fields_of_an_update_is_reported_in_the_session() {
+        let mut same = |s: Buffered| Ok(s);
+        let found = check(Buffered { lossy: true, ..Buffered::default() }, &mut same, "lossy", false);
+        let cases: std::collections::BTreeSet<&str> = found.iter().map(|v| v.case.as_str()).collect();
+        assert!(cases.contains("update/same_session"), "{found:#?}");
     }
 
     #[test]
