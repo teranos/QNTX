@@ -293,3 +293,54 @@ func TestIxOtelIsReachedAsAWriteOfAttestations(t *testing.T) {
 		t.Fatalf("%s is reached by %v, and /api/attestations by %v", ixOtelPrefix, reached[ixOtelPrefix], reached["/api/attestations"])
 	}
 }
+
+// One export is one JSON value: something after it is no export.
+func TestJSONWithSomethingAfterTheExportIs400(t *testing.T) {
+	s, _, markets := standServer(t, "pond")
+	body := `{"resourceSpans":[]} {"resourceSpans":[]}`
+	refusedWith(t, exporting(s, pondToken("*"), ixOtelTraces, "application/json", "", []byte(body)), http.StatusBadRequest)
+	if kept := everythingIn(t, markets["pond"]); len(kept) != 0 {
+		t.Fatalf("pond holds %v from a body that was no export", kept)
+	}
+}
+
+// A field the schema does not know is discarded, whatever it is named.
+func TestAnUnknownFieldNamedLikeAnIdIsDiscarded(t *testing.T) {
+	s, _, markets := standServer(t, "pond")
+	body := `{"resourceSpans":[{"resource":{"attributes":[],"spanId":"not hex"},` +
+		`"scopeSpans":[{"spans":[{"traceId":"` + sentTrace + `","spanId":"` + sentSpan + `","name":"anthropic.session.turn"}]}]}]}`
+	rec := exporting(s, pondToken("*"), ixOtelTraces, "application/json", "", []byte(body))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	if kept := everythingIn(t, markets["pond"]); len(kept) != 1 {
+		t.Fatalf("pond holds %d attestations, want the one span", len(kept))
+	}
+}
+
+// An all-zero trace or span id is invalid in OTLP, and would make every such
+// span one attestation.
+func TestASpanWithAZeroIdIsRejected(t *testing.T) {
+	s, _, markets := standServer(t, "pond")
+	export := oneSpan(t)
+	export.ResourceSpans[0].ScopeSpans[0].Spans[0].SpanId = make([]byte, 8)
+	said := answered(t, exporting(s, pondToken("*"), ixOtelTraces, "application/x-protobuf", "", protobufOf(t, export)))
+	if said.GetPartialSuccess().GetRejectedSpans() != 1 {
+		t.Fatalf("partial_success = %v, want the zero-id span rejected", said.GetPartialSuccess())
+	}
+	if kept := everythingIn(t, markets["pond"]); len(kept) != 0 {
+		t.Fatalf("pond holds %v, a span with a zero id", kept)
+	}
+}
+
+// A start past int64's nanoseconds is kept at its own time, not wrapped into the past.
+func TestAStartPastInt64NanosecondsIsNotWrapped(t *testing.T) {
+	s, _, markets := standServer(t, "pond")
+	export := oneSpan(t)
+	export.ResourceSpans[0].ScopeSpans[0].Spans[0].StartTimeUnixNano = 1<<63 + 1e9
+	answered(t, exporting(s, pondToken("*"), ixOtelTraces, "application/x-protobuf", "", protobufOf(t, export)))
+	kept := everythingIn(t, markets["pond"])
+	if len(kept) != 1 || kept[0].Timestamp.Year() < 2262 {
+		t.Fatalf("kept %v, want the span at its start after 2262", kept)
+	}
+}

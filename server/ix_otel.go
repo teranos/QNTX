@@ -168,7 +168,11 @@ func otlpDecode(encoding string, body []byte, into proto.Message) error {
 	if err := decoder.Decode(&said); err != nil {
 		return err
 	}
-	if err := otlpIDs(said, hexToBase64); err != nil {
+	// One export is one JSON value; anything after it is no export.
+	if _, err := decoder.Token(); err != io.EOF {
+		return errors.New("the body holds more than one JSON value")
+	}
+	if err := otlpExportIDs(said); err != nil {
 		return err
 	}
 	mapped, err := json.Marshal(said)
@@ -204,6 +208,61 @@ func otlpIDs(v any, turn func(string) (string, error)) error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// otlpExportIDs turns the hex ids of an ExportTraceServiceRequest's spans and
+// their links, where the schema has them: a field of that name the schema does
+// not know is left to be discarded, whatever it holds.
+func otlpExportIDs(export any) error {
+	for _, resource := range otlpList(export, "resourceSpans") {
+		for _, scope := range otlpList(resource, "scopeSpans") {
+			for _, span := range otlpList(scope, "spans") {
+				if err := otlpIDsOf(span, "traceId", "spanId", "parentSpanId"); err != nil {
+					return err
+				}
+				for _, link := range otlpList(span, "links") {
+					if err := otlpIDsOf(link, "traceId", "spanId"); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// otlpZero is whether an id is all zero bytes, which OTLP names invalid.
+func otlpZero(id []byte) bool {
+	for _, b := range id {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// otlpList is the list under key of an object, or none.
+func otlpList(v any, key string) []any {
+	object, _ := v.(map[string]any)
+	list, _ := object[key].([]any)
+	return list
+}
+
+// otlpIDsOf turns the hex ids named keys of one object.
+func otlpIDsOf(v any, keys ...string) error {
+	object, _ := v.(map[string]any)
+	for _, key := range keys {
+		said, isText := object[key].(string)
+		if !isText {
+			continue
+		}
+		turned, err := hexToBase64(said)
+		if err != nil {
+			return errors.Wrapf(err, "%s %q", key, said)
+		}
+		object[key] = turned
 	}
 	return nil
 }
@@ -265,8 +324,8 @@ func (s *QNTXServer) keepSpans(admitted auth.Admission, store ats.AttestationSto
 			for _, span := range scopeSpans.GetSpans() {
 				trace, spanID := hex.EncodeToString(span.GetTraceId()), hex.EncodeToString(span.GetSpanId())
 				switch {
-				case len(span.GetTraceId()) != 16 || len(span.GetSpanId()) != 8:
-					reject(fmt.Sprintf("span %q names trace %q and span %q, and a span is a 16-byte trace id and an 8-byte span id", span.GetName(), trace, spanID))
+				case len(span.GetTraceId()) != 16 || len(span.GetSpanId()) != 8 || otlpZero(span.GetTraceId()) || otlpZero(span.GetSpanId()):
+					reject(fmt.Sprintf("span %q names trace %q and span %q, and a span is a 16-byte trace id and an 8-byte span id, neither all zero", span.GetName(), trace, spanID))
 					continue
 				case span.GetName() == "":
 					reject(fmt.Sprintf("span %s of trace %s names nothing it did", spanID, trace))
@@ -294,7 +353,8 @@ func (s *QNTXServer) keepSpans(admitted auth.Admission, store ats.AttestationSto
 				now := time.Now()
 				at := now
 				if started := span.GetStartTimeUnixNano(); started != 0 {
-					at = time.Unix(0, int64(started)).UTC()
+					// Unsigned nanoseconds, split so one past int64's range does not wrap.
+					at = time.Unix(int64(started/1e9), int64(started%1e9)).UTC()
 				}
 				err = store.CreateAttestation(&types.As{
 					ID:         id,
