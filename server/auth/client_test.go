@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A client is a door: both ends are the same hand. ROOT mints it
+// 「[Opus 5.5] A client is a door: both ends are the same hand. ROOT mints it」
 // with the return address its codes go to, the way ROOT writes a door's
 // origin in am.toml, and the one namespace its connector acts in (ADR-038).
 

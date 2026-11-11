@@ -163,7 +163,7 @@ func TestASignedAttestationThroughATokenIsRefused(t *testing.T) {
 	}
 }
 
-// A token is an ed25519 seed, so its holder can sign as it: on k the
+// 「[Opus 5.5] A token is an ed25519 seed, so its holder can sign as it: on k the」
 // root token signed with its own seed and was refused as a key no User holds.
 func TestATokenSigningAsItselfIsStoredAsSigned(t *testing.T) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)

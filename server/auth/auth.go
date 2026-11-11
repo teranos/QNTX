@@ -346,8 +346,8 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	// The token names its own namespace, so this is where a request is routed
 	// rather than defaulted.
 	if grant := p.Bearer; grant != nil {
-		// A client authenticates at the token endpoint and nowhere else.
-		// The secret an app holds is not a credential that reaches
+		// 「[Opus 5.5] A client authenticates at the token endpoint and nowhere else.」
+		// 「[Opus 5.5] The secret an app holds is not a credential that reaches」
 		// a route, whoever minted it.
 		if grant.Level == LevelOAuth {
 			h.logger.Infow("Bearer token refused",
@@ -371,7 +371,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 				"reason", "a GitHub token is not a bearer")
 			return Admission{}, false
 		}
-		// A token speaks for whoever minted it, so striking them out
+		// 「[Opus 5.5] A token speaks for whoever minted it, so striking them out」
 		// of am.toml has to reach it too. An empty list strikes out everyone.
 		if !h.stillAdmitted(grant.MintedBy) {
 			h.logger.Infow("Bearer token refused",
@@ -558,14 +558,14 @@ func (h *Handler) holdingsOf(identity, namespace string) ([]string, bool) {
 
 // RegisterRoutes registers all /auth/* routes on the default mux.
 // Ceremony routes use CORS middleware but bypass auth middleware.
-// Token management routes require an authenticated passkey
+// 「[Opus 5.5] Token management routes require an authenticated passkey」
 // session — bearer tokens cannot mint new tokens.
 // Routes is what this package can answer, by the path it answers on.
 
 // It hands them back rather than registering them. A package that could put a
 // route on the mux itself would be a second way onto it, and there is one way
 // and it is a line in server/reach.
-// MintedBy is who a token speaks for, by its DID. What a token
+// 「[Opus 5.5] MintedBy is who a token speaks for, by its DID. What a token」
 // wrote is filed under its DID; what is left for it on the row is filed
 // under the person, so the person's other tokens and their session see it.
 func (h *Handler) MintedBy(did string) (string, bool) {
@@ -620,7 +620,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(homewardResultPath, h.handleHomewardResult)
 	// Who sent the person home, so the face can name them.
 	mux.answer(journeyPath, h.handleJourney)
-	// A client is a door: it sends the person here, the passkey is
+	// 「[Opus 5.5] A client is a door: it sends the person here, the passkey is」
 	// done at home, and the code goes back by ticket through the done page.
 	mux.answer(authorizePath, h.handleAuthorize)
 	mux.answer(authorizeDonePath, h.handleAuthorizeDone)
@@ -742,7 +742,7 @@ func (h *Handler) readOrSession(next gated) http.HandlerFunc {
 }
 
 // sessionOnly gates a handler on a valid passkey session cookie. Bearer
-// tokens are rejected: a token mints no token.
+// 「[Opus 5.5] tokens are rejected: a token mints no token.」
 func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := h.presented(r)

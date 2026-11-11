@@ -9,7 +9,7 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// A client is a door. A door in am.toml is answered by the origin
+// 「[Opus 5.5] A client is a door. A door in am.toml is answered by the origin」
 // it was named after; a client is answered by its DID, and what it answers is
 // where its codes go — written by the same hand at minting. returnableTo
 // sends somebody only where am.toml already said; returnableToClient sends a

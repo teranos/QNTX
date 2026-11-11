@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-12
-**Related:** [[ADR-010-identity-system]], ADR-012 (Browser WASM Parity), ADR-014 (plugin-provided service), ADR-026 (Namespaces), ADR-027 (Permissions)
+「[Opus 5.5] **Related:** [[ADR-010-identity-system]], ADR-012 (Browser WASM Parity), ADR-014 (plugin-provided service), ADR-026 (Namespaces), ADR-027 (Permissions)」
 
 ## Decision
 

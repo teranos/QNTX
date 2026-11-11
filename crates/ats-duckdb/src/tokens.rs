@@ -1,4 +1,4 @@
-//! Access token records for the parquet backend.
+//! 「[Opus 5.5] Access token records for the parquet backend.」
 //!
 //! One object per token under `<location>/access_tokens/`, rewritten on
 //! change — the "small config" shape from ADR-024. Not Parquet, not a DuckDB
@@ -61,7 +61,7 @@ pub struct TokenRecord {
     /// record does not live under the namespaces it names.
     #[serde(default)]
     pub namespaces: Namespaces,
-    /// Where a client's codes are sent. A client's, and only a
+    /// 「[Opus 5.5] Where a client's codes are sent. A client's, and only a」
     /// client's; empty on every other kind.
     #[serde(default)]
     pub return_address: String,

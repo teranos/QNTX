@@ -178,7 +178,7 @@ type parkedCode struct {
 // is not yet anybody, single-use, and gone in minutes.
 //
 // The access token is the token QNTX already hands out, and lives where
-// tokens live now: the token store, through Issue.
+// 「[Opus 5.5] tokens live now: the token store, through Issue.」
 type oauthStore struct {
 	ClientDoors
 	h     *Handler

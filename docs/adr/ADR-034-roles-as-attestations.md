@@ -2,7 +2,7 @@
 
 **Status:** Accepted, with deep regret
 **Date:** 2026-09-06
-**Related:** ADR-027 (Permissions), ADR-031 (The User), #899, #909, #914
+「[Opus 5.5] **Related:** ADR-027 (Permissions), ADR-031 (The User), #899, #909, #914」
 
 ## Decision
 

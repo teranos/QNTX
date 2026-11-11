@@ -96,7 +96,7 @@ func TestAPublicRegistrationIsAnsweredWithItsDoorAndNamespace(t *testing.T) {
 	assert.Equal(t, "session", body["via"])
 }
 
-// A token speaks for whoever minted it. The answer is that person's
+// 「[Opus 5.5] A token speaks for whoever minted it. The answer is that person's」
 // User, and it says the request came in on a token rather than a session.
 func TestATokenIsAnsweredWithTheMintersUserAndSaysSo(t *testing.T) {
 	h := testHandler()

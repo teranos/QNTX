@@ -8,7 +8,7 @@ Server binds to `127.0.0.1` by default (loopback only). Configurable via `[serve
 
 Opt-in via `[auth] enabled = true`. Access gate — proves identity before the server responds. Not encryption.
 
-Two auth paths: WebAuthn biometric sessions (in-memory, `HttpOnly` cookie, expire after 24h configurable) for browser access, and, for machine access, a request signed by a key the node holds a grant for (`Authorization: Signed …`): "A signature proves the key, and nothing reusable leaves the node." "Tokens are to be removed from QNTX except for third-party OAuth clients"; those carry `Authorization: Bearer …`, and a bearer token mints and revokes no token.
+「[Opus 5.5] Two auth paths: WebAuthn biometric sessions (in-memory, `HttpOnly` cookie, expire after 24h configurable) for browser access, and, for machine access, a request signed by a key the node holds a grant for (`Authorization: Signed …`): "A signature proves the key, and nothing reusable leaves the node." "Tokens are to be removed from QNTX except for third-party OAuth clients"; those carry `Authorization: Bearer …`, and a bearer token mints and revokes no token.」
 
 To manage tokens in the UI, open the **⍟ Self** element and click **⚿ Access Tokens** — there is no URL route.
 

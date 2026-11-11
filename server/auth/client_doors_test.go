@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A client is a door: answered by its DID, and what it answers is
+// 「[Opus 5.5] A client is a door: answered by its DID, and what it answers is」
 // where its codes go.
 
 const appReturn = "https://app.example/callback"

@@ -9,7 +9,7 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// TokenPrefix marks a raw token as this node's.
+// 「[Opus 5.5] TokenPrefix marks a raw token as this node's.」
 const TokenPrefix = "qntx_"
 
 // TokenSeedBytes is the length of the random half: 32 bytes, an ed25519 seed,
@@ -93,7 +93,7 @@ type IssuedToken struct {
 	Hash  string
 	DID   string
 	Label string
-	// Who said yes at the door, carried on the session.
+	// 「[Opus 5.5] Who said yes at the door, carried on the session.」
 	MintedBy            string
 	MintedByUser        string
 	MintedByDisplayName string
@@ -260,7 +260,7 @@ type GitHubSecret struct {
 }
 
 // MintToken draws the raw token and the DID it names: 32 random bytes,
-// hex-encoded, `qntx_` prefixed. The bytes are an ed25519 seed,
+// 「[Opus 5.5] hex-encoded, `qntx_` prefixed. The bytes are an ed25519 seed,」
 // so the token has a public half worth naming and its holder can sign as it.
 //
 // The one place a token is drawn, whether the mint element asks the store or
