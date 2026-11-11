@@ -105,6 +105,8 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's git was not set up, so nothing was said to it: " + err.Error()}
 		}
 	}
+	// 「[Opus 5.5] Its spans go to the node's own ix/otel, under its own token.」
+	itsGit = append(itsGit, s.harnessOTel(agent)...)
 	// Its ground is the one its hooks run (ADR-050, Hosted agents under ground),
 	// and the node's Claude Code the one a ritual it performs starts its agent with (ground ritual/run.d).
 	if !t.withoutClaude {
