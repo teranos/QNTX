@@ -705,6 +705,11 @@
         "ROOT"
       ]
     },
+    "/api/vault/repository": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/vault/send": {
       "x-qntx-reach": [
         "ROOT"
