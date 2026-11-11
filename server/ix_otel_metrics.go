@@ -97,10 +97,9 @@ func (s *QNTXServer) keepNumbers(admitted auth.Admission, store ats.AttestationS
 		}
 	}
 	actors := s.otlpActors(admitted)
-	sender := ""
-	if admitted.Grant != nil {
-		sender = admitted.Grant.DID
-	}
+	// Who sent it is who the kept point is attested by, a session's person as
+	// much as a token.
+	sender := strings.Join(actors, "\x00")
 	for _, resourceMetrics := range export.GetResourceMetrics() {
 		service := otlpServiceOf(resourceMetrics.GetResource().GetAttributes())
 		resource, err := otlpJSONOf(resourceMetrics.GetResource())

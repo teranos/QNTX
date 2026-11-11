@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/teranos/QNTX/server/auth"
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
@@ -140,4 +141,21 @@ func asJSON(t *testing.T, v any) string {
 		t.Fatal(err)
 	}
 	return string(said)
+}
+
+// Two people in one namespace sending the same reading are two readings: who
+// sent it is in a number's id, a session's person as much as a token.
+func TestTheSameNumberFromTwoPeopleIsKeptTwice(t *testing.T) {
+	s, _, markets := standServer(t, "pond")
+	body := protobufOf(t, twoNumbers())
+	for _, who := range []string{"passkey:one", "passkey:two"} {
+		person := auth.Admitted(auth.LevelAttestor, "pond")
+		person.Identity = who
+		person = auth.Saying(auth.Holding(person, "observer"), auth.Words{Write: []string{"*"}, Read: []string{"*"}})
+		rec := exporting(s, person, ixOtelMetrics, "application/x-protobuf", "", body)
+		metricsAnswered(t, rec.Code, rec.Body.Bytes())
+	}
+	if kept := everythingIn(t, markets["pond"]); len(kept) != 4 {
+		t.Fatalf("pond holds %d attestations after two people sent the same two numbers, want 4", len(kept))
+	}
 }
