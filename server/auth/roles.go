@@ -322,8 +322,8 @@ func (h *Handler) rolesHeld(reaches func(route string) bool, namespace string) [
 // predicates.
 
 // A ROOT session may. A SUPER token may when ROOT minted it: a SUPER token is
-// ROOT's own reach handed to a token (ADR-034), and a token speaks
-// for whoever minted it, so the minter is asked too.
+// 「[Opus 5.5] ROOT's own reach handed to a token (ADR-034), and a token speaks」
+// 「[Opus 5.5] for whoever minted it, so the minter is asked too.」
 // An ATTESTOR token is the narrow one, and writes no policy however it was
 // minted: every token here is ROOT's, and a leaked ATTESTOR granting itself
 // a role would be the narrowing undone. Everyone else is refused, including
