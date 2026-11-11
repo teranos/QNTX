@@ -9,17 +9,17 @@
 //! ats-dev [--db FILE] ax "ALICE is author of GITHUB since last month" [--limit N]
 //! ats-dev [--db FILE] get ID
 //! ats-dev [--db FILE] count
-//! ats-dev [--db FILE] exists ID                 # prints true or false
-//! ats-dev [--db FILE] ids
-//! ats-dev [--db FILE] update '{"id":"AS-…","attributes":{…}}'   # the given fields replace the stored ones
-//! ats-dev [--db FILE] delete ID
-//! ats-dev [--db FILE] clear --yes
-//! ats-dev [--db FILE] subjects | predicates | contexts | actors   # distinct values, one per line
-//! ats-dev [--db FILE] stats
+//! 「[Sonnet 5.5] ats-dev [--db FILE] exists ID                 # prints true or false」
+//! 「[Sonnet 5.5] ats-dev [--db FILE] ids」
+//! 「[Sonnet 5.5] ats-dev [--db FILE] update '{"id":"AS-…","attributes":{…}}'   # the given fields replace the stored ones」
+//! 「[Sonnet 5.5] ats-dev [--db FILE] delete ID」
+//! 「[Sonnet 5.5] ats-dev [--db FILE] clear --yes」
+//! 「[Sonnet 5.5] ats-dev [--db FILE] subjects | predicates | contexts | actors   # distinct values, one per line」
+//! 「[Sonnet 5.5] ats-dev [--db FILE] stats」
 //! ats-dev [--db FILE] key                       # the signing key's did:key and file (minted if there is none)
 //! ats-dev [--db FILE] bench load N [--step S] [--batch K] [--replace] | probe N | query   # see bench/README.md
 //! ats-dev [--db FILE] verify [ID]               # valid / invalid / unsigned, one line each; exit 1 if any is invalid
-//! ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X
+//! 「[Sonnet 5.5] ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X」
 //! ```
 //!
 //! `put` signs with ats-dev's own ed25519 key (`--key`, else `$ATS_DEV_KEY`, else
@@ -442,8 +442,8 @@ fn lines(v: Vec<String>) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-/// The stored attestation with the given JSON fields laid over it. An update
-/// that named only `attributes` leaves everything else as it was.
+/// 「[Sonnet 5.5] The stored attestation with the given JSON fields laid over it. An update」
+/// 「[Sonnet 5.5] that named only `attributes` leaves everything else as it was.」
 fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let given = tail.first().ok_or_else(|| fail("update needs JSON", "ats-dev update '{\"id\":\"AS-…\",\"source\":\"x\"}'"))?;
     let patch: serde_json::Value = serde_json::from_str(given).map_err(|e| fail("not JSON", e))?;
@@ -507,7 +507,7 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     }
     s.update(a.clone()).map_err(|e| fail("update failed", e))?;
     s.persist()?;
-    // What is on disk, not what was asked for: `created_at` is kept as it was.
+    // 「[Sonnet 5.5] What is on disk, not what was asked for: `created_at` is kept as it was.」
     let kept = s.get(id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", id))?;
     // An update that said Ok but left something else stored is a store that
     // did not do what its trait says; say so, with both rows.
