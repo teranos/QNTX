@@ -18,7 +18,7 @@ func tokenRequest() *fosite.Request {
 }
 
 // fosite hands out the token Create hands out: 32 bytes, hex, qntx_-prefixed,
-// named by the SHA-256 the store keeps.
+// 「[Opus 5.5] named by the SHA-256 the store keeps.」
 func TestTokenStrategyIssuesAQNTXToken(t *testing.T) {
 	ctx := context.Background()
 	var s TokenStrategy
