@@ -243,7 +243,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
 		return s.accessLog(s.authGate(handler))
 	}
-	// A sqlite deployment has no token store,
+	// 「[Opus 5.5] A sqlite deployment has no token store,」
 	// and the bool says so by name. The nil store makes Middleware skip the
 	// bearer path and /auth/tokens answer 503.
 	spent, err := auth.ExpiredTokenHashes(s.nodeDB, time.Now().UTC().UnixMilli())
