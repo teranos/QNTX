@@ -140,7 +140,7 @@ func (s *QNTXServer) takeIn(w http.ResponseWriter, r *http.Request, encoding str
 		otlpRefuse(w, s, encoding, http.StatusBadRequest, fmt.Sprintf("the body is no %s: %v", export.ProtoReflect().Descriptor().Name(), err))
 		return
 	}
-	store, err := s.storeFor(r)
+	store, err := s.otlpStoreFor(r)
 	if err != nil {
 		otlpRefuse(w, s, encoding, http.StatusForbidden, err.Error())
 		return
@@ -154,6 +154,17 @@ func (s *QNTXServer) takeIn(w http.ResponseWriter, r *http.Request, encoding str
 		return
 	}
 	otlpAnswer(w, s, encoding, http.StatusOK, answer)
+}
+
+// "system (Recommended)"
+//
+// 「[Opus 5.5] otlpStoreFor is where an export is kept: system for one of ROOT's agents, which keeps its」
+// 「[Opus 5.5] sessions there, and otherwise the namespace the caller acts in.」
+func (s *QNTXServer) otlpStoreFor(r *http.Request) (ats.AttestationStore, error) {
+	if auth.ThroughARootsAgentsDoor(r.Context()) {
+		return s.held.WriteWhatTheNodeKnowsOfItself()
+	}
+	return s.storeFor(r)
 }
 
 // 「[Opus 5.5] otlpEncodingOf is the encoding the request's Content-Type names, or empty for one OTLP does not speak.」
