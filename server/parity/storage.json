@@ -312,6 +312,16 @@
     ]
   },
   {
+    "name": "issues_seen",
+    "sqlite": true,
+    "duckdb": false,
+    "postgres": false,
+    "rebuilt": false,
+    "sites": [
+      "server/issues_kept.go"
+    ]
+  },
+  {
     "name": "job_checkpoints",
     "sqlite": true,
     "duckdb": false,
