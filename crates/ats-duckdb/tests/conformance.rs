@@ -1,20 +1,20 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-//! `DuckdbStore` against `AttestationStore`'s contract. `reopen` drops the
-//! store, which flushes the buffer to a Parquet file, and opens the location
-//! again: a new process's view of what the first one left.
+//! 「[Sonnet 5.5] `DuckdbStore` against `AttestationStore`'s contract. `reopen` drops the」
+//! 「[Sonnet 5.5] store, which flushes the buffer to a Parquet file, and opens the location」
+//! 「[Sonnet 5.5] again: a new process's view of what the first one left.」
 //!
-//! DuckDB does not meet the contract after a flush, and this test says exactly
-//! where. `ids`, `delete`, `update` and `clear` run against the in-memory buffer
-//! table; `get`, `exists` and `count` also read the Parquet files. ADR-024 says
-//! "Files are immutable once written" and defines no delete or update for them,
-//! so a row in a file cannot be changed through the trait: `update` returns
-//! `Ok(())` and `delete` returns `false` with the row still there.
+//! 「[Sonnet 5.5] DuckDB does not meet the contract after a flush, and this test says exactly」
+//! 「[Sonnet 5.5] where. `ids`, `delete`, `update` and `clear` run against the in-memory buffer」
+//! 「[Sonnet 5.5] table; `get`, `exists` and `count` also read the Parquet files. ADR-024 says」
+//! 「[Sonnet 5.5] "Files are immutable once written" and defines no delete or update for them,」
+//! 「[Sonnet 5.5] so a row in a file cannot be changed through the trait: `update` returns」
+//! 「[Sonnet 5.5] `Ok(())` and `delete` returns `false` with the row still there.」
 //!
-//! `KNOWN` is that gap, by (case, step). The test fails on a violation that is
-//! not in it, and on an entry that no longer happens: whoever makes DuckDB do
-//! what the trait says, or makes the trait say what DuckDB can, removes the
-//! entry here. What a delete or an update means over immutable files is
-//! ADR-024's to decide; this list is not that decision.
+//! 「[Sonnet 5.5] `KNOWN` is that gap, by (case, step). The test fails on a violation that is」
+//! 「[Sonnet 5.5] not in it, and on an entry that no longer happens: whoever makes DuckDB do」
+//! 「[Sonnet 5.5] what the trait says, or makes the trait say what DuckDB can, removes the」
+//! 「[Sonnet 5.5] entry here. What a delete or an update means over immutable files is」
+//! 「[Sonnet 5.5] ADR-024's to decide; this list is not that decision.」
 
 use std::collections::BTreeSet;
 
