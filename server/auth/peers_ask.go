@@ -70,7 +70,7 @@ func (h *Handler) askPeer(ctx context.Context, admitted Admission, peer Client, 
 		answer.Err = errors.Wrapf(err, "nobody to carry to %s", peer.Label)
 		return answer
 	}
-	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, peer, namespaces, time.Now())
+	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, h.levelOf(person.String()), peer, namespaces, time.Now())
 	if err != nil {
 		answer.Err = errors.Wrapf(err, "this node did not sign to carry you to %s", peer.Label)
 		return answer
@@ -113,6 +113,6 @@ func (h *Handler) CarriedAs(admitted Admission, peer Client) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "nobody to carry to %s", peer.Label)
 	}
-	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, peer, peer.Namespaces, time.Now())
+	carriedAs, err := h.carriedSignature(person.String(), admitted.DisplayName, h.levelOf(person.String()), peer, peer.Namespaces, time.Now())
 	return carriedAs, errors.Wrapf(err, "this node did not sign to carry you to %s", peer.Label)
 }

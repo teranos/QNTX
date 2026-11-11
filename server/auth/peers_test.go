@@ -1,11 +1,15 @@
 package auth
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -163,6 +167,59 @@ func TestThePeerAdmitsThePersonCarriedAsItsOwnUser(t *testing.T) {
 	holding := handlerWithDoors(t)
 	holding.users = &memUsers{held: []User{{ID: "US-HERE", Level: LevelRoot, Accounts: []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}}}}}
 	assert.Equal(t, "US-HERE", carried(holding).UserID)
+}
+
+// A key signed in here reaches the peer as the person it speaks for, at its
+// grant's level and in the namespaces its grant reaches there: the signature
+// is spent here, and the peer is handed the primary's.
+//
+// "k should be delegating auth to the node entirely to q"
+func TestASignatureAdmittedHereIsCarriedAsItsGrant(t *testing.T) {
+	primary, served, got := primaryAndPeer(t, func() string { _, did := otherNode(t); return did }())
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	did := EncodeDIDKey(key.Public().(ed25519.PublicKey))
+	_, err = primary.tokens.Issue(IssuedToken{Hash: signedOnly(did), DID: did, Label: "ground on l", MintedBy: mastodonAccount,
+		Level: LevelAttestor, Namespaces: []string{NamespaceDefault}, ExpiresAt: NeverEnds()})
+	require.NoError(t, err)
+
+	r := toPeer("/api/attestations")
+	presented := signature(t, key, did, served, time.Minute)
+	r.Header.Set("Authorization", signedScheme+presented)
+	w := httptest.NewRecorder()
+	primary.handlePeer(w, r)
+	require.Equal(t, http.StatusTeapot, w.Code, w.Body.String())
+
+	carriedJWT, signed := strings.CutPrefix(got.authorization, signedScheme)
+	require.True(t, signed, "the key was not carried by a signature: %q", got.authorization)
+	assert.NotEqual(t, presented, carriedJWT, "the signature presented here went on to the peer")
+	var claims carriedClaims
+	_, _, err = jwt.NewParser().ParseUnverified(carriedJWT, &claims)
+	require.NoError(t, err)
+	assert.Equal(t, mastodonAccount, claims.Subject)
+	assert.Equal(t, string(LevelAttestor), claims.Level, "the grant was carried wider than it reaches here")
+	assert.Equal(t, []string{NamespaceDefault}, claims.Namespaces)
+}
+
+// A grant reaching none of the namespaces the peer serves carries none there.
+func TestAGrantCarriesNoNamespaceItDoesNotReach(t *testing.T) {
+	primary, served, got := primaryAndPeer(t, func() string { _, did := otherNode(t); return did }())
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	did := EncodeDIDKey(key.Public().(ed25519.PublicKey))
+	_, err = primary.tokens.Issue(IssuedToken{Hash: signedOnly(did), DID: did, Label: "ground on l", MintedBy: mastodonAccount,
+		Level: LevelAttestor, Namespaces: []string{"orchard"}, ExpiresAt: NeverEnds()})
+	require.NoError(t, err)
+
+	r := toPeer("/api/attestations")
+	r.Header.Set("Authorization", signedScheme+signature(t, key, did, served, time.Minute))
+	primary.handlePeer(httptest.NewRecorder(), r)
+	carriedJWT, signed := strings.CutPrefix(got.authorization, signedScheme)
+	require.True(t, signed, got.authorization)
+	var claims carriedClaims
+	_, _, err = jwt.NewParser().ParseUnverified(carriedJWT, &claims)
+	require.NoError(t, err)
+	assert.Empty(t, claims.Namespaces)
 }
 
 // A request that carries its own token goes as it came: the peer reads it.
