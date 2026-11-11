@@ -1050,6 +1050,15 @@
         "ANYONE"
       ]
     },
+    "/ix/otel/": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR"
+      ],
+      "x-qntx-prefix": true
+    },
     "/mcp": {
       "x-qntx-reach": [
         "ROOT",
