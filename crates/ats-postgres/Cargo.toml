@@ -13,7 +13,7 @@ workspace = true
 qntx-proto.workspace = true
 ats.workspace = true
 qntx-ffi-common = { path = "../qntx-ffi-common" }
-laye-error = { path = "../laye-error" }
+sacred-error.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
@@ -22,6 +22,10 @@ postgres = "0.19"
 # TLS is rustls on ring, which this workspace already builds.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 tokio-postgres-rustls = "0.13"
+
+[dev-dependencies]
+# storage::conformance, the check this backend runs on itself
+ats = { workspace = true, features = ["conformance"] }
 
 [lib]
 crate-type = ["rlib", "cdylib", "staticlib"]

@@ -93,10 +93,11 @@ func TestYugiDequeuesJob(t *testing.T) {
 	t.Log("  'It's time to duel!' *drew card job successfully*")
 }
 
-// TestTASBotJobPriority tests that TAS Bot's high-priority jobs are dequeued first
+// 「[Fable 5.1] TestTASBotJobPriority tests that the job that waited longest is dequeued first.」
+// 「[Fable 5.1] There is no priority on a job; what TAS Bot enqueued first, Yugi draws first.」
 func TestTASBotJobPriority(t *testing.T) {
-	t.Log("🎮 TAS Bot tests job priority ordering...")
-	t.Log("   'High-priority jobs must execute first for optimal speedrun'")
+	t.Log("🎮 TAS Bot tests job ordering...")
+	t.Log("   'The job that waited longest executes first'")
 
 	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
@@ -110,6 +111,7 @@ func TestTASBotJobPriority(t *testing.T) {
 		Status:      "queued",
 
 		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	queue.Enqueue(lowPriorityJob)
 
@@ -122,20 +124,21 @@ func TestTASBotJobPriority(t *testing.T) {
 		Source:      "fast_strat.html",
 		Status:      "queued",
 		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 	queue.Enqueue(highPriorityJob)
 
-	// Yugi dequeues - should get high-priority job first
+	// 「[Fable 5.1] Yugi dequeues - the job enqueued first has waited longest and comes first」
 	firstJob, err := queue.Dequeue()
 	if err != nil {
 		t.Fatalf("Failed to dequeue first job: %v", err)
 	}
 
-	if firstJob.ID != "JOB_HIGH_PRIORITY" {
-		t.Errorf("TAS Bot expected high-priority job first, got %s", firstJob.ID)
+	if firstJob.ID != "JOB_LOW_PRIORITY" {
+		t.Errorf("TAS Bot expected the job enqueued first to be dequeued first, got %s", firstJob.ID)
 	}
 
-	t.Log("✓ TAS Bot confirmed high-priority job dequeued first")
+	t.Log("✓ TAS Bot confirmed the job that waited longest was dequeued first")
 	t.Log("  'Optimal speedrun route achieved'")
 }
 
@@ -367,12 +370,11 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
-	// TAS Bot enqueues multiple jobs in sequence
-	// NOTE: Currently the queue is LIFO (Last-In-First-Out) due to DESC ordering
+	// 「[Fable 5.1] TAS Bot enqueues multiple jobs in sequence; Yugi draws them in that order.」
 	jobs := []Job{
-		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CreatedAt: time.Now()},
-		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CreatedAt: time.Now().Add(time.Millisecond)},
-		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_003", HandlerName: "test.jd-extraction", Source: "third.html", Status: "queued", CreatedAt: time.Now().Add(2 * time.Millisecond)},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_001", HandlerName: "test.jd-extraction", Source: "first.html", Status: "queued", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_002", HandlerName: "test.jd-extraction", Source: "second.html", Status: "queued", CreatedAt: time.Now().Add(time.Millisecond), UpdatedAt: time.Now().Add(time.Millisecond)},
+		{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: "JOB_INT_003", HandlerName: "test.jd-extraction", Source: "third.html", Status: "queued", CreatedAt: time.Now().Add(2 * time.Millisecond), UpdatedAt: time.Now().Add(2 * time.Millisecond)},
 	}
 
 	for _, job := range jobs {
@@ -384,7 +386,7 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 		time.Sleep(5 * time.Millisecond) // Ensure distinct timestamps
 	}
 
-	// Yugi processes jobs in LIFO order (newest first due to DESC ordering in store)
+	// 「[Fable 5.1] Yugi processes jobs in the order they were enqueued: the one that waited longest first」
 	processedOrder := []string{}
 	for i := 0; i < 3; i++ {
 		job, err := queue.Dequeue()
@@ -398,16 +400,16 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 		t.Logf("  Yugi: Processed %s", job.ID)
 	}
 
-	// Verify LIFO ordering (last job enqueued is first dequeued)
-	expectedOrder := []string{"JOB_INT_003", "JOB_INT_002", "JOB_INT_001"}
+	// 「[Fable 5.1] Verify the order: first enqueued is first dequeued」
+	expectedOrder := []string{"JOB_INT_001", "JOB_INT_002", "JOB_INT_003"}
 	for i, expected := range expectedOrder {
 		if processedOrder[i] != expected {
 			t.Errorf("Job %d: expected %s, got %s", i, expected, processedOrder[i])
 		}
 	}
 
-	t.Log("✓ Integration test complete: jobs processed in LIFO order")
-	t.Log("  TAS Bot: 'Frame-perfect LIFO ordering confirmed!'")
+	t.Log("✓ Integration test complete: jobs processed in the order enqueued")
+	t.Log("  TAS Bot: 'Frame-perfect ordering confirmed!'")
 	t.Log("  Yugi: 'It's time to duel!' *perfect card draw sequence*")
 }
 
@@ -1040,4 +1042,118 @@ func TestVacanciesScraperChildJobsContinue(t *testing.T) {
 	t.Log("✓ Noah's animals continue their journey after the ark's work is complete!")
 	t.Log("  'The parent completes, but the children must continue' - the vacancies workflow lives!")
 	t.Log("  Genesis 8:17 - 'Bring out with you every living thing... that they may multiply on the earth.'")
+}
+
+// "it has to be a place where we do like a stupid query"
+//
+// One count by status answers every ask within CountsHeldFor; a write forgets it.
+func TestOneCountAnswersEveryAskUntilAWrite(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	queue := NewQueue(db)
+
+	first := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+		ID: "JOB_COUNTED_001", HandlerName: "test.count", Source: "a", Status: JobStatusQueued, CreatedAt: time.Now()}
+	if err := queue.Enqueue(first); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	stats, err := queue.GetStats()
+	if err != nil {
+		t.Fatalf("GetStats: %v", err)
+	}
+	if stats.Queued != 1 {
+		t.Fatalf("queued = %d, want 1", stats.Queued)
+	}
+	takenAt := queue.counted.at
+
+	queued, running, err := queue.GetJobCounts()
+	if err != nil {
+		t.Fatalf("GetJobCounts: %v", err)
+	}
+	if queued != 1 || running != 0 {
+		t.Fatalf("counts = %d queued, %d running, want 1, 0", queued, running)
+	}
+	if !queue.counted.at.Equal(takenAt) {
+		t.Fatal("the second ask within CountsHeldFor took a new count")
+	}
+
+	second := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+		ID: "JOB_COUNTED_002", HandlerName: "test.count", Source: "b", Status: JobStatusQueued, CreatedAt: time.Now()}
+	if err := queue.Enqueue(second); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	stats, err = queue.GetStats()
+	if err != nil {
+		t.Fatalf("GetStats after a write: %v", err)
+	}
+	if stats.Queued != 2 {
+		t.Fatalf("queued after a write = %d, want 2: the write did not forget the held count", stats.Queued)
+	}
+}
+
+// "we also need to fix the actual issue, why is pulse failing in the first place"
+//
+// 「[Fable 5.1] The worker takes the job that waited longest; a newer one does not jump it.」
+func TestYugiDrawsTheOldestQueuedJob(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	queue := NewQueue(db)
+	mk := func(id string, at time.Time) {
+		t.Helper()
+		j := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+			ID: id, HandlerName: "test.order", Source: id, Status: JobStatusQueued, CreatedAt: at, UpdatedAt: at}
+		if err := queue.Enqueue(j); err != nil {
+			t.Fatalf("Enqueue(%s): %v", id, err)
+		}
+	}
+	mk("JOB_WAITED_LONGEST", time.Now().Add(-3*time.Hour))
+	mk("JOB_WAITED_LESS", time.Now().Add(-time.Hour))
+	mk("JOB_JUST_NOW", time.Now())
+
+	for _, want := range []string{"JOB_WAITED_LONGEST", "JOB_WAITED_LESS", "JOB_JUST_NOW"} {
+		job, err := queue.Dequeue()
+		if err != nil {
+			t.Fatalf("Dequeue: %v", err)
+		}
+		if job.ID != want {
+			t.Fatalf("dequeued %s, want %s", job.ID, want)
+		}
+	}
+	if _, err := queue.Dequeue(); !errors.Is(err, ErrJobNotFound) {
+		t.Fatalf("an empty queue answered %v, want ErrJobNotFound", err)
+	}
+}
+
+// 「[Fable 5.1] A job put back in the queue is touched, and stands behind every other queued」
+// 「[Fable 5.1] job: the worker does not take it again at once.」
+func TestAJobPutBackStandsBehindTheOthers(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	queue := NewQueue(db)
+	mk := func(id string, at time.Time) {
+		t.Helper()
+		j := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+			ID: id, HandlerName: "test.order", Source: id, Status: JobStatusQueued, CreatedAt: at, UpdatedAt: at}
+		if err := queue.Enqueue(j); err != nil {
+			t.Fatalf("Enqueue(%s): %v", id, err)
+		}
+	}
+	mk("JOB_NO_HANDLER", time.Now().Add(-2*time.Hour))
+	mk("JOB_NEXT", time.Now().Add(-time.Hour))
+
+	first, err := queue.Dequeue()
+	if err != nil || first.ID != "JOB_NO_HANDLER" {
+		t.Fatalf("first Dequeue = %v, %v; want JOB_NO_HANDLER", first, err)
+	}
+	// 「[Fable 5.1] What the worker does for a handler not yet registered.」
+	first.Status, first.UpdatedAt = JobStatusQueued, time.Now()
+	if err := queue.UpdateJob(first); err != nil {
+		t.Fatalf("UpdateJob: %v", err)
+	}
+
+	second, err := queue.Dequeue()
+	if err != nil {
+		t.Fatalf("second Dequeue: %v", err)
+	}
+	if second.ID != "JOB_NEXT" {
+		t.Fatalf("second Dequeue = %s, want JOB_NEXT: the job put back was taken again at once", second.ID)
+	}
 }

@@ -4,14 +4,14 @@
 //! Identity is IDB-backed: DB `laye-p2p-identity`, store `identity`, keys
 //! `self` (keypair) and `bindings`. The ceremony lives in the host.
 
-// LayeError carries ~184 bytes of context; unboxed is what lets a boundary
+// SacredError carries ~184 bytes of context; unboxed is what lets a boundary
 // emit straight through.
 #![allow(clippy::result_large_err)]
 
 use crate::error::{self as errpipe, build, build_panic};
 use crate::store::{IdentityStore, InMemoryStore, load_or_generate};
 use futures::channel::oneshot;
-use laye_error::{Error as LayeError, Severity};
+use sacred_error::{Error as SacredError, Severity};
 use laye_me::{Keypair, SignedBinding};
 use laye_net::{Net, NetConfig, NetDrive};
 use serde::Deserialize;
@@ -166,7 +166,7 @@ pub fn sign_attestation(attestation_json: String) -> Vec<u8> {
     }
 }
 
-fn sign_attestation_inner(attestation_json: &str) -> Result<Vec<u8>, LayeError> {
+fn sign_attestation_inner(attestation_json: &str) -> Result<Vec<u8>, SacredError> {
     STATE.with(|s| {
         let st = s.borrow();
         let net = st.net.as_ref().ok_or_else(|| {
@@ -214,7 +214,7 @@ pub fn errors() -> String {
     serde_json::to_string(&errpipe::peek_all()).unwrap_or_else(|_| "[]".to_string())
 }
 
-fn sign_inner(bytes: &[u8]) -> Result<Vec<u8>, LayeError> {
+fn sign_inner(bytes: &[u8]) -> Result<Vec<u8>, SacredError> {
     STATE.with(|s| {
         let st = s.borrow();
         let net = st.net.as_ref().ok_or_else(|| {
@@ -238,7 +238,7 @@ fn sign_inner(bytes: &[u8]) -> Result<Vec<u8>, LayeError> {
     })
 }
 
-async fn init_inner(config_json: String) -> Result<(), LayeError> {
+async fn init_inner(config_json: String) -> Result<(), SacredError> {
     let config: BootConfig = serde_json::from_str(&config_json).map_err(|e| {
         build(
             Severity::Error,
@@ -384,7 +384,7 @@ async fn drive_forever(drive: NetDrive) {
     drive.await;
 }
 
-fn handle_login_message(json_str: &str) -> Result<(), LayeError> {
+fn handle_login_message(json_str: &str) -> Result<(), SacredError> {
     let msg: BrokerMessageWire = serde_json::from_str(json_str).map_err(|e| {
         build(
             Severity::Warn,
@@ -483,7 +483,7 @@ fn handle_login_message(json_str: &str) -> Result<(), LayeError> {
 
 /// The 32 raw bytes behind this keypair's public half. did:key, the peer hex
 /// and a binding claim are all this value in another encoding.
-fn self_ed25519_pubkey(kp: &Keypair) -> Result<[u8; 32], LayeError> {
+fn self_ed25519_pubkey(kp: &Keypair) -> Result<[u8; 32], SacredError> {
     let ed = kp.public().try_into_ed25519().map_err(|e| {
         build(
             Severity::Error,

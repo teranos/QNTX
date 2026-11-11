@@ -41,6 +41,30 @@ the error goes in as an error and not as a string.
 Below error there is only the log line. An issue that fires on every info line
 is an inbox nobody reads.
 
+## Issues are capped, and kept in QNTX
+
+"WE DONT NEED TO SEND 3000 ERRORS"
+
+"WE NEED TO CAP THE AMOUNT OR ERRORS SENT TO SENTRY AND TRACK IT IN QNTX."
+
+"WE NEED OUR OWN ABSTRACTION AND TRACKING OF THIS IN CASE WE DO HIT SENTRY LIMIT, SO WE NEVER REALLY LOST OBS"
+
+On 2026-11-11 one unreachable forward target raised 3,103 of the 3,107 issue
+events `qntx-go` sent that day. Every delivery carries its own `delivery` id, so
+no two lines were identical and `CollectRepeats` folded none of them.
+
+An issue is its level, logger, caller, message and `plugin` field: the fields
+that differ per occurrence do not make a new one. Within a UTC day an issue is
+raised on its 1st, 4th, 16th, 64th… occurrence, and the node raises at most
+`issuesPerDay` issues in all (`internal/logger/issues.go`). The log line ships
+every time either way.
+
+Every error the node logs is counted in its ledger whether or not Sentry is on,
+raised or withheld, and the ledger is written to the operational db's
+`issues_seen` table every minute: a row per issue per UTC day, with its
+occurrences, how many were raised to Sentry, when it was first and last seen,
+and the last error it carried. What Sentry did not get is in that table.
+
 ## Writing a line worth having
 
 The instrumentation ships what you already write. What arrives is only as good

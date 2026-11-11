@@ -35,7 +35,7 @@ REACH is '/auth/door/home' '/auth/door/home/result'                       of ANY
 # Who sent the person home, answered from the ticket they hold, so the face
 # can name a client. A stranger holding no ticket is told nothing.
 REACH is '/auth/door/journey'                                             of ANYONE
-# A client is a door (ADR-025): it sends a stranger here for the passkey, and
+# A client is a door: it sends a stranger here for the passkey, and
 # the code goes back by ticket. Both are the way home, for a client.
 REACH is '/auth/authorize' '/auth/authorize/done'                         of ANYONE
 # The client comes for its token with the code and its secret, holding no
@@ -44,10 +44,6 @@ REACH is '/auth/token'                                                    of ANY
 # An agent asks to be signed in and holds no session: the person's yes at the
 # passkey, at home, is the credential, checked at the endpoints themselves.
 REACH is '/auth/device' '/auth/device/approve' '/auth/device/done'        of ANYONE
-# An agent a token starts is handed a token of its own (ADR-025): the token
-# asking is the credential, and the handler hands one to a TOKEN or an
-# ATTESTOR minted rather than issued through a client, and to nobody else.
-REACH is '/auth/agent'                                                    of TOKEN ATTESTOR
 # Another node asks whether a token this one issued is live, holding no session:
 # its signed assertion is the credential, checked at the endpoint itself.
 REACH is '/auth/introspect'                                               of ANYONE
@@ -63,6 +59,9 @@ REACH is '/n/'                                                            of ANY
 # The GitHub App's webhook, at the path ROOT sets under /github/. The
 # delivery's signature is the credential; every other path answers nobody.
 REACH is '/github/'                                                       of ANYONE
+# 「[Opus 5.5] ix/otel takes OpenTelemetry in as attestations: who reaches it is who writes」
+# 「[Opus 5.5] attestations, and a token's spans land where it acts, under its WRITE lines.」
+REACH is '/ix/otel/'                                                      of ROOT SUPER TOKEN ATTESTOR
 # Discovery documents (RFC 8414, RFC 9728): how a client that has never seen
 # this node finds its doors without being configured by hand. Read before it
 # sends anybody anywhere, so by a stranger.
@@ -109,11 +108,14 @@ REACH is '/setup' '/setup/claim'                                          of ANY
 # A staand is a market's public receive point (ADR-035).
 REACH is '/s/'                                                            of ANYONE
 
-# An element module is UI, and a page importing it carries no session. Every
-# call the module goes on to make is gated on its own line above.
-REACH is '/g/'                                                            of ANYONE
+# An element module is served from the reader's own namespace store (ADR-026),
+# so the reader is admitted: a page's import is same-origin and carries its
+# session; a token carries itself. A stranger stands in no namespace and is
+# published nothing. Every call the module goes on to make is gated on its own
+# line above.
+REACH is '/g/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 
-# Tokens (ADR-025) and Users (ADR-031). A write on either is a session's
+# Tokens and Users (ADR-031). A write on either is a session's
 # alone, gated by the handler and not by this line.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT SUPER
 REACH is '/auth/users' '/auth/users/'                                     of ROOT SUPER
@@ -132,6 +134,8 @@ REACH is '/api/namespaces/{name}/store'                                 of ROOT 
 # The lines the gate reads (ADR-034). Writing one is gated at the
 # attestation handler, not by this line.
 REACH is '/api/roles'                                                     of ROOT SUPER
+REACH is '/api/rooms' '/api/rooms/{room}' '/api/rooms/{room}/read'        of ROOT
+REACH is '/api/rooms/{room}/post' '/api/rooms/{room}/wake'              of ROOT
 
 # Who reaches what at runtime, granted and revoked (the reach signum).
 REACH is '/api/reach'                                                     of ROOT
@@ -211,6 +215,7 @@ REACH is '/api/mcp' '/api/mcp/tools' '/api/mcp/drop'                      of ROO
 # 「[Opus 5.5] Each server the node consumes, served to the node's agents, whose tokens stand at ROOT.」
 REACH is '/api/mcp/servers/{name}'                                        of ROOT
 REACH is '/auth/mcp/callback'                                             of ROOT
+REACH is '/auth/mcp/return'                                               of ANYONE
 
 # Approvals (ADR-052): "approvals is ROOT only for now". The list is a sigil;
 # the answer is a route and no sigil, "human only" and "only through it's
@@ -220,7 +225,7 @@ REACH is '/api/approvals' '/api/approvals/answer'                         of ROO
 # A2A over HTTP+JSON, one line for every operation: a route like
 # /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the
 # foreseeable future" (ADR-039); a2a:<signum> lines say who reaches a skill.
-REACH is '/a2a/'                                                          of ROOT
+REACH is '/a2a' '/a2a/'                                                   of ROOT
 
 # Generated by make openapi and held to this table by a test, so a line added
 # here without regenerating fails the build.

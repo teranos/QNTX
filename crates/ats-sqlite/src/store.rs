@@ -25,7 +25,7 @@ type AttestationRow = (
 );
 use crate::json::{
     deserialize_attributes, deserialize_string_vec, serialize_attributes, serialize_string_vec,
-    sql_to_timestamp, timestamp_to_sql,
+    sql_to_timestamp, try_timestamp_to_sql,
 };
 
 type StoreResult<T> = Result<T, StoreError>;
@@ -327,39 +327,17 @@ impl SqliteStore {
     }
 }
 
-/// Insert an attestation through any Connection (shared by SqliteStore and WriteConn).
-/// Handles the main INSERT and the junction tables.
-pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> StoreResult<()> {
-    let subjects_json = serialize_string_vec(&attestation.subjects)?;
-    let predicates_json = serialize_string_vec(&attestation.predicates)?;
-    let contexts_json = serialize_string_vec(&attestation.contexts)?;
-    let actors_json = serialize_string_vec(&attestation.actors)?;
-    let attributes_json = serialize_attributes(&attestation.attributes)?;
+/// An instant to be stored, or the refusal that it is one no date holds: a
+/// write that cannot keep a date says so, it does not keep today's.
+fn instant(id: &str, field: &str, ms: i64) -> StoreResult<String> {
+    try_timestamp_to_sql(ms).ok_or_else(|| {
+        StoreError::InvalidData(format!("{id}: {field} {ms} ms is outside the dates a store holds"))
+    })
+}
 
-    let timestamp_sql = timestamp_to_sql(attestation.timestamp);
-    let created_at_sql = timestamp_to_sql(attestation.created_at);
-
-    crate::flight_recorder::record_fmt("put:insert_main", &attestation.id);
-    conn.execute(
-        "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        rusqlite::params![
-            attestation.id,
-            subjects_json,
-            predicates_json,
-            contexts_json,
-            actors_json,
-            timestamp_sql,
-            attestation.source,
-            attributes_json,
-            created_at_sql,
-            attestation.signature,
-            attestation.signer_did,
-        ],
-    )
-    .map_err(SqliteError::from)?;
-
-    // Populate junction tables for indexed lookups
+/// The rows the indexed lookups read (`attestation_{actors,contexts,subjects,predicates}`),
+/// one per value of the attestation.
+fn write_junctions(conn: &Connection, attestation: &Attestation, created_at_sql: &str) -> StoreResult<()> {
     crate::flight_recorder::record_fmt("put:junction_actors", &attestation.id);
     for actor in &attestation.actors {
         conn.execute(
@@ -392,6 +370,43 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
         )
         .map_err(SqliteError::from)?;
     }
+
+    Ok(())
+}
+
+/// Insert an attestation through any Connection (shared by SqliteStore and WriteConn).
+/// Handles the main INSERT and the junction tables.
+pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> StoreResult<()> {
+    let subjects_json = serialize_string_vec(&attestation.subjects)?;
+    let predicates_json = serialize_string_vec(&attestation.predicates)?;
+    let contexts_json = serialize_string_vec(&attestation.contexts)?;
+    let actors_json = serialize_string_vec(&attestation.actors)?;
+    let attributes_json = serialize_attributes(&attestation.attributes)?;
+
+    let timestamp_sql = instant(&attestation.id, "timestamp", attestation.timestamp)?;
+    let created_at_sql = instant(&attestation.id, "created_at", attestation.created_at)?;
+
+    crate::flight_recorder::record_fmt("put:insert_main", &attestation.id);
+    conn.execute(
+        "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rusqlite::params![
+            attestation.id,
+            subjects_json,
+            predicates_json,
+            contexts_json,
+            actors_json,
+            timestamp_sql,
+            attestation.source,
+            attributes_json,
+            created_at_sql,
+            attestation.signature,
+            attestation.signer_did,
+        ],
+    )
+    .map_err(SqliteError::from)?;
+
+    write_junctions(conn, attestation, &created_at_sql)?;
 
     crate::flight_recorder::record_fmt("put:done", &attestation.id);
     Ok(())
@@ -488,9 +503,18 @@ impl AttestationStore for SqliteStore {
         let actors_json = serialize_string_vec(&attestation.actors)?;
         let attributes_json = serialize_attributes(&attestation.attributes)?;
 
-        let timestamp_sql = timestamp_to_sql(attestation.timestamp);
+        let timestamp_sql = instant(&attestation.id, "timestamp", attestation.timestamp)?;
 
-        self.conn
+        // The row and its junction rows change together: an update that left the
+        // junction rows alone would keep finding the attestation under values it
+        // no longer has, and miss it under the ones it has now.
+        let created_at_sql: String = self
+            .conn
+            .query_row("SELECT created_at FROM attestations WHERE id = ?", [&attestation.id], |r| r.get(0))
+            .map_err(SqliteError::from)?;
+        let tx = self.conn.transaction().map_err(SqliteError::from)?;
+
+        tx
             .execute(
                 "UPDATE attestations
              SET subjects = ?, predicates = ?, contexts = ?, actors = ?,
@@ -510,6 +534,13 @@ impl AttestationStore for SqliteStore {
                 ],
             )
             .map_err(SqliteError::from)?;
+
+        for table in ["attestation_actors", "attestation_contexts", "attestation_subjects", "attestation_predicates"] {
+            tx.execute(&format!("DELETE FROM {table} WHERE attestation_id = ?"), [&attestation.id])
+                .map_err(SqliteError::from)?;
+        }
+        write_junctions(&tx, &attestation, &created_at_sql)?;
+        tx.commit().map_err(SqliteError::from)?;
 
         Ok(())
     }

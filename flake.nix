@@ -84,7 +84,13 @@
             fetchurl = args: pkgs.fetchurl (args // {
               curlOptsList = [ "--user-agent" "qntx-nix" ];
             });
-          }) { lockFile = ./Cargo.lock; };
+          }) {
+            lockFile = ./Cargo.lock;
+            # sacred-error is a git dependency (github.com/teranos/sacred-error,
+            # the rev in Cargo.toml). Change the rev, change this hash: nix hash
+            # path --sri on a `git archive` of that rev.
+            outputHashes."sacred-error-0.1.0" = "sha256-AFWB5DT1EjfHvjuODxri3Dw+vGYo/EAnTwF0xpJwSQQ=";
+          };
 
         # "i doubt we need to build ats each and every time / or laye / or the go backend"
         # The Rust derivations see only what the Rust build reads. A commit to

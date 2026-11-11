@@ -2239,7 +2239,10 @@ type VaultSubdirs struct {
 	Dirs []string `protobuf:"bytes,1,rep,name=dirs,proto3" json:"dirs,omitempty"`
 	// The repository's default branch, which the folders are read on and a
 	// folder is bound to.
-	Branch        string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
+	Branch string `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
+	// Each note and story directly in the folder, by its path from the
+	// repository's top: what a note of the vault can be bound to.
+	Files         []string `protobuf:"bytes,3,rep,name=files,proto3" json:"files,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2286,6 +2289,13 @@ func (x *VaultSubdirs) GetBranch() string {
 		return x.Branch
 	}
 	return ""
+}
+
+func (x *VaultSubdirs) GetFiles() []string {
+	if x != nil {
+		return x.Files
+	}
+	return nil
 }
 
 // Vault is one vault as the node keeps it: where its copy is on the box, and
@@ -3828,10 +3838,11 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x04dirs\x18\x01 \x03(\tR\x04dirs\"\"\n" +
 	"\n" +
 	"VaultRepos\x12\x14\n" +
-	"\x05repos\x18\x01 \x03(\tR\x05repos\":\n" +
+	"\x05repos\x18\x01 \x03(\tR\x05repos\"P\n" +
 	"\fVaultSubdirs\x12\x12\n" +
 	"\x04dirs\x18\x01 \x03(\tR\x04dirs\x12\x16\n" +
-	"\x06branch\x18\x02 \x01(\tR\x06branch\"\xe7\x01\n" +
+	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x14\n" +
+	"\x05files\x18\x03 \x03(\tR\x05files\"\xe7\x01\n" +
 	"\x05Vault\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x18\n" +

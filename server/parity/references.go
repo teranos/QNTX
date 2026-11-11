@@ -120,6 +120,13 @@ func Says(name string) (map[string]string, *protocol.Refusal) {
 		return nil, refused
 	}
 	says := map[string]string{}
+	// An SDK says more than its messages: what its client does, as make says
+	// read it.
+	if _, held := fromSDK[name]; held {
+		for said, words := range sdkSaid() {
+			says[said] = words
+		}
+	}
 	keep := func(d protoreflect.Descriptor) {
 		if said := saysOf(d); said != "" {
 			says[string(d.FullName())] = said

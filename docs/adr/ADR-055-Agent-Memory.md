@@ -4,7 +4,6 @@ pre-0.999.0-polish-blocker
 > With the increasing velocity of digital content and the increasing availability of powerful creation and editing techniques, establishing the provenance of media is critical to ensure transparency, understanding, and ultimately, trust. 
 
 https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/ref-q.html
-
 https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/CO.html#COHQQ
 
 「[Fable 5.1] `protocol.Quote` and `protocol.Interp` ([sigil.proto](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/sigil.proto)) are TEI's `q` and `interp`, field by attribute, the words as the element's content. TEI P5 4.12.0 is pinned at [server/parity/tei_4.12.0_113e933](https://github.com/teranos/QNTX/blob/main/server/parity/tei_4.12.0_113e933/SOURCE) as every reference is, and parity holds a Quote to it.」
@@ -13,12 +12,12 @@ https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/CO.html#COHQQ
 
 https://platform.claude.com/dashboard
 
-- Integrate with Claude Console API's 'Memory store'
-- And later 'dreams' as well
+- [ ] Integrate with Claude Console API's 'Memory store'
+- [ ] And later 'dreams' as well
 
-- Interesting to think about an [[ADR-049-Obsidian|Obsidian]] linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory.
+- [ ] Interesting to think about an [[ADR-049-Obsidian|Obsidian]] linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory.
 
-bidirectional sync between our abstraction of the memory store.
+- [ ] bidirectional sync between our abstraction of the memory store.
 
 
 Allow all Agent Harnesses to leverage memories created in Managed Agents.
@@ -86,17 +85,14 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 
 "the backfill will happen at some point, that feature will exist, but is not in scope now."
 
-- [ ] 「[Fable 5.1] Old text is traced: each span to the human words it came from, exact or by how many corrections, or marked as the agent's. Not in scope now.」
+- [ ] 「[Fable 5.1] Old text is traced: each span to the human words it came from, exact or by how many corrections, or marked as the agent's.」
 - [ ] 「[Fable 5.1] The signum that keeps a Quote, so the node holds it to tei.」
 - [ ] 「[Fable 5.1] C2PA, for the material a quote arrives in, pinned as TEI is.」
 
-## 「[Opus 5.5] The process」
+---
 
 "there needs to be a process"
+「[Fable] Every row of ground's own attestations table carries qntx_at, qntx_status and qntx_reason: what ground sees is written to a node.」
 
-"「[Opus 5.5] it doesnt run one today」"
-
-"dealing with the ground namespace"
-
-「[Fable] Every row of ground's own attestations table carries qntx_at, qntx_status and qntx_reason: what ground sees is written to a node. What the namespace holds there I have not read.」
+---
 

@@ -20,7 +20,9 @@ func TestA2ASaysIsWhatTheSDKSays(t *testing.T) {
 	require.NoError(t, err)
 	grpc, err := os.ReadFile(filepath.Join(generated, "a2av1_grpc.pb.go"))
 	require.NoError(t, err)
-	read, err := A2AGoSays(pb, grpc)
+	resolver, err := os.ReadFile(filepath.Join(strings.TrimSpace(string(module)), "a2aclient", "agentcard", "resolver.go"))
+	require.NoError(t, err)
+	read, err := A2AGoSays(pb, grpc, resolver)
 	require.NoError(t, err)
 	written := sdkSaid()
 	for name, said := range read {

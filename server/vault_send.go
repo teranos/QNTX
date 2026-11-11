@@ -127,15 +127,15 @@ func vaultNotesAt(root string) (map[string][]byte, error) {
 	return notes, nil
 }
 
-// boundVaultNotes is every note a binding holds in the vault's copy: those
-// directly in its folder, or its one note when the vault has it as a file of
-// its own; a link to one is not.
+// 「[Opus 5.5] boundVaultNotes is every note a binding holds in the vault's copy: those」
+// 「[Opus 5.5] directly in its folder, or its one note when the vault has it as a file of」
+// 「[Opus 5.5] its own; a link to one is not.」
 func boundVaultNotes(vaultPath string, b vaultBinding) (map[string][]byte, error) {
 	if !b.note {
 		return vaultNotesAt(b.rootIn(vaultPath))
 	}
 	notes := map[string][]byte{}
-	// A note's folder that is a link is not a folder of the vault, as a bound folder's is not.
+	// 「[Opus 5.5] A note's folder that is a link is not a folder of the vault, as a bound folder's is not.」
 	if folder, err := os.Lstat(b.rootIn(vaultPath)); err == nil && folder.Mode()&os.ModeSymlink != 0 {
 		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", b.rootIn(vaultPath))
 	}
@@ -233,12 +233,13 @@ func (s *QNTXServer) sendVaultFolder(ctx context.Context, vault Vault, folder, b
 		if there && was.sha == gitBlobSHA(content) {
 			continue
 		}
-		file := binding.repoFile(under)
 		message := vault.Name + ": " + path.Join(binding.placeRoot(), under)
+		// A note the branch holds goes back where it is: its vault name may
+		// read as a story's (a note named X.feature.md) when it is not one.
 		if there {
-			edits = append(edits, forge.Replaced(file, content, was.sha, message))
+			edits = append(edits, forge.Replaced(was.path, content, was.sha, message))
 		} else {
-			edits = append(edits, forge.Added(file, content, message))
+			edits = append(edits, forge.Added(binding.repoFile(under), content, message))
 		}
 	}
 	for _, note := range onBranch {

@@ -88,11 +88,13 @@ func (s *QNTXServer) thereIsNoCodex() *protocol.Refusal {
 // codexPart is codex's part of one turn of the Node Agent: its own CODEX_HOME,
 // naming the node's gateway and the agent's ground, and its own thread.
 func (s *QNTXServer) codexPart(named appcfg.CodexConfig, agent *rootAgent) (aTurn, *protocol.Refusal) {
-	if s.ownURL == "" {
+	if s.reachOf(agent) == "" {
 		return aTurn{}, &protocol.Refusal{Why: sigil.Failed, Says: "this node knows no URL of its own, where codex reaches its gateway"}
 	}
 	var binary string
-	key := agent.token
+	// Codex names a key for the gateway, and is handed the agent's DID, which is
+	// no secret: the door admits the agent, not what it presents.
+	key := agent.did
 	threads := filepath.Join(agent.home, codexThreadFile)
 	return aTurn{
 		ready: func(ctx context.Context, _ string, kept bool) (bool, *protocol.Refusal) {
@@ -112,7 +114,7 @@ func (s *QNTXServer) codexPart(named appcfg.CodexConfig, agent *rootAgent) (aTur
 			if err := comet.Under(agent.home); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + " is said nothing until it runs under ground: " + err.Error()}
 			}
-			if err := comet.AgentCodexConfig(agent.home, codexGateway(s.ownURL, named.Gateway)); err != nil {
+			if err := comet.AgentCodexConfig(agent.home, codexGateway(s.reachOf(agent), named.Gateway)); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 			}
 			return kept, nil

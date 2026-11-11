@@ -37,6 +37,8 @@ type QNTXServer struct {
 	// its doors, and the health of the file underneath. What a namespace keeps
 	// is the namespace's, and is reached through it.
 	nodeDB                *sql.DB
+	issuesSeeded          atomic.Bool                   // today's issues_seen was read into the ledger, so a write may replace its rows
+	issuesWrite           sync.Mutex                    // one take-and-write of the issue ledger at a time, the last one included
 	nodeAgentApart        bool                          // The Node Agent's turns run apart from this process; set as the agent subsystem boots
 	startedAt             time.Time                     // When this process began answering; zero until New runs
 	dbPath                string                        // Database file path (for display in banner)
@@ -54,7 +56,6 @@ type QNTXServer struct {
 	taskEnds              sync.Mutex                    // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
 	taskStreams           sync.Map                      // Each Task whose turn this process runs, by id, to the stream the turn prints to
 	taskCancels           sync.Map                      // Each Task canceled in this process, by id, to who canceled it
-	pushing               sync.Map                      // Each Task with push notifications, by id, to the *sync.Mutex its notifications go out under one after another
 	noNodeAgent           error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents       agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
 	elementAgents         agentsHeld                    // Each element's agent this node has held, by its purpose (ADR-054)
@@ -62,6 +63,7 @@ type QNTXServer struct {
 	consuming             consumedFlows                 // 「[Opus 5.5] Each yes at an MCP server the node consumes, waiting on its callback (mcp_consumed.go)」
 	agentsDir             string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL                string                        // Where this node answers on its own machine; empty until it listens
+	doors                 agentDoors                    // The door each agent the node runs reaches it at (agent_door.go)
 	anthropicBaseURL      string                        // Where Anthropic's API is; empty is api.anthropic.com
 	anthropicInUse        inUse                         // What ROOT's agents last ran on at Anthropic
 	identityTokensRenewed identityTokens                // Each ROOT agent home whose identity token is renewed

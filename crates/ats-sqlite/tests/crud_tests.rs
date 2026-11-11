@@ -250,3 +250,37 @@ fn test_timestamp_preservation() {
     let retrieved = store.get("AS-time").unwrap().unwrap();
     assert_eq!(retrieved.timestamp, timestamp);
 }
+
+#[test]
+fn a_write_that_cannot_keep_its_date_is_refused_not_kept_as_today() {
+    let mut store = SqliteStore::in_memory().unwrap();
+    let mut a = create_test_attestation("AS-LATE");
+    a.timestamp = i64::MAX;
+    let e = store.put(a).unwrap_err().to_string();
+    assert!(e.contains("AS-LATE") && e.contains("timestamp"), "{e}");
+    assert_eq!(store.count().unwrap(), 0);
+
+    let mut b = create_test_attestation("AS-OLD");
+    b.created_at = i64::MIN;
+    assert!(store.put(b).unwrap_err().to_string().contains("created_at"));
+    assert_eq!(store.count().unwrap(), 0);
+}
+
+#[test]
+fn an_update_moves_the_lookups_with_the_row() {
+    use ats::storage::QueryStore;
+    let mut store = SqliteStore::in_memory().unwrap();
+    store.put(create_test_attestation("AS-MOVE")).unwrap();
+
+    let mut a = store.get("AS-MOVE").unwrap().unwrap();
+    a.subjects = vec!["ZED".into()];
+    a.actors = vec!["human:carol".into()];
+    store.update(a).unwrap();
+
+    assert_eq!(store.subjects().unwrap(), vec!["ZED"]);
+    assert_eq!(store.actors().unwrap(), vec!["human:carol"]);
+    let by_old = ats::AxFilter { subjects: vec!["ALICE".into()], limit: 10, ..Default::default() };
+    assert_eq!(store.query(&by_old).unwrap().attestations.len(), 0);
+    let by_new = ats::AxFilter { subjects: vec!["ZED".into()], limit: 10, ..Default::default() };
+    assert_eq!(store.query(&by_new).unwrap().attestations.len(), 1);
+}

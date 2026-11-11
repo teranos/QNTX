@@ -41,6 +41,11 @@
         "ANYONE"
       ]
     },
+    "/a2a": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/a2a/": {
       "x-qntx-reach": [
         "ROOT"
@@ -594,6 +599,31 @@
         "SUPER"
       ]
     },
+    "/api/rooms": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}/post": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}/read": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}/wake": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/search/semantic": {
       "x-qntx-reach": [
         "ROOT"
@@ -712,12 +742,6 @@
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
-      ]
-    },
-    "/auth/agent": {
-      "x-qntx-reach": [
-        "TOKEN",
-        "ATTESTOR"
       ]
     },
     "/auth/authorize": {
@@ -872,6 +896,11 @@
         "ROOT"
       ]
     },
+    "/auth/mcp/return": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/register/begin": {
       "x-qntx-reach": [
         "ANYONE"
@@ -937,7 +966,12 @@
     },
     "/g/": {
       "x-qntx-reach": [
-        "ANYONE"
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION",
+        "USER"
       ],
       "x-qntx-prefix": true
     },
@@ -1015,6 +1049,15 @@
       "x-qntx-reach": [
         "ANYONE"
       ]
+    },
+    "/ix/otel/": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR"
+      ],
+      "x-qntx-prefix": true
     },
     "/mcp": {
       "x-qntx-reach": [

@@ -1,0 +1,35 @@
+[package]
+name = "ats-dev"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "ATS on its own: read and write attestations in a SQLite file, no node, no WASM, no auth"
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "ats-dev"
+path = "src/main.rs"
+
+[features]
+# `--backend duckdb` links libduckdb (dynamically, as the node does); `--backend
+# postgres` speaks the wire protocol itself. Neither is in the default binary.
+duckdb = ["dep:ats-duckdb"]
+postgres = ["dep:ats-postgres"]
+
+[dependencies]
+ats.workspace = true
+ats-duckdb = { path = "../ats-duckdb", optional = true }
+ats-postgres = { path = "../ats-postgres", optional = true }
+ats-sign = { path = "../ats-sign" }
+ats-sqlite = { path = "../ats-sqlite" }
+laye-me = { path = "../laye-me" }
+libp2p-identity = { version = "=0.2.14", features = ["ed25519"] }
+sacred-error.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

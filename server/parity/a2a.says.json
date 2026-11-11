@@ -1,4 +1,5 @@
 {
+  "a2aclient/agentcard.Resolver.Resolve": "Resolve fetches an [a2a.AgentCard] from the provided URL (base URL or complete agent card URL). By default, if the provided URL has no path or a root path, the request is sent for the /.well-known/agent-card.json path. If the provided URL contains a non-root path, it is fetched directly as the complete agent card URL. A file:// URL is supported to load the card from the local file system, in which case the card is read directly from the referenced path and request headers are ignored.",
   "lf.a2a.v1.A2AService": "Provides operations for interacting with agents using the A2A protocol.",
   "lf.a2a.v1.A2AService.CancelTask": "Cancels a task in progress.",
   "lf.a2a.v1.A2AService.CreateTaskPushNotificationConfig": "Creates a push notification config for a task.",

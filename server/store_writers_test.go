@@ -95,8 +95,8 @@ var storeWriters = map[string]string{
 		"they own the namespace, or are ROOT or SUPER",
 	// 「[Opus 5.5] An MCP server the node consumes (ADR-038).」
 	"writeConsumedLine": "an MCP or MCP_CALL line of the node, in system through Write as the caller is admitted, " +
-		"after consumedUsing says they stand at ROOT, and for connecting and dropping consumedHandling refuses a token " +
-		"or a connector; a refreshed token is kept as whoever's call refreshed it",
+		"after consumedUsing says they stand at ROOT, the node's agents included; a refreshed token is kept as " +
+		"whoever's call refreshed it",
 
 	"systemTasks": "a Task of the Node Agent or of an element's agent (A2A §3.4.2) lands in system, where " +
 		"their sessions are written, what the node knows of itself. Reached from the Task operations at no tenant " +
@@ -197,6 +197,10 @@ func asksToWrite(body *ast.BlockStmt) bool {
 // it is a claim somebody makes in the open, or it is a thing a namespace has.
 var nodeReaders = map[string]string{
 	"handlers.go:health":                          "the health of the file underneath, which is the node's to answer",
+	"issues_kept.go:flushIssues":                  "what the node logged, kept as it stops: one process's errors, not a namespace's",
+	"issues_kept.go:keepIssues":                   "what the node logged, kept every minute: one process's errors, not a namespace's",
+	"issues_kept.go:seedIssues":                   "today's issues as the node kept them, read back after a restart",
+	"issues_kept.go:writeIssuesOnce":              "one write of what the node logged to issues_seen",
 	"operational_watchdog.go:askOperationalStore": "the same ping on a tick, so a node that has stopped answering says so",
 	"operational_watchdog.go:operationalPool":     "where the connections to the node's own file are while a ping waits on it",
 	"lifecycle.go:Stop":                           "shutdown compares the pulse read connection with the node's own",

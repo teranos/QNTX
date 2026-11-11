@@ -59,6 +59,15 @@ func (h *Handler) SetPrimary(origin string) error {
 	return nil
 }
 
+// Primary is the origin of the node this one's people log in at
+// (nodes.primary), or "" when they log in here.
+func (h *Handler) Primary() string {
+	if !h.logsInElsewhere {
+		return ""
+	}
+	return h.loginAt
+}
+
 // goingOnThisNode is where somebody asked to go, kept to a path on this node's
 // page. Anywhere else is the root.
 func goingOnThisNode(asked string) string {

@@ -1,11 +1,15 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"net/http/httputil"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	errors "github.com/teranos/sacred-error"
 )
 
 // The primary carries a request for a peer to it. The peer decides who is in:
@@ -14,22 +18,19 @@ import (
 // peerPath is where a request for a peer arrives: /n/<name>/<path on the peer>.
 const peerPath = "/n/"
 
-// carriedLife is how long a person's token for a peer lasts, and carriedSlack
-// how long before its end it is replaced.
-const (
-	carriedLife  = 5 * time.Minute
-	carriedSlack = time.Minute
-)
+// carriedLife is how long the primary's signature for one carried request
+// lasts: long enough to cross to the peer, and spent there once.
+const carriedLife = time.Minute
 
-// carried is a person's token for one peer, and until when it is used.
-type carried struct {
-	raw   string
-	until time.Time
-}
-
-// carriedTokens is the tokens a session's person is carried to peers with, by person and peer.
-type carriedTokens struct {
-	byPersonPeer sync.Map
+// carriedClaims is what the primary signs about the person it carries: who
+// they are here, and where the peer may let them act.
+type carriedClaims struct {
+	jwt.RegisteredClaims
+	Name       string   `json:"name,omitempty"`
+	Level      string   `json:"level"`
+	Namespaces []string `json:"namespaces"`
+	Label      string   `json:"label"`
+	Client     string   `json:"client_id"`
 }
 
 // handlePeer carries a request to the peer it names. The session cookie stays
@@ -46,22 +47,34 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := h.presented(r)
-	bearer := ""
-	if p.SessionLive {
+	carriedAs := ""
+	// What this node admitted is carried, a session or a signature: what was
+	// presented here is spent here, and the peer is handed this node's word.
+	//
+	// "k should be delegating auth to the node entirely to q"
+	carries := p.SessionLive || p.Bearer != nil
+	if carries {
 		admitted, ok := h.admissionOf(p)
 		if !ok {
-			h.writeError(w, http.StatusUnauthorized, "the session here admits nobody")
+			h.writeError(w, http.StatusUnauthorized, "what was presented here admits nobody")
 			return
 		}
-		raw, err := h.carriedFor(admitted.Identity, p, peer, time.Now())
+		level, name, namespaces := h.levelOf(admitted.Identity), p.DisplayName, peer.Namespaces
+		if !p.SessionLive {
+			// A grant goes as far as it reaches here, and no further.
+			level, name, namespaces = Level(admitted.LevelName()), admitted.DisplayName, nil
+			for _, namespace := range peer.Namespaces {
+				if admitted.MayActIn(namespace) {
+					namespaces = append(namespaces, namespace)
+				}
+			}
+		}
+		signed, err := h.carriedSignature(admitted.Identity, name, level, peer, namespaces, time.Now())
 		if err != nil {
-			h.attest(PredicateUnanswered, admitted.Identity, map[string]any{
-				"asked": "token store", "doing": "carry a person to a peer", "peer": peer.Label, "error": err.Error(),
-			})
-			h.writeError(w, http.StatusInternalServerError, "no token was written to carry you to "+peer.Label+": "+err.Error())
+			h.writeError(w, http.StatusInternalServerError, "this node did not sign to carry you to "+peer.Label+": "+err.Error())
 			return
 		}
-		bearer = raw
+		carriedAs = signed
 	}
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(out *httputil.ProxyRequest) {
@@ -71,8 +84,8 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 			out.Out.URL.RawPath = ""
 			out.Out.Host = peer.Origin.Host
 			out.Out.Header.Del("Cookie")
-			if p.SessionLive {
-				out.Out.Header.Set("Authorization", "Bearer "+bearer)
+			if carries {
+				out.Out.Header.Set("Authorization", carriedAs)
 			}
 		},
 		// Which origins may read the answer is said here, once; the peer's own saying would be a second.
@@ -95,38 +108,38 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
-// carriedFor is a token that is this person at the peer, issued here through
-// the peer, which asks here who it is and admits them by its own list.
-func (h *Handler) carriedFor(identity string, p Presented, peer Client, now time.Time) (string, error) {
-	key := identity + "\x00" + peer.DID
-	if held, found := h.carried.byPersonPeer.Load(key); found {
-		if token, isToken := held.(carried); isToken && now.Before(token.until) {
-			return token.raw, nil
-		}
-	}
-	raw, did, err := MintToken()
+// carriedSignature is the Authorization a request carrying identity to peer
+// goes with: this node signing, as its own did:key, who the person is, for that
+// 「[Opus 5.5] peer alone and for one request. What it names is where the peer lets them act:」
+// 「[Opus 5.5] the namespaces handed in, of those the peer serves.」
+//
+// "A signature proves the key, and nothing reusable leaves the node."
+func (h *Handler) carriedSignature(identity, name string, level Level, peer Client, namespaces []string, now time.Time) (string, error) {
+	did, err := h.ownDID()
 	if err != nil {
 		return "", err
 	}
-	ends := now.Add(carriedLife)
-	id, err := h.tokens.Issue(IssuedToken{
-		Hash:                sha256Hex(raw),
-		DID:                 did,
-		Label:               peer.Label,
-		MintedBy:            identity,
-		MintedByUser:        p.UserID,
-		MintedByDisplayName: p.DisplayName,
-		Level:               h.levelOf(identity),
-		Namespaces:          peer.Namespaces,
-		ExpiresAt:           &ends,
-		ClientDID:           peer.DID,
-	})
-	if err != nil {
-		return "", err
+	jti := make([]byte, assertionIDBytes)
+	if drawn, err := rand.Read(jti); err != nil || drawn != assertionIDBytes {
+		return "", errors.New("no id could be drawn for the signature")
 	}
-	h.attest(PredicateMinted, identity, map[string]any{
-		"token": id, "label": peer.Label, "client": peer.DID, "via": "carried to a peer",
-	})
-	h.carried.byPersonPeer.Store(key, carried{raw: raw, until: ends.Add(-carriedSlack)})
-	return raw, nil
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodEdDSA, carriedClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    did,
+			Subject:   identity,
+			Audience:  jwt.ClaimStrings{peer.DID},
+			ExpiresAt: jwt.NewNumericDate(now.Add(carriedLife)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ID:        hex.EncodeToString(jti),
+		},
+		Name:       name,
+		Level:      string(level),
+		Namespaces: namespaces,
+		Label:      peer.Label,
+		Client:     peer.DID,
+	}).SignedString(h.nodeKey)
+	if err != nil {
+		return "", errors.Wrapf(err, "the signature carrying %s to %s was not made", identity, peer.Label)
+	}
+	return signedScheme + signed, nil
 }

@@ -73,7 +73,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "says: %v\n", err)
 		os.Exit(1)
 	}
-	a2a, err := parity.A2AGoSays(pb, grpc)
+	resolver, err := os.ReadFile(filepath.Join(strings.TrimSpace(string(module)), "a2aclient", "agentcard", "resolver.go"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "says: %v\n", err)
+		os.Exit(1)
+	}
+	a2a, err := parity.A2AGoSays(pb, grpc, resolver)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "says: %v\n", err)
 		os.Exit(1)

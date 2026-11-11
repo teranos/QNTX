@@ -349,6 +349,9 @@ message VaultSubdirs {
   // The repository's default branch, which the folders are read on and a
   // folder is bound to.
   string branch = 2;
+  // Each note and story directly in the folder, by its path from the
+  // repository's top: what a note of the vault can be bound to.
+  repeated string files = 3;
 }
 
 // Vault is one vault as the node keeps it: where its copy is on the box, and

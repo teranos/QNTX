@@ -43,10 +43,19 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer(agentCardPath, s.HandleAgentCard)
 
 	// A2A over HTTP+JSON (server/a2a).
-	s.answer(a2aPrefix, s.a2aHTTP())
+	// The card names JSON-RPC at /a2a itself, so it is answered there and not
+	// redirected to /a2a/, which a client that does not follow it never reads.
+	a2aServed := s.a2aHTTP()
+	s.answer(a2aPrefix, a2aServed)
+	s.answer(a2aPrefix[:len(a2aPrefix)-1], a2aServed)
+	// A2AService's streaming operations, spoken to a peer's agent or a card's (SSE).
+	s.answerA2AStreams()
 
 	// The GitHub App's one webhook, for every event it is subscribed to.
 	s.answer(githubWebhookPrefix, s.HandleGitHubWebhook)
+
+	// 「[Opus 5.5] ix/otel: OpenTelemetry taken in as OTLP/HTTP, each span kept as an attestation where its sender's token acts.」
+	s.answer(ixOtelPrefix, s.HandleIxOtel)
 
 	// What git's credential helper asks when an agent pushes (ADR-048).
 	s.answer(githubCredentialPath, s.HandleGitHubCredential)
@@ -74,7 +83,18 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// This allows routes to be registered immediately while plugins load asynchronously
 	// A plugin registers its own routes over gRPC and the host never sees
 	// them, so no row here can describe one. Every plugin route is ROOT's.
+	ownPaths := map[string]bool{}
+	for _, signum := range s.signa() {
+		for _, held := range signum.GetSigils() {
+			ownPaths[held.GetHttp().GetPath()] = true
+		}
+	}
 	for _, name := range s.pluginRegistry.ListEnabled() {
+		// A plugin named as a path the node answers itself (rooms) does not take it over.
+		if ownPaths["/api/"+name] {
+			s.logger.Errorw("A plugin is named as a path the node answers itself; its HTTP routes are not served", "plugin", name, "path", "/api/"+name)
+			continue
+		}
 		// Register exact match for /api/{plugin} (e.g., /api/code)
 		exactPattern := "/api/" + name
 		s.answer(exactPattern, s.handlePluginRequest)
@@ -151,6 +171,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/mcp/", s.HandleMCP)
 	// 「[Opus 5.5] An MCP server the node consumes sends the person back here with the code (mcp_consumed.go).」
 	s.answer(ConsumedCallbackPath, s.handleConsumedCallback)
+	s.answer(ConsumedReturnPath, s.handleConsumedReturn)
 	// 「[Opus 5.5] Each MCP server the node consumes, served to the node's agents as one of its own (mcp_consumed.go).」
 	s.answer(ConsumedServedAt+"{name}", s.HandleConsumedServer)
 

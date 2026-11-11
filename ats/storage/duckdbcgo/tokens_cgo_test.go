@@ -35,7 +35,7 @@ func hashOf(raw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// A client's return address is where its codes go (ADR-025). It rides the
+// A client's return address is where its codes go. It rides the
 // record through the FFI and back, and survives reopen.
 func TestAClientKeepsItsReturnAddress(t *testing.T) {
 	dir := "file://" + t.TempDir()
@@ -150,7 +150,7 @@ func TestATokenSayingNothingOfItsEndIsRefused(t *testing.T) {
 }
 
 // fosite exchanges the code for the token the strategy already mints, and the
-// store writes it with the DID the session carries (ADR-025). What it wrote
+// store writes it with the DID the session carries. What it wrote
 // is found by the hash the strategy named it by, as a token of the kind and
 // namespace it was issued in.
 func TestAnIssuedTokenIsFoundByItsHash(t *testing.T) {
@@ -220,7 +220,7 @@ func TestCreateReturnsAUsableToken(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	if !strings.HasPrefix(raw, "qntx_") {
-		t.Errorf("raw token %q lacks the qntx_ prefix (ADR-025:16)", raw)
+		t.Errorf("raw token %q lacks the qntx_ prefix", raw)
 	}
 	if id == "" {
 		t.Error("Create returned an empty id")
@@ -231,7 +231,7 @@ func TestCreateReturnsAUsableToken(t *testing.T) {
 }
 
 // A use is recorded on the record and read back off the list, through the
-// FFI: last used is what a revocation is watched by (ADR-025).
+// FFI: last used is what a revocation is watched by.
 func TestTouchIsReadBackAsLastUsed(t *testing.T) {
 	store := newStore(t)
 	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})
@@ -276,7 +276,7 @@ func TestRevokeKillsTheToken(t *testing.T) {
 	}
 }
 
-// Revocation is a switch (ADR-025).
+// Revocation is a switch.
 func TestEnableBringsItBack(t *testing.T) {
 	store := newStore(t)
 	raw, id, err := store.Create(access.NewToken{Label: "laptop-cron", ExpiresAt: &neverEnds, MintedBy: "https://mastodon.example/@tim", Namespaces: []string{NamespaceDefault}})

@@ -21,7 +21,7 @@ pub fn sacred(e: StoreError, surface: &str, call: &str) -> String {
         StoreError::Serialization(_) => "serialization",
     };
     if let StoreError::Backend(json) = &e {
-        if serde_json::from_str::<laye_error::Error>(json).is_ok() {
+        if serde_json::from_str::<sacred_error::Error>(json).is_ok() {
             return json.clone();
         }
     }
@@ -30,10 +30,10 @@ pub fn sacred(e: StoreError, surface: &str, call: &str) -> String {
         Ok(since) => since.as_millis().to_string(),
         Err(before) => format!("-{}", before.duration().as_millis()),
     };
-    let sacred = laye_error::Error {
+    let sacred = sacred_error::Error {
         id: format!("err-{surface}-{at}"),
-        severity: laye_error::Severity::Error,
-        context: laye_error::Context {
+        severity: sacred_error::Severity::Error,
+        context: sacred_error::Context {
             surface: surface.to_string(),
             region: Some(region.to_string()),
             anchor: None,
