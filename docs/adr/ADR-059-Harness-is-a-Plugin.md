@@ -20,9 +20,9 @@ A harness is added, configured, swapped and built as every plugin is ([[ADR-002-
 
 ## One harness service
 
-"one harness service with Claude Code, Pi and Codex as backends, the way ADR-014 has several LLM providers behind one LLMServer" / "Yes. Do this"
+One harness service, core's, with Claude Code, Pi and Codex its backends, as `LLMServer` has its providers ([[ADR-014-llm-as-plugin-provided-service]]): "Yes. Do this"
 
-The service is one, and core's, as `LLMServer` is ([[ADR-014-llm-as-plugin-provided-service]]). What holds there holds here:
+What holds there holds here:
 
 - "Provider plugins (OpenRouter, llama.cpp) register as gRPC LLM backends. Core routes calls to the appropriate provider": Claude Code, Pi, Codex and agy each register as a backend of it, and core routes a turn to the one the agent runs in.
 - "Multiple providers can run simultaneously. The caller specifies which backend to use": as `harness` names one today (`agent say`).
