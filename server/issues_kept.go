@@ -16,23 +16,27 @@ import (
 
 const issuesKeptEvery = time.Minute
 
-// keepIssues writes the ledger every issuesKeptEvery, and once more as the node stops.
+// keepIssues takes in what is kept of today, then writes the ledger every
+// issuesKeptEvery. The last write is flushIssues', at the end of Stop, after
+// the last thing the node logs as it stops.
 func (s *QNTXServer) keepIssues() {
 	if s.nodeDB == nil {
 		return
 	}
 	log := s.logger.Named("issues")
+	ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
+	kept, err := readIssues(ctx, s.nodeDB, time.Now().UTC().Format(time.DateOnly))
+	cancel()
+	if err != nil {
+		log.Warnw("What issues_seen holds of today was not read; today's counts start again", "error", err)
+	}
+	logger.SeedIssues(kept)
 	s.wg.Go("issues.kept", func() {
 		ticker := time.NewTicker(issuesKeptEvery)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-s.ctx.Done():
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				if err := writeIssues(ctx, s.nodeDB, logger.TakeIssues()); err != nil {
-					log.Warnw("The issues the node counted were not written as it stopped", "error", err)
-				}
 				return
 			case <-ticker.C:
 				taken := logger.TakeIssues()
@@ -46,6 +50,59 @@ func (s *QNTXServer) keepIssues() {
 			}
 		}
 	})
+}
+
+// issuesFlushTries is how many times the last write is tried as the node stops.
+const issuesFlushTries = 3
+
+// flushIssues is the last write, as the node stops: tried issuesFlushTries
+// times, what failed given back between tries.
+func (s *QNTXServer) flushIssues() {
+	if s.nodeDB == nil {
+		return
+	}
+	var err error
+	for try := 1; try <= issuesFlushTries; try++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		taken := logger.TakeIssues()
+		err = writeIssues(ctx, s.nodeDB, taken)
+		cancel()
+		if err == nil {
+			return
+		}
+		logger.ReturnIssues(taken)
+	}
+	s.logger.Named("issues").Warnw("The issues the node counted were not written as it stopped", "tries", issuesFlushTries, "error", err)
+}
+
+// readIssues is what issues_seen holds of day.
+func readIssues(ctx context.Context, db *sql.DB, day string) (_ []logger.Issue, err error) {
+	rows, err := db.QueryContext(ctx, `SELECT day, key, level, logger, caller, message, plugin, last_error, first_seen, last_seen, occurrences, raised FROM issues_seen WHERE day = ?`, day)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read the issues of %s", day)
+	}
+	defer func() {
+		if closed := rows.Close(); err == nil && closed != nil {
+			err = errors.Wrap(closed, "failed to close the issues read")
+		}
+	}()
+	var kept []logger.Issue
+	for rows.Next() {
+		var issue logger.Issue
+		var first, last string
+		if err := rows.Scan(&issue.Day, &issue.Key, &issue.Level, &issue.Logger, &issue.Caller, &issue.Message, &issue.Plugin,
+			&issue.LastError, &first, &last, &issue.Occurrences, &issue.Raised); err != nil {
+			return nil, errors.Wrapf(err, "failed to read an issue of %s", day)
+		}
+		if issue.FirstSeen, err = time.Parse(time.RFC3339Nano, first); err != nil {
+			return nil, errors.Wrapf(err, "issue %s first_seen %q does not read", issue.Key, first)
+		}
+		if issue.LastSeen, err = time.Parse(time.RFC3339Nano, last); err != nil {
+			return nil, errors.Wrapf(err, "issue %s last_seen %q does not read", issue.Key, last)
+		}
+		kept = append(kept, issue)
+	}
+	return kept, errors.Wrapf(rows.Err(), "failed to read every issue of %s", day)
 }
 
 // writeIssues upserts each issue's day. A row's counts are the ledger's own

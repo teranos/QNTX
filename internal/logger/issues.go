@@ -46,6 +46,11 @@ var issues = newIssueLedger(time.Now, issuesPerDay)
 // TakeIssues hands over every issue that changed since the last call.
 func TakeIssues() []Issue { return issues.take() }
 
+// SeedIssues takes in what the node already kept of today, before anything is
+// counted: a restart within a UTC day continues its counts, its raises and the
+// day's cap, and does not write smaller totals over larger ones.
+func SeedIssues(kept []Issue) { issues.seed(kept) }
+
 // ReturnIssues gives back issues that were taken and not written, so the next
 // take hands them over again.
 func ReturnIssues(taken []Issue) { issues.giveBack(taken) }
@@ -103,6 +108,35 @@ func (l *issueLedger) raise(ent zapcore.Entry, fields []zapcore.Field) bool {
 	l.nextRise[issue.Key] = max(issue.Occurrences, 1) * 4
 	l.changed[issue.Day+issue.Key] = issue
 	return true
+}
+
+func (l *issueLedger) seed(kept []Issue) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	day := l.now().UTC().Format(time.DateOnly)
+	if day != l.day {
+		l.day, l.raised = day, 0
+		l.today = map[string]*Issue{}
+		l.nextRise = map[string]int{}
+	}
+	for _, k := range kept {
+		if k.Day != day {
+			continue
+		}
+		if held, counted := l.today[k.Key]; counted {
+			// Counted before the seed: the kept totals are added under it.
+			held.Occurrences += k.Occurrences
+			held.Raised += k.Raised
+			held.FirstSeen = k.FirstSeen
+		} else {
+			issue := k
+			l.today[k.Key] = &issue
+		}
+		l.raised += k.Raised
+		if k.Raised > 0 {
+			l.nextRise[k.Key] = max(k.Occurrences, 1) * 4
+		}
+	}
 }
 
 // take hands over what changed since the last take, in day and key order.

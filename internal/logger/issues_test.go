@@ -218,3 +218,34 @@ func TestGivenBackIsTakenAgain(t *testing.T) {
 		t.Errorf("after giving back, the take handed over %+v", kept)
 	}
 }
+
+// A restart within a UTC day continues the day: what was kept is counted on
+// from, and a day whose cap was reached raises nothing more.
+func TestARestartContinuesTheDay(t *testing.T) {
+	at := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	before, _ := ledgerAt(at, 2)
+	for i := range 20 {
+		before.seen(forwardFailed(), forwardFields(i))
+		before.raise(forwardFailed(), forwardFields(i))
+	}
+	other := forwardFailed()
+	other.Message = "another"
+	before.seen(other, nil)
+	before.raise(other, nil)
+	kept := before.take()
+
+	after, _ := ledgerAt(at.Add(time.Hour), 2)
+	after.seed(kept)
+	after.seen(forwardFailed(), forwardFields(20))
+	third := forwardFailed()
+	third.Message = "a third"
+	after.seen(third, nil)
+	if after.raise(third, nil) {
+		t.Error("an issue was raised after the day's cap was reached before the restart")
+	}
+	for _, issue := range after.take() {
+		if issue.Message == forwardFailed().Message && issue.Occurrences != 21 {
+			t.Errorf("the restarted ledger counts %d occurrences, want 21 (20 kept and 1 since)", issue.Occurrences)
+		}
+	}
+}
