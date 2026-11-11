@@ -2344,3 +2344,169 @@ pub extern "C" fn duckdb_identity_save(
         }
     })
 }
+
+// ============================================================================
+// A DuckDB a subsystem holds for itself (crate::held)
+// ============================================================================
+
+use crate::held::HeldDb;
+
+/// The rows a held DuckDB answered: a JSON array of objects by column name.
+#[repr(C)]
+pub struct HeldResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub rows_json: *mut c_char,
+}
+
+impl FfiResult for HeldResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            rows_json: ptr::null_mut(),
+        }
+    }
+}
+
+/// One migration as Go hands it: its version and its SQL.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HeldMigration {
+    version: String,
+    sql: String,
+}
+
+/// Open the DuckDB at `path` and apply `migrations_json`, a JSON array of
+/// `{"version","sql"}`. NULL on failure, the reason in `error_out`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_held_new(
+    path: *const c_char,
+    migrations_json: *const c_char,
+    error_out: *mut *mut c_char,
+) -> *mut HeldDb {
+    qntx_ffi_common::guarded(
+        "duckdb_held_new",
+        || {
+            const CALL: &str = "duckdb_held_new";
+            let path = match unsafe { argument(CALL, "path", path) } {
+                Ok(s) => s,
+                Err(e) => return fail_with(error_out, CALL, e),
+            };
+            let migrations = match unsafe { argument(CALL, "migrations_json", migrations_json) } {
+                Ok(s) => s,
+                Err(e) => return fail_with(error_out, CALL, e),
+            };
+            let migrations: Vec<HeldMigration> = match serde_json::from_str(migrations) {
+                Ok(m) => m,
+                Err(e) => return fail_with(error_out, CALL, DuckdbError::Serde(e)),
+            };
+            let migrations: Vec<(String, String)> =
+                migrations.into_iter().map(|m| (m.version, m.sql)).collect();
+            match HeldDb::open(path, &migrations) {
+                Ok(held) => Box::into_raw(Box::new(held)),
+                Err(e) => fail_with(error_out, CALL, open_failed(Object::Held, path, None, e)),
+            }
+        },
+        |_| std::ptr::null_mut(),
+    )
+}
+
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_held_free(held: *mut HeldDb) {
+    qntx_ffi_common::guarded(
+        "duckdb_held_free",
+        || {
+            unsafe { free_boxed(held) };
+        },
+        |_| (),
+    )
+}
+
+/// The SQL and its parameters, read off the C strings.
+unsafe fn held_statement(
+    call: &'static str,
+    sql: *const c_char,
+    params_json: *const c_char,
+) -> std::result::Result<(String, Vec<serde_json::Value>), String> {
+    let sql = unsafe { argument(call, "sql", sql) }.map_err(|e| e.crosses(call))?;
+    let params =
+        unsafe { argument(call, "params_json", params_json) }.map_err(|e| e.crosses(call))?;
+    let params: Vec<serde_json::Value> =
+        serde_json::from_str(params).map_err(|e| e.crosses(call))?;
+    Ok((sql.to_string(), params))
+}
+
+/// Run SQL that answers no rows. `params_json` is a JSON array bound in
+/// order; with none, the SQL may hold several statements. The count is the
+/// rows it changed.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_held_exec(
+    held: *const HeldDb,
+    sql: *const c_char,
+    params_json: *const c_char,
+) -> CountResultC {
+    qntx_ffi_common::guarded_result("duckdb_held_exec", || {
+        const CALL: &str = "duckdb_held_exec";
+        if held.is_null() {
+            return CountResultC::error("null held DuckDB pointer");
+        }
+        let (sql, params) = match unsafe { held_statement(CALL, sql, params_json) } {
+            Ok(s) => s,
+            Err(e) => return CountResultC::error(e),
+        };
+        match unsafe { &*held }.exec(&sql, &params) {
+            Ok(n) => CountResultC::ok(n),
+            Err(e) => CountResultC::error(e.crosses(CALL)),
+        }
+    })
+}
+
+/// The rows SQL answers, as a JSON array of objects in `rows_json`. Free with
+/// `duckdb_held_result_free`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn duckdb_held_query(
+    held: *const HeldDb,
+    sql: *const c_char,
+    params_json: *const c_char,
+) -> HeldResultC {
+    qntx_ffi_common::guarded_result("duckdb_held_query", || {
+        const CALL: &str = "duckdb_held_query";
+        if held.is_null() {
+            return HeldResultC::error("null held DuckDB pointer");
+        }
+        let (sql, params) = match unsafe { held_statement(CALL, sql, params_json) } {
+            Ok(s) => s,
+            Err(e) => return HeldResultC::error(e),
+        };
+        let rows = match unsafe { &*held }.query(&sql, &params) {
+            Ok(rows) => rows,
+            Err(e) => return HeldResultC::error(e.crosses(CALL)),
+        };
+        match serde_json::to_string(&rows) {
+            Ok(json) => HeldResultC {
+                success: true,
+                error_msg: ptr::null_mut(),
+                rows_json: cstring_new_or_empty(&json),
+            },
+            Err(e) => HeldResultC::error(e.crosses(CALL)),
+        }
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn duckdb_held_result_free(result: HeldResultC) {
+    qntx_ffi_common::guarded(
+        "duckdb_held_result_free",
+        || unsafe {
+            free_cstring(result.error_msg);
+            free_cstring(result.rows_json);
+        },
+        |_| (),
+    )
+}

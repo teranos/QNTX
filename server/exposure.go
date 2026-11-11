@@ -72,9 +72,6 @@ func RefuseUnsaid(cfg *appcfg.Config) error {
 	if cfg.Said("sentry.dsn") {
 		keys = append(keys, "sentry.min_level", "sentry.capture_errors", "sentry.flush_seconds", "sentry.debug")
 	}
-	if cfg.Said("distill.interval_seconds") {
-		keys = append(keys, "distill.max_age_hours", "distill.batch_size")
-	}
 	return cfg.RefuseUnsaid("the node does not run on what it was not told", keys...)
 }
 

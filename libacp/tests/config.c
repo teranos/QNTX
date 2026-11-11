@@ -1,4 +1,4 @@
-// Session config options, as #124 gave them: set_config_option's request, and a session's selects.
+// 「[Opus 5.5] Session config options, as #124 gave them: set_config_option's request, and a session's selects.」
 #include "acp.h"
 
 #include <stdio.h>
@@ -18,7 +18,7 @@ static int says(const acp_buffer *b, const char *want) {
     return b->data != NULL && strcmp(b->data, want) == 0;
 }
 
-// A value is a value id, or a boolean with its type said: the request's two shapes.
+// 「[Opus 5.5] A value is a value id, or a boolean with its type said: the request's two shapes.」
 static void set_config_option_request(void) {
     acp_set_config_option in;
     acp_buffer error;
@@ -43,7 +43,7 @@ static void set_config_option_request(void) {
     CHECK(set_option("{\"sessionId\":\"code-1-1-1\",\"value\":\"high\"}", &in, &error) == ACP_INVALID_PARAMS);
     CHECK(says(&error, "{\"code\":-32602,\"message\":\"session/set_config_option needs configId\"}"));
     acp_buffer_free(&error);
-    // A boolean without its type, and no value at all, are neither shape.
+    // 「[Opus 5.5] A boolean without its type, and no value at all, are neither shape.」
     const char *neither[] = {
         "{\"sessionId\":\"code-1-1-1\",\"configId\":\"effort\",\"value\":true}",
         "{\"sessionId\":\"code-1-1-1\",\"configId\":\"effort\"}",
@@ -58,7 +58,7 @@ static void set_config_option_request(void) {
     }
 }
 
-// SessionConfigOption selects, in the order given: each one's current value and the values it offers.
+// 「[Opus 5.5] SessionConfigOption selects, in the order given: each one's current value and the values it offers.」
 static void options_written(void) {
     const acp_config_value modes[] = {
         {"default", "Manual", "m in a permission block"},
@@ -77,13 +77,13 @@ static void options_written(void) {
                      "{\"id\":\"effort\",\"name\":\"Effort\",\"category\":\"thought_level\",\"type\":\"select\",\"currentValue\":\"medium\","
                      "\"options\":[{\"value\":\"low\",\"name\":\"Low\"},{\"value\":\"medium\",\"name\":\"Medium\"}]}]"));
     acp_buffer_free(&out);
-    // No category is none written.
+    // 「[Opus 5.5] No category is none written.」
     const acp_config_select bare = {"x", "X", NULL, "low", efforts, 2};
     CHECK(acp_config_options_write(&bare, 1, &out) == ACP_OK);
     CHECK(says(&out, "[{\"id\":\"x\",\"name\":\"X\",\"type\":\"select\",\"currentValue\":\"low\","
                      "\"options\":[{\"value\":\"low\",\"name\":\"Low\"},{\"value\":\"medium\",\"name\":\"Medium\"}]}]"));
     acp_buffer_free(&out);
-    // The current value is one of those offered.
+    // 「[Opus 5.5] The current value is one of those offered.」
     const acp_config_select stray = {"effort", "Effort", "thought_level", "ultra", efforts, 2};
     CHECK(acp_config_options_write(&stray, 1, &out) == ACP_INVALID_ARGUMENT);
     CHECK(acp_config_options_write(NULL, 0, &out) == ACP_INVALID_ARGUMENT);

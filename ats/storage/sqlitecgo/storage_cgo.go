@@ -248,34 +248,6 @@ func (rs *RustStore) releaseReadConn(entry *readConnEntry) {
 	}
 }
 
-// SetEnforcementConfig sets the enforcement config on the Rust store.
-// When set, Rust runs enforcement automatically after every put().
-func (rs *RustStore) SetEnforcementConfig(config *EnforcementConfig) error {
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal enforcement config")
-	}
-
-	cJSON := C.CString(string(configJSON))
-	defer C.free(unsafe.Pointer(cJSON))
-
-	rs.muWrite.Lock()
-	rs.SetWriteHolder("set-enforcement-config")
-	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
-	if rs.closed {
-		return errors.New("store is closed")
-	}
-
-	result := C.storage_set_enforcement_config(rs.store, cJSON)
-	defer C.storage_result_free(result)
-
-	if !result.success {
-		return errors.New(C.GoString(result.error_msg))
-	}
-
-	return nil
-}
-
 // Close frees the underlying Rust store.
 // Safe to call multiple times.
 func (rs *RustStore) Close() error {
@@ -827,62 +799,6 @@ func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string, resolved 
 	return attestations, nil
 }
 
-// EnforceLimits runs bounded enforcement through Rust and returns enforcement events as JSON.
-func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *EnforcementConfig) ([]EnforcementEvent, error) {
-	input := enforcementInput{
-		Actors:   actors,
-		Contexts: contexts,
-		Subjects: subjects,
-		Config:   *config,
-	}
-
-	inputJSON, err := json.Marshal(input)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal enforcement input")
-	}
-
-	cJSON := C.CString(string(inputJSON))
-	defer C.free(unsafe.Pointer(cJSON))
-
-	rs.muWrite.Lock()
-	rs.SetWriteHolder("enforce-limits")
-	if rs.closed {
-		rs.ClearWriteHolder()
-		rs.muWrite.Unlock()
-		return nil, errors.New("store is closed")
-	}
-
-	start := time.Now()
-	result := C.storage_enforce_limits(rs.store, cJSON)
-	var success bool
-	var errMsg, jsonStr string
-	success = bool(result.success)
-	if !success {
-		errMsg = C.GoString(result.error_msg)
-	} else if result.attestation_json != nil {
-		jsonStr = C.GoString(result.attestation_json)
-	}
-	C.attestation_result_free(result)
-	rs.ClearWriteHolder()
-	rs.muWrite.Unlock()
-	logSlowOp(start, "storage_enforce_limits")
-
-	if !success {
-		return nil, errors.New(errMsg)
-	}
-
-	if jsonStr == "" || jsonStr == "[]" {
-		return nil, nil
-	}
-
-	var events []EnforcementEvent
-	if err := json.Unmarshal([]byte(jsonStr), &events); err != nil {
-		return nil, errors.Wrap(err, "failed to parse enforcement events")
-	}
-
-	return events, nil
-}
-
 // GetStorageStats returns storage statistics from Rust.
 func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
 	var result C.AttestationResultC
@@ -1093,34 +1009,6 @@ func (rs *RustStore) QueryAttestationsRaw(sql string, params []any) ([]*types.As
 	}
 
 	return attestations, nil
-}
-
-// AgeDistill runs age-triggered distillation through Rust FFI.
-// Folds old attestations (older than cutoff) + existing sigmas into compressed summaries.
-// All within a single SQLite transaction on the Rust side.
-func (rs *RustStore) AgeDistill(cutoffRFC3339 string, batchSize int) (distilled, sigmasCreated, skipped int, err error) {
-	cCutoff := C.CString(cutoffRFC3339)
-	defer C.free(unsafe.Pointer(cCutoff))
-
-	return rs.ageDistillFFI(cCutoff, batchSize)
-}
-
-func (rs *RustStore) ageDistillFFI(cCutoff *C.char, batchSize int) (int, int, int, error) {
-	rs.muWrite.Lock()
-	rs.SetWriteHolder("age-distill")
-	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
-	if rs.closed {
-		return 0, 0, 0, errors.New("store is closed")
-	}
-
-	result := C.storage_age_distill(rs.store, cCutoff, C.size_t(batchSize))
-	if !result.success {
-		errMsg := C.GoString(result.error_msg)
-		C.storage_string_free(result.error_msg)
-		return 0, 0, 0, errors.Newf("age distill failed: %s", errMsg)
-	}
-
-	return int(result.distilled), int(result.sigmas_created), int(result.skipped), nil
 }
 
 // WALCheckpointTruncate runs a TRUNCATE WAL checkpoint through Rust FFI.

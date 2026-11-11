@@ -1,4 +1,4 @@
-// terminal/*, as ground code asks it of the client: each request, and what the client answers.
+// 「[Opus 5.5] terminal/*, as ground code asks it of the client: each request, and what the client answers.」
 #include "acp.h"
 
 #include <stdio.h>
@@ -13,7 +13,7 @@ static int says(const acp_buffer *b, const char *want) {
     return b->data != NULL && strcmp(b->data, want) == 0;
 }
 
-// terminal/create: the command, its args, the cwd and the limit; args, cwd and limit only when given.
+// 「[Opus 5.5] terminal/create: the command, its args, the cwd and the limit; args, cwd and limit only when given.」
 static void create(void) {
     acp_buffer out = {0};
     const char *args[] = {"-c", "echo \"hi\" | wc -c"};
@@ -39,7 +39,7 @@ static char *created(const char *message) {
     return id;
 }
 
-// The terminalId of a result; any other answer is none.
+// 「[Opus 5.5] The terminalId of a result; any other answer is none.」
 static void create_answers(void) {
     char *id = created("{\"jsonrpc\":\"2.0\",\"id\":\"term-1\",\"result\":{\"terminalId\":\"t-9\"}}");
     CHECK(id != NULL && strcmp(id, "t-9") == 0);
@@ -49,7 +49,7 @@ static void create_answers(void) {
     CHECK(created("not json") == NULL);
 }
 
-// The four that name a terminal: sessionId and terminalId, each under its own method.
+// 「[Opus 5.5] The four that name a terminal: sessionId and terminalId, each under its own method.」
 static void by_terminal(void) {
     acp_buffer out = {0};
     CHECK(acp_terminal_output_request_write("\"term-2\"", "code-1-1-1", "t-9", &out) == ACP_OK);
@@ -76,7 +76,7 @@ static acp_status exit_of(const char *message, acp_terminal_exit *out) {
     return acp_terminal_exit_read(message, strlen(message), out);
 }
 
-// wait_for_exit's result: an exit code, a signal, or neither known; any other answer is no exit.
+// 「[Opus 5.5] wait_for_exit's result: an exit code, a signal, or neither known; any other answer is no exit.」
 static void exits(void) {
     acp_terminal_exit e;
     CHECK(exit_of("{\"jsonrpc\":\"2.0\",\"id\":\"term-3\",\"result\":{\"exitCode\":2,\"signal\":null}}", &e) == ACP_OK);
@@ -101,7 +101,7 @@ static acp_status output_of(const char *message, acp_terminal_output *out) {
     return acp_terminal_output_result_read(message, strlen(message), out);
 }
 
-// terminal/output's result: every byte of the output, whether it was cut, and the exit when there was one.
+// 「[Opus 5.5] terminal/output's result: every byte of the output, whether it was cut, and the exit when there was one.」
 static void outputs(void) {
     acp_terminal_output o;
     CHECK(output_of("{\"jsonrpc\":\"2.0\",\"id\":\"term-2\",\"result\":{\"output\":\"a\\u0000b\\n\",\"truncated\":true,"
@@ -124,7 +124,7 @@ static int answered(const char *message) {
     return got;
 }
 
-// kill's and release's answers say nothing but whether they are a result.
+// 「[Opus 5.5] kill's and release's answers say nothing but whether they are a result.」
 static void acks(void) {
     CHECK(answered("{\"jsonrpc\":\"2.0\",\"id\":\"term-4\",\"result\":{}}") == 1);
     CHECK(answered("{\"jsonrpc\":\"2.0\",\"id\":\"term-4\",\"result\":null}") == 1);
@@ -133,7 +133,7 @@ static void acks(void) {
     CHECK(acp_terminal_answered_read("{}", 2, NULL) == ACP_INVALID_ARGUMENT);
 }
 
-// A tool call that shows the terminal: its content is the terminal, ahead of any other.
+// 「[Opus 5.5] A tool call that shows the terminal: its content is the terminal, ahead of any other.」
 static void shown(void) {
     acp_buffer out = {0};
     acp_tool_call call = {0};

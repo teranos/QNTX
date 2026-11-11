@@ -1,5 +1,5 @@
-// session/update and elicitation, as #162 to #177 tell the client: each update kind, the
-// notification around it, and what a session's MCP server elicits, asked again over ACP.
+// 「[Opus 5.5] session/update and elicitation, as #162 to #177 tell the client: each update kind, the」
+// 「[Opus 5.5] notification around it, and what a session's MCP server elicits, asked again over ACP.」
 #include "acp.h"
 
 #include <stdio.h>
@@ -22,12 +22,12 @@ static void envelope(void) {
     CHECK(says(&out, "{\"jsonrpc\":\"2.0\",\"method\":\"session/update\",\"params\":{\"sessionId\":\"code-1-1-1\","
                      "\"update\":{\"sessionUpdate\":\"usage_update\",\"used\":1,\"size\":2}}}"));
     CHECK(acp_session_update_write("code-1-1-1", "not json", &out) == ACP_INVALID_ARGUMENT);
-    // The update as it was written, so what it carries raw is passed on byte for byte.
+    // 「[Opus 5.5] The update as it was written, so what it carries raw is passed on byte for byte.」
     CHECK(acp_session_update_write("code-1-1-1", "{\"rawOutput\":{\"a\": 1}}", &out) == ACP_OK);
     CHECK(says(&out, "{\"jsonrpc\":\"2.0\",\"method\":\"session/update\",\"params\":{\"sessionId\":\"code-1-1-1\",\"update\":{\"rawOutput\":{\"a\": 1}}}}"));
 }
 
-// #164: thought chunks; and the message chunks the replay tells, every byte.
+// 「[Opus 5.5] #164: thought chunks; and the message chunks the replay tells, every byte.」
 static void chunks(void) {
     acp_buffer out = {0};
     CHECK(acp_text_chunk_write(ACP_CHUNK_AGENT_MESSAGE, "say \"hi\"\n", 9, &out) == ACP_OK);
@@ -38,8 +38,8 @@ static void chunks(void) {
     CHECK(says(&out, "{\"sessionUpdate\":\"user_message_chunk\",\"content\":{\"type\":\"text\",\"text\":\"a\\u0000b\"}}"));
 }
 
-// #163, #172: a call's first report names the tool, its updates say how it came out and what it
-// produced: MCP's content blocks as they came, or a text.
+// 「[Opus 5.5] #163, #172: a call's first report names the tool, its updates say how it came out and what it」
+// 「[Opus 5.5] produced: MCP's content blocks as they came, or a text.」
 static void tool_calls(void) {
     acp_buffer out = {0};
     acp_tool_call first = {0, "c1", "x__y", "x__y", "read", "pending", "{\"q\":1}", NULL, NULL, NULL, NULL, NULL};
@@ -63,19 +63,19 @@ static void tool_calls(void) {
     CHECK(says(&out, "{\"sessionUpdate\":\"tool_call_update\",\"toolCallId\":\"c1\",\"status\":\"failed\","
                      "\"rawOutput\":{\"status\":\"not run\"},\"content\":[{\"type\":\"content\",\"content\":{\"type\":\"text\","
                      "\"text\":\"the user rejected it\"}}]}"));
-    // Raw JSON is passed on byte for byte, as the server wrote it.
+    // 「[Opus 5.5] Raw JSON is passed on byte for byte, as the server wrote it.」
     acp_tool_call spaced = {1, "c1", NULL, NULL, NULL, "completed", "{ \"q\" : 1 }", "{\"jsonrpc\": \"2.0\", \"id\": 3}", NULL, NULL, NULL, NULL};
     CHECK(acp_tool_call_write(&spaced, &out) == ACP_OK);
     CHECK(says(&out, "{\"sessionUpdate\":\"tool_call_update\",\"toolCallId\":\"c1\",\"status\":\"completed\","
                      "\"rawInput\":{ \"q\" : 1 },\"rawOutput\":{\"jsonrpc\": \"2.0\", \"id\": 3}}"));
-    // Output that is no JSON is the text it is; no blocks and no text, no content.
+    // 「[Opus 5.5] Output that is no JSON is the text it is; no blocks and no text, no content.」
     acp_tool_call bare = {1, "c1", NULL, NULL, NULL, "failed", NULL, "boom", "[]", NULL, NULL, NULL};
     CHECK(acp_tool_call_write(&bare, &out) == ACP_OK);
     CHECK(says(&out, "{\"sessionUpdate\":\"tool_call_update\",\"toolCallId\":\"c1\",\"status\":\"failed\",\"rawOutput\":\"boom\"}"));
     acp_tool_call stray = {1, "c1", NULL, NULL, NULL, "failed", NULL, NULL, "{\"a\":1}", NULL, NULL, NULL};
     CHECK(acp_tool_call_write(&stray, &out) == ACP_INVALID_ARGUMENT);
-    // A write shows the file it modified as a diff, every byte of either text, after any terminal and
-    // before any blocks; a file that was not there has no old text, null.
+    // 「[Opus 5.5] A write shows the file it modified as a diff, every byte of either text, after any terminal and」
+    // 「[Opus 5.5] before any blocks; a file that was not there has no old text, null.」
     acp_diff changed = {"/tmp/a b", "one\0two\n", 8, "one\0three\n", 10};
     acp_tool_call wrote = {1, "c1", NULL, NULL, NULL, "completed", NULL, "{\"result\":{}}", NULL, NULL, NULL, &changed};
     CHECK(acp_tool_call_write(&wrote, &out) == ACP_OK);
@@ -87,7 +87,7 @@ static void tool_calls(void) {
     CHECK(acp_tool_call_write(&made, &out) == ACP_OK);
     CHECK(says(&out, "{\"sessionUpdate\":\"tool_call_update\",\"toolCallId\":\"c1\",\"status\":\"completed\","
                      "\"content\":[{\"type\":\"diff\",\"path\":\"/tmp/new\",\"oldText\":null,\"newText\":\"\"}]}"));
-    // "The absolute file path being modified", and newText is required.
+    // 「[Opus 5.5] "The absolute file path being modified", and newText is required.」
     acp_diff relative = {"a b", NULL, 0, "x", 1};
     acp_tool_call bad = {1, "c1", NULL, NULL, NULL, "completed", NULL, NULL, NULL, NULL, NULL, &relative};
     CHECK(acp_tool_call_write(&bad, &out) == ACP_INVALID_ARGUMENT);
@@ -98,9 +98,9 @@ static void tool_calls(void) {
     CHECK(acp_tool_call_write(&nameless, &out) == ACP_INVALID_ARGUMENT);
 }
 
-// The agent's plan: "The Agent MUST send a complete list of all plan entries in each update", each
-// its content, priority and status, every byte of the content; anything else an entry holds is not
-// the plan's. A plan of no entries is a plan.
+// 「[Opus 5.5] The agent's plan: "The Agent MUST send a complete list of all plan entries in each update", each」
+// 「[Opus 5.5] its content, priority and status, every byte of the content; anything else an entry holds is not」
+// 「[Opus 5.5] the plan's. A plan of no entries is a plan.」
 static void plans(void) {
     acp_buffer out = {0};
     const char *plan = "{\"entries\":[{\"content\":\"Read the \\\"code\\\"\\u0000\",\"priority\":\"high\",\"status\":\"completed\",\"extra\":1},"
@@ -120,7 +120,7 @@ static void plans(void) {
         "{\"entries\":[{\"content\":\"x\",\"priority\":\"high\",\"status\":\"done\"}]}",
         "{\"entries\":[{\"content\":\"x\",\"priority\":\"high\"}]}",
         "{\"entries\":[7]}",
-        // A NUL makes a value another one, whatever it starts with.
+        // 「[Opus 5.5] A NUL makes a value another one, whatever it starts with.」
         "{\"entries\":[{\"content\":\"x\",\"priority\":\"high\\u0000x\",\"status\":\"pending\"}]}",
         "{\"entries\":[{\"content\":\"x\",\"priority\":\"high\",\"status\":\"completed\\u0000unexpected\"}]}",
         "not json",
@@ -129,8 +129,8 @@ static void plans(void) {
     CHECK(out.data == NULL);
 }
 
-// #169, #177: how full the context is, and what the session has cost; #166, #176: the title,
-// and when it was last active; #173: the commands; #171: a notice.
+// 「[Opus 5.5] #169, #177: how full the context is, and what the session has cost; #166, #176: the title,」
+// 「[Opus 5.5] and when it was last active; #173: the commands; #171: a notice.」
 static void others(void) {
     acp_buffer out = {0};
     CHECK(acp_usage_update_write(124, 1000000, "0.001236", "USD", &out) == ACP_OK);
@@ -154,8 +154,8 @@ static void others(void) {
                      "\"description\":\"disk low\"}"));
 }
 
-// #167, #178: a server's elicitation/create, asked of the client tied to the session and the call:
-// those lead, then its mode, form when it names none, then everything else it asked, in its order.
+// 「[Opus 5.5] #167, #178: a server's elicitation/create, asked of the client tied to the session and the call:」
+// 「[Opus 5.5] those lead, then its mode, form when it names none, then everything else it asked, in its order.」
 static void elicitation(void) {
     acp_buffer out = {0};
     int mode = -1;
@@ -182,7 +182,7 @@ static void elicitation(void) {
     CHECK(says(&out, "{\"jsonrpc\":\"2.0\",\"method\":\"elicitation/complete\",\"params\":{\"elicitationId\":\"x1\"}}"));
 }
 
-// An image the user gave, told back as a user_message_chunk: "An image provided to or from an LLM."
+// 「[Opus 5.5] An image the user gave, told back as a user_message_chunk: "An image provided to or from an LLM."」
 static void image_chunk(void) {
     acp_buffer out = {0};
     CHECK(acp_image_chunk_write(ACP_CHUNK_USER_MESSAGE, "image/png", "iVBORw0KGgo=", &out) == ACP_OK);
@@ -191,7 +191,7 @@ static void image_chunk(void) {
     CHECK(acp_image_chunk_write((acp_chunk_kind) 9, "image/png", "x", &out) == ACP_INVALID_ARGUMENT);
 }
 
-// Audio the user gave, told back as a user_message_chunk: "Audio provided to or from an LLM."
+// 「[Opus 5.5] Audio the user gave, told back as a user_message_chunk: "Audio provided to or from an LLM."」
 static void audio_chunk(void) {
     acp_buffer out = {0};
     CHECK(acp_audio_chunk_write(ACP_CHUNK_USER_MESSAGE, "audio/wav", "UklGRg==", &out) == ACP_OK);
@@ -199,8 +199,8 @@ static void audio_chunk(void) {
     CHECK(acp_audio_chunk_write(ACP_CHUNK_USER_MESSAGE, "audio/wav", NULL, &out) == ACP_INVALID_ARGUMENT);
 }
 
-// An elicitation "tied to a specific JSON-RPC request outside of a session (e.g., during
-// auth/configuration phases before any session is started)": url mode, scoped by requestId.
+// 「[Opus 5.5] An elicitation "tied to a specific JSON-RPC request outside of a session (e.g., during」
+// 「[Opus 5.5] auth/configuration phases before any session is started)": url mode, scoped by requestId.」
 static void request_scoped(void) {
     acp_buffer out = {0};
     CHECK(acp_elicitation_url_write("\"login-1\"", "7", "qntx-ABCD-EFGH", "https://q.example/auth/device/approve?user_code=ABCD-EFGH",
@@ -208,7 +208,7 @@ static void request_scoped(void) {
     CHECK(says(&out, "{\"jsonrpc\":\"2.0\",\"id\":\"login-1\",\"method\":\"elicitation/create\",\"params\":{\"requestId\":7,"
                      "\"mode\":\"url\",\"message\":\"Sign in to QNTX: ABCD-EFGH\",\"elicitationId\":\"qntx-ABCD-EFGH\","
                      "\"url\":\"https://q.example/auth/device/approve?user_code=ABCD-EFGH\"}}"));
-    // A string request id stays a string.
+    // 「[Opus 5.5] A string request id stays a string.」
     CHECK(acp_elicitation_url_write("\"login-2\"", "\"auth-1\"", "e", "https://q.example/a", "m", &out) == ACP_OK);
     CHECK(says(&out, "{\"jsonrpc\":\"2.0\",\"id\":\"login-2\",\"method\":\"elicitation/create\",\"params\":{\"requestId\":\"auth-1\","
                      "\"mode\":\"url\",\"message\":\"m\",\"elicitationId\":\"e\",\"url\":\"https://q.example/a\"}}"));

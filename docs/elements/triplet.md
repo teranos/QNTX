@@ -30,7 +30,6 @@ Same **subject + predicate + context** = same triplet. Actor and timestamp vary 
 |--------|------|------|
 | `⫶` | Triplet | Primary attestation interaction — grouped by claim |
 | `+` | Attestation | Fallback for lone ungroupable attestations |
-| `Σ` | Sigma | Statistical aggregate of many attestations |
 | `⊢` | Type | Type definition (metadata about a category) |
 
 ## Palette
@@ -42,7 +41,6 @@ The attestation element (+) inherits the current attestation palette (muted azur
 Color migration:
 - Triplet (⫶): new palette — slightly lighter, slight blue lean
 - Attestation (+): keeps current azure palette unchanged
-- Sigma (Σ): amber, unchanged
 - Type (⊢): violet, unchanged
 
 ## Meta Pill

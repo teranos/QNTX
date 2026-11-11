@@ -8,8 +8,6 @@ This glossary defines the core concepts and symbols used throughout QNTX. For a 
 
 **Authoritative definition: [ats/README.md](https://github.com/teranos/QNTX/blob/main/ats/README.md).** Do not restate it here.
 
-For storage details, see [Bounded Storage](architecture/bounded-storage.md).
-
 ### [Attestation](attestation.md)
 The atomic unit of QNTX — a signed, immutable claim in the form: `[Subject] is [Predicate] of [Context] by [Actor] at [Time]`
 
@@ -17,13 +15,6 @@ The atomic unit of QNTX — a signed, immutable claim in the form: `[Subject] is
 
 ### ASID (Attestation System ID)
 Unique identifier for attestations. Always random for uniqueness, ensuring no collisions.
-
-### Sigma (Σ)
-A distilled attestation — the compressed aggregate of many attestations folded into one. Created when bounded storage enforcement evicts attestations (Rust path) or when the Pulse age-trigger fires (Go path). A sigma carries `_count` (batch size), `_total` (transitive observation count), `_first_seen`/`_last_seen`, merged attributes (numeric → min/max/sum/count, string → frequencies), and a temporal `_histogram`.
-
-Sigmas are normal attestations — they participate in enforcement and can be recursively meta-distilled (sigma of sigmas). Each generation grows heavier: first-gen sigmas average ~5k observations, meta-distilled sigmas reach 100k+. The `_version` and `_rust_version` attributes track which code produced each generation.
-
-Identified by `_distill: true` in attributes, `source: "distill"`, and predicates prefixed with `distill:`. Rendered in the UI as the sigma element (Σ) with histogram bar charts, numeric range bars, and pie charts for string frequency distributions. See [ADR-020](adr/ADR-020-attestation-distillation.md) and [Bounded Storage](architecture/bounded-storage.md).
 
 ### Codex runtime
 
@@ -83,9 +74,6 @@ Uses both REST API and WebSocket:
 - Phases: "ingest" (process data) and "aggregate" (combine results)
 
 ## Data Model
-
-### Bounded Storage
-Hard limits with oldest deletion by default. Future versions will support user-defined retention policies.
 
 ### Temporal Representation
 Flexible based on predicate - can be single timestamp, range, or point-in-time with duration.

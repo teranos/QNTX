@@ -92,6 +92,7 @@ func (c *GRPCLLMClient) Chat(ctx context.Context, req ChatRequest) (*ChatRespons
 			CompletionTokens: int(resp.CompletionTokens),
 			TotalTokens:      int(resp.TotalTokens),
 		},
+		Served: ServedFrom(resp.GetServed()),
 	}, nil
 }
 
@@ -136,6 +137,7 @@ func (c *GRPCLLMClient) ChatStreaming(ctx context.Context, req ChatRequest, stre
 			sc.CompletionTokens = int(chunk.CompletionTokens)
 			sc.TotalTokens = int(chunk.TotalTokens)
 		}
+		sc.Served = ServedFrom(chunk.GetServed())
 
 		signal, carried, err := chunk.SignalCarried()
 		if err != nil {
@@ -179,6 +181,26 @@ func (c *GRPCLLMClient) ChatStreaming(ctx context.Context, req ChatRequest, stre
 		if chunk.Done {
 			return nil
 		}
+	}
+}
+
+// ServedFrom is the provider's report of how a call was served, or nil for a
+// response that carries none.
+func ServedFrom(served *protocol.LLMServed) *Served {
+	if served == nil {
+		return nil
+	}
+	return &Served{
+		RequestedProvider: served.GetRequestedProvider(),
+		RequestedModel:    served.GetRequestedModel(),
+		UpstreamProvider:  served.GetUpstreamProvider(),
+		ExecutedModel:     served.GetExecutedModel(),
+		ResponseModel:     served.GetResponseModel(),
+		RequestID:         served.GetRequestId(),
+		CostUSD:           served.CostUsd,
+		PricingSource:     served.GetPricingSource(),
+		AttemptCount:      int(served.GetAttemptCount()),
+		Fallback:          served.GetFallback(),
 	}
 }
 

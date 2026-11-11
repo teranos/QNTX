@@ -115,6 +115,15 @@ func (s *QNTXServer) anthropicSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/order"},
 				},
 				{
+					Name: "cap",
+					Does: "The most each Session an element's agent runs in at Anthropic may spend: it pauses there, and goes on once the cap is raised past what it spent. Set none, the node's default.",
+					Takes: []*protocol.Param{
+						{Name: "amount", Says: "A number above zero in " + anthropicCapCurrency + ", with at most two places after the point: 200 or 12.50. Left out, the cap is the node's default again."},
+					},
+					Answer: "protocol.NodeAnthropic",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: at + "/cap"},
+				},
+				{
 					Name:   "set",
 					Does:   "Keeps each id of Anthropic's in what was given, placed by its kind, and asks Anthropic whether it accepts the node once the organization, the service account and the rule are known.",
 					Takes:  takes,
@@ -127,6 +136,7 @@ func (s *QNTXServer) anthropicSignum() sigil.Signum {
 			"am":    s.anthropicAm,
 			"set":   s.anthropicSet,
 			"order": s.anthropicOrder,
+			"cap":   s.anthropicCapSet,
 		},
 	}
 }
@@ -144,6 +154,8 @@ func (s *QNTXServer) anthropicAm(ctx context.Context, _ sigil.Sent) (any, *proto
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	am.Cap, am.CapDefault = capOf(kept)
+	am.CapCurrency = anthropicCapCurrency
 	if !held {
 		return am, nil
 	}
@@ -173,23 +185,43 @@ func (s *QNTXServer) anthropicSet(ctx context.Context, sent sigil.Sent) (any, *p
 		return nil, &protocol.Refusal{Why: sigil.NotOneOf, Param: "given", Says: "no id of Anthropic's in " + strings.TrimSpace(sent["given"]) + ": an organization's is a UUID, an issuer's starts fdis_, a service account's svac_, a rule's fdrl_"}
 	}
 	// What was given joins what the node kept: each id is given once, at its own step.
-	kept, _, err := s.anthropicLine()
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	}
-	for name, id := range found {
-		kept.ids[name] = id
-	}
-	if refused := s.keepAnthropicLine(admitted.Identity, kept); refused != nil {
+	if _, refused := s.changeAnthropicLine(admitted.Identity, func(kept *anthropicKept) {
+		for name, id := range found {
+			kept.ids[name] = id
+		}
+	}); refused != nil {
 		return nil, refused
 	}
 	s.logger.Infow("the node's ids at Anthropic were given", "given", found, "by", admitted.Identity)
 	return s.anthropicAm(ctx, sent)
 }
 
+// 「[Opus 5.5] changeAnthropicLine is one read of the node's ANTHROPIC line, change, and write of it」
+// 「[Opus 5.5] anew, that no other change comes between: each write carries the whole line, so one」
+// 「[Opus 5.5] read before another's write would write that other's change away.」
+func (s *QNTXServer) changeAnthropicLine(by string, change func(*anthropicKept)) (anthropicKept, *protocol.Refusal) {
+	s.anthropicLining.Lock()
+	defer s.anthropicLining.Unlock()
+	kept, _, err := s.anthropicLine()
+	if err != nil {
+		return anthropicKept{}, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	change(&kept)
+	if refused := s.keepAnthropicLine(by, kept); refused != nil {
+		return anthropicKept{}, refused
+	}
+	return kept, nil
+}
+
+// 「[Opus 5.5] anthropicNow is when a line is written: the clock, which a test holds still.」
+var anthropicNow = time.Now
+
 // keepAnthropicLine writes the node's ANTHROPIC line anew: every id kept, and the order.
 func (s *QNTXServer) keepAnthropicLine(by string, kept anthropicKept) *protocol.Refusal {
 	attributes := map[string]any{"first": kept.first, "then": kept.then}
+	if kept.cap != "" {
+		attributes["cap"] = kept.cap
+	}
 	for name, id := range kept.ids {
 		if id != "" {
 			attributes[name] = id
@@ -203,7 +235,11 @@ func (s *QNTXServer) keepAnthropicLine(by string, kept anthropicKept) *protocol.
 	if err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "failed to name the node's %s line", anthropicLineSubject).Error()}
 	}
-	now := time.Now()
+	// 「[Opus 5.5] A line is stamped when it is written, and comes after the line it changes by its」
+	// 「[Opus 5.5] revision, one more, set under anthropicLining (changeAnthropicLine).」
+	attributes[anthropicRevisionAttribute] = kept.revision + 1
+	attributes[anthropicAfterAttribute] = kept.newestStamp.UnixMilli()
+	now := anthropicNow()
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{anthropicLineSubject}, Predicates: []string{anthropicLinePredicate}, Contexts: []string{auth.NamespaceSystem},
 		Actors: []string{by}, Timestamp: now, CreatedAt: now, Source: "anthropic", Attributes: attributes,
@@ -219,8 +255,66 @@ type anthropicKept struct {
 	// What ROOT's agents spend first, and whether the other follows.
 	first string
 	then  bool
+	// 「[Opus 5.5] The cap ROOT set on each Session at Anthropic, in anthropicCapCurrency; empty is none set.」
+	cap   string
 	setBy string
 	at    time.Time
+	// 「[Opus 5.5] revision is the line's place among the node's ANTHROPIC lines; 0 is a line written before」
+	// 「[Opus 5.5] lines carried one, older than any that does.」
+	revision int64
+	// 「[Opus 5.5] newestStamp is the latest stamp among every ANTHROPIC line: the after of the next line.」
+	newestStamp time.Time
+}
+
+// 「[Opus 5.5] anthropicAfterAttribute is the attribute a line keeps, in Unix milliseconds, the newest」
+// 「[Opus 5.5] stamp among the lines it was written after.」
+const anthropicAfterAttribute = "after"
+
+// 「[Opus 5.5] anthropicRevisionAttribute is the attribute a line's revision is kept under.」
+const anthropicRevisionAttribute = "revision"
+
+// 「[Opus 5.5] afterOf is the after a line with a revision keeps, in Unix milliseconds: its own stamp when」
+// 「[Opus 5.5] it keeps none.」
+func afterOf(as *types.As) (int64, error) {
+	held, carried := as.Attributes[anthropicAfterAttribute]
+	if !carried {
+		return as.Timestamp.UnixMilli(), nil
+	}
+	if after, isNumber := held.(float64); isNumber && after == float64(int64(after)) {
+		return int64(after), nil
+	}
+	if after, isNumber := held.(int64); isNumber {
+		return after, nil
+	}
+	if after, isNumber := held.(int); isNumber {
+		return int64(after), nil
+	}
+	return 0, errors.Newf("the node's %s line %s keeps %s as %v (%T), not a whole number", anthropicLineSubject, as.ID, anthropicAfterAttribute, held, held)
+}
+
+// 「[Opus 5.5] revisionOf is the revision a line carries, 0 for one that carries none. A line's」
+// 「[Opus 5.5] timestamp is when it was written and does not order it: two kept in one millisecond tie,」
+// 「[Opus 5.5] and one stamped ahead of the clock would become the record's take-in mark (storage.TakeIn).」
+func revisionOf(as *types.As) (int64, error) {
+	held, carried := as.Attributes[anthropicRevisionAttribute]
+	if !carried {
+		return 0, nil
+	}
+	switch revision := held.(type) {
+	case float64:
+		if revision == float64(int64(revision)) && revision > 0 {
+			return int64(revision), nil
+		}
+	case int:
+		if revision > 0 {
+			return int64(revision), nil
+		}
+	case int64:
+		if revision > 0 {
+			return revision, nil
+		}
+	}
+	return 0, errors.Newf("the node's %s line %s keeps %s as %v (%T), not a whole number above zero", anthropicLineSubject, as.ID, anthropicRevisionAttribute, held, held)
 }
 
 // anthropicLine reads the node's newest ANTHROPIC line. False is a node ROOT gave no ids yet.
@@ -233,16 +327,41 @@ func (s *QNTXServer) anthropicLine() (anthropicKept, bool, error) {
 	if err != nil {
 		return anthropicKept{}, false, errors.Wrapf(err, "failed to read the node's %s line", anthropicLineSubject)
 	}
-	var newest *types.As
+	// 「[Opus 5.5] The newest is the line with the greatest revision, unless a line with none (written before」
+	// 「[Opus 5.5] revisions, or by a build from before them run after) is stamped past that line's after:」
+	// 「[Opus 5.5] then it was written after it. A line with a revision and no after is after its own stamp.」
+	var revised, unrevised *types.As
+	var newestRevision int64
+	var newestStamp time.Time
 	for _, as := range found {
-		if newest == nil || as.Timestamp.After(newest.Timestamp) {
-			newest = as
+		revision, err := revisionOf(as)
+		if err != nil {
+			return anthropicKept{}, false, err
+		}
+		if as.Timestamp.After(newestStamp) {
+			newestStamp = as.Timestamp
+		}
+		switch {
+		case revision > 0 && (revised == nil || revision > newestRevision):
+			revised, newestRevision = as, revision
+		case revision == 0 && (unrevised == nil || as.Timestamp.After(unrevised.Timestamp)):
+			unrevised = as
+		}
+	}
+	newest := revised
+	if unrevised != nil {
+		if newest == nil {
+			newest = unrevised
+		} else if after, err := afterOf(revised); err != nil {
+			return anthropicKept{}, false, err
+		} else if unrevised.Timestamp.UnixMilli() > after {
+			newest = unrevised
 		}
 	}
 	if newest == nil {
 		return anthropicKept{ids: map[string]string{}, first: anthropicSession}, false, nil
 	}
-	kept := anthropicKept{ids: map[string]string{}, first: anthropicSession, at: newest.Timestamp}
+	kept := anthropicKept{ids: map[string]string{}, first: anthropicSession, at: newest.Timestamp, revision: newestRevision, newestStamp: newestStamp}
 	// A line kept before ROOT ordered anything spends the session first, and nothing follows.
 	if _, ordered := newest.Attributes["first"]; ordered {
 		if kept.first, err = oneText(newest.Attributes, "first", anthropicLineSubject, newest.ID, auth.NamespaceSystem); err != nil {
@@ -253,6 +372,15 @@ func (s *QNTXServer) anthropicLine() (anthropicKept, bool, error) {
 			return anthropicKept{}, false, errors.Newf("the node's %s line %s keeps then as %T, not a bool", anthropicLineSubject, newest.ID, newest.Attributes["then"])
 		}
 		kept.then = then
+	}
+	// 「[Opus 5.5] A line kept before ROOT set a cap has none, and the default holds.」
+	if _, capped := newest.Attributes["cap"]; capped {
+		if kept.cap, err = oneText(newest.Attributes, "cap", anthropicLineSubject, newest.ID, auth.NamespaceSystem); err != nil {
+			return anthropicKept{}, false, err
+		}
+		if _, err := centsOf(kept.cap); err != nil {
+			return anthropicKept{}, false, errors.Wrapf(err, "the node's %s line %s keeps a cap Anthropic would not take", anthropicLineSubject, newest.ID)
+		}
 	}
 	for _, name := range anthropicIDs {
 		// An id not given yet is absent from the line.

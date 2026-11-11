@@ -56,8 +56,8 @@ func TestMarkSettingsFromSource(t *testing.T) {
 		settings := map[string]any{
 			"storage": map[string]any{
 				"sqlite": map[string]any{
-					"bounded_storage": map[string]any{
-						"actor_context_limit": 32,
+					"wal": map[string]any{
+						"checkpoint_pages": 32,
 					},
 				},
 			},
@@ -67,7 +67,7 @@ func TestMarkSettingsFromSource(t *testing.T) {
 		TrackNestedSources(settings, "", SourceProject, "/project/am.toml")
 
 		// Verify deep nesting creates correct dotted key
-		info, exists := ConfigSources["storage.sqlite.bounded_storage.actor_context_limit"]
+		info, exists := ConfigSources["storage.sqlite.wal.checkpoint_pages"]
 		assert.True(t, exists)
 		assert.Equal(t, SourceProject, info.Source)
 		assert.Equal(t, "/project/am.toml", info.Path)

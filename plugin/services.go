@@ -92,6 +92,25 @@ type LLMResponse struct {
 	PromptTokens     int
 	CompletionTokens int
 	TotalTokens      int
+	// Served is how the call was served, when its provider reports it
+	// (llm.proto LLMServed); nil when it reports nothing past Model.
+	Served *LLMServed
+}
+
+// LLMServed is what a call asked for beside what served it, as the provider
+// that served it reports it (llm.proto LLMServed). An empty field was not
+// reported: it never means "the same as asked".
+type LLMServed struct {
+	RequestedProvider string
+	RequestedModel    string
+	UpstreamProvider  string
+	ExecutedModel     string
+	ResponseModel     string
+	RequestID         string
+	CostUSD           *string // The decimal text reported, unparsed; nil when none was.
+	PricingSource     string
+	AttemptCount      int
+	Fallback          bool
 }
 
 // VectorSearchService provides nearest-neighbor search over dense vector indexes (ADR-016).

@@ -32,6 +32,8 @@ pub enum Object {
     Namespace,
     Namespaces,
     NamespaceDefinition,
+    /// A DuckDB a subsystem holds for itself, in a file of the node's.
+    Held,
 }
 
 impl Object {
@@ -50,6 +52,7 @@ impl Object {
             Object::Tick | Object::Ticks => "schedule_ticks",
             Object::NodeIdentity => "node_identity",
             Object::Namespace | Object::Namespaces | Object::NamespaceDefinition => "namespaces",
+            Object::Held => "held",
         }
     }
 }
@@ -80,6 +83,7 @@ impl std::fmt::Display for Object {
             Object::Namespace => "the namespace",
             Object::Namespaces => "what the location holds",
             Object::NamespaceDefinition => "a namespace definition",
+            Object::Held => "a subsystem's own DuckDB",
         };
         f.write_str(word)
     }
@@ -434,15 +438,15 @@ impl DuckdbError {
 
     /// The one typed value this crosses every layer as. `ffi_call` names the
     /// C function it left through, or is empty inside the crate.
-    pub fn sacred(self, ffi_call: &str) -> laye_error::Error {
+    pub fn sacred(self, ffi_call: &str) -> sacred_error::Error {
         let at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis().to_string())
             .unwrap_or_default();
-        laye_error::Error {
+        sacred_error::Error {
             id: format!("err-{SURFACE}-{at}"),
-            severity: laye_error::Severity::Error,
-            context: laye_error::Context {
+            severity: sacred_error::Severity::Error,
+            context: sacred_error::Context {
                 surface: SURFACE.to_string(),
                 region: Some(self.region().to_string()),
                 anchor: None,

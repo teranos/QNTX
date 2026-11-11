@@ -106,7 +106,7 @@ func (s *LLMServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*pr
 	}
 
 	s.createWeave(ctx, req, providerName, resp.GetModel(), resp.GetContent(),
-		int(resp.GetTotalTokens()), nil)
+		int(resp.GetTotalTokens()), nil, resp.GetServed())
 
 	return resp, nil
 }
@@ -132,6 +132,7 @@ func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMSer
 		model     string
 		totalToks int
 		signals   []*protocol.TokenSignalProto
+		served    *protocol.LLMServed
 	)
 
 	for {
@@ -149,6 +150,9 @@ func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMSer
 			model = chunk.GetModel()
 			totalToks = int(chunk.GetTotalTokens())
 		}
+		if chunk.GetServed() != nil {
+			served = chunk.GetServed()
+		}
 		signal, carried, err := chunk.SignalCarried()
 		if err != nil {
 			return errors.Wrapf(err, "provider %s", providerName)
@@ -162,7 +166,7 @@ func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMSer
 		}
 	}
 
-	s.createWeave(srv.Context(), req, providerName, model, text.String(), totalToks, signals)
+	s.createWeave(srv.Context(), req, providerName, model, text.String(), totalToks, signals, served)
 
 	return nil
 }
@@ -235,7 +239,7 @@ func (s *LLMServer) providerNames() []string {
 
 // createWeave creates a Weave attestation capturing an LLM interaction.
 // Runs asynchronously — failures are logged, never propagated to the caller.
-func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatRequest, provider, model, responseText string, totalTokens int, signals []*protocol.TokenSignalProto) {
+func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatRequest, provider, model, responseText string, totalTokens int, signals []*protocol.TokenSignalProto, served *protocol.LLMServed) {
 	answered, err := named.TextOf("the model provider "+provider+" answered with", model)
 	if err != nil {
 		s.logger.Warnw("LLM call happened and is not woven: its provider named no model", "provider", provider, "error", err)
@@ -248,6 +252,9 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 		"model":        answered.String(),
 		"token_count":  totalTokens,
 		"weave_source": provider,
+	}
+	for key, value := range servedAttributes(served) {
+		attrs[key] = value
 	}
 
 	// Per-token signal data, and the mean over the tokens so far: a stream
@@ -305,6 +312,41 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 		measure.Count(measure.Woven, 1)
 		s.logger.Debugw("LLM call woven", "provider", provider, "model", model, "attestation", woven.ID)
 	}()
+}
+
+// servedAttributes are the provider's report of how a call was served, each
+// under its own name beside the weave's model: what was asked is never
+// written over what answered. A field the provider did not report is left out.
+func servedAttributes(served *protocol.LLMServed) map[string]any {
+	attrs := map[string]any{}
+	if served == nil {
+		return attrs
+	}
+	for key, value := range map[string]string{
+		"requested_provider": served.GetRequestedProvider(),
+		"requested_model":    served.GetRequestedModel(),
+		"upstream_provider":  served.GetUpstreamProvider(),
+		"executed_model":     served.GetExecutedModel(),
+		"response_model":     served.GetResponseModel(),
+		"request_id":         served.GetRequestId(),
+		"pricing_source":     served.GetPricingSource(),
+	} {
+		if value != "" {
+			attrs[key] = value
+		}
+	}
+	if served.CostUsd != nil {
+		attrs["cost_usd"] = served.GetCostUsd()
+	}
+	// A count reported says whether it fell back too; a fallback is reported
+	// with no count as well.
+	if served.GetAttemptCount() > 0 {
+		attrs["attempt_count"] = int(served.GetAttemptCount())
+	}
+	if served.GetAttemptCount() > 0 || served.GetFallback() {
+		attrs["fallback"] = served.GetFallback()
+	}
+	return attrs
 }
 
 // lastUserMessage extracts the last user message from the request for the weave prompt.

@@ -29,7 +29,7 @@ void acp_buffer_free(acp_buffer *buffer) {
     buffer->length = 0;
 }
 
-// One JSON value, the whole of what was given, or NULL.
+// 「[Opus 5.5] One JSON value, the whole of what was given, or NULL.」
 json_object *acp_parse(const char *json, size_t length) {
     if (json == NULL || length > INT32_MAX) return NULL;
     json_tokener *tokener = json_tokener_new();
@@ -37,7 +37,7 @@ json_object *acp_parse(const char *json, size_t length) {
     json_object *value = json_tokener_parse_ex(tokener, json, (int) length);
     int whole = json_tokener_get_error(tokener) == json_tokener_success
         && (size_t) json_tokener_get_parse_end(tokener) == length;
-    // A number at the end of the text may yet go on: a NUL ends it, as it ends a C string.
+    // 「[Opus 5.5] A number at the end of the text may yet go on: a NUL ends it, as it ends a C string.」
     if (value == NULL && json_tokener_get_error(tokener) == json_tokener_continue) {
         value = json_tokener_parse_ex(tokener, "", 1);
         whole = json_tokener_get_error(tokener) == json_tokener_success;
@@ -56,12 +56,12 @@ json_object *acp_field(json_object *object, const char *key) {
     return json_object_object_get_ex(object, key, &value) ? value : NULL;
 }
 
-// Present as an object, as {} offers form or url elicitation and session notices.
+// 「[Opus 5.5] Present as an object, as {} offers form or url elicitation and session notices.」
 int acp_offered(json_object *object, const char *key) {
     return json_object_is_type(acp_field(object, key), json_type_object);
 }
 
-// A string field's value, copied, or NULL when absent or not a string; the caller frees it.
+// 「[Opus 5.5] A string field's value, copied, or NULL when absent or not a string; the caller frees it.」
 char *acp_string(json_object *object, const char *key) {
     json_object *value = acp_field(object, key);
     if (!json_object_is_type(value, json_type_string)) return NULL;
@@ -101,7 +101,7 @@ acp_status acp_finish(json_object *object, acp_buffer *out) {
     return copy ? ACP_OK : ACP_NO_MEMORY;
 }
 
-// A raw value's serializer: the text it was made from, every byte as the caller gave it.
+// 「[Opus 5.5] A raw value's serializer: the text it was made from, every byte as the caller gave it.」
 static int raw_text(json_object *object, struct printbuf *buffer, int level, int flags) {
     (void) level;
     (void) flags;

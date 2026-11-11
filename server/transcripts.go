@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,10 +12,12 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // Transcripts are loom's job, done by the node.
@@ -63,9 +66,6 @@ type transcript struct {
 	Started  string
 	Ended    string
 	Turns    []transcriptTurn
-	// Events the store folded into sigmas (ADR-020): said, because no turn
-	// can be read back from a sigma.
-	Folded int
 	// The model its SessionStart names, and the effort.level its last Stop ran at.
 	Model  string
 	Effort string
@@ -80,7 +80,7 @@ func (t transcript) message() *protocol.Transcript {
 		turns = append(turns, &protocol.Turn{At: turn.At, Speaker: turn.Speaker, Text: turn.Text, Of: turn.Of})
 	}
 	return &protocol.Transcript{Session: t.Session, Subjects: t.Subjects, Started: t.Started, Ended: t.Ended,
-		Turns: turns, Folded: uint32(t.Folded), Model: t.Model, Effort: t.Effort}
+		Turns: turns, Model: t.Model, Effort: t.Effort}
 }
 
 func (s *QNTXServer) transcriptsSignum() sigil.Signum {
@@ -142,11 +142,64 @@ func (s *QNTXServer) transcriptsRead(ctx context.Context, sent sigil.Sent) (any,
 	if refused != nil {
 		return nil, refused
 	}
+	if sent["session"] != "" && len(read) == 0 {
+		return s.transcriptAtPeers(caller, sent["session"])
+	}
 	answer := &protocol.Transcripts{Transcripts: make([]*protocol.Transcript, 0, len(read))}
 	for _, t := range read {
 		answer.Transcripts = append(answer.Transcripts, t.message())
 	}
 	return answer, nil
+}
+
+// 「[Opus 5.5] How long a peer is given to read a session from its own disk, and the most」
+// 「[Opus 5.5] of it that is read back: one session whole.」
+const (
+	transcriptAskWithin = 2 * time.Minute
+	transcriptAskBytes  = 256 << 20
+)
+
+// 「[Opus 5.5] transcriptAtPeers is one session asked for by id and held nowhere here: it is」
+// 「[Opus 5.5] read where it lives. Each namespace a peer serves is asked as the caller,」
+// 「[Opus 5.5] signed for that namespace alone (auth.Handler.AskPeerIn), and the first that」
+// 「[Opus 5.5] holds the session answers. A peer that could not be asked is said, not taken」
+// 「[Opus 5.5] for one that holds nothing.」
+func (s *QNTXServer) transcriptAtPeers(caller *http.Request, session string) (any, *protocol.Refusal) {
+	none := &protocol.Transcripts{Transcripts: []*protocol.Transcript{}}
+	if s.authHandler == nil {
+		return none, nil
+	}
+	admitted, gated := auth.AdmissionFrom(caller.Context())
+	if !gated {
+		return none, nil
+	}
+	path := "/api/transcripts?session=" + url.QueryEscape(session)
+	var unasked []string
+	for _, peer := range s.authHandler.Peers() {
+		for _, namespace := range peer.Namespaces {
+			asked := s.authHandler.AskPeerIn(caller.Context(), admitted, peer, namespace, path, transcriptAskWithin, transcriptAskBytes)
+			if asked.Err != nil {
+				unasked = append(unasked, peer.Label+"/"+namespace+": "+asked.Err.Error())
+				continue
+			}
+			if asked.Status != http.StatusOK {
+				unasked = append(unasked, peer.Label+"/"+namespace+" answered "+strconv.Itoa(asked.Status)+": "+string(asked.Body))
+				continue
+			}
+			held := &protocol.Transcripts{}
+			if err := protojson.Unmarshal(asked.Body, held); err != nil {
+				unasked = append(unasked, peer.Label+"/"+namespace+" answered what is no transcript: "+err.Error())
+				continue
+			}
+			if len(held.GetTranscripts()) > 0 {
+				return held, nil
+			}
+		}
+	}
+	if len(unasked) > 0 {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "session " + session + " is held nowhere here, and not every peer could be asked: " + strings.Join(unasked, "; ")}
+	}
+	return none, nil
 }
 
 // humanPredicates are the events a transcript reads as the person speaking.
@@ -209,9 +262,8 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 		if session == "" {
 			continue
 		}
-		folded := as.Source == "distill"
 		turn, ok := turnOf(as)
-		if !folded && !ok {
+		if !ok {
 			continue
 		}
 		t, seen := bySession[session]
@@ -219,12 +271,6 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 			t = &transcript{Session: session, Subjects: []string{}, Turns: []transcriptTurn{}}
 			bySession[session] = t
 			subjects[session] = map[string]bool{}
-		}
-		if folded {
-			t.Folded += foldedCount(as.Attributes)
-			t.Started = earlier(t.Started, seenAt(as.Attributes, "_first_seen"))
-			t.Ended = later(t.Ended, seenAt(as.Attributes, "_last_seen"))
-			continue
 		}
 		t.Turns = append(t.Turns, turn)
 		ranOn(t, as)
@@ -237,11 +283,6 @@ func transcriptsOf(events []*types.As, limit int) []transcript {
 	}
 	out := make([]transcript, 0, len(bySession))
 	for _, t := range bySession {
-		if len(t.Turns) == 0 {
-			// Everything it had was folded: it is said by its count alone.
-			out = append(out, *t)
-			continue
-		}
 		sort.SliceStable(t.Turns, func(i, j int) bool {
 			if !t.Turns[i].when.Equal(t.Turns[j].when) {
 				return t.Turns[i].when.Before(t.Turns[j].when)
@@ -348,15 +389,6 @@ func toolTurn(tool, path, command string) (string, string) {
 	return "tool", tool
 }
 
-// seenAt is a sigma's first or last seen, as a turn's At is written, or empty.
-func seenAt(attrs map[string]any, key string) string {
-	at, err := time.Parse(time.RFC3339, attrString(attrs, key))
-	if err != nil {
-		return ""
-	}
-	return at.UTC().Format(time.RFC3339)
-}
-
 // earlier and later pick between two At times; empty is no time at all.
 func earlier(a, b string) string {
 	if a == "" || (b != "" && b < a) {
@@ -370,14 +402,6 @@ func later(a, b string) string {
 		return b
 	}
 	return a
-}
-
-// foldedCount is how many events a sigma holds: its _total, or 1.
-func foldedCount(attrs map[string]any) int {
-	if total, ok := attrs["_total"].(float64); ok && total > 0 {
-		return int(total)
-	}
-	return 1
 }
 
 // riteSaid is what a rite found: its name, its verdict and the code it read.

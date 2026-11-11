@@ -61,12 +61,10 @@ func (s *QNTXServer) anthropicOrder(ctx context.Context, sent sigil.Sent) (any, 
 	if !gated {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what ROOT's agents spend is ordered through the gate, and this came through none"}
 	}
-	kept, _, err := s.anthropicLine()
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-	}
-	kept.first, kept.then = sent["first"], sent["then"] == "true"
-	if refused := s.keepAnthropicLine(admitted.Identity, kept); refused != nil {
+	kept, refused := s.changeAnthropicLine(admitted.Identity, func(kept *anthropicKept) {
+		kept.first, kept.then = sent["first"], sent["then"] == "true"
+	})
+	if refused != nil {
 		return nil, refused
 	}
 	s.logger.Infow("what ROOT's agents spend at Anthropic was ordered", "first", kept.first, "then", kept.then, "by", admitted.Identity)

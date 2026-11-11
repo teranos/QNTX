@@ -62,7 +62,7 @@ let
     }
 
     # "can't we build the client into libACP and make QNTX use it as an optional subsystem?"
-    # libACP's C, the subtree in libacp/, which an ACP harness runs through.
+    # 「[Opus 5.5] libACP's C, the subtree in libacp/, which an ACP harness runs through.」
     {
       name = "Build libACP";
       run = ''
@@ -90,7 +90,8 @@ in
 
   on = {
     pull_request = {
-      branches = [ "main" ];
+      # q-stack is what q follows: a change aimed at it is tested as one aimed at main is.
+      branches = [ "main" "q-stack" ];
       # Rust has the Rust CI.
       paths = goPaths ++ [ ".github/workflows/go.yml" ];
     };

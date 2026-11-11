@@ -26,7 +26,6 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 		CallReduce:  s.callReducePlugin,
 		Invalidator: s.embeddingClusterInvalidator,
 	}
-	s.setupDistillSchedule(s.deps.cfg)
 	s.setupCheckpointSchedule()
 	s.setupCIWatch()
 	s.setupWeeklyReport(s.deps.cfg)

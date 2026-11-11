@@ -21,9 +21,8 @@ import (
 //   - Vanity ASID generation for GenerateAndCreateAttestation
 //
 // The RawAttestationStore contract is deliberately minimal; backend-specific
-// operations (bounded enforcement on sqlite, Parquet flush on parquet,
-// backup, WAL checkpoint) stay on the concrete backend types and are called
-// directly by the code that needs them.
+// operations (Parquet flush on parquet, backup, WAL checkpoint) stay on the
+// concrete backend types and are called directly by the code that needs them.
 type AtsStore struct {
 	raw RawAttestationStore
 	log *zap.SugaredLogger

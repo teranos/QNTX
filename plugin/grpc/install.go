@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"os"
 	"path/filepath"
@@ -152,7 +153,12 @@ func sha256Of(data []byte) []byte {
 // absolute or climbing out of dir is refused rather than sanitised — a release
 // that tries it is not one to install a corrected version of.
 func extractArchive(archive []byte, dir, binaryName string) (_ string, _ int, err error) {
-	gz, err := gzip.NewReader(bytes.NewReader(archive))
+	return extractArchiveFrom(bytes.NewReader(archive), dir, binaryName)
+}
+
+// extractArchiveFrom is extractArchive of a .tar.gz read as it is unpacked.
+func extractArchiveFrom(archive io.Reader, dir, binaryName string) (_ string, _ int, err error) {
+	gz, err := gzip.NewReader(archive)
 	if err != nil {
 		return "", 0, errors.Wrap(err, "asset is not gzip data")
 	}
@@ -267,6 +273,13 @@ func safeArchivePath(name string) (string, bool, error) {
 // is worse than a partial file: the binary can be complete while the library it
 // needs is missing, which fails at exec with nothing to point at.
 func install(archive []byte, dir, binaryName string) (_ string, _ int, err error) {
+	return installFrom(bytes.NewReader(archive), "", dir, binaryName)
+}
+
+// installFrom is install of a .tar.gz read as it is unpacked. With digest, the
+// hex sha256 the archive was checked against, what was read is that archive
+// or nothing is moved into place: what is unpacked is what was checked.
+func installFrom(archive io.Reader, digest, dir, binaryName string) (_ string, _ int, err error) {
 	parent := filepath.Dir(dir)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return "", 0, errors.Wrapf(err, "failed to create plugin directory %s", parent)
@@ -284,9 +297,20 @@ func install(archive []byte, dir, binaryName string) (_ string, _ int, err error
 		}
 	}()
 
-	binary, files, err := extractArchive(archive, staging, binaryName)
+	read := sha256.New()
+	binary, files, err := extractArchiveFrom(io.TeeReader(archive, read), staging, binaryName)
 	if err != nil {
 		return "", 0, err
+	}
+	if digest != "" {
+		// The tar's end is not the gzip's: what is left is read too, so the
+		// digest is of the whole archive.
+		if _, err := io.Copy(read, archive); err != nil {
+			return "", 0, errors.Wrap(err, "failed to read the rest of the archive")
+		}
+		if got := hex.EncodeToString(read.Sum(nil)); got != digest {
+			return "", 0, errors.Newf("the archive unpacked has digest %s and was checked as %s; nothing was installed", got, digest)
+		}
 	}
 
 	// Remove first: renaming over a populated directory fails, and a running

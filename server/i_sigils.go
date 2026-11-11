@@ -45,12 +45,21 @@ func (s *QNTXServer) iSignum() sigil.Signum {
 					Answer: "protocol.Reaches",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: "/i/reaches"},
 				},
+				{
+					Name: "name",
+					Does: "Assign the agent asking a name, held by its own DID and by no other agent on this node. A name another agent holds is refused as taken: ask again with another. Asked again with the name it holds, it answers the same. Asked for another, it takes that one in place of the name it held, which is free for another agent from then on.",
+					Takes: []*protocol.Param{{Name: "name", Required: true,
+						Says: "The name asked for: one line of text, 64 characters at most, and not root. Its case does not tell two names apart."}},
+					Answer: "protocol.Named",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: iNamePath},
+				},
 			},
 		},
 		Answers: map[string]sigil.Answer{
 			"standing": s.iStanding,
 			"step":     s.iStep,
 			"reaches":  s.iReaches,
+			"name":     s.iName,
 		},
 	}
 }

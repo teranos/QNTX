@@ -74,11 +74,6 @@ const (
 	QueueDepth    = "qntx.pulse.queue.depth"
 	WorkersActive = "qntx.pulse.workers.active"
 
-	// AttestationsEvicted is the other side of AttestationsWritten: what the
-	// store let go of to stay within its bounds. Written climbing while evicted
-	// climbs with it is a store at capacity.
-	AttestationsEvicted = "qntx.attestations.evicted"
-
 	// Embedded is one per attestation given a vector, and Clustered is one per
 	// vector placed, sliced by outcome: assigned to a cluster, or noise. Many
 	// embedded and few assigned is a model that no longer fits its data.
@@ -169,6 +164,13 @@ const (
 	// plugin's own row on the statusline.
 	PluginCalled = "qntx.plugin.called"
 	PluginTook   = "qntx.plugin.took"
+
+	// MCPToolTook is how long one MCP tool call ran, from its request arriving
+	// to the MCP server being done with it, sliced by the tool and by how it
+	// ended: answered, refused (a tool error), unwritten (answered, and nothing
+	// was written back) or unanswered (the request ended first). Admitted counts
+	// a call at the gate; this is the call at its end.
+	MCPToolTook = "qntx.mcp.tool.took"
 )
 
 // The dimensions.
@@ -244,6 +246,11 @@ const (
 	// "POST /me/draft", or "undeclared" for every path it did not. Bounded by
 	// the plugin's own table, never by the path a caller sent.
 	AttrPluginRoute = "plugin_route"
+
+	// AttrTool is which MCP tool: a sigil's, or a served route's. Bounded by
+	// what the node serves, never by a name a caller sent: a call to a tool
+	// the node does not have never reaches one.
+	AttrTool = "tool"
 )
 
 // Attr is what a call site builds a dimension with. It is Sentry's own builder,

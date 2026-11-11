@@ -1,4 +1,4 @@
-// session/request_permission, as #138 asks it: the request, and the client's outcome.
+// 「[Opus 5.5] session/request_permission, as #138 asks it: the request, and the client's outcome.」
 #include "acp.h"
 
 #include <stdio.h>
@@ -17,7 +17,7 @@ static const acp_permission_option options[] = {
     {"reject_always", "Always reject x__y", "reject_always"},
 };
 
-// The whole request: its id, the tool call pending, and the options in order.
+// 「[Opus 5.5] The whole request: its id, the tool call pending, and the options in order.」
 static void request(void) {
     acp_permission_request asked = {"\"perm-1\"", "code-1-1-1", "c1", "x__y", "x__y", "read", "pending", "{\"q\":\"a/b\"}", options, 2};
     acp_buffer out = {0};
@@ -28,7 +28,7 @@ static void request(void) {
                      "{\"optionId\":\"allow_once\",\"name\":\"Allow once\",\"kind\":\"allow_once\"},"
                      "{\"optionId\":\"reject_always\",\"name\":\"Always reject x__y\",\"kind\":\"reject_always\"}]}}"));
     acp_buffer_free(&out);
-    // No name and no kind are none written; input that is not JSON is written as the text it is.
+    // 「[Opus 5.5] No name and no kind are none written; input that is not JSON is written as the text it is.」
     acp_permission_request bare = {"7", "code-1-1-1", "c1", "x__y", NULL, NULL, "pending", "", options, 1};
     CHECK(acp_permission_request_write(&bare, &out) == ACP_OK);
     CHECK(says(&out, "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"session/request_permission\",\"params\":{"
@@ -39,7 +39,7 @@ static void request(void) {
     CHECK(acp_permission_request_write(&half, &out) == ACP_OK);
     CHECK(out.data && strstr(out.data, "\"rawInput\":\"{\\\"q\\\":\"}") != NULL);
     acp_buffer_free(&out);
-    // An id that is not JSON, or no options, is no request.
+    // 「[Opus 5.5] An id that is not JSON, or no options, is no request.」
     acp_permission_request stray = {"perm-1", "code-1-1-1", "c1", "x__y", NULL, NULL, "pending", "{}", options, 1};
     CHECK(acp_permission_request_write(&stray, &out) == ACP_INVALID_ARGUMENT);
     acp_permission_request none = {"7", "code-1-1-1", "c1", "x__y", NULL, NULL, "pending", "{}", options, 0};
@@ -51,7 +51,7 @@ static acp_status outcome(const char *answer, acp_permission_outcome *out) {
     return acp_permission_outcome_read(answer, strlen(answer), out);
 }
 
-// "selected" and its optionId, "cancelled", or neither.
+// 「[Opus 5.5] "selected" and its optionId, "cancelled", or neither.」
 static void outcomes(void) {
     acp_permission_outcome o;
     CHECK(outcome("{\"jsonrpc\":\"2.0\",\"id\":\"perm-1\",\"result\":{\"outcome\":{\"outcome\":\"selected\",\"optionId\":\"allow_once\"}}}", &o) == ACP_OK);

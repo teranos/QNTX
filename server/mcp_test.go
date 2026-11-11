@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -120,7 +121,7 @@ func TestAFieldNamingItsMessageIsSaidInItsShape(t *testing.T) {
 	}}).schema
 	carried, err := json.Marshal(map[string]any{
 		"visits": []*protocol.Visit{{Visit: "v", Visitor: "p", DurationSeconds: 3, Views: 2, Bounce: true}},
-		"transcript": &protocol.Transcript{Session: "s", Subjects: []string{"a"}, Folded: 4,
+		"transcript": &protocol.Transcript{Session: "s", Subjects: []string{"a"},
 			Turns: []*protocol.Turn{{At: "t", Speaker: "person", Text: "hey"}}},
 		"market": 7,
 	})
@@ -148,11 +149,16 @@ func TestAnAnswerIsItsMessageWhole(t *testing.T) {
 
 	written, err := answerJSON(&protocol.Transcripts{Transcripts: []*protocol.Transcript{{Session: "s", Turns: []*protocol.Turn{{Text: "hey"}}}}})
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"transcripts":[{"session":"s","subjects":[],"started":"","ended":"","turns":[{"at":"","speaker":"","text":"hey","of":""}],"folded":0,"model":"","effort":""}]}`, string(written))
+	assert.JSONEq(t, `{"transcripts":[{"session":"s","subjects":[],"started":"","ended":"","turns":[{"at":"","speaker":"","text":"hey","of":""}],"model":"","effort":""}]}`, string(written))
 	assert.NoError(t, heldTo(promised.schema, written))
 
 	assert.Error(t, heldTo(promised.schema, []byte(`{"transcripts":[{"session":"s"}]}`)), "a session leaving out what it holds")
-	assert.Error(t, heldTo(promised.schema, []byte(`{"transcripts":[{"session":"s","subjects":[],"started":"","ended":"","turns":[],"folded":"0","model":"","effort":""}]}`)), "a count given as text")
+
+	visits := promisedBy(t, &protocol.Sigil{Answer: "protocol.StaandVisits"})
+	assert.Error(t, heldTo(visits.schema, []byte(`{"market":"m","slug":"s","visits":[{"visit":"v","visitor":"p","market":"m","slug":"s","started":"","ended":"","duration_seconds":"3","entry_path":"","exit_path":"","views":2,"events":0,"bounce":false}]}`)), "a count given as text")
+	written, err = answerJSON(&protocol.StaandVisits{Market: "m", Slug: "s", Visits: []*protocol.Visit{{Visit: "v", Visitor: "p", Market: "m", Slug: "s", DurationSeconds: 3, Views: 2}}})
+	require.NoError(t, err)
+	assert.NoError(t, heldTo(visits.schema, written), "the same with the count as a number")
 
 	written, err = answerJSON(&protocol.SessionTranscript{})
 	require.NoError(t, err)
@@ -621,4 +627,35 @@ func initializedFor(t *testing.T, s *QNTXServer, asked *http.Request) *mcp.Initi
 	t.Cleanup(func() { _ = asking.Close() })
 
 	return asking.InitializeResult()
+}
+
+// "very large requests we should not want to deal with"
+//
+// An MCP request past the most its server takes is refused before the MCP
+// server reads it, and the refusal says the most. The node's server takes
+// what the Node Agent's A2A agent takes; a namespace's what a tenant's does.
+func TestAnMCPRequestPastItsMostIsRefused(t *testing.T) {
+	connector := auth.Admitted(auth.LevelConnector, "Clean")
+	connector.ClientDID = "did:key:zconnector"
+	for path, c := range map[string]struct {
+		as   auth.Admission
+		most int
+	}{
+		"/mcp/":      {auth.Admitted(auth.LevelRoot), nodeBodyMost},
+		"/mcp/Clean": {connector, tenantBodyMost},
+	} {
+		sent := func(body string) *httptest.ResponseRecorder {
+			req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+			req = req.WithContext(auth.WithAdmission(req.Context(), c.as))
+			w := httptest.NewRecorder()
+			bareNode().HandleMCP(w, req)
+			return w
+		}
+		over := sent(strings.Repeat(" ", c.most+1))
+		assert.Equal(t, http.StatusRequestEntityTooLarge, over.Code, path)
+		assert.Contains(t, over.Body.String(), strconv.Itoa(c.most), path)
+
+		at := sent(`{}` + strings.Repeat(" ", c.most-2))
+		assert.NotEqual(t, http.StatusRequestEntityTooLarge, at.Code, path)
+	}
 }

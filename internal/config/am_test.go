@@ -38,7 +38,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "zero workers is valid (no background workers)",
 			config: Config{
 				Pulse:   PulseConfig{Workers: 0},
-				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{}},
 			},
 			wantErr: false,
 		},
@@ -46,7 +46,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "negative workers is invalid",
 			config: Config{
 				Pulse:   PulseConfig{Workers: -1},
-				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{}},
 			},
 			wantErr: true,
 		},
@@ -54,7 +54,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "zero ticker interval is valid (no periodic ticking)",
 			config: Config{
 				Pulse:   PulseConfig{TickerIntervalSeconds: 0},
-				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{}},
 			},
 			wantErr: false,
 		},
@@ -62,14 +62,14 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "negative ticker interval is invalid",
 			config: Config{
 				Pulse:   PulseConfig{TickerIntervalSeconds: -1},
-				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{}},
 			},
 			wantErr: true,
 		},
 		{
 			name: "empty database path is valid",
 			config: Config{
-				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{Path: "", BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}}},
+				Storage: StorageConfig{Backend: "sqlite", Sqlite: SqliteConfig{Path: ""}},
 			},
 			wantErr: false,
 		},
@@ -239,9 +239,6 @@ func TestValidate_ParquetLocation(t *testing.T) {
 				Storage: StorageConfig{
 					Backend: "parquet",
 					Parquet: ParquetConfig{Location: tt.location},
-					Sqlite: SqliteConfig{
-						BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64},
-					},
 				},
 			}
 			err := cfg.Validate()
@@ -272,13 +269,6 @@ func TestValidate_StorageBackend(t *testing.T) {
 			cfg := Config{
 				Storage: StorageConfig{
 					Backend: tt.backend,
-					Sqlite: SqliteConfig{
-						BoundedStorage: BoundedStorageConfig{
-							ActorContextLimit:  32,
-							ActorContextsLimit: 64,
-							EntityActorsLimit:  64,
-						},
-					},
 					// Provide a valid Parquet location so parquet-backend cases
 					// don't fail on the location requirement — this test focuses
 					// on backend-value validation only.

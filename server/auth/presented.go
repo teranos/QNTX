@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"time"
 )
 
 // What a request carries, and the only place a request is read for it.
@@ -61,6 +62,13 @@ type Presented struct {
 func (h *Handler) presented(r *http.Request) Presented {
 	var p Presented
 
+	// An agent the node runs, at the door the node opened for it alone.
+	if grant, through := doorGrant(r.Context()); through {
+		p.bearerPresented = true
+		p.Bearer = &grant
+		return p
+	}
+
 	if cookie, err := r.Cookie(sessionCookieName); err == nil {
 		p.sessionToken = cookie.Value
 		// identityOf is the expiry check as well as the lookup, so a session
@@ -74,6 +82,18 @@ func (h *Handler) presented(r *http.Request) Presented {
 	p.pendingToken = heldPending(r)
 	if half, live := h.pendingLogins.peek(p.pendingToken); live {
 		p.Pending, p.PendingLive, p.pending = half.identity, true, half
+	}
+
+	if signed, ok := signedAssertion(r); ok {
+		p.bearerPresented = true
+		h.asBecome(&p)
+		grant, err := h.signedGrant(signed, time.Now())
+		if err != nil {
+			h.logger.Infow("a signature was refused at the gate", "error", err)
+			return p
+		}
+		p.Bearer = &grant
+		return p
 	}
 
 	if raw, ok := bearerToken(r); ok {

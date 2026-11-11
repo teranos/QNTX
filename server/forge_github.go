@@ -24,6 +24,27 @@ func (s *QNTXServer) forges() forge.Forges {
 	return forge.ForgesOf(map[string]forge.Forge{forge.GitHub: gitHubForge{service: s.gitHubService}})
 }
 
+// gitHubActionsApp is GitHub Actions' App: the checks a push waits on are the ones it runs.
+const gitHubActionsApp = 15368
+
+// gitHubRepo is a repository as GitHub's API names it: an owner and a name.
+type gitHubRepo struct{ Owner, Name string }
+
+func (g gitHubRepo) String() string { return g.Owner + "/" + g.Name }
+
+// onGitHub is the repository as GitHubService is asked about it. A repository
+// on another forge is refused here, naming it, and not asked of GitHub.
+func onGitHub(repo forge.Repo) (gitHubRepo, error) {
+	if !strings.EqualFold(repo.Host, forge.GitHub) {
+		return gitHubRepo{}, errors.Newf("%s is not on %s, and this asks GitHub", repo, forge.GitHub)
+	}
+	owner, name, ok := strings.Cut(repo.Path, "/")
+	if !ok || strings.Contains(name, "/") {
+		return gitHubRepo{}, errors.Newf("%s is not owner/repo: GitHub does not nest", repo)
+	}
+	return gitHubRepo{Owner: owner, Name: name}, nil
+}
+
 // gitHubForge is github.com, through GitHubService.
 type gitHubForge struct {
 	service func() *services.GitHubServer

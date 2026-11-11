@@ -82,26 +82,7 @@ func (b buildSource) String() string {
 	return s
 }
 
-// TODO(forge): gitHubRepo and onGitHub are the adapter's. Move them to forge_github.go; outside it, only github_follow.go still calls onGitHub, and buildSource.onGitHub below has no caller.
-// gitHubRepo is a repository as GitHub's API names it: an owner and a name.
-type gitHubRepo struct{ Owner, Name string }
-
-func (g gitHubRepo) String() string { return g.Owner + "/" + g.Name }
-
-// onGitHub is the repository as GitHubService is asked about it. A repository
-// on another forge is refused here, naming it, and not asked of GitHub.
-func onGitHub(repo forge.Repo) (gitHubRepo, error) {
-	if !strings.EqualFold(repo.Host, forge.GitHub) {
-		return gitHubRepo{}, errors.Newf("%s is not on %s, and this asks GitHub", repo, forge.GitHub)
-	}
-	owner, name, ok := strings.Cut(repo.Path, "/")
-	if !ok || strings.Contains(name, "/") {
-		return gitHubRepo{}, errors.Newf("%s is not owner/repo: GitHub does not nest", repo)
-	}
-	return gitHubRepo{Owner: owner, Name: name}, nil
-}
-
-// TODO(forge): No caller. Remove.
+// TODO(forge): Its one caller is a test (plugin_build_test.go). Remove it with that test's use of it.
 // onGitHub is the source's repository as GitHubService is asked about it.
 func (b buildSource) onGitHub() (gitHubRepo, error) { return onGitHub(b.Repo) }
 

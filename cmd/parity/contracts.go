@@ -24,9 +24,8 @@ import (
 // invisible.
 //
 // A contract counts only if something depends on it. An interface nobody
-// names is dead code, not work waiting to be done — ats.BoundedStore is
-// declared and referenced nowhere, and putting it on the picture would invent
-// a thing QNTX does not persist. TokenStore is the opposite: a field on
+// names is dead code, not work waiting to be done: putting it on the picture
+// would invent a thing QNTX does not persist. TokenStore is the opposite: a field on
 // auth.Handler, a parameter to auth.New, a nil variable in sub_auth.go.
 //
 // Satisfaction is decided on method names, not full signatures. That errs
@@ -92,8 +91,8 @@ func scanTypes(root string) (contracts map[string][]string, concrete map[string]
 		pkg := filepath.Dir(path)
 
 		// Every type something declares a field, parameter, result, or
-		// variable of, resolved through the file's imports so ats.BoundedStore
-		// and storage.BoundedStore stay separate types. A contract that
+		// variable of, resolved through the file's imports so two types of
+		// one bare name in two packages stay separate types. A contract that
 		// appears here is depended upon; one that never does is declared and
 		// abandoned.
 		imports := importDirs(file, module, root)
@@ -239,8 +238,8 @@ func interfaceMembers(iface *ast.InterfaceType) []string {
 }
 
 // resolveEmbedded expands embedded interfaces (marked with ~) into the full
-// method set. BoundedStore embeds AttestationStore; a type satisfies the
-// former only by satisfying both.
+// method set. An interface that embeds AttestationStore is satisfied only
+// by a type that satisfies both.
 func resolveEmbedded(key string, contracts map[string][]string, seen map[string]bool) map[string]bool {
 	if seen[key] {
 		return nil

@@ -15,7 +15,7 @@ import (
 // a *sql.DB for the operational Go-side tables, an ats.AttestationStore for
 // attestation CRUD, the resolved path or location (for logging), and an
 // opaque handle used by the server for backend-specific hooks
-// (WALCheckpointer, AgeDistiller, etc.) via type assertions.
+// (WALCheckpointer, etc.) via type assertions.
 func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, error) {
 	cfg, err := config.Load()
 	if err != nil {

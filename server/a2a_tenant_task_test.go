@@ -108,6 +108,9 @@ func TestAMessageAtAnElementIsATaskOfItsAgent(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, code, "an element's Task is no Task of the Node Agent")
 
 	// An element named by a path is no element.
-	code, _ = a2aAsked(t, srv, http.MethodGet, "/a2a/element:..%2Fsecrets/tasks", "", tokens[auth.LevelRoot])
-	assert.Equal(t, http.StatusNotFound, code)
+	r := asBearer(http.MethodGet, "/a2a/element:..%2Fsecrets/tasks", tokens[auth.LevelRoot])
+	r.Header.Set("A2A-Version", "1.0")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }

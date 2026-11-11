@@ -1,4 +1,4 @@
-// Session modes, as #121 gave them: set_mode's request, and a session's modes.
+// 「[Opus 5.5] Session modes, as #121 gave them: set_mode's request, and a session's modes.」
 #include "acp.h"
 
 #include <stdio.h>
@@ -35,7 +35,7 @@ static void set_mode_request(void) {
     CHECK(in.session_id == NULL && in.mode_id == NULL);
 }
 
-// A SessionModeState: the current mode, then every mode offered, each with its description.
+// 「[Opus 5.5] A SessionModeState: the current mode, then every mode offered, each with its description.」
 static void modes_written(void) {
     const acp_mode offered[] = {
         {"default", "Manual", "m in a permission block"},
@@ -46,7 +46,7 @@ static void modes_written(void) {
     CHECK(says(&out, "{\"currentModeId\":\"plan\",\"availableModes\":[{\"id\":\"default\",\"name\":\"Manual\","
                      "\"description\":\"m in a permission block\"},{\"id\":\"plan\",\"name\":\"Plan\"}]}"));
     acp_buffer_free(&out);
-    // The current mode is one of those offered.
+    // 「[Opus 5.5] The current mode is one of those offered.」
     CHECK(acp_modes_write("yolo", offered, 2, &out) == ACP_INVALID_ARGUMENT);
     CHECK(acp_modes_write("plan", NULL, 0, &out) == ACP_INVALID_ARGUMENT);
 }

@@ -476,11 +476,12 @@ func absDiff(a, b float64) float64 {
 	return b - a
 }
 
-// broadcastLLMStream sends streaming LLM output to all connected clients
-func (s *QNTXServer) broadcastLLMStream(msg LLMStreamMessage) {
-	s.broadcastMessage(msg)
+// sendLLMStream sends streaming LLM output to the socket that asked for it.
+func (s *QNTXServer) sendLLMStream(to audience, msg LLMStreamMessage) {
+	s.queueBroadcast(&broadcastRequest{reqType: "message", msg: msg, to: to})
 
-	s.logger.Debugw("Broadcasted LLM stream chunk",
+	s.logger.Debugw("Sent LLM stream chunk",
+		"socket", to.name,
 		"job_id", msg.JobID,
 		"content_length", len(msg.Content),
 		"done", msg.Done,

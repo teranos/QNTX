@@ -19,7 +19,6 @@
 //! - Uses the same SQLite schema as the Go implementation for compatibility
 //! - Supports in-memory databases for testing
 //! - Thread-safe with proper connection handling
-//! - Optional quota enforcement via `BoundedStore`
 //!
 //! # Example: Basic Usage
 //!
@@ -57,26 +56,8 @@
 //! # }
 //! ```
 //!
-//! # Example: Bounded Storage with Quotas
-//!
-//! ```rust,no_run
-//! use ats_sqlite::{BoundedStore, StorageQuotas};
-//! use ats::{AttestationBuilder, storage::AttestationStore};
-//!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create store with custom quotas
-//! let quotas = StorageQuotas::new(100, 256, 256); // 100 attestations, 256 predicates, 256 contexts
-//! let mut store = BoundedStore::in_memory_with_quotas(quotas)?;
-//!
-//! // Attempts to exceed quotas will fail with QuotaExceeded error
-//! # Ok(())
-//! # }
-//! ```
 
 pub mod alias;
-pub mod bounded;
-pub mod distill;
-pub mod enforcement;
 pub mod error;
 pub mod flight_recorder;
 pub mod json;
@@ -96,6 +77,5 @@ pub mod ffi;
 pub mod sql_ffi;
 
 // Re-export main types
-pub use bounded::{BoundedStore, StorageQuotas};
 pub use error::{Result, SqliteError};
 pub use store::SqliteStore;

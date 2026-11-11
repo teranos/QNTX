@@ -5,7 +5,7 @@ use ats::{
     storage::{AttestationStore, QueryStore, StorageStats, StoreError},
 };
 use rusqlite::{backup, Connection, OptionalExtension};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::error::SqliteError;
 
@@ -25,10 +25,8 @@ type AttestationRow = (
 );
 use crate::json::{
     deserialize_attributes, deserialize_string_vec, serialize_attributes, serialize_string_vec,
-    sql_to_timestamp, timestamp_to_sql,
+    sql_to_timestamp, try_timestamp_to_sql,
 };
-
-use ats::storage::enforcement::{EnforcementConfig, EnforcementInput};
 
 type StoreResult<T> = Result<T, StoreError>;
 
@@ -43,72 +41,8 @@ pub struct SqliteStore {
     pub(crate) conn: Connection,
     /// Database file path, if file-backed. Used by backup to open a separate read connection.
     pub(crate) db_path: Option<String>,
-    /// Enforcement config for bounded storage limits (16/64/64 default).
-    /// When set, enforcement runs every 50 puts using junction table COUNT queries.
-    pub(crate) enforcement_config: Option<EnforcementConfig>,
-    /// When true, put() skips enforcement to prevent infinite loops during distillation.
-    pub(crate) distilling: bool,
-    /// Counter for amortized enforcement: only run enforcement every N puts.
+    /// Puts since open, for the periodic WAL checkpoint.
     put_count: u64,
-    /// In-memory enforcement counters for O(1) threshold checks.
-    /// Populated lazily from DB on first access, then maintained on put/delete.
-    pub(crate) enforcement_counters: EnforcementCounters,
-}
-
-/// In-memory counters for O(1) enforcement threshold checks.
-/// Avoids expensive COUNT queries with JOINs on every put().
-#[derive(Default)]
-pub struct EnforcementCounters {
-    /// (actor, context) → attestation count
-    pub(crate) actor_context: HashMap<(String, String), usize>,
-    /// actor → set of distinct contexts
-    pub(crate) actor_contexts: HashMap<String, HashSet<String>>,
-    /// subject → set of distinct actors
-    pub(crate) entity_actors: HashMap<String, HashSet<String>>,
-    /// Whether counters have been populated from DB
-    pub(crate) initialized: bool,
-}
-
-impl EnforcementCounters {
-    /// Check if any counter exceeds its half-bound threshold.
-    /// O(1) — just checks the in-memory maps for the attestation's dimensions.
-    pub fn any_threshold_exceeded(
-        &self,
-        config: &ats::storage::enforcement::EnforcementConfig,
-    ) -> bool {
-        let ac_threshold = config.actor_context_limit + config.actor_context_limit / 2;
-        for count in self.actor_context.values() {
-            if *count > ac_threshold {
-                return true;
-            }
-        }
-
-        let acs_threshold = config.actor_contexts_limit + config.actor_contexts_limit / 2;
-        for contexts in self.actor_contexts.values() {
-            if contexts.len() > acs_threshold {
-                return true;
-            }
-        }
-
-        let ea_threshold = config.entity_actors_limit + config.entity_actors_limit / 2;
-        for actors in self.entity_actors.values() {
-            if actors.len() > ea_threshold {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    /// Decrement actor_context counter after enforcement deletes.
-    pub fn decrement_actor_context(&mut self, actor: &str, context: &str, count: usize) {
-        if let Some(val) = self
-            .actor_context
-            .get_mut(&(actor.to_string(), context.to_string()))
-        {
-            *val = val.saturating_sub(count);
-        }
-    }
 }
 
 /// Read-only SQLite connection for concurrent queries.
@@ -129,10 +63,7 @@ impl SqliteStore {
         Self {
             conn,
             db_path: None,
-            enforcement_config: None,
-            distilling: false,
             put_count: 0,
-            enforcement_counters: EnforcementCounters::default(),
         }
     }
 
@@ -176,10 +107,7 @@ impl SqliteStore {
         Ok(Self {
             conn,
             db_path: Some(path_str),
-            enforcement_config: None,
-            distilling: false,
             put_count: 0,
-            enforcement_counters: EnforcementCounters::default(),
         })
     }
 
@@ -216,144 +144,6 @@ impl SqliteStore {
             })
             .map_err(SqliteError::from)?;
         Ok((busy, log, checkpointed))
-    }
-
-    /// Age-triggered distillation: fold old attestations into sigmas.
-    ///
-    /// Queries attestations older than `cutoff_rfc3339` plus all existing sigmas
-    /// (source='distill'). Groups by first predicate, builds a sigma per group,
-    /// deletes originals. All within a single transaction.
-    ///
-    /// Returns (distilled_count, sigmas_created, skipped_singles).
-    pub fn age_distill(
-        &self,
-        cutoff_rfc3339: &str,
-        batch_size: usize,
-    ) -> StoreResult<(usize, usize, usize)> {
-        use crate::distill::build_distill_attestation;
-
-        // Load candidates
-        let mut stmt = self.conn.prepare(
-            "SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
-             FROM attestations
-             WHERE (timestamp < ?1 OR source = 'distill')
-             ORDER BY timestamp ASC
-             LIMIT ?2"
-        ).map_err(SqliteError::from)?;
-
-        let rows = stmt
-            .query_map(
-                rusqlite::params![cutoff_rfc3339, batch_size as i64],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, String>(4)?,
-                        row.get::<_, String>(5)?,
-                        row.get::<_, String>(6)?,
-                        row.get::<_, Option<String>>(7)?,
-                        row.get::<_, String>(8)?,
-                        row.get::<_, Option<Vec<u8>>>(9)?,
-                        row.get::<_, Option<String>>(10)?,
-                    ))
-                },
-            )
-            .map_err(SqliteError::from)?;
-
-        let mut candidates: Vec<Attestation> = Vec::new();
-        for row in rows {
-            let row_data = row.map_err(SqliteError::from)?;
-            match Self::row_to_attestation(row_data) {
-                Ok(att) => candidates.push(att),
-                Err(_) => continue,
-            }
-        }
-        drop(stmt);
-
-        if candidates.is_empty() {
-            return Ok((0, 0, 0));
-        }
-
-        // Instrumentation: log each candidate being considered for distillation
-        for att in &candidates {
-            let pred = att.predicates.first().map(|s| s.as_str()).unwrap_or("_");
-            let actor = att.actors.first().map(|s| s.as_str()).unwrap_or("_");
-            let subj = att.subjects.first().map(|s| s.as_str()).unwrap_or("_");
-            eprintln!(
-                "[distill] candidate: id={} pred={} actor={} subj={} ts={} src={}",
-                att.id, pred, actor, subj, att.timestamp, att.source
-            );
-        }
-
-        // Group by first predicate
-        let mut groups: HashMap<String, Vec<Attestation>> = HashMap::new();
-        for att in candidates {
-            let predicate = att
-                .predicates
-                .first()
-                .cloned()
-                .unwrap_or_else(|| "_".to_string());
-            groups.entry(predicate).or_default().push(att);
-        }
-
-        let tx = self
-            .conn
-            .unchecked_transaction()
-            .map_err(SqliteError::from)?;
-
-        let mut total_distilled = 0usize;
-        let mut total_created = 0usize;
-        let mut total_skipped = 0usize;
-
-        for (predicate, batch) in &groups {
-            if batch.len() < 2 {
-                total_skipped += batch.len();
-                continue;
-            }
-
-            // Build sigma — uses distill:<predicate> as context
-            let context = format!("distill:{}", predicate.trim_start_matches("distill:"));
-            let sigma = build_distill_attestation(batch, &context);
-
-            // The sigma predicate should be distill:<original_predicate>
-            let sigma = Attestation {
-                subjects: vec![format!(
-                    "distill:{}",
-                    predicate.trim_start_matches("distill:")
-                )],
-                predicates: vec![format!(
-                    "distill:{}",
-                    predicate.trim_start_matches("distill:")
-                )],
-                ..sigma
-            };
-
-            // Delete originals (CASCADE handles junction tables)
-            for att in batch {
-                let subj = att.subjects.first().map(|s| s.as_str()).unwrap_or("_");
-                let actor = att.actors.first().map(|s| s.as_str()).unwrap_or("_");
-                eprintln!(
-                    "[distill] DELETE id={} pred={} subj={} actor={} ts={}",
-                    att.id, predicate, subj, actor, att.timestamp
-                );
-                tx.execute(
-                    "DELETE FROM attestations WHERE id = ?1",
-                    rusqlite::params![att.id],
-                )
-                .map_err(SqliteError::from)?;
-                total_distilled += 1;
-            }
-
-            // Insert sigma
-            put_attestation(&tx, &sigma)?;
-            total_created += 1;
-        }
-
-        tx.commit().map_err(SqliteError::from)?;
-
-        Ok((total_distilled, total_created, total_skipped))
     }
 
     /// Run PRAGMA integrity_check and return the result lines.
@@ -404,11 +194,6 @@ impl SqliteStore {
             }
         }
         Ok(())
-    }
-
-    /// Set enforcement config. When set, enforcement runs after every put().
-    pub fn set_enforcement_config(&mut self, config: EnforcementConfig) {
-        self.enforcement_config = Some(config);
     }
 
     /// Get a reference to the underlying write connection
@@ -542,8 +327,16 @@ impl SqliteStore {
     }
 }
 
+/// An instant to be stored, or the refusal that it is one no date holds: a
+/// write that cannot keep a date says so, it does not keep today's.
+fn instant(id: &str, field: &str, ms: i64) -> StoreResult<String> {
+    try_timestamp_to_sql(ms).ok_or_else(|| {
+        StoreError::InvalidData(format!("{id}: {field} {ms} ms is outside the dates a store holds"))
+    })
+}
+
 /// Insert an attestation through any Connection (shared by SqliteStore and WriteConn).
-/// Handles the main INSERT, junction tables, and enforcement counter updates.
+/// Handles the main INSERT and the junction tables.
 pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> StoreResult<()> {
     let subjects_json = serialize_string_vec(&attestation.subjects)?;
     let predicates_json = serialize_string_vec(&attestation.predicates)?;
@@ -551,8 +344,8 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
     let actors_json = serialize_string_vec(&attestation.actors)?;
     let attributes_json = serialize_attributes(&attestation.attributes)?;
 
-    let timestamp_sql = timestamp_to_sql(attestation.timestamp);
-    let created_at_sql = timestamp_to_sql(attestation.created_at);
+    let timestamp_sql = instant(&attestation.id, "timestamp", attestation.timestamp)?;
+    let created_at_sql = instant(&attestation.id, "created_at", attestation.created_at)?;
 
     crate::flight_recorder::record_fmt("put:insert_main", &attestation.id);
     conn.execute(
@@ -619,56 +412,7 @@ impl AttestationStore for SqliteStore {
             return Err(StoreError::AlreadyExists(attestation.id.clone()));
         }
 
-        let actors = attestation.actors.clone();
-        let contexts = attestation.contexts.clone();
-        let subjects = attestation.subjects.clone();
-
         put_attestation(&self.conn, &attestation)?;
-
-        // Update in-memory counters and check thresholds.
-        // Skip enforcement when distilling to prevent infinite loops (distill insert → enforce → distill).
-        if !self.distilling {
-            self.enforcement_counters.initialized = true;
-
-            // Update counters for every put
-            for actor in &actors {
-                for context in &contexts {
-                    *self
-                        .enforcement_counters
-                        .actor_context
-                        .entry((actor.clone(), context.clone()))
-                        .or_insert(0) += 1;
-                }
-                self.enforcement_counters
-                    .actor_contexts
-                    .entry(actor.clone())
-                    .or_default()
-                    .extend(contexts.iter().cloned());
-            }
-            for subject in &subjects {
-                self.enforcement_counters
-                    .entity_actors
-                    .entry(subject.clone())
-                    .or_default()
-                    .extend(actors.iter().cloned());
-            }
-
-            // Only run enforcement when a threshold is exceeded (O(1) check)
-            if let Some(ref config) = self.enforcement_config {
-                let needs_enforcement = self.enforcement_counters.any_threshold_exceeded(config);
-                if needs_enforcement {
-                    let input = EnforcementInput {
-                        actors,
-                        contexts,
-                        subjects,
-                        config: config.clone(),
-                    };
-                    if let Err(e) = self.enforce_limits(&input) {
-                        eprintln!("ats-sqlite: post-put enforcement failed: {}", e);
-                    }
-                }
-            }
-        }
 
         // Periodic PASSIVE checkpoint — moves WAL pages to the main DB without
         // truncating WAL or -shm. Safe with concurrent readers (PASSIVE skips
@@ -752,7 +496,7 @@ impl AttestationStore for SqliteStore {
         let actors_json = serialize_string_vec(&attestation.actors)?;
         let attributes_json = serialize_attributes(&attestation.attributes)?;
 
-        let timestamp_sql = timestamp_to_sql(attestation.timestamp);
+        let timestamp_sql = instant(&attestation.id, "timestamp", attestation.timestamp)?;
 
         self.conn
             .execute(

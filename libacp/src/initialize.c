@@ -3,12 +3,12 @@
 #include <stdio.h>
 #include <string.h>
 
-// ProtocolVersion is a uint16 in both schemas.
+// 「[Opus 5.5] ProtocolVersion is a uint16 in both schemas.」
 #define ACP_VERSION_MAX 65535
 
 static void read_capabilities(json_object *params, unsigned requested, acp_client_capabilities *caps) {
     memset(caps, 0, sizeof *caps);
-    // The request is in the shape of the version the client asked for.
+    // 「[Opus 5.5] The request is in the shape of the version the client asked for.」
     json_object *c = acp_field(params, requested >= 2 ? "capabilities" : "clientCapabilities");
     json_object *elicitation = acp_field(c, "elicitation");
     caps->elicitation_form = acp_offered(elicitation, "form");
@@ -35,7 +35,7 @@ static acp_status unsupported(acp_buffer *error_json, unsigned requested, const 
     json_object *error = rpc_error(ACP_ERROR_UNSUPPORTED_VERSION, message);
     json_object *data = json_object_new_object();
     json_object *listed = json_object_new_array();
-    // Listed in ascending order, whatever order the caller named them in.
+    // 「[Opus 5.5] Listed in ascending order, whatever order the caller named them in.」
     unsigned last = 0;
     for (size_t i = 0; i < n; i++) {
         unsigned next = 0;
@@ -78,7 +78,7 @@ acp_status acp_initialize_read(const char *params_json, size_t length,
     }
     out->requested_version = (unsigned) requested;
 
-    // The highest supported at or below what was requested.
+    // 「[Opus 5.5] The highest supported at or below what was requested.」
     for (size_t i = 0; i < supported_count; i++)
         if (supported[i] <= out->requested_version && supported[i] > out->selected_version)
             out->selected_version = supported[i];

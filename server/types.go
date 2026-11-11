@@ -3,6 +3,7 @@ package server
 import (
 	"time"
 
+	"github.com/teranos/QNTX/internal/ai/provider"
 	"github.com/teranos/QNTX/pulse/async"
 )
 
@@ -96,6 +97,10 @@ type LLMStreamMessage struct {
 	PromptTokens     int `json:"prompt_tokens,omitempty"`
 	CompletionTokens int `json:"completion_tokens,omitempty"`
 	TotalTokens      int `json:"total_tokens,omitempty"`
+
+	// Served is how the call was served, when its provider reports it: on the
+	// final chunk.
+	Served *provider.Served `json:"served,omitempty"`
 }
 
 // LLMTokenSignal carries per-token inference signal data for visualization

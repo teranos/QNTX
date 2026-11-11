@@ -619,9 +619,9 @@ func TestGetDaemon(t *testing.T) {
 		t.Fatal("daemon.Registry() returned nil")
 	}
 
-	// Verify registry has only built-in handlers (e.g. distill if configured),
+	// Verify registry has only built-in handlers,
 	// and what the subsystems linked into this build declare (ADR-056).
-	allowed := []string{"distill", "wal-checkpoint", watcher.CIWatchHandlerName, reportHandlerName}
+	allowed := []string{"wal-checkpoint", watcher.CIWatchHandlerName, reportHandlerName}
 	for _, sub := range subsystem.Registered() {
 		allowed = append(allowed, sub.Declare().GetHandlerNames()...)
 	}

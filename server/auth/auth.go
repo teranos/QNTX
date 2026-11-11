@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"net/http"
 	"net/url"
 	"strings"
@@ -43,7 +45,9 @@ type Handler struct {
 	users UserStore
 	// Held across the read-then-write that creates a User. One process only:
 	// two nodes on one location still race, and nothing arbitrates that.
-	creating       sync.Mutex
+	creating sync.Mutex
+	// 「[Opus 5.5] Held across the look-then-write that hands an agent its token, for the」
+	// 「[Opus 5.5] same reason and with the same reach.」
 	sessions       *sessionStore
 	becomings      becomings
 	layeChallenges layeChallenges
@@ -104,7 +108,9 @@ type Handler struct {
 	assertions spentAssertions
 	// nodes.primary: whose tokens this one also accepts, and what it said of each.
 	issuers []string
-	issued  issuedAnswers
+	// The did:key each issuer says it signs as, asked once (signed.go).
+	issuerDIDs sync.Map
+	issued     issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
 	logsInElsewhere bool
@@ -112,9 +118,7 @@ type Handler struct {
 	// How this primary asks GitHub for a peer (github_for_peers.go).
 	githubForPeers         GitHubGet
 	githubLocationForPeers GitHubLocate
-	// nodes.peers: this primary's peers, by did:key and by name, and the
-	// tokens people are carried to them with.
-	carried  carriedTokens
+	// nodes.peers: this primary's peers, by did:key and by name.
 	nodes    map[string]Client
 	tokens   TokenStore // ADR-025: bearer token path; may be nil during init
 	attestor Attestor   // records admissions; nil until the store is up
@@ -284,8 +288,15 @@ func (h *Handler) SetNodeKey(key ed25519.PrivateKey) {
 func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) http.HandlerFunc {
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
+		// The served request's span is named by its route, so what a caller
+		// was answered is read in the trace and not in the node's log.
+		span := trace.SpanFromContext(r.Context())
+		span.SetName(r.Method + " " + route)
+		span.SetAttributes(attribute.String("http.route", route))
+
 		p := h.presented(r)
 		if p.turnedAway {
+			refusedOn(r, "turned-away")
 			h.rejectTurnedAway(w)
 			return
 		}
@@ -299,18 +310,22 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 		// every token already out there (ADR-031).
 		by, err := h.switchedOff(admitted)
 		if err != nil {
+			refusedOn(r, "unanswered")
 			h.rejectUnanswered(w, r, admitted, err)
 			return
 		}
 		if by != "" {
+			refusedOn(r, "switched-off")
 			h.rejectSwitchedOff(w, r, admitted, by)
 			return
 		}
 		if by, refused := h.notThemselves(p, admitted.UserID); refused {
+			refusedOn(r, "become")
 			h.rejectBecome(w, r, admitted.UserID, by)
 			return
 		}
 		if !reach.Admits(admitted) {
+			refusedOn(r, "out-of-reach")
 			h.rejectOutOfReach(w, r, admitted, route, reach)
 			return
 		}
@@ -318,6 +333,7 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 			measure.String(measure.AttrLevel, admitted.LevelName()),
 			measure.String(measure.AttrRoute, route),
 		)
+		span.SetAttributes(attribute.String("qntx.level", admitted.LevelName()))
 		next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
 	}
 }
@@ -394,6 +410,22 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 			}
 			return h.admittedAsThePerson(*grant), true
 		}
+		// 「[Opus 5.5] A token holds roles by its label, its name.」
+		holder := grant.Label
+		// 「[Opus 5.5] An agent's token is the token it runs under, under a DID of its own」
+		// 「[Opus 5.5] (ADR-025): its level, its namespaces and its roles are that token's,」
+		// 「[Opus 5.5] read now, and it stands while that token does.」
+		if asking, isAgents, stands := h.runsUnder(grant.Label, grant.DID); isAgents {
+			if !stands {
+				h.logger.Infow("Bearer token refused",
+					"did", grant.DID,
+					"reason", "named as an agent's token, and not one this node derived for a token that is live")
+				return Admission{}, false
+			}
+			agents := *grant
+			agents.Level, agents.Namespaces = asking.Level, asking.Namespaces
+			grant, holder = &agents, asking.Label
+		}
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
 		admitted := Admission{
@@ -414,9 +446,9 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// token names, and in system.
 		var roles []string
 		for _, namespace := range grant.Namespaces {
-			roles = append(roles, h.RolesOfToken(grant.Label, namespace)...)
+			roles = append(roles, h.RolesOfToken(holder, namespace)...)
 		}
-		seesSystem := len(h.RolesOfToken(grant.Label, NamespaceSystem)) > 0
+		seesSystem := len(h.RolesOfToken(holder, NamespaceSystem)) > 0
 		return admission.Granted(admitted, grant.Level, roles, seesSystem, h.WordsOf(roles)), true
 	}
 
@@ -789,6 +821,7 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 	}
 
 	measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, why))
+	refusedOn(r, why)
 
 	if isAPIRequest(r) {
 		// Where this resource says who issues tokens for it (RFC 9728 §5.1).
@@ -799,6 +832,11 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.String()), http.StatusSeeOther)
+}
+
+// refusedOn puts why the gate refused a request on the request's span.
+func refusedOn(r *http.Request, why string) {
+	trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("qntx.refused", why))
 }
 
 // rejectOutOfReach turns away somebody the node knows. They are admitted; no

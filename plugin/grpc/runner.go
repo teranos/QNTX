@@ -169,6 +169,12 @@ func (r *Runner) Take(digestFile string, logger *zap.SugaredLogger) (TakenBuild,
 // checkedDigest is archive's sha256, when said, the .sha256 the package step
 // wrote beside it, names that digest. Each is named in the error by where it was read.
 func checkedDigest(archiveName string, archive []byte, digestName string, said []byte) (string, error) {
+	return checkedSum(archiveName, hex.EncodeToString(sha256Of(archive)), digestName, said)
+}
+
+// checkedSum is got, the hex sha256 of the archive named archiveName, when
+// said, the .sha256 beside it, names that digest.
+func checkedSum(archiveName, got, digestName string, said []byte) (string, error) {
 	// sha256sum writes the digest, then the file it is of.
 	var first string
 	if read, err := fmt.Sscan(string(said), &first); err != nil {
@@ -179,7 +185,6 @@ func checkedDigest(archiveName string, archive []byte, digestName string, said [
 		return "", errors.Newf("%s holds no sha256 digest: %q is not %d hex bytes", digestName, first, sha256.Size)
 	}
 	want := hex.EncodeToString(sum)
-	got := hex.EncodeToString(sha256Of(archive))
 	if got != want {
 		return "", errors.Newf("build %s has digest %s and %s says %s; nothing was installed", archiveName, got, digestName, want)
 	}

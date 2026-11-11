@@ -10,11 +10,13 @@ import (
 	"sync"
 	"time"
 
+	sentryotel "github.com/getsentry/sentry-go/otel"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/internal/otlp"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
@@ -23,6 +25,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server"
 	errors "github.com/teranos/sacred-error"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -106,6 +109,25 @@ func init() {
 		// metrics are on is a call site that will one day ask wrong.
 		measure.Start()
 
+		// 「[Fable 5.1] Spans leave over OTLP when the environment names where」
+		// 「[Fable 5.1] (internal/otlp). Like Sentry, failing to start it is said on the」
+		// 「[Fable 5.1] terminal and is not a reason for a node not to run.」
+		// Spans go to Sentry too when it traces: sentry-go's own span processor.
+		var toSentry []sdktrace.SpanProcessor
+		if logger.SentryRunning() && opt.TracesSampleRate > 0 {
+			toSentry = append(toSentry, sentryotel.NewSentrySpanProcessor())
+		}
+		exported := otlp.Start(context.Background(), version.VersionTag, toSentry...)
+		if exported != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP span export: %v\n", exported)
+		}
+		if endpoint, said := otlp.Said(); otlp.Running() && said && exported == nil {
+			logger.Infow("Shipping spans over OTLP", "endpoint", endpoint, "release", version.VersionTag)
+		}
+		if len(toSentry) > 0 && otlp.Running() {
+			logger.Infow("Shipping spans to Sentry", "traces_sample_rate", opt.TracesSampleRate)
+		}
+
 		if logger.SentryRunning() {
 			// Logs and numbers leaving the machine is a thing the operator gets
 			// told, on the first line, rather than something they find out
@@ -134,6 +156,7 @@ func init() {
 	rootCmd.AddCommand(commands.HandlerCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
+	rootCmd.AddCommand(commands.SignCmd)
 	rootCmd.AddCommand(commands.VersionCmd)
 }
 
@@ -727,8 +750,18 @@ func Main() {
 		logger.Errorw("Fatal error", "error", err)
 		// The error that ended the process is the one worth shipping,
 		// and os.Exit runs no defers. Drain before leaving.
+		flushSpans()
 		logger.FlushSentry()
 		os.Exit(1)
 	}
+	flushSpans()
 	logger.FlushSentry()
+}
+
+// 「[Fable 5.1] flushSpans sends the spans the OTLP batch still holds before the」
+// 「[Fable 5.1] process ends, and says so on the terminal when they did not leave.」
+func flushSpans() {
+	if err := otlp.Flush(); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+	}
 }

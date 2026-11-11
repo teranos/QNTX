@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -59,6 +60,10 @@ type ExternalDomainProxy struct {
 
 	// pythonProvider indicates this plugin can execute Python code (populated during Initialize)
 	pythonProvider bool
+
+	// roomsProvider indicates this plugin holds rooms (populated during Initialize).
+	// Atomic: a plugin initialized again while a room is asked for writes it.
+	roomsProvider atomic.Bool
 
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
@@ -255,6 +260,16 @@ func (c *ExternalDomainProxy) PythonServiceClient() protocol.PythonServiceClient
 	return protocol.NewPythonServiceClient(c.conn)
 }
 
+// IsRoomsProvider returns true if the plugin holds rooms (RoomsService, ADR-057).
+func (c *ExternalDomainProxy) IsRoomsProvider() bool {
+	return c.roomsProvider.Load()
+}
+
+// RoomsServiceClient returns a RoomsServiceClient using this plugin's existing gRPC connection.
+func (c *ExternalDomainProxy) RoomsServiceClient() protocol.RoomsServiceClient {
+	return protocol.NewRoomsServiceClient(c.conn)
+}
+
 // GetSigilsFrom returns where the plugin said, at Initialize, its sigils are
 // taken from.
 func (c *ExternalDomainProxy) GetSigilsFrom() protocol.SigilsFrom {
@@ -394,6 +409,18 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		config[key] = pluginConfig.GetString(key)
 	}
 
+	// The node's Sentry goes to a plugin whose schema names it. A plugin that
+	// cannot say its schema is handed no DSN; its events are not worth failing
+	// the Initialize for.
+	if node := nodeTelemetry(); node.DSN != "" && c.client != nil {
+		if schema, err := c.ConfigSchema(ctx); err != nil {
+			c.logger.Warnw("The node's Sentry was not handed: the plugin's config schema was not read",
+				"plugin", c.metadata.Name, "error", err)
+		} else {
+			handNodeTelemetry(config, schema.GetFields(), node)
+		}
+	}
+
 	// The services every plugin is joined by, and the token, as the node's
 	// config hands them: one the node is not running fails Err below.
 	atsStoreEndpoint := pluginConfig.GetString("_ats_store_endpoint")
@@ -485,6 +512,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 
 	// Store Python provider capability
 	c.pythonProvider = resp.GetPythonProvider()
+	c.roomsProvider.Store(resp.GetRoomsProvider())
 
 	// Store and create watcher registrations. Declaring none withdraws
 	// every watcher the plugin declared before.

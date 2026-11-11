@@ -82,8 +82,12 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	grpcServer := grpc.NewServer()
 	protocol.RegisterDomainPluginServiceServer(grpcServer, s)
 
-	// If plugin implements LLMProvider, register LLMService on the same server
-	if provider, ok := s.plugin.(plugin.LLMProvider); ok {
+	// A plugin serving the whole LLMService registers its own server; one
+	// implementing LLMProvider has its Chat served through llmPluginServer.
+	if provider, ok := s.plugin.(LLMServiceProvider); ok {
+		protocol.RegisterLLMServiceServer(grpcServer, provider.LLMService())
+		s.logger.Infow("Registered the plugin's own LLMService on plugin server", "plugin", s.plugin.Metadata().Name)
+	} else if provider, ok := s.plugin.(plugin.LLMProvider); ok {
 		llmSrv := &llmPluginServer{provider: provider, name: s.plugin.Metadata().Name}
 		protocol.RegisterLLMServiceServer(grpcServer, llmSrv)
 		s.logger.Infow("Registered LLMService on plugin server", "plugin", s.plugin.Metadata().Name)
@@ -265,6 +269,9 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 	}
 
 	_, isLLMProvider := s.plugin.(plugin.LLMProvider)
+	if _, serves := s.plugin.(LLMServiceProvider); serves {
+		isLLMProvider = true
+	}
 	_, isSearchProvider := s.plugin.(plugin.SearchProvider)
 	_, isEmbeddingProvider := s.plugin.(plugin.EmbeddingProvider)
 
@@ -547,6 +554,18 @@ func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobR
 	}, nil
 }
 
+// LLMServiceProvider is an optional interface for a Go plugin that serves the
+// whole LLMService itself: StreamChat, the multi-turn messages field, the
+// priority and the served report, none of which plugin.LLMProvider's Chat
+// carries. Its server is registered on the plugin's gRPC server in place of
+// llmPluginServer, and the plugin is reported to the node as an LLM provider.
+type LLMServiceProvider interface {
+	plugin.DomainPlugin
+
+	// LLMService is the server registered as the plugin's LLMService.
+	LLMService() protocol.LLMServiceServer
+}
+
 // llmPluginServer implements protocol.LLMServiceServer by wrapping a plugin.LLMProvider.
 // Registered as a separate gRPC service on the same server, only for provider plugins.
 // StreamChat falls through to UnimplementedLLMServiceServer — Go-based providers
@@ -586,6 +605,7 @@ func (s *llmPluginServer) Chat(ctx context.Context, req *protocol.LLMChatRequest
 		PromptTokens:     int32(resp.PromptTokens),
 		CompletionTokens: int32(resp.CompletionTokens),
 		TotalTokens:      int32(resp.TotalTokens),
+		Served:           servedToProto(resp.Served),
 	}, nil
 }
 

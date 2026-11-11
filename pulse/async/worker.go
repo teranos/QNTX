@@ -512,6 +512,9 @@ func (wp *WorkerPool) processNextJob() error {
 	execStart := time.Now()
 	span, execCtx := wp.startJobSpan(job)
 	defer wp.finishJobSpan(span, job)
+	// 「[Fable 5.1] Deferred after, so it runs before: the OpenTelemetry span reads」
+	// 「[Fable 5.1] how the execution ended off the Sentry span while it is open.」
+	defer finishOTelJobSpan(execCtx, span, job)
 	wp.writeTaskLog(job.ID, job.HandlerName, "info", fmt.Sprintf("Starting %s", job.HandlerName))
 
 	if err := wp.executor.Execute(execCtx, job); err != nil {
@@ -523,18 +526,23 @@ func (wp *WorkerPool) processNextJob() error {
 			// Context was cancelled - requeue job with checkpoint intact (don't fail it)
 			wp.logger.Closing("Job cancelled during execution, re-queuing with checkpoint", "job_id", job.ID)
 			markSpan(span, sentry.SpanStatusAborted, "requeued_shutdown")
-			job.Status = JobStatusQueued
+			job.Status, job.UpdatedAt = JobStatusQueued, time.Now()
 			if updateErr := wp.queue.UpdateJob(job); updateErr != nil {
 				wp.logger.SugaredLogger.Errorw("Failed to re-queue cancelled job", "job_id", job.ID, "error", updateErr)
 			}
 			return nil // Return nil to avoid logging as error
 		default:
-			// Handler not registered yet (e.g. plugins still loading) — re-queue
-			if errors.Is(err, ErrHandlerNotRegistered) {
+			// 「[Fable 5.1] Handler not registered yet (e.g. plugins still loading) — re-queue,」
+			// 「[Fable 5.1] touched, so it stands behind every other queued job. A handler that」
+			// 「[Fable 5.1] has not registered within HandlerGrace of the job's creation is not」
+			// 「[Fable 5.1] loading; the job fails below, with that as its error, instead of」
+			// 「[Fable 5.1] being taken again forever. On q, plugin.update had no handler since」
+			// 「[Fable 5.1] 2026-10-01 and its one queued row held the worker.」
+			if errors.Is(err, ErrHandlerNotRegistered) && time.Since(job.CreatedAt) < HandlerGrace {
 				wp.logger.SugaredLogger.Debugw("Handler not registered yet, re-queuing job",
 					"job_id", job.ID, "handler", job.HandlerName)
 				markSpan(span, sentry.SpanStatusUnavailable, "requeued_no_handler")
-				job.Status = JobStatusQueued
+				job.Status, job.UpdatedAt = JobStatusQueued, time.Now()
 				if updateErr := wp.queue.UpdateJob(job); updateErr != nil {
 					wp.logger.SugaredLogger.Errorw("Failed to re-queue job for missing handler",
 						"job_id", job.ID, "error", updateErr)
@@ -578,7 +586,7 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	// work — a queue consumer — and the handler rides as the description. A
 	// handler per op would be one group per handler and no way to ask about
 	// Pulse as a whole.
-	// ContinueFromHeaders is what makes a child job's execution land in its
+	// continueFrom is what makes a child job's execution land in its
 	// parent's trace rather than as a root of its own. A job with nothing
 	// stored — every job enqueued outside a span, and every row written before
 	// the trace columns existed — passes an empty header, which the SDK reads
@@ -587,7 +595,7 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 		sentry.WithOpName("queue.process"),
 		sentry.WithDescription(job.HandlerName),
 		sentry.WithTransactionSource(sentry.SourceTask),
-		sentry.ContinueFromHeaders(job.TraceContext, job.TraceBaggage),
+		continueFrom(job.TraceContext, job.TraceBaggage),
 	)
 
 	span.SetData("messaging.message.id", job.ID)
@@ -610,14 +618,18 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	//
 	// Only when the span is actually sampled: with tracing off there is nothing
 	// worth a write, and every job would pay for an UPDATE nobody reads.
-	if span.Sampled == sentry.SampledTrue {
-		if err := wp.queue.store.SetExecutionTrace(job.ID, span.ToSentryTrace(), span.ToBaggage()); err != nil {
+	// 「[Fable 5.1] Or when the OpenTelemetry span is recorded: a child then inherits」
+	// 「[Fable 5.1] this trace id whether or not Sentry sampled it.」
+	ctx = startOTelJobSpan(span, job)
+	if span.Sampled == sentry.SampledTrue || recordingOTel(ctx) {
+		traceparent, bag := traceparentOf(ctx)
+		if err := wp.queue.store.SetExecutionTrace(job.ID, traceparent, bag); err != nil {
 			wp.logger.SugaredLogger.Warnw("Execution trace not recorded; children of this job will start their own traces",
 				"job_id", job.ID, "handler", job.HandlerName, "error", err)
 		}
 	}
 
-	return span, span.Context()
+	return span, ctx
 }
 
 // finishJobSpan closes the span, reading the fields the handler moved while it

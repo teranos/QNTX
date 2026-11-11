@@ -3,7 +3,6 @@ package async
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -145,7 +144,7 @@ func TestTheCauseSurvivesTheQueue(t *testing.T) {
 	if stored.TraceContext == "" {
 		t.Fatal("the job was enqueued inside a span and stored no cause")
 	}
-	if !strings.HasPrefix(stored.TraceContext, string(span.TraceID.Hex())) {
+	if parsed(t, stored.TraceContext).TraceID().String() != span.TraceID.String() {
 		t.Errorf("the stored cause %q does not name the trace %s it was enqueued in",
 			stored.TraceContext, string(span.TraceID.Hex()))
 	}

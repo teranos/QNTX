@@ -10,7 +10,7 @@ Types exist through [attestation](attestation.md) - 'restaurant' is real because
 
 A type attestation is: `[typeSubject] is type`. No context — a type exists because it was attested, not because it belongs to a namespace. The `source` field records who attested it. Attributes carry display metadata (color, label, opacity) and semantic information. `rich_string_fields` declares which attribute names contain searchable text (used for full-text search and embedding). `array_fields` declares which attributes hold lists.
 
-The type name is its own actor (self-certifying in typespace), avoiding bounded storage limits.
+The type name is its own actor (self-certifying in typespace).
 
 ## Ensuring types from plugins
 

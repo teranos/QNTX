@@ -13,7 +13,7 @@ workspace = true
 qntx-proto.workspace = true
 ats.workspace = true
 qntx-ffi-common = { path = "../qntx-ffi-common" }
-laye-error = { path = "../laye-error" }
+sacred-error.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

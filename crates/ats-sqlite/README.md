@@ -6,7 +6,6 @@ Native SQLite storage backend for QNTX attestations.
 
 - **AttestationStore** - Full CRUD operations
 - **QueryStore** - Filtering, aggregation, and statistics
-- **BoundedStore** - Configurable quota enforcement (16/64/64 default)
 - **FFI/CGO** - C-compatible interface for Go integration
 - **Schema Compatibility** - Uses Go migration files as source of truth
 
@@ -15,7 +14,7 @@ Native SQLite storage backend for QNTX attestations.
 ### Rust
 
 ```rust
-use ats_sqlite::{SqliteStore, BoundedStore, StorageQuotas};
+use ats_sqlite::SqliteStore;
 use ats::{AttestationBuilder, storage::{AttestationStore, QueryStore}};
 
 // Basic usage
@@ -27,10 +26,6 @@ let attestation = AttestationBuilder::new()
     .context("work")
     .build();
 store.put(attestation)?;
-
-// With quotas
-let quotas = StorageQuotas::new(100, 256, 256);
-let mut bounded = BoundedStore::in_memory_with_quotas(quotas)?;
 ```
 
 ### Go (via CGO)
@@ -55,7 +50,6 @@ See [FFI.md](./FFI.md) for CGO integration details.
 ├─────────────────────┤
 │ • AttestationStore  │ ← CRUD operations
 │ • QueryStore        │ ← Filtering/aggregation
-│ • BoundedStore      │ ← Quota enforcement
 └──────────┬──────────┘
            │
            ├─► SQLite (via rusqlite)
@@ -89,6 +83,6 @@ cargo build --release --features ffi -p ats-sqlite
 ## Status
 
 - **Phase 1**: ✅ Basic CRUD (AttestationStore)
-- **Phase 2**: ✅ Queries + Quotas (QueryStore, BoundedStore)
+- **Phase 2**: ✅ Queries (QueryStore)
 - **Phase 3**: 🚧 FFI/CGO bindings (proof of concept)
 - **Future**: Cross-validation with Go databases, IndexedDB backend (#334)

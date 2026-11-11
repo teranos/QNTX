@@ -114,6 +114,7 @@ func AddSentryOutput(opt SentryOptions) error {
 		LevelEnabler:  opt.MinLevel,
 		log:           sentry.NewLogger(context.Background()),
 		captureErrors: opt.CaptureErrors,
+		issues:        issues,
 	}
 
 	combined := zapcore.NewTee(Logger.Desugar().Core(), core)
@@ -155,6 +156,7 @@ type sentryCore struct {
 	log           sentry.Logger
 	fields        []zapcore.Field
 	captureErrors bool
+	issues        *issueLedger // says which errors are raised; nil raises every one
 }
 
 func (c *sentryCore) With(fields []zapcore.Field) zapcore.Core {
@@ -185,10 +187,19 @@ func (c *sentryCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	}
 	entry.Emit(ent.Message)
 
-	if c.captureErrors && ent.Level >= zapcore.ErrorLevel {
+	if c.captureErrors && ent.Level >= zapcore.ErrorLevel && c.mayRaise(ent, fields) {
 		c.captureIssue(ent, attrs, fields)
 	}
 	return nil
+}
+
+// mayRaise asks the ledger whether this error is raised as an issue. The log
+// line above ships either way, and the ledger counts it either way.
+func (c *sentryCore) mayRaise(ent zapcore.Entry, fields []zapcore.Field) bool {
+	if c.issues == nil {
+		return true
+	}
+	return c.issues.raise(ent, append(c.fields[:len(c.fields):len(c.fields)], fields...))
 }
 
 // Sync is where zap asks a core to flush. Sentry's batch is drained on a timer

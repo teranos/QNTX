@@ -1,4 +1,4 @@
 # Shared Go vendorHash for all builds from repo root
 # To update: set vendorHash = pkgs.lib.fakeHash; in flake.nix,
 # run `nix build .#qntx`, copy the hash from the error, paste it here.
-"sha256-Du+x1zUdYSVDDTt4UpF8LV+qxF6tt/Q/a6aNj29u35E="
+"sha256-Z/25ZhXr2XFJ4LTj9VgPyePG9IHtzfru7vnw2j2fBPQ="

@@ -37,6 +37,8 @@ type QNTXServer struct {
 	// its doors, and the health of the file underneath. What a namespace keeps
 	// is the namespace's, and is reached through it.
 	nodeDB                *sql.DB
+	issuesSeeded          atomic.Bool                   // today's issues_seen was read into the ledger, so a write may replace its rows
+	issuesWrite           sync.Mutex                    // one take-and-write of the issue ledger at a time, the last one included
 	nodeAgentApart        bool                          // The Node Agent's turns run apart from this process; set as the agent subsystem boots
 	startedAt             time.Time                     // When this process began answering; zero until New runs
 	dbPath                string                        // Database file path (for display in banner)
@@ -54,13 +56,14 @@ type QNTXServer struct {
 	taskEnds              sync.Mutex                    // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
 	taskStreams           sync.Map                      // Each Task whose turn this process runs, by id, to the stream the turn prints to
 	taskCancels           sync.Map                      // Each Task canceled in this process, by id, to who canceled it
-	pushing               sync.Map                      // Each Task with push notifications, by id, to the *sync.Mutex its notifications go out under one after another
 	noNodeAgent           error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents       agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
 	elementAgents         agentsHeld                    // Each element's agent this node has held, by its purpose (ADR-054)
 	providersAt           map[string]string             // Where each provider a key is asked of answers; nil is providersAt (provider_keys.go)
+	consuming             consumedFlows                 // 「[Opus 5.5] Each yes at an MCP server the node consumes, waiting on its callback (mcp_consumed.go)」
 	agentsDir             string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL                string                        // Where this node answers on its own machine; empty until it listens
+	doors                 agentDoors                    // The door each agent the node runs reaches it at (agent_door.go)
 	anthropicBaseURL      string                        // Where Anthropic's API is; empty is api.anthropic.com
 	anthropicInUse        inUse                         // What ROOT's agents last ran on at Anthropic
 	identityTokensRenewed identityTokens                // Each ROOT agent home whose identity token is renewed
@@ -71,7 +74,6 @@ type QNTXServer struct {
 	tickerCfg             schedule.TickerConfig         // Ticker configuration (resolved at init)
 	ticker                *schedule.Ticker              // Pulse ticker for scheduled jobs
 	configWatcher         *config.ConfigWatcher         // Config watcher for auto-reload on config changes
-	storageEventsPoller   *StorageEventsPoller          // Poller for storage events (warnings/evictions)
 	handlerFailures       *statusline.HandlerFailureLog // Recent failed handler executions, for the status row
 	news                  *statusline.NewsLog           // What built-ins left on the status row, per caller
 	askPeers              statusline.PeerRows           // How the peers' rows are asked for the status row; statusline.NoPeers until auth declares them
@@ -147,6 +149,12 @@ type QNTXServer struct {
 	// opening is held while answering changes and what is served is rebuilt
 	// from it. Plugins arrive on their own goroutines.
 	opening sync.Mutex
+	// naming is held from reading who holds a name to writing down who now
+	// does (i name), so two agents asking for one name at once do not both get it.
+	naming sync.Mutex
+	// 「[Opus 5.5] anthropicLining is held from reading the node's ANTHROPIC line to writing it anew」
+	// 「[Opus 5.5] (changeAnthropicLine), so an order, a cap and the ids asked at once each stand.」
+	anthropicLining sync.Mutex
 
 	// The MCP endpoint (ADR-038). The HTTP handler is built once; the server
 	// behind it is built per request, so a tool acts as the caller in front of
@@ -224,7 +232,6 @@ type QNTXServer struct {
 	watcherDB          *sql.DB            // Separate DB connection for watcher engine (avoids RustStore contention)
 	pulseReadDB        *sql.DB            // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
 	walCheckpointer    WALCheckpointer    // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
-	ageDistiller       AgeDistiller       // Rust-side age distillation (fold old attestations into sigmas)
 	writeLockInspector WriteLockInspector // Rust-side write lock holder tracking
 	shed               *auth.Shed         // the tokens the gate turns away while the operational store is slow
 	recordReporters    []RecordReporter   // What reading the record off-node has cost, per reader
@@ -248,11 +255,6 @@ type QNTXServer struct {
 // SetWALCheckpointer sets the Rust-side WAL checkpointer (closes read conns, checkpoints, reopens).
 func (s *QNTXServer) SetWALCheckpointer(c WALCheckpointer) {
 	s.walCheckpointer = c
-}
-
-// SetAgeDistiller sets the Rust-side age distiller (fold old attestations into sigmas).
-func (s *QNTXServer) SetAgeDistiller(d AgeDistiller) {
-	s.ageDistiller = d
 }
 
 // SetWriteLockInspector sets the write lock inspector for diagnostics.
@@ -280,6 +282,9 @@ func (s *QNTXServer) SetLandingReporter(r LandingReporter) {
 
 // handleClientRegister handles a new client connection
 func (s *QNTXServer) handleClientRegister(client *Client) {
+	if client.registered != nil {
+		defer close(client.registered)
+	}
 	s.mu.Lock()
 
 	// Defensive: Check client limit

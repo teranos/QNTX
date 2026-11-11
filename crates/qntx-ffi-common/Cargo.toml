@@ -11,7 +11,7 @@ workspace = true
 
 [dependencies]
 ats.workspace = true
-laye-error = { path = "../laye-error" }
+sacred-error.workspace = true
 serde_json.workspace = true
 # No dependencies - this is a minimal utility crate
 

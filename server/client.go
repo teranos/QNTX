@@ -63,6 +63,9 @@ type Client struct {
 	// so it is the answer rather than the way to get it.
 	in        string
 	closeOnce sync.Once // Defensive: Prevents double-close panics
+	// registered is closed once the hub has decided on this client, held or
+	// turned away: its name is told to it after, so a prompt naming it finds it.
+	registered chan struct{}
 }
 
 // universe is the namespace this connection acts in, whole. The same answer

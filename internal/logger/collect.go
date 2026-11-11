@@ -31,7 +31,9 @@ func CollectRepeats() {
 type collector struct {
 	inner  zapcore.Core
 	fields string
+	with   []zapcore.Field
 	seen   *seenLines
+	issues *issueLedger // counts every error, also the ones folded here
 }
 
 type seenLines struct {
@@ -47,8 +49,9 @@ type seenLine struct {
 
 func newCollector(inner zapcore.Core, now func() time.Time) *collector {
 	return &collector{
-		inner: inner,
-		seen:  &seenLines{now: now, lines: map[string]*seenLine{}},
+		inner:  inner,
+		seen:   &seenLines{now: now, lines: map[string]*seenLine{}},
+		issues: issues,
 	}
 }
 
@@ -58,7 +61,9 @@ func (c *collector) With(fields []zapcore.Field) zapcore.Core {
 	return &collector{
 		inner:  c.inner.With(fields),
 		fields: c.fields + encodeFields(fields),
+		with:   append(c.with[:len(c.with):len(c.with)], fields...),
 		seen:   c.seen,
+		issues: c.issues,
 	}
 }
 
@@ -72,6 +77,9 @@ func (c *collector) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.
 // Write hands the line to the cores that would have taken it, through their own
 // Check, so a sink's level still decides what reaches it.
 func (c *collector) Write(ent zapcore.Entry, fields []zapcore.Field) error {
+	if ent.Level >= zapcore.ErrorLevel && c.issues != nil {
+		c.issues.seen(ent, append(c.with[:len(c.with):len(c.with)], fields...))
+	}
 	if ent.Level < zapcore.DPanicLevel {
 		count, write := c.seen.occur(c.key(ent, fields))
 		if !write {

@@ -671,6 +671,12 @@ func (h *Handler) publicOrigin() string {
 	return h.loopbackOrigin
 }
 
+// 「[Opus 5.5] RenderCeremonyPage is renderCeremonyPage, for a yes the node asks for outside this package: an」
+// 「[Opus 5.5] MCP server the node consumes (server/mcp_consumed.go).」
+func (h *Handler) RenderCeremonyPage(w http.ResponseWriter, status int, ok bool, message string) {
+	h.renderCeremonyPage(w, status, ok, message)
+}
+
 // renderCeremonyPage is the whole of the redirect landing page. The element is
 // already polling for the result, so this window's only job is to stop being
 // the thing the person is looking at.

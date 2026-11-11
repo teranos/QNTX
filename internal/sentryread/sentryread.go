@@ -2,9 +2,10 @@
 //
 // "can you do it please to the degree that is feasible given sentry access?"
 //
-// Two questions and no more: a table of rows (the events endpoint) and a
-// series of buckets (the events-stats endpoint). What each asks for is the
-// caller's; this package only carries the question and reads the answer.
+// Three questions and no more: a table of rows (the events endpoint), a
+// series of buckets (the events-stats endpoint), and what became of what was
+// sent (the stats_v2 endpoint). What each asks for is the caller's; this
+// package only carries the question and reads the answer.
 package sentryread
 
 import (
@@ -67,6 +68,19 @@ type Point struct {
 	At    time.Time
 	Value float64
 }
+
+// Outcome is how many events of one category Sentry took, or dropped for one
+// reason, as Sentry names both: accepted, or rate_limited for
+// error_usage_exceeded.
+type Outcome struct {
+	Outcome string
+	Reason  string
+	Count   float64
+}
+
+// CategoryError is the category of error events, as the stats_v2 endpoint
+// names it.
+const CategoryError = "error"
 
 // Configured reports whether there is enough to ask anything, and names what
 // is missing when there is not.
@@ -142,6 +156,39 @@ func (c Client) Series(ctx context.Context, q SeriesQuery) ([]Point, error) {
 		points = append(points, p)
 	}
 	return points, nil
+}
+
+// Outcomes asks what became of the events of one category the project sent
+// in the window: how many Sentry took, and how many were dropped and why. An
+// event Sentry dropped is in no table and no series, so this is the only place
+// a dropped event is seen. The token needs org:read.
+func (c Client) Outcomes(ctx context.Context, category string, w Window) ([]Outcome, error) {
+	const sum = "sum(quantity)"
+	params := url.Values{}
+	params.Set("project", c.Project)
+	params.Set("category", category)
+	params.Set("field", sum)
+	params.Add("groupBy", "outcome")
+	params.Add("groupBy", "reason")
+	params.Set("start", w.Start.UTC().Format(time.RFC3339))
+	params.Set("end", w.End.UTC().Format(time.RFC3339))
+	var answer struct {
+		Groups []struct {
+			By struct {
+				Outcome string `json:"outcome"`
+				Reason  string `json:"reason"`
+			} `json:"by"`
+			Totals map[string]float64 `json:"totals"`
+		} `json:"groups"`
+	}
+	if err := c.get(ctx, "stats_v2", params, &answer); err != nil {
+		return nil, err
+	}
+	outcomes := make([]Outcome, 0, len(answer.Groups))
+	for _, g := range answer.Groups {
+		outcomes = append(outcomes, Outcome{Outcome: g.By.Outcome, Reason: g.By.Reason, Count: g.Totals[sum]})
+	}
+	return outcomes, nil
 }
 
 func (c Client) params(dataset, query string, w Window) url.Values {

@@ -22,7 +22,7 @@ import (
 // Documents are indexed into the "attestations" MeiliSearch index.
 type SearchIndexObserver struct {
 	servicesManager *grpcplugin.ServicesManager
-	richStore       *storage.BoundedStore
+	richStore       *storage.RichStore
 	logger          *zap.SugaredLogger
 	indexed         atomic.Int64
 	indexConfigured atomic.Bool
@@ -31,7 +31,7 @@ type SearchIndexObserver struct {
 // NewSearchIndexObserver creates a search indexing observer.
 func NewSearchIndexObserver(
 	sm *grpcplugin.ServicesManager,
-	richStore *storage.BoundedStore,
+	richStore *storage.RichStore,
 	logger *zap.SugaredLogger,
 ) *SearchIndexObserver {
 	return &SearchIndexObserver{

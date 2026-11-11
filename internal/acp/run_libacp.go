@@ -24,19 +24,19 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// Linked is whether this QNTX was built with libACP, and so runs an ACP harness.
+// 「[Opus 5.5] Linked is whether this QNTX was built with libACP, and so runs an ACP harness.」
 const Linked = true
 
-// The agent may write a line this long: a tool's output, a file it read.
+// 「[Opus 5.5] The agent may write a line this long: a tool's output, a file it read.」
 const maxLine = 16 * 1024 * 1024
 
-// stopReasons is PromptResponse's stopReason, in libACP's acp_stop_reason order.
+// 「[Opus 5.5] stopReasons is PromptResponse's stopReason, in libACP's acp_stop_reason order.」
 var stopReasons = [...]string{"end_turn", "max_tokens", "max_turn_requests", "refusal", "cancelled"}
 
-// Run starts the agent, signs in when Auth names a method, starts or continues the session, sets its
-// options, says Says, and hands each update to each as it comes. It answers with the agent's message and
-// why the turn stopped, or the error that broke it: the agent's own, with what it wrote on stderr when
-// it ended before answering.
+// 「[Opus 5.5] Run starts the agent, signs in when Auth names a method, starts or continues the session, sets its」
+// 「[Opus 5.5] options, says Says, and hands each update to each as it comes. It answers with the agent's message and」
+// 「[Opus 5.5] why the turn stopped, or the error that broke it: the agent's own, with what it wrote on stderr when」
+// 「[Opus 5.5] it ended before answering.」
 func Run(ctx context.Context, a Agent, t Turn, each func(Update)) (Answer, error) {
 	if a.Binary == "" || t.Says == "" || !filepath.IsAbs(t.Cwd) {
 		return Answer{}, errNoTurn
@@ -68,7 +68,7 @@ func Run(ctx context.Context, a Agent, t Turn, each func(Update)) (Answer, error
 	c.read(out)
 	answer, err := c.turn(t)
 	answer.Took = time.Since(started)
-	// The agent ends when its input does.
+	// 「[Opus 5.5] The agent ends when its input does.」
 	_ = in.Close()
 	if err != nil {
 		_ = cmd.Process.Kill()
@@ -78,7 +78,7 @@ func Run(ctx context.Context, a Agent, t Turn, each func(Update)) (Answer, error
 		err = ctx.Err()
 	}
 	if err != nil {
-		// What the agent wrote on stderr is its side of why.
+		// 「[Opus 5.5] What the agent wrote on stderr is its side of why.」
 		if said := stderr.String(); said != "" {
 			return answer, errors.Wrapf(err, "%s said: %s", filepath.Base(a.Binary), said)
 		}
@@ -100,11 +100,11 @@ type conn struct {
 	permission func(Asked) string
 	// 「[Opus 5.5] quiet holds back the updates a session told again replays, which the caller was told before.」
 	quiet bool
-	// answer is what the turn's updates said so far.
+	// 「[Opus 5.5] answer is what the turn's updates said so far.」
 	answer *Answer
 }
 
-// read hands each line the agent writes to lines, closing it when the agent's output ends.
+// 「[Opus 5.5] read hands each line the agent writes to lines, closing it when the agent's output ends.」
 func (c *conn) read(out io.Reader) {
 	go func() {
 		defer close(c.lines)
@@ -229,7 +229,7 @@ func (c *conn) turn(t Turn) (Answer, error) {
 		return C.acp_client_session_prompt_write(id, sid, says, C.size_t(len(t.Says)), m)
 	})
 	if err != nil {
-		// A turn left is called off, so the agent stops what it was doing for it.
+		// 「[Opus 5.5] A turn left is called off, so the agent stops what it was doing for it.」
 		var m C.acp_buffer
 		if C.acp_client_session_cancel_write(sid, &m) == C.ACP_OK {
 			_ = c.send(takeBuffer(&m))
@@ -246,8 +246,8 @@ func (c *conn) turn(t Turn) (Answer, error) {
 	return answer, nil
 }
 
-// call writes a request and reads until its answer, telling each update and answering each request of
-// the agent's on the way. The answer's line, or the agent's error as an *Error.
+// 「[Opus 5.5] call writes a request and reads until its answer, telling each update and answering each request of」
+// 「[Opus 5.5] the agent's on the way. The answer's line, or the agent's error as an *Error.」
 func (c *conn) call(method string, write func(id *C.char, m *C.acp_buffer) C.acp_status) ([]byte, error) {
 	c.next++
 	id := strconv.Itoa(c.next)
@@ -335,8 +335,8 @@ func (c *conn) update(line []byte) {
 	c.each(out)
 }
 
-// answerRequest answers what the agent asks: a permission by the turn's choice, and anything else, which
-// this client offers none of, with -32601.
+// 「[Opus 5.5] answerRequest answers what the agent asks: a permission by the turn's choice, and anything else, which」
+// 「[Opus 5.5] this client offers none of, with -32601.」
 func (c *conn) answerRequest(id, method, params string) error {
 	cid := C.CString(id)
 	defer C.free(unsafe.Pointer(cid))
@@ -379,7 +379,7 @@ func (c *conn) send(b []byte) error {
 	return err
 }
 
-// withLine hands a line to libACP as the bytes it is, for as long as f runs.
+// 「[Opus 5.5] withLine hands a line to libACP as the bytes it is, for as long as f runs.」
 func withLine(line []byte, f func(*C.char, C.size_t)) {
 	if len(line) == 0 {
 		var none [1]byte
@@ -401,7 +401,7 @@ func goString(s *C.char) string {
 	return C.GoString(s)
 }
 
-// tail keeps the last of what the agent wrote on stderr, bounded while it runs.
+// 「[Opus 5.5] tail keeps the last of what the agent wrote on stderr, bounded while it runs.」
 type tail struct{ data []byte }
 
 func (b *tail) Write(p []byte) (int, error) {

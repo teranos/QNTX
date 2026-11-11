@@ -8,9 +8,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/hex"
+	"io"
 	"os"
 	"time"
 
+	"github.com/teranos/QNTX/internal/sqlclose"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 )
@@ -53,6 +55,19 @@ func PackageBuild(name, binary string) ([]byte, error) {
 // archive's digest.
 func InstallBuild(name string, archive []byte, logger *zap.SugaredLogger) (bool, string, error) {
 	digest := hex.EncodeToString(sha256Of(archive))
+	return installBuild(name, digest, func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(archive)), nil }, logger)
+}
+
+// InstallArtifactBuild is InstallBuild of a build inside an artifact, checked
+// as digest by ArtifactBuild: it is read out of the artifact as it is
+// unpacked, and never held whole.
+func InstallArtifactBuild(name string, archive ArtifactArchive, digest string, logger *zap.SugaredLogger) (bool, string, error) {
+	return installBuild(name, digest, archive.Open, logger)
+}
+
+// installBuild installs the archive open reads, of digest, as name's build,
+// unless it is the build already installed.
+func installBuild(name, digest string, open func() (io.ReadCloser, error), logger *zap.SugaredLogger) (_ bool, _ string, err error) {
 	dir, err := PluginInstallPath(name)
 	if err != nil {
 		return false, digest, err
@@ -60,7 +75,12 @@ func InstallBuild(name string, archive []byte, logger *zap.SugaredLogger) (bool,
 	if installed, ok := installedDigest(dir); ok && installed == digest {
 		return false, digest, nil
 	}
-	binary, files, err := install(archive, dir, PluginBinaryName(name))
+	archive, err := open()
+	if err != nil {
+		return false, digest, err
+	}
+	defer func() { err = sqlclose.With(err, archive.Close(), "the build of plugin "+name) }()
+	binary, files, err := installFrom(archive, digest, dir, PluginBinaryName(name))
 	if err != nil {
 		return false, digest, errors.Wrapf(err, "failed to install the build of plugin %s to %s", name, dir)
 	}

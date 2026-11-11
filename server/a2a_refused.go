@@ -13,7 +13,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/internal/measure"
-	"github.com/teranos/QNTX/server/a2a"
 	"golang.org/x/time/rate"
 )
 
@@ -43,12 +42,13 @@ const (
 )
 
 // a2aRefusalSaid is one request the node answered with an error: the
-// operation the SDK read it as, empty when none was; the JSON-RPC method (§9)
-// it called when it was JSON-RPC, as the client wrote it; and the answer.
+// operation the SDK read it as, empty when none was; whether it came over
+// JSON-RPC (§9); and the answer.
 type a2aRefusalSaid struct {
-	Operation, JSONRPC string
-	Status             int
-	Reason, Message    string
+	Operation       string
+	JSONRPC         bool
+	Status          int
+	Reason, Message string
 }
 
 // kindOf is a defect for a 5xx or an answer the node could not give, and expected otherwise.
@@ -78,7 +78,7 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 	}
 	kind := kindOf(refusal)
 	binding := "http+json"
-	if refusal.JSONRPC != "" {
+	if refusal.JSONRPC {
 		binding = "jsonrpc"
 	}
 	version := r.Header.Get("A2A-Version")
@@ -102,7 +102,6 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 		"a2a.operation": refusal.Operation,
 		"a2a.binding":   binding,
 		"a2a.version":   bounded(version, saidVersionMost),
-		"a2a.jsonrpc":   refusal.JSONRPC,
 		"a2a.reason":    reason,
 		"a2a.kind":      string(kind),
 		"a2a.caller":    spokenBy(r),
@@ -161,8 +160,8 @@ func versionOf(said string) string {
 	switch {
 	case said == "":
 		return "0.3"
-	case said == a2a.Version || strings.HasPrefix(said, a2a.Version+"."):
-		return a2a.Version
+	case said == string(a2asdk.Version) || strings.HasPrefix(said, string(a2asdk.Version)+"."):
+		return string(a2asdk.Version)
 	case said == "0.3" || strings.HasPrefix(said, "0.3."):
 		return "0.3"
 	}

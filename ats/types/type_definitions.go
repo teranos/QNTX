@@ -59,7 +59,6 @@ type TypeDef struct {
 // No context — a type exists because it was attested, not because it belongs to a namespace.
 //
 // The typeName becomes its own actor in the typespace, separate from the ASID entity space.
-// This avoids bounded storage limits (64 actors per entity) since each type self-certifies.
 //
 // Example usage:
 //

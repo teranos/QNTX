@@ -85,7 +85,6 @@ impl PostgresError {
                 ats::storage::StoreError::Backend(_) => "backend",
                 ats::storage::StoreError::Query(_) => "query",
                 ats::storage::StoreError::Serialization(_) => "serialization",
-                ats::storage::StoreError::QuotaExceeded { .. } => "quota-exceeded",
             },
             PostgresError::Connect { .. } => "connect",
             PostgresError::BadNamespace { .. } => "bad-namespace",
@@ -168,16 +167,16 @@ impl PostgresError {
 
     /// The one typed value this crosses every layer as. `ffi_call` names the
     /// C function it left through, and is None inside the crate.
-    pub fn sacred(self, ffi_call: Option<&str>) -> laye_error::Error {
+    pub fn sacred(self, ffi_call: Option<&str>) -> sacred_error::Error {
         // A clock before 1970 says how far before, as a negative instant.
         let at = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
             Ok(since) => since.as_millis().to_string(),
             Err(before) => format!("-{}", before.duration().as_millis()),
         };
-        laye_error::Error {
+        sacred_error::Error {
             id: format!("err-{SURFACE}-{at}"),
-            severity: laye_error::Severity::Error,
-            context: laye_error::Context {
+            severity: sacred_error::Severity::Error,
+            context: sacred_error::Context {
                 surface: SURFACE.to_string(),
                 region: Some(self.region().to_string()),
                 anchor: None,

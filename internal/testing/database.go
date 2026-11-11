@@ -67,7 +67,7 @@ func CreateTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 }
 
 // sqlTestStore implements ats.AttestationStore using raw SQL.
-// Test-only: no signing, no observers, no bounded enforcement. A signature it
+// Test-only: no signing, no observers. A signature it
 // is given is kept and read back, as the Rust store keeps one.
 // Note: GetAttestations uses LIKE-based matching, not exact array membership
 // like the real Rust backend. Tests may pass here for patterns that would

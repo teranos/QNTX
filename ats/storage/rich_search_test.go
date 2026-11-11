@@ -43,7 +43,7 @@ func attestTypeDefinition(t *testing.T, db *sql.DB, typeName string, richFields 
 func TestSearchRichStringFields(t *testing.T) {
 	ctx := context.Background()
 	db := qntxtest.CreateTestDB(t)
-	store := NewBoundedStore(db, nil, zap.NewNop().Sugar())
+	store := NewRichStore(db, nil, zap.NewNop().Sugar())
 
 	// First, attest type definitions for the fields we'll use
 	attestTypeDefinition(t, db, "Commit", []string{"message", "description"})
@@ -298,7 +298,7 @@ func TestSearchRichStringFields(t *testing.T) {
 func TestSearchRichStringFields_FuzzyMatching(t *testing.T) {
 	ctx := context.Background()
 	db := qntxtest.CreateTestDB(t)
-	store := NewBoundedStore(db, nil, zap.NewNop().Sugar())
+	store := NewRichStore(db, nil, zap.NewNop().Sugar())
 
 	// First, attest type definition for the 'message' field we'll use
 	attestTypeDefinition(t, db, "Commit", []string{"message"})
@@ -431,7 +431,7 @@ func TestSearchRichStringFields_Performance(t *testing.T) {
 
 	ctx := context.Background()
 	db := qntxtest.CreateTestDB(t)
-	store := NewBoundedStore(db, nil, zap.NewNop().Sugar())
+	store := NewRichStore(db, nil, zap.NewNop().Sugar())
 
 	// Attest a type definition with rich fields for Commit type
 	attestTypeDefinition(t, db, "Commit", []string{"message", "description"})
@@ -467,7 +467,7 @@ func TestSearchRichStringFields_Performance(t *testing.T) {
 func TestDynamicFieldDiscovery(t *testing.T) {
 	ctx := context.Background()
 	db := qntxtest.CreateTestDB(t)
-	store := NewBoundedStore(db, nil, zap.NewNop().Sugar())
+	store := NewRichStore(db, nil, zap.NewNop().Sugar())
 
 	t.Run("Discovers fields from type definitions", func(t *testing.T) {
 		// Insert a type definition attestation with custom rich fields
@@ -501,7 +501,7 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 	t.Run("Returns empty slice when no type definitions", func(t *testing.T) {
 		// Fresh database with no type definitions
 		db2 := qntxtest.CreateTestDB(t)
-		store2 := NewBoundedStore(db2, nil, zap.NewNop().Sugar())
+		store2 := NewRichStore(db2, nil, zap.NewNop().Sugar())
 
 		fields := store2.buildDynamicRichStringFields(ctx)
 
@@ -512,7 +512,7 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 	t.Run("SearchRichStringFieldsWithResult returns searched fields", func(t *testing.T) {
 		// Create a fresh database and store to avoid cache conflicts
 		freshDB := qntxtest.CreateTestDB(t)
-		freshStore := NewBoundedStore(freshDB, nil, zap.NewNop().Sugar())
+		freshStore := NewRichStore(freshDB, nil, zap.NewNop().Sugar())
 
 		// Attest a type definition for SearchTestNote with notes and message fields
 		attestTypeDefinition(t, freshDB, "SearchTestNote", []string{"notes", "message"})
@@ -613,7 +613,7 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 // long ago comes after one carried once, lately, and each says when.
 func TestGetRichFieldsWithStats_MostRecentlyCarriedFirst(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
-	store := NewBoundedStore(db, nil, zap.NewNop().Sugar())
+	store := NewRichStore(db, nil, zap.NewNop().Sugar())
 	attestTypeDefinition(t, db, "Note", []string{"often", "lately", "never"})
 
 	carry := func(id, field string, at time.Time) {

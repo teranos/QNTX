@@ -34,6 +34,7 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
@@ -76,6 +77,13 @@ type Host interface {
 	// StoreFor is the store of the namespace the caller of a sigil stands in,
 	// from the context the sigil's Answer was handed.
 	StoreFor(ctx context.Context) (ats.AttestationStore, error)
+	// OfStandingRow is the store of the namespace a standing row landed in,
+	// for what its built-in writes beside the row. system is refused.
+	OfStandingRow(namespace string) (ats.AttestationStore, error)
+	// Held is a DuckDB the subsystem holds for itself, by name: its own
+	// tables, made by its migrations, in one file of the node's, held in memory
+	// while the node runs and kept across restarts. Asked once per name.
+	Held(name string, migrations []Migration) (Held, error)
 	// Registry is where a built-in is registered, by its name.
 	Registry() *async.HandlerRegistry
 	// Enqueue hands a job to the daemon, for a built-in to run off the
@@ -92,6 +100,23 @@ type Host interface {
 	Logger() *zap.SugaredLogger
 }
 
+// Held is a DuckDB a subsystem holds for itself (Host.Held).
+type Held interface {
+	// Exec runs SQL answering no rows, params bound in order, and answers how
+	// many rows it changed.
+	Exec(sql string, params ...any) (int, error)
+	// Query runs SQL, params bound in order, and decodes its rows, objects by
+	// column name, into into.
+	Query(into any, sql string, params ...any) error
+}
+
+// A Migration is one of a subsystem's own, for the DuckDB it holds: applied
+// once, by its version, in the order handed.
+type Migration struct {
+	Version string
+	SQL     string
+}
+
 // Delivered is a subsystem that reads the App's webhook deliveries. The node
 // hands it each event its declaration names (protocol.Subsystem.github_events),
 // and puts what it answered in the webhook's response under the subsystem's
@@ -100,6 +125,24 @@ type Host interface {
 type Delivered interface {
 	Delivered(ctx context.Context, event string, body []byte) (any, error)
 }
+
+// Reported is a subsystem with a part in the weekly report (ADR-042). The node
+// asks it for the week the report stands in and puts the sections it answered
+// in the mail after its own, in html and in text. An error is said in the mail
+// under the subsystem's name, and the rest of the report still goes out.
+type Reported interface {
+	Reported(ctx context.Context, start, end time.Time) ([]ReportSection, error)
+}
+
+// A ReportSection is one titled part of the weekly report: its rows.
+type ReportSection struct {
+	Title string
+	Rows  []ReportRow
+}
+
+// A ReportRow is a label on the left and its value on the right. A row with no
+// label is its value alone.
+type ReportRow struct{ Label, Value string }
 
 var (
 	mu         sync.RWMutex

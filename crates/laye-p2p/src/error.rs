@@ -1,7 +1,7 @@
-//! Per-consumer wrapper around `laye_error::Error`.
+//! Per-consumer wrapper around `sacred_error::Error`.
 //!
 //! Thread-local buffer + `emit` / `drain` / `next_id` / `now_ms`. The
-//! wire shape lives in `laye_error`; this module owns the id-prefix
+//! wire shape lives in `sacred_error`; this module owns the id-prefix
 //! and the clock source (JS Date on wasm32, SystemTime on native).
 //!
 //! Every failing boundary in laye-p2p routes through `emit`. Nobody
@@ -9,7 +9,7 @@
 //! drops silently. The overlay reads via `drain` and renders each Error
 //! as the sacred terminal-block per ERROR.md's visual contract.
 
-use laye_error::{Anchor, Context, Error, Severity};
+use sacred_error::{Anchor, Context, Error, Severity};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 

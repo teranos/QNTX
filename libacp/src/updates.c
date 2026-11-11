@@ -10,7 +10,7 @@ static void add_string(json_object *object, const char *key, const char *value) 
 
 acp_status acp_session_update_write(const char *session_id, const char *update_json, acp_buffer *message_json) {
     if (session_id == NULL || update_json == NULL || message_json == NULL) return ACP_INVALID_ARGUMENT;
-    // The update as it was written, byte for byte: what it carries raw stays raw.
+    // 「[Opus 5.5] The update as it was written, byte for byte: what it carries raw stays raw.」
     json_object *update = acp_raw(update_json);
     if (!json_object_is_type(update, json_type_object)) {
         json_object_put(update);
@@ -39,7 +39,7 @@ acp_status acp_text_chunk_write(acp_chunk_kind kind, const char *text, size_t le
     return acp_finish(update, update_json);
 }
 
-// A chunk holding media of type, "image" or "audio": its mimeType and its base64 data.
+// 「[Opus 5.5] A chunk holding media of type, "image" or "audio": its mimeType and its base64 data.」
 static acp_status media_chunk(acp_chunk_kind kind, const char *type, const char *mime_type, const char *data,
     acp_buffer *update_json) {
     static const char *const named[] = {"agent_message_chunk", "agent_thought_chunk", "user_message_chunk"};
@@ -63,13 +63,13 @@ acp_status acp_audio_chunk_write(acp_chunk_kind kind, const char *mime_type, con
     return media_chunk(kind, "audio", mime_type, data, update_json);
 }
 
-// A string of length bytes, every one of them; NULL when json-c cannot hold so many.
+// 「[Opus 5.5] A string of length bytes, every one of them; NULL when json-c cannot hold so many.」
 static json_object *string_of(const char *text, size_t length) {
     return length > INT_MAX ? NULL : json_object_new_string_len(text, (int) length);
 }
 
-// ToolCallContent's diff: "The absolute file path being modified", "The original content (null for new
-// files)" and "The new content after modification".
+// 「[Opus 5.5] ToolCallContent's diff: "The absolute file path being modified", "The original content (null for new」
+// 「[Opus 5.5] files)" and "The new content after modification".」
 static json_object *diff_content(const acp_diff *diff, int *bad) {
     if (diff->path == NULL || diff->path[0] != '/' || diff->new_text == NULL) {
         *bad = 1;
@@ -91,8 +91,8 @@ static json_object *diff_content(const acp_diff *diff, int *bad) {
     return item;
 }
 
-// ToolCallContent: the terminal when there is one, the diff when there is one, then each block written as
-// content, or the text as one text block when there are none.
+// 「[Opus 5.5] ToolCallContent: the terminal when there is one, the diff when there is one, then each block written as」
+// 「[Opus 5.5] content, or the text as one text block when there are none.」
 static json_object *tool_content(const char *terminal_id, const acp_diff *diff, const char *blocks_json,
     const char *text, int *bad) {
     json_object *changed = NULL;
@@ -160,7 +160,7 @@ acp_status acp_tool_call_write(const acp_tool_call *call, acp_buffer *update_jso
     return acp_finish(update, update_json);
 }
 
-// Whether value is one of names, every byte of it: a NUL in it makes it another value.
+// 「[Opus 5.5] Whether value is one of names, every byte of it: a NUL in it makes it another value.」
 static int one_of(json_object *value, const char *const *names, size_t count) {
     if (!json_object_is_type(value, json_type_string)) return 0;
     size_t length = (size_t) json_object_get_string_len(value);
@@ -209,7 +209,7 @@ acp_status acp_usage_update_write(unsigned long long used, unsigned long long si
     if (update_json == NULL || used > INT64_MAX || size > INT64_MAX) return ACP_INVALID_ARGUMENT;
     json_object *amount = NULL;
     if (cost_amount != NULL) {
-        // The amount as the caller wrote it, so its digits are its own.
+        // 「[Opus 5.5] The amount as the caller wrote it, so its digits are its own.」
         json_object *read = acp_parse(cost_amount, strlen(cost_amount));
         int number = json_object_is_type(read, json_type_double) || json_object_is_type(read, json_type_int);
         double value = number ? json_object_get_double(read) : 0;
@@ -294,7 +294,7 @@ acp_status acp_elicitation_create_write(const char *request_id, const char *sess
     add_string(params, "sessionId", session_id);
     add_string(params, "toolCallId", tool_call_id);
     add_string(params, "mode", how);
-    // "message", required, as the server gave it; then the rest of what it asked.
+    // 「[Opus 5.5] "message", required, as the server gave it; then the rest of what it asked.」
     json_object *message_text = acp_field(asked, "message");
     if (message_text != NULL) json_object_object_add(params, "message", json_object_get(message_text));
     json_object_object_foreach(asked, key, value) {

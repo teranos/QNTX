@@ -30,6 +30,21 @@ let
     }
   ];
 
+  # What a build job does after setup, the same on every runner.
+  build = [
+    # Builds against the toolchain flake.lock pins, so every run uses the
+    # same rustc.
+    {
+      name = "Build \${{ matrix.package }}";
+      run = "nix build .#\${{ matrix.package }} --show-trace";
+    }
+
+    {
+      name = "Push to Cachix";
+      run = "nix build .#\${{ matrix.package }} --print-out-paths --no-link | cachix push qntx";
+    }
+  ];
+
   # "when i do something, i want that the system understands that i am not to be scrutinised"
   # The PR QNTX opens from the vault (syncbvh, docs-pr) is not built or checked.
   notTheVault = "!(github.event_name == 'pull_request' && github.event.pull_request.user.login == 'sbvh-qntx[bot]' && github.head_ref == 'docs-pr')";
@@ -51,30 +66,29 @@ in
       "flake.lock"
       ".github/workflows/nix.yml"
     ];
+    # Monday 04:00 UTC, the week's first day: the one run that builds on macOS.
+    schedule = [{ cron = "0 4 * * 1"; }];
+    # The macOS build asked for by hand, between two Mondays.
+    workflow_dispatch = { };
   };
 
   jobs = {
-    # Core Go binaries (parallel builds per OS)
+    # Core Go binaries, on Linux for every push to main and every nix change.
     build-go = {
       "if" = notTheVault;
-      strategy.matrix = {
-        os = [ "ubuntu-latest" "macos-latest" ];
-        package = [ "qntx" ];
-      };
-      runs-on = "\${{ matrix.os }}";
-      steps = setup ++ [
-        # Builds against the toolchain flake.lock pins, so every run uses the
-        # same rustc.
-        {
-          name = "Build \${{ matrix.package }}";
-          run = "nix build .#\${{ matrix.package }} --show-trace";
-        }
+      strategy.matrix.package = [ "qntx" ];
+      runs-on = "ubuntu-latest";
+      steps = setup ++ build;
+    };
 
-        {
-          name = "Push to Cachix";
-          run = "nix build .#\${{ matrix.package }} --print-out-paths --no-link | cachix push qntx";
-        }
-      ];
+    # "Decrease dependency on gh actions for macOS 3-core by changing to weekly."
+    # The same build on macOS, on the weekly schedule or when asked by hand, and
+    # on no push and no pull request.
+    build-go-macos = {
+      "if" = "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'";
+      strategy.matrix.package = [ "qntx" ];
+      runs-on = "macos-latest";
+      steps = setup ++ build;
     };
 
     # Docker images (Linux only, optional for PRs)

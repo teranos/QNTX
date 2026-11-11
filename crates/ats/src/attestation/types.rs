@@ -219,7 +219,7 @@ pub struct AxFilter {
     /// Temporal range end (Unix timestamp ms)
     pub time_end: Option<i64>,
 
-    /// Filter by source (exact match, e.g., "cli", "distill")
+    /// Filter by source (exact match, e.g., "cli", "datapunt")
     pub source: Option<String>,
 
     /// Maximum results. A filter that leaves it out is refused, 0 is 0 rows,

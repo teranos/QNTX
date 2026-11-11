@@ -15,18 +15,14 @@ import (
 // tokenNeverEnds is what a mint says for a token that does not end.
 const tokenNeverEnds = "never"
 
-// mintable resolves what kind of token was asked for. Minting names the kind,
-// and these three are the kinds it names.
+// mintable resolves what kind of token was asked for: a third-party OAuth
+// client's, the one kind minting names.
+//
+// "Tokens are to be removed from QNTX except for third-party OAuth clients"
 func mintable(asked string) (Level, bool) {
-	switch Level(strings.ToUpper(strings.TrimSpace(asked))) {
-	case LevelSuper:
-		return LevelSuper, true
-	case LevelAttestor:
-		return LevelAttestor, true
-	case LevelOAuth:
+	if Level(strings.ToUpper(strings.TrimSpace(asked))) == LevelOAuth {
 		return LevelOAuth, true
 	}
-	// ROOT goes beyond QNTX (ADR-027) and is not something minting hands out.
 	return "", false
 }
 
@@ -106,6 +102,12 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 		h.writeError(w, http.StatusBadRequest, "no label")
 		return
 	}
+	// 「[Opus 5.5] An agent's token is the node's to write, named for the token it runs」
+	// 「[Opus 5.5] under: a label naming one would stand on that token's roles.」
+	if strings.HasPrefix(strings.TrimSpace(req.Label), agentOfLabel+":") {
+		h.writeError(w, http.StatusBadRequest, "a label starting "+agentOfLabel+": names an agent's token, which the node writes")
+		return
+	}
 	// The label is the token's name, and a grant hangs on it. Revoked ones
 	// count: revocation is a switch, and a switched-off token comes back.
 	held, err := h.tokens.List()
@@ -131,25 +133,17 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			said = "nothing"
 		}
 		h.writeError(w, http.StatusBadRequest,
-			"a token is minted as "+string(LevelSuper)+", "+string(LevelAttestor)+" or "+string(LevelOAuth)+", and this named "+said)
+			"a token is minted for a third-party client, as "+string(LevelOAuth)+", and this named "+said)
 		return
 	}
 
 	returnAddress := strings.TrimSpace(req.ReturnAddress)
 	instructions := strings.TrimSpace(req.Instructions)
-	if instructions != "" && level != LevelOAuth {
-		h.writeError(w, http.StatusBadRequest, "only a client has instructions")
-		return
-	}
 	if why := guidable(instructions); why != "" {
 		h.writeError(w, http.StatusBadRequest, why)
 		return
 	}
 	namespaces := req.Namespaces
-	if req.Root && level != LevelOAuth {
-		h.writeError(w, http.StatusBadRequest, "only a client is ROOT's client")
-		return
-	}
 	// "but i want a MCP specifically for the Node, only for ROOT"
 	if req.Root && h.levelOf(mintedBy) != LevelRoot {
 		h.writeError(w, http.StatusForbidden, "ROOT's client is ROOT's to mint")
@@ -160,30 +154,20 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			"ROOT's client answers at /mcp, the node's, and this named "+strconv.Itoa(len(namespaces))+" namespaces")
 		return
 	}
-	if level == LevelOAuth {
-		// A client is a door (ADR-025): ROOT writes its return address here the
-		// way it writes a door's origin in am.toml. Its connector acts in the one
-		// namespace picked here (ADR-038).
-		if len(namespaces) != 1 && !req.Root {
-			h.writeError(w, http.StatusBadRequest,
-				"a client acts in one namespace, picked at minting, and this named "+strconv.Itoa(len(namespaces)))
-			return
-		}
-		if returnAddress == "" {
-			h.writeError(w, http.StatusBadRequest, "a client has a return address, and this named none")
-			return
-		}
-		if err := returnable(returnAddress); err != nil {
-			h.writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-	} else if returnAddress != "" {
-		h.writeError(w, http.StatusBadRequest, "only a client has a return address")
+	// A client is a door: ROOT writes its return address here the way it
+	// writes a door's origin in am.toml. Its connector acts in the one
+	// namespace picked here (ADR-038).
+	if len(namespaces) != 1 && !req.Root {
+		h.writeError(w, http.StatusBadRequest,
+			"a client acts in one namespace, picked at minting, and this named "+strconv.Itoa(len(namespaces)))
 		return
 	}
-	// An ATTESTOR acts where it names. A SUPER token names no namespace.
-	if len(namespaces) == 0 && level == LevelAttestor {
-		h.writeError(w, http.StatusBadRequest, "an "+string(LevelAttestor)+" acts in the namespaces it names, and this named none")
+	if returnAddress == "" {
+		h.writeError(w, http.StatusBadRequest, "a client has a return address, and this named none")
+		return
+	}
+	if err := returnable(returnAddress); err != nil {
+		h.writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	for _, namespace := range namespaces {
@@ -436,9 +420,23 @@ func (h *Handler) answerFor(info TokenInfo) tokenAnswer {
 		Roles:      map[string][]string{},
 		KnownRoles: map[string][]string{},
 	}
+	// 「[Opus 5.5] An agent's token holds what the token it runs under holds, where that」
+	// 「[Opus 5.5] token acts, as the gate admits it; one that does not stand holds nothing.」
+	holder, namespaces := info.Label, info.Namespaces
+	if asking, isAgents, stands := h.runsUnder(info.Label, info.DID); isAgents {
+		holder, namespaces = asking.Label, asking.Namespaces
+		if !stands {
+			namespaces = nil
+		}
+		// Shown acting where it acts now, beside the roles it holds there.
+		answer.Namespaces = namespaces
+		if answer.Namespaces == nil {
+			answer.Namespaces = []string{}
+		}
+	}
 	var held []string
-	for _, namespace := range info.Namespaces {
-		roles := h.RolesOfToken(info.Label, namespace)
+	for _, namespace := range namespaces {
+		roles := h.RolesOfToken(holder, namespace)
 		if roles == nil {
 			roles = []string{}
 		}

@@ -15,12 +15,10 @@ import (
 )
 
 // RustBackedStore wraps the Rust FFI store with Go domain logic:
-// signing (before write), observers (after write), and bounded enforcement (periodic).
-// Enforcement runs through Rust's single connection to avoid dual-driver SQLITE_CORRUPT.
+// signing (before write) and observers (after write).
 type RustBackedStore struct {
-	rust           *sqlitecgo.RustStore         // Attestation CRUD + enforcement via Rust FFI
-	enforcementCfg *sqlitecgo.EnforcementConfig // Bounded storage limits (16/64/64 default)
-	log            *zap.SugaredLogger
+	rust *sqlitecgo.RustStore // Attestation CRUD via Rust FFI
+	log  *zap.SugaredLogger
 	// namespace is the universe this store is, and what observers are routed
 	// by. A sqlite node keeps one universe (ADR-026 does not put namespaces on
 	// sqlite), so this is the name of that one.
@@ -109,7 +107,7 @@ func (s *RustBackedStore) QueryFilterResolved(filter types.AxFilter) ([]*types.A
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation.
 // Reimplemented here (rather than delegating to RustStore) so that CreateAttestation
-// goes through this wrapper's signing/observers/bounded enforcement path.
+// goes through this wrapper's signing/observers path.
 func (s *RustBackedStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	checkExists := func(asid string) bool {
 		return s.rust.AttestationExists(asid)

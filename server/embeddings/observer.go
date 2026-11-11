@@ -43,7 +43,7 @@ type EmbeddingObserver struct {
 		GetModelInfo(model string) (*ModelInfo, error)
 	}
 	embeddingStore   *storage.EmbeddingStore
-	richStore        *storage.BoundedStore // Reused across calls for 5-min rich field cache
+	richStore        *storage.RichStore // Reused across calls for 5-min rich field cache
 	logger           *zap.SugaredLogger
 	models           []string // model names to embed with; empty slice = default model only
 	clusterMu        sync.RWMutex
@@ -68,7 +68,7 @@ func NewEmbeddingObserver(
 		GetModelInfo(model string) (*ModelInfo, error)
 	},
 	embStore *storage.EmbeddingStore,
-	richStore *storage.BoundedStore,
+	richStore *storage.RichStore,
 	logger *zap.SugaredLogger,
 	clusterThreshold float32,
 	projectFunc func(embeddingID string, embedding []float32),

@@ -29,14 +29,6 @@ type AttestationStore interface {
 	GetAttestations(filters AttestationFilter) ([]*types.As, error)
 }
 
-// BoundedStore defines bounded storage operations that enforce quota limits
-type BoundedStore interface {
-	AttestationStore
-
-	// CreateAttestationWithLimits creates an attestation and enforces storage limits
-	CreateAttestationWithLimits(cmd *types.AsCommand) (*types.As, error)
-}
-
 // AliasResolver defines alias resolution operations
 type AliasResolver interface {
 	// ResolveAlias returns all identifiers that should be included when searching for the given identifier
@@ -58,7 +50,7 @@ type AttestationFilter struct {
 	Subjects   []string        // Filter by subjects (OR logic)
 	Predicates []string        // Filter by predicates (OR logic)
 	Contexts   []string        // Filter by contexts (OR logic)
-	Source     string          // Filter by source (exact match, e.g., "cli", "distill")
+	Source     string          // Filter by source (exact match, e.g., "cli", "datapunt")
 	TimeStart  types.TimeBound // Where the time range starts: a time, or unbounded
 	TimeEnd    types.TimeBound // Where the time range ends: a time, or unbounded
 	Limit      int             // How many rows: 0 is none, and every row is EveryRow

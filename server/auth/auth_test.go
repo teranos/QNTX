@@ -624,7 +624,7 @@ func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	h := &Handler{users: &memUsers{}, tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
-		strings.NewReader(`{"expires_at":"never","label":"laptop-cron","level":"ATTESTOR","namespaces":["default"],"scope":{"write":["ingested"]}}`))
+		strings.NewReader(`{"expires_at":"never","label":"laptop-cron","level":"OAUTH","namespaces":["default"],"return_address":"https://app.example/callback"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -652,7 +652,7 @@ func TestANameIsHeldByOneToken(t *testing.T) {
 	h := &Handler{users: &memUsers{}, tokens: store, logger: testLogger()}
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/tokens",
-		strings.NewReader(`{"expires_at":"never","label":"pond-sensor","level":"ATTESTOR","namespaces":["default"]}`))
+		strings.NewReader(`{"expires_at":"never","label":"pond-sensor","level":"OAUTH","namespaces":["default"],"return_address":"https://app.example/callback"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	mint(h, rec, req)

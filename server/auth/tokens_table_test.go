@@ -329,3 +329,35 @@ func TestALastUsedTheTableRefusedIsKept(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, listed[0].LastUsedAt, "a use the table refused was dropped")
 }
+
+// 「[Opus 5.5] A token is found by its DID without listing every token: an agent's token」
+// 「[Opus 5.5] asks after the token it runs under on every request.」
+func TestATokenIsFoundByItsDID(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	table, _, err := OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	id, err := table.Issue(aToken("abc", "one"))
+	require.NoError(t, err)
+	_, err = table.Issue(aToken("def", "two"))
+	require.NoError(t, err)
+
+	found, held := table.ByDID("did:key:zabc")
+	require.True(t, held)
+	assert.Equal(t, id, found.ID)
+	assert.Equal(t, "one", found.Label)
+	_, held = table.ByDID("did:key:znobody")
+	assert.False(t, held)
+
+	// 「[Opus 5.5] Revoked is still found, and says so: whether it is live is the caller's.」
+	require.NoError(t, table.Revoke(id))
+	found, held = table.ByDID("did:key:zabc")
+	require.True(t, held)
+	assert.NotNil(t, found.RevokedAt)
+
+	// 「[Opus 5.5] A table opened again knows its tokens by DID as well.」
+	reopened, _, err := OpenTokenTable(db, nil)
+	require.NoError(t, err)
+	found, held = reopened.ByDID("did:key:zdef")
+	require.True(t, held)
+	assert.Equal(t, "two", found.Label)
+}

@@ -14,9 +14,11 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	"go.uber.org/zap/zaptest"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // One event as Ground streams it (ground source/stream.d): subject is
@@ -135,31 +137,6 @@ func TestTranscriptsAreNewestFirstAndCut(t *testing.T) {
 	assert.Empty(t, transcriptsOf(nil, 10))
 }
 
-// Spike: a sigma (ADR-020) lists hook predicates but holds no turn. It is
-// counted as folded, never read as an empty turn.
-func TestAFoldedSessionSaysSo(t *testing.T) {
-	at := time.Date(2026, 10, 1, 22, 0, 0, 0, time.UTC)
-	sigma := streamed("AS-distill-1", "PreToolUse", "s-1", at.Add(time.Hour), map[string]any{
-		"_distill": true, "_total": float64(46),
-		"_first_seen": "2026-10-01T21:00:00+00:00", "_last_seen": "2026-10-01T23:30:00+00:00",
-	})
-	sigma.Predicates = []string{"PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop"}
-	sigma.Source = "distill"
-
-	got := transcriptsOf(append(aSession(at), sigma), 10)
-	require.Len(t, got, 1)
-	assert.Equal(t, 46, got[0].Folded)
-	assert.Len(t, got[0].Turns, 7)
-	assert.Equal(t, "2026-10-01T21:00:00Z", got[0].Started, "what was folded began before what is left")
-	assert.Equal(t, "2026-10-01T23:30:00Z", got[0].Ended)
-
-	only := transcriptsOf([]*types.As{sigma}, 10)
-	require.Len(t, only, 1)
-	assert.Equal(t, 46, only[0].Folded)
-	assert.Empty(t, only[0].Turns)
-	assert.Equal(t, "2026-10-01T23:30:00Z", only[0].Ended)
-}
-
 // Jenny: the sigil reads the namespace the caller stands in, and one session
 // can be asked for by its id.
 func TestTheTranscriptsSigilReadsWhereTheCallerStands(t *testing.T) {
@@ -268,4 +245,60 @@ func TestTranscriptsFollowTEI(t *testing.T) {
 		"q.who: a list in the schema, and protocol.Turn.speaker is one value",
 		"q.source: a list in the schema, and protocol.Turn.of is one value",
 	}, departed)
+}
+
+// 「[Opus 5.5] A session held nowhere here is read where it lives: each namespace a peer」
+// 「[Opus 5.5] serves is asked as the caller, signed for that namespace, and the one that」
+// 「[Opus 5.5] holds it answers.」
+func TestASessionHeldAtAPeerIsReadThere(t *testing.T) {
+	var asked []string
+	held := &protocol.Transcripts{Transcripts: []*protocol.Transcript{{Session: "s-9", Turns: []*protocol.Turn{{Speaker: "human", Text: "read it"}}}}}
+	peerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.Path+"?"+r.URL.RawQuery)
+		if r.URL.Query().Get("session") != "s-9" {
+			http.NotFound(w, r)
+			return
+		}
+		body, err := protojson.Marshal(held)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(peerServer.Close)
+	namedNode(t)
+	srv, _ := pluginServingServer(t, "fake")
+	keyedNode(srv)
+	store, db := qntxtest.CreateTestStore(t)
+	srv.held = servingOne(db, store)
+	require.NoError(t, srv.authHandler.DeclarePeer("k", "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", []string{"Ground"}, peerServer.URL, peerServer.URL))
+	caller := auth.Admitted(auth.LevelRoot)
+	caller.Identity = "person:root"
+
+	answer, refused := srv.transcriptsRead(sigil.WithCaller(context.Background(), requestAs(caller)), sigil.Sent{"session": "s-9"})
+	require.Nil(t, refused, "%v", refused)
+	read := answer.(*protocol.Transcripts).GetTranscripts()
+	require.Len(t, read, 1)
+	assert.Equal(t, "s-9", read[0].GetSession())
+	assert.Equal(t, "read it", read[0].GetTurns()[0].GetText())
+	assert.Equal(t, []string{"/api/transcripts?session=s-9"}, asked)
+}
+
+// 「[Opus 5.5] A peer that could not be asked is said: it is not taken for one that holds nothing.」
+func TestAPeerThatCouldNotBeAskedIsSaid(t *testing.T) {
+	gone := httptest.NewServer(http.NotFoundHandler())
+	gone.Close()
+	namedNode(t)
+	srv, _ := pluginServingServer(t, "fake")
+	keyedNode(srv)
+	store, db := qntxtest.CreateTestStore(t)
+	srv.held = servingOne(db, store)
+	require.NoError(t, srv.authHandler.DeclarePeer("k", "did:key:z6Mksjm1puegvWqoRsYxu9Xz4Snu1WLHFce8FGEVKhWEtoX4", []string{"Ground"}, gone.URL, gone.URL))
+	caller := auth.Admitted(auth.LevelRoot)
+	caller.Identity = "person:root"
+
+	_, refused := srv.transcriptsRead(sigil.WithCaller(context.Background(), requestAs(caller)), sigil.Sent{"session": "s-9"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "k/Ground")
 }

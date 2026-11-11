@@ -26,8 +26,9 @@ var Platforms = map[string]bool{"x86_64-linux": true, "aarch64-linux": true, "x8
 
 // Name is one comet: a repository's sand, for one platform and one engine ABI, carrying one machine's controls.
 // Machine is the owner/repo whose controls/ hold that machine's pbt: each machine's are in its own repository.
-// ABI is the engine the sand was built for (ground source/sandview.d SAND_ABI); a build is asked for without one.
-type Name struct{ Owner, Repo, Platform, ABI, Machine string }
+// ABI is the engine the sand was built for (ground source/sand/view.d SAND_ABI); a build is asked for without one.
+// GroundRev is the ground an engine was built from, when it names one: its comet is built from that ground.
+type Name struct{ Owner, Repo, Platform, ABI, Machine, GroundRev string }
 
 // MachineOf is the owner/repo a person named as the machine a comet carries the controls of.
 func MachineOf(named string) (string, error) {

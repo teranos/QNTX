@@ -1,0 +1,77 @@
+// 「[Fable 5.1] Copyright 2019, OpenTelemetry Authors」
+//
+// 「[Fable 5.1] Licensed under the Apache License, Version 2.0 (the "License");」
+// 「[Fable 5.1] you may not use this file except in compliance with the License.」
+// 「[Fable 5.1] You may obtain a copy of the License at」
+//
+//     「[Fable 5.1] http://www.apache.org/licenses/LICENSE-2.0」
+//
+// 「[Fable 5.1] Unless required by applicable law or agreed to in writing, software」
+// 「[Fable 5.1] distributed under the License is distributed on an "AS IS" BASIS,」
+// 「[Fable 5.1] WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.」
+// 「[Fable 5.1] See the License for the specific language governing permissions and」
+// 「[Fable 5.1] limitations under the License.」
+
+syntax = "proto3";
+
+package opentelemetry.proto.collector.trace.v1;
+
+import "opentelemetry/proto/trace/v1/trace.proto";
+
+option csharp_namespace = "OpenTelemetry.Proto.Collector.Trace.V1";
+option java_multiple_files = true;
+option java_package = "io.opentelemetry.proto.collector.trace.v1";
+option java_outer_classname = "TraceServiceProto";
+option go_package = "go.opentelemetry.io/proto/otlp/collector/trace/v1";
+
+// 「[Fable 5.1] Service that can be used to push spans between one Application instrumented with」
+// 「[Fable 5.1] OpenTelemetry and a collector, or between a collector and a central collector (in this」
+// 「[Fable 5.1] case spans are sent/received to/from multiple Applications).」
+service TraceService {
+  rpc Export(ExportTraceServiceRequest) returns (ExportTraceServiceResponse) {}
+}
+
+message ExportTraceServiceRequest {
+  // 「[Fable 5.1] An array of ResourceSpans.」
+  // 「[Fable 5.1] For data coming from a single resource this array will typically contain one」
+  // 「[Fable 5.1] element. Intermediary nodes (such as OpenTelemetry Collector) that receive」
+  // 「[Fable 5.1] data from multiple origins typically batch the data before forwarding further and」
+  // 「[Fable 5.1] in that case this array will contain multiple elements.」
+  repeated opentelemetry.proto.trace.v1.ResourceSpans resource_spans = 1;
+}
+
+message ExportTraceServiceResponse {
+  // 「[Fable 5.1] The details of a partially successful export request.」
+  //
+  // 「[Fable 5.1] If the request is only partially accepted」
+  // 「[Fable 5.1] (i.e. when the server accepts only parts of the data and rejects the rest)」
+  // 「[Fable 5.1] the server MUST initialize the `partial_success` field and MUST」
+  // 「[Fable 5.1] set the `rejected_<signal>` with the number of items it rejected.」
+  //
+  // 「[Fable 5.1] Servers MAY also make use of the `partial_success` field to convey」
+  // 「[Fable 5.1] warnings/suggestions to senders even when the request was fully accepted.」
+  // 「[Fable 5.1] In such cases, the `rejected_<signal>` MUST have a value of `0` and」
+  // 「[Fable 5.1] the `error_message` MUST be non-empty.」
+  //
+  // 「[Fable 5.1] A `partial_success` message with an empty value (rejected_<signal> = 0 and」
+  // 「[Fable 5.1] `error_message` = "") is equivalent to it not being set/present. Senders」
+  // 「[Fable 5.1] SHOULD interpret it the same way as in the full success case.」
+  ExportTracePartialSuccess partial_success = 1;
+}
+
+message ExportTracePartialSuccess {
+  // 「[Fable 5.1] The number of rejected spans.」
+  //
+  // 「[Fable 5.1] A `rejected_<signal>` field holding a `0` value indicates that the」
+  // 「[Fable 5.1] request was fully accepted.」
+  int64 rejected_spans = 1;
+
+  // 「[Fable 5.1] A developer-facing human-readable message in English. It should be used」
+  // 「[Fable 5.1] either to explain why the server rejected parts of the data during a partial」
+  // 「[Fable 5.1] success or to convey warnings/suggestions during a full success. The message」
+  // 「[Fable 5.1] should offer guidance on how users can address such issues.」
+  //
+  // 「[Fable 5.1] error_message is an optional field. An error_message with an empty value」
+  // 「[Fable 5.1] is equivalent to it not being set.」
+  string error_message = 2;
+}

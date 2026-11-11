@@ -44,7 +44,7 @@ is true:
 
 func init() {
 	gitCredentialCmd.Flags().StringVar(&elementTo, "to", "", "Node to reach (default: this machine's, from am.toml)")
-	gitCredentialCmd.Flags().StringVar(&elementToken, "token", "", "Bearer token (default: $QNTX_TOKEN, then ~/.qntx/token)")
+	gitCredentialCmd.Flags().BoolVar(&atDoor, "door", false, "--to is the door the node opened for the agent asking: present nothing")
 	GitCmd.AddCommand(gitCredentialCmd)
 }
 

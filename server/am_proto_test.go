@@ -60,17 +60,14 @@ func TestAmNodeIsTheCardTheAskerWouldGet(t *testing.T) {
 				Name string `json:"name"`
 			} `json:"skills"`
 		} `json:"card"`
-		Missing []string `json:"missing"`
 	}
 	require.NoError(t, json.Unmarshal(body, &got))
-	require.Len(t, got.Card.SupportedInterfaces, 1, "an interface is a way to speak A2A")
+	require.Len(t, got.Card.SupportedInterfaces, 2, "an interface is a way to speak A2A: HTTP+JSON and JSON-RPC")
 	assert.Equal(t, "https://node.example/a2a", got.Card.SupportedInterfaces[0].URL)
 	require.Len(t, got.Card.Capabilities.Extensions, 1)
 	assert.Equal(t, "https://node.example/mcp", got.Card.Capabilities.Extensions[0].Params.MCP.URL)
 	assert.Equal(t, mcpProtocolVersion, got.Card.Capabilities.Extensions[0].Params.MCP.ProtocolVersion)
 	assert.NotEmpty(t, got.Card.Skills)
-	assert.Contains(t, got.Missing, "AgentCard.name")
-	assert.NotContains(t, got.Missing, "AgentCard.skills[0].id")
 }
 
 func TestAmNodeIsRootsAlone(t *testing.T) {

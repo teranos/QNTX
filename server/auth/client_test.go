@@ -108,14 +108,6 @@ func TestAReturnAddressHasToBeReachable(t *testing.T) {
 	}
 }
 
-func TestOnlyAClientHasAReturnAddress(t *testing.T) {
-	h, _ := grantHandler(t)
-
-	rec := mintClient(t, h, `{"expires_at":"never","label":"ingest","level":"ATTESTOR","return_address":"https://app.example/callback"}`)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-}
-
 // A client authenticates at the token endpoint and nowhere else. The secret
 // an app holds must not be a bearer that reaches a route, whoever minted it.
 func TestAClientIsNotABearer(t *testing.T) {

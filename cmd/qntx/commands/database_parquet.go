@@ -151,7 +151,7 @@ func openParquetDatabase(cfg *config.Config, dbPath string) (*sql.DB, ats.Attest
 	})
 
 	// The extra handle carries capabilities server.go asserts for. It embeds
-	// rustStore so the WAL checkpoint and age distiller assertions still find
+	// rustStore so the WAL checkpoint assertion still finds
 	// what they were finding, and adds the watchers on top.
 	// Spans every namespace at the location.
 	namespaces, err := duckdbcgo.NewNamespaceStore(location)
@@ -400,21 +400,33 @@ func (h *parquetHandles) WALCheckpoint(truncateAt int64) (busy, walPages, checkp
 	files := maps.Clone(h.landings)
 	h.mu.Unlock()
 	for _, name := range names {
+		before := walBytesOf(landingPath(h.dbPath, name))
 		b, w, c, lerr := files[name].WALCheckpoint(truncateAt)
 		if lerr != nil {
 			return busy, walPages, checkpointedPages, errors.Wrapf(lerr, "the landing file of %s did not checkpoint", name)
 		}
-		// A checkpoint that copied every page reports as many checkpointed as
-		// are in the WAL. Only a landing file that left pages behind is said.
-		if b != 0 || c != w {
-			logger.Logger.Infow("Landing file checkpointed",
-				"namespace", name, "busy", b, "wal_pages", w, "checkpointed_pages", c)
-		}
+		// Every landing file says what its checkpoint measured. On q the hourly
+		// run reported every page copied while system.db-wal stood at 1.4 GB
+		// with its main file untouched since 2026-11-04: what is not logged is
+		// not known.
+		logger.Logger.Infow("Landing file checkpointed",
+			"namespace", name, "busy", b, "wal_pages", w, "checkpointed_pages", c,
+			"wal_bytes_before", before, "wal_bytes_after", walBytesOf(landingPath(h.dbPath, name)))
 		busy += b
 		walPages += w
 		checkpointedPages += c
 	}
 	return busy, walPages, checkpointedPages, nil
+}
+
+// walBytesOf is the size of the WAL beside path, and -1 when it cannot be read:
+// a number no file has, so an unknown never reads as an empty WAL.
+func walBytesOf(path string) int64 {
+	info, err := os.Stat(path + "-wal")
+	if err != nil {
+		return -1
+	}
+	return info.Size()
 }
 
 // OpenNamespace opens one namespace: its attestations and its watchers, which
@@ -528,7 +540,7 @@ func (h *parquetHandles) universe(name string, landing *landed, watchers *duckdb
 		Schedules:   schedule.NewStore(h.operational),
 		Canvas:      elementstorage.NewCanvasStore(landing.db),
 		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
-		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
+		Rich:        storage.NewRichStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
 		Prompts:     prompt.NewPromptStore(h.operational, store),
 		Aliases:     storage.NewAliasStore(landing.db),
@@ -795,7 +807,7 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 		Schedules:   schedule.NewStore(h.operational),
 		Canvas:      elementstorage.NewCanvasStore(h.defaultDB),
 		Embeddings:  storage.NewEmbeddingStore(h.operational, logger.Logger.Desugar()),
-		Rich:        storage.NewBoundedStore(h.operational, nil, logger.Logger),
+		Rich:        storage.NewRichStore(h.operational, nil, logger.Logger),
 		Executions:  schedule.NewExecutionStore(h.operational),
 		Prompts:     prompt.NewPromptStore(h.operational, dflt),
 		Aliases:     storage.NewAliasStore(dfltLanding.db),

@@ -133,17 +133,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Bounded storage limits: positive where said
-	if c.Said("storage.sqlite.bounded_storage.actor_context_limit") && c.Storage.Sqlite.BoundedStorage.ActorContextLimit <= 0 {
-		return errors.Newf("storage.sqlite.bounded_storage.actor_context_limit must be > 0, got %d", c.Storage.Sqlite.BoundedStorage.ActorContextLimit)
-	}
-	if c.Said("storage.sqlite.bounded_storage.actor_contexts_limit") && c.Storage.Sqlite.BoundedStorage.ActorContextsLimit <= 0 {
-		return errors.Newf("storage.sqlite.bounded_storage.actor_contexts_limit must be > 0, got %d", c.Storage.Sqlite.BoundedStorage.ActorContextsLimit)
-	}
-	if c.Said("storage.sqlite.bounded_storage.entity_actors_limit") && c.Storage.Sqlite.BoundedStorage.EntityActorsLimit <= 0 {
-		return errors.Newf("storage.sqlite.bounded_storage.entity_actors_limit must be > 0, got %d", c.Storage.Sqlite.BoundedStorage.EntityActorsLimit)
-	}
-
 	// Embeddings intervals: nil = not scheduled (default), must be positive when set
 	if c.Embeddings.ReclusterIntervalSeconds != nil && *c.Embeddings.ReclusterIntervalSeconds <= 0 {
 		return errors.Newf("embeddings.recluster_interval_seconds must be > 0 when set, got %d (omit to disable)", *c.Embeddings.ReclusterIntervalSeconds)

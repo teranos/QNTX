@@ -17,8 +17,8 @@ import (
 // SQLRawStore is a RawAttestationStore over Go's *sql.DB: the attestations
 // table and its junction tables, written as crates/ats-sqlite's
 // put_attestation writes them, so the Go reads in retrieval.go read them the
-// same. It is QuickDev's store; bounded enforcement and the rest of what the
-// Rust store does beyond the row are not here.
+// same. It is QuickDev's store; what the Rust store does beyond the row is
+// not here.
 type SQLRawStore struct{ db *sql.DB }
 
 var (

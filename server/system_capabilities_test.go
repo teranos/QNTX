@@ -48,7 +48,7 @@ func TestSendSystemCapabilities(t *testing.T) {
 			t.Errorf("Message type = %q, want %q", capMsg.Type, "system_capabilities")
 		}
 
-		// The UI hides namespaces and sigma on what this says, so an empty
+		// The UI hides namespaces on what this says, so an empty
 		// store is the node declining to answer rather than picking a default.
 		if capMsg.Store == "" {
 			t.Error("Store is empty; the node must name the store it keeps")

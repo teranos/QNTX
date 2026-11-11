@@ -29,6 +29,7 @@ func TestStandingIsReadAndSteppedOnOnePath(t *testing.T) {
 		"standing": http.MethodGet + " /i/standing",
 		"step":     http.MethodPost + " /i/standing",
 		"reaches":  http.MethodGet + " /i/reaches",
+		"name":     http.MethodPost + " /i/name",
 	}, methods)
 }
 

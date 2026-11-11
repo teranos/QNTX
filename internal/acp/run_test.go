@@ -15,8 +15,8 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// The fake agent: this test binary, run again with ACP_FAKE naming what it does. It answers as an ACP
-// agent on stdin and stdout, and fails the turn when a client message is not the one it expects.
+// 「[Opus 5.5] The fake agent: this test binary, run again with ACP_FAKE naming what it does. It answers as an ACP」
+// 「[Opus 5.5] agent on stdin and stdout, and fails the turn when a client message is not the one it expects.」
 func TestMain(m *testing.M) {
 	if scenario := os.Getenv("ACP_FAKE"); scenario != "" {
 		os.Exit(fakeAgent(scenario))
@@ -120,7 +120,7 @@ func fakeAgent(scenario string) int {
 	}
 	update(`{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"say pong"}}`)
 	update(`{"sessionUpdate":"tool_call","toolCallId":"c1","title":"ls","kind":"execute","status":"pending","rawInput":{"command":"ls"}}`)
-	// The client may ask nothing of the agent's that it does not offer, and answers what it asks.
+	// 「[Opus 5.5] The client may ask nothing of the agent's that it does not offer, and answers what it asks.」
 	say(`{"jsonrpc":"2.0","id":"r1","method":"fs/read_text_file","params":{"sessionId":"s-1","path":"/etc/passwd"}}`)
 	refused := next()
 	if string(refused.ID) != `"r1"` || !strings.Contains(in.Text(), `"code":-32601`) {
@@ -238,14 +238,14 @@ func TestRunRefusesATurnWithoutCwd(t *testing.T) {
 	}
 }
 
-// A turn left is stopped, the agent with it, however the agent holds on.
+// 「[Opus 5.5] A turn left is stopped, the agent with it, however the agent holds on.」
 func TestRunStopsWhenLeft(t *testing.T) {
 	self, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
 	script := t.TempDir() + "/holds"
-	// A child keeping the agent's stdout must not keep the turn waiting.
+	// 「[Opus 5.5] A child keeping the agent's stdout must not keep the turn waiting.」
 	if err := os.WriteFile(script, []byte("#!/bin/sh\nsleep 30 &\nexec sleep 30\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +265,7 @@ func TestRunStopsWhenLeft(t *testing.T) {
 	}
 }
 
-// What the agent writes on stderr is kept to its last 4 KiB while it runs.
+// 「[Opus 5.5] What the agent writes on stderr is kept to its last 4 KiB while it runs.」
 func TestStderrStaysBounded(t *testing.T) {
 	var b tail
 	for range 100 {

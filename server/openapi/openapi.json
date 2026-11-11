@@ -41,6 +41,11 @@
         "ANYONE"
       ]
     },
+    "/a2a": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/a2a/": {
       "x-qntx-reach": [
         "ROOT"
@@ -140,6 +145,11 @@
       ]
     },
     "/api/anthropic": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/anthropic/cap": {
       "x-qntx-reach": [
         "ROOT"
       ]
@@ -432,6 +442,26 @@
         "ROOT"
       ]
     },
+    "/api/mcp": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mcp/drop": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mcp/servers/{name}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/mcp/tools": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/namespaces": {
       "x-qntx-reach": [
         "ROOT",
@@ -567,6 +597,31 @@
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
+      ]
+    },
+    "/api/rooms": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}/post": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}/read": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/rooms/{room}/wake": {
+      "x-qntx-reach": [
+        "ROOT"
       ]
     },
     "/api/search/semantic": {
@@ -836,6 +891,16 @@
         "ANYONE"
       ]
     },
+    "/auth/mcp/callback": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/auth/mcp/return": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/register/begin": {
       "x-qntx-reach": [
         "ANYONE"
@@ -901,7 +966,12 @@
     },
     "/g/": {
       "x-qntx-reach": [
-        "ANYONE"
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR",
+        "PUBLIC_REGISTRATION",
+        "USER"
       ],
       "x-qntx-prefix": true
     },
@@ -935,6 +1005,14 @@
     "/i/enable": {
       "x-qntx-reach": [
         "ANYONE"
+      ]
+    },
+    "/i/name": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR"
       ]
     },
     "/i/picture": {

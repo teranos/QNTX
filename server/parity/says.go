@@ -26,7 +26,12 @@ import (
 
 // saysOf is the comment leading a descriptor in its .proto, as prose.
 func saysOf(d protoreflect.Descriptor) string {
-	return words(d.ParentFile().SourceLocations().ByDescriptor(d).LeadingComments)
+	if said := words(d.ParentFile().SourceLocations().ByDescriptor(d).LeadingComments); said != "" {
+		return said
+	}
+	// A reference an SDK holds keeps no comments: what it says is what its
+	// generated Go says, as make says read it.
+	return sdkSaid()[string(d.FullName())]
 }
 
 // words is a comment as prose: what AIP marks as not for readers, between (--

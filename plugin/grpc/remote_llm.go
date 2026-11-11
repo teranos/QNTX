@@ -72,5 +72,45 @@ func (r *RemoteLLM) Chat(ctx context.Context, req plugin.LLMRequest) (*plugin.LL
 		PromptTokens:     int(resp.PromptTokens),
 		CompletionTokens: int(resp.CompletionTokens),
 		TotalTokens:      int(resp.TotalTokens),
+		Served:           servedFromProto(resp.GetServed()),
 	}, nil
+}
+
+// servedFromProto is a provider's report of how a call was served, or nil for
+// a response that carries none.
+func servedFromProto(served *protocol.LLMServed) *plugin.LLMServed {
+	if served == nil {
+		return nil
+	}
+	return &plugin.LLMServed{
+		RequestedProvider: served.GetRequestedProvider(),
+		RequestedModel:    served.GetRequestedModel(),
+		UpstreamProvider:  served.GetUpstreamProvider(),
+		ExecutedModel:     served.GetExecutedModel(),
+		ResponseModel:     served.GetResponseModel(),
+		RequestID:         served.GetRequestId(),
+		CostUSD:           served.CostUsd,
+		PricingSource:     served.GetPricingSource(),
+		AttemptCount:      int(served.GetAttemptCount()),
+		Fallback:          served.GetFallback(),
+	}
+}
+
+// servedToProto is the wire form of a provider's report, or nil for none.
+func servedToProto(served *plugin.LLMServed) *protocol.LLMServed {
+	if served == nil {
+		return nil
+	}
+	return &protocol.LLMServed{
+		RequestedProvider: served.RequestedProvider,
+		RequestedModel:    served.RequestedModel,
+		UpstreamProvider:  served.UpstreamProvider,
+		ExecutedModel:     served.ExecutedModel,
+		ResponseModel:     served.ResponseModel,
+		RequestId:         served.RequestID,
+		CostUsd:           served.CostUSD,
+		PricingSource:     served.PricingSource,
+		AttemptCount:      int32(served.AttemptCount),
+		Fallback:          served.Fallback,
+	}
 }
