@@ -14,9 +14,20 @@ workspace = true
 name = "ats-dev"
 path = "src/main.rs"
 
+[features]
+# `--backend duckdb` links libduckdb (dynamically, as the node does); `--backend
+# postgres` speaks the wire protocol itself. Neither is in the default binary.
+duckdb = ["dep:ats-duckdb"]
+postgres = ["dep:ats-postgres"]
+
 [dependencies]
 ats.workspace = true
+ats-duckdb = { path = "../ats-duckdb", optional = true }
+ats-postgres = { path = "../ats-postgres", optional = true }
+ats-sign = { path = "../ats-sign" }
 ats-sqlite = { path = "../ats-sqlite" }
+laye-me = { path = "../laye-me" }
+libp2p-identity = { version = "=0.2.14", features = ["ed25519"] }
 sacred-error.workspace = true
 serde_json.workspace = true
 

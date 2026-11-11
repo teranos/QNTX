@@ -3,7 +3,8 @@
 //! Tablet of Reach. It reads and writes attestations in one SQLite file.
 //!
 //! ```text
-//! ats-dev [--db FILE] [--sync full|normal|off] put "ALICE is author of GITHUB by BOB" [--attr k=v]...
+//! ats-dev [--backend sqlite|duckdb|postgres] [--db FILE|LOCATION|URL] [--namespace NS] [--ca FILE]   # before any command; see below
+//! ats-dev [--db FILE] [--sync full|normal|off] [--key FILE] [--unsigned] put "ALICE is author of GITHUB by BOB" [--attr k=v]...
 //! ats-dev [--db FILE] [--sync …] put -          # JSON attestations, one per line, on stdin
 //! ats-dev [--db FILE] ax "ALICE is author of GITHUB since last month" [--limit N]
 //! ats-dev [--db FILE] get ID
@@ -15,12 +16,40 @@
 //! ats-dev [--db FILE] clear --yes
 //! ats-dev [--db FILE] subjects | predicates | contexts | actors   # distinct values, one per line
 //! ats-dev [--db FILE] stats
+//! ats-dev [--db FILE] key                       # the signing key's did:key and file (minted if there is none)
+//! ats-dev [--db FILE] bench load N [--step S] [--batch K] [--replace] | probe N | query   # see bench/README.md
+//! ats-dev [--db FILE] verify [ID]               # valid / invalid / unsigned, one line each; exit 1 if any is invalid
 //! ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X
 //! ```
+//!
+//! `put` signs with ats-dev's own ed25519 key (`--key`, else `$ATS_DEV_KEY`, else
+//! `<db>.key`, minted on first use) over the bytes `ats/signing` signs in Go.
+//! `--unsigned` writes without a signature. This is not the node's key. An existing
+//! key file that group or other can reach (mode other than 0600) is refused.
 //!
 //! `--db` defaults to `$ATS_DEV_DB`, else `ats-dev.db`. Rows come out as JSON,
 //! one attestation per line. A failure goes to stderr as a sacred-error `Error`
 //! and exits 1.
+//!
+//! `--backend` (or `$ATS_DEV_BACKEND`) picks the store. `sqlite` is the default.
+//! `duckdb` and `postgres` are built with `--features duckdb` / `--features
+//! postgres` (duckdb links libduckdb dynamically, as the node does) and run
+//! what `AttestationStore` has: put, get, exists, count, ids, update, delete,
+//! clear, verify. `ax`, the listings, `stats` and `alias` need `QueryStore` /
+//! `AliasStore`, which only `SqliteStore` implements, so they refuse on the
+//! others. `--db` is DuckDB's location (a path, or an `s3://` / `file://` url)
+//! and Postgres's connection url (`$QNTX_POSTGRES_URL` if not given); `--ca`
+//! is Postgres's CA file when the url is TLS; `--namespace` (default
+//! `ats-dev`) is the namespace both open. The signing key goes beside a path
+//! `--db`; for a url, name it with `--key` or `$ATS_DEV_KEY`.
+//!
+//! `duckdb` is one writer per location (ADR-024: "One node writes a namespace
+//! prefix"). `ats-dev` does not coordinate two processes writing the same one,
+//! and two that put the same id at once can both succeed.
+
+mod backend;
+mod bench;
+mod sign;
 
 use std::io::{BufRead, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -28,6 +57,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ats::{ax, AliasStore, AttestationStore, QueryStore, TemporalConfig};
 use ats::{Attestation, Parser};
 use ats_sqlite::SqliteStore;
+use backend::{Kind, Store};
 use sacred_error::{Context, Error, Severity};
 
 /// Puts per transaction on `put -`. Unbatched, each put is five commits
@@ -90,19 +120,33 @@ fn new_id() -> Result<String, Box<Error>> {
 }
 
 struct Opts {
+    backend: Kind,
     db: String,
+    #[cfg_attr(not(any(feature = "duckdb", feature = "postgres")), allow(dead_code))]
+    namespace: String,
+    ca: Option<String>,
     sync: Option<String>,
+    key: Option<String>,
+    unsigned: bool,
     rest: Vec<String>,
 }
 
 fn opts(args: &[String]) -> Result<Opts, Box<Error>> {
-    let mut db = std::env::var("ATS_DEV_DB").unwrap_or_else(|_| "ats-dev.db".into());
+    let mut backend = std::env::var("ATS_DEV_BACKEND").ok();
+    let mut db = std::env::var("ATS_DEV_DB").ok();
+    let mut namespace = "ats-dev".to_string();
+    let mut ca = None;
     let mut sync = None;
+    let mut key = None;
+    let mut unsigned = false;
     let mut rest = Vec::new();
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
-            "--db" => db = it.next().ok_or_else(|| fail("--db needs a file", "none given"))?.clone(),
+            "--db" => db = Some(it.next().ok_or_else(|| fail("--db needs a file", "none given"))?.clone()),
+            "--backend" => backend = Some(it.next().ok_or_else(|| fail("--backend needs a name", "sqlite|duckdb|postgres"))?.clone()),
+            "--namespace" => namespace = it.next().ok_or_else(|| fail("--namespace needs a name", "none given"))?.clone(),
+            "--ca" => ca = Some(it.next().ok_or_else(|| fail("--ca needs a file", "none given"))?.clone()),
             "--sync" => {
                 let v = it.next().ok_or_else(|| fail("--sync needs a value", "full|normal|off"))?;
                 if !matches!(v.as_str(), "full" | "normal" | "off") {
@@ -110,13 +154,35 @@ fn opts(args: &[String]) -> Result<Opts, Box<Error>> {
                 }
                 sync = Some(v.clone());
             }
+            "--key" => key = Some(it.next().ok_or_else(|| fail("--key needs a file", "none given"))?.clone()),
+            "--unsigned" => unsigned = true,
             _ => rest.push(a.clone()),
         }
     }
-    Ok(Opts { db, sync, rest })
+    let backend = Kind::parse(backend.as_deref().unwrap_or("sqlite"))?;
+    let db = match db {
+        Some(d) => d,
+        None => backend.default_db()?,
+    };
+    Ok(Opts { backend, db, namespace, ca, sync, key, unsigned, rest })
 }
 
-fn open(o: &Opts) -> Result<SqliteStore, Box<Error>> {
+impl Opts {
+    /// The path the signing key goes beside, if `--db` is one: a SQLite file,
+    /// or a DuckDB location that is a plain path. A url has no file to sit beside.
+    fn beside(&self) -> Option<&str> {
+        match self.backend {
+            Kind::Sqlite => Some(&self.db),
+            Kind::Duckdb if !self.db.contains("://") => Some(&self.db),
+            _ => None,
+        }
+    }
+}
+
+fn open_sqlite(o: &Opts) -> Result<SqliteStore, Box<Error>> {
+    if o.backend != Kind::Sqlite {
+        return Err(fail("this command is SQLite's", format!("--backend {} given", o.backend.name())));
+    }
     let s = SqliteStore::open(&o.db).map_err(|e| fail("could not open the database", e))?;
     if let Some(m) = &o.sync {
         s.connection()
@@ -126,10 +192,135 @@ fn open(o: &Opts) -> Result<SqliteStore, Box<Error>> {
     Ok(s)
 }
 
+fn open(o: &Opts) -> Result<Store, Box<Error>> {
+    if o.backend != Kind::Sqlite && o.sync.is_some() {
+        return Err(fail("--sync is SQLite's", format!("--backend {} given", o.backend.name())));
+    }
+    if o.backend != Kind::Postgres && o.ca.is_some() {
+        return Err(fail("--ca is Postgres's", format!("--backend {} given", o.backend.name())));
+    }
+    if o.backend == Kind::Duckdb {
+        duckdb_location(o)?;
+    }
+    match o.backend {
+        Kind::Sqlite => Ok(Store::Sqlite(open_sqlite(o)?)),
+        #[cfg(feature = "duckdb")]
+        Kind::Duckdb => {
+            let location = duckdb_location(o)?;
+            let s = ats_duckdb::DuckdbStore::open(location, &o.namespace)
+                .map_err(|e| Box::new(e.sacred("")))?;
+            Ok(Store::Duckdb(s))
+        }
+        #[cfg(feature = "postgres")]
+        Kind::Postgres => {
+            let s = ats_postgres::PostgresStore::open(&o.db, o.ca.as_deref().unwrap_or(""), &o.namespace)
+                .map_err(|e| Box::new(e.sacred(None)))?;
+            Ok(Store::Postgres(s))
+        }
+        #[cfg(not(feature = "duckdb"))]
+        Kind::Duckdb => Err(unbuilt("duckdb")),
+        #[cfg(not(feature = "postgres"))]
+        Kind::Postgres => Err(unbuilt("postgres")),
+    }
+}
+
+/// The location DuckDB is opened at: a plain path is a directory on this machine,
+/// made absolute, a url is taken as given. ats-duckdb writes the location, the
+/// namespace and the file name into a COPY statement inside quotes and does not
+/// escape them, so an apostrophe in any of what it will write fails at the first
+/// flush, after the directories are made. Refused here, on the resolved value:
+/// a relative `--db` under a working directory with an apostrophe has one too.
+fn duckdb_location(o: &Opts) -> Result<String, Box<Error>> {
+    let location = if o.db.contains("://") {
+        o.db.clone()
+    } else {
+        let abs = std::path::absolute(&o.db).map_err(|e| fail("could not make the path absolute", e))?;
+        format!("file://{}", abs.display())
+    };
+    for (what, value) in [("location", &location), ("namespace", &o.namespace)] {
+        if value.contains('\'') {
+            return Err(fail(
+                &format!("a DuckDB {what} cannot contain an apostrophe"),
+                format!("{value}: ats-duckdb puts it inside a quoted SQL string, unescaped"),
+            ));
+        }
+    }
+    Ok(location)
+}
+
+#[cfg(not(all(feature = "duckdb", feature = "postgres")))]
+fn unbuilt(feature: &str) -> Box<Error> {
+    fail(
+        &format!("this ats-dev was built without {feature}"),
+        format!("cargo build -p ats-dev --features {feature}"),
+    )
+}
+
+/// ats-dev's signing key, loaded (or minted) the first time something needs a
+/// signature made, never for reading, `--unsigned`, or a signature already given.
+struct Keys {
+    path: Result<std::path::PathBuf, Box<Error>>,
+    unsigned: bool,
+    loaded: std::cell::OnceCell<sign::Signer>,
+}
+
+impl Keys {
+    fn of(o: &Opts) -> Self {
+        Keys { path: sign::key_path(o.key.as_deref(), o.beside(), o.backend.name()), unsigned: o.unsigned, loaded: std::cell::OnceCell::new() }
+    }
+
+    fn path(&self) -> Result<&std::path::Path, Box<Error>> {
+        match &self.path {
+            Ok(p) => Ok(p),
+            Err(e) => Err(e.clone()),
+        }
+    }
+
+    /// The key if one exists already; nothing is minted to find out.
+    fn existing(&self) -> Result<Option<&sign::Signer>, Box<Error>> {
+        if self.unsigned {
+            return Ok(None);
+        }
+        if let Some(s) = self.loaded.get() {
+            return Ok(Some(s));
+        }
+        Ok(sign::Signer::load_existing(self.path()?)?.map(|s| self.loaded.get_or_init(|| s)))
+    }
+
+    fn signer(&self) -> Result<Option<&sign::Signer>, Box<Error>> {
+        if self.unsigned {
+            return Ok(None);
+        }
+        if let Some(s) = self.loaded.get() {
+            return Ok(Some(s));
+        }
+        let s = sign::Signer::load_or_mint(self.path()?)?;
+        Ok(Some(self.loaded.get_or_init(|| s)))
+    }
+}
+
+/// What is written: a signature already given is checked and kept, none given
+/// is made with ats-dev's key.
+fn seal(keys: &Keys, a: Attestation) -> Result<Attestation, Box<Error>> {
+    if a.signature.is_none() && a.signer_did.is_some() {
+        return Err(fail("a signer without a signature", format!("{}: name a signature too, or neither", a.id)));
+    }
+    if a.signature.is_some() {
+        return match sign::verify(&a) {
+            sign::Verdict::Invalid(why) => Err(fail("the signature given does not hold", format!("{}: {why}", a.id))),
+            _ => Ok(a),
+        };
+    }
+    match keys.signer()? {
+        Some(sg) => sg.sign(a),
+        None => Ok(a),
+    }
+}
+
 fn run(args: &[String]) -> Result<(), Box<Error>> {
     let o = opts(args)?;
     let mut it = o.rest.iter();
-    let cmd = it.next().ok_or_else(|| fail("no command", "put | ax | get | count | exists | ids | update | delete | clear | subjects | predicates | contexts | actors | stats | alias"))?;
+    let cmd = it.next().ok_or_else(|| fail("no command", "key | verify | bench | put | ax | get | count | exists | ids | update | delete | clear | subjects | predicates | contexts | actors | stats | alias"))?;
     let tail: Vec<&String> = it.collect();
     match cmd.as_str() {
         "put" => put(&o, &tail),
@@ -153,13 +344,13 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
             println!("{yes}");
             Ok(())
         }
-        "ids" => lines(open(&o)?.ids().map_err(|e| fail("ids failed", e))?),
-        "subjects" => lines(open(&o)?.subjects().map_err(|e| fail("subjects failed", e))?),
-        "predicates" => lines(open(&o)?.predicates().map_err(|e| fail("predicates failed", e))?),
-        "contexts" => lines(open(&o)?.contexts().map_err(|e| fail("contexts failed", e))?),
-        "actors" => lines(open(&o)?.actors().map_err(|e| fail("actors failed", e))?),
+        "ids" => lines(listed(&open(&o)?)?),
+        "subjects" => lines(open(&o)?.sqlite("QueryStore")?.subjects().map_err(|e| fail("subjects failed", e))?),
+        "predicates" => lines(open(&o)?.sqlite("QueryStore")?.predicates().map_err(|e| fail("predicates failed", e))?),
+        "contexts" => lines(open(&o)?.sqlite("QueryStore")?.contexts().map_err(|e| fail("contexts failed", e))?),
+        "actors" => lines(open(&o)?.sqlite("QueryStore")?.actors().map_err(|e| fail("actors failed", e))?),
         "stats" => {
-            let st = open(&o)?.stats().map_err(|e| fail("stats failed", e))?;
+            let st = open(&o)?.sqlite("QueryStore")?.stats().map_err(|e| fail("stats failed", e))?;
             println!(
                 "{}",
                 serde_json::json!({
@@ -174,22 +365,73 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
         }
         "delete" => {
             let id = tail.first().ok_or_else(|| fail("delete needs an id", "ats-dev delete ID"))?;
-            if open(&o)?.delete(id).map_err(|e| fail("delete failed", e))? {
-                Ok(())
-            } else {
-                Err(fail("no such attestation", id))
+            let mut s = open(&o)?;
+            if s.delete(id).map_err(|e| fail("delete failed", e))? {
+                return s.persist();
             }
+            // false says nothing was removed. If the store still has it, the
+            // delete did not reach the row, and "no such attestation" would be untrue.
+            if s.exists(id).map_err(|e| fail("exists failed", e))? {
+                return Err(fail(
+                    "delete removed nothing, and the attestation is still there",
+                    format!("{id}: delete returned false, exists returns true ({})", s.kind().name()),
+                ));
+            }
+            Err(fail("no such attestation", id))
         }
         "clear" => {
             if tail.first().map(|f| f.as_str()) != Some("--yes") {
                 return Err(fail("clear removes every attestation", "say so: ats-dev clear --yes"));
             }
-            open(&o)?.clear().map_err(|e| fail("clear failed", e))
+            let mut s = open(&o)?;
+            s.clear().map_err(|e| fail("clear failed", e))?;
+            s.persist()?;
+            // Cleared, or said so: Ok with rows left is a clear that did not reach them.
+            let left = s.count().map_err(|e| fail("count failed", e))?;
+            if left != 0 {
+                return Err(fail(
+                    "clear returned Ok, and the store still holds attestations",
+                    format!("{left} left ({})", s.kind().name()),
+                ));
+            }
+            Ok(())
         }
         "update" => update(&o, &tail),
+        "key" => {
+            let path = sign::key_path(o.key.as_deref(), o.beside(), o.backend.name())?;
+            let sg = sign::Signer::load_or_mint(&path)?;
+            println!("{}", serde_json::json!({ "did": sg.did, "file": path.display().to_string() }));
+            Ok(())
+        }
+        "verify" => verify(&o, &tail),
+        "bench" => bench::run(&o, &tail),
         "alias" => alias(&o, &tail),
         other => Err(fail("unknown command", other)),
     }
+}
+
+/// Every id the store holds, or a refusal. `ids` and `count` are two questions
+/// to a store, and one that answers fewer ids than it counts (DuckDB's `ids` reads
+/// its buffer, `count` the Parquet files too) would make `verify` check nothing
+/// and say so with an exit 0.
+///
+/// They are two reads, so a writer committing between them makes them differ
+/// for a moment on a store that is complete. A mismatch that is still there on
+/// the third reading is the store's.
+fn listed(s: &Store) -> Result<Vec<String>, Box<Error>> {
+    let mut last = (0, 0);
+    for _ in 0..3 {
+        let ids = s.ids().map_err(|e| fail("ids failed", e))?;
+        let count = s.count().map_err(|e| fail("count failed", e))?;
+        if ids.len() == count {
+            return Ok(ids);
+        }
+        last = (ids.len(), count);
+    }
+    Err(fail(
+        "ids does not list every stored attestation",
+        format!("ids lists {}, count says {} ({}), on three readings", last.0, last.1, s.kind().name()),
+    ))
 }
 
 fn lines(v: Vec<String>) -> Result<(), Box<Error>> {
@@ -210,8 +452,10 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     if !unknown.is_empty() {
         return Err(fail("not an attestation field", unknown.join(", ")));
     }
+    // A signature is made, not edited: a patch that names one could swap the
+    // signer of a row, or store one that does not hold.
     if let Some(k) = ["signature", "signer_did"].into_iter().find(|k| patch.contains_key(*k)) {
-        return Err(fail("an update cannot name a signature", k));
+        return Err(fail("an update cannot name a signature", format!("{k}: ats-dev signs what it changes")));
     }
     let id = patch.get("id").and_then(|v| v.as_str()).ok_or_else(|| fail("update needs an \"id\"", given))?;
     let mut s = open(o)?;
@@ -222,39 +466,67 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
             m.insert(k.clone(), x.clone());
         }
     }
-    let a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
-    // The signature covers these fields; ats-dev has no key to sign what it changes.
-    if stored.signature.is_some() && !same_signed_fields(&stored, &a) {
-        return Err(fail(
-            "a signed attestation cannot be edited",
-            format!("{id}: the signature covers what the update changes"),
-        ));
+    let mut a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
+    // A signature covers what was just changed. It stays only if it still
+    // holds; else ats-dev re-signs what its own key signed, and refuses the rest.
+    if stored.signature.is_some() {
+        if !matches!(sign::verify(&a), sign::Verdict::Valid(_)) {
+            // Whose key it must be is known from the stored row; no key is minted to find out.
+            let keys = Keys::of(o);
+            let sg = match keys.existing()? {
+                Some(sg) if stored.signer_did.as_deref() == Some(sg.did.as_str()) => sg,
+                _ if o.unsigned => {
+                    return Err(fail(
+                        "the update breaks the signature",
+                        format!("{id}: --unsigned cannot keep a signed attestation signed"),
+                    ))
+                }
+                other => {
+                    return Err(fail(
+                        "the update breaks a signature ats-dev cannot make",
+                        format!(
+                            "{id} is signed by {}, ats-dev's key is {}",
+                            stored.signer_did.as_deref().unwrap_or("?"),
+                            other.map(|k| k.did.as_str()).unwrap_or("not made yet"),
+                        ),
+                    ))
+                }
+            };
+            // The actors are under the signature; a signed row with none is out of every actor's claims.
+            if a.actors.is_empty() {
+                return Err(fail("a signed attestation must name its actors", format!("{id}: the update would leave none")));
+            }
+            a.signature = None;
+            a.signer_did = None;
+            a = sg.sign(a)?;
+        }
+    } else {
+        // An unsigned row is authored as put authors it: an update that empties
+        // the actors would otherwise hide the row from every actor's claims.
+        a = a.authored_by(ACTOR);
     }
-    // An unsigned row is authored as put authors it: an update that empties
-    // the actors would otherwise hide the row from every actor's claims.
-    let a = if stored.signature.is_some() { a } else { a.authored_by(ACTOR) };
-    s.update(a).map_err(|e| fail("update failed", e))?;
+    s.update(a.clone()).map_err(|e| fail("update failed", e))?;
+    s.persist()?;
     // What is on disk, not what was asked for: `created_at` is kept as it was.
     let kept = s.get(id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", id))?;
+    // An update that said Ok but left something else stored is a store that
+    // did not do what its trait says; say so, with both rows.
+    if (Attestation { created_at: a.created_at, ..kept.clone() }) != a {
+        let held = serde_json::to_string(&kept).map_err(|e| fail("could not encode an attestation", e))?;
+        let asked = serde_json::to_string(&a).map_err(|e| fail("could not encode an attestation", e))?;
+        return Err(fail(
+            "update returned Ok, and the store holds something else",
+            format!("{} said Ok; asked: {asked}; stored: {held}", s.kind().name()),
+        ));
+    }
     emit(&kept)
-}
-
-/// What a signature covers: everything but `created_at` and the signature itself.
-fn same_signed_fields(a: &Attestation, b: &Attestation) -> bool {
-    a.id == b.id
-        && a.subjects == b.subjects
-        && a.predicates == b.predicates
-        && a.contexts == b.contexts
-        && a.actors == b.actors
-        && a.timestamp == b.timestamp
-        && a.source == b.source
-        && a.attributes == b.attributes
 }
 
 fn alias(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let usage = "ats-dev alias add A B | rm A B | ls | resolve X";
     let sub = tail.first().ok_or_else(|| fail("alias needs a subcommand", usage))?;
-    let mut s = open(o)?;
+    let mut store = open(o)?;
+    let s = store.sqlite_mut("AliasStore")?;
     let pair = || -> Result<(&str, &str), Box<Error>> {
         match (tail.get(1), tail.get(2)) {
             (Some(a), Some(b)) => Ok((a.as_str(), b.as_str())),
@@ -297,8 +569,9 @@ fn emit(a: &Attestation) -> Result<(), Box<Error>> {
 fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let what = tail.first().ok_or_else(|| fail("put needs a sentence or -", "ats-dev put \"A is p of C by X\""))?;
     let mut s = open(o)?;
+    let keys = Keys::of(o);
     if what.as_str() == "-" {
-        return put_stdin(&mut s);
+        return put_stdin(&mut s, &keys);
     }
     let parsed = Parser::parse(what).map_err(|e| fail("could not parse the sentence", e))?;
     if parsed.has_temporal() {
@@ -334,7 +607,9 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
             other => return Err(fail("unknown put flag", other)),
         }
     }
+    let a = seal(&keys, a)?;
     s.put(a.clone()).map_err(|e| fail("put failed", e))?;
+    s.persist()?;
     emit(&a)
 }
 
@@ -383,19 +658,25 @@ fn complete(line: &str) -> Result<Attestation, Box<Error>> {
     Ok(a.authored_by(ACTOR))
 }
 
-fn put_stdin(s: &mut SqliteStore) -> Result<(), Box<Error>> {
+fn put_stdin(s: &mut Store, keys: &Keys) -> Result<(), Box<Error>> {
     let mut batch: Vec<String> = Vec::new();
     let mut total = 0usize;
     for (n, line) in std::io::stdin().lock().lines().enumerate() {
-        let line = line.map_err(|e| fail("could not read stdin", e))?;
-        if line.trim().is_empty() { continue; }
         let at = n + 1;
-        let a = match complete(&line) {
+        let line = match line {
+            Ok(l) => l,
+            // Rows before this one are already stored on a backend with no batch to undo.
+            Err(e) => return abandon(s, &batch, fail(&format!("line {at}: could not read stdin"), e)),
+        };
+        if line.trim().is_empty() { continue; }
+        let a = match complete(&line).and_then(|a| seal(keys, a)) {
             Ok(a) => a,
             Err(e) => return abandon(s, &batch, fail(&format!("line {at}: {}", e.title), e.why)),
         };
         if batch.is_empty() {
-            s.connection().execute_batch("BEGIN").map_err(|e| fail("BEGIN failed", e))?;
+            if let Some(q) = s.as_sqlite() {
+                q.connection().execute_batch("BEGIN").map_err(|e| fail("BEGIN failed", e))?;
+            }
         }
         let id = a.id.clone();
         match s.put(a) {
@@ -413,24 +694,41 @@ fn put_stdin(s: &mut SqliteStore) -> Result<(), Box<Error>> {
     }
     commit(s, &mut batch)?;
     // wal_autocheckpoint is 0 in SqliteStore::open, so nothing else folds the WAL back.
-    s.wal_checkpoint_truncate().map_err(|e| fail("checkpoint failed", e))?;
+    if let Some(q) = s.as_sqlite() {
+        q.wal_checkpoint_truncate().map_err(|e| fail("checkpoint failed", e))?;
+    }
     eprintln!("ats-dev: {total} attestations written");
     Ok(())
 }
 
-/// COMMIT the open batch, then say its ids: an id on stdout is a row on disk.
-fn commit(s: &SqliteStore, batch: &mut Vec<String>) -> Result<(), Box<Error>> {
+/// Make the open batch durable, then say its ids: an id on stdout is a row
+/// that is stored. SQLite COMMITs the transaction the batch ran in; the others
+/// have no transaction across puts, so it is the backend's own `persist`.
+fn commit(s: &Store, batch: &mut Vec<String>) -> Result<(), Box<Error>> {
     if batch.is_empty() { return Ok(()); }
-    s.connection().execute_batch("COMMIT").map_err(|e| fail("COMMIT failed", e))?;
+    match s.as_sqlite() {
+        Some(q) => q.connection().execute_batch("COMMIT").map_err(|e| fail("COMMIT failed", e))?,
+        None => s.persist()?,
+    }
     for id in batch.drain(..) { emit_id(&id)?; }
     Ok(())
 }
 
-/// A line failed: the open batch is rolled back, none of its ids were said.
-fn abandon(s: &SqliteStore, batch: &[String], why: Box<Error>) -> Result<(), Box<Error>> {
-    if !batch.is_empty() {
-        s.connection().execute_batch("ROLLBACK").map_err(|e| fail("ROLLBACK failed", e))?;
-        eprintln!("ats-dev: rolled back {} attestations of the open batch", batch.len());
+/// A line failed. SQLite rolls the open batch back and none of its ids are
+/// said. Another backend has already stored each put, so those rows stay: they
+/// are made durable and their ids said, and the failure follows.
+fn abandon(s: &Store, batch: &[String], why: Box<Error>) -> Result<(), Box<Error>> {
+    if batch.is_empty() { return Err(why); }
+    match s.as_sqlite() {
+        Some(q) => {
+            q.connection().execute_batch("ROLLBACK").map_err(|e| fail("ROLLBACK failed", e))?;
+            eprintln!("ats-dev: rolled back {} attestations of the open batch", batch.len());
+        }
+        None => {
+            s.persist()?;
+            for id in batch { emit_id(id)?; }
+            eprintln!("ats-dev: {} has no batch to roll back; {} attestations before the failure stay written", s.kind().name(), batch.len());
+        }
     }
     Err(why)
 }
@@ -454,12 +752,39 @@ fn query(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     }
     let now = now_ms();
     let req = ax::ax_filter(q, now, limit).map_err(|e| fail("could not read the query", e))?;
-    let s = open(o)?;
-    let res = ax::execute_with_aliases(&s, &req.filter, &TemporalConfig::default(), now)
+    let store = open(o)?;
+    let s = store.sqlite("QueryStore and AliasStore")?;
+    let res = ax::execute_with_aliases(s, &req.filter, &TemporalConfig::default(), now)
         .map_err(|e| fail("query failed", e))?;
     for a in &res.attestations {
         emit(a)?;
     }
     eprintln!("ats-dev: {} attestations", res.attestations.len());
+    Ok(())
+}
+
+fn verify(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
+    let s = open(o)?;
+    let ids = match tail.first() {
+        Some(id) => vec![id.to_string()],
+        None => listed(&s)?,
+    };
+    let mut bad = 0usize;
+    let mut out = std::io::stdout().lock();
+    for id in ids {
+        let a = s.get(&id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", &id))?;
+        let line = match sign::verify(&a) {
+            sign::Verdict::Unsigned => serde_json::json!({ "id": id, "signature": "unsigned" }),
+            sign::Verdict::Valid(did) => serde_json::json!({ "id": id, "signature": "valid", "signer": did }),
+            sign::Verdict::Invalid(why) => {
+                bad += 1;
+                serde_json::json!({ "id": id, "signature": "invalid", "why": why })
+            }
+        };
+        writeln!(out, "{line}").map_err(|e| fail("could not write stdout", e))?;
+    }
+    if bad > 0 {
+        return Err(fail("signatures that do not hold", format!("{bad}")));
+    }
     Ok(())
 }
