@@ -283,7 +283,7 @@ func (h *Handler) handleListTokens(w http.ResponseWriter, r *http.Request) {
 //	DELETE /auth/tokens/{id}          revoke
 //	POST   /auth/tokens/{id}/enable   lift the revocation
 //
-// Revocation is a switch (ADR-025): kill the token, watch whether anything is
+// Revocation is a switch: kill the token, watch whether anything is
 // still presenting it, turn it back on if that was you.
 func (h *Handler) handleTokenByID(w http.ResponseWriter, r *http.Request, p Presented) {
 	if h.tokens == nil {

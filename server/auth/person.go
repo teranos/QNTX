@@ -49,7 +49,7 @@ type Person struct {
 	// did:key. A token carries the identity that minted it.
 	Identity string `json:"identity"`
 	// Via is what the request came in on: a passkey session, or a bearer token
-	// speaking for whoever minted it (ADR-025).
+	// speaking for whoever minted it.
 	Via string `json:"via"`
 	// Accounts is every provider account joined to this User, by what the
 	// provider calls it and what it calls itself. No binding, no token, no

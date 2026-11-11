@@ -35,7 +35,7 @@ REACH is '/auth/door/home' '/auth/door/home/result'                       of ANY
 # Who sent the person home, answered from the ticket they hold, so the face
 # can name a client. A stranger holding no ticket is told nothing.
 REACH is '/auth/door/journey'                                             of ANYONE
-# A client is a door (ADR-025): it sends a stranger here for the passkey, and
+# A client is a door: it sends a stranger here for the passkey, and
 # the code goes back by ticket. Both are the way home, for a client.
 REACH is '/auth/authorize' '/auth/authorize/done'                         of ANYONE
 # The client comes for its token with the code and its secret, holding no
@@ -112,7 +112,7 @@ REACH is '/s/'                                                            of ANY
 # line above.
 REACH is '/g/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 
-# Tokens (ADR-025) and Users (ADR-031). A write on either is a session's
+# Tokens and Users (ADR-031). A write on either is a session's
 # alone, gated by the handler and not by this line.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT SUPER
 REACH is '/auth/users' '/auth/users/'                                     of ROOT SUPER
