@@ -12,12 +12,12 @@ https://tei-c.org/Vault/P5/4.12.0/doc/tei-p5-doc/en/html/CO.html#COHQQ
 
 https://platform.claude.com/dashboard
 
-- [ ] Integrate with Claude Console API's 'Memory store'
-- [ ] And later 'dreams' as well
+- [ ] 「[Opus 5.5] Integrate with Claude Console API's 'Memory store'」
+- [ ] 「[Opus 5.5] And later 'dreams' as well」
 
-- [ ] Interesting to think about an [[ADR-049-Obsidian|Obsidian]] linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory.
+- [ ] 「[Opus 5.5] Interesting to think about an [[ADR-049-Obsidian|Obsidian]] linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory.」
 
-- [ ] bidirectional sync between our abstraction of the memory store.
+- [ ] 「[Opus 5.5] bidirectional sync between our abstraction of the memory store.」
 
 
 Allow all Agent Harnesses to leverage memories created in Managed Agents.
