@@ -1,4 +1,4 @@
--- A token says when it ends. One minted before it had to was read as
+-- 「[Opus 5.5] A token says when it ends. One minted before it had to was read as」
 -- never ending; that is what it meant, so it is written down: 9999-12-31,
 -- the node's NeverExpires.
 --
