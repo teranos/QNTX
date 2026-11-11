@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/internal/measure"
@@ -64,6 +65,11 @@ type ExternalDomainProxy struct {
 	// roomsProvider indicates this plugin holds rooms (populated during Initialize).
 	// Atomic: a plugin initialized again while a room is asked for writes it.
 	roomsProvider atomic.Bool
+
+	// harnessProvider indicates this plugin runs a Coding Agent Harness and
+	// serves A2AService (populated during Initialize, ADR-059). Atomic, as
+	// roomsProvider is.
+	harnessProvider atomic.Bool
 
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
@@ -268,6 +274,18 @@ func (c *ExternalDomainProxy) IsRoomsProvider() bool {
 // RoomsServiceClient returns a RoomsServiceClient using this plugin's existing gRPC connection.
 func (c *ExternalDomainProxy) RoomsServiceClient() protocol.RoomsServiceClient {
 	return protocol.NewRoomsServiceClient(c.conn)
+}
+
+// IsHarnessProvider returns true if the plugin runs a Coding Agent Harness
+// (A2AService over gRPC, ADR-059).
+func (c *ExternalDomainProxy) IsHarnessProvider() bool {
+	return c.harnessProvider.Load()
+}
+
+// A2AServiceClient returns a2a-go's A2AServiceClient using this plugin's
+// existing gRPC connection. Only meaningful when IsHarnessProvider() is true.
+func (c *ExternalDomainProxy) A2AServiceClient() a2apb.A2AServiceClient {
+	return a2apb.NewA2AServiceClient(c.conn)
 }
 
 // GetSigilsFrom returns where the plugin said, at Initialize, its sigils are
@@ -513,6 +531,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store Python provider capability
 	c.pythonProvider = resp.GetPythonProvider()
 	c.roomsProvider.Store(resp.GetRoomsProvider())
+	c.harnessProvider.Store(resp.GetHarnessProvider())
 
 	// Store and create watcher registrations. Declaring none withdraws
 	// every watcher the plugin declared before.

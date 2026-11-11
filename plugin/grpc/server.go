@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 
+	a2agrpc "github.com/a2aproject/a2a-go/v2/a2agrpc/v1"
+	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	errors "github.com/teranos/sacred-error"
@@ -98,6 +100,13 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 		searchSrv := &searchPluginServer{provider: provider}
 		protocol.RegisterSearchServiceServer(grpcServer, searchSrv)
 		s.logger.Infow("Registered SearchService on plugin server", "plugin", s.plugin.Metadata().Name)
+	}
+
+	// "Harness is a plugin that speaks grpc A2A": a2a-go's gRPC binding of
+	// what the plugin's harness handles, on the same server (ADR-059).
+	if provider, ok := s.plugin.(HarnessProvider); ok {
+		a2agrpc.NewHandler(provider.Harness()).RegisterWith(grpcServer)
+		s.logger.Infow("Registered A2AService on plugin server", "plugin", s.plugin.Metadata().Name)
 	}
 
 	s.logger.Infow("Starting gRPC plugin server", "address", actualAddr, "port", actualPort)
@@ -274,6 +283,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 	}
 	_, isSearchProvider := s.plugin.(plugin.SearchProvider)
 	_, isEmbeddingProvider := s.plugin.(plugin.EmbeddingProvider)
+	_, isHarnessProvider := s.plugin.(HarnessProvider)
 
 	return &protocol.InitializeResponse{
 		HandlerNames:      handlerNames,
@@ -281,6 +291,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		LlmProvider:       isLLMProvider,
 		SearchProvider:    isSearchProvider,
 		EmbeddingProvider: isEmbeddingProvider,
+		HarnessProvider:   isHarnessProvider,
 		HttpRoutes:        routes,
 		SigilsFrom:        sigilsFrom,
 	}, nil
@@ -552,6 +563,17 @@ func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobR
 		LogEntries:    logs,
 		PluginVersion: version,
 	}, nil
+}
+
+// HarnessProvider is an optional interface for a Go plugin that runs a Coding
+// Agent Harness (ADR-059). What Harness hands back is served as A2A's own
+// A2AService, by a2a-go's gRPC binding, and core's harness service routes a
+// turn to it by the plugin's name.
+type HarnessProvider interface {
+	plugin.DomainPlugin
+
+	// Harness is what answers A2A for the harness: a2a-go's request handler.
+	Harness() a2asrv.RequestHandler
 }
 
 // LLMServiceProvider is an optional interface for a Go plugin that serves the
