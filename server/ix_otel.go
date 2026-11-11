@@ -169,13 +169,16 @@ func otlpEncodingOf(r *http.Request) string {
 	return ""
 }
 
-// 「[Opus 5.5] otlpBodyMost is the bound an export is held to: what the MCP endpoint takes from the same caller.」
-// 「[Opus 5.5] ROOT and SUPER act for the node; a caller acting in a namespace is bound at a namespace's size.」
-func otlpBodyMost(r *http.Request) int {
-	if admitted, ok := auth.AdmissionFrom(r.Context()); ok && admitted.ReachesEveryNamespace() {
-		return nodeBodyMost
-	}
-	return tenantBodyMost
+// 「[Opus 5.5] ixOtelBodyMost is the bound an export is held to, before and after unpacking, for every caller.」
+// 「[Opus 5.5] A Claude API destination with full content and no content limit set puts up to 8 MiB in a」
+// 「[Opus 5.5] span (platform.claude.com/cookbook/observability-opentelemetry-tracing), and the API does not」
+// 「[Opus 5.5] retry a 413, so a bound below that drops the span for good; twice it leaves room for the」
+// 「[Opus 5.5] span's envelope and a second span.」
+const ixOtelBodyMost = 16 << 20
+
+// 「[Opus 5.5] otlpBodyMost is the bound an export is held to.」
+func otlpBodyMost(*http.Request) int {
+	return ixOtelBodyMost
 }
 
 // 「[Opus 5.5] otlpBody reads the body, unpacked when gzipped, refusing 413 past most before or after unpacking.」
