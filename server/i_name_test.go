@@ -3,7 +3,8 @@ package server
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
+	"crypto/sha256"
+	"encoding/hex"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
@@ -316,16 +318,26 @@ func TestEachAgentUnderOneTokenNamesItself(t *testing.T) {
 		require.NotNil(t, admitted.Grant, "the gate admitted no token")
 		return auth.WithAdmission(context.Background(), admitted)
 	}
-	handAgent := h.Middleware("/auth/agent", auth.Also(auth.LevelToken, auth.LevelAttestor), h.Routes()["/auth/agent"])
+	// 「[Opus 5.5] Agent-of tokens already held, as the node derived and wrote them before it」
+	// 「[Opus 5.5] stopped handing them out: each under the token they ran under, a DID of its own.」
+	held, err := tokens.List()
+	require.NoError(t, err)
+	sharedDID := ""
+	for _, info := range held {
+		if info.Label == "ground-token" {
+			sharedDID = info.DID
+		}
+	}
+	require.NotEmpty(t, sharedDID)
 	handed := func(agent string) (raw, did string) {
-		asked := httptest.NewRequest(http.MethodPost, "/auth/agent", strings.NewReader(`{"agent":"`+agent+`"}`))
-		asked.Header.Set("Authorization", "Bearer "+shared)
-		answered := httptest.NewRecorder()
-		handAgent.ServeHTTP(answered, asked)
-		require.Equal(t, http.StatusCreated, answered.Code, answered.Body.String())
-		var body struct{ Token, DID string }
-		require.NoError(t, json.Unmarshal(answered.Body.Bytes(), &body))
-		return body.Token, body.DID
+		label := "agent-of:" + sharedDID + ":" + agent
+		raw, did, err := access.DeriveToken(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)), label)
+		require.NoError(t, err)
+		sum := sha256.Sum256([]byte(raw))
+		_, err = tokens.Issue(auth.IssuedToken{Hash: hex.EncodeToString(sum[:]), DID: did, Label: label, MintedBy: rootAccount,
+			Level: auth.LevelAttestor, Namespaces: []string{"garden"}, ExpiresAt: auth.NeverEnds()})
+		require.NoError(t, err)
+		return raw, did
 	}
 
 	otari, otariDID := handed("otari")

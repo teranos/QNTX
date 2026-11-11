@@ -47,7 +47,7 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	ticket, err := h.pendingLogins.open(mastodonAccount)
 	require.NoError(t, err)
 
-	req := mintRequest(`{"expires_at":"never","label":"ingest","level":"ATTESTOR","namespaces":["default"]}`, "")
+	req := mintRequest(`{"expires_at":"never","label":"ingest","level":"OAUTH","namespaces":["default"],"return_address":"https://app.example/callback"}`, "")
 	req.AddCookie(&http.Cookie{Name: pendingCookieName, Value: ticket})
 	rec := httptest.NewRecorder()
 	mint(h, rec, req)
@@ -63,14 +63,23 @@ func TestAHalfAdmissionDoesNotNameAMint(t *testing.T) {
 	assert.Empty(t, grant.MintedBy)
 }
 
-// A SUPER token is not narrowed, so a label and the kind are the whole of it.
-func TestALabelIsAllASuperMintAsksFor(t *testing.T) {
-	h, _ := grantHandler(t)
-	rec := httptest.NewRecorder()
-
-	mint(h, rec, mintRequest(`{"expires_at":"never","label":"mbp","level":"SUPER"}`, ""))
-
-	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+// "Tokens are to be removed from QNTX except for third-party OAuth clients"
+func TestASessionMintsNoTokenButAClient(t *testing.T) {
+	for _, body := range []string{
+		`{"expires_at":"never","label":"mbp","level":"SUPER"}`,
+		`{"expires_at":"never","label":"ingest","level":"ATTESTOR","namespaces":["default"]}`,
+		`{"expires_at":"never","label":"root","level":"ROOT"}`,
+	} {
+		h, store := grantHandler(t)
+		session, err := h.sessions.create(mastodonAccount, User{})
+		require.NoError(t, err)
+		rec := httptest.NewRecorder()
+		mint(h, rec, mintRequest(body, session))
+		assert.Equal(t, http.StatusBadRequest, rec.Code, body)
+		listed, err := store.List()
+		require.NoError(t, err)
+		assert.Empty(t, listed, "a session minted a token that is not a client's: "+body)
+	}
 }
 
 // The session that asked is who the token speaks for. Without this a token
@@ -82,7 +91,7 @@ func TestATokenRemembersWhoMintedIt(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"expires_at":"never","label":"ingest","level":"ATTESTOR","namespaces":["default"]}`, session))
+		`{"expires_at":"never","label":"ingest","level":"OAUTH","namespaces":["default"],"return_address":"https://app.example/callback"}`, session))
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var resp struct {
@@ -106,7 +115,7 @@ func TestANamespaceOtherThanDefaultIsMinted(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"expires_at":"never","label":"other","level":"ATTESTOR","namespaces":["pond"]}`, session))
+		`{"expires_at":"never","label":"other","level":"OAUTH","namespaces":["pond"],"return_address":"https://app.example/callback"}`, session))
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	listed, err := store.List()
@@ -151,7 +160,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	// A session that logged in as nobody — the ungoverned case.
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"expires_at":"never","label":"sneak","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, ""))
+		`{"expires_at":"never","label":"sneak","level":"OAUTH","namespaces":["did:key:zproject"],"return_address":"https://app.example/callback"}`, ""))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 	// A refused caller gets the outcome. Who they are, whether that name is
 	// known, and what would have let them through are the node's to keep.
@@ -162,7 +171,7 @@ func TestNamingANamespaceNeedsAListedIdentity(t *testing.T) {
 	require.NoError(t, err)
 	rec = httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"expires_at":"never","label":"fine","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, session))
+		`{"expires_at":"never","label":"fine","level":"OAUTH","namespaces":["did:key:zproject"],"return_address":"https://app.example/callback"}`, session))
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
@@ -178,7 +187,7 @@ func TestStrikingAnIdentityStopsItNamingNamespaces(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(
-		`{"expires_at":"never","label":"late","level":"ATTESTOR","namespaces":["did:key:zproject"]}`, session))
+		`{"expires_at":"never","label":"late","level":"OAUTH","namespaces":["did:key:zproject"],"return_address":"https://app.example/callback"}`, session))
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
@@ -189,26 +198,12 @@ func TestDefaultNamespaceNeedsNoListedIdentity(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	mint(h, rec, mintRequest(
-		`{"expires_at":"never","label":"ordinary","level":"ATTESTOR","namespaces":["default"]}`, ""))
+		`{"expires_at":"never","label":"ordinary","level":"OAUTH","namespaces":["default"],"return_address":"https://app.example/callback"}`, ""))
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-// "nil is nil"
-func TestAnAttestorNamingNoNamespaceIsRefused(t *testing.T) {
-	h, store := grantHandler(t)
-	rec := httptest.NewRecorder()
-
-	mint(h, rec, mintRequest(`{"expires_at":"never","label":"nowhere","level":"ATTESTOR"}`, ""))
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-	listed, err := store.List()
-	require.NoError(t, err)
-	assert.Empty(t, listed, "a token was minted into a namespace nobody named")
-}
-
-// Minting names the kind. A body that names one gets a token of that kind, and
-// a body that names none gets an answer saying which two there are.
+// Minting names the kind, and a body that names none is told the one there is.
 func TestMintingNamesTheKind(t *testing.T) {
 	h, _ := grantHandler(t)
 	rec := httptest.NewRecorder()
@@ -216,32 +211,7 @@ func TestMintingNamesTheKind(t *testing.T) {
 	mint(h, rec, mintRequest(`{"expires_at":"never","label":"unsaid"}`, ""))
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), string(LevelSuper))
-	assert.Contains(t, rec.Body.String(), string(LevelAttestor))
-}
-
-// The two kinds are what minting offers, and a token comes back as the kind it
-// was minted as rather than as whatever the middleware decides for all of them.
-func TestBothKindsAreMintedAsThemselves(t *testing.T) {
-	// An ATTESTOR names what it may attest, and a SUPER token is not narrowed.
-	for kind, body := range map[Level]string{
-		LevelSuper:    `{"expires_at":"never","label":"mine","level":"SUPER"}`,
-		LevelAttestor: `{"expires_at":"never","label":"theirs","level":"ATTESTOR","namespaces":["default"]}`,
-	} {
-		h, store := grantHandler(t)
-		rec := httptest.NewRecorder()
-
-		mint(h, rec, mintRequest(body, ""))
-		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-
-		var resp struct {
-			Token string `json:"token"`
-		}
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-		grant, live := store.Lookup(sha256Hex(resp.Token))
-		require.True(t, live)
-		assert.Equal(t, kind, grant.Level)
-	}
+	assert.Contains(t, rec.Body.String(), string(LevelOAuth))
 }
 
 // The middleware is where a token stops being a string and starts being a

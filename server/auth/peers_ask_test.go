@@ -3,16 +3,21 @@ package auth
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// The primary asks a peer for its row as the person, with a token issued here
-// for that peer, so the peer files and finds news under the same person.
+// The primary asks a peer for its row as the person, signing for them as
+// itself, so the peer files and finds news under the same person.
 func TestAPeerIsAskedAsThePerson(t *testing.T) {
-	primary, got, peerDID := anyPeer(t)
+	primary, got, _ := anyPeer(t)
 	admitted := Admitted(LevelRoot)
 	admitted.Identity = mastodonAccount
 
@@ -25,12 +30,7 @@ func TestAPeerIsAskedAsThePerson(t *testing.T) {
 
 	assert.Equal(t, "/am/statusline", got.path)
 	assert.Equal(t, "format=json", got.query)
-	raw, bears := bearerToken(&http.Request{Header: http.Header{"Authorization": {got.authorization}}})
-	require.True(t, bears, "the person was not carried")
-	grant, live := primary.tokens.Lookup(sha256Hex(raw))
-	require.True(t, live)
-	assert.Equal(t, mastodonAccount, grant.MintedBy)
-	assert.Equal(t, peerDID, grant.ClientDID)
+	assert.True(t, strings.HasPrefix(got.authorization, signedScheme), "the person was not carried by a signature")
 }
 
 // Nobody is carried to a peer: a caller with no identity is answered with why.
@@ -48,4 +48,54 @@ func TestANodeWithNoPeersAsksNobody(t *testing.T) {
 	admitted := Admitted(LevelRoot)
 	admitted.Identity = mastodonAccount
 	assert.Empty(t, primary.AskPeers(context.Background(), admitted, "/am/statusline?format=json"))
+}
+
+// 「[Opus 5.5] A peer is asked as the person acting in one namespace it serves: what the」
+// 「[Opus 5.5] primary signs names that one, so the peer reads where it was asked to.」
+func TestAPeerIsAskedInOneNamespaceItServes(t *testing.T) {
+	primary, got, _ := anyPeer(t)
+	admitted := Admitted(LevelRoot)
+	admitted.Identity = mastodonAccount
+	peer := primary.Peers()[0]
+
+	answer := primary.AskPeerIn(context.Background(), admitted, peer, NamespaceDefault, "/api/transcripts?session=s-1", time.Second, 1<<10)
+	require.NoError(t, answer.Err)
+	assert.Equal(t, http.StatusTeapot, answer.Status)
+	assert.Equal(t, "/api/transcripts", got.path)
+	assert.Equal(t, "session=s-1", got.query)
+
+	signed, carried := strings.CutPrefix(got.authorization, signedScheme)
+	require.True(t, carried, "the person was not carried by a signature: %q", got.authorization)
+	var claims carriedClaims
+	_, _, err := jwt.NewParser().ParseUnverified(signed, &claims)
+	require.NoError(t, err)
+	assert.Equal(t, []string{NamespaceDefault}, claims.Namespaces)
+}
+
+// 「[Opus 5.5] A namespace the peer is not declared serving is not asked in.」
+func TestAPeerIsNotAskedInANamespaceItDoesNotServe(t *testing.T) {
+	primary, got, _ := anyPeer(t)
+	admitted := Admitted(LevelRoot)
+	admitted.Identity = mastodonAccount
+
+	answer := primary.AskPeerIn(context.Background(), admitted, primary.Peers()[0], "Ground", "/api/transcripts?session=s-1", time.Second, 1<<10)
+	require.Error(t, answer.Err)
+	assert.Empty(t, got.path, "the peer was asked in a namespace it does not serve")
+}
+
+// 「[Opus 5.5] An answer longer than the most asked for is an error, never an answer cut short.」
+func TestAnAnswerPastWhatWasAskedForIsAnError(t *testing.T) {
+	_, did := otherNode(t)
+	primary, _, _ := authorizingHandler(t)
+	long := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(strings.Repeat("x", 2<<10)))
+	}))
+	t.Cleanup(long.Close)
+	require.NoError(t, primary.DeclarePeer(peerName, did, []string{NamespaceDefault}, long.URL, long.URL))
+	admitted := Admitted(LevelRoot)
+	admitted.Identity = mastodonAccount
+
+	answer := primary.AskPeerIn(context.Background(), admitted, primary.Peers()[0], NamespaceDefault, "/api/transcripts", time.Second, 1<<10)
+	require.Error(t, answer.Err)
+	assert.Empty(t, answer.Body)
 }

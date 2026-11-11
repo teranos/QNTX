@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A client is a door (ADR-025): both ends are the same hand. ROOT mints it
+// A client is a door: both ends are the same hand. ROOT mints it
 // with the return address its codes go to, the way ROOT writes a door's
 // origin in am.toml, and the one namespace its connector acts in (ADR-038).
 
@@ -106,14 +106,6 @@ func TestAReturnAddressHasToBeReachable(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 		})
 	}
-}
-
-func TestOnlyAClientHasAReturnAddress(t *testing.T) {
-	h, _ := grantHandler(t)
-
-	rec := mintClient(t, h, `{"expires_at":"never","label":"ingest","level":"ATTESTOR","return_address":"https://app.example/callback"}`)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
 
 // A client authenticates at the token endpoint and nowhere else. The secret

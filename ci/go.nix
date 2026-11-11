@@ -90,7 +90,8 @@ in
 
   on = {
     pull_request = {
-      branches = [ "main" ];
+      # q-stack is what q follows: a change aimed at it is tested as one aimed at main is.
+      branches = [ "main" "q-stack" ];
       # Rust has the Rust CI.
       paths = goPaths ++ [ ".github/workflows/go.yml" ];
     };

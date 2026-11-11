@@ -160,7 +160,7 @@ func (s *QNTXServer) codexSay(ctx context.Context, sent sigil.Sent) (any, *proto
 		return aTurn{
 			withoutClaude: true, keepBeforeRun: true,
 			ready: func(ctx context.Context, _ string, _ bool) (bool, *protocol.Refusal) {
-				if s.ownURL == "" {
+				if s.reachOf(agent) == "" {
 					return false, codexRefusal(errors.New("Codex namespace agent has no node MCP URL"))
 				}
 				if err := codexCredential(agent.home); err != nil {
@@ -192,7 +192,7 @@ func (s *QNTXServer) codexSay(ctx context.Context, sent sigil.Sent) (any, *proto
 				defer cancel()
 				var persistErr error
 				var last string
-				answer, err := (codex.Said{Binary: binary, Home: agent.home, Session: thread, Says: t.says, Model: line.model, Sandbox: line.sandbox, System: agent.isSaidToBe(), MCPURL: s.ownURL + "/mcp", MCPBearer: agent.token, Ground: comet.AgentGround(agent.home), TrustHooks: true}).Run(runCtx, func(e codex.Event) {
+				answer, err := (codex.Said{Binary: binary, Home: agent.home, Session: thread, Says: t.says, Model: line.model, Sandbox: line.sandbox, System: agent.isSaidToBe(), MCPURL: s.reachOf(agent) + "/mcp", Ground: comet.AgentGround(agent.home), TrustHooks: true}).Run(runCtx, func(e codex.Event) {
 					if persistErr != nil {
 						return
 					}

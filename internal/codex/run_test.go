@@ -152,10 +152,36 @@ cat <<'JSON'
 		t.Fatal(err)
 	}
 	groundToken, err := os.ReadFile(filepath.Join(home, "work", "ground-token"))
-	if err != nil || string(groundToken) != "agent-own-token" {
-		t.Fatalf("agent Ground token not carried: %v", err)
+	if err != nil || string(groundToken) != "" {
+		t.Fatalf("ground was handed a token: %q %v", groundToken, err)
 	}
 	if string(bearer) != "agent-own-token" {
 		t.Fatal("agent MCP bearer was not carried")
+	}
+}
+
+// "A signature proves the key, and nothing reusable leaves the node."
+// An agent at its own door presents nothing, and codex is told of no bearer.
+func TestRunAtADoorNamesNoBearer(t *testing.T) {
+	home := t.TempDir()
+	binary := fake(t, `printf '%s\n' "$@" > args
+printf '%s' "$QNTX_CODEX_MCP_BEARER" > bearer
+cat >/dev/null
+cat <<'JSON'
+`+success+"JSON\n")
+	_, err := (Said{Binary: binary, Home: home, Model: "test", Sandbox: "read-only", MCPURL: "http://127.0.0.1:40001/mcp", Ground: filepath.Join(home, "ground"), TrustHooks: true}).Run(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args, err := os.ReadFile(filepath.Join(home, "work", "args"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(args), "bearer_token_env_var") || !strings.Contains(string(args), "mcp_servers.qntx.url") {
+		t.Fatalf("args: %s", args)
+	}
+	bearer, err := os.ReadFile(filepath.Join(home, "work", "bearer"))
+	if err != nil || string(bearer) != "" {
+		t.Fatalf("a bearer was handed over at a door: %q %v", bearer, err)
 	}
 }

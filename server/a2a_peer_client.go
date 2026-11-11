@@ -27,8 +27,7 @@ func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant st
 	if !gated {
 		return nil, a2aRefusal(a2asdk.ErrUnauthenticated, "a peer is spoken to as the person asking here, and this came through no gate")
 	}
-	bearer, err := s.authHandler.BearerFor(admitted, peer)
-	if err != nil {
+	if _, err := s.authHandler.CarriedAs(admitted, peer); err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, err.Error())
 	}
 	at := strings.TrimSuffix(peer.Origin.JoinPath(a2aPrefix).String(), "/")
@@ -39,11 +38,11 @@ func (s *QNTXServer) peerClient(ctx context.Context, peer auth.Client, tenant st
 	}
 	client, err := a2aclient.NewFromEndpoints(ctx,
 		[]*a2asdk.AgentInterface{{URL: at, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: tenant}},
-		// The person's token goes to the peer and nowhere else: a redirect is
+		// The person's signature goes to the peer and nowhere else: a redirect is
 		// the peer's answer, not a place to follow it to.
 		a2aclient.WithRESTTransport(&http.Client{Transport: carried,
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}),
-		a2aclient.WithCallInterceptors(bearerOf(bearer)))
+		a2aclient.WithCallInterceptors(carriedTo{carry: func() (string, error) { return s.authHandler.CarriedAs(admitted, peer) }}))
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "no A2A client speaks to "+peer.Label+": "+err.Error())
 	}
@@ -79,15 +78,20 @@ func (c *cardHeard) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// bearerOf is a2a-go's call interceptor that carries token as the bearer.
-type bearerOf string
+// carriedTo is a2a-go's call interceptor that carries the person on each call
+// with a signature of its own, since the peer spends each once.
+type carriedTo struct{ carry func() (string, error) }
 
-func (b bearerOf) Before(ctx context.Context, req *a2aclient.Request) (context.Context, any, error) {
-	req.ServiceParams["Authorization"] = []string{"Bearer " + string(b)}
+func (c carriedTo) Before(ctx context.Context, req *a2aclient.Request) (context.Context, any, error) {
+	carriedAs, err := c.carry()
+	if err != nil {
+		return ctx, nil, err
+	}
+	req.ServiceParams["Authorization"] = []string{carriedAs}
 	return ctx, nil, nil
 }
 
-func (bearerOf) After(context.Context, *a2aclient.Response) error { return nil }
+func (carriedTo) After(context.Context, *a2aclient.Response) error { return nil }
 
 // peersAgentCard is the card of the agent a peer serves at namespace, asked of
 // the peer with a2a-go's client as the person asking here, and verified by

@@ -92,7 +92,10 @@ func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
 		if err != nil {
 			return Answer{}, errors.Wrap(err, "Codex MCP URL did not encode")
 		}
-		args = append(args, "-c", "mcp_servers.qntx.url="+string(value), "-c", `mcp_servers.qntx.bearer_token_env_var="QNTX_CODEX_MCP_BEARER"`)
+		args = append(args, "-c", "mcp_servers.qntx.url="+string(value))
+		if s.MCPBearer != "" {
+			args = append(args, "-c", `mcp_servers.qntx.bearer_token_env_var="QNTX_CODEX_MCP_BEARER"`)
+		}
 	}
 	if s.Ground != "" {
 		command := "'" + strings.ReplaceAll(s.Ground, "'", "'\"'\"'") + "'"
@@ -116,11 +119,11 @@ func (s Said) Run(ctx context.Context, each func(Event)) (Answer, error) {
 	if s.APIKey != "" {
 		cmd.Env = append(cmd.Env, "CODEX_API_KEY="+s.APIKey)
 	}
-	if s.MCPURL != "" {
+	if s.MCPURL != "" && s.MCPBearer != "" {
 		cmd.Env = append(cmd.Env, "QNTX_CODEX_MCP_BEARER="+s.MCPBearer)
 	}
 	if s.Ground != "" {
-		cmd.Env = append(cmd.Env, "QNTX_TOKEN="+s.MCPBearer, "PATH="+filepath.Dir(s.Ground)+":"+os.Getenv("PATH"))
+		cmd.Env = append(cmd.Env, "PATH="+filepath.Dir(s.Ground)+":"+os.Getenv("PATH"))
 	}
 	cmd.Stdin = strings.NewReader(s.Says)
 	cmd.WaitDelay = time.Second

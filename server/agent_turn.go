@@ -98,13 +98,15 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: t.effort, element: t.element, screenshot: t.screenshot}
 	write, unwritten := s.sessionRows(agent, store, session, t.called)
 	// The Node Agent's git is its own (ADR-048, Its git). A namespace agent has
-	// none: its ground is handed the agent's own token, and writes in its namespace.
-	itsGit := []string{"QNTX_TOKEN=" + agent.token}
+	// none: its ground reaches the node at the agent's door, and writes in its namespace.
+	itsGit := []string{}
 	if agent.namespace == auth.NamespaceSystem {
 		if itsGit, err = s.gitEnvironment(agent); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's git was not set up, so nothing was said to it: " + err.Error()}
 		}
 	}
+	// 「[Opus 5.5] Its spans go to the node's own ix/otel, under its own token.」
+	itsGit = append(itsGit, s.harnessOTel(agent)...)
 	// Its ground is the one its hooks run (ADR-050, Hosted agents under ground),
 	// and the node's Claude Code the one a ritual it performs starts its agent with (ground ritual/run.d).
 	if !t.withoutClaude {

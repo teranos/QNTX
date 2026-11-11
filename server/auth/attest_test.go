@@ -75,7 +75,7 @@ func TestATokensLifeIsAttested(t *testing.T) {
 	require.NoError(t, err)
 
 	rec := httptest.NewRecorder()
-	mint(h, rec, mintRequest(`{"expires_at":"never","label":"mbp","level":"ATTESTOR","namespaces":["default"],"scope":{"read":["*"],"write":["*"]}}`, session))
+	mint(h, rec, mintRequest(`{"expires_at":"never","label":"mbp","level":"OAUTH","namespaces":["default"],"return_address":"https://app.example/callback"}`, session))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	listed, err := store.List()

@@ -124,10 +124,14 @@ func (s *QNTXServer) holdElementAgent(element string) (*rootAgent, *protocol.Ref
 	if err := agent.keepIn(filepath.Join(agent.sessionDir, elementNameFile), element); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + element + " was not written down: " + err.Error()}
 	}
-	// Its token is ROOT's kind, as the Node Agent's is: the element is ROOT's to shake.
+	// It is ROOT's kind, as the Node Agent is: the element is ROOT's to shake.
 	if s.authHandler != nil {
-		if err := s.authHandler.HoldElementAgent(agent.token, agent.did, element); err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the token of the agent of " + element + " is not held, so it would reach none of the node's sigils: " + err.Error()}
+		grant, err := s.authHandler.ElementAgentGrant(agent.did, element)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + element + " speaks for nobody, so it would reach none of the node's sigils: " + err.Error()}
+		}
+		if err := s.openDoor(agent, grant, ""); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the agent of " + element + " has no door to the node: " + err.Error()}
 		}
 	}
 	return s.elementAgents.hold(purpose, agent), nil

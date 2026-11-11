@@ -744,12 +744,6 @@
         "SUPER"
       ]
     },
-    "/auth/agent": {
-      "x-qntx-reach": [
-        "TOKEN",
-        "ATTESTOR"
-      ]
-    },
     "/auth/authorize": {
       "x-qntx-reach": [
         "ANYONE"
@@ -1055,6 +1049,15 @@
       "x-qntx-reach": [
         "ANYONE"
       ]
+    },
+    "/ix/otel/": {
+      "x-qntx-reach": [
+        "ROOT",
+        "SUPER",
+        "TOKEN",
+        "ATTESTOR"
+      ],
+      "x-qntx-prefix": true
     },
     "/mcp": {
       "x-qntx-reach": [

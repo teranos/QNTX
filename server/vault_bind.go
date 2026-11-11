@@ -110,9 +110,9 @@ func vaultHasDir(vault Vault, place string) (bool, error) {
 	return info.IsDir(), nil
 }
 
-// vaultPlaceRefused is why place is no place of the vault's copy to bind to,
-// or empty: a folder's place is a folder on the box; a note's is no folder,
-// and it and the folders it is in are written when it is filled.
+// 「[Opus 5.5] vaultPlaceRefused is why place is no place of the vault's copy to bind to,」
+// 「[Opus 5.5] or empty: a folder's place is a folder on the box; a note's is no folder,」
+// 「[Opus 5.5] and it and the folders it is in are written when it is filled.」
 func vaultPlaceRefused(vault Vault, place string, note bool) (string, error) {
 	if !note {
 		there, err := vaultHasDir(vault, place)

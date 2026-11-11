@@ -14,8 +14,11 @@ import (
 )
 
 // "yes, i want this"
-// An agent asks for a sign-in, prints a link, and the person approves it with the
-// passkey at home; the agent's token is then the person, as a client's is (RFC 8628).
+// An agent asks for a sign-in naming its own did:key, prints a link, and the
+// person approves it with the passkey at home; the agent's key is then the
+// person, as a client's is (RFC 8628). Nothing is handed back.
+//
+// "A signature proves the key, and nothing reusable leaves the node."
 
 // deviceAuthorizationPath is where an agent asks for a sign-in (RFC 8628 §3.1).
 const deviceAuthorizationPath = "/auth/device"
@@ -32,7 +35,7 @@ const deviceCodeGrant = "urn:ietf:params:oauth:grant-type:device_code"
 // devicePollSeconds is how long an agent waits between asks (RFC 8628 §3.2 interval).
 const devicePollSeconds = 5
 
-// deviceTokenTTL is how long the token lasts: a yes lasts thirty days, as a refresh's does.
+// deviceTokenTTL is how long a yes lasts: thirty days, as a refresh's does.
 const deviceTokenTTL = refreshTokenTTL
 
 // userCodeAlphabet is RFC 8628 §6.1's base-20 set: no vowels, nothing read two ways.
@@ -45,6 +48,7 @@ const userCodeLength = 8
 type deviceSignIn struct {
 	mu        sync.Mutex
 	label     string
+	did       string
 	userCode  string
 	startedAt time.Time
 	// Who said yes at the passkey, once somebody did; spent once its token was issued.
@@ -98,6 +102,11 @@ func (h *Handler) handleDeviceAuthorization(w http.ResponseWriter, r *http.Reque
 		h.writeError(w, http.StatusBadRequest, "label names the agent asking, which the person reads before saying yes, and this named nothing")
 		return
 	}
+	did := strings.TrimSpace(r.PostForm.Get("did"))
+	if _, err := DecodeUserDID(did); err != nil {
+		h.writeError(w, http.StatusBadRequest, "did names the agent's own ed25519 did:key, which it signs with: "+err.Error())
+		return
+	}
 	deviceCode, err := randomTicket()
 	if err != nil {
 		h.logger.Errorw("could not draw a device code", "label", label, "error", err)
@@ -110,9 +119,9 @@ func (h *Handler) handleDeviceAuthorization(w http.ResponseWriter, r *http.Reque
 		h.writeError(w, http.StatusInternalServerError, "the user code was not drawn")
 		return
 	}
-	h.devices.Store(deviceCode, &deviceSignIn{label: label, userCode: userCode, startedAt: time.Now()})
+	h.devices.Store(deviceCode, &deviceSignIn{label: label, did: did, userCode: userCode, startedAt: time.Now()})
 	approve := h.publicOrigin() + deviceApprovePath
-	h.logger.Infow("An agent asked to be signed in", "label", label, "user_code", userCode)
+	h.logger.Infow("An agent asked to be signed in", "label", label, "did", did, "user_code", userCode)
 	h.writeJSON(w, http.StatusOK, map[string]any{
 		"device_code":               deviceCode,
 		"user_code":                 userCode,
@@ -224,7 +233,7 @@ func (h *Handler) deviceAnswer(w http.ResponseWriter, code, said string) {
 }
 
 // handleDeviceToken is the agent asking whether its yes came (RFC 8628 §3.4): waiting,
-// over, or its token, issued once, through itself as client so it is admitted as the person.
+// over, or its key held as the person, once, through itself as client.
 func (h *Handler) handleDeviceToken(w http.ResponseWriter, form url.Values) {
 	deviceCode := form.Get("device_code")
 	val, ok := h.devices.Load(deviceCode)
@@ -237,7 +246,7 @@ func (h *Handler) handleDeviceToken(w http.ResponseWriter, form url.Values) {
 	defer d.mu.Unlock()
 	switch {
 	case d.spent:
-		h.deviceAnswer(w, "invalid_grant", "this sign-in's token was already issued")
+		h.deviceAnswer(w, "invalid_grant", "this sign-in was already answered")
 		return
 	case time.Since(d.startedAt) > homewardTTL && !d.approved:
 		h.deviceAnswer(w, "expired_token", "nobody said yes within "+homewardTTL.String())
@@ -252,17 +261,13 @@ func (h *Handler) handleDeviceToken(w http.ResponseWriter, form url.Values) {
 	}
 	level := h.levelOf(d.identity)
 	if level == "" {
-		h.deviceAnswer(w, "access_denied", d.identity+" is no longer admitted, so no token speaks for them")
+		h.deviceAnswer(w, "access_denied", d.identity+" is no longer admitted, so nothing speaks for them")
 		return
 	}
-	raw, did, err := MintToken()
-	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, "the token was not drawn: "+err.Error())
-		return
-	}
+	did := d.did
 	until := time.Now().Add(deviceTokenTTL)
 	id, err := h.tokens.Issue(IssuedToken{
-		Hash:                sha256Hex(raw),
+		Hash:                signedOnly(did),
 		DID:                 did,
 		Label:               d.title(),
 		MintedBy:            d.identity,
@@ -276,18 +281,18 @@ func (h *Handler) handleDeviceToken(w http.ResponseWriter, form url.Values) {
 		h.attest(PredicateUnanswered, d.identity, map[string]any{
 			"asked": "token store", "doing": "issue", "label": d.title(), "error": err.Error(),
 		})
-		h.writeError(w, http.StatusInternalServerError, "the token was not written: "+err.Error())
+		h.writeError(w, http.StatusInternalServerError, "the yes was not written: "+err.Error())
 		return
 	}
 	d.spent = true
 	h.attest(PredicateMinted, d.identity, map[string]any{
 		"token": id, "label": d.title(), "level": string(level), "did": did, "grant": deviceCodeGrant,
 	})
-	h.logger.Infow("An agent was given its token", "minted_by", d.identity, "label", d.title(), "token", id)
+	h.logger.Infow("An agent's key was said yes to", "minted_by", d.identity, "label", d.title(), "did", did, "grant", id)
 	h.writeJSON(w, http.StatusOK, map[string]any{
-		"access_token": raw,
-		"token_type":   "Bearer",
-		"expires_in":   int(deviceTokenTTL / time.Second),
+		"did":        did,
+		"token_type": strings.TrimSpace(signedScheme),
+		"expires_in": int(deviceTokenTTL / time.Second),
 	})
 }
 

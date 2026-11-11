@@ -114,7 +114,7 @@ func TestThePrimaryHandsOverTheCardOfAnAgentAPeerServes(t *testing.T) {
 	assert.Equal(t, "orchard", card.Interfaces[0].Tenant)
 
 	require.Len(t, peer.asked, 1)
-	assert.Contains(t, peer.asked[0].Header.Get("Authorization"), "Bearer ", "the peer was not asked as the person")
+	assert.Contains(t, peer.asked[0].Header.Get("Authorization"), "Signed ", "the peer was not asked as the person")
 	// "the A2A-Version header or request parameter" (§3.6.2): a2a-go's client
 	// sends the header.
 	assert.Equal(t, string(a2asdk.Version), peer.asked[0].Header.Get("A2A-Version"))

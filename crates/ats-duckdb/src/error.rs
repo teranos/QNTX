@@ -32,6 +32,8 @@ pub enum Object {
     Namespace,
     Namespaces,
     NamespaceDefinition,
+    /// A DuckDB a subsystem holds for itself, in a file of the node's.
+    Held,
 }
 
 impl Object {
@@ -50,6 +52,7 @@ impl Object {
             Object::Tick | Object::Ticks => "schedule_ticks",
             Object::NodeIdentity => "node_identity",
             Object::Namespace | Object::Namespaces | Object::NamespaceDefinition => "namespaces",
+            Object::Held => "held",
         }
     }
 }
@@ -80,6 +83,7 @@ impl std::fmt::Display for Object {
             Object::Namespace => "the namespace",
             Object::Namespaces => "what the location holds",
             Object::NamespaceDefinition => "a namespace definition",
+            Object::Held => "a subsystem's own DuckDB",
         };
         f.write_str(word)
     }

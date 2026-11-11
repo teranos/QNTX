@@ -37,6 +37,8 @@ type QNTXServer struct {
 	// its doors, and the health of the file underneath. What a namespace keeps
 	// is the namespace's, and is reached through it.
 	nodeDB                *sql.DB
+	issuesSeeded          atomic.Bool                   // today's issues_seen was read into the ledger, so a write may replace its rows
+	issuesWrite           sync.Mutex                    // one take-and-write of the issue ledger at a time, the last one included
 	nodeAgentApart        bool                          // The Node Agent's turns run apart from this process; set as the agent subsystem boots
 	startedAt             time.Time                     // When this process began answering; zero until New runs
 	dbPath                string                        // Database file path (for display in banner)
@@ -61,6 +63,7 @@ type QNTXServer struct {
 	consuming             consumedFlows                 // 「[Opus 5.5] Each yes at an MCP server the node consumes, waiting on its callback (mcp_consumed.go)」
 	agentsDir             string                        // Where agents are kept; empty is ~/.qntx/agents
 	ownURL                string                        // Where this node answers on its own machine; empty until it listens
+	doors                 agentDoors                    // The door each agent the node runs reaches it at (agent_door.go)
 	anthropicBaseURL      string                        // Where Anthropic's API is; empty is api.anthropic.com
 	anthropicInUse        inUse                         // What ROOT's agents last ran on at Anthropic
 	identityTokensRenewed identityTokens                // Each ROOT agent home whose identity token is renewed

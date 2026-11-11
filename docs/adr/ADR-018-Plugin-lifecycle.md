@@ -55,6 +55,7 @@ Binary launch          gRPC connect          Initialize RPC         Health poll 
 - **Re-initialization** (`ReinitializePlugin` / `ForceInitialize`) is only for config updates on an existing proxy — not for new processes after restart.
 - **Plugins must handle re-init gracefully.** Stop previous state (nodes, connections, goroutines) before starting new ones. The `Initialize` handler may be called on a proxy that already has running state from a previous call.
 - **Config comes from the plugin's record.** The `config` map in `InitializeRequest` contains the key-value pairs set in the plugin element.
+- **The node's Sentry is handed to a plugin that names it.** When the node has a `sentry.dsn`, the `config` map also carries `sentry_dsn` and, if the node has one, `sentry_environment`, for a plugin whose `ConfigSchema` names `sentry_dsn`. A plugin reads them like any other key and binds its own client, so its events land in the node's Sentry project. A value the plugin's record sets is kept, not replaced. A plugin that does not name `sentry_dsn` is handed neither.
 
 #### Restart
 

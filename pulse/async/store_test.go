@@ -316,7 +316,7 @@ func TestCronosCleanupOldJobs(t *testing.T) {
 	}
 
 	// Cronos cleans up jobs older than 24 hours
-	deleted, err := store.CleanupOldJobs(24 * time.Hour)
+	deleted, err := store.CleanupOldJobs(24*time.Hour, 1000)
 	if err != nil {
 		t.Fatalf("Cronos failed to cleanup old jobs: %v", err)
 	}
@@ -541,4 +541,107 @@ func TestKirbyCountsPastTheListingCap(t *testing.T) {
 	}
 
 	t.Logf("✓ Kirby counted all %d, past the %d listing cap", overflow, MaxJobsLimit)
+}
+
+// Cleanup spares what is still needed: a forward's row (its handler is kept), a
+// parent whose child is still queued, and anything inside the retention. It
+// takes at most atMost rows a pass.
+func TestCleanupSparesForwardsLiveParentsAndTheRecent(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewStore(db)
+	old := time.Now().Add(-48 * time.Hour)
+	mk := func(id, handler, parent string, status JobStatus, at time.Time) {
+		t.Helper()
+		j := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+			ID: id, HandlerName: handler, Source: id, Status: status, ParentJobID: parent, CreatedAt: at, UpdatedAt: at}
+		if err := store.CreateJob(j); err != nil {
+			t.Fatalf("CreateJob(%s): %v", id, err)
+		}
+	}
+	mk("OLD_PLAIN_1", "test.plain", "", JobStatusCompleted, old)
+	mk("OLD_PLAIN_2", "test.plain", "", JobStatusFailed, old)
+	mk("OLD_FORWARD", "github.forward", "", JobStatusCompleted, old)
+	mk("OLD_PARENT", "test.parent", "", JobStatusCompleted, old)
+	mk("CHILD_QUEUED", "test.child", "OLD_PARENT", JobStatusQueued, time.Now())
+	mk("NEW_PLAIN", "test.plain", "", JobStatusCompleted, time.Now())
+
+	removed, err := store.CleanupOldJobs(24*time.Hour, 1, "github.forward")
+	if err != nil {
+		t.Fatalf("CleanupOldJobs: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("a pass of one removed %d", removed)
+	}
+	removed, err = store.CleanupOldJobs(24*time.Hour, 1000, "github.forward")
+	if err != nil {
+		t.Fatalf("CleanupOldJobs: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("the second pass removed %d, want the one old plain job left", removed)
+	}
+	for _, id := range []string{"OLD_FORWARD", "OLD_PARENT", "CHILD_QUEUED", "NEW_PLAIN"} {
+		if _, err := store.GetJob(id); err != nil {
+			t.Errorf("%s was removed: %v", id, err)
+		}
+	}
+	for _, id := range []string{"OLD_PLAIN_1", "OLD_PLAIN_2"} {
+		if _, err := store.GetJob(id); err == nil {
+			t.Errorf("%s stayed", id)
+		}
+	}
+}
+
+// 「[Fable 5.1] A queued job older than the horizon is cancelled with the reason as its error;」
+// 「[Fable 5.1] a newer one, a running one, and another handler's are not touched. A pass」
+// 「[Fable 5.1] takes at most atMost.」
+func TestCancelQueuedBeforeDropsOnlyTheOldQueuedOfTheHandler(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewStore(db)
+	old := time.Now().Add(-48 * time.Hour)
+	mk := func(id, handler string, status JobStatus, at time.Time) {
+		t.Helper()
+		j := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(),
+			ID: id, HandlerName: handler, Source: id, Status: status, CreatedAt: at, UpdatedAt: at}
+		if err := store.CreateJob(j); err != nil {
+			t.Fatalf("CreateJob(%s): %v", id, err)
+		}
+	}
+	mk("OLD_FWD_1", "github.forward", JobStatusQueued, old)
+	mk("OLD_FWD_2", "github.forward", JobStatusQueued, old)
+	mk("OLD_FWD_RUNNING", "github.forward", JobStatusRunning, old)
+	mk("NEW_FWD", "github.forward", JobStatusQueued, time.Now())
+	mk("OLD_OTHER", "test.other", JobStatusQueued, old)
+
+	cancelled, err := store.CancelQueuedBefore("github.forward", time.Now().Add(-24*time.Hour), "dropped", 1)
+	if err != nil {
+		t.Fatalf("CancelQueuedBefore: %v", err)
+	}
+	if len(cancelled) != 1 || cancelled[0].Status != JobStatusCancelled || cancelled[0].Error != "dropped" {
+		t.Fatalf("a pass of one answered %+v", cancelled)
+	}
+	cancelled, err = store.CancelQueuedBefore("github.forward", time.Now().Add(-24*time.Hour), "dropped", 1000)
+	if err != nil {
+		t.Fatalf("CancelQueuedBefore: %v", err)
+	}
+	if len(cancelled) != 1 {
+		t.Fatalf("the second pass cancelled %d, want the one old queued forward left", len(cancelled))
+	}
+	for _, id := range []string{"OLD_FWD_1", "OLD_FWD_2"} {
+		j, err := store.GetJob(id)
+		if err != nil {
+			t.Fatalf("GetJob(%s): %v", id, err)
+		}
+		if j.Status != JobStatusCancelled || j.Error != "dropped" {
+			t.Errorf("%s is %s with error %q, want cancelled with dropped", id, j.Status, j.Error)
+		}
+	}
+	for id, want := range map[string]JobStatus{"OLD_FWD_RUNNING": JobStatusRunning, "NEW_FWD": JobStatusQueued, "OLD_OTHER": JobStatusQueued} {
+		j, err := store.GetJob(id)
+		if err != nil {
+			t.Fatalf("GetJob(%s): %v", id, err)
+		}
+		if j.Status != want {
+			t.Errorf("%s is %s, want %s", id, j.Status, want)
+		}
+	}
 }

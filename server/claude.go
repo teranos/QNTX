@@ -38,9 +38,10 @@ const nodeAgentMCP = "qntx"
 type rootAgent struct {
 	did    string
 	signer *signing.Signer
-	// token is its own, and what it presents at the node's MCP.
-	token string
-	home  string
+	// door is where it reaches the node: a listener opened for it alone
+	// (agent_door.go). Empty on a node with no gate to open one at.
+	door string
+	home string
 	// sessions is its session in each harness, by the harness's name.
 	sessions   map[string]*inHarness
 	sessionsMu sync.Mutex
@@ -127,19 +128,20 @@ func theNodeAgent(node ed25519.PrivateKey, home string) (*rootAgent, error) {
 	return agent, nil
 }
 
-// theAgent is an agent of the node holding this key: its own key and token
-// derived from the node's for purpose, so it is the same DID wherever the node
-// is rebuilt from its record, working in home.
+// theAgent is an agent of the node holding this key: its own key derived from
+// the node's for purpose, so it is the same DID wherever the node is rebuilt
+// from its record, working in home.
 func theAgent(node ed25519.PrivateKey, purpose, home string) (*rootAgent, error) {
 	key, err := access.DeriveKey(node, purpose)
 	if err != nil {
 		return nil, err
 	}
-	token, did, err := access.DeriveToken(node, purpose)
-	if err != nil {
-		return nil, err
+	public, isEd25519 := key.Public().(ed25519.PublicKey)
+	if !isEd25519 {
+		return nil, errors.Newf("the key derived for %s has no ed25519 public half, so the agent has no DID", purpose)
 	}
-	return &rootAgent{did: did, signer: signing.NewSigner(key, did), token: token, home: home}, nil
+	did := access.EncodeDIDKey(public)
+	return &rootAgent{did: did, signer: signing.NewSigner(key, did), home: home}, nil
 }
 
 // nodeAgentHome is where a node keeps its Node Agent: its Claude Code
@@ -328,11 +330,11 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 				Apart:   s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,
 				Started: t.started,
 			}
-			if s.ownURL != "" {
-				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: s.ownURL + "/mcp", Bearer: agent.token}}
+			if reach := s.reachOf(agent); reach != "" {
+				said.MCP = []claudecode.MCPServer{{Name: nodeAgentMCP, URL: reach + "/mcp"}}
 				// "THE NODE'S MCP NEEDS"
-				for _, consumed := range s.consumedForAgent(agent, s.ownURL) {
-					said.MCP = append(said.MCP, claudecode.MCPServer{Name: consumed.Name, URL: consumed.URL, Bearer: agent.token})
+				for _, consumed := range s.consumedForAgent(agent, reach) {
+					said.MCP = append(said.MCP, claudecode.MCPServer{Name: consumed.Name, URL: consumed.URL})
 					// A server ROOT said yes to is one the agent may use, unasked:
 					// each of its tools, whatever its name holds.
 					said.Allow = append(slices.Clone(said.Allow), "mcp__"+consumed.Name, "mcp__"+consumed.Name+"__*")

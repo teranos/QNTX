@@ -3,26 +3,18 @@
 ## Status
 
 Accepted (revised 2026-08-09)
-The kern (OCaml) half is withdrawn with ADR-011.
+
 Date: 2026-03-15
+
 
 ## Context
 
-The browser should not be a lite client that talks to a server. It should run the same engine — same parser, same execution. This means both kern (OCaml) and the Rust engine need to compile to WASM and run in the browser.
+The browser should not be a lite client that talks to a server. It should run the same engine — same parser, same execution. This means the Rust engine need to compile to WASM and run in the browser.
 
 ## The problem
 
-kern (OCaml) compiles to WASM via `wasm_of_ocaml`, which outputs WasmGC instructions. The Rust engine compiles to WASM via `wasm-bindgen`. Both need to run in the browser and talk to each other.
+The Rust engine compiles to WASM via `wasm-bindgen`. Both need to run in the browser and talk to each other.
 
-### WasmGC support
-
-- **Browsers**: Chrome 119+, Firefox 122+, Safari 18.2+ — all support WasmGC
-- **wazero (Go)**: does not support WasmGC, no timeline ([#1860](https://github.com/tetratelabs/wazero/issues/1860))
-- **wasmtime (Rust)**: supports WasmGC since v27.0 (November 2024)
-
-This is why the browser path works but the Go server path doesn't for OCaml WASM.
-
-Those three rows were recorded 2026-03-15 and have not been re-checked since.
 
 ### Composition
 
