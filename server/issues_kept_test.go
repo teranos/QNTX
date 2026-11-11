@@ -9,7 +9,7 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
-// A row is an issue's day, and the newer counts replace the older.
+// 「[Opus 5.5] A row is an issue's day, and the newer counts replace the older.」
 func TestIssuesAreWrittenToIssuesSeen(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	ctx := context.Background()
