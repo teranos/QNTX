@@ -3,6 +3,7 @@ package server
 import (
 	"slices"
 
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
 )
 
@@ -14,8 +15,13 @@ import (
 //
 // 「[Opus 5.5] Metrics and logs are named none: ix/otel takes traces alone. A node that serves no」
 // 「[Opus 5.5] ix/otel, or an agent with no door, hands nothing.」
+//
+// An agent whose door admits less than ROOT or SUPER is handed nothing either:
+// ix/otel keeps a span only where its sender may write the span's name, and no
+// WRITE line names Claude Code's (claude_code.*), so every span it sent would be
+// refused.
 func (s *QNTXServer) harnessOTel(agent *rootAgent) []string {
-	if s.served == nil || agent.door == "" {
+	if s.served == nil || agent.door == "" || !s.doorWritesAnything(agent) {
 		return nil
 	}
 	if !slices.ContainsFunc(s.served.Routes(), func(route reach.Route) bool { return route.Path == ixOtelPrefix }) {
@@ -30,4 +36,17 @@ func (s *QNTXServer) harnessOTel(agent *rootAgent) []string {
 		"OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
 		"OTEL_EXPORTER_OTLP_ENDPOINT=" + agent.door + "/ix/otel",
 	}
+}
+
+// doorWritesAnything is whether the door agent arrives at admits ROOT or SUPER,
+// who write any name.
+func (s *QNTXServer) doorWritesAnything(agent *rootAgent) bool {
+	s.doors.mu.Lock()
+	door, open := s.doors.byDID[agent.did]
+	s.doors.mu.Unlock()
+	if !open {
+		return false
+	}
+	level := door.grant.load().Level
+	return level == auth.LevelRoot || level == auth.LevelSuper
 }

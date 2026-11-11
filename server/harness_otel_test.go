@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 )
 
@@ -22,6 +23,7 @@ func TestAHarnessTheNodeStartsSendsItsSpansToTheNodesIxOtel(t *testing.T) {
 	s, ran := runningTheNodeAgent(t, opusLow)
 	s.served = servedForTest(t).served
 	s.nodeAgent.door = "http://127.0.0.1:8771"
+	doorAdmits(s, auth.LevelRoot)
 	_, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
 
@@ -41,6 +43,34 @@ func TestAHarnessTheNodeStartsSendsItsSpansToTheNodesIxOtel(t *testing.T) {
 		assert.NotContains(t, line, "the-nodes-key", "the harness holds the node's Sentry key")
 		assert.False(t, strings.HasPrefix(line, "OTEL_EXPORTER_OTLP_TRACES_"), "the harness holds the node's own %s", line)
 		assert.False(t, strings.HasPrefix(line, "OTEL_EXPORTER_OTLP_HEADERS"), "the harness is handed a header: %s", line)
+	}
+}
+
+// doorAdmits gives the Node Agent a door admitting level.
+func doorAdmits(s *QNTXServer, level auth.Level) {
+	door := &agentDoor{url: s.nodeAgent.door}
+	door.grant.store(auth.Grant{DID: s.nodeAgent.did, Level: level})
+	s.doors.mu.Lock()
+	if s.doors.byDID == nil {
+		s.doors.byDID = map[string]*agentDoor{}
+	}
+	s.doors.byDID[s.nodeAgent.did] = door
+	s.doors.mu.Unlock()
+}
+
+// An agent whose door admits no more than its namespace is handed no
+// OpenTelemetry: no WRITE line names Claude Code's spans, so ix/otel would
+// refuse every one.
+func TestAHarnessWhoseSpansWouldBeRefusedIsHandedNone(t *testing.T) {
+	s, ran := runningTheNodeAgent(t, opusLow)
+	s.served = servedForTest(t).served
+	s.nodeAgent.door = "http://127.0.0.1:8771"
+	doorAdmits(s, auth.LevelAttestor)
+	_, refused := saying(s, sigil.Sent{"says": "hello"})
+	require.Nil(t, refused)
+
+	for _, line := range ranWith(t, ran, "0", "env") {
+		assert.False(t, strings.HasPrefix(line, "OTEL_EXPORTER_OTLP_ENDPOINT"), "an ATTESTOR's harness was handed %s", line)
 	}
 }
 
