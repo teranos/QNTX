@@ -138,6 +138,13 @@
           # DuckDB's own host first: GitHub's release asset for arm64 answered 504 on every ask on 2026-11-08.
           curl -fsSL -o libduckdb.zip "https://install.duckdb.org/v''${DUCKDB_VERSION}/libduckdb-linux-''${{ matrix.arch }}.zip" \
             || curl -fsSL -o libduckdb.zip "https://github.com/duckdb/duckdb/releases/download/v''${DUCKDB_VERSION}/libduckdb-linux-''${{ matrix.arch }}.zip"
+          # Each archive is held to the hash DuckDB's two hosts agreed on (2026-11-11); a version pinned nowhere here is refused.
+          case "$DUCKDB_VERSION-''${{ matrix.arch }}" in
+            1.5.5-amd64) WANT=1fb8ce388157d84a25abe685a8a2520bf00c00321821968e4bb398fd766e7abb ;;
+            1.5.5-arm64) WANT=abe4f6f005ee0b448a058322f4263584b4bd1b6faf7ab4637b79eeaf978f8e9c ;;
+            *) echo "no hash pinned for libduckdb $DUCKDB_VERSION ''${{ matrix.arch }}"; exit 1 ;;
+          esac
+          echo "$WANT  libduckdb.zip" | sha256sum -c -
           unzip -o libduckdb.zip libduckdb.so -d release/lib/
           # Debian 13's glibc, which the node runs on, is the newest a release may need.
           NEEDS=$(objdump -T release/lib/libduckdb.so | grep -oE 'GLIBC_2\.[0-9]+' | sort -t. -k2 -n -u | tail -1)
