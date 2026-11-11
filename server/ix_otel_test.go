@@ -132,9 +132,9 @@ func refusedWith(t *testing.T, rec *httptest.ResponseRecorder, code int) *status
 	return said
 }
 
-// refusedAs is refusedWith for an export sent as encoding: the refusal must be
+// otlpRefusedAs is refusedWith for an export sent as encoding: the refusal must be
 // written in that encoding, so a JSON export answered in protobuf fails.
-func refusedAs(t *testing.T, rec *httptest.ResponseRecorder, code int, encoding string) *status.Status {
+func otlpRefusedAs(t *testing.T, rec *httptest.ResponseRecorder, code int, encoding string) *status.Status {
 	t.Helper()
 	if got := rec.Header().Get("Content-Type"); got != encoding {
 		t.Fatalf("an export sent as %s was refused as %q", encoding, got)
@@ -314,7 +314,7 @@ func TestIxOtelIsReachedAsAWriteOfAttestations(t *testing.T) {
 func TestJSONWithSomethingAfterTheExportIs400(t *testing.T) {
 	s, _, markets := standServer(t, "pond")
 	body := `{"resourceSpans":[]} {"resourceSpans":[]}`
-	refusedAs(t, exporting(s, pondToken("*"), ixOtelTraces, "application/json", "", []byte(body)), http.StatusBadRequest, otlpJSON)
+	otlpRefusedAs(t, exporting(s, pondToken("*"), ixOtelTraces, "application/json", "", []byte(body)), http.StatusBadRequest, otlpJSON)
 	if kept := everythingIn(t, markets["pond"]); len(kept) != 0 {
 		t.Fatalf("pond holds %v from a body that was no export", kept)
 	}
