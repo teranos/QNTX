@@ -6,11 +6,6 @@ ATS.
 
 A Type System built on the Attestation primitive, as [subject] is [predicate] of [context] by [actor]
 
-## ATS and QNTX
-
-QNTX is heavily built on ATS — the server, plugins, glyphs, ꩜ Pulse and the CLI all reach
-claims through it.
-
 ## Multiple database backends
 
 Storage sits behind the interfaces in
@@ -19,8 +14,8 @@ selected by `[storage] backend` in `am.toml`:
 
 | Backend | Where | Selected by |
 |---|---|---|
-| SQLite | server, CLI — via Rust (`crates/ats-sqlite`) | `backend = "sqlite"` (default) |
-| Parquet | server — via DuckDB (`crates/ats-duckdb`) | `backend = "parquet"` |
+| SQLite | native — via Rust (`crates/ats-sqlite`) | `backend = "sqlite"` (default) |
+| Parquet | native — via DuckDB (`crates/ats-duckdb`) | `backend = "parquet"` |
 | IndexedDB | browser tab (`crates/ats-indexeddb`) | the browser build |
 
 See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selection) and
@@ -34,8 +29,8 @@ See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selecti
 | Language (parse, classify, expand, temporal) | ✓ | `crates/ats/src/parser/`, `classify/`, `expand.rs`, `temporal.rs` |
 | Store | ✓ | `crates/ats-indexeddb` — IndexedDB against the same `ats` storage traits |
 | Reaction (watchers) | ✓ | `crates/ats/src/watcher.rs` |
-| ⟶ `so` actions | ✗ | dispatch to ꩜ Pulse — server-side |
-| gRPC `ATSStoreService` | ✗ | the remote surface, for plugins |
+| ⟶ `so` actions | ✗ | dispatch to ꩜ Pulse, outside the tab |
+| gRPC `ATSStoreService` | ✗ | the remote surface, out of process |
 
 `crates/ats-indexeddb` matches the `ats` storage trait contract — same method names,
 same inputs, same outputs, same error semantics.
@@ -81,8 +76,8 @@ ATS stays domain-agnostic through interfaces: `EntityResolver` (entity aliases),
 
 - **ASID generation** with vanity ID support and collision detection
 - **Attestation existence checking** to prevent duplicates
-- **REST API** for querying and creating attestations over HTTP — what the node serves is in [openapi.json](../server/openapi/openapi.json)
-- **gRPC API** for plugin access to attestation storage, server-side streaming included — declared in [atsstore.proto](../plugin/grpc/protocol/atsstore.proto)
+- **REST API** for querying and creating attestations over HTTP — see [openapi.json](../server/openapi/openapi.json)
+- **gRPC API** for out-of-process access to attestation storage, server-side streaming included — declared in [atsstore.proto](../plugin/grpc/protocol/atsstore.proto)
 
 ## Packages
 
