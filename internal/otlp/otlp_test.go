@@ -84,7 +84,7 @@ func TestTheNodesNumbersLeaveAsOTLPMetrics(t *testing.T) {
 		t.Fatalf("%s arrived as %v", measure.QueueDepth, got.metrics[measure.QueueDepth])
 	}
 	took := got.metrics[measure.QueryTook]
-	// What takes less than a millisecond is kept as the part of one it took.
+	// 「[Opus 5.5] What takes less than a millisecond is kept as the part of one it took.」
 	if took.GetUnit() != "ms" || len(took.GetHistogram().GetDataPoints()) != 1 || took.GetHistogram().GetDataPoints()[0].GetSum() != 15.25 {
 		t.Fatalf("%s arrived as %v", measure.QueryTook, took)
 	}
@@ -119,8 +119,8 @@ func TestMetricsExporterNoneSendsNoMetrics(t *testing.T) {
 	}
 }
 
-// An exporter other than OTLP named alone sends nothing over OTLP; OTLP among
-// several, or named in another case, does.
+// 「[Opus 5.5] An exporter other than OTLP named alone sends nothing over OTLP; OTLP among」
+// 「[Opus 5.5] several, or named in another case, does.」
 func TestOnlyAnOTLPExporterSendsMetrics(t *testing.T) {
 	t.Setenv(Endpoint, "http://127.0.0.1:1/ix/otel")
 	t.Setenv(MetricsEndpoint, "")

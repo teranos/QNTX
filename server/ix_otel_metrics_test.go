@@ -143,8 +143,8 @@ func asJSON(t *testing.T, v any) string {
 	return string(said)
 }
 
-// Two people in one namespace sending the same reading are two readings: who
-// sent it is in a number's id, a session's person as much as a token.
+// 「[Opus 5.5] Two people in one namespace sending the same reading are two readings: who」
+// 「[Opus 5.5] sent it is in a number's id, a session's person as much as a token.」
 func TestTheSameNumberFromTwoPeopleIsKeptTwice(t *testing.T) {
 	s, _, markets := standServer(t, "pond")
 	body := protobufOf(t, twoNumbers())

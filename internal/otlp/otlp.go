@@ -123,8 +123,8 @@ func Running() bool {
 
 // 「[Opus 5.5] MetricsSaid is the endpoint the environment names for the node's numbers, and whether it names one.」
 func MetricsSaid() (string, bool) {
-	// The exporter is OTLP unless the variable names others: "none",
-	// "prometheus" or "console" alone sends nothing over OTLP.
+	// 「[Opus 5.5] The exporter is OTLP unless the variable names others: "none",」
+	// 「[Opus 5.5] "prometheus" or "console" alone sends nothing over OTLP.」
 	if named := strings.ToLower(strings.TrimSpace(os.Getenv(MetricsExporter))); named != "" &&
 		!slices.Contains(strings.Split(strings.ReplaceAll(named, " ", ""), ","), "otlp") {
 		return "", false
@@ -154,9 +154,9 @@ func StartMetrics(ctx context.Context, release string) error {
 		return errors.New("otlp.StartMetrics called twice: the second provider would replace the first and leave its numbers unsent")
 	}
 
-	// Delta: a series is sent for what moved since the last export, and one
-	// that did not move is not sent again, so a receiver keeping every point
-	// does not keep the same total once a minute for ever.
+	// 「[Opus 5.5] Delta: a series is sent for what moved since the last export, and one」
+	// 「[Opus 5.5] that did not move is not sent again, so a receiver keeping every point」
+	// 「[Opus 5.5] does not keep the same total once a minute for ever.」
 	exporter, err := otlpmetrichttp.New(ctx, otlpmetrichttp.WithTemporalitySelector(func(sdkmetric.InstrumentKind) metricdata.Temporality {
 		return metricdata.DeltaTemporality
 	}))
@@ -189,7 +189,7 @@ func Flush() error {
 	mu.Lock()
 	defer mu.Unlock()
 	var spans, numbers error
-	// Each its own flushWithin, so spans slow to leave do not spend the numbers' time.
+	// 「[Opus 5.5] Each its own flushWithin, so spans slow to leave do not spend the numbers' time.」
 	if provider != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), flushWithin)
 		spans = provider.Shutdown(ctx)
