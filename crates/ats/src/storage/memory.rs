@@ -68,11 +68,12 @@ impl AttestationStore for MemoryStore {
         Ok(self.attestations.remove(id).is_some())
     }
 
-    fn update(&mut self, attestation: Attestation) -> StoreResult<()> {
+    fn update(&mut self, mut attestation: Attestation) -> StoreResult<()> {
         attestation.writable()?;
-        if !self.attestations.contains_key(&attestation.id) {
+        let Some(stored) = self.attestations.get(&attestation.id) else {
             return Err(StoreError::NotFound(attestation.id));
-        }
+        };
+        attestation.created_at = stored.created_at;
         self.attestations
             .insert(attestation.id.clone(), attestation);
         Ok(())

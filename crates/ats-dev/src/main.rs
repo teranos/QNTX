@@ -467,6 +467,9 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         }
     }
     let mut a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
+    // When it was first stored is not an update's to change (`AttestationStore::update`),
+    // so a patch naming `created_at` is ignored and the row must come back with the stored one.
+    a.created_at = stored.created_at;
     // A signature covers what was just changed. It stays only if it still
     // holds; else ats-dev re-signs what its own key signed, and refuses the rest.
     if stored.signature.is_some() {
@@ -511,7 +514,7 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let kept = s.get(id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", id))?;
     // An update that said Ok but left something else stored is a store that
     // did not do what its trait says; say so, with both rows.
-    if (Attestation { created_at: a.created_at, ..kept.clone() }) != a {
+    if kept != a {
         let held = serde_json::to_string(&kept).map_err(|e| fail("could not encode an attestation", e))?;
         let asked = serde_json::to_string(&a).map_err(|e| fail("could not encode an attestation", e))?;
         return Err(fail(

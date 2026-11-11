@@ -149,11 +149,13 @@ impl IndexedDbStore {
 
     /// Update an existing attestation.
     /// Returns `StoreError::NotFound` if the attestation doesn't exist.
-    pub async fn update(&self, attestation: Attestation) -> StoreResult<()> {
+    pub async fn update(&self, mut attestation: Attestation) -> StoreResult<()> {
         attestation.writable()?;
-        if !self.exists(&attestation.id).await? {
+        let Some(stored) = self.get(&attestation.id).await? else {
             return Err(StoreError::NotFound(attestation.id));
-        }
+        };
+        // When it was first stored is not the update's to change.
+        attestation.created_at = stored.created_at;
 
         let js_val = attestation_to_js(&attestation)?;
 
