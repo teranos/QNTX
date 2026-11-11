@@ -410,6 +410,13 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 	if err != nil {
 		return errors.Wrapf(err, "invalid QNTX version %s", r.version)
 	}
+	// A rolling branch build is named by git describe, the tag and the commits
+	// past it (v0.55.0-925-gaf1299b51), which semver reads as a prerelease that
+	// no ">= 0.1.0" admits. It is a build past that tag, not before it: its
+	// constraint is checked against the tag.
+	if released, err := qntxVer.SetPrerelease(""); err == nil {
+		qntxVer = &released
+	}
 
 	// Check compatibility
 	if !constraint.Check(qntxVer) {
