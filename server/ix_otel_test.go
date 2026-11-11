@@ -293,3 +293,27 @@ func TestIxOtelIsReachedAsAWriteOfAttestations(t *testing.T) {
 		t.Fatalf("%s is reached by %v, and /api/attestations by %v", ixOtelPrefix, reached[ixOtelPrefix], reached["/api/attestations"])
 	}
 }
+
+// "system (Recommended)"
+//
+// 「[Opus 5.5] ROOT's agents keep their sessions in system, so what one sends through its door lands there,」
+// 「[Opus 5.5] not in the namespace ROOT stands in.」
+func TestARootsAgentsSpansLandInSystem(t *testing.T) {
+	for _, label := range []string{auth.NodeAgentLabel, auth.ElementAgentLabel + ":canvas"} {
+		s, sys, markets := standServer(t, "pond")
+		req := httptest.NewRequest(http.MethodPost, ixOtelTraces, bytes.NewReader(protobufOf(t, oneSpan(t))))
+		req.Header.Set("Content-Type", "application/x-protobuf")
+		ctx := auth.ThroughDoor(req.Context(), auth.Grant{DID: "did:key:agent", Label: label, Level: auth.LevelRoot})
+		req = req.WithContext(auth.WithAdmission(ctx, auth.Admitted(auth.LevelRoot)))
+		rec := httptest.NewRecorder()
+		s.HandleIxOtel(rec, req)
+		answered(t, rec)
+
+		if kept := everythingIn(t, sys); len(kept) != 1 {
+			t.Fatalf("%s: system holds %d attestations, want the one span", label, len(kept))
+		}
+		if kept := everythingIn(t, markets["pond"]); len(kept) != 0 {
+			t.Fatalf("%s: pond holds %v", label, kept)
+		}
+	}
+}
