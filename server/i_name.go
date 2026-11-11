@@ -104,7 +104,7 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 
 // itsOwnDID is the DID a name is held by: a token asking as itself, by the
 // DID it has for as long as it is that token. An agent the node hosts asks so
-// (ADR-048), and so does a token minted in the element.
+// 「[Opus 5.5] (ADR-048), and so does a token minted in the element.」
 //
 // A session and a connector ask as a person, who is named as they arrive
 // (ADR-031). A client's own token is issued anew under another DID each time
