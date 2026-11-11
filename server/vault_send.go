@@ -133,8 +133,10 @@ func vaultNotesAt(root string) (map[string][]byte, error) {
 func vaultNotesWhole(root string) (map[string][]byte, error) {
 	notes := map[string][]byte{}
 	placed, err := os.Lstat(root)
+	// A repository's folder that is not there is not an empty one: sent as
+	// empty, every note on the branch would be removed.
 	if errors.Is(err, fs.ErrNotExist) {
-		return notes, nil
+		return notes, errors.Newf("%s is not in the vault, so nothing is sent from it", root)
 	}
 	if err != nil {
 		return notes, errors.Wrapf(err, "the notes in %s were not read", root)
@@ -151,6 +153,11 @@ func vaultNotesWhole(root string) (map[string][]byte, error) {
 				return filepath.SkipDir
 			}
 			return nil
+		}
+		// A link, to a folder or a note, is refused: skipped, the notes under
+		// it would read as gone and be removed from the branch.
+		if d.Type()&fs.ModeSymlink != 0 {
+			return errors.Newf("%s is a link, not a folder or note of the vault, so nothing is sent", at)
 		}
 		if !d.Type().IsRegular() || !strings.HasSuffix(d.Name(), noteSuffix) {
 			return nil

@@ -262,6 +262,31 @@ func readIfThere(at string) ([]byte, bool, error) {
 	return content, true, nil
 }
 
+// noLinkOnTheWay refuses at when the vault reaches it through a link: any
+// folder from the vault down to it, or it itself. A fill writes, reads and
+// removes only inside the vault.
+func noLinkOnTheWay(vaultPath, at string) error {
+	under, err := filepath.Rel(vaultPath, at)
+	if err != nil || under == ".." || strings.HasPrefix(under, ".."+string(filepath.Separator)) {
+		return errors.Newf("%s is not inside the vault at %s", at, vaultPath)
+	}
+	step := vaultPath
+	for _, part := range strings.Split(under, string(filepath.Separator)) {
+		step = filepath.Join(step, part)
+		info, err := os.Lstat(step)
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return errors.Wrapf(err, "whether %s is a link was not read", step)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return errors.Newf("%s is a link; the vault is not written, read or removed through one", step)
+		}
+	}
+	return nil
+}
+
 // writeNote writes a note, and the folders it is in.
 func writeNote(at string, content []byte, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(at), 0o755); err != nil {
@@ -300,6 +325,10 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		baseAt := filepath.Join(bases, filepath.FromSlash(path.Clean(note.under)))
 		if !strings.HasPrefix(at, root+string(filepath.Separator)) || !strings.HasPrefix(baseAt, bases+string(filepath.Separator)) {
 			filled.Refused = errors.Newf("%s of %s would be written outside %s, at %s", note.path, repo, root, at)
+			return filled
+		}
+		if err := noLinkOnTheWay(vault.Path, at); err != nil {
+			filled.Refused = err
 			return filled
 		}
 		placed := path.Join(place, note.under)
@@ -381,6 +410,10 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		baseAt := filepath.Join(bases, filepath.FromSlash(path.Clean(under)))
 		if !strings.HasPrefix(at, root+string(filepath.Separator)) {
 			filled.Refused = errors.Newf("%s, which main no longer has, would be removed outside %s, at %s", under, root, at)
+			return filled
+		}
+		if err := noLinkOnTheWay(vault.Path, at); err != nil {
+			filled.Refused = err
 			return filled
 		}
 		held, inVault, err := readIfThere(at)

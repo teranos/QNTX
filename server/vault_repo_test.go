@@ -131,3 +131,40 @@ func TestTheTopIsTheRepositoryBindingsAlone(t *testing.T) {
 	require.NotNil(t, refused)
 	assert.Equal(t, "path", refused.GetParam())
 }
+
+// The vault itself is no repository's place, however it is spelled: bound
+// there, a send would carry every note of the vault into the repository.
+func TestARepositoryIsNotBoundAtTheVaultItself(t *testing.T) {
+	s, _ := wholeRepository(t)
+	for _, place := range []string{".", "./", "a/..", "/", "../outside"} {
+		_, refused := askVault(t, s, "repository", sigil.Sent{"name": "abcd", "repo": "github.com/abcd-nl/clean", "place": place})
+		require.NotNil(t, refused, place)
+		assert.Equal(t, "place", refused.GetParam(), place)
+	}
+}
+
+// A repository is not bound under a link, and a fill does not write through one.
+func TestARepositoryIsNotBoundUnderALink(t *testing.T) {
+	s, vault := wholeRepository(t)
+	outside := t.TempDir()
+	require.NoError(t, os.Symlink(outside, filepath.Join(vault.Path, "Linked")))
+	_, refused := askVault(t, s, "repository", sigil.Sent{"name": "abcd", "repo": "github.com/abcd-nl/clean", "place": "Linked/clean"})
+	require.NotNil(t, refused)
+	entries, err := os.ReadDir(outside)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "a note was written outside the vault")
+}
+
+// A repository's folder that is gone, or holds a link, is never sent as empty:
+// that would remove every note on the branch.
+func TestAGoneOrLinkedFolderSendsNothing(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "clean")
+	_, err := vaultNotesWhole(root)
+	require.Error(t, err, "a folder that is not there read as empty")
+
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "docs"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "docs", "a.md"), []byte("# a\n"), 0o644))
+	require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(root, "linked")))
+	_, err = vaultNotesWhole(root)
+	require.Error(t, err, "a link under the folder was skipped")
+}

@@ -320,12 +320,20 @@ func (s *QNTXServer) vaultBindRepository(ctx context.Context, sent sigil.Sent) (
 	if place == "" {
 		place = repo.Path
 	}
+	// The vault itself is no repository's place: bound there, a send would
+	// carry every note of the vault into the repository.
+	if cleaned := path.Clean(filepath.ToSlash(place)); cleaned == "." || cleaned == "/" || cleaned == ".." || strings.HasPrefix(cleaned, "../") || strings.HasPrefix(cleaned, "/") {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is the vault itself or outside it; a repository is bound under a folder of the vault"}
+	}
 	// The name is a folder's place; it is written when the repository's notes
 	// are, so it need not be on the box yet.
 	if strings.HasSuffix(place, noteSuffix) {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is a note's place; a repository is bound under a folder's"}
 	}
 	at := filepath.Join(vault.Path, filepath.FromSlash(place))
+	if err := noLinkOnTheWay(vault.Path, at); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: err.Error()}
+	}
 	if info, err := os.Stat(at); err == nil && !info.IsDir() {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is a file of " + vault.Name + ", not a folder"}
 	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
