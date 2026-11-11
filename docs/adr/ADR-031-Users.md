@@ -43,7 +43,7 @@ You claim the ROOT User by proving you own a root identity. It happens once and
 cannot happen again, so it is attested as `node:claimed`. Recording never fails
 the thing it records ([[ADR-030-identity-providers]]), which makes this the one attestation whose loss cannot be made up later.
 
-## Becoming and Unbecoming (!!remove pre-0.995.0)
+## 「[Opus 5.5] Becoming and Unbecoming (!!remove pre-0.995.0)」
 
 "i wish i was able to assume the identity of another user, 
 one that isn't ROOT, but also be able to go back."
@@ -76,7 +76,7 @@ one that isn't ROOT, but also be able to go back."
 
 ## What is recorded
 
-A User is one object per person under `<location>/system/users/` on the parquet backend, holding an id, a display_name, any number of emails and phone numbers,
+「[Opus 5.5] A User is one object per person under `<location>/system/users/` on the parquet backend, holding an id, a display_name, any number of emails and phone numbers,」
 the level, who switched it off, the keys it holds and the accounts that reach it.
 The record is [`auth.User`](https://github.com/teranos/QNTX/blob/main/server/auth/users.go),
 mirrored by [`UserRecord`](https://github.com/teranos/QNTX/blob/main/crates/ats-duckdb/src/users.rs)
