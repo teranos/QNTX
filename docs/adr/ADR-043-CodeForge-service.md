@@ -76,5 +76,5 @@ none. A run counts for the plugin only on that repository and that branch.
 
 ---
 
-- Explore [[CodeForge Agent]] idea
-- The Repository as a proper abstraction for interacting with, for Agents alike. 
+- 「[Opus 5.5] Explore [[CodeForge Agent]] idea」
+- 「[Opus 5.5] The Repository as a proper abstraction for interacting with, for Agents alike.」
