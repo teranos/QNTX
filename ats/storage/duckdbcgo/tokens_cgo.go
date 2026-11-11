@@ -30,8 +30,8 @@ const (
 	NamespaceDefault = access.NamespaceDefault
 )
 
-// TokenStore is the parquet-backend implementation of auth.TokenStore.
-// Tokens are one object each under `<location>/access_tokens/`,
+// 「[Opus 5.5] TokenStore is the parquet-backend implementation of auth.TokenStore.」
+// 「[Opus 5.5] Tokens are one object each under `<location>/access_tokens/`,」
 // held by the Rust crate.
 //
 // The raw token is minted here and never crosses the FFI boundary — only its
@@ -203,7 +203,7 @@ func (s *TokenStore) Create(spec access.NewToken) (string, string, error) {
 	return raw, id, nil
 }
 
-// Issue writes down a token the flow already minted: the strategy
+// 「[Opus 5.5] Issue writes down a token the flow already minted: the strategy」
 // drew the raw and named its DID, and only the hash and the DID arrive here.
 // The same record Create writes, less the return address a client alone has.
 func (s *TokenStore) Issue(spec access.IssuedToken) (string, error) {
@@ -387,7 +387,7 @@ func (s *TokenStore) Revoke(id string) error {
 	return storageResultErr(result, "revoke access token "+id)
 }
 
-// Enable lifts a revocation. It does not extend an expiry.
+// 「[Opus 5.5] Enable lifts a revocation. It does not extend an expiry.」
 func (s *TokenStore) Enable(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
