@@ -93,6 +93,15 @@ and the folder itself carries nothing.
 - 「[Opus 5.5] A file at the repository's top can be bound. A folder still cannot be the top.」
 - 「[Opus 5.5] A path ending `.md` names one file, and its place ends `.md`.」
 
+## The repository
+
+"we are missing some bindings like the ground CLAUDE.md, its other markdown document's"
+"so, perhaps we should introduce another vault binding, which is different from a directory or single file binding, namely;"
+"- the repository/git binding"
+"- named as one git repository under one name, like teranos/ground currently is."
+- 「[Opus 5.5] A repository is bound whole: `github.com/owner/repo@branch:.=place`, the place being the one name it is under in the vault, its `owner/repo` when none is said.」
+- 「[Opus 5.5] Every note and story of it is the binding's, in every folder of it, at its path below the place. A folder or file starting with a dot is not.」
+
 ## What reaches the vault
 
 - 「[Opus 5.5] Only notes: `.md` files, and stories. What else the repository's folder holds stays there.」
