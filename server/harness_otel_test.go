@@ -16,11 +16,12 @@ func nodeExportsToSentry(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_HEADERS", "x-sentry-auth=sentry sentry_key=the-nodes-key")
 }
 
-// 「[Opus 5.5] A harness the node starts sends its spans to the node's own ix/otel, under the agent's own token, and holds nothing of the node's Sentry key.」
+// 「[Opus 5.5] A harness the node starts sends its spans to ix/otel at its agent's own door, and holds nothing of the node's Sentry key.」
 func TestAHarnessTheNodeStartsSendsItsSpansToTheNodesIxOtel(t *testing.T) {
 	nodeExportsToSentry(t)
 	s, ran := runningTheNodeAgent(t, opusLow)
 	s.served = servedForTest(t).served
+	s.nodeAgent.door = "http://127.0.0.1:8771"
 	_, refused := saying(s, sigil.Sent{"says": "hello"})
 	require.Nil(t, refused)
 
@@ -32,14 +33,14 @@ func TestAHarnessTheNodeStartsSendsItsSpansToTheNodesIxOtel(t *testing.T) {
 		"OTEL_METRICS_EXPORTER=none",
 		"OTEL_LOGS_EXPORTER=none",
 		"OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
-		"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:8770/ix/otel",
-		"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + s.nodeAgent.token,
+		"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:8771/ix/otel",
 	} {
 		assert.Contains(t, env, handed)
 	}
 	for _, line := range env {
 		assert.NotContains(t, line, "the-nodes-key", "the harness holds the node's Sentry key")
 		assert.False(t, strings.HasPrefix(line, "OTEL_EXPORTER_OTLP_TRACES_"), "the harness holds the node's own %s", line)
+		assert.False(t, strings.HasPrefix(line, "OTEL_EXPORTER_OTLP_HEADERS"), "the harness is handed a header: %s", line)
 	}
 }
 

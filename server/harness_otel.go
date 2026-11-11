@@ -7,14 +7,15 @@ import (
 )
 
 // 「[Opus 5.5] harnessOTel is the OpenTelemetry a harness the node starts is handed: Claude Code's own」
-// 「[Opus 5.5] variables (code.claude.com/docs/en/monitoring-usage), its spans to the node's own ix/otel,」
-// 「[Opus 5.5] under the agent's own token. The node's own exporter environment is never handed on」
-// 「[Opus 5.5] (agentenv keeps none of it), so no harness holds the key the node exports with.」
+// 「[Opus 5.5] variables (code.claude.com/docs/en/monitoring-usage), its spans to ix/otel at the」
+// 「[Opus 5.5] agent's own door (agent_door.go), where what arrives is that agent, so no header is」
+// 「[Opus 5.5] handed. The node's own exporter environment is never handed on (agentenv keeps none」
+// 「[Opus 5.5] of it), so no harness holds the key the node exports with.」
 //
 // 「[Opus 5.5] Metrics and logs are named none: ix/otel takes traces alone. A node that serves no」
-// 「[Opus 5.5] ix/otel, or does not know where it answers, hands nothing.」
+// 「[Opus 5.5] ix/otel, or an agent with no door, hands nothing.」
 func (s *QNTXServer) harnessOTel(agent *rootAgent) []string {
-	if s.ownURL == "" || s.served == nil || agent.token == "" {
+	if s.served == nil || agent.door == "" {
 		return nil
 	}
 	if !slices.ContainsFunc(s.served.Routes(), func(route reach.Route) bool { return route.Path == ixOtelPrefix }) {
@@ -27,7 +28,6 @@ func (s *QNTXServer) harnessOTel(agent *rootAgent) []string {
 		"OTEL_METRICS_EXPORTER=none",
 		"OTEL_LOGS_EXPORTER=none",
 		"OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
-		"OTEL_EXPORTER_OTLP_ENDPOINT=" + s.ownURL + "/ix/otel",
-		"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer " + agent.token,
+		"OTEL_EXPORTER_OTLP_ENDPOINT=" + agent.door + "/ix/otel",
 	}
 }
