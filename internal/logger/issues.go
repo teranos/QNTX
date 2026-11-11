@@ -133,8 +133,13 @@ func (l *issueLedger) seed(kept []Issue) {
 			l.today[k.Key] = &issue
 		}
 		l.raised += k.Raised
+		// Raised r times is raised at 1, 4 … 4^(r-1): the next is 4^r.
 		if k.Raised > 0 {
-			l.nextRise[k.Key] = max(k.Occurrences, 1) * 4
+			next := 1
+			for range k.Raised {
+				next *= 4
+			}
+			l.nextRise[k.Key] = next
 		}
 	}
 }

@@ -16,21 +16,31 @@ import (
 
 const issuesKeptEvery = time.Minute
 
-// keepIssues takes in what is kept of today, then writes the ledger every
-// issuesKeptEvery. The last write is flushIssues', at the end of Stop, after
-// the last thing the node logs as it stops.
+// seedIssues reads what issues_seen holds of today into the ledger. Until it
+// has, nothing is written: a write would put this process's smaller totals
+// over the kept ones.
+func (s *QNTXServer) seedIssues() {
+	if s.nodeDB == nil || s.issuesSeeded.Load() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	kept, err := readIssues(ctx, s.nodeDB, time.Now().UTC().Format(time.DateOnly))
+	if err != nil {
+		s.logger.Named("issues").Warnw("What issues_seen holds of today was not read; nothing is written until it is", "error", err)
+		return
+	}
+	logger.SeedIssues(kept)
+	s.issuesSeeded.Store(true)
+}
+
+// keepIssues writes the ledger every issuesKeptEvery, once today is read into
+// it. The last write is flushIssues', at the end of Stop, after the last thing
+// the node logs as it stops.
 func (s *QNTXServer) keepIssues() {
 	if s.nodeDB == nil {
 		return
 	}
-	log := s.logger.Named("issues")
-	ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
-	kept, err := readIssues(ctx, s.nodeDB, time.Now().UTC().Format(time.DateOnly))
-	cancel()
-	if err != nil {
-		log.Warnw("What issues_seen holds of today was not read; today's counts start again", "error", err)
-	}
-	logger.SeedIssues(kept)
 	s.wg.Go("issues.kept", func() {
 		ticker := time.NewTicker(issuesKeptEvery)
 		defer ticker.Stop()
@@ -39,40 +49,50 @@ func (s *QNTXServer) keepIssues() {
 			case <-s.ctx.Done():
 				return
 			case <-ticker.C:
-				taken := logger.TakeIssues()
-				if err := writeIssues(s.ctx, s.nodeDB, taken); err != nil {
-					logger.ReturnIssues(taken)
-					// Warn, not Error: an Error here is an issue that this write
-					// would count, about the write that failed to count it.
-					log.Warnw("The issues the node counted were not written to issues_seen",
-						"issues", len(taken), "error", err)
-				}
+				s.seedIssues()
+				s.writeIssuesOnce(s.ctx)
 			}
 		}
 	})
 }
 
+// writeIssuesOnce takes what changed and writes it, giving it back when the
+// write fails. One runs at a time, so the last write never misses a batch a
+// periodic one still holds.
+func (s *QNTXServer) writeIssuesOnce(ctx context.Context) error {
+	if !s.issuesSeeded.Load() {
+		return errors.New("today's issues_seen is not read yet")
+	}
+	s.issuesWrite.Lock()
+	defer s.issuesWrite.Unlock()
+	taken := logger.TakeIssues()
+	if err := writeIssues(ctx, s.nodeDB, taken); err != nil {
+		logger.ReturnIssues(taken)
+		// Warn, not Error: an Error here is an issue that this write would
+		// count, about the write that failed to count it.
+		s.logger.Named("issues").Warnw("The issues the node counted were not written to issues_seen", "issues", len(taken), "error", err)
+		return err
+	}
+	return nil
+}
+
 // issuesFlushTries is how many times the last write is tried as the node stops.
 const issuesFlushTries = 3
 
-// flushIssues is the last write, as the node stops: tried issuesFlushTries
-// times, what failed given back between tries.
+// flushIssues is the last write, as the node stops, tried issuesFlushTries times.
 func (s *QNTXServer) flushIssues() {
 	if s.nodeDB == nil {
 		return
 	}
-	var err error
-	for try := 1; try <= issuesFlushTries; try++ {
+	s.seedIssues()
+	for range issuesFlushTries {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		taken := logger.TakeIssues()
-		err = writeIssues(ctx, s.nodeDB, taken)
+		err := s.writeIssuesOnce(ctx)
 		cancel()
 		if err == nil {
 			return
 		}
-		logger.ReturnIssues(taken)
 	}
-	s.logger.Named("issues").Warnw("The issues the node counted were not written as it stopped", "tries", issuesFlushTries, "error", err)
 }
 
 // readIssues is what issues_seen holds of day.
