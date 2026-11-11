@@ -761,7 +761,7 @@ func TestFilesGoInAndComeBackOut(t *testing.T) {
 			`{"url": "https://example.org/orchard.png", "mediaType": "image/png"},` +
 			`{"data": {"rows": 2}}]}`
 		if accepts != "" {
-			body += `, "configuration": {"acceptedOutputModes": ["text/plain"` + accepts + `]}`
+			body += `, "configuration": {"acceptedOutputModes": [` + accepts + `]}`
 		}
 		code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", body+`}`, tokens[auth.LevelRoot])
 		require.Equal(t, http.StatusOK, code, answered)
@@ -791,13 +791,61 @@ func TestFilesGoInAndComeBackOut(t *testing.T) {
 	assert.Equal(t, "image/png", at(byName["chart.png"], "parts.0.mediaType"))
 
 	// "Agents SHOULD use this to tailor their output" (acceptedOutputModes).
-	answered = sent("m-2", `, "text/csv"`)
+	answered = sent("m-2", `"text/plain", "text/csv"`)
 	for _, artifact := range at(answered, "task.artifacts").([]any) {
 		assert.NotEqual(t, "chart.png", at(artifact, "name"), "a file the client does not take was given")
 	}
+
+	// A client that takes a PNG alone is given the PNG alone: no text.
+	answered = sent("m-3", `"image/png"`)
+	artifacts := at(answered, "task.artifacts").([]any)
+	require.Len(t, artifacts, 1, answered)
+	assert.Equal(t, "chart.png", at(artifacts[0], "name"))
 
 	// The files went with the Task.
 	left, err := filepath.Glob(filepath.Join(srv.nodeAgent.home, "work", "a2a", "*"))
 	require.NoError(t, err)
 	assert.Empty(t, left, "a Task's files stayed after it ended")
+}
+
+// A Task whose turn wrote a file before the node stopped is given that file
+// when the next node settles it, and its files go once it is settled.
+func TestATaskSettledFromItsStreamGivesTheFilesItsTurnWrote(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	before := time.Now().Add(-time.Minute)
+	stream := leftTurn(t, srv.nodeAgent, "s-left", claudeAnswered)
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "left", "TASK_STATE_SUBMITTED", "someone", before, map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "left", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-left", "stream": filepath.Base(stream)}, streamContext(stream)))
+	out := filepath.Join(taskFiles(srv.nodeAgent, "left"), "out")
+	require.NoError(t, os.MkdirAll(out, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(out, "uptime.txt"), []byte("3 days"), 0o600))
+
+	readingOn(srv, time.Now())
+
+	code, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/left", "", tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, got)
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(got, "status.state"))
+	assert.Equal(t, "uptime.txt", at(got, "artifacts.1.name"), got)
+	assert.Equal(t, base64.StdEncoding.EncodeToString([]byte("3 days")), at(got, "artifacts.1.parts.0.raw"))
+	assert.NoDirExists(t, taskFiles(srv.nodeAgent, "left"), "a settled task's files stayed")
+}
+
+// A secret sent in JSON data or in a file of text is masked in what the Task
+// keeps, as one sent as text is (§14.1.1: "Sensitive information in task
+// history and artifacts MUST be protected").
+func TestASecretInDataOrATextFileIsNotKept(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123"
+	body := `{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [` +
+		`{"data": {"token": "` + secret + `", "nested": ["` + secret + `"]}},` +
+		`{"raw": "` + base64.StdEncoding.EncodeToString([]byte("token="+secret)) + `", "filename": "env.txt", "mediaType": "text/plain"}]}}`
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", body, tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, sent)
+	id := at(sent, "task.id").(string)
+
+	_, held := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	kept, _ := json.Marshal(held)
+	require.Contains(t, string(kept), "env.txt", "the task kept no history to look in")
+	assert.NotContains(t, string(kept), secret)
+	assert.NotContains(t, string(kept), base64.StdEncoding.EncodeToString([]byte("token="+secret)))
 }

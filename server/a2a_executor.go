@@ -49,7 +49,7 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 		// What is sent and given back as files lies in the turn's work, under
 		// the Task, and goes once the Task ends; a turn the next node reads
 		// on (settleLeftTask) keeps it.
-		files := filepath.Join(ta.agent.home, "work", "a2a", string(id))
+		files := taskFiles(ta.agent, string(id))
 		in, out := filepath.Join(files, "in"), filepath.Join(files, "out")
 		defer func() {
 			if e.s.ctx.Err() == nil {
@@ -146,6 +146,9 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 				})
 			case texts := <-printed:
 				moved = true
+				if !takesText(call.accepts) {
+					continue
+				}
 				for _, text := range texts {
 					chunk := a2asdk.NewArtifactUpdateEvent(ec, saidArtifactID, textPart(masked(text)))
 					chunk.Append = len(said) > 0
@@ -169,11 +172,23 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 				stop()
 				return
 			case answer := <-answered:
-				e.ended(ec, ta, submitted, answer, said, e.filesOut(out, call.accepts), yield)
+				e.ended(ec, ta, submitted, answer, said, e.s.filesOut(out, call.accepts), takesText(call.accepts), yield)
 				return
 			}
 		}
 	}
+}
+
+// taskFiles is where what a Task is sent and gives back as files lies: in the
+// turn's work, under the Task.
+func taskFiles(agent *rootAgent, id string) string {
+	return filepath.Join(agent.home, "work", "a2a", id)
+}
+
+// takesText is whether a client that named accepts takes text back: one that
+// named none takes what the agent gives (acceptedOutputModes).
+func takesText(accepts []string) bool {
+	return len(accepts) == 0 || slices.ContainsFunc(accepts, isTextPlain)
 }
 
 // saidArtifactID is the artifact of what a turn said as it moved.
@@ -197,7 +212,7 @@ func textsIn(line []byte) []string {
 
 // ended is how the turn ended, as the events of the Task's end: its answer,
 // and what it said as it moved when it said anything.
-func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted *a2asdk.Task, answered sigil.Asked, moving []*a2asdk.Part, files []*a2asdk.Artifact, yield func(a2asdk.Event, error) bool) {
+func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted *a2asdk.Task, answered sigil.Asked, moving []*a2asdk.Part, files []*a2asdk.Artifact, text bool, yield func(a2asdk.Event, error) bool) {
 	failed := func(why string) {
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(ec.TaskID, ec.ContextID, why)), nil)
 	}
@@ -238,9 +253,14 @@ func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted 
 		completed := *submitted
 		now := time.Now()
 		completed.Status = a2asdk.TaskStatus{State: a2asdk.TaskStateCompleted, Timestamp: &now}
-		completed.Artifacts = []*a2asdk.Artifact{answerArtifact(masked(claude.GetAnswer()))}
-		if len(moving) > 0 {
-			completed.Artifacts = append(completed.Artifacts, &a2asdk.Artifact{ID: saidArtifactID, Name: saidArtifactID, Parts: moving})
+		// A client that does not take text back is given the files alone
+		// ("Agents SHOULD use this to tailor their output").
+		completed.Artifacts = nil
+		if text {
+			completed.Artifacts = append(completed.Artifacts, answerArtifact(masked(claude.GetAnswer())))
+			if len(moving) > 0 {
+				completed.Artifacts = append(completed.Artifacts, &a2asdk.Artifact{ID: saidArtifactID, Name: saidArtifactID, Parts: moving})
+			}
 		}
 		completed.Artifacts = append(completed.Artifacts, files...)
 		yield(&completed, nil)
@@ -383,12 +403,12 @@ func fileIn(in string, i int, part *a2asdk.Part, raw a2asdk.Raw) (string, error)
 // filesOut is what a turn wrote into out, each an artifact of the Task (§3.7)
 // as its bytes, name and media type (§6.7), the most answerFiles carries into a
 // room, and only of a media type the agent gives and the client takes.
-func (e turnExecutor) filesOut(out string, accepts []string) []*a2asdk.Artifact {
+func (s *QNTXServer) filesOut(out string, accepts []string) []*a2asdk.Artifact {
 	var artifacts []*a2asdk.Artifact
-	for _, file := range e.s.answerFiles(out) {
+	for _, file := range s.answerFiles(out) {
 		kind, _, err := mime.ParseMediaType(file.GetType())
 		if err != nil || !slices.Contains(turnModes, kind) || (len(accepts) > 0 && !slices.Contains(accepts, kind)) {
-			e.s.logger.Warnw("a file a turn wrote is no media type its Task gives", "file", file.GetName(), "type", file.GetType())
+			s.logger.Warnw("a file a turn wrote is no media type its Task gives", "file", file.GetName(), "type", file.GetType())
 			continue
 		}
 		part := a2asdk.NewRawPart(file.GetData())
