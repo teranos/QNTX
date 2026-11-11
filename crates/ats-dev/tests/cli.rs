@@ -782,6 +782,65 @@ fn a_refused_bench_load_replace_deletes_nothing() {
     drop(d);
 }
 
+/// `run_on` with raw bytes on stdin and a working directory.
+fn run_raw(backend: &[&str], cwd: &std::path::Path, db: &str, args: &[&str], stdin: &[u8]) -> Output {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_ats-dev"))
+        .args(backend)
+        .arg("--db")
+        .arg(db)
+        .args(args)
+        .current_dir(cwd)
+        .env_remove("QNTX_POSTGRES_URL")
+        .env_remove("ATS_DEV_DB")
+        .env_remove("ATS_DEV_BACKEND")
+        .env_remove("ATS_DEV_KEY")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    c.stdin.take().unwrap().write_all(stdin).unwrap();
+    c.wait_with_output().unwrap()
+}
+
+#[test]
+fn a_stdin_that_cannot_be_read_rolls_back_the_open_batch_and_says_so() {
+    let (d, p) = db();
+    let o = run_raw(&["--unsigned"], d.path(), p.to_str().unwrap(), &["put", "-"], b"{\"subjects\":[\"A\"]}\n\xff\xfe\n");
+    assert!(!o.status.success() && err(&o).contains("line 2: could not read stdin"), "{}", err(&o));
+    assert!(err(&o).contains("rolled back 1"), "{}", err(&o));
+    assert_eq!(out(&o), "", "an id is said only for a row that is kept");
+    assert_eq!(count(&p), "0");
+}
+
+#[cfg(feature = "duckdb")]
+#[test]
+fn duckdb_says_the_id_of_a_row_kept_before_a_stdin_that_cannot_be_read() {
+    let d = tempfile::tempdir().unwrap();
+    let loc = d.path().join("parquet");
+    let b = ["--backend", "duckdb", "--unsigned"];
+    let o = run_raw(&b, d.path(), loc.to_str().unwrap(), &["put", "-"], b"{\"subjects\":[\"A\"]}\n\xff\xfe\n");
+    assert!(!o.status.success() && err(&o).contains("could not read stdin"), "{}", err(&o));
+    assert_eq!(out(&o).lines().count(), 1, "the row that was kept has its id said: {}", out(&o));
+    assert_eq!(out(&run_on(&b, loc.to_str().unwrap(), &["count"], "")).trim(), "1");
+}
+
+#[test]
+fn a_duckdb_namespace_or_resolved_path_with_an_apostrophe_is_refused_before_anything_is_made() {
+    let d = tempfile::tempdir().unwrap();
+    // the namespace
+    let loc = d.path().join("loc");
+    let o = run_on(&["--backend", "duckdb", "--unsigned", "--namespace", "O'Brien"], loc.to_str().unwrap(), &["put", "ALICE is author of GITHUB"], "");
+    assert!(!o.status.success() && err(&o).contains("DuckDB namespace cannot contain an apostrophe"), "{}", err(&o));
+    assert!(!loc.exists(), "no directory was made");
+    // a relative --db under a working directory that has one
+    let cwd = d.path().join("O'Brien");
+    std::fs::create_dir(&cwd).unwrap();
+    let o = run_raw(&["--backend", "duckdb", "--unsigned"], &cwd, "rel", &["put", "ALICE is author of GITHUB"], b"");
+    assert!(!o.status.success() && err(&o).contains("DuckDB location cannot contain an apostrophe"), "{}", err(&o));
+    assert!(!cwd.join("rel").exists(), "no directory was made");
+}
+
 #[test]
 fn a_duckdb_location_with_an_apostrophe_is_refused_before_anything_is_written() {
     let d = tempfile::tempdir().unwrap();

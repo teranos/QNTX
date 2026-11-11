@@ -199,25 +199,14 @@ fn open(o: &Opts) -> Result<Store, Box<Error>> {
     if o.backend != Kind::Postgres && o.ca.is_some() {
         return Err(fail("--ca is Postgres's", format!("--backend {} given", o.backend.name())));
     }
-    // ats-duckdb writes a file's path into a COPY statement inside quotes and does
-    // not escape it, so a location with an apostrophe fails at the first flush.
-    if o.backend == Kind::Duckdb && o.db.contains('\'') {
-        return Err(fail(
-            "a DuckDB location cannot contain an apostrophe",
-            format!("{}: ats-duckdb puts it inside a quoted SQL string, unescaped", o.db),
-        ));
+    if o.backend == Kind::Duckdb {
+        duckdb_location(o)?;
     }
     match o.backend {
         Kind::Sqlite => Ok(Store::Sqlite(open_sqlite(o)?)),
         #[cfg(feature = "duckdb")]
         Kind::Duckdb => {
-            // A plain path is a directory on this machine; a url is taken as given.
-            let location = if o.db.contains("://") {
-                o.db.clone()
-            } else {
-                let abs = std::path::absolute(&o.db).map_err(|e| fail("could not make the path absolute", e))?;
-                format!("file://{}", abs.display())
-            };
+            let location = duckdb_location(o)?;
             let s = ats_duckdb::DuckdbStore::open(location, &o.namespace)
                 .map_err(|e| Box::new(e.sacred("")))?;
             Ok(Store::Duckdb(s))
@@ -233,6 +222,30 @@ fn open(o: &Opts) -> Result<Store, Box<Error>> {
         #[cfg(not(feature = "postgres"))]
         Kind::Postgres => Err(unbuilt("postgres")),
     }
+}
+
+/// The location DuckDB is opened at: a plain path is a directory on this machine,
+/// made absolute, a url is taken as given. ats-duckdb writes the location, the
+/// namespace and the file name into a COPY statement inside quotes and does not
+/// escape them, so an apostrophe in any of what it will write fails at the first
+/// flush, after the directories are made. Refused here, on the resolved value:
+/// a relative `--db` under a working directory with an apostrophe has one too.
+fn duckdb_location(o: &Opts) -> Result<String, Box<Error>> {
+    let location = if o.db.contains("://") {
+        o.db.clone()
+    } else {
+        let abs = std::path::absolute(&o.db).map_err(|e| fail("could not make the path absolute", e))?;
+        format!("file://{}", abs.display())
+    };
+    for (what, value) in [("location", &location), ("namespace", &o.namespace)] {
+        if value.contains('\'') {
+            return Err(fail(
+                &format!("a DuckDB {what} cannot contain an apostrophe"),
+                format!("{value}: ats-duckdb puts it inside a quoted SQL string, unescaped"),
+            ));
+        }
+    }
+    Ok(location)
 }
 
 #[cfg(not(all(feature = "duckdb", feature = "postgres")))]
@@ -401,16 +414,24 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
 /// to a store, and one that answers fewer ids than it counts (DuckDB's `ids` reads
 /// its buffer, `count` the Parquet files too) would make `verify` check nothing
 /// and say so with an exit 0.
+///
+/// They are two reads, so a writer committing between them makes them differ
+/// for a moment on a store that is complete. A mismatch that is still there on
+/// the third reading is the store's.
 fn listed(s: &Store) -> Result<Vec<String>, Box<Error>> {
-    let ids = s.ids().map_err(|e| fail("ids failed", e))?;
-    let count = s.count().map_err(|e| fail("count failed", e))?;
-    if ids.len() != count {
-        return Err(fail(
-            "ids does not list every stored attestation",
-            format!("ids lists {}, count says {count} ({})", ids.len(), s.kind().name()),
-        ));
+    let mut last = (0, 0);
+    for _ in 0..3 {
+        let ids = s.ids().map_err(|e| fail("ids failed", e))?;
+        let count = s.count().map_err(|e| fail("count failed", e))?;
+        if ids.len() == count {
+            return Ok(ids);
+        }
+        last = (ids.len(), count);
     }
-    Ok(ids)
+    Err(fail(
+        "ids does not list every stored attestation",
+        format!("ids lists {}, count says {} ({}), on three readings", last.0, last.1, s.kind().name()),
+    ))
 }
 
 fn lines(v: Vec<String>) -> Result<(), Box<Error>> {
@@ -641,9 +662,13 @@ fn put_stdin(s: &mut Store, keys: &Keys) -> Result<(), Box<Error>> {
     let mut batch: Vec<String> = Vec::new();
     let mut total = 0usize;
     for (n, line) in std::io::stdin().lock().lines().enumerate() {
-        let line = line.map_err(|e| fail("could not read stdin", e))?;
-        if line.trim().is_empty() { continue; }
         let at = n + 1;
+        let line = match line {
+            Ok(l) => l,
+            // Rows before this one are already stored on a backend with no batch to undo.
+            Err(e) => return abandon(s, &batch, fail(&format!("line {at}: could not read stdin"), e)),
+        };
+        if line.trim().is_empty() { continue; }
         let a = match complete(&line).and_then(|a| seal(keys, a)) {
             Ok(a) => a,
             Err(e) => return abandon(s, &batch, fail(&format!("line {at}: {}", e.title), e.why)),
