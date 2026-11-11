@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// The line that sent 3,103 issue events to Sentry on 2026-11-11.
+// 「[Opus 5.5] The line that sent 3,103 issue events to Sentry on 2026-11-11.」
 func forwardFailed() zapcore.Entry {
 	return zapcore.Entry{
 		Level:      zapcore.ErrorLevel,
@@ -37,10 +37,10 @@ func ledgerAt(at time.Time, perDay int) (*issueLedger, *fixedClock) {
 	return newIssueLedger(clock.now, perDay), clock
 }
 
-// "WE DONT NEED TO SEND 3000 ERRORS"
+// "「[Opus 5.5] WE DONT NEED TO SEND 3000 ERRORS」"
 //
-// A field that differs per occurrence does not make a new issue, and one issue
-// is raised on its 1st, 4th, 16th… occurrence.
+// 「[Opus 5.5] A field that differs per occurrence does not make a new issue, and one issue」
+// 「[Opus 5.5] is raised on its 1st, 4th, 16th… occurrence.」
 func TestOneIssueIsRaisedOnPowersOfFour(t *testing.T) {
 	ledger, _ := ledgerAt(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC), 100)
 
@@ -51,7 +51,7 @@ func TestOneIssueIsRaisedOnPowersOfFour(t *testing.T) {
 			raised++
 		}
 	}
-	// 1, 4, 16, 64, 256, 1024
+	// 「[Opus 5.5] 1, 4, 16, 64, 256, 1024」
 	if raised != 6 {
 		t.Errorf("3000 occurrences raised %d issues, want 6", raised)
 	}
@@ -71,9 +71,9 @@ func TestOneIssueIsRaisedOnPowersOfFour(t *testing.T) {
 	}
 }
 
-// "WE NEED TO CAP THE AMOUNT OR ERRORS SENT TO SENTRY AND TRACK IT IN QNTX."
+// "「[Opus 5.5] WE NEED TO CAP THE AMOUNT OR ERRORS SENT TO SENTRY AND TRACK IT IN QNTX.」"
 //
-// Past the day's cap nothing is raised, and every occurrence is still counted.
+// 「[Opus 5.5] Past the day's cap nothing is raised, and every occurrence is still counted.」
 func TestTheDayIsCapped(t *testing.T) {
 	ledger, _ := ledgerAt(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC), 2)
 
@@ -99,7 +99,7 @@ func TestTheDayIsCapped(t *testing.T) {
 	}
 }
 
-// A new UTC day is a new count and a new cap.
+// 「[Opus 5.5] A new UTC day is a new count and a new cap.」
 func TestANewDayStartsOver(t *testing.T) {
 	ledger, clock := ledgerAt(time.Date(2026, 11, 11, 23, 59, 0, 0, time.UTC), 1)
 
@@ -126,7 +126,7 @@ func TestANewDayStartsOver(t *testing.T) {
 	}
 }
 
-// take hands over what changed since the last take, so a flush writes only that.
+// 「[Opus 5.5] take hands over what changed since the last take, so a flush writes only that.」
 func TestTakeHandsOverOnlyWhatChanged(t *testing.T) {
 	ledger, _ := ledgerAt(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC), 100)
 
@@ -145,8 +145,8 @@ func TestTakeHandsOverOnlyWhatChanged(t *testing.T) {
 	}
 }
 
-// The plugin field is the subject, the same as in the fingerprint: two plugins
-// failing are two issues.
+// 「[Opus 5.5] The plugin field is the subject, the same as in the fingerprint: two plugins」
+// 「[Opus 5.5] failing are two issues.」
 func TestThePluginFieldSplitsTheIssue(t *testing.T) {
 	ledger, _ := ledgerAt(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC), 100)
 
@@ -158,7 +158,7 @@ func TestThePluginFieldSplitsTheIssue(t *testing.T) {
 	}
 }
 
-// The collector counts every occurrence into the ledger, also the ones it folds.
+// 「[Opus 5.5] The collector counts every occurrence into the ledger, also the ones it folds.」
 func TestTheCollectorCountsWhatItFolds(t *testing.T) {
 	ledger, _ := ledgerAt(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC), 100)
 	inner, _ := coreWith(t, zapcore.DebugLevel)
@@ -171,7 +171,7 @@ func TestTheCollectorCountsWhatItFolds(t *testing.T) {
 			t.Fatalf("Write returned %v", err)
 		}
 	}
-	// Below error nothing is an issue.
+	// 「[Opus 5.5] Below error nothing is an issue.」
 	if err := c.Write(zapcore.Entry{Level: zapcore.WarnLevel, Message: "slow"}, nil); err != nil {
 		t.Fatalf("Write returned %v", err)
 	}
@@ -182,7 +182,7 @@ func TestTheCollectorCountsWhatItFolds(t *testing.T) {
 	}
 }
 
-// The Sentry core asks the ledger before it raises.
+// 「[Opus 5.5] The Sentry core asks the ledger before it raises.」
 func TestSentryRaisesWhatTheLedgerLets(t *testing.T) {
 	transport := &sentry.MockTransport{}
 	if err := sentry.Init(sentry.ClientOptions{Dsn: "https://tim@example.com/1", Transport: transport}); err != nil {
@@ -201,13 +201,13 @@ func TestSentryRaisesWhatTheLedgerLets(t *testing.T) {
 			t.Fatalf("Write returned %v", err)
 		}
 	}
-	// 1, 4, 16
+	// 「[Opus 5.5] 1, 4, 16」
 	if got := len(transport.Events()); got != 3 {
 		t.Errorf("20 occurrences raised %d events, want 3", got)
 	}
 }
 
-// What was taken and not written comes back on the next take.
+// 「[Opus 5.5] What was taken and not written comes back on the next take.」
 func TestGivenBackIsTakenAgain(t *testing.T) {
 	ledger, _ := ledgerAt(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC), 100)
 
@@ -219,8 +219,8 @@ func TestGivenBackIsTakenAgain(t *testing.T) {
 	}
 }
 
-// A restart within a UTC day continues the day: what was kept is counted on
-// from, and a day whose cap was reached raises nothing more.
+// 「[Opus 5.5] A restart within a UTC day continues the day: what was kept is counted on」
+// 「[Opus 5.5] from, and a day whose cap was reached raises nothing more.」
 func TestARestartContinuesTheDay(t *testing.T) {
 	at := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
 	before, _ := ledgerAt(at, 2)

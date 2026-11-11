@@ -11,19 +11,19 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// "WE DONT NEED TO SEND 3000 ERRORS"
+// "「[Opus 5.5] WE DONT NEED TO SEND 3000 ERRORS」"
 //
-// "WE NEED TO CAP THE AMOUNT OR ERRORS SENT TO SENTRY AND TRACK IT IN QNTX."
+// "「[Opus 5.5] WE NEED TO CAP THE AMOUNT OR ERRORS SENT TO SENTRY AND TRACK IT IN QNTX.」"
 //
-// "WE NEED OUR OWN ABSTRACTION AND TRACKING OF THIS IN CASE WE DO HIT SENTRY LIMIT, SO WE NEVER REALLY LOST OBS"
+// "「[Opus 5.5] WE NEED OUR OWN ABSTRACTION AND TRACKING OF THIS IN CASE WE DO HIT SENTRY LIMIT, SO WE NEVER REALLY LOST OBS」"
 //
-// See docs/sentry.md.
+// 「[Opus 5.5] See docs/sentry.md.」
 
-// issuesPerDay is the most issues the node raises to Sentry in one UTC day.
+// 「[Opus 5.5] issuesPerDay is the most issues the node raises to Sentry in one UTC day.」
 const issuesPerDay = 100
 
-// Issue is one issue's day: what the node counted, and what of it went to Sentry.
-// Occurrences minus Raised is what Sentry did not get.
+// 「[Opus 5.5] Issue is one issue's day: what the node counted, and what of it went to Sentry.」
+// 「[Opus 5.5] Occurrences minus Raised is what Sentry did not get.」
 type Issue struct {
 	Day         string // UTC, 2006-01-02
 	Key         string // sha256 of level, logger, caller, message and plugin
@@ -39,20 +39,20 @@ type Issue struct {
 	Raised      int
 }
 
-// issues is the node's ledger. The collector counts into it and the Sentry core
-// asks it before raising.
+// 「[Opus 5.5] issues is the node's ledger. The collector counts into it and the Sentry core」
+// 「[Opus 5.5] asks it before raising.」
 var issues = newIssueLedger(time.Now, issuesPerDay)
 
-// TakeIssues hands over every issue that changed since the last call.
+// 「[Opus 5.5] TakeIssues hands over every issue that changed since the last call.」
 func TakeIssues() []Issue { return issues.take() }
 
-// SeedIssues takes in what the node already kept of today, before anything is
-// counted: a restart within a UTC day continues its counts, its raises and the
-// day's cap, and does not write smaller totals over larger ones.
+// 「[Opus 5.5] SeedIssues takes in what the node already kept of today, before anything is」
+// 「[Opus 5.5] counted: a restart within a UTC day continues its counts, its raises and the」
+// 「[Opus 5.5] day's cap, and does not write smaller totals over larger ones.」
 func SeedIssues(kept []Issue) { issues.seed(kept) }
 
-// ReturnIssues gives back issues that were taken and not written, so the next
-// take hands them over again.
+// 「[Opus 5.5] ReturnIssues gives back issues that were taken and not written, so the next」
+// 「[Opus 5.5] take hands them over again.」
 func ReturnIssues(taken []Issue) { issues.giveBack(taken) }
 
 type issueLedger struct {
@@ -76,7 +76,7 @@ func newIssueLedger(now func() time.Time, perDay int) *issueLedger {
 	}
 }
 
-// seen counts one occurrence of the issue this entry is.
+// 「[Opus 5.5] seen counts one occurrence of the issue this entry is.」
 func (l *issueLedger) seen(ent zapcore.Entry, fields []zapcore.Field) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -88,14 +88,14 @@ func (l *issueLedger) seen(ent zapcore.Entry, fields []zapcore.Field) {
 	}
 }
 
-// raise says whether this entry goes to Sentry as an issue: the 1st, 4th,
-// 16th… occurrence of the issue today, while the day's cap is not reached.
+// 「[Opus 5.5] raise says whether this entry goes to Sentry as an issue: the 1st, 4th,」
+// 「[Opus 5.5] 16th… occurrence of the issue today, while the day's cap is not reached.」
 func (l *issueLedger) raise(ent zapcore.Entry, fields []zapcore.Field) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	issue := l.issueFor(ent, fields)
 	if issue.Occurrences == 0 {
-		// Nothing counted it: no collector is in front of this core.
+		// 「[Opus 5.5] Nothing counted it: no collector is in front of this core.」
 		issue.Occurrences = 1
 		issue.LastSeen = l.now()
 	}
@@ -124,7 +124,7 @@ func (l *issueLedger) seed(kept []Issue) {
 			continue
 		}
 		if held, counted := l.today[k.Key]; counted {
-			// Counted before the seed: the kept totals are added under it.
+			// 「[Opus 5.5] Counted before the seed: the kept totals are added under it.」
 			held.Occurrences += k.Occurrences
 			held.Raised += k.Raised
 			held.FirstSeen = k.FirstSeen
@@ -133,7 +133,7 @@ func (l *issueLedger) seed(kept []Issue) {
 			l.today[k.Key] = &issue
 		}
 		l.raised += k.Raised
-		// Raised r times is raised at 1, 4 … 4^(r-1): the next is 4^r.
+		// 「[Opus 5.5] Raised r times is raised at 1, 4 … 4^(r-1): the next is 4^r.」
 		if k.Raised > 0 {
 			next := 1
 			for range k.Raised {
@@ -144,7 +144,7 @@ func (l *issueLedger) seed(kept []Issue) {
 	}
 }
 
-// take hands over what changed since the last take, in day and key order.
+// 「[Opus 5.5] take hands over what changed since the last take, in day and key order.」
 func (l *issueLedger) take() []Issue {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -162,8 +162,8 @@ func (l *issueLedger) take() []Issue {
 	return taken
 }
 
-// giveBack marks taken issues changed again. One that changed since it was
-// taken is already marked, and its newer counts stand.
+// 「[Opus 5.5] giveBack marks taken issues changed again. One that changed since it was」
+// 「[Opus 5.5] taken is already marked, and its newer counts stand.」
 func (l *issueLedger) giveBack(taken []Issue) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -176,7 +176,7 @@ func (l *issueLedger) giveBack(taken []Issue) {
 	}
 }
 
-// issueFor finds or starts today's issue for this entry, and marks it changed.
+// 「[Opus 5.5] issueFor finds or starts today's issue for this entry, and marks it changed.」
 func (l *issueLedger) issueFor(ent zapcore.Entry, fields []zapcore.Field) *Issue {
 	now := l.now()
 	if day := now.UTC().Format(time.DateOnly); day != l.day {
@@ -208,7 +208,7 @@ func (l *issueLedger) issueFor(ent zapcore.Entry, fields []zapcore.Field) *Issue
 	return issue
 }
 
-// pluginOf is the "plugin" field, the subject the fingerprint splits on.
+// 「[Opus 5.5] pluginOf is the "plugin" field, the subject the fingerprint splits on.」
 func pluginOf(fields []zapcore.Field) string {
 	for _, field := range fields {
 		if field.Key == "plugin" && field.Type == zapcore.StringType {
