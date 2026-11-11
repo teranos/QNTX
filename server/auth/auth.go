@@ -868,6 +868,10 @@ var a2aStatus = map[int]string{http.StatusUnauthorized: "UNAUTHENTICATED", http.
 // "HTTP error responses use the google.rpc.Status JSON representation" (A2A
 // §11.6), and as every other refusal here elsewhere.
 func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, message string) {
+	if strings.HasPrefix(r.URL.Path, ixOtelPrefix) {
+		h.refuseOTLP(w, r, status, message)
+		return
+	}
 	if !strings.HasPrefix(r.URL.Path, a2aPrefix) {
 		h.writeError(w, status, message)
 		return
