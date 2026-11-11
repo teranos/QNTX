@@ -335,8 +335,8 @@ fn instant(id: &str, field: &str, ms: i64) -> StoreResult<String> {
     })
 }
 
-/// The rows the indexed lookups read (`attestation_{actors,contexts,subjects,predicates}`),
-/// one per value of the attestation.
+/// 「[Sonnet 5.5] The rows the indexed lookups read (`attestation_{actors,contexts,subjects,predicates}`),」
+/// 「[Sonnet 5.5] one per value of the attestation.」
 fn write_junctions(conn: &Connection, attestation: &Attestation, created_at_sql: &str) -> StoreResult<()> {
     crate::flight_recorder::record_fmt("put:junction_actors", &attestation.id);
     for actor in &attestation.actors {
@@ -374,8 +374,8 @@ fn write_junctions(conn: &Connection, attestation: &Attestation, created_at_sql:
     Ok(())
 }
 
-/// Insert an attestation through any Connection (shared by SqliteStore and WriteConn).
-/// Handles the main INSERT and the junction tables.
+/// 「[Sonnet 5.5] Insert an attestation through any Connection (shared by SqliteStore and WriteConn).」
+/// 「[Sonnet 5.5] Handles the main INSERT and the junction tables.」
 pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> StoreResult<()> {
     let subjects_json = serialize_string_vec(&attestation.subjects)?;
     let predicates_json = serialize_string_vec(&attestation.predicates)?;
@@ -505,9 +505,9 @@ impl AttestationStore for SqliteStore {
 
         let timestamp_sql = instant(&attestation.id, "timestamp", attestation.timestamp)?;
 
-        // The row and its junction rows change together: an update that left the
-        // junction rows alone would keep finding the attestation under values it
-        // no longer has, and miss it under the ones it has now.
+        // 「[Sonnet 5.5] The row and its junction rows change together: an update that left the」
+        // 「[Sonnet 5.5] junction rows alone would keep finding the attestation under values it」
+        // 「[Sonnet 5.5] no longer has, and miss it under the ones it has now.」
         let created_at_sql: String = self
             .conn
             .query_row("SELECT created_at FROM attestations WHERE id = ?", [&attestation.id], |r| r.get(0))
