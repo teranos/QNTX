@@ -109,9 +109,6 @@ func vaultNotesAt(root string) (map[string][]byte, error) {
 	if placed.Mode()&os.ModeSymlink != 0 {
 		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", root)
 	}
-	if !placed.IsDir() {
-		return notes, errors.Newf("%s is a file, not the folder the repository is bound to, so nothing is sent", root)
-	}
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return notes, errors.Wrapf(err, "the notes in %s were not read", root)
@@ -146,6 +143,9 @@ func vaultNotesWhole(root string) (map[string][]byte, error) {
 	}
 	if placed.Mode()&os.ModeSymlink != 0 {
 		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", root)
+	}
+	if !placed.IsDir() {
+		return notes, errors.Newf("%s is a file, not the folder the repository is bound to, so nothing is sent", root)
 	}
 	err = filepath.WalkDir(root, func(at string, d fs.DirEntry, err error) error {
 		if err != nil || at == root {
