@@ -225,10 +225,10 @@ func gzipped(t *testing.T, body []byte) []byte {
 	return packed.Bytes()
 }
 
-// 「[Opus 5.5] Bound as the MCP endpoint bounds: 413 past it, and a token acting in a namespace is bound at what a namespace's MCP server takes.」
+// 「[Opus 5.5] 413 past ix/otel's bound, and nothing of the body is kept.」
 func TestABodyPastTheBoundIs413(t *testing.T) {
 	s, _, markets := standServer(t, "pond")
-	refusedWith(t, exporting(s, pondToken("*"), ixOtelTraces, "application/x-protobuf", "", make([]byte, tenantBodyMost+1)), http.StatusRequestEntityTooLarge)
+	refusedWith(t, exporting(s, pondToken("*"), ixOtelTraces, "application/x-protobuf", "", make([]byte, ixOtelBodyMost+1)), http.StatusRequestEntityTooLarge)
 	if kept := everythingIn(t, markets["pond"]); len(kept) != 0 {
 		t.Fatalf("pond holds %v after a refused body", kept)
 	}
@@ -237,17 +237,17 @@ func TestABodyPastTheBoundIs413(t *testing.T) {
 // 「[Opus 5.5] OTLP bounds the body after decompression too: a small gzip that unpacks past the bound is 413.」
 func TestAGzipThatUnpacksPastTheBoundIs413(t *testing.T) {
 	s, _, _ := standServer(t, "pond")
-	refusedWith(t, exporting(s, pondToken("*"), ixOtelTraces, "application/x-protobuf", "gzip", gzipped(t, make([]byte, tenantBodyMost+1))), http.StatusRequestEntityTooLarge)
+	refusedWith(t, exporting(s, pondToken("*"), ixOtelTraces, "application/x-protobuf", "gzip", gzipped(t, make([]byte, ixOtelBodyMost+1))), http.StatusRequestEntityTooLarge)
 }
 
-// 「[Opus 5.5] ROOT is bound at the node's size, as the node's MCP server is.」
-func TestRootIsBoundAtTheNodesSize(t *testing.T) {
+// 「[Opus 5.5] The Claude API retries no 413, and a span it sends with full content holds up to 8 MiB of it:」
+// 「[Opus 5.5] a token acting in a namespace is not bound at a namespace's MCP size, which turned such a span away for good.」
+func TestAFullContentSpanFromANamespaceTokenIsNot413(t *testing.T) {
 	s, _, _ := standServer(t, "pond")
-	rec := exporting(s, auth.Admitted(auth.LevelRoot), ixOtelTraces, "application/x-protobuf", "", make([]byte, tenantBodyMost+1))
+	rec := exporting(s, pondToken("*"), ixOtelTraces, "application/x-protobuf", "", make([]byte, 8<<20))
 	if rec.Code == http.StatusRequestEntityTooLarge {
-		t.Fatalf("ROOT was bound at a namespace's %d bytes", tenantBodyMost)
+		t.Fatalf("an 8 MiB export from a namespace's token was refused 413: %s", rec.Body.String())
 	}
-	refusedWith(t, exporting(s, auth.Admitted(auth.LevelRoot), ixOtelTraces, "application/x-protobuf", "", make([]byte, nodeBodyMost+1)), http.StatusRequestEntityTooLarge)
 }
 
 func TestABodyThatIsNoExportIs400(t *testing.T) {

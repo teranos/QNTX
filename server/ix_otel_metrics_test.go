@@ -116,7 +116,7 @@ func TestANumberItsTokenMayNotWriteIsRejected(t *testing.T) {
 // 「[Opus 5.5] Numbers are held to the bound spans are held to.」
 func TestNumbersPastTheBoundAre413(t *testing.T) {
 	s, _, _ := standServer(t, "pond")
-	refusedWith(t, exporting(s, pondToken("*"), ixOtelMetrics, "application/x-protobuf", "", make([]byte, tenantBodyMost+1)), http.StatusRequestEntityTooLarge)
+	refusedWith(t, exporting(s, pondToken("*"), ixOtelMetrics, "application/x-protobuf", "", make([]byte, ixOtelBodyMost+1)), http.StatusRequestEntityTooLarge)
 }
 
 // 「[Opus 5.5] Numbers sent as OTLP/JSON are read and answered in JSON.」
