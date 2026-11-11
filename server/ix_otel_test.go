@@ -20,6 +20,7 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -120,7 +121,12 @@ func refusedWith(t *testing.T, rec *httptest.ResponseRecorder, code int) *status
 		t.Fatalf("status = %d, want %d: %q", rec.Code, code, rec.Body.String())
 	}
 	said := &status.Status{}
-	if err := proto.Unmarshal(rec.Body.Bytes(), said); err != nil {
+	// 「[Opus 5.5] A refusal is written in the encoding the export came in, so it is read in the one it says.」
+	read := proto.Unmarshal
+	if rec.Header().Get("Content-Type") == otlpJSON {
+		read = protojson.Unmarshal
+	}
+	if err := read(rec.Body.Bytes(), said); err != nil {
 		t.Fatalf("the refusal is no google.rpc.Status: %v", err)
 	}
 	return said
