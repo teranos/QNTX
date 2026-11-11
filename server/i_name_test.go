@@ -200,6 +200,25 @@ func TestOnlyATokenAskingAsItselfIsNamed(t *testing.T) {
 	assert.Empty(t, systemHolds(t, s), "a name was written for a caller that holds no DID of its own")
 }
 
+// "I WANT TO MAKE EVERY SESSION BE ABLE TO NAME ITSELF"
+//
+// A key the person said yes to at the passkey (auth/device.go) is recorded as
+// its own client: it signs as itself, and its next signature is the same DID,
+// so a name on it lasts. Only a client that issues the next token under
+// another DID is refused.
+func TestAKeySaidYesToNamesItself(t *testing.T) {
+	s := rootKnowingServer(t)
+
+	key := auth.Admitted(auth.LevelRoot, "garden")
+	key.ClientDID = "did:key:z6Mkground"
+	key.Grant = &auth.Grant{DID: "did:key:z6Mkground", ClientDID: "did:key:z6Mkground", Level: auth.LevelRoot}
+
+	named, refusal := s.iName(auth.WithAdmission(context.Background(), key), sigil.Sent{"name": "Alder"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "Alder", named.(*protocol.Named).GetName())
+	assert.Equal(t, "did:key:z6Mkground", named.(*protocol.Named).GetDid())
+}
+
 // What a display_name is held to: one line of text, 64 characters at most,
 // and root is nobody's to take.
 func TestWhatIsNoNameIsRefused(t *testing.T) {
