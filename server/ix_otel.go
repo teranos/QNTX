@@ -162,9 +162,31 @@ func (s *QNTXServer) takeIn(w http.ResponseWriter, r *http.Request, encoding str
 // 「[Opus 5.5] sessions there, and otherwise the namespace the caller acts in.」
 func (s *QNTXServer) otlpStoreFor(r *http.Request) (ats.AttestationStore, error) {
 	if auth.ThroughARootsAgentsDoor(r.Context()) {
-		return s.held.WriteWhatTheNodeKnowsOfItself()
+		system, err := s.held.WriteWhatTheNodeKnowsOfItself()
+		if err != nil {
+			return nil, err
+		}
+		return otlpInSystem{system}, nil
 	}
 	return s.storeFor(r)
+}
+
+// otlpSystemSubject heads the subject of what ix/otel keeps in system.
+const otlpSystemSubject = "otel:"
+
+// otlpInSystem keeps an export in system under subjects of its own. The node's
+// own lines in system are read by subject (its GitHub settings, the reach
+// table, a stand), and a span whose service.name is GITHUB, named node, would
+// otherwise be read as the newest of them.
+type otlpInSystem struct{ ats.AttestationStore }
+
+func (s otlpInSystem) CreateAttestation(as *types.As) error {
+	held := *as
+	held.Subjects = make([]string, len(as.Subjects))
+	for i, subject := range as.Subjects {
+		held.Subjects[i] = otlpSystemSubject + subject
+	}
+	return s.AttestationStore.CreateAttestation(&held)
 }
 
 // 「[Opus 5.5] otlpEncodingOf is the encoding the request's Content-Type names, or empty for one OTLP does not speak.」

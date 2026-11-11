@@ -317,3 +317,32 @@ func TestARootsAgentsSpansLandInSystem(t *testing.T) {
 		}
 	}
 }
+
+// What a root's agent sends is kept in system under subjects of its own, so a
+// span whose service and name match one of the node's own lines (GitHub's
+// settings: subject GITHUB, predicate node) is never read as that line.
+func TestARootsAgentsSpanIsNeverReadAsTheNodesOwnLine(t *testing.T) {
+	s, sys, _ := standServer(t, "pond")
+	export := oneSpan(t)
+	export.ResourceSpans[0].Resource.Attributes[0].Value = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: githubSubject}}
+	export.ResourceSpans[0].ScopeSpans[0].Spans[0].Name = "node"
+	req := httptest.NewRequest(http.MethodPost, ixOtelTraces, bytes.NewReader(protobufOf(t, export)))
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	ctx := auth.ThroughDoor(req.Context(), auth.Grant{DID: "did:key:agent", Label: auth.NodeAgentLabel, Level: auth.LevelRoot})
+	req = req.WithContext(auth.WithAdmission(ctx, auth.Admitted(auth.LevelRoot)))
+	rec := httptest.NewRecorder()
+	s.HandleIxOtel(rec, req)
+	answered(t, rec)
+
+	kept := everythingIn(t, sys)
+	if len(kept) != 1 || !slices.Equal(kept[0].Subjects, []string{otlpSystemSubject + githubSubject}) {
+		t.Fatalf("system holds %v, want the span under %q", kept, otlpSystemSubject+githubSubject)
+	}
+	lines, err := newestLines(s, githubSubject, "records")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != 0 {
+		t.Fatalf("the node's GitHub lines read %v, a span among them", lines)
+	}
+}
