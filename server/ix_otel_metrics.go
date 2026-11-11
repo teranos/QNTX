@@ -18,6 +18,20 @@ import (
 
 // 「[Opus 5.5] onePoint is one data point of a metric: the metric as OTLP carries it, holding this point」
 // 「[Opus 5.5] alone, what kind of number it is, and when it was read.」
+// aggregationOf is how a metric's points add up: its temporality, and whether a
+// sum only rises. The same point under another is another reading.
+func aggregationOf(m *metricspb.Metric) string {
+	switch {
+	case m.GetSum() != nil:
+		return fmt.Sprintf("%d/%t", m.GetSum().GetAggregationTemporality(), m.GetSum().GetIsMonotonic())
+	case m.GetHistogram() != nil:
+		return fmt.Sprintf("%d", m.GetHistogram().GetAggregationTemporality())
+	case m.GetExponentialHistogram() != nil:
+		return fmt.Sprintf("%d", m.GetExponentialHistogram().GetAggregationTemporality())
+	}
+	return ""
+}
+
 type onePoint struct {
 	metric *metricspb.Metric
 	kind   string
@@ -83,16 +97,30 @@ func (s *QNTXServer) keepNumbers(admitted auth.Admission, store ats.AttestationS
 		}
 	}
 	actors := s.otlpActors(admitted)
+	sender := ""
+	if admitted.Grant != nil {
+		sender = admitted.Grant.DID
+	}
 	for _, resourceMetrics := range export.GetResourceMetrics() {
 		service := otlpServiceOf(resourceMetrics.GetResource().GetAttributes())
 		resource, err := otlpJSONOf(resourceMetrics.GetResource())
 		if err != nil {
 			return rejected, "", errors.Wrap(err, "a resource did not write as OTLP/JSON")
 		}
+		// Who sent it and the whole resource and scope are in a point's id, so
+		// two senders' or two streams' same reading are two points.
+		resourceSaid, err := proto.MarshalOptions{Deterministic: true}.Marshal(resourceMetrics.GetResource())
+		if err != nil {
+			return rejected, "", errors.Wrap(err, "a resource did not marshal")
+		}
 		for _, scopeMetrics := range resourceMetrics.GetScopeMetrics() {
 			scope, err := otlpJSONOf(scopeMetrics.GetScope())
 			if err != nil {
 				return rejected, "", errors.Wrap(err, "a scope did not write as OTLP/JSON")
+			}
+			scopeSaid, err := proto.MarshalOptions{Deterministic: true}.Marshal(scopeMetrics.GetScope())
+			if err != nil {
+				return rejected, "", errors.Wrap(err, "a scope did not marshal")
 			}
 			for _, metric := range scopeMetrics.GetMetrics() {
 				points := pointsOf(metric)
@@ -105,12 +133,13 @@ func (s *QNTXServer) keepNumbers(admitted auth.Admission, store ats.AttestationS
 					continue
 				}
 				for _, one := range points {
-					// 「[Opus 5.5] A number is its service, its scope, its metric and the point itself, so the same point sent again is kept once.」
+					// A number is who sent it, its resource, its scope, its metric and the point itself, so the same point sent again is kept once.
 					said, err := proto.MarshalOptions{Deterministic: true}.Marshal(one.point)
 					if err != nil {
 						return rejected, "", errors.Wrapf(err, "a data point of %s did not marshal", metric.GetName())
 					}
-					sum := sha256.Sum256([]byte(strings.Join([]string{service, scopeMetrics.GetScope().GetName(), metric.GetName(), one.kind, string(said)}, "\x00")))
+					sum := sha256.Sum256([]byte(strings.Join([]string{sender, string(resourceSaid), string(scopeSaid),
+						metric.GetName(), metric.GetUnit(), one.kind, aggregationOf(metric), string(said)}, "\x00")))
 					id := "AS-otel-metric-" + hex.EncodeToString(sum[:16])
 					if store.AttestationExists(id) {
 						continue

@@ -310,13 +310,13 @@ func Gauge(name string, value float64, attrs ...Attr) {
 // from ever disagreeing with the number.
 func Took(name string, d time.Duration, attrs ...Attr) {
 	if o := otel.Load(); o != nil {
-		o.distribution(name, "ms", float64(d.Milliseconds()), attrs)
+		o.distribution(name, "ms", float64(d)/float64(time.Millisecond), attrs)
 	}
 	m := meter.Load()
 	if m == nil {
 		return
 	}
-	(*m).Distribution(name, float64(d.Milliseconds()),
+	(*m).Distribution(name, float64(d)/float64(time.Millisecond),
 		sentry.WithUnit(sentry.UnitMillisecond),
 		sentry.WithAttributes(permitted(attrs)...))
 }

@@ -15,6 +15,8 @@ package otlp
 import (
 	"context"
 	"os"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -120,7 +123,10 @@ func Running() bool {
 
 // 「[Opus 5.5] MetricsSaid is the endpoint the environment names for the node's numbers, and whether it names one.」
 func MetricsSaid() (string, bool) {
-	if os.Getenv(MetricsExporter) == "none" {
+	// The exporter is OTLP unless the variable names others: "none",
+	// "prometheus" or "console" alone sends nothing over OTLP.
+	if named := strings.ToLower(strings.TrimSpace(os.Getenv(MetricsExporter))); named != "" &&
+		!slices.Contains(strings.Split(strings.ReplaceAll(named, " ", ""), ","), "otlp") {
 		return "", false
 	}
 	for _, name := range []string{MetricsEndpoint, Endpoint} {
@@ -148,7 +154,12 @@ func StartMetrics(ctx context.Context, release string) error {
 		return errors.New("otlp.StartMetrics called twice: the second provider would replace the first and leave its numbers unsent")
 	}
 
-	exporter, err := otlpmetrichttp.New(ctx)
+	// Delta: a series is sent for what moved since the last export, and one
+	// that did not move is not sent again, so a receiver keeping every point
+	// does not keep the same total once a minute for ever.
+	exporter, err := otlpmetrichttp.New(ctx, otlpmetrichttp.WithTemporalitySelector(func(sdkmetric.InstrumentKind) metricdata.Temporality {
+		return metricdata.DeltaTemporality
+	}))
 	if err != nil {
 		return errors.Wrapf(err, "failed to start the OTLP metric exporter (endpoint=%q)", endpoint)
 	}
@@ -177,17 +188,20 @@ func MetricsRunning() bool {
 func Flush() error {
 	mu.Lock()
 	defer mu.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), flushWithin)
-	defer cancel()
 	var spans, numbers error
+	// Each its own flushWithin, so spans slow to leave do not spend the numbers' time.
 	if provider != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), flushWithin)
 		spans = provider.Shutdown(ctx)
+		cancel()
 		provider = nil
 	}
 	// 「[Opus 5.5] The node's last numbers are read and sent before the meter stops, and nothing is measured into it after.」
 	if meters != nil {
 		measure.ExportTo(nil)
+		ctx, cancel := context.WithTimeout(context.Background(), flushWithin)
 		numbers = meters.Shutdown(ctx)
+		cancel()
 		meters = nil
 	}
 	if spans != nil {

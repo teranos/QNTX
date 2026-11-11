@@ -62,6 +62,7 @@ func TestTheNodesNumbersLeaveAsOTLPMetrics(t *testing.T) {
 	measure.Count(measure.AttestationsWritten, 2, measure.String(measure.AttrOutcome, "taken"))
 	measure.Gauge(measure.QueueDepth, 3681)
 	measure.Took(measure.QueryTook, 15*time.Millisecond)
+	measure.Took(measure.QueryTook, 250*time.Microsecond)
 	if err := Flush(); err != nil {
 		t.Fatal(err)
 	}
@@ -72,6 +73,9 @@ func TestTheNodesNumbersLeaveAsOTLPMetrics(t *testing.T) {
 		t.Fatalf("exported to %v, want the base endpoint's v1/metrics", got.paths)
 	}
 	written := got.metrics[measure.AttestationsWritten].GetSum().GetDataPoints()
+	if got.metrics[measure.AttestationsWritten].GetSum().GetAggregationTemporality() != metricspb.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA {
+		t.Fatalf("%s is sent cumulative, so a total that does not move is sent again every interval", measure.AttestationsWritten)
+	}
 	if len(written) != 1 || written[0].GetAsInt() != 2 || written[0].GetAttributes()[0].GetValue().GetStringValue() != "taken" {
 		t.Fatalf("%s arrived as %v", measure.AttestationsWritten, got.metrics[measure.AttestationsWritten])
 	}
@@ -80,7 +84,8 @@ func TestTheNodesNumbersLeaveAsOTLPMetrics(t *testing.T) {
 		t.Fatalf("%s arrived as %v", measure.QueueDepth, got.metrics[measure.QueueDepth])
 	}
 	took := got.metrics[measure.QueryTook]
-	if took.GetUnit() != "ms" || len(took.GetHistogram().GetDataPoints()) != 1 || took.GetHistogram().GetDataPoints()[0].GetSum() != 15 {
+	// What takes less than a millisecond is kept as the part of one it took.
+	if took.GetUnit() != "ms" || len(took.GetHistogram().GetDataPoints()) != 1 || took.GetHistogram().GetDataPoints()[0].GetSum() != 15.25 {
 		t.Fatalf("%s arrived as %v", measure.QueryTook, took)
 	}
 }
@@ -111,5 +116,18 @@ func TestMetricsExporterNoneSendsNoMetrics(t *testing.T) {
 	}
 	if MetricsRunning() {
 		t.Fatal("metrics are leaving while OTEL_METRICS_EXPORTER is none")
+	}
+}
+
+// An exporter other than OTLP named alone sends nothing over OTLP; OTLP among
+// several, or named in another case, does.
+func TestOnlyAnOTLPExporterSendsMetrics(t *testing.T) {
+	t.Setenv(Endpoint, "http://127.0.0.1:1/ix/otel")
+	t.Setenv(MetricsEndpoint, "")
+	for named, sends := range map[string]bool{"prometheus": false, "console": false, "None": false, "": true, "OTLP": true, "prometheus, otlp": true} {
+		t.Setenv(MetricsExporter, named)
+		if _, said := MetricsSaid(); said != sends {
+			t.Errorf("OTEL_METRICS_EXPORTER=%q: metrics said %t, want %t", named, said, sends)
+		}
 	}
 }
