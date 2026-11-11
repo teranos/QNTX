@@ -9,16 +9,16 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "WE NEED OUR OWN ABSTRACTION AND TRACKING OF THIS IN CASE WE DO HIT SENTRY LIMIT, SO WE NEVER REALLY LOST OBS"
+// "「[Opus 5.5] WE NEED OUR OWN ABSTRACTION AND TRACKING OF THIS IN CASE WE DO HIT SENTRY LIMIT, SO WE NEVER REALLY LOST OBS」"
 //
-// The ledger in internal/logger counts every error the node logs. This writes
-// what changed in it to issues_seen. See docs/sentry.md.
+// 「[Opus 5.5] The ledger in internal/logger counts every error the node logs. This writes」
+// 「[Opus 5.5] what changed in it to issues_seen. See docs/sentry.md.」
 
 const issuesKeptEvery = time.Minute
 
-// seedIssues reads what issues_seen holds of today into the ledger. Until it
-// has, nothing is written: a write would put this process's smaller totals
-// over the kept ones.
+// 「[Opus 5.5] seedIssues reads what issues_seen holds of today into the ledger. Until it」
+// 「[Opus 5.5] has, nothing is written: a write would put this process's smaller totals」
+// 「[Opus 5.5] over the kept ones.」
 func (s *QNTXServer) seedIssues() {
 	if s.nodeDB == nil || s.issuesSeeded.Load() {
 		return
@@ -34,9 +34,9 @@ func (s *QNTXServer) seedIssues() {
 	s.issuesSeeded.Store(true)
 }
 
-// keepIssues writes the ledger every issuesKeptEvery, once today is read into
-// it. The last write is flushIssues', at the end of Stop, after the last thing
-// the node logs as it stops.
+// 「[Opus 5.5] keepIssues writes the ledger every issuesKeptEvery, once today is read into」
+// 「[Opus 5.5] it. The last write is flushIssues', at the end of Stop, after the last thing」
+// 「[Opus 5.5] the node logs as it stops.」
 func (s *QNTXServer) keepIssues() {
 	if s.nodeDB == nil {
 		return
@@ -56,9 +56,9 @@ func (s *QNTXServer) keepIssues() {
 	})
 }
 
-// writeIssuesOnce takes what changed and writes it, giving it back when the
-// write fails. One runs at a time, so the last write never misses a batch a
-// periodic one still holds.
+// 「[Opus 5.5] writeIssuesOnce takes what changed and writes it, giving it back when the」
+// 「[Opus 5.5] write fails. One runs at a time, so the last write never misses a batch a」
+// 「[Opus 5.5] periodic one still holds.」
 func (s *QNTXServer) writeIssuesOnce(ctx context.Context) error {
 	if !s.issuesSeeded.Load() {
 		return errors.New("today's issues_seen is not read yet")
@@ -68,18 +68,18 @@ func (s *QNTXServer) writeIssuesOnce(ctx context.Context) error {
 	taken := logger.TakeIssues()
 	if err := writeIssues(ctx, s.nodeDB, taken); err != nil {
 		logger.ReturnIssues(taken)
-		// Warn, not Error: an Error here is an issue that this write would
-		// count, about the write that failed to count it.
+		// 「[Opus 5.5] Warn, not Error: an Error here is an issue that this write would」
+		// 「[Opus 5.5] count, about the write that failed to count it.」
 		s.logger.Named("issues").Warnw("The issues the node counted were not written to issues_seen", "issues", len(taken), "error", err)
 		return err
 	}
 	return nil
 }
 
-// issuesFlushTries is how many times the last write is tried as the node stops.
+// 「[Opus 5.5] issuesFlushTries is how many times the last write is tried as the node stops.」
 const issuesFlushTries = 3
 
-// flushIssues is the last write, as the node stops, tried issuesFlushTries times.
+// 「[Opus 5.5] flushIssues is the last write, as the node stops, tried issuesFlushTries times.」
 func (s *QNTXServer) flushIssues() {
 	if s.nodeDB == nil {
 		return
@@ -95,7 +95,7 @@ func (s *QNTXServer) flushIssues() {
 	}
 }
 
-// readIssues is what issues_seen holds of day.
+// 「[Opus 5.5] readIssues is what issues_seen holds of day.」
 func readIssues(ctx context.Context, db *sql.DB, day string) (_ []logger.Issue, err error) {
 	rows, err := db.QueryContext(ctx, `SELECT day, key, level, logger, caller, message, plugin, last_error, first_seen, last_seen, occurrences, raised FROM issues_seen WHERE day = ?`, day)
 	if err != nil {
@@ -125,8 +125,8 @@ func readIssues(ctx context.Context, db *sql.DB, day string) (_ []logger.Issue, 
 	return kept, errors.Wrapf(rows.Err(), "failed to read every issue of %s", day)
 }
 
-// writeIssues upserts each issue's day. A row's counts are the ledger's own
-// running totals for that day, so the newer row replaces the older.
+// 「[Opus 5.5] writeIssues upserts each issue's day. A row's counts are the ledger's own」
+// 「[Opus 5.5] running totals for that day, so the newer row replaces the older.」
 func writeIssues(ctx context.Context, db *sql.DB, taken []logger.Issue) error {
 	if len(taken) == 0 {
 		return nil
