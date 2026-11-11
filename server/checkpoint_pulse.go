@@ -257,6 +257,7 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 		s.logger.Named("jobs").Errorw("Stale forwards were not dropped at boot", "error", err)
 	}
 	s.keepCleaningJobs()
+	s.keepIssues()
 }
 
 // ensureCheckpointSchedule creates the checkpoint job, or moves the one this
