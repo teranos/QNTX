@@ -36,6 +36,8 @@ const (
 	Endpoint       = "OTEL_EXPORTER_OTLP_ENDPOINT"
 	// 「[Opus 5.5] MetricsEndpoint names where the node's numbers go, over Endpoint.」
 	MetricsEndpoint = "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
+	// 「[Opus 5.5] MetricsExporter is OpenTelemetry's own switch: none sends no numbers, whatever endpoint is named.」
+	MetricsExporter = "OTEL_METRICS_EXPORTER"
 )
 
 // 「[Fable 5.1] flushWithin is how long the process waits for the last batch when it ends.」
@@ -118,6 +120,9 @@ func Running() bool {
 
 // 「[Opus 5.5] MetricsSaid is the endpoint the environment names for the node's numbers, and whether it names one.」
 func MetricsSaid() (string, bool) {
+	if os.Getenv(MetricsExporter) == "none" {
+		return "", false
+	}
 	for _, name := range []string{MetricsEndpoint, Endpoint} {
 		if endpoint := os.Getenv(name); endpoint != "" {
 			return endpoint, true

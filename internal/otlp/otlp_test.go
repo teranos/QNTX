@@ -97,3 +97,19 @@ func TestNoEndpointSendsNoMetrics(t *testing.T) {
 	}
 	measure.Count(measure.AttestationsWritten, 1)
 }
+
+// 「[Opus 5.5] OTEL_METRICS_EXPORTER=none starts no metrics, so the one endpoint pointed at Sentry, which takes no OTLP metrics, carries spans alone.」
+func TestMetricsExporterNoneSendsNoMetrics(t *testing.T) {
+	t.Setenv(Endpoint, "https://o1.ingest.sentry.io/api/2/integration/otlp")
+	t.Setenv(MetricsEndpoint, "")
+	t.Setenv(MetricsExporter, "none")
+	if _, said := MetricsSaid(); said {
+		t.Fatal("an endpoint is said for metrics while OTEL_METRICS_EXPORTER is none")
+	}
+	if err := StartMetrics(context.Background(), "test"); err != nil {
+		t.Fatal(err)
+	}
+	if MetricsRunning() {
+		t.Fatal("metrics are leaving while OTEL_METRICS_EXPORTER is none")
+	}
+}
