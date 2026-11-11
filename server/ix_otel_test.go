@@ -272,7 +272,7 @@ func TestOnlyPostIsTaken(t *testing.T) {
 // 「[Opus 5.5] Only the signals ix/otel takes are answered under it.」
 func TestASignalIxOtelDoesNotTakeIs404(t *testing.T) {
 	s, _, _ := standServer(t, "pond")
-	refusedWith(t, exporting(s, pondToken("*"), ixOtelPrefix+"v1/logs", "application/x-protobuf", "", nil), http.StatusNotFound)
+	refusedWith(t, exporting(s, pondToken("*"), ixOtelPrefix+"v1development/profiles", "application/x-protobuf", "", nil), http.StatusNotFound)
 }
 
 // 「[Opus 5.5] A caller in no namespace the node serves reaches no store, and is told so.」
