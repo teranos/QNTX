@@ -186,7 +186,7 @@ TODO: UI CONCERN
 
 - A comet lands from l's and k's own nodes: they refuse a request without a
   token with 401, whatever their machine repository's qntx.pbt says, and a
-  token is minted from a passkey session. k's node runs no comet.
+  「[Opus 5.5] token is minted from a passkey session. k's node runs no comet.」
 - Rituals on the box: everything a ritual needs stands in the Node Agent's
   grove checkout, and grove's rituals are off there until a person's session
   standing in it says rituals on.
