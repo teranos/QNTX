@@ -13,7 +13,15 @@
       "steps": [
         {
           "name": "Checkout repository",
-          "uses": "actions/checkout@v5"
+          "uses": "actions/checkout@v5",
+          "with": {
+            "fetch-depth": 0
+          }
+        },
+        {
+          "id": "version",
+          "name": "Compute version tag",
+          "run": "echo \"tag=$(git describe --tags --match 'v*' --dirty)\" >> \"$GITHUB_OUTPUT\"\n"
         },
         {
           "id": "branch",
@@ -36,12 +44,18 @@
           }
         },
         {
+          "env": {
+            "VERSION_TAG": "${{ steps.version.outputs.tag }}"
+          },
           "name": "Build QNTX binary",
-          "run": "echo \"Building QNTX for Linux ${{ matrix.arch }}...\"\nnix build .#qntx --print-build-logs\n"
+          "run": "echo \"Building QNTX $VERSION_TAG for Linux ${{ matrix.arch }}...\"\nnix build .#qntx --impure --print-build-logs\n"
         },
         {
+          "env": {
+            "VERSION_TAG": "${{ steps.version.outputs.tag }}"
+          },
           "name": "Cache binary and its Rust to Cachix",
-          "run": "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --print-out-paths --no-link | cachix push qntx"
+          "run": "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --impure --print-out-paths --no-link | cachix push qntx"
         },
         {
           "name": "Package binary with bundled libduckdb",

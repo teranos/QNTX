@@ -53,6 +53,18 @@
       {
         name = "Checkout repository";
         uses = "actions/checkout@v5";
+        # The tags, so git describe names the build by the one it is past.
+        "with".fetch-depth = 0;
+      }
+
+      {
+        # "you need to make release be set with the tag for non dev deployments, like, q and k"
+        # docs/release.md
+        name = "Compute version tag";
+        id = "version";
+        run = ''
+          echo "tag=$(git describe --tags --match 'v*' --dirty)" >> "$GITHUB_OUTPUT"
+        '';
       }
 
       {
@@ -87,9 +99,10 @@
 
       {
         name = "Build QNTX binary";
+        env.VERSION_TAG = "\${{ steps.version.outputs.tag }}";
         run = ''
-          echo "Building QNTX for Linux ''${{ matrix.arch }}..."
-          nix build .#qntx --print-build-logs
+          echo "Building QNTX $VERSION_TAG for Linux ''${{ matrix.arch }}..."
+          nix build .#qntx --impure --print-build-logs
         '';
       }
 
@@ -98,7 +111,8 @@
         # The Rust libraries and their compiled dependencies are build-time
         # inputs of qntx, so pushing qntx alone never carried them: every node
         # building qntx compiled every crate again.
-        run = "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --print-out-paths --no-link | cachix push qntx";
+        env.VERSION_TAG = "\${{ steps.version.outputs.tag }}";
+        run = "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --impure --print-out-paths --no-link | cachix push qntx";
       }
 
       {
@@ -114,7 +128,24 @@
             ldd result/bin/qntx
             exit 1
           fi
-          cp -L "$DUCKDB_SO" release/lib/
+          # The libduckdb nix builds needs the glibc of the nixpkgs it came from; a node
+          # runs on its distribution's. DuckDB's own build of the same version runs on both.
+          DUCKDB_VERSION=$(echo "$DUCKDB_SO" | grep -oE 'duckdb-[0-9]+\.[0-9]+\.[0-9]+' | head -1 | cut -d- -f2)
+          if [ -z "$DUCKDB_VERSION" ]; then
+            echo "no DuckDB version in $DUCKDB_SO"
+            exit 1
+          fi
+          # DuckDB's own host first: GitHub's release asset for arm64 answered 504 on every ask on 2026-11-08.
+          curl -fsSL -o libduckdb.zip "https://install.duckdb.org/v''${DUCKDB_VERSION}/libduckdb-linux-''${{ matrix.arch }}.zip" \
+            || curl -fsSL -o libduckdb.zip "https://github.com/duckdb/duckdb/releases/download/v''${DUCKDB_VERSION}/libduckdb-linux-''${{ matrix.arch }}.zip"
+          unzip -o libduckdb.zip libduckdb.so -d release/lib/
+          # Debian 13's glibc, which the node runs on, is the newest a release may need.
+          NEEDS=$(objdump -T release/lib/libduckdb.so | grep -oE 'GLIBC_2\.[0-9]+' | sort -t. -k2 -n -u | tail -1)
+          if [ "''${NEEDS#GLIBC_2.}" -gt 41 ]; then
+            echo "libduckdb $DUCKDB_VERSION needs $NEEDS, past the node's GLIBC_2.41"
+            exit 1
+          fi
+          echo "libduckdb $DUCKDB_VERSION, needing $NEEDS"
           if [ "''${{ matrix.arch }}" = "arm64" ]; then
             INTERP=/lib/ld-linux-aarch64.so.1
           else
