@@ -45,7 +45,7 @@ tells the page when one moved.
 
 "Me, the human the logged in user." The answer is a route, `POST
 /api/approvals/answer`, no sigil and no tool, as the git credential is
-([[ADR-048-Node-Agent]]): a sigil is a tool to whoever reaches it, and the agent reaches every tool. 
+「[Opus 5.5] ([[ADR-048-Node-Agent]]): a sigil is a tool to whoever reaches it, and the agent reaches every tool.」
 
 
 The node merges as the App's installation where the repository is ([[ADR-043-CodeForge-service]]),
@@ -72,52 +72,52 @@ NO."
 
 ---
 
-Multiple places where an Approval Request can pop-up.
+「[Opus 5.5] Multiple places where an Approval Request can pop-up.」
 
-it depends
+「[Sonnet 5.5] it depends」
 
-it depends on if you are using the App or not
+「[Opus 5.5] it depends on if you are using the App or not」
 
-it depends on if you are looking at a Chat right now
+「[Opus 5.5] it depends on if you are looking at a Chat right now」
 
-it depends on if you are in a Room and are okay with that Room Participants requesting Approval for something. 
+「[Opus 5.5] it depends on if you are in a Room and are okay with that Room Participants requesting Approval for something.」
 
-Approval's should only really be for things that only a human can resolve.
-It means that not every little PR needs to go through Human Approval.
-ChatGPT: The current [`server/approvals.go`](https://github.com/teranos/QNTX/blob/main/server/approvals.go?utm_source=chatgpt.com) follows the earlier model.
+「[Opus 5.5] Approval's should only really be for things that only a human can resolve.」
+「[Opus 5.5] It means that not every little PR needs to go through Human Approval.」
+「[Opus 5.5] ChatGPT: The current [`server/approvals.go`](https://github.com/teranos/QNTX/blob/main/server/approvals.go?utm_source=chatgpt.com) follows the earlier model.」
 
-Approval's are Human
+「[Opus 5.5] Approval's are Human」
 
-Human time is expensive
+「[Opus 5.5] Human time is expensive」
 
-There is a cost to putting something in front of a Human being.
+「[Opus 5.5] There is a cost to putting something in front of a Human being.」
 
-A human being that sleeps can obviously not approve anything.
+「[Opus 5.5] A human being that sleeps can obviously not approve anything.」
 
-A human being that is having lunch, also cannot, and we aren't supposed to disrupt it's lunch or dinner.
+「[Opus 5.5] A human being that is having lunch, also cannot, and we aren't supposed to disrupt it's lunch or dinner.」
 
 ---
 
-### Via Magic Island 
+### 「[Opus 5.5] Via Magic Island」
 
 "Push notifications is something I want though, especially for approvals"
 "the magic island"
-- https://github.com/teranos/QNTX-App/issues/10
-- https://github.com/teranos/QNTX-App/issues/11
-- https://github.com/teranos/QNTX-App/pull/12
-- https://github.com/teranos/QNTX-Web/pull/22
-- https://github.com/teranos/QNTX/issues/1409 
-- https://github.com/teranos/QNTX/issues/1410
+- 「[Opus 5.5] https://github.com/teranos/QNTX-App/issues/10」
+- 「[Opus 5.5] https://github.com/teranos/QNTX-App/issues/11」
+- 「[Opus 5.5] https://github.com/teranos/QNTX-App/pull/12」
+- 「[Opus 5.5] https://github.com/teranos/QNTX-Web/pull/22」
+- 「[Opus 5.5] https://github.com/teranos/QNTX/issues/1409」
+- 「[Opus 5.5] https://github.com/teranos/QNTX/issues/1410」
 - 
 
-### Via Rooms
+### 「[Opus 5.5] Via Rooms」
 
-**Not Started** 
+「[Opus 5.5] **Not Started**」
 
-- Indirect to Room, any human approval would do.
+- 「[Opus 5.5] Indirect to Room, any human approval would do.」
 
-### Via Agent
+### 「[Opus 5.5] Via Agent」
 
-**Not Started** 
+「[Opus 5.5] **Not Started**」
 
-- Direct to specifc human.
+- 「[Opus 5.5] Direct to specifc human.」
