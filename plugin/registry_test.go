@@ -467,6 +467,18 @@ func TestRegistry_validateVersion(t *testing.T) {
 			wantErr:     true,
 		},
 		{
+			name:        "a prerelease the tag names stays a prerelease",
+			qntxVersion: "v1.0.0-rc.1",
+			constraint:  ">= 1.0.0",
+			wantErr:     true,
+		},
+		{
+			name:        "a rolling build past a prerelease tag stays that prerelease",
+			qntxVersion: "v1.0.0-rc.1-3-gabc1234",
+			constraint:  ">= 1.0.0",
+			wantErr:     true,
+		},
+		{
 			name:        "invalid QNTX version",
 			qntxVersion: "invalid",
 			constraint:  "^1.0.0",
