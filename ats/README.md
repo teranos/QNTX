@@ -29,7 +29,7 @@ See [ADR-023](../docs/adr/ADR-023-storage-backend-selection.md) (backend selecti
 | Language (parse, classify, expand, temporal) | ✓ | `crates/ats/src/parser/`, `classify/`, `expand.rs`, `temporal.rs` |
 | Store | ✓ | `crates/ats-indexeddb` — IndexedDB against the same `ats` storage traits |
 | Reaction (watchers) | ✓ | `crates/ats/src/watcher.rs` |
-| ⟶ `so` actions | ✗ | dispatch to ꩜ Pulse, outside the tab |
+| ⟶ `so` actions | ✗ | asynchronous dispatch, outside the tab |
 | gRPC `ATSStoreService` | ✗ | the remote surface, out of process |
 
 `crates/ats-indexeddb` matches the `ats` storage trait contract — same method names,
@@ -105,7 +105,7 @@ ATS stays domain-agnostic through interfaces: `EntityResolver` (entity aliases),
 **Acting on claims**
 
 - **`watcher/`** - Fires on arriving claims
-- **`so/` ⟶** - Semantic operations, dispatched to ꩜ Pulse ([see so/README.md](so/README.md))
+- **`so/` ⟶** - Semantic operations, handed off for asynchronous execution ([see so/README.md](so/README.md))
 
 ## Testing
 
