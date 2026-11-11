@@ -270,7 +270,7 @@ func assertCookieSecure(t *testing.T, rec *httptest.ResponseRecorder, wantSecure
 	assert.Equal(t, wantSecure, setCookies[0].Secure, "cookie Secure flag mismatch")
 }
 
-// --- Bearer token path ---
+// 「[Opus 5.5] --- Bearer token path ---」
 
 // memTokenStore is an in-memory TokenStore, so the endpoint and middleware
 // contracts are exercised without a backend. The parquet one is what ships
@@ -423,7 +423,7 @@ func (m *memTokenStore) List() ([]TokenInfo, error) {
 		}
 		if tok.revoked {
 			// The real stores list a revoked token with when it stopped
-			// working.
+			// 「[Opus 5.5] working.」
 			revoked := time.Now().UTC().Format(time.RFC3339Nano)
 			info.RevokedAt = &revoked
 		}
@@ -509,7 +509,7 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
-// Revocation is watched by last used, and nothing was writing it.
+// 「[Opus 5.5] Revocation is watched by last used, and nothing was writing it.」
 // Presenting a live token records the use, off the request's path.
 func TestPresentingABearerRecordsItsUse(t *testing.T) {
 	store := newMemTokenStore()
@@ -617,7 +617,7 @@ func TestSuperListsAndReadsTokensAndChangesNone(t *testing.T) {
 	assert.False(t, store.tokens[sha256Hex(raw)].revoked, "a token was revoked by a token")
 }
 
-// --- Token endpoints ---
+// 「[Opus 5.5] --- Token endpoints ---」
 
 func TestHandleCreateTokenReturnsRawOnce(t *testing.T) {
 	store := newMemTokenStore()
@@ -736,7 +736,7 @@ func TestTokenByIDRejectsWrongMethods(t *testing.T) {
 	}
 }
 
-// Revocation is a switch: kill the token, watch whether anything is
+// 「[Opus 5.5] Revocation is a switch: kill the token, watch whether anything is」
 // still presenting it, turn it back on if that was you. Any TokenStore has to
 // hold this line, not just the in-memory one.
 func TestEnableRestoresARevokedToken(t *testing.T) {
