@@ -8,7 +8,7 @@ Exploratory. Nothing here is implemented. Every mechanism referenced below alrea
 
 **Solana is the same curve.** A Solana address *is* an ed25519 public key, base58-encoded. Every laye browser key and every passkey-PRF-derived device key is already a valid Solana account waiting for its first lamport. Ethereum is not: EOAs are secp256k1 + keccak, a curve laye does not carry.
 
-**Access tokens are machine wallets.** ADR-025: a token's 32 bytes are "an ed25519 seed rather than only a secret, so the token has a public half and its holder can sign as it" — plus `minted_by`, `namespace`, and `scope`. That is a scoped hot key with provenance, which is what an automated on-chain agent needs.
+**Access tokens are machine wallets.** A token's 32 bytes are "an ed25519 seed rather than only a secret, so the token has a public half and its holder can sign as it" — plus `minted_by`, `namespace`, and `scope`. That is a scoped hot key with provenance, which is what an automated on-chain agent needs.
 
 **Attestations are chain-event-shaped.** A log emitted by a contract is a signed, immutable, actor-bearing, timestamped claim. `[tx 0xabc…] is [transfer] of [erc20:usdc] by [0xdead…] at [block 21_004_113]` needs no new primitive. Append-only with no retraction even absorbs reorgs: a reorged-out transaction is not deleted, it is superseded by a new attestation from the same observer — "Two claims aren't a conflict — they're two claims."
 
