@@ -193,8 +193,8 @@ func (c *sentryCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	return nil
 }
 
-// mayRaise asks the ledger whether this error is raised as an issue. The log
-// line above ships either way, and the ledger counts it either way.
+// 「[Opus 5.5] mayRaise asks the ledger whether this error is raised as an issue. The log」
+// 「[Opus 5.5] line above ships either way, and the ledger counts it either way.」
 func (c *sentryCore) mayRaise(ent zapcore.Entry, fields []zapcore.Field) bool {
 	if c.issues == nil {
 		return true
