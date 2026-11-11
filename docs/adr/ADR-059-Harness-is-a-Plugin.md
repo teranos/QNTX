@@ -18,6 +18,19 @@ Each harness (Claude Code, Pi, Codex, agy) is a plugin that provides a service, 
 
 A harness is added, configured, swapped and built as every plugin is ([[ADR-002-plugin-configuration]]), in any language gRPC speaks: Pi's own included.
 
+## One harness service
+
+"one harness service with Claude Code, Pi and Codex as backends, the way ADR-014 has several LLM providers behind one LLMServer" / "Yes. Do this"
+
+The service is one, and core's, as `LLMServer` is ([[ADR-014-llm-as-plugin-provided-service]]). What holds there holds here:
+
+- "Provider plugins (OpenRouter, llama.cpp) register as gRPC LLM backends. Core routes calls to the appropriate provider": Claude Code, Pi, Codex and agy each register as a backend of it, and core routes a turn to the one the agent runs in.
+- "Multiple providers can run simultaneously. The caller specifies which backend to use": as `harness` names one today (`agent say`).
+- "`LLMServer` becomes the queuing point … ordered by priority — interactive prompts (user-initiated) before background work": a turn a person waits on goes before a ritual's or a room's.
+- "Core weaves every call `LLMServer` answers … providers only do inference": core writes down every turn and what it spent, and a harness only runs it.
+- "`LLMServer.resolveProvider` refuses a name that is not registered: no other provider answers in its place": as "nothing stands in for the model named" ([[ADR-048-Node-Agent]]).
+- "The server owns provider resolution — the UI never references plugin names."
+
 ## Side by side
 
 - A machine has its node: "A comet lands from its machine's node" ([[ADR-050-comet]]). The laptop's, the desktop's and the server's are three nodes, and each knows the others as its peers (`a2a Peers`).
