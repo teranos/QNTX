@@ -162,9 +162,23 @@ func TestAGoneOrLinkedFolderSendsNothing(t *testing.T) {
 	_, err := vaultNotesWhole(root)
 	require.Error(t, err, "a folder that is not there read as empty")
 
+	require.NoError(t, os.WriteFile(root, []byte("# not a folder\n"), 0o644))
+	_, err = vaultNotesWhole(root)
+	require.Error(t, err, "a file in the folder's place read as an empty folder")
+	require.NoError(t, os.Remove(root))
+
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "docs"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "docs", "a.md"), []byte("# a\n"), 0o644))
 	require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(root, "linked")))
 	_, err = vaultNotesWhole(root)
 	require.Error(t, err, "a link under the folder was skipped")
+}
+
+// A send reads the folder only when the vault reaches it through no link.
+func TestASendReadsNothingThroughALinkAboveTheFolder(t *testing.T) {
+	vault, outside := t.TempDir(), t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(outside, "b"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(outside, "b", "private.md"), []byte("# private\n"), 0o644))
+	require.NoError(t, os.Symlink(outside, filepath.Join(vault, "a")))
+	require.Error(t, noLinkOnTheWay(vault, filepath.Join(vault, "a", "b")))
 }

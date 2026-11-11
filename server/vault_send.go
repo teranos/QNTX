@@ -109,6 +109,9 @@ func vaultNotesAt(root string) (map[string][]byte, error) {
 	if placed.Mode()&os.ModeSymlink != 0 {
 		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", root)
 	}
+	if !placed.IsDir() {
+		return notes, errors.Newf("%s is a file, not the folder the repository is bound to, so nothing is sent", root)
+	}
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return notes, errors.Wrapf(err, "the notes in %s were not read", root)
@@ -181,6 +184,10 @@ func vaultNotesWhole(root string) (map[string][]byte, error) {
 // 「[Opus 5.5] its own; a link to one is not.」
 func boundVaultNotes(vaultPath string, b vaultBinding) (map[string][]byte, error) {
 	if b.repository {
+		// The vault reaches the folder through no link, so what is sent is the vault's.
+		if err := noLinkOnTheWay(vaultPath, b.rootIn(vaultPath)); err != nil {
+			return nil, err
+		}
 		return vaultNotesWhole(b.rootIn(vaultPath))
 	}
 	if !b.note {
