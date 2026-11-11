@@ -18,8 +18,8 @@ import (
 
 // 「[Opus 5.5] onePoint is one data point of a metric: the metric as OTLP carries it, holding this point」
 // 「[Opus 5.5] alone, what kind of number it is, and when it was read.」
-// aggregationOf is how a metric's points add up: its temporality, and whether a
-// sum only rises. The same point under another is another reading.
+// 「[Opus 5.5] aggregationOf is how a metric's points add up: its temporality, and whether a」
+// 「[Opus 5.5] sum only rises. The same point under another is another reading.」
 func aggregationOf(m *metricspb.Metric) string {
 	switch {
 	case m.GetSum() != nil:
@@ -97,8 +97,8 @@ func (s *QNTXServer) keepNumbers(admitted auth.Admission, store ats.AttestationS
 		}
 	}
 	actors := s.otlpActors(admitted)
-	// Who sent it is who the kept point is attested by, a session's person as
-	// much as a token.
+	// 「[Opus 5.5] Who sent it is who the kept point is attested by, a session's person as」
+	// 「[Opus 5.5] much as a token.」
 	sender := strings.Join(actors, "\x00")
 	for _, resourceMetrics := range export.GetResourceMetrics() {
 		service := otlpServiceOf(resourceMetrics.GetResource().GetAttributes())
@@ -106,8 +106,8 @@ func (s *QNTXServer) keepNumbers(admitted auth.Admission, store ats.AttestationS
 		if err != nil {
 			return rejected, "", errors.Wrap(err, "a resource did not write as OTLP/JSON")
 		}
-		// Who sent it and the whole resource and scope are in a point's id, so
-		// two senders' or two streams' same reading are two points.
+		// 「[Opus 5.5] Who sent it and the whole resource and scope are in a point's id, so」
+		// 「[Opus 5.5] two senders' or two streams' same reading are two points.」
 		resourceSaid, err := proto.MarshalOptions{Deterministic: true}.Marshal(resourceMetrics.GetResource())
 		if err != nil {
 			return rejected, "", errors.Wrap(err, "a resource did not marshal")
@@ -132,7 +132,7 @@ func (s *QNTXServer) keepNumbers(admitted auth.Admission, store ats.AttestationS
 					continue
 				}
 				for _, one := range points {
-					// A number is who sent it, its resource, its scope, its metric and the point itself, so the same point sent again is kept once.
+					// 「[Opus 5.5] A number is who sent it, its resource, its scope, its metric and the point itself, so the same point sent again is kept once.」
 					said, err := proto.MarshalOptions{Deterministic: true}.Marshal(one.point)
 					if err != nil {
 						return rejected, "", errors.Wrapf(err, "a data point of %s did not marshal", metric.GetName())
