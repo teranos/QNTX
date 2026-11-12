@@ -23,7 +23,6 @@ See [github.com/teranos/sacred-error](https://github.com/teranos/sacred-error) a
 ## Tablet of REACH
 
 A sigil handles a server capability, the reach table governs it with attestation DSL policy lines like this:
-`REACH is '/i/standing' of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION`
 `REACH is '/am/syscap' of ROOT`
 
 ## Plugins
