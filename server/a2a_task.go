@@ -268,7 +268,7 @@ func (s *QNTXServer) writeTask(lines taskLines, task *a2asdk.Task, by string, al
 	}), "the %s line of task %s was not written", state, task.ID)
 }
 
-// maskedValue is a JSON value with every string in it masked.
+// 「[Opus 5.5] maskedValue is a JSON value with every string in it masked.」
 func maskedValue(value any) any {
 	switch v := value.(type) {
 	case string:
@@ -303,8 +303,8 @@ func maskedTask(task *a2asdk.Task) *a2asdk.Task {
 			case a2asdk.Data:
 				p.Content = a2asdk.Data{Value: maskedValue(content.Value)}
 			case a2asdk.Raw:
-				// A file of text is masked as text is; an image or a PDF is
-				// kept as it was sent.
+				// 「[Opus 5.5] A file of text is masked as text is; an image or a PDF is」
+				// 「[Opus 5.5] kept as it was sent.」
 				if kind, _, err := mime.ParseMediaType(p.MediaType); err == nil && (strings.HasPrefix(kind, "text/") || kind == "application/json") {
 					p.Content = a2asdk.Raw(masked(string(content)))
 				}
@@ -517,27 +517,27 @@ func textPart(text string) *a2asdk.Part {
 	return part
 }
 
-// textPlain is the media type the agents answer in.
+// 「[Opus 5.5] textPlain is the media type the agents answer in.」
 const textPlain = "text/plain"
 
-// turnModes are the media types a turn takes and gives (§4.4.5): text, JSON,
-// and the files Claude Code reads, a PDF and an image among them. Any other is
-// refused, as "Agents SHOULD sanitize or validate file content types and
-// reject unexpected media types" (§13.4).
+// 「[Opus 5.5] turnModes are the media types a turn takes and gives (§4.4.5): text, JSON,」
+// 「[Opus 5.5] and the files Claude Code reads, a PDF and an image among them. Any other is」
+// 「[Opus 5.5] refused, as "Agents SHOULD sanitize or validate file content types and」
+// 「[Opus 5.5] reject unexpected media types" (§13.4).」
 var turnModes = []string{
 	textPlain, "text/markdown", "text/csv", "application/json",
 	"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
 }
 
-// isTurnMode is whether a media type, whatever its parameters, is one a turn
-// gives.
+// 「[Opus 5.5] isTurnMode is whether a media type, whatever its parameters, is one a turn」
+// 「[Opus 5.5] gives.」
 func isTurnMode(mediaType string) bool {
 	parsed, _, err := mime.ParseMediaType(mediaType)
 	return err == nil && slices.Contains(turnModes, parsed)
 }
 
-// sameMediaType is whether mode, whatever its parameters, names kind: a client
-// taking image/png; profile=x takes a PNG.
+// 「[Opus 5.5] sameMediaType is whether mode, whatever its parameters, names kind: a client」
+// 「[Opus 5.5] taking image/png; profile=x takes a PNG.」
 func sameMediaType(mode, kind string) bool {
 	parsed, _, err := mime.ParseMediaType(mode)
 	return err == nil && strings.EqualFold(parsed, kind)
@@ -607,10 +607,10 @@ func (s *QNTXServer) settleLeftTask(agent *rootAgent, session, stream string, an
 			state, gave = a2asdk.TaskStateCompleted, masked(answer.Text)
 		}
 		did := s.agentOfLine(line)
-		// What the turn wrote for its answer before the node stopped is given
-		// with it, and the Task's files go once it is settled. Which modes
-		// the client took went with the node that stopped: the turn's own are
-		// given.
+		// 「[Opus 5.5] What the turn wrote for its answer before the node stopped is given」
+		// 「[Opus 5.5] with it, and the Task's files go once it is settled. Which modes」
+		// 「[Opus 5.5] the client took went with the node that stopped: the turn's own are」
+		// 「[Opus 5.5] given.」
 		dir := taskFiles(agent, id)
 		var files []*a2asdk.Artifact
 		if state == a2asdk.TaskStateCompleted {
