@@ -70,6 +70,37 @@ A deferred message is the same row with an `after` gate (ground `CLAUDE.md`).
 - The session names itself under its own DID with `i name` (#1633), with the name its harness gives it, and is reached by that name as a peer's agent is: by its card, through `a2a Peers` and `a2a SendMessage`.
 - A key that is its own client is named by its DID (#1633); a session that asks as a person is not, and is named as the person is ([[ADR-031-Users]]).
 
+"I HAVE 4 SESSIONS ON MY LAPTOP"
+"EACH OF THEM SHOULD BE ABLE TO GIVE THEMSELVES A NAME THAT HAS NOT BEEN TAKEN"
+"I HAVE A DESKTOP CALLED K"
+"ON K I EXPECT EACH SESSION TO ALSO HAVE ITS OWN KEY AND NAME"
+"I EXPECT K SESSIONS TO BE ABLE TO TALK TO SESSIONS ON MY LAPTOP IF CONNECTIVITY ALLOWS FOR IT"
+"I WANT A SESSION TO BE ABLE TO GIVE ITSELF AN AVAILABLE NAME, AMONGST ALL PARTICIPANTS IN THE CLUSTER"
+"SO, ONE ALDER"
+"ONE SLATE"
+"ONE OTEL"
+
+Where it is built:
+
+- **The key.** Ground makes it at SessionStart and keeps it in `~/.qntx/sessions/<session id>/key` (ground `source/naming.d`, branch `session-names`).
+- **The admission.** `POST /auth/admit` with the session's DID and what it is called, signed by `~/.qntx/key` (`server/auth/admit.go`, #1656).
+- **The name.** `i name`, signed by the session's own key. Ground asks for what Claude Code calls the session, and keeps the name the node gave beside the key, so the session asks for the same one again. `ground name <Name>` takes another.
+"the name"
+"needs to stick"
+"why would ground ask for a rename, its the same session"
+- **What a name is** (`server/i_name.go`, #1668).
+"a name is an Uppercase character followed by normal lowercase characters"
+"and a name can be two names after each other as well"
+"or three"
+"i want to ban numbers in names"
+"so no special chars in names as well"
+"a Name needs to be able to be phonetically spoken"
+"Names need to be compatible with STT/TTS"
+- **A name a revoked token held** goes to the agent asking for it (#1668).
+"the token can be GONE"
+"i want false Alder to take a different name for example"
+- Ground holds a session's id, key, DID and name together, in that one directory.
+
 ## What the repository already answers
 
 - "Minimal node means no Node Agent". "A node that names no model has no NODE agent, and nothing stands in for the model named" ([[ADR-048-Node-Agent]]); "QNTX runs in minimal core mode without any plugins" ([[ADR-001-domain-plugin-architecture]]).
