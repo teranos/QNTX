@@ -164,6 +164,12 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill
 		// long-lived WebSocket connections (graph, sync).
 	}
+	// gRPC is HTTP/2, and behind a front door that ended TLS it arrives
+	// without it: A2A over gRPC is served on this port (a2a_grpc.go).
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	protocols.SetUnencryptedHTTP2(true)
+	s.httpServer.Protocols = protocols
 	listener, err := net.Listen("tcp", s.httpServer.Addr)
 	if err != nil {
 		return errors.Wrapf(err, "failed to listen on %s", s.httpServer.Addr)
