@@ -55,7 +55,7 @@ type googleSpendItem struct {
 }
 
 // 「[Opus 5.5] googleUnmeteredWhy is why an item ROOT set a limit on halts when
-// the node meters nothing of it: only ROOT pressing Connect costs again ends it.」
+// 「[Opus 5.5] the node meters nothing of it: only ROOT pressing Connect costs again ends it.」」
 func googleUnmeteredWhy(item googleSpendItem) string {
 	return fmt.Sprintf("ROOT set a limit on %s, and the node does not meter what it spends: ROOT presses Connect costs again", item.called())
 }
