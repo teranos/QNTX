@@ -88,16 +88,45 @@ func (w *roomWakes) ask(key, speaker string, tell func(speaker string)) {
 	})
 }
 
+// findingsSeen is, by comment, the sum of what it found when it last woke the
+// agent and the agent took the turn. An edit finding the same wakes no one. It
+// lives as long as the node: after a restart the first edit wakes once more.
+type findingsSeen struct {
+	mu   sync.Mutex
+	seen map[string]string
+}
+
+var findings = &findingsSeen{seen: map[string]string{}}
+
+func (f *findingsSeen) same(c roomcomments.Comment) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.seen[c.URL] == c.Findings()
+}
+
+// keep is said once the agent took the turn the comment woke: a turn refused
+// leaves the next edit, finding the same, to wake it again.
+func (f *findingsSeen) keep(c roomcomments.Comment) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.seen[c.URL] = c.Findings()
+}
+
 // wakeAfterComment tells the agent the room, when the comment just said into
 // it is one the agent is to be woken by.
 func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments.Comment) {
 	if !c.Wakes(wakeApps(), nodeRoomName) {
 		return
 	}
+	if findings.same(c) {
+		return
+	}
 	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, "github-app:"+c.App, func(speaker string) {
 		if err := s.tellAgentTheRoom(target, wakeAgent, speaker, c.At); err != nil {
 			s.logger.Errorw("A PR comment was said into the Node Room and the agent was not told", "agent", wakeAgent, "room", target.Room, "error", err)
+			return
 		}
+		findings.keep(c)
 	})
 }
 
@@ -138,11 +167,19 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 		return errors.Wrap(err, "the Node Room was not read")
 	}
 	var said []roomcomments.Said
+	var last string
 	for _, m := range read.GetMessages() {
-		said = append(said, roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()})
+		heard := roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()}
+		last = heard.At
+		if !roomcomments.Unheard(heard, agent) {
+			said = append(said, heard)
+		}
 	}
 	if len(said) == 0 {
-		return nil
+		if last == "" {
+			return nil
+		}
+		return told.Keep(ctx, target.Room, agent, last)
 	}
 	request, err := http.NewRequestWithContext(withSpeaker(lifetime, speaker), http.MethodPost, "/github/comments", nil)
 	if err != nil {
@@ -152,5 +189,5 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 		return errors.Newf("%s did not take the turn, so what it was to be told is told again with the next", agent)
 	}
 	// Kept once the agent took the turn: what is said during it is the next one's.
-	return told.Keep(context.WithoutCancel(ctx), target.Room, agent, said[len(said)-1].At)
+	return told.Keep(context.WithoutCancel(ctx), target.Room, agent, last)
 }
