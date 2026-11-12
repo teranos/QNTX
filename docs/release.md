@@ -26,3 +26,7 @@ Every tarball bundles Nix's `libduckdb.so` in `lib/` beside the binary, with the
 
 The version is the tag. `git describe --tags --match 'v*' --dirty` is asked once, in the Makefile, and reaches Nix as `VERSION_TAG` — which needs `nix build --impure`, since pure eval cannot read the environment. Without it a binary calls itself `dev`.
 
+"you need to make release be set with the tag for non dev deployments, like, q and k"
+
+A rolling branch build asks the same `git describe` and builds with `--impure`, so the tarball q and k install calls itself by the tag and the commits past it (`v0.55.0-925-gaf1299b51`), and that is the release Sentry files its events under.
+
