@@ -21,10 +21,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// "Harness is a plugin that speaks grpc A2A"
+// "「[Opus 5.5] Harness is a plugin that speaks grpc A2A」"
 
-// a2aOverGRPCAsked is a node served as its port serves it, HTTP/2 without TLS
-// beside HTTP/1, and a2a-go's gRPC client of its A2AService.
+// 「[Fable 5.2] a2aOverGRPCAsked is a node served as its port serves it, HTTP/2 without TLS」
+// 「[Fable 5.2] beside HTTP/1, and a2a-go's gRPC client of its A2AService.」
 func a2aOverGRPCAsked(t *testing.T) (a2apb.A2AServiceClient, map[auth.Level]string) {
 	t.Helper()
 	held := filepath.Join(t.TempDir(), "held")
@@ -43,8 +43,8 @@ func a2aOverGRPCAsked(t *testing.T) (a2apb.A2AServiceClient, map[auth.Level]stri
 	return a2apb.NewA2AServiceClient(conn), tokens
 }
 
-// as is ctx carrying token as gRPC carries a credential: the authorization
-// metadata, which is the HTTP header the gate reads.
+// 「[Fable 5.2] as is ctx carrying token as gRPC carries a credential: the authorization」
+// 「[Fable 5.2] metadata, which is the HTTP header the gate reads.」
 func asOverGRPC(token string) context.Context {
 	return metadata.AppendToOutgoingContext(context.Background(), "authorization", "Bearer "+token, "a2a-version", "1.0")
 }
@@ -66,7 +66,7 @@ func TestTheNodeAgentIsSpokenToOverGRPC(t *testing.T) {
 	require.NotNil(t, task, "a turn is a Task")
 	assert.Equal(t, a2apb.TaskState_TASK_STATE_SUBMITTED, task.GetStatus().GetState())
 
-	// The Task it made is the one HTTP+JSON and JSON-RPC answer by that id.
+	// 「[Fable 5.2] The Task it made is the one HTTP+JSON and JSON-RPC answer by that id.」
 	again, err := client.GetTask(root, &a2apb.GetTaskRequest{Id: task.GetId()})
 	require.NoError(t, err)
 	assert.Equal(t, task.GetId(), again.GetId())
@@ -76,17 +76,17 @@ func TestTheNodeAgentIsSpokenToOverGRPC(t *testing.T) {
 func TestA2AOverGRPCGoesThroughTheGate(t *testing.T) {
 	client, tokens := a2aOverGRPCAsked(t)
 
-	// Nobody: the gate turns it away as gRPC says a refusal, and to no login page.
+	// 「[Fable 5.2] Nobody: the gate turns it away as gRPC says a refusal, and to no login page.」
 	_, err := client.SendMessage(context.Background(), saidOverGRPC("hi"))
 	require.Error(t, err)
 	assert.Equal(t, codes.Unauthenticated, status.Code(err), err)
 
-	// A2A is ROOT's: SUPER is not served it.
+	// 「[Fable 5.2] A2A is ROOT's: SUPER is not served it.」
 	_, err = client.SendMessage(asOverGRPC(tokens[auth.LevelSuper]), saidOverGRPC("hi"))
 	require.Error(t, err)
 	assert.Equal(t, codes.PermissionDenied, status.Code(err), err)
 
-	// A tenant no agent is served at does not exist, as over the other bindings (§3.3.2).
+	// 「[Fable 5.2] A tenant no agent is served at does not exist, as over the other bindings (§3.3.2).」
 	request := saidOverGRPC("hi")
 	request.Tenant = "Rowan"
 	_, err = client.SendMessage(asOverGRPC(tokens[auth.LevelRoot]), request)
@@ -95,9 +95,9 @@ func TestA2AOverGRPCGoesThroughTheGate(t *testing.T) {
 	assert.Contains(t, err.Error(), "no agent is served at tenant Rowan")
 }
 
-// The card lists gRPC where am.toml says it is reached, and nowhere else: the
-// node serves it on its own port, and whether its front door passes HTTP/2 is
-// the deployment's to say.
+// 「[Fable 5.2] The card lists gRPC where am.toml says it is reached, and nowhere else: the」
+// 「[Fable 5.2] node serves it on its own port, and whether its front door passes HTTP/2 is」
+// 「[Fable 5.2] the deployment's to say.」
 func TestTheCardListsGRPCWhereItIsReached(t *testing.T) {
 	srv, _, _ := nodeAgentOverA2A(t, "")
 	bindings := func() string {
