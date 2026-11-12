@@ -44,6 +44,10 @@ type Said struct {
 	// Allow is the tools the session may use without being asked, each by
 	// Claude Code's own name for it.
 	Allow []string
+	// In is the repository of its work the turn is said in, as owner/repo: it
+	// runs in that checkout, so what stands there, a project's rituals, is
+	// where its hooks stand. Empty, it runs in its work.
+	In string
 	// Env is what the session's environment holds beyond what this sets, each
 	// NAME=value. What the session runs inherits it.
 	Env []string
@@ -173,6 +177,10 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 			return Answer{}, errors.Wrapf(err, "could not create %s", dir)
 		}
 	}
+	at, err := s.place(work)
+	if err != nil {
+		return Answer{}, err
+	}
 
 	// Partial messages are the stream_event lines: the words as the model says
 	// them, for whoever tails the stream while the turn runs (Tail).
@@ -240,7 +248,7 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		}
 	}
 	cmd := exec.Command(binary, argv...)
-	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = work, env, out, said
+	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = at, env, out, said
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: s.Apart}
 	if err := cmd.Start(); err != nil {
 		return Answer{}, errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), handedOver())
@@ -267,6 +275,41 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(err, signalled), <-waited)
 	}
 	return answer, err
+}
+
+// place is where the turn runs: its work, or the checkout of the repository In names there.
+// Anything but an owner/repo checked out in its work is no place to say it in.
+func (s Said) place(work string) (string, error) {
+	if s.In == "" {
+		return work, nil
+	}
+	refused := errors.Newf("%q is no repository of the agent's work to say a turn in: one is owner/repo, checked out under %s", s.In, work)
+	parts := strings.Split(s.In, "/")
+	if len(parts) != 2 {
+		return "", refused
+	}
+	for _, part := range parts {
+		// A name that is only dots climbs out of the work.
+		if part == "" || strings.Trim(part, ".") == "" || strings.ContainsAny(part, `\`) {
+			return "", refused
+		}
+	}
+	// Resolved, so a link in the work that leads out of it is no checkout of it.
+	root, err := filepath.EvalSymlinks(work)
+	if err != nil {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	dir, err := filepath.EvalSymlinks(filepath.Join(work, parts[0], parts[1]))
+	if err != nil {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	if within, err := filepath.Rel(root, dir); err != nil || within != filepath.Join(parts[0], parts[1]) {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	if info, err := os.Stat(filepath.Join(dir, ".git")); err != nil || info == nil {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	return dir, nil
 }
 
 // Holds reports whether Claude Code under home keeps the session: it writes
