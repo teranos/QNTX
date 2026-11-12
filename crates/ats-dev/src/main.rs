@@ -16,16 +16,26 @@
 //! ats-dev [--db FILE] clear --yes
 //! ats-dev [--db FILE] subjects | predicates | contexts | actors   # distinct values, one per line
 //! ats-dev [--db FILE] stats
-//! ats-dev [--db FILE] key                       # the signing key's did:key and file (minted if there is none)
+//! ats-dev [--db FILE] key                       # the signing key's did:key and file
+//! ats-dev [--db FILE] push NODE [ID...]         # send rows to a node, the request signed by the key; one JSON line per row
 //! ats-dev [--db FILE] bench load N [--step S] [--batch K] [--replace] | probe N | query   # see bench/README.md
 //! ats-dev [--db FILE] verify [ID]               # valid / invalid / unsigned, one line each; exit 1 if any is invalid
 //! ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X
 //! ```
 //!
-//! `put` signs with ats-dev's own ed25519 key (`--key`, else `$ATS_DEV_KEY`, else
-//! `<db>.key`, minted on first use) over the bytes `ats/signing` signs in Go.
-//! `--unsigned` writes without a signature. This is not the node's key. An existing
-//! key file that group or other can reach (mode other than 0600) is refused.
+//! `put` signs as the key kept in `~/.qntx/key` (else `--key FILE`, else
+//! `$ATS_DEV_KEY`): the one `qntx` signs a request to a node with, a 32-byte
+//! ed25519 seed in hex that `ground code login` keeps. ats-dev never mints one.
+//! The bytes are the ones the node verifies (`ats-sign`), and a row signed here
+//! is the node's to store as it was signed: its actors lead with the key's
+//! did:key and its timestamp is a whole second, as the node writes them under
+//! a signature. `--unsigned` writes without a signature, authored by `ats-dev`.
+//! A key file that group or other can reach (mode other than 0600) is refused.
+//!
+//! "A signature proves the key, and nothing reusable leaves the node."
+//! `push NODE` posts rows to `NODE/api/attestations`, each request carrying a
+//! JWT the same key signs for that node, spent once there; the node stores a
+//! row signed by that key as signed, and signs an unsigned one as itself.
 //!
 //! `--db` defaults to `$ATS_DEV_DB`, else `ats-dev.db`. Rows come out as JSON,
 //! one attestation per line. A failure goes to stderr as a sacred-error `Error`
@@ -40,8 +50,7 @@
 //! others. `--db` is DuckDB's location (a path, or an `s3://` / `file://` url)
 //! and Postgres's connection url (`$QNTX_POSTGRES_URL` if not given); `--ca`
 //! is Postgres's CA file when the url is TLS; `--namespace` (default
-//! `ats-dev`) is the namespace both open. The signing key goes beside a path
-//! `--db`; for a url, name it with `--key` or `$ATS_DEV_KEY`.
+//! `ats-dev`) is the namespace both open.
 //!
 //! `duckdb` is one writer per location (ADR-024: "One node writes a namespace
 //! prefix"). `ats-dev` does not coordinate two processes writing the same one,
@@ -168,15 +177,6 @@ fn opts(args: &[String]) -> Result<Opts, Box<Error>> {
 }
 
 impl Opts {
-    /// The path the signing key goes beside, if `--db` is one: a SQLite file,
-    /// or a DuckDB location that is a plain path. A url has no file to sit beside.
-    fn beside(&self) -> Option<&str> {
-        match self.backend {
-            Kind::Sqlite => Some(&self.db),
-            Kind::Duckdb if !self.db.contains("://") => Some(&self.db),
-            _ => None,
-        }
-    }
 }
 
 fn open_sqlite(o: &Opts) -> Result<SqliteStore, Box<Error>> {
@@ -256,8 +256,8 @@ fn unbuilt(feature: &str) -> Box<Error> {
     )
 }
 
-/// ats-dev's signing key, loaded (or minted) the first time something needs a
-/// signature made, never for reading, `--unsigned`, or a signature already given.
+/// The signing key, loaded the first time something needs a signature made,
+/// never for reading, `--unsigned`, or a signature already given.
 struct Keys {
     path: Result<std::path::PathBuf, Box<Error>>,
     unsigned: bool,
@@ -266,7 +266,7 @@ struct Keys {
 
 impl Keys {
     fn of(o: &Opts) -> Self {
-        Keys { path: sign::key_path(o.key.as_deref(), o.beside(), o.backend.name()), unsigned: o.unsigned, loaded: std::cell::OnceCell::new() }
+        Keys { path: sign::key_path(o.key.as_deref()), unsigned: o.unsigned, loaded: std::cell::OnceCell::new() }
     }
 
     fn path(&self) -> Result<&std::path::Path, Box<Error>> {
@@ -276,7 +276,7 @@ impl Keys {
         }
     }
 
-    /// The key if one exists already; nothing is minted to find out.
+    /// The key if one is kept; none kept is not an error here.
     fn existing(&self) -> Result<Option<&sign::Signer>, Box<Error>> {
         if self.unsigned {
             return Ok(None);
@@ -294,13 +294,13 @@ impl Keys {
         if let Some(s) = self.loaded.get() {
             return Ok(Some(s));
         }
-        let s = sign::Signer::load_or_mint(self.path()?)?;
+        let s = sign::Signer::load(self.path()?)?;
         Ok(Some(self.loaded.get_or_init(|| s)))
     }
 }
 
 /// What is written: a signature already given is checked and kept, none given
-/// is made with ats-dev's key.
+/// is made with the key, and an unsigned row is authored by ats-dev.
 fn seal(keys: &Keys, a: Attestation) -> Result<Attestation, Box<Error>> {
     if a.signature.is_none() && a.signer_did.is_some() {
         return Err(fail("a signer without a signature", format!("{}: name a signature too, or neither", a.id)));
@@ -312,9 +312,33 @@ fn seal(keys: &Keys, a: Attestation) -> Result<Attestation, Box<Error>> {
         };
     }
     match keys.signer()? {
-        Some(sg) => sg.sign(a),
-        None => Ok(a),
+        Some(sg) => sg.sign(ready_to_sign(sg, a)?),
+        None => Ok(a.authored_by(ACTOR)),
     }
+}
+
+/// The attestation as the node writes it under this key's signature, so that
+/// what is signed here is what the node verifies there. The node writes a
+/// request admitted as a key with that key's did:key leading the actors
+/// (`actorsFor`, QNTX `server/attestation_handlers.go`), and a signature's
+/// actors must be those; it takes a timestamp in seconds (`time.Unix(s, 0)`),
+/// so a signature over a sub-second moment would not verify there.
+fn ready_to_sign(sg: &sign::Signer, mut a: Attestation) -> Result<Attestation, Box<Error>> {
+    if a.timestamp.rem_euclid(1000) != 0 {
+        return Err(fail(
+            "a signed attestation's timestamp is a whole second",
+            format!("{}: timestamp {} ms; the node carries it in seconds, so a signature over milliseconds would not verify there", a.id, a.timestamp),
+        ));
+    }
+    if a.actors.first() != Some(&sg.did) {
+        a.actors.insert(0, sg.did.clone());
+    }
+    Ok(a)
+}
+
+/// Now, to the whole second: a timestamp the node carries as it was signed.
+fn now_whole_ms() -> i64 {
+    now_ms().div_euclid(1000) * 1000
 }
 
 fn run(args: &[String]) -> Result<(), Box<Error>> {
@@ -398,12 +422,13 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
         }
         "update" => update(&o, &tail),
         "key" => {
-            let path = sign::key_path(o.key.as_deref(), o.beside(), o.backend.name())?;
-            let sg = sign::Signer::load_or_mint(&path)?;
+            let path = sign::key_path(o.key.as_deref())?;
+            let sg = sign::Signer::load(&path)?;
             println!("{}", serde_json::json!({ "did": sg.did, "file": path.display().to_string() }));
             Ok(())
         }
         "verify" => verify(&o, &tail),
+        "push" => push(&o, &tail),
         "bench" => bench::run(&o, &tail),
         "alias" => alias(&o, &tail),
         other => Err(fail("unknown command", other)),
@@ -485,20 +510,16 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
                     return Err(fail(
                         "the update breaks a signature ats-dev cannot make",
                         format!(
-                            "{id} is signed by {}, ats-dev's key is {}",
+                            "{id} is signed by {}, the key kept is {}",
                             stored.signer_did.as_deref().unwrap_or("?"),
-                            other.map(|k| k.did.as_str()).unwrap_or("not made yet"),
+                            other.map(|k| k.did.as_str()).unwrap_or("none"),
                         ),
                     ))
                 }
             };
-            // The actors are under the signature; a signed row with none is out of every actor's claims.
-            if a.actors.is_empty() {
-                return Err(fail("a signed attestation must name its actors", format!("{id}: the update would leave none")));
-            }
             a.signature = None;
             a.signer_did = None;
-            a = sg.sign(a)?;
+            a = sg.sign(ready_to_sign(sg, a)?)?;
         }
     } else {
         // An unsigned row is authored as put authors it: an update that empties
@@ -587,12 +608,12 @@ fn put(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         contexts: if parsed.contexts.is_empty() { vec!["_".into()] } else { own(&parsed.contexts) },
         predicates: if parsed.predicates.is_empty() { vec!["_".into()] } else { own(&parsed.predicates) },
         actors: own(&parsed.actors),
-        timestamp: now_ms(),
+        timestamp: now_whole_ms(),
         created_at: now_ms(),
         source: "ats-dev".into(),
         ..Attestation::default()
     };
-    let mut a = a.authored_by(ACTOR);
+    let mut a = a;
     let mut flags = tail.iter().skip(1);
     while let Some(f) = flags.next() {
         match f.as_str() {
@@ -638,7 +659,7 @@ fn complete(line: &str) -> Result<Attestation, Box<Error>> {
     }
     let now = now_ms();
     if !obj.contains_key("id") { obj.insert("id".into(), new_id()?.into()); }
-    if !obj.contains_key("timestamp") { obj.insert("timestamp".into(), now.into()); }
+    if !obj.contains_key("timestamp") { obj.insert("timestamp".into(), now_whole_ms().into()); }
     if !obj.contains_key("created_at") { obj.insert("created_at".into(), now.into()); }
     if !obj.contains_key("source") { obj.insert("source".into(), "ats-dev".into()); }
     for k in ["predicates", "contexts"] {
@@ -655,7 +676,7 @@ fn complete(line: &str) -> Result<Attestation, Box<Error>> {
             format!("{}: the signature covers them, so ats-dev cannot author one in", a.id),
         ));
     }
-    Ok(a.authored_by(ACTOR))
+    Ok(a)
 }
 
 fn put_stdin(s: &mut Store, keys: &Keys) -> Result<(), Box<Error>> {
@@ -787,4 +808,127 @@ fn verify(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         return Err(fail("signatures that do not hold", format!("{bad}")));
     }
     Ok(())
+}
+
+/// Rows per request: one signature is spent per request, and the node answers
+/// a list row by row, in the order sent (`handleCreateAttestation`).
+const PUSH_BATCH: usize = 100;
+
+/// Seconds a request's signature lasts: long enough to reach the node, well
+/// inside the five minutes the node allows one (what `qntx sign` gives).
+const PUSH_SIGNED_FOR: i64 = 60;
+
+/// Send rows to a node: `POST NODE/api/attestations`, each request signed by
+/// the key for that node. The node answers every row; each answer is a line on
+/// stdout, as the node gave it. A row signed by the key is stored as signed,
+/// an unsigned one is signed by the node, one signed by another key is refused
+/// there unless the node's grant holds that key.
+fn push(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
+    let usage = "ats-dev push https://node.example [ID...]";
+    let node = tail.first().ok_or_else(|| fail("push needs a node", usage))?;
+    let origin = origin_of(node)?;
+    let url = format!("{}/api/attestations", node.trim_end_matches('/'));
+    let sg = sign::Signer::load(&sign::key_path(o.key.as_deref())?)?;
+    let s = open(o)?;
+    let ids: Vec<String> = match tail.get(1..) {
+        Some(given) if !given.is_empty() => given.iter().map(|x| x.to_string()).collect(),
+        _ => listed(&s)?,
+    };
+
+    let mut out = std::io::stdout().lock();
+    let mut say = |line: serde_json::Value| -> Result<(), Box<Error>> {
+        writeln!(out, "{line}").map_err(|e| fail("could not write stdout", e))
+    };
+    let mut not_taken = 0usize;
+    let mut rows: Vec<(String, serde_json::Value)> = Vec::new();
+    for id in ids {
+        match s.get(&id).map_err(|e| fail("get failed", e))? {
+            None => {
+                not_taken += 1;
+                say(serde_json::json!({ "id": id, "refused": "no such attestation" }))?;
+            }
+            Some(a) => match wire(&a) {
+                Ok(v) => rows.push((id, v)),
+                Err(why) => {
+                    not_taken += 1;
+                    say(serde_json::json!({ "id": id, "refused": why }))?;
+                }
+            },
+        }
+    }
+
+    let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
+    let mut sent = 0usize;
+    for chunk in rows.chunks(PUSH_BATCH) {
+        let body = serde_json::Value::Array(chunk.iter().map(|(_, v)| v.clone()).collect()).to_string();
+        let mut resp = agent
+            .post(&url)
+            .header("Authorization", &sg.authorization(&origin, PUSH_SIGNED_FOR)?)
+            .header("Content-Type", "application/json")
+            .send(body)
+            .map_err(|e| fail(&format!("{url} did not answer"), e))?;
+        let status = resp.status().as_u16();
+        let text = resp.body_mut().read_to_string().map_err(|e| fail(&format!("{url} answered {status}, unread"), e))?;
+        sent += chunk.len();
+        let answer: serde_json::Value = serde_json::from_str(&text).unwrap_or(serde_json::Value::String(text.clone()));
+        let results = answer.get("results").and_then(|r| r.as_array()).filter(|r| status == 200 && r.len() == chunk.len());
+        match results {
+            Some(results) => {
+                for ((id, _), r) in chunk.iter().zip(results) {
+                    let st = r.get("status").and_then(|x| x.as_u64()).unwrap_or(0);
+                    if st != 200 && st != 201 {
+                        not_taken += 1;
+                    }
+                    say(serde_json::json!({ "id": id, "status": st, "answer": r.get("answer") }))?;
+                }
+            }
+            // The request itself was not taken (the gate, a body the node did
+            // not read): every row of it is answered with what the node said.
+            None => {
+                for (id, _) in chunk {
+                    not_taken += 1;
+                    say(serde_json::json!({ "id": id, "status": status, "answer": answer }))?;
+                }
+            }
+        }
+    }
+    eprintln!("ats-dev: {sent} sent to {url} as {}, {not_taken} not taken", sg.did);
+    if not_taken > 0 {
+        return Err(fail("rows the node did not take", not_taken));
+    }
+    Ok(())
+}
+
+/// The scheme and host of a node's url: what a request's signature is made out to.
+fn origin_of(node: &str) -> Result<String, Box<Error>> {
+    let (scheme, rest) = node.split_once("://").ok_or_else(|| fail("a node is a url", node))?;
+    if scheme != "http" && scheme != "https" {
+        return Err(fail("a node is reached over http or https", node));
+    }
+    let host = rest.split('/').next().unwrap_or("");
+    if host.is_empty() {
+        return Err(fail("a node url names a host", node));
+    }
+    Ok(format!("{scheme}://{host}"))
+}
+
+/// One row as `POST /api/attestations` takes it: the timestamp in seconds, the
+/// signature as Go reads a `[]byte`, `created_at` left to the node. A row whose
+/// timestamp is not a whole second is not sent: the node would store another
+/// moment, and a signature over this one would not verify there.
+fn wire(a: &Attestation) -> Result<serde_json::Value, String> {
+    use base64::Engine;
+    if a.timestamp.rem_euclid(1000) != 0 {
+        return Err(format!("timestamp {} ms is not a whole second; the node takes seconds", a.timestamp));
+    }
+    let mut v = serde_json::json!({
+        "id": a.id, "subjects": a.subjects, "predicates": a.predicates, "contexts": a.contexts,
+        "actors": a.actors, "timestamp": a.timestamp.div_euclid(1000), "source": a.source,
+        "attributes": a.attributes,
+    });
+    if let (Some(sig), Some(did), Some(m)) = (&a.signature, &a.signer_did, v.as_object_mut()) {
+        m.insert("signature".into(), base64::engine::general_purpose::STANDARD.encode(sig).into());
+        m.insert("signer_did".into(), did.clone().into());
+    }
+    Ok(v)
 }
