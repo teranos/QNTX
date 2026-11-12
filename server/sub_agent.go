@@ -62,6 +62,24 @@ func (h *harnessHeld) Now() (path string, arrived bool, err error) {
 	}
 }
 
+// 「[Opus 5.5] claudeCode is the Claude Code this node holds, fetched the first
+// time it is needed: at start when am.toml names the Node Agent in it, or when
+// a namespace's agent in Claude Code is first asked for. Holding it names
+// nobody in Claude Code.」
+func (s *QNTXServer) claudeCode() (*harnessHeld, error) {
+	return s.holdHarnessOnce("claude", func() (*harnessHeld, error) {
+		pin, err := claudecode.Pinned()
+		if err != nil {
+			return nil, errors.Wrap(err, "the Claude Code this build pins did not read")
+		}
+		dir, err := claudeCodeDir()
+		if err != nil {
+			return nil, err
+		}
+		return holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger), nil
+	})
+}
+
 // holdClaudeCode fetches what pin names into dir, off the boot's own time: the
 // binary is hundreds of megabytes and the node serves while it arrives.
 func holdClaudeCode(ctx context.Context, pin claudecode.Pin, dir string, spawn func(string, func()), logger *zap.SugaredLogger) *harnessHeld {
@@ -95,21 +113,29 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 		return err
 	}
 	s.agentsDir = filepath.Dir(home)
-	if !s.deps.cfg.Agent.Root.Named() {
+	root := s.deps.cfg.Agent.Root
+	// "Read them as Claude, warn"
+	if moved := root.MovedKeys(); len(moved) > 0 {
+		s.logger.Warnw("am.toml names Claude Code under [agent.root] itself, the way it was named before [agent.root.claude]: read as [agent.root.claude], move it there",
+			"keys", moved)
+	}
+	// 「[Opus 5.5] A Node Agent named in any harness is one: Claude Code no more than the others.」
+	if !root.Named() {
 		return nil
 	}
 	// The node serves without its agent, so why there is none is kept for
 	// whoever speaks to it.
 	defer func() { s.noNodeAgent = err }()
-	pin, err := claudecode.Pinned()
-	if err != nil {
-		return errors.Wrap(err, "the Claude Code this build pins did not read")
-	}
+	// Each harness's binary is kept beside the others, under ~/.qntx.
 	dir, err := claudeCodeDir()
 	if err != nil {
 		return err
 	}
-	s.holdHarness("claude", holdClaudeCode(s.ctx, pin, dir, s.wg.Go, s.logger))
+	if root.Claude.Named() {
+		if _, err := s.claudeCode(); err != nil {
+			return err
+		}
+	}
 	if s.deps.cfg.Agent.Root.Codex.Named() {
 		s.holdHarness("codex", holdCodex(s.ctx, filepath.Join(filepath.Dir(dir), "codex"), s.wg.Go, s.logger))
 	}
@@ -125,14 +151,24 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	// The Node Agent's turns run apart from the node from its boot on: "on a
 	// redeploy NODE agent would still be alive" (#1256).
 	s.nodeAgentApart = true
-	// The session is held from here, before anything can be said to it, until
-	// the turns the node's last process left are read on.
 	agent := s.nodeAgent
-	in := agent.in(s.claudeHarness())
-	in.turn <- struct{}{}
-	effort := s.deps.cfg.Agent.Root.Effort
 	// A Task is settled by this node only when the node before it held it.
 	since := time.Now()
+	// 「[Opus 5.5] The turns a last process left are Claude Code's: with none
+	// named, there are none to read on, and a Task they left is settled now.」
+	if !root.Claude.Named() {
+		s.wg.Go("agent.settle", func() {
+			if err := s.settleTasksNoTurnLeft(agent, since); err != nil {
+				s.logger.Errorw("The tasks the node's last process left with no turn to end them were not settled", "agent", agent.did, "error", err)
+			}
+		})
+		return nil
+	}
+	// The session is held from here, before anything can be said to it, until
+	// the turns the node's last process left are read on.
+	in := agent.in(s.claudeHarness())
+	in.turn <- struct{}{}
+	effort := root.Claude.Effort
 	s.wg.Go("agent.follow", func() { s.followLeftTurns(agent, in, effort, since) })
 	return nil
 }

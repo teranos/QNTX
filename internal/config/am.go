@@ -28,9 +28,33 @@ type AgentConfig struct {
 	Root NodeAgentConfig `mapstructure:"root"`
 }
 
-// NodeAgentConfig names the Node Agent: QNTX itself as ROOT talks to it, run
-// by the node as Claude Code. Nothing stands in for the model or the effort.
+// "Let's say that I don't like how it's putting Claude on a pedestal."
+
+// 「[Opus 5.5] NodeAgentConfig names the Node Agent: QNTX itself as ROOT talks to
+// it, in each harness am.toml names it in, none above another. Nothing stands in
+// for a model or an effort.」
 type NodeAgentConfig struct {
+	// 「[Opus 5.5] Claude is how it runs in Claude Code.」
+	Claude ClaudeConfig `mapstructure:"claude"`
+	// Pi is the other harness it runs in, from the Pi element (ADR-048).
+	Pi PiConfig `mapstructure:"pi"`
+	// "Codex Agent runtime as another first class citizen in QNTX besides Claude"
+	Codex CodexConfig `mapstructure:"codex"`
+	// "wiring it into node and namespace config as an actual harness"
+	Agy AgyConfig `mapstructure:"agy"`
+
+	// 「[Opus 5.5] Moved is Claude Code as am.toml named it before
+	// [agent.root.claude]: read as Claude when that is not named, and said
+	// where it moved (MovedKeys).」
+	Moved ClaudeConfig `mapstructure:",squash"`
+
+	movedKeys []string // the keys of Moved am.toml said
+	folded    bool     // Moved is read as Claude
+}
+
+// 「[Opus 5.5] ClaudeConfig names how the Node Agent runs in Claude Code. A node
+// that names no model does not run it there.」
+type ClaudeConfig struct {
 	Model    string `mapstructure:"model"`  // The Claude model it is, by its full name.
 	Effort   string `mapstructure:"effort"` // The effort it runs at: low, medium, high, xhigh or max.
 	TokenRef string `mapstructure:"token"`  // ssm:// or env: reference to the Claude plan token — a literal is rejected
@@ -39,12 +63,39 @@ type NodeAgentConfig struct {
 	// Code's own names for them.
 	Mode  string   `mapstructure:"permission_mode"`
 	Allow []string `mapstructure:"allow"`
-	// Pi is the other harness it runs in, from the Pi element (ADR-048).
-	Pi PiConfig `mapstructure:"pi"`
-	// "Codex Agent runtime as another first class citizen in QNTX besides Claude"
-	Codex CodexConfig `mapstructure:"codex"`
-	// "wiring it into node and namespace config as an actual harness"
-	Agy AgyConfig `mapstructure:"agy"`
+}
+
+// 「[Opus 5.5] Named reports whether am.toml names Claude Code for the Node Agent.」
+func (c ClaudeConfig) Named() bool {
+	return c.Model != "" || c.Effort != "" || c.TokenRef != "" || c.Mode != "" || len(c.Allow) > 0
+}
+
+// 「[Opus 5.5] movedClaudeKeys is each key Claude Code was named by under
+// [agent.root], before it had [agent.root.claude].」
+var movedClaudeKeys = []string{"model", "effort", "token", "permission_mode", "allow"}
+
+// 「[Opus 5.5] foldMovedClaude reads Claude Code named the old way, under
+// [agent.root] itself, as [agent.root.claude], and keeps which keys moved so
+// the node says so. Named both ways, [agent.root.claude] stands and Validate
+// refuses the rest.」
+func (c *Config) foldMovedClaude(isSet func(string) bool) {
+	root := &c.Agent.Root
+	root.movedKeys = nil
+	for _, key := range movedClaudeKeys {
+		if isSet("agent.root." + key) {
+			root.movedKeys = append(root.movedKeys, "agent.root."+key)
+		}
+	}
+	if len(root.movedKeys) > 0 && !root.Claude.Named() {
+		root.Claude = root.Moved
+		root.folded = true
+	}
+}
+
+// 「[Opus 5.5] MovedKeys is each key am.toml named Claude Code by the old way,
+// under [agent.root] itself. Read as [agent.root.claude.*] until moved there.」
+func (r NodeAgentConfig) MovedKeys() []string {
+	return r.movedKeys
 }
 
 // 「[Opus 5.5] AgyConfig turns the Node Agent on in agy. It runs as the node's own identity at」
@@ -75,13 +126,16 @@ type CodexConfig struct {
 	Sandbox string `mapstructure:"sandbox"`
 }
 
+// 「[Opus 5.5] CodexSandboxes is each sandbox codex runs in, as codex names them.」
+var CodexSandboxes = []string{"read-only", "workspace-write"}
+
 // Named reports whether am.toml names codex for the Node Agent.
 func (c CodexConfig) Named() bool {
 	return c.Model != "" || c.Gateway != ""
 }
 
 // PiConfig names how the Node Agent runs in Pi. A node that names no model
-// runs it in Claude Code alone.
+// does not run it in Pi.
 type PiConfig struct {
 	Model    string `mapstructure:"model"`    // The model, by the id the gateway knows it as.
 	Thinking string `mapstructure:"thinking"` // off, minimal, low, medium, high, xhigh or max.
@@ -99,9 +153,10 @@ func (p PiConfig) Named() bool {
 // names them.
 var ThinkingLevels = []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"}
 
-// Named reports whether am.toml names a Node Agent at all.
+// 「[Opus 5.5] Named reports whether am.toml names a Node Agent at all: in any
+// harness, Claude Code no more than the others.」
 func (r NodeAgentConfig) Named() bool {
-	return r.Model != "" || r.Effort != "" || r.TokenRef != "" || r.Mode != "" || len(r.Allow) > 0
+	return r.Claude.Named() || r.Pi.Named() || r.Codex.Named() || r.Agy.Named()
 }
 
 // PermissionModes is every permission mode Claude Code runs in, as its own
