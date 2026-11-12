@@ -10,6 +10,7 @@ package grpc
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
@@ -19,14 +20,19 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	a2agrpc "github.com/a2aproject/a2a-go/v2/a2agrpc/v1"
+	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // PluginServer wraps a DomainPlugin to expose it via gRPC.
@@ -44,6 +50,10 @@ type PluginServer struct {
 	// initOnce ensures Initialize is only executed once; concurrent calls block until completion
 	initOnce sync.Once
 	initErr  error
+
+	// harnessToken is the token the node handed at Initialize: what a call to
+	// the plugin's harness presents.
+	harnessToken atomic.Value
 }
 
 // NewPluginServer creates a new gRPC server wrapper for a DomainPlugin.
@@ -81,7 +91,7 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	// This goes to stdout and will be captured by pluginLogger
 	fmt.Printf("QNTX_PLUGIN_PORT=%d\n", actualPort)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(s.harnessUnary), grpc.ChainStreamInterceptor(s.harnessStream))
 	protocol.RegisterDomainPluginServiceServer(grpcServer, s)
 
 	// A plugin serving the whole LLMService registers its own server; one
@@ -123,6 +133,42 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	}
 
 	return nil
+}
+
+// harnessCalls is every method of A2A's A2AService, as gRPC names them.
+var harnessCalls = "/" + a2apb.A2AService_ServiceDesc.ServiceName + "/"
+
+// fromTheNode refuses a call to the plugin's harness that does not present
+// the token the node handed this plugin at Initialize. A turn names the
+// harness's home, its environment and its provider, so it is the node's alone
+// to say: a plugin the node has not initialized answers no turn.
+func (s *PluginServer) fromTheNode(ctx context.Context, method string) error {
+	if !strings.HasPrefix(method, harnessCalls) {
+		return nil
+	}
+	handed, _ := s.harnessToken.Load().(string)
+	if handed == "" {
+		return status.Error(codes.Unauthenticated, "this plugin's harness answers the node, which has handed it no token yet")
+	}
+	presented, _ := strings.CutPrefix(strings.Join(metadata.ValueFromIncomingContext(ctx, harnessTokenKey), ""), "Bearer ")
+	if subtle.ConstantTimeCompare([]byte(presented), []byte(handed)) != 1 {
+		return status.Error(codes.Unauthenticated, "this plugin's harness answers the node, and this call does not present the plugin's token")
+	}
+	return nil
+}
+
+func (s *PluginServer) harnessUnary(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	if err := s.fromTheNode(ctx, info.FullMethod); err != nil {
+		return nil, err
+	}
+	return handler(ctx, req)
+}
+
+func (s *PluginServer) harnessStream(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	if err := s.fromTheNode(stream.Context(), info.FullMethod); err != nil {
+		return err
+	}
+	return handler(srv, stream)
 }
 
 // listenAttempts is how many ports listen tries, from the one asked for up.
@@ -206,6 +252,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		// A plugin answering a sigil presents the call's token to the store here.
 		pluginConfig["_ats_store_endpoint"] = req.AtsStoreEndpoint
 		pluginConfig["_auth_token"] = req.AuthToken
+		s.harnessToken.Store(req.AuthToken)
 
 		services, err := NewRemoteServiceRegistry(
 			ctx,

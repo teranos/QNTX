@@ -350,13 +350,17 @@ type harnessesHeld struct {
 
 // harnessHeldBy is the binary of the harness named, or nil when the node holds
 // none. A harness a plugin runs is held where the plugin is (ADR-059): the
-// binary is the plugin's own.
+// binary is the plugin's own. Only a harness whose turn core says to a plugin
+// is held so: one the node runs itself needs a binary the node holds.
 func (s *QNTXServer) harnessHeldBy(name string) *harnessHeld {
 	s.harnessBinaries.mu.Lock()
 	held := s.harnessBinaries.held[name]
 	s.harnessBinaries.mu.Unlock()
 	if held != nil {
 		return held
+	}
+	if !harnessesAPluginRuns[name] {
+		return nil
 	}
 	if _, runs := s.harnessBackend(name); !runs {
 		return nil

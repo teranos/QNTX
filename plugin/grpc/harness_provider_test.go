@@ -16,8 +16,10 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // "Harness is a plugin that speaks grpc A2A" (ADR-059).
@@ -55,7 +57,8 @@ func TestPluginServer_APluginRunningAHarnessIsAHarnessProvider(t *testing.T) {
 }
 
 // Its harness answers as A2A's own A2AService on the plugin's port, the one
-// connection core holds to it.
+// connection core holds to it, and answers the node alone: a call presents
+// the token the node handed the plugin at Initialize.
 func TestPluginServer_ServesThePluginsHarnessAsA2AService(t *testing.T) {
 	server := NewPluginServer(&harnessPlugin{mockPlugin: newMockPlugin()}, zaptest.NewLogger(t).Sugar())
 
@@ -74,16 +77,32 @@ func TestPluginServer_ServesThePluginsHarnessAsA2AService(t *testing.T) {
 
 	// "A2A-Version": the version spoken, which a2a-go's own client says itself.
 	asking := metadata.AppendToOutgoingContext(ctx, "a2a-version", string(a2asdk.Version))
-	var answered *a2apb.SendMessageResponse
+	turn := &a2apb.SendMessageRequest{
+		Message: &a2apb.Message{MessageId: "m1", Role: a2apb.Role_ROLE_USER, Parts: []*a2apb.Part{{Content: &a2apb.Part_Text{Text: "how is the harvest?"}}}},
+	}
+
+	// Before the node initialized it, the plugin answers no turn.
 	require.Eventually(t, func() bool {
-		answered, err = a2apb.NewA2AServiceClient(conn).SendMessage(asking, &a2apb.SendMessageRequest{
-			Message: &a2apb.Message{MessageId: "m1", Role: a2apb.Role_ROLE_USER, Parts: []*a2apb.Part{{Content: &a2apb.Part_Text{Text: "how is the harvest?"}}}},
-		})
-		if err != nil {
-			t.Log(err)
-		}
-		return err == nil
-	}, 10*time.Second, 50*time.Millisecond, "the plugin's A2AService did not answer")
+		_, err = a2apb.NewA2AServiceClient(conn).SendMessage(asking, turn)
+		return status.Code(err) == codes.Unauthenticated
+	}, 10*time.Second, 50*time.Millisecond, "the plugin's A2AService answered a caller before the node handed it a token")
+
+	_, err = server.Initialize(ctx, &protocol.InitializeRequest{AuthToken: "the-plugins-token"})
+	require.NoError(t, err)
+
+	// Whoever else reaches the port is refused: no token, and another's.
+	_, err = a2apb.NewA2AServiceClient(conn).SendMessage(asking, turn)
+	assert.Equal(t, codes.Unauthenticated, status.Code(err), "a call presenting no token ran a turn")
+	_, err = a2apb.NewA2AServiceClient(PresentingHarnessToken(conn, "another-token")).SendMessage(asking, turn)
+	assert.Equal(t, codes.Unauthenticated, status.Code(err), "a call presenting another token ran a turn")
+	streamed, err := a2apb.NewA2AServiceClient(conn).SendStreamingMessage(asking, turn)
+	if err == nil {
+		_, err = streamed.Recv()
+	}
+	assert.Equal(t, codes.Unauthenticated, status.Code(err), "a streamed call presenting no token ran a turn")
+
+	answered, err := a2apb.NewA2AServiceClient(PresentingHarnessToken(conn, "the-plugins-token")).SendMessage(asking, turn)
+	require.NoError(t, err)
 	task := answered.GetTask()
 	require.NotNil(t, task)
 	assert.Equal(t, a2apb.TaskState_TASK_STATE_COMPLETED, task.GetStatus().GetState())
