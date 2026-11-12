@@ -20,7 +20,7 @@ In this repository:
 - [[ADR-021-graph-database-as-plugin-service]]
 - [[ADR-022-python-as-plugin-provided-service]]
 - [[ADR-057-Agent-Rooms]]
-- [[ADR-059-Harness-is-a-Plugin]]
+- 「[Opus 5.5, Fable 5.2, Fable 5.1] [[ADR-059-Harness-is-a-Plugin]]」
 
 
 - [[ADR-041-mail-service]]
