@@ -64,32 +64,58 @@ func (c *Config) Validate() error {
 
 	// The Node Agent is named whole or not at all (ADR-048): a model nothing
 	// named would be a model something chose for it.
-	if root := c.Agent.Root; root.Named() {
-		if root.Model == "" {
-			return errors.New("agent.root.model is required: the Node Agent is the model am.toml names, and nothing stands in for it")
+	// 「[Opus 5.5] Each harness is named whole or not at all, by itself: Claude
+	// Code no more than the others.」
+	root := c.Agent.Root
+	if len(root.movedKeys) > 0 && !root.folded {
+		return errors.Newf("am.toml names Claude Code under [agent.root.claude] and also by %s, the way it was named before: name it under [agent.root.claude] alone", strings.Join(root.movedKeys, ", "))
+	}
+	// Under the old keys, the keys said are the old ones.
+	at := "agent.root.claude."
+	if root.folded {
+		at = "agent.root."
+	}
+	if claude := root.Claude; claude.Named() {
+		if claude.Model == "" {
+			return errors.Newf("%smodel is required: the Node Agent is the model am.toml names, and nothing stands in for it", at)
 		}
-		if !NodeAgentModel(root.Model) {
-			return errors.Newf("agent.root.model is %q: only Opus or Fable may be the Node Agent", root.Model)
+		if !NodeAgentModel(claude.Model) {
+			return errors.Newf("%smodel is %q: only Opus or Fable may be the Node Agent", at, claude.Model)
 		}
-		if root.Effort == "" {
-			return errors.New("agent.root.effort is required: the Node Agent runs at the effort am.toml names")
+		if claude.Effort == "" {
+			return errors.Newf("%seffort is required: the Node Agent runs at the effort am.toml names", at)
 		}
-		if err := secretref.Validate(root.TokenRef); err != nil {
-			return errors.Wrap(err, "agent.root.token is invalid")
+		if err := secretref.Validate(claude.TokenRef); err != nil {
+			return errors.Wrapf(err, "%stoken is invalid", at)
 		}
-		if root.Mode != "" && !slices.Contains(PermissionModes, root.Mode) {
-			return errors.Newf("agent.root.permission_mode must be one of [%s], got %q", strings.Join(PermissionModes, ", "), root.Mode)
+		if claude.Mode != "" && !slices.Contains(PermissionModes, claude.Mode) {
+			return errors.Newf("%spermission_mode must be one of [%s], got %q", at, strings.Join(PermissionModes, ", "), claude.Mode)
 		}
-		if pi := root.Pi; pi.Named() {
-			if pi.Model == "" || pi.Gateway == "" {
-				return errors.New("agent.root.pi names a model and the gateway plugin its calls go through, both or neither")
-			}
-			if !NodeAgentModel(pi.Model) {
-				return errors.Newf("agent.root.pi.model is %q: only Opus or Fable may be the Node Agent", pi.Model)
-			}
-			if pi.Thinking != "" && !slices.Contains(ThinkingLevels, pi.Thinking) {
-				return errors.Newf("agent.root.pi.thinking must be one of [%s], got %q", strings.Join(ThinkingLevels, ", "), pi.Thinking)
-			}
+	}
+	if pi := root.Pi; pi.Named() {
+		if pi.Model == "" || pi.Gateway == "" {
+			return errors.New("agent.root.pi names a model and the gateway plugin its calls go through, both or neither")
+		}
+		if !NodeAgentModel(pi.Model) {
+			return errors.Newf("agent.root.pi.model is %q: only Opus or Fable may be the Node Agent", pi.Model)
+		}
+		if pi.Thinking != "" && !slices.Contains(ThinkingLevels, pi.Thinking) {
+			return errors.Newf("agent.root.pi.thinking must be one of [%s], got %q", strings.Join(ThinkingLevels, ", "), pi.Thinking)
+		}
+	}
+	// "Incomplete Codex settings start the node" — "Yes"
+	// 「[Opus 5.5] Codex named by half is refused here, as codex itself refuses
+	// it at the first turn: a model, the gateway its calls go through, and one
+	// of its two sandboxes.」
+	if codex := root.Codex; codex.Named() {
+		if codex.Model == "" || codex.Gateway == "" {
+			return errors.New("agent.root.codex names a model and the gateway its calls go through, both or neither")
+		}
+		if !slices.Contains(CodexSandboxes, codex.Sandbox) {
+			return errors.Newf("agent.root.codex.sandbox must be one of [%s], got %q", strings.Join(CodexSandboxes, ", "), codex.Sandbox)
+		}
+		if err := secretref.Validate(codex.TokenRef); err != nil {
+			return errors.Wrap(err, "agent.root.codex.token is invalid")
 		}
 	}
 

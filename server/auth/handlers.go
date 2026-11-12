@@ -87,7 +87,7 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	p := h.presented(r)
 	identity, _ := p.Admitted()
 
-	// A token speaks for whoever minted it (ADR-025), and the door is drawn on
+	// A token speaks for whoever minted it, and the door is drawn on
 	// this field alone. Reporting nobody sent a caller Middleware already
 	// grants SUPER to a passkey prompt no token can answer.
 	if identity == "" && p.Bearer != nil && h.stillAdmitted(p.Bearer.MintedBy) {

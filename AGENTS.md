@@ -50,7 +50,6 @@ TODO: sweep every repository and file for the old am.toml way of managing QNTX p
 Who may log in, the provider ceremony, and what a passkey carries:
 
 - [ADR-030](docs/adr/ADR-030-identity-providers.md).
-- Access tokens: [ADR-025](docs/adr/ADR-025-access-tokens.md).
 
 ## Connectors
 

@@ -2,8 +2,7 @@
 
 Date: 2026-10-06
 Update: 2026-11-04
-Status: Developed in pr #1094 - I think its merged because i am using obsidian to write this now.
-pre-0.888.0-polish-blocker 
+Status: actively in use. Worth going deeper 
 
 
 "i want to integrate better with Obsidian's sync service if possible, and have Obsidian be a QNTX thing, I would rather have that than to reinvent everything Obsidian does, i tried that before actually, and i got somewhere, but truth be told is that Obsidian is really good at what it is and I like using it as is."
@@ -92,6 +91,15 @@ and the folder itself carries nothing.
 - 「[Opus 5.5] A binding can name one file: `github.com/owner/repo@branch:file=place`, the place being the note's own path in the vault, as `github.com/teranos/QNTX@main:AGENTS.md=QNTX/AgentInstructions/QNTX/AGENTS.md`.」
 - 「[Opus 5.5] A file at the repository's top can be bound. A folder still cannot be the top.」
 - 「[Opus 5.5] A path ending `.md` names one file, and its place ends `.md`.」
+
+## The repository
+
+"we are missing some bindings like the ground CLAUDE.md, its other markdown document's"
+"so, perhaps we should introduce another vault binding, which is different from a directory or single file binding, namely;"
+"- the repository/git binding"
+"- named as one git repository under one name, like teranos/ground currently is."
+- 「[Opus 5.5] A repository is bound whole: `github.com/owner/repo@branch:.=place`, the place being the one name it is under in the vault, its `owner/repo` when none is said.」
+- 「[Opus 5.5] Every note and story of it is the binding's, in every folder of it, at its path below the place. A folder or file starting with a dot is not.」
 
 ## What reaches the vault
 

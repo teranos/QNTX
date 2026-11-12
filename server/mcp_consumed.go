@@ -696,9 +696,9 @@ func (s *QNTXServer) grantOf(name string) (string, *consumedGrant, error) {
 	return at.String(), &grant, nil
 }
 
-// handleConsumedCallback finishes a yes for a person logged in here at ROOT: GET from a browser holding
-// the node's cookie, POST from the app, which holds the person's session as a bearer and is handed the
-// code by /auth/mcp/return.
+// 「[Opus 5.5] handleConsumedCallback finishes a yes for a person logged in here at ROOT: GET from a browser holding」
+// 「[Opus 5.5] the node's cookie, POST from the app, which holds the person's session as a bearer and is handed the」
+// 「[Opus 5.5] code by /auth/mcp/return.」
 func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Request) {
 	if s.authHandler == nil {
 		http.Error(w, "this node serves no auth, so no yes comes back to it", http.StatusNotFound)
@@ -735,8 +735,8 @@ func (s *QNTXServer) handleConsumedCallback(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// finishConsumed hands the yes in q to the connecting it was asked for, when the person at the gate is
-// one it may come back to, and is what to say of how it ended.
+// 「[Opus 5.5] finishConsumed hands the yes in q to the connecting it was asked for, when the person at the gate is」
+// 「[Opus 5.5] one it may come back to, and is what to say of how it ended.」
 func (s *QNTXServer) finishConsumed(r *http.Request, q url.Values) (int, bool, string) {
 	held, open := s.consuming.pending.Load(q.Get("state"))
 	if !open {
@@ -784,19 +784,19 @@ func (s *QNTXServer) finishConsumed(r *http.Request, q url.Values) (int, bool, s
 	return http.StatusOK, true, "The node is connected to " + flow.name + ", which lists " + strings.Join(flow.attempt.tools, ", ")
 }
 
-// ConsumedReturnPath is where the server's authorization sends the person back with the code: anyone's,
-// because the browser it comes back to may hold no session here. The person finishes the yes from it, in
-// the QNTX app, which is logged in, or in this browser, when it is (ConsumedCallbackPath).
+// 「[Opus 5.5] ConsumedReturnPath is where the server's authorization sends the person back with the code: anyone's,」
+// 「[Opus 5.5] because the browser it comes back to may hold no session here. The person finishes the yes from it, in」
+// 「[Opus 5.5] the QNTX app, which is logged in, or in this browser, when it is (ConsumedCallbackPath).」
 //
 // "the QNTX app is here on my phone, I am talking to you through it"
 const ConsumedReturnPath = "/auth/mcp/return"
 
-// consumedAppReturn is where the QNTX app takes a yes back to the node (QNTX-Web app-door.ts).
+// 「[Opus 5.5] consumedAppReturn is where the QNTX app takes a yes back to the node (QNTX-Web app-door.ts).」
 const consumedAppReturn = "qntx://mcp"
 
-// handleConsumedReturn shows the person the two ways to finish a yes the node is waiting on. It hands the
-// code on and finishes nothing: the code redeems nothing without the verifier this node alone holds, and
-// is finished only by a person at ROOT (finishConsumed).
+// 「[Opus 5.5] handleConsumedReturn shows the person the two ways to finish a yes the node is waiting on. It hands the」
+// 「[Opus 5.5] code on and finishes nothing: the code redeems nothing without the verifier this node alone holds, and」
+// 「[Opus 5.5] is finished only by a person at ROOT (finishConsumed).」
 func (s *QNTXServer) handleConsumedReturn(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

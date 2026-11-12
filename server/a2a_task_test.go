@@ -47,7 +47,7 @@ func nodeAgentOverA2A(t *testing.T, held string) (*QNTXServer, map[auth.Level]st
 	underGround(t, agent.home)
 	t.Setenv("QNTX_TEST_PLAN_TOKEN", "the-plan-token")
 	named := opusLow
-	named.TokenRef = "env:QNTX_TEST_PLAN_TOKEN"
+	named.Claude.TokenRef = "env:QNTX_TEST_PLAN_TOKEN"
 
 	store, db := createTestStore(t)
 	srv.held = servingOne(db, store)

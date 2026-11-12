@@ -178,7 +178,7 @@ type parkedCode struct {
 // is not yet anybody, single-use, and gone in minutes.
 //
 // The access token is the token QNTX already hands out, and lives where
-// tokens live now (ADR-025): the token store, through Issue.
+// tokens live now: the token store, through Issue.
 type oauthStore struct {
 	ClientDoors
 	h     *Handler
@@ -375,7 +375,7 @@ func (s *oauthStore) RevokeRefreshToken(context.Context, string) error {
 // notAsked is every store question nothing registered asks. There is no
 // introspection or revocation endpoint; the interface asks for the shape.
 func notAsked(what string) error {
-	return errors.WithStack(fosite.ErrServerError.WithHintf("%s is not served: nothing registered asks (ADR-025)", what))
+	return errors.WithStack(fosite.ErrServerError.WithHintf("%s is not served: nothing registered asks", what))
 }
 
 func (s *oauthStore) GetAccessTokenSession(context.Context, string, fosite.Session) (fosite.Requester, error) {

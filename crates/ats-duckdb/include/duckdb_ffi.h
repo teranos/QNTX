@@ -130,7 +130,7 @@ CountResultC       duckdb_storage_file_count(const DuckdbStore *store);
  */
 AskedResultC       duckdb_storage_requests(const DuckdbStore *store);
 
-/* Access tokens (ADR-025)
+/* Access tokens
  *
  * A separate handle from the attestation store: tokens are one object each
  * under `<location>/system/access_tokens/`, not rows in the DuckDB table, and

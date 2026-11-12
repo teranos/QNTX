@@ -59,9 +59,13 @@ backup_interval_seconds = 3600
 # name = "the-node"
 # description = "What this node is for."
 
-[agent.root]
-# The Node Agent (ADR-048): QNTX itself as ROOT talks to it.
-# Named whole or not at all. Default: none, and the node has no Node Agent.
+[agent.root.claude]
+# The Node Agent (ADR-048): QNTX itself as ROOT talks to it, in each
+# harness named here, none above another: [agent.root.claude],
+# [agent.root.pi], [agent.root.codex], [agent.root.agy]. Each is named
+# whole or not at all. Default: none, and the node has no Node Agent.
+# Claude Code's keys under [agent.root] itself, as before, are read as
+# these, and the node warns that they moved.
 # model = 'claude-opus-5-5'
 
 # effort = 'low'
