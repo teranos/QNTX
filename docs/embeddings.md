@@ -133,9 +133,9 @@ When HDBSCAN re-clustering runs (manually or via Pulse schedule), the system emi
 
 ### Ground delivery protocol
 
-Ground reads `deferred:*` attestations and delivers the `detail` field. After delivery, it writes a `delivered:<name>` attestation with the same project context as an ack.
+Nothing delivers these rows today. The node still writes `deferred:cluster-update` (`server/embeddings/clustering.go`) and `deferred:pulse-summary` (`server/embeddings/pulse.go`) into its own store. Ground no longer reads a `deferred:*` queue: what a project is told now is an immediate row keyed by project, which sky carries (ground `source/sessionstart.d`, where the queue was read). The node reads no `delivered:` line either, so nothing accumulates across runs.
 
-**Ack-aware accumulation:** Before emitting new deferred news, QNTX checks for a `delivered:cluster-update` ack from Ground. If the previous news hasn't been delivered yet, the new events are prepended to the existing detail — so Ground delivers the full accumulated summary spanning all runs since last delivery.
+What reaches a session now is the status row's news, written into ground's store by ug and carried by sky: [ADR-059](adr/ADR-059-Harness-is-a-Plugin.md), "How a session on a machine is told".
 
 ## Open Work
 

@@ -50,6 +50,21 @@ Who may log in, the provider ceremony, and what a passkey carries:
 
 - [ADR-030](docs/adr/ADR-030-identity-providers.md).
 
+## Ground
+
+"Name any file in the teranos/ground project"
+"Be better informed"
+
+A session on a person's machine is ground's ([teranos/ground](https://github.com/teranos/ground), public). Before saying what does or does not reach a session, read there:
+
+- `source/stream.d`: what ground sees, written to the node.
+- `source/immediate.d` and `source/sky.d`: the row a session is told by, and the courier that hands it over.
+- `ug/tmux.d` (`newsPass`): what the node left on the status row, written into ground's store.
+
+Here: `server/statusline/news.go`, `server/am_ground.go`, and [ADR-059](docs/adr/ADR-059-Harness-is-a-Plugin.md), "How a session on a machine is told".
+
+An ADR that says nothing of a thing does not say the thing is absent: search the code of both repositories before calling it missing.
+
 ## Connectors
 
 QNTX is able to interface with a variety of other systems in many different ways.

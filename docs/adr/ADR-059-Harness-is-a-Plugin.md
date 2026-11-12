@@ -41,6 +41,25 @@ What holds there holds here:
 - "The node reaches no machine" ([[ADR-050-comet]]), so a session is spoken to where it looks: "Say an Agent session is still a session as you know, but it communicates with the room, or rather it has access to it", "Say you can wake a specific Agent so it will check the room", "Say all your Node Agents are all in the Node Room" ([[ADR-057-Agent-Rooms]]).
 - "In a QNTX Cluster, only one Node is ever responsible for Rooms Services cluster-wide" ([[ADR-057-Agent-Rooms]]): the sessions of every machine's harness meet there.
 
+## How a session on a machine is told
+
+"does QNTX write deferred msg into ground db"
+"I know the answer and it’s yes"
+
+The node reaches no machine: sky polls every five seconds and ug polls the status line ([[ADR-050-comet]], Landing). What is built on that, in this repository and in [teranos/ground](https://github.com/teranos/ground):
+
+- **A session is known to the node by its session id.** Every row a hook writes goes to the node as well, carried by sky (ground `source/stream.d`), in a `session:<id>` context. Ground speaks to its node as the key in `~/.qntx/key` (ground `source/signed.d`). `am ground` answers the sessions started and left (`server/am_ground.go`).
+- **The node leaves news on the status row**, for the person, naming the session it is for: the return leg (`server/statusline/news.go`). An item stays two minutes (`NewsHold`) and is held in memory: a restart empties it. Today what is left is a CI verdict (`server/ci_pulse.go`).
+- **ug writes it into ground's store.** `newsPass` asks `/am/statusline?format=json`, then `/am/statusline/{id}` for an item it has not seen, and writes one `immediate:news` row in the context `session:<id>`, or `project:<repo>` when the node names no session (ground `ug/tmux.d`, `ug/sql.d`).
+- **sky hands it to the session**: it reads what is addressed to its session or its project, writes it to stderr and exits 2, which wakes the session, and a `delivered:<id>` row per session makes it once (ground `source/sky.d`, `source/immediate.d`). A deferred message is an immediate row with an `after` gate (ground `CLAUDE.md`).
+- The node inserts nothing into ground's store itself. The node's news reaches a session only through `ug tmux` (ground `UNDERGROUND.md`, Limitation): with no tmux drawing it, the session is never told.
+
+Not joined to it:
+
+- A name (`agent:named`, by the agent's DID) to a session id. The node holds each, and nothing ties one to the other.
+- What a session answers, back to who said it.
+- A session on another node.
+
 ## A session's key and its name
 
 "The true way forwards is A2A"
