@@ -20,10 +20,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// "AGENTS CAN TALK TO EACH OTHER BY THEIR NAME"
-// "AND GROUND DELIVERS IT VIA UG AND STATUSLINE"
+// "「[Opus 5.5] AGENTS CAN TALK TO EACH OTHER BY THEIR NAME」"
+// "「[Opus 5.5] AND GROUND DELIVERS IT VIA UG AND STATUSLINE」"
 
-// namedOverA2A is a node whose agent Birch named itself, and ROOT's token.
+// 「[Fable 5.2] namedOverA2A is a node whose agent Birch named itself, and ROOT's token.」
 func namedOverA2A(t *testing.T) (*QNTXServer, string) {
 	t.Helper()
 	held := filepath.Join(t.TempDir(), "held")
@@ -37,7 +37,7 @@ func namedOverA2A(t *testing.T) (*QNTXServer, string) {
 	return srv, tokens[auth.LevelRoot]
 }
 
-// taskStateIn is the state the task answered stands in.
+// 「[Fable 5.2] taskStateIn is the state the task answered stands in.」
 func taskStateIn(answered map[string]any) string {
 	task, _ := answered["task"].(map[string]any)
 	if task == nil {
@@ -58,8 +58,8 @@ func TestWhatIsSaidToANameIsATaskAndIsOnTheStatusRow(t *testing.T) {
 	id := task["id"].(string)
 	assert.Equal(t, "did:key:z6Mkbirch", task["contextId"], "the context is the agent it was said to")
 
-	// On the row, for Birch, as ug reads it: the item by the Task's id, and
-	// the whole of it naming who it is for.
+	// 「[Fable 5.2] On the row, for Birch, as ug reads it: the item by the Task's id, and」
+	// 「[Fable 5.2] the whole of it naming who it is for.」
 	var left []statusline.News
 	require.Eventually(t, func() bool {
 		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
@@ -72,8 +72,8 @@ func TestWhatIsSaidToANameIsATaskAndIsOnTheStatusRow(t *testing.T) {
 
 }
 
-// The row lets go of it with nothing saying it was received: the Task says so,
-// and it is off the row.
+// 「[Fable 5.2] The row lets go of it with nothing saying it was received: the Task says so,」
+// 「[Fable 5.2] and it is off the row.」
 func TestWhatNothingSaysWasReceivedIsNotReceived(t *testing.T) {
 	srv, root := namedOverA2A(t)
 	within := toldWithin
@@ -99,7 +99,7 @@ func TestANameNobodyHoldsIsNoAgent(t *testing.T) {
 	assert.Contains(t, toJSON(t, answered), "no agent is served at tenant Rowan")
 }
 
-// toJSON is v as its JSON, to look for words in.
+// 「[Fable 5.2] toJSON is v as its JSON, to look for words in.」
 func toJSON(t *testing.T, v any) string {
 	t.Helper()
 	raw, err := json.Marshal(v)
@@ -107,7 +107,7 @@ func toJSON(t *testing.T, v any) string {
 	return string(raw)
 }
 
-// "AGENTS CAN TALK TO EACH OTHER BY THEIR NAME"
+// "「[Opus 5.5] AGENTS CAN TALK TO EACH OTHER BY THEIR NAME」"
 func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	alder := auth.Admitted(auth.LevelRoot, "garden")
@@ -135,7 +135,7 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	assert.Equal(t, "Alder to Birch", left[0].Item.Name, "it is from Alder, by name")
 	assert.Equal(t, "your commit broke the build", left[0].Item.Note)
 
-	// A name nobody holds is no agent, said so.
+	// 「[Fable 5.2] A name nobody holds is no agent, said so.」
 	_, refusal = signum.Answers["SendMessage"](asAlder, sigil.Sent{
 		"tenant":  "Rowan",
 		"message": `{"messageId": "m2", "role": "ROLE_USER", "parts": [{"text": "hello"}]}`,
@@ -144,8 +144,8 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	assert.Contains(t, refusal.GetSays(), "no agent is served at tenant Rowan")
 }
 
-// What is said to a name is text: a sender that takes only another media type
-// is refused before anything is said.
+// 「[Fable 5.2] What is said to a name is text: a sender that takes only another media type」
+// 「[Fable 5.2] is refused before anything is said.」
 func TestASenderThatTakesNoTextIsRefusedForAName(t *testing.T) {
 	srv, root := namedOverA2A(t)
 	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send",
@@ -155,8 +155,8 @@ func TestASenderThatTakesNoTextIsRefusedForAName(t *testing.T) {
 	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()))
 }
 
-// A node that stopped while something said to a name was on its status row
-// held that row in memory: the node after it says it was not received.
+// 「[Fable 5.2] A node that stopped while something said to a name was on its status row」
+// 「[Fable 5.2] held that row in memory: the node after it says it was not received.」
 func TestWhatWasOnTheRowOfANodeThatStoppedWasNotReceived(t *testing.T) {
 	srv, root := namedOverA2A(t)
 	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send", saidToTheNode("before the restart", `{"returnImmediately": true}`), root)
@@ -169,8 +169,8 @@ func TestWhatWasOnTheRowOfANodeThatStoppedWasNotReceived(t *testing.T) {
 	assert.Contains(t, toJSON(t, ended), "the node stopped while it was on the status row")
 }
 
-// A stream to a name is read as it is written: the Task as it was made
-// arrives while it is still on the status row, not when the row lets go.
+// 「[Fable 5.2] A stream to a name is read as it is written: the Task as it was made」
+// 「[Fable 5.2] arrives while it is still on the status row, not when the row lets go.」
 func TestAStreamToANameArrivesAsItIsWritten(t *testing.T) {
 	srv, root := namedOverA2A(t)
 	within := toldWithin
@@ -197,8 +197,8 @@ func TestAStreamToANameArrivesAsItIsWritten(t *testing.T) {
 	assert.Less(t, time.Since(asked), toldWithin, "it came before the row let go of it")
 }
 
-// A binding that panics answers nothing more: the one who asked in process is
-// answered with that, and does not wait on it.
+// 「[Fable 5.2] A binding that panics answers nothing more: the one who asked in process is」
+// 「[Fable 5.2] answered with that, and does not wait on it.」
 func TestABindingThatPanicsDoesNotLeaveItsCallerWaiting(t *testing.T) {
 	asked := askedInProcess{serve: func(http.ResponseWriter, *http.Request) { panic("the binding broke") }}
 	r, err := http.NewRequest(http.MethodGet, "http://node/a2a/Birch/tasks/1", nil)
