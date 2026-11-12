@@ -41,6 +41,21 @@ What holds there holds here:
 - "The node reaches no machine" ([[ADR-050-comet]]), so a session is spoken to where it looks: "Say an Agent session is still a session as you know, but it communicates with the room, or rather it has access to it", "Say you can wake a specific Agent so it will check the room", "Say all your Node Agents are all in the Node Room" ([[ADR-057-Agent-Rooms]]).
 - "In a QNTX Cluster, only one Node is ever responsible for Rooms Services cluster-wide" ([[ADR-057-Agent-Rooms]]): the sessions of every machine's harness meet there.
 
+## A session's key and its name
+
+"The true way forwards is A2A"
+"if every session is its own addresable A2A via QNTX so Alder would be addressable"
+"I WANT TO MAKE EVERY SESSION BE ABLE TO NAME ITSELF"
+"session's having their own name"
+"and sessions naming themselves"
+"key per session"
+
+- A session is an agent of its harness's plugin, so it is a DID of its own: a key made where the session starts and kept there.
+"A signature proves the key, and nothing reusable leaves the node."
+- A key the person already said yes to admits the session's key: on a machine, ground's (`~/.qntx/key`); on a node, the harness plugin's. The node holds a grant for the new DID at the admitting key's level and namespaces, and no passkey is asked for a session.
+- The session names itself under its own DID with `i name` (#1633), with the name its harness gives it, and is reached by that name as a peer's agent is: by its card, through `a2a Peers` and `a2a SendMessage`.
+- A key that is its own client is named by its DID (#1633); a session that asks as a person is not, and is named as the person is ([[ADR-031-Users]]).
+
 ## What the repository already answers
 
 - "Minimal node means no Node Agent". "A node that names no model has no NODE agent, and nothing stands in for the model named" ([[ADR-048-Node-Agent]]); "QNTX runs in minimal core mode without any plugins" ([[ADR-001-domain-plugin-architecture]]).
