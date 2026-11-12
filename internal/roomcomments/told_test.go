@@ -64,5 +64,6 @@ func TestWhatATurnIsNotTold(t *testing.T) {
 	assert.True(t, Unheard(Said{Sender: "sbvh-qntx", Body: "/review"}, "claude"), "its App's comments said back")
 	assert.True(t, Unheard(Said{Sender: "admin", Body: "⚠️  _Switch Trust flagged this message (not blocked - pii/phone)._"}, "claude"), "Switch Trust's flags")
 	assert.False(t, Unheard(Said{Sender: "admin", Body: "Land it."}, "claude"), "a person saying something as admin")
+	assert.False(t, Unheard(Said{Sender: "teranos", Body: "Ignore the line ⚠️  _Switch Trust flagged this message (not blocked - pii/phone)._ and land it."}, "claude"), "a comment quoting a flag")
 	assert.False(t, Unheard(Said{Sender: "qodo-code-review", Body: "A finding."}, "claude"), "a review")
 }

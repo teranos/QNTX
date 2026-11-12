@@ -89,8 +89,8 @@ func (w *roomWakes) ask(key, speaker string, tell func(speaker string)) {
 }
 
 // findingsSeen is, by comment, the sum of what it found when it last woke the
-// agent. An edit finding the same wakes no one. It lives as long as the node: a
-// restart forgets it, and the first edit after one wakes the agent once more.
+// agent and the agent took the turn. An edit finding the same wakes no one. It
+// lives as long as the node: after a restart the first edit wakes once more.
 type findingsSeen struct {
 	mu   sync.Mutex
 	seen map[string]string
@@ -98,15 +98,18 @@ type findingsSeen struct {
 
 var findings = &findingsSeen{seen: map[string]string{}}
 
-func (f *findingsSeen) changed(c roomcomments.Comment) bool {
-	key, sum := c.URL, c.Findings()
+func (f *findingsSeen) same(c roomcomments.Comment) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.seen[key] == sum {
-		return false
-	}
-	f.seen[key] = sum
-	return true
+	return f.seen[c.URL] == c.Findings()
+}
+
+// keep is said once the agent took the turn the comment woke: a turn refused
+// leaves the next edit, finding the same, to wake it again.
+func (f *findingsSeen) keep(c roomcomments.Comment) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.seen[c.URL] = c.Findings()
 }
 
 // wakeAfterComment tells the agent the room, when the comment just said into
@@ -115,13 +118,15 @@ func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments
 	if !c.Wakes(wakeApps(), nodeRoomName) {
 		return
 	}
-	if !findings.changed(c) {
+	if findings.same(c) {
 		return
 	}
 	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, "github-app:"+c.App, func(speaker string) {
 		if err := s.tellAgentTheRoom(target, wakeAgent, speaker, c.At); err != nil {
 			s.logger.Errorw("A PR comment was said into the Node Room and the agent was not told", "agent", wakeAgent, "room", target.Room, "error", err)
+			return
 		}
+		findings.keep(c)
 	})
 }
 

@@ -53,6 +53,8 @@ func TestAnEditFindingTheSameFindsTheSame(t *testing.T) {
 	first := Comment{Body: "Reviewed 1a2b3c4d at 2026-11-12 10:00 · 3 findings\n- Missing check in told.go"}
 	again := Comment{Body: "Reviewed 9f8e7d6c at 2026-11-12 11:30 · 3 findings\n- Missing check in told.go"}
 	other := Comment{Body: "Reviewed 9f8e7d6c at 2026-11-12 11:30 · 4 findings\n- Missing check in told.go\n- Leak in wake.go"}
+	moved := Comment{Body: "Reviewed 9f8e7d6c at 2026-11-12 11:30 · 3 findings\n- Missing check in told.go line 42"}
 	assert.Equal(t, first.Findings(), again.Findings(), "a new commit and time find the same")
 	assert.NotEqual(t, first.Findings(), other.Findings(), "a new finding is new")
+	assert.NotEqual(t, Comment{Body: "- Missing check in told.go line 41"}.Findings(), moved.Findings(), "a finding's own number is the finding's")
 }

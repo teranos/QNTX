@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -64,8 +65,12 @@ func Unheard(s Said, agent string) bool {
 	case strings.ToLower(agent), "sbvh-qntx":
 		return true
 	}
-	return strings.Contains(s.Body, "Switch Trust flagged this message")
+	return trustFlag.MatchString(strings.TrimSpace(s.Body))
 }
+
+// trustFlag is the whole of a message Switch Trust says to flag another: a
+// comment that only quotes it is still heard.
+var trustFlag = regexp.MustCompile(`^⚠️\s*_Switch Trust flagged this message \([^)\n]*\)\._$`)
 
 // Digest is what a turn is told of what the room said: each message by who
 // said it, oldest first.

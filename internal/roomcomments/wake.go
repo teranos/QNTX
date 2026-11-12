@@ -67,12 +67,12 @@ func (c Comment) Poster() string {
 // unchanged"
 
 // passing is what changes in a comment from one review of a pull request to
-// the next without its findings changing: the commit it reviewed, times, counts.
-var passing = regexp.MustCompile(`\b[0-9a-f]{7,40}\b|[0-9]+`)
+// the next without its findings changing: the commit it reviewed and the time.
+var passing = regexp.MustCompile(`\b[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?`)
 
-// Findings is a sum of what the comment says, less the commit, times and
-// counts that change with every review: two versions of a comment with the same
-// sum found the same things.
+// Findings is a sum of what the comment says, less the commit and time that
+// change with every review: two versions of a comment with the same sum found
+// the same things.
 func (c Comment) Findings() string {
 	sum := sha256.Sum256([]byte(strings.Join(strings.Fields(passing.ReplaceAllString(c.Body, "")), " ")))
 	return hex.EncodeToString(sum[:])
