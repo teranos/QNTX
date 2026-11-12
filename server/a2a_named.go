@@ -278,3 +278,63 @@ func textSaidIn(message *a2asdk.Message) (string, error) {
 	}
 	return strings.Join(texts, "\n"), nil
 }
+
+// "do you think the ground say should show near misses ?"
+//
+// nearNames is the names agents hold that are near one nobody holds: the same
+// letters whatever the spaces and the case, or two letters off at most. Kwi
+// Kwi is near Kwikwi.
+func (s *QNTXServer) nearNames(tenant string) []string {
+	if s.held == nil {
+		return nil
+	}
+	names, err := s.agentNames()
+	if err != nil {
+		return nil
+	}
+	plain := func(name string) string {
+		return strings.ToLower(strings.Join(strings.Fields(name), ""))
+	}
+	asked := plain(tenant)
+	if asked == "" {
+		return nil
+	}
+	var near []string
+	for _, kept := range names {
+		if lettersApart(asked, plain(kept.name)) <= 2 {
+			near = append(near, kept.name)
+		}
+	}
+	slices.Sort(near)
+	return near
+}
+
+// nearSaid is the names near tenant as a refusal ends with them, or nothing.
+func (s *QNTXServer) nearSaid(tenant string) string {
+	near := s.nearNames(tenant)
+	if len(near) == 0 {
+		return ""
+	}
+	return ". Near it: " + strings.Join(near, ", ")
+}
+
+// lettersApart is how many letters are to be put in, taken out or changed to
+// make a of b.
+func lettersApart(a, b string) int {
+	row := make([]int, len(b)+1)
+	for j := range row {
+		row[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		before := row[0]
+		row[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := before
+			if a[i-1] != b[j-1] {
+				cost = min(before, row[j], row[j-1]) + 1
+			}
+			before, row[j] = row[j], cost
+		}
+	}
+	return row[len(b)]
+}
