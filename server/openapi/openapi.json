@@ -1064,6 +1064,12 @@
       ],
       "x-qntx-prefix": true
     },
+    "/lf.a2a.v1.A2AService/": {
+      "x-qntx-reach": [
+        "ROOT"
+      ],
+      "x-qntx-prefix": true
+    },
     "/mcp": {
       "x-qntx-reach": [
         "ROOT",
