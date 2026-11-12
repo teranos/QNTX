@@ -46,6 +46,10 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 			return
 		}
 		ta, id := call.agent, ec.TaskID
+		if ta.named {
+			e.saidToAName(ctx, ec, call, yield)
+			return
+		}
 		// What is sent and given back as files lies in the turn's work, under
 		// the Task, and goes once the Task ends; a turn the next node reads
 		// on (settleLeftTask) keeps it.
@@ -289,7 +293,11 @@ func (e turnExecutor) Cancel(ctx context.Context, ec *a2asrv.ExecutorContext) it
 		}
 		id := string(ec.TaskID)
 		e.s.taskCancels.Store(id, spokenBy(call.request))
-		if _, runs := e.s.taskStreams.Load(id); !runs {
+		if call.agent.named {
+			if e.s.news != nil {
+				e.s.news.Drop(id)
+			}
+		} else if _, runs := e.s.taskStreams.Load(id); !runs {
 			_, stream, _, _, err := e.s.heldTask(call.agent.taskLines, id)
 			if err != nil {
 				yield(nil, err)
