@@ -63,6 +63,7 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		a2asrv.WithAgentInactivityTimeout(turnQuietMost),
 		a2asrv.WithExtendedAgentCardProducer(a2asrv.ExtendedAgentCardProducerFn(s.a2aExtendedCardOf)),
 	)
+	s.a2aGRPC = s.a2aOverGRPC(handler)
 	// A turn can be quiet for minutes: a stream is kept alive through the
 	// gateways in front of the node, which drop idle connections.
 	alive := a2asrv.WithTransportKeepAlive(streamKeptAlive)
@@ -148,6 +149,7 @@ type a2aExchange struct {
 	request   *http.Request
 	operation string
 	jsonRPC   bool
+	grpc      bool
 	read      int
 }
 
