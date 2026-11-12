@@ -352,9 +352,9 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 	if err != nil {
 		return ctx, nil, err
 	}
-	// What the agent's card says it does and takes is what it is asked: a2a-go's
-	// enforcer refuses a capability it does not have and a part whose media
-	// type no skill takes, with ContentTypeNotSupportedError (§3.1.1, §13.4).
+	// 「[Opus 5.5] What the agent's card says it does and takes is what it is asked: a2a-go's」
+	// 「[Opus 5.5] enforcer refuses a capability it does not have and a part whose media」
+	// 「[Opus 5.5] type no skill takes, with ContentTypeNotSupportedError (§3.1.1, §13.4).」
 	card, err := g.s.a2aCardAt(r, tenant)
 	if err != nil {
 		return ctx, nil, err
@@ -411,7 +411,7 @@ func (s *QNTXServer) messageTaken(ta taskAgent, sent *a2asdk.SendMessageRequest)
 	if m.Role != a2asdk.MessageRoleUser {
 		return a2aRefusal(a2asdk.ErrInvalidParams, "a message sent to "+ta.called+" is the user's, and this one's role is "+string(m.Role))
 	}
-	// "acceptedOutputModes": what the client takes, of what the agent gives.
+	// 「[Opus 5.5] "acceptedOutputModes": what the client takes, of what the agent gives.」
 	if config := sent.Config; config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTurnMode) {
 		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" gives "+strings.Join(turnModes, ", ")+", none of which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" takes")
 	}
@@ -489,8 +489,8 @@ func (s *QNTXServer) a2aExtendedCardOf(ctx context.Context, req *a2asdk.GetExten
 	return signed, nil
 }
 
-// a2aCardAt is the card of the agent the node serves at tenant, the node's at
-// none, as the caller of r is given it.
+// 「[Opus 5.5] a2aCardAt is the card of the agent the node serves at tenant, the node's at」
+// 「[Opus 5.5] none, as the caller of r is given it.」
 func (s *QNTXServer) a2aCardAt(r *http.Request, tenant string) (agentCard, error) {
 	var card agentCard
 	switch element, isElement := strings.CutPrefix(tenant, elementTenantPrefix); {
