@@ -316,7 +316,9 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			}
 			// No plan token named is Claude Code on its own sign-in, which has
 			// to have happened: a turn with no credential at all is not run.
-			if plan == "" {
+			// The claude plugin's Claude Code is the plugin's to have signed in
+			// (ADR-059): the node holds no binary to ask.
+			if _, pluginRuns := s.harnessBackend(agentLineClaude); plan == "" && !pluginRuns {
 				status, err := s.claudeStatus(ctx, binary, agent.home)
 				if err != nil {
 					return false, &protocol.Refusal{Why: sigil.Failed, Says: "Claude Code did not say whether the agent is signed in: " + err.Error()}

@@ -348,11 +348,26 @@ type harnessesHeld struct {
 	held map[string]*harnessHeld
 }
 
-// harnessHeldBy is the binary of the harness named, or nil when the node holds none.
+// harnessHeldBy is the binary of the harness named, or nil when the node holds
+// none. A harness a plugin runs is held where the plugin is (ADR-059): the
+// binary is the plugin's own. Only a harness the node holds no binary of is
+// held so (harnessesAPluginHolds).
 func (s *QNTXServer) harnessHeldBy(name string) *harnessHeld {
 	s.harnessBinaries.mu.Lock()
-	defer s.harnessBinaries.mu.Unlock()
-	return s.harnessBinaries.held[name]
+	held := s.harnessBinaries.held[name]
+	s.harnessBinaries.mu.Unlock()
+	if held != nil {
+		return held
+	}
+	if !harnessesAPluginHolds[name] {
+		return nil
+	}
+	if _, runs := s.harnessBackend(name); !runs {
+		return nil
+	}
+	arrived := make(chan struct{})
+	close(arrived)
+	return &harnessHeld{name: name, fetched: arrived, path: harnessPluginHeld(name)}
 }
 
 // 「[Opus 5.5] holdHarnessOnce is the binary of the harness named, kept by
