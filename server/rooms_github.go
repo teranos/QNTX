@@ -66,8 +66,8 @@ func sayRoomComment(ctx context.Context, rooms protocol.RoomsServiceClient, targ
 	if found.GetRoom().GetName() != nodeRoomName {
 		return "", errors.New("the comment's destination is no longer the Node Room")
 	}
-	// By nil is the provider's node identity, not the GitHub author and not
-	// a harness. Posting comment text never asks an agent to act on it.
+	// 「[Sonnet 5.5] By nil is the provider's node identity, not the GitHub author and not」
+	// 「[Sonnet 5.5] a harness. Posting comment text never asks an agent to act on it.」
 	said, err := rooms.PostToRoom(ctx, &protocol.PostToRoomRequest{
 		Provider: target.Provider, Room: target.Room, Body: c.Message(),
 		Files: []*protocol.RoomFile{{Name: fmt.Sprintf("github-comment-%d.md", c.ID), Type: "text/markdown", Data: []byte(c.Body)}},
