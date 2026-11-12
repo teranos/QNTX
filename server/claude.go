@@ -211,7 +211,9 @@ func (s *QNTXServer) claudeHarness() *harness {
 		name: "claude", called: "Claude Code", file: claudeSessionFile,
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs this in. Not sent, it is the one am.toml gives."},
-			{Name: "model", OneOf: claudeModels, Says: "The model it answers with. Not sent, it is the one am.toml gives."},
+			// "the hardcoded list is BS": the node keeps no list of models. The name
+			// goes to Claude Code, which runs the model and refuses a name it does not know.
+			{Name: "model", Says: "The model it answers with, by Claude Code's name for it. Not sent, it is the one am.toml gives."},
 		},
 		// "Let's say that I don't like how it's putting Claude on a pedestal."
 		named:    func() bool { return named().Named() },
@@ -224,7 +226,7 @@ func (s *QNTXServer) claudeHarness() *harness {
 		am: func(is agentIn, agent *rootAgent, spec agentSpec) proto.Message {
 			am := &protocol.ClaudeAm{
 				Did: is.did, Model: spec.Model, Effort: spec.Effort, PermissionMode: spec.Mode,
-				PermissionModes: appcfg.PermissionModes, Models: claudeModels, Allow: spec.Allow,
+				PermissionModes: appcfg.PermissionModes, Models: []string{spec.Model}, Allow: spec.Allow,
 				Session: is.session, Answering: is.answering, ClaudeCode: is.path, NotReady: is.notReady,
 			}
 			// Asked of Claude Code itself, when the node holds one.
@@ -271,12 +273,6 @@ func (s *QNTXServer) thereIsNoClaude() *protocol.Refusal {
 	}
 	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Claude Code for the Node Agent ([agent.root.claude]), so it does not run in Claude Code"}
 }
-
-// claudeModels is every model a turn can be said to answer with.
-// After a tool result, Opus 5.5, Sonnet 5.5 and Fable 5.1 hold their text and
-// print it whole (anthropics/claude-code#96439); Sonnet 5 and Haiku 4.5 stream
-// it, so a turn watched live through tool calls is said with one of those.
-var claudeModels = []string{"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-sonnet-5", "claude-haiku-4-5"}
 
 // claudePart is Claude Code's part of one turn: run in the permission mode
 // whoever speaks names, or the one am.toml gives.
