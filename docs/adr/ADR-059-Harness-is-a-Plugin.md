@@ -43,6 +43,14 @@ What holds there holds here:
 
 ## How a session on a machine is told
 
+"SESSION A ON MY LAPTOP HAS A NAME"
+"THAT NAME IS NOT TAKEN"
+"GROUND IS THE DELIVERY NETWORK"
+"AND IT HAPPENS VIA UG"
+"BECAUSE UG SEES THE STATUSLINE OF QNTX"
+"AGENTS CAN TALK TO EACH OTHER BY THEIR NAME"
+"AND GROUND DELIVERS IT VIA UG AND STATUSLINE"
+
 "Messages from QNTX can end up in ground and we need no new path"
 
 QNTX writes a message into ground's db, and ground hands it to the session:
