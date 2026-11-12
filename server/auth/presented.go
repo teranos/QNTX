@@ -122,7 +122,7 @@ func (h *Handler) presented(r *http.Request) Presented {
 				if h.shed != nil {
 					h.shed.named(hash, grant.Label)
 				}
-				// Last used is what a revocation is watched by (ADR-025), and
+				// Last used is what a revocation is watched by, and
 				// nothing wrote it.
 				h.touch(hash, grant.DID)
 			} else if grant, live := h.issuedElsewhere(raw); live {

@@ -26,8 +26,9 @@ type News struct {
 	// ID is the attestation's own, so the laptop writes it once whatever the
 	// poll count. The row carries it and a click asks by it.
 	ID string
-	// For is who the item is addressed to: the token's DID that attested the
-	// event, which is what the poll presents when it asks.
+	// For is who the item is addressed to, as NewsKey names a caller: the
+	// person a token or a key speaks for, and the DID only for a caller that
+	// is nobody's. It is what the poll is found by when it asks.
 	For  string
 	Item StatusItem
 	// Detail is the whole of it, answered on a click.
@@ -134,7 +135,7 @@ func (l *NewsLog) ByID(caller, id string) (News, bool) {
 }
 
 // NewsKey is the name a caller's news is filed under: the person. A token
-// speaks for whoever minted it (ADR-025) and carries that as Identity, and
+// speaks for whoever minted it and carries that as Identity, and
 // so does their session, so news left for a push one token attested is found
 // by another of theirs, or by them at the browser. The DID is the key only
 // for a caller that is nobody's.

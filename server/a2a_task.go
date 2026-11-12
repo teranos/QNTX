@@ -2,7 +2,9 @@ package server
 
 import (
 	"encoding/json"
+	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -266,6 +268,27 @@ func (s *QNTXServer) writeTask(lines taskLines, task *a2asdk.Task, by string, al
 	}), "the %s line of task %s was not written", state, task.ID)
 }
 
+// maskedValue is a JSON value with every string in it masked.
+func maskedValue(value any) any {
+	switch v := value.(type) {
+	case string:
+		return masked(v)
+	case map[string]any:
+		held := make(map[string]any, len(v))
+		for key, inner := range v {
+			held[key] = maskedValue(inner)
+		}
+		return held
+	case []any:
+		held := make([]any, len(v))
+		for i, inner := range v {
+			held[i] = maskedValue(inner)
+		}
+		return held
+	}
+	return value
+}
+
 // maskedTask is task with every text it holds masked, as the turn's own lines
 // are: what a person or the agent said can carry a secret.
 func maskedTask(task *a2asdk.Task) *a2asdk.Task {
@@ -274,8 +297,17 @@ func maskedTask(task *a2asdk.Task) *a2asdk.Task {
 		out := make(a2asdk.ContentParts, 0, len(parts))
 		for _, part := range parts {
 			p := *part
-			if text, isText := p.Content.(a2asdk.Text); isText {
-				p.Content = a2asdk.Text(masked(string(text)))
+			switch content := p.Content.(type) {
+			case a2asdk.Text:
+				p.Content = a2asdk.Text(masked(string(content)))
+			case a2asdk.Data:
+				p.Content = a2asdk.Data{Value: maskedValue(content.Value)}
+			case a2asdk.Raw:
+				// A file of text is masked as text is; an image or a PDF is
+				// kept as it was sent.
+				if kind, _, err := mime.ParseMediaType(p.MediaType); err == nil && (strings.HasPrefix(kind, "text/") || kind == "application/json") {
+					p.Content = a2asdk.Raw(masked(string(content)))
+				}
 			}
 			out = append(out, &p)
 		}
@@ -485,13 +517,36 @@ func textPart(text string) *a2asdk.Part {
 	return part
 }
 
-// textPlain is the media type the agents take and give.
+// textPlain is the media type the agents answer in.
 const textPlain = "text/plain"
+
+// turnModes are the media types a turn takes and gives (§4.4.5): text, JSON,
+// and the files Claude Code reads, a PDF and an image among them. Any other is
+// refused, as "Agents SHOULD sanitize or validate file content types and
+// reject unexpected media types" (§13.4).
+var turnModes = []string{
+	textPlain, "text/markdown", "text/csv", "application/json",
+	"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
+}
+
+// isTurnMode is whether a media type, whatever its parameters, is one a turn
+// gives.
+func isTurnMode(mediaType string) bool {
+	parsed, _, err := mime.ParseMediaType(mediaType)
+	return err == nil && slices.Contains(turnModes, parsed)
+}
+
+// sameMediaType is whether mode, whatever its parameters, names kind: a client
+// taking image/png; profile=x takes a PNG.
+func sameMediaType(mode, kind string) bool {
+	parsed, _, err := mime.ParseMediaType(mode)
+	return err == nil && strings.EqualFold(parsed, kind)
+}
 
 // endTask writes that task id ended in state, as by, unless it ended already:
 // a Task ends once, by its turn, a restart or a cancel, whichever is first.
 // answer is what it gave when it completed, why why it did not.
-func (s *QNTXServer) endTask(lines taskLines, id string, state a2asdk.TaskState, by, session, answer, why string) error {
+func (s *QNTXServer) endTask(lines taskLines, id string, state a2asdk.TaskState, by, session, answer, why string, files ...*a2asdk.Artifact) error {
 	s.taskEnds.Lock()
 	defer s.taskEnds.Unlock()
 	task, _, _, held, err := s.heldTask(lines, id)
@@ -511,7 +566,7 @@ func (s *QNTXServer) endTask(lines taskLines, id string, state a2asdk.TaskState,
 	}
 	switch state {
 	case a2asdk.TaskStateCompleted:
-		task.Artifacts = []*a2asdk.Artifact{answerArtifact(answer)}
+		task.Artifacts = append([]*a2asdk.Artifact{answerArtifact(answer)}, files...)
 	case a2asdk.TaskStateFailed:
 		task.Status.Message = failedWhy(task.ID, task.ContextID, why)
 	}
@@ -552,8 +607,20 @@ func (s *QNTXServer) settleLeftTask(agent *rootAgent, session, stream string, an
 			state, gave = a2asdk.TaskStateCompleted, masked(answer.Text)
 		}
 		did := s.agentOfLine(line)
-		if err := s.endTask(s.systemTasks(did), id, state, did, session, gave, why); err != nil {
+		// What the turn wrote for its answer before the node stopped is given
+		// with it, and the Task's files go once it is settled. Which modes
+		// the client took went with the node that stopped: the turn's own are
+		// given.
+		dir := taskFiles(agent, id)
+		var files []*a2asdk.Artifact
+		if state == a2asdk.TaskStateCompleted {
+			files = s.filesOut(filepath.Join(dir, "out"), nil)
+		}
+		if err := s.endTask(s.systemTasks(did), id, state, did, session, gave, why, files...); err != nil {
 			return err
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			s.logger.Warnw("a settled task's files were not removed", "task", id, "error", err)
 		}
 	}
 	return nil

@@ -270,6 +270,7 @@ fn row_to_attestation(row: &Row) -> StoreResult<Attestation> {
 
 impl AttestationStore for PostgresStore {
     fn put(&mut self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         let attributes = attributes_json(&attestation)?;
         let sql = format!(
             "INSERT INTO {} ({COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
@@ -307,6 +308,7 @@ impl AttestationStore for PostgresStore {
     }
 
     fn update(&mut self, attestation: Attestation) -> StoreResult<()> {
+        attestation.writable()?;
         let attributes = attributes_json(&attestation)?;
         let sql = format!(
             "UPDATE {} SET subjects = $2, predicates = $3, contexts = $4, actors = $5, timestamp = $6, source = $7, attributes = $8, created_at = $9, signature = $10, signer_did = $11 WHERE id = $1",

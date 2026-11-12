@@ -54,6 +54,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// The GitHub App's one webhook, for every event it is subscribed to.
 	s.answer(githubWebhookPrefix, s.HandleGitHubWebhook)
 
+	// 「[Opus 5.5] ix/otel: OpenTelemetry taken in as OTLP/HTTP, each span kept as an attestation where its sender's token acts.」
+	s.answer(ixOtelPrefix, s.HandleIxOtel)
+
 	// What git's credential helper asks when an agent pushes (ADR-048).
 	s.answer(githubCredentialPath, s.HandleGitHubCredential)
 

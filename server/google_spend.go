@@ -54,6 +54,12 @@ type googleSpendItem struct {
 	budget string
 }
 
+// 「[Opus 5.5] googleUnmeteredWhy is why an item ROOT set a limit on halts when
+// the node meters nothing of it: only ROOT pressing Connect costs again ends it.」
+func googleUnmeteredWhy(item googleSpendItem) string {
+	return fmt.Sprintf("ROOT set a limit on %s, and the node does not meter what it spends: ROOT presses Connect costs again", item.called())
+}
+
 // 「[Opus 5.5] meter is the id the budget's reports carry.」
 func (i googleSpendItem) meter() string {
 	return i.budget[strings.LastIndex(i.budget, "/")+1:]
@@ -410,7 +416,7 @@ func (s *QNTXServer) googleItemHalted(name string) (bool, string) {
 		return false, ""
 	}
 	if item.budget == "" {
-		return true, fmt.Sprintf("ROOT set a limit on %s, and the node does not meter what it spends: ROOT presses Connect costs again", item.called())
+		return true, googleUnmeteredWhy(item)
 	}
 	if limit > 0 {
 		cost, currency := 0.0, ""

@@ -23,6 +23,10 @@ postgres = "0.19"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 tokio-postgres-rustls = "0.13"
 
+[dev-dependencies]
+# storage::conformance, the check this backend runs on itself
+ats = { workspace = true, features = ["conformance"] }
+
 [lib]
 crate-type = ["rlib", "cdylib", "staticlib"]
 

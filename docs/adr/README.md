@@ -1,19 +1,27 @@
 # ADRs
 
-## Whose words
+In this repository:
 
-"Quotation marks indicate that a real human has ever said it verbatim."
-"Meaning it's fully decided. it's settled." 
+- No ADR own's anything the Tablet of Reach already owns.
+- User Stories, UI/UX flows are owned by QNTX-Web
 
-"The Quoted text is the one source of truth, 
-rephrasing it is entirely banned,
-instead, reference the agreed truth source."
+#### Plugins
 
-And a `>` block-quote is not. 
-Neither is anything unquoted. 
-Both are written by whatever drafted it, 
-and stay in flight 
-until a quoted line settles it 
-with human authority.
+- [[ADR-001-domain-plugin-architecture]]
+- [[ADR-002-plugin-configuration]]
+- [[ADR-003-plugin-communication]]
+- [[ADR-004-plugin-pulse-integration]]
+- [[ADR-018-Plugin-lifecycle]]
+
+- [[ADR-014-llm-as-plugin-provided-service]]
+- [[ADR-015-search-as-plugin-provided-service]]
+- [[ADR-016-vector-search-as-plugin-provided-service]]
+- [[ADR-017-embedding-as-plugin-provided-service]]
+- [[ADR-021-graph-database-as-plugin-service]]
+- [[ADR-022-python-as-plugin-provided-service]]
+- [[ADR-057-Agent-Rooms]]
+- [[ADR-059-Harness-is-a-Plugin]]
 
 
+- [[ADR-041-mail-service]]
+- [[ADR-046-a-plugin-stands-in-a-namespace]]

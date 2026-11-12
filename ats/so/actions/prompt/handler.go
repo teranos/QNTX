@@ -11,11 +11,11 @@ import (
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/ats/so"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/ai/provider"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/logger"
-	"github.com/teranos/QNTX/pulse/async"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -88,7 +88,7 @@ type Result struct {
 	Usage provider.Usage `json:"usage,omitempty"`
 }
 
-// Handler implements async.JobHandler for prompt execution
+// Handler implements so.Handler for prompt execution
 type Handler struct {
 	queryStore    ats.AttestationQueryStore
 	store         ats.AttestationStore
@@ -117,13 +117,13 @@ func (h *Handler) Name() string {
 }
 
 // Execute runs the prompt job
-func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
+func (h *Handler) Execute(ctx context.Context, job so.Job) error {
 	// Decode payload
 	var payload Payload
-	if err := json.Unmarshal(job.Payload, &payload); err != nil {
+	if err := json.Unmarshal(job.Payload(), &payload); err != nil {
 		err = errors.Wrap(err, "failed to decode prompt payload")
-		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("Payload length: %d bytes", len(job.Payload)))
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID()))
+		err = errors.WithDetail(err, fmt.Sprintf("Payload length: %d bytes", len(job.Payload())))
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", HandlerName))
 		return err
 	}
@@ -132,14 +132,14 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	doc, err := ParseFrontmatter(payload.Template)
 	if err != nil {
 		err = errors.Wrap(err, "failed to parse frontmatter")
-		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID()))
 		err = errors.WithDetail(err, fmt.Sprintf("Prompt ID: %s", payload.PromptID))
 		err = errors.WithDetail(err, fmt.Sprintf("Template length: %d bytes", len(payload.Template)))
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", HandlerName))
 		logger.Logger.Errorw("Frontmatter parsing failed",
 			"error", err,
 			"template_length", len(payload.Template),
-			"job_id", job.ID,
+			"job_id", job.ID(),
 			"prompt_id", payload.PromptID,
 		)
 		return err
@@ -149,7 +149,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	tmpl, err := Parse(doc.Body)
 	if err != nil {
 		err = errors.Wrap(err, "failed to parse prompt template")
-		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID()))
 		err = errors.WithDetail(err, fmt.Sprintf("Prompt ID: %s", payload.PromptID))
 		err = errors.WithDetail(err, fmt.Sprintf("Template body length: %d bytes", len(doc.Body)))
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", HandlerName))
@@ -171,7 +171,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	result, err := executor.ExecuteAsk(ctx, filter)
 	if err != nil {
 		err = errors.Wrap(err, "failed to execute ax query")
-		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID()))
 		err = errors.WithDetail(err, fmt.Sprintf("Prompt ID: %s", payload.PromptID))
 		err = errors.WithDetail(err, fmt.Sprintf("Filter subjects: %v", filter.Subjects))
 		err = errors.WithDetail(err, fmt.Sprintf("Filter predicates: %v", filter.Predicates))
@@ -182,16 +182,16 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 
 	if len(result.Attestations) == 0 {
 		// No attestations to process - this is not an error
-		job.UpdateProgress(0)
+		job.SetProgress(0)
 		return nil
 	}
 
 	// Set total for progress tracking
-	job.Progress.Total = len(result.Attestations)
+	job.SetTotal(len(result.Attestations))
 
 	providerName, err := ProviderNamed(payload.Provider)
 	if err != nil {
-		return errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		return errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID()))
 	}
 	client := provider.NewGRPCLLMClient(h.llmRouter, providerName)
 	// The model asked for: the payload's, else the prompt's own. Neither is the
@@ -221,7 +221,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		prompt, err := tmpl.Execute(&as)
 		if err != nil {
 			err = errors.Wrapf(err, "failed to interpolate template for attestation %s", as.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID()))
 			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
 			err = errors.WithDetail(err, fmt.Sprintf("Attestation subjects: %v", as.Subjects))
 			err = errors.WithDetail(err, fmt.Sprintf("Attestation predicates: %v", as.Predicates))
@@ -256,7 +256,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 
 		if err != nil {
 			err = errors.Wrapf(err, "LLM call failed for attestation %s", as.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID()))
 			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
 			err = errors.WithDetail(err, fmt.Sprintf("Provider: %s", providerName))
 			err = errors.WithDetail(err, fmt.Sprintf("Model: %s", model))
@@ -284,7 +284,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		resultAs, err := h.createResultAttestation(&as, resp.Content, payload, author)
 		if err != nil {
 			err = errors.Wrapf(err, "failed to create result attestation for %s", as.ID)
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID()))
 			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
 			err = errors.WithDetail(err, fmt.Sprintf("Response length: %d chars", len(resp.Content)))
 			err = errors.WithDetail(err, fmt.Sprintf("Result predicate: %s", payload.ResultPredicate))
@@ -306,7 +306,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		}
 
 		// Update progress
-		job.UpdateProgress(i + 1)
+		job.SetProgress(i + 1)
 	}
 
 	// Store results in job (as JSON in Source field for now)
@@ -315,11 +315,11 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		resultsJSON, err := json.Marshal(results)
 		if err != nil {
 			err = errors.Wrap(err, "failed to marshal execution results")
-			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID()))
 			err = errors.WithDetail(err, fmt.Sprintf("Results count: %d", len(results)))
 			return err
 		}
-		job.Source = string(resultsJSON)
+		job.SetResult(string(resultsJSON))
 	}
 
 	return nil

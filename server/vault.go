@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/teranos/QNTX/internal/forge"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -81,6 +82,10 @@ type vaultBinding struct {
 	place  string
 	// 「[Opus 5.5] note is a binding naming one file: its path, and its place, are a note.」
 	note bool
+	// "- the repository/git binding"
+	// repository is a binding of the repository whole, its path being its top:
+	// every note of it, in every folder of it, is the binding's.
+	repository bool
 }
 
 // 「[Opus 5.5] bindingOf reads one of a vault's folders: a build's input, = and its place.」
@@ -97,7 +102,7 @@ func bindingOf(folder string) (vaultBinding, error) {
 	if note != strings.HasSuffix(place, noteSuffix) {
 		return vaultBinding{}, errors.Newf("%q binds a note to a folder: a note's place is a note, and a folder's a folder", folder)
 	}
-	return vaultBinding{source: source, place: place, note: note}, nil
+	return vaultBinding{source: source, place: place, note: note, repository: source.Path == forge.Root}, nil
 }
 
 // 「[Opus 5.5] placeRoot is the vault's folder the binding's notes are under: its place, or」
@@ -230,7 +235,7 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 					Takes: []*protocol.Param{
 						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
 						{Name: "path", Required: true, Says: "Where the vault's copy is on the box: an absolute path."},
-						{Name: "folders", Says: "Each folder the vault holds as owner/repo@branch:path=place, the place being where in the vault it is, separated by spaces; a path ending .md names one note, and its place is the note's own path in the vault. None when not sent."},
+						{Name: "folders", Says: "Each folder the vault holds as owner/repo@branch:path=place, the place being where in the vault it is, separated by spaces; a path ending .md names one note, and its place is the note's own path in the vault; a path of . binds the repository whole. None when not sent."},
 					},
 					Answer: "protocol.Vaults",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath},
@@ -276,6 +281,17 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 					},
 					Answer: "protocol.Vaults",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/bind"},
+				},
+				{
+					Name: "repository",
+					Does: "Binds a repository whole under one name in the vault, beside the folders it holds: every note and story of it, in every folder of it, at its path below that name. A folder starting with a dot is left out. Refused when the name is a note's place, a file of the vault, or another bound place, or holds one, or is inside one.",
+					Takes: []*protocol.Param{
+						{Name: "name", Required: true, Says: "The vault's name, as Obsidian Sync names it."},
+						{Name: "repo", Required: true, Says: "The repository, as owner/repo."},
+						{Name: "place", Says: "The one name the repository is under in the vault, a folder's place. The repository's owner/repo when not sent."},
+					},
+					Answer: "protocol.Vaults",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: vaultPath + "/repository"},
 				},
 				{
 					Name: "unbind",
@@ -330,7 +346,7 @@ func (s *QNTXServer) vaultSignum() sigil.Signum {
 		Answers: map[string]sigil.Answer{
 			"list": s.vaultList, "set": s.vaultSet,
 			"dirs": s.vaultDirs, "owners": s.vaultOwners, "repos": s.vaultRepos, "subdirs": s.vaultSubdirs,
-			"bind": s.vaultBind, "unbind": s.vaultUnbind, "states": s.vaultStates,
+			"bind": s.vaultBind, "repository": s.vaultBindRepository, "unbind": s.vaultUnbind, "states": s.vaultStates,
 			"disable": s.vaultDisable, "enable": s.vaultEnable, "send": s.vaultSend,
 		},
 	}

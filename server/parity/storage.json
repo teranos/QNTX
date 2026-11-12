@@ -292,6 +292,16 @@
     ]
   },
   {
+    "name": "github_room_comments",
+    "sqlite": true,
+    "duckdb": false,
+    "postgres": false,
+    "rebuilt": false,
+    "sites": [
+      "internal/roomcomments/outbox.go"
+    ]
+  },
+  {
     "name": "invitation_accounts",
     "sqlite": true,
     "duckdb": false,
@@ -309,6 +319,16 @@
     "rebuilt": false,
     "sites": [
       "server/auth/invitation.go"
+    ]
+  },
+  {
+    "name": "issues_seen",
+    "sqlite": true,
+    "duckdb": false,
+    "postgres": false,
+    "rebuilt": false,
+    "sites": [
+      "server/issues_kept.go"
     ]
   },
   {

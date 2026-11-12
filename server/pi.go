@@ -3,10 +3,13 @@ package server
 import (
 	"context"
 
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/named"
 	"github.com/teranos/QNTX/internal/pi"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	harnesswire "github.com/teranos/QNTX/plugin/harness"
 	"github.com/teranos/QNTX/server/sigil"
 	"google.golang.org/protobuf/proto"
 )
@@ -45,14 +48,14 @@ func (s *QNTXServer) thereIsNoPi() *protocol.Refusal {
 		return s.thereIsNoNodeAgent()
 	}
 	if !s.deps.cfg.Agent.Root.Pi.Named() {
-		return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it runs in Claude Code alone"}
+		return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Pi for the Node Agent ([agent.root.pi]), so it does not run in Pi"}
 	}
 	return piIsOff()
 }
 
-// piIsOff is why no agent runs in Pi: the node holds no Pi.
+// piIsOff is why no agent runs in Pi: no plugin on the node runs it (ADR-059).
 func piIsOff() *protocol.Refusal {
-	return &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no Pi, so no agent runs in it, the Node Agent nor a namespace's: Pi is off"}
+	return &protocol.Refusal{Why: sigil.Failed, Says: "no plugin on this node runs Pi, so no agent runs in it, the Node Agent nor a namespace's: a plugin named pi runs it by declaring harness_provider"}
 }
 
 // piPart is Pi's part of one turn of the Node Agent.
@@ -64,18 +67,32 @@ func (s *QNTXServer) piPart(named appcfg.PiConfig, agent *rootAgent) aTurn {
 
 // piTurn is Pi's part of one turn, run as said gives it.
 func (s *QNTXServer) piTurn(thinking string, said func(binary, session, says string, env []string) pi.Said) aTurn {
-	var binary string
+	// Pi is the pi plugin's to run (ADR-059): the turn is said to it over
+	// A2A, and the binary is the plugin's own to name.
+	var backend a2apb.A2AServiceClient
 	return aTurn{
 		effort: thinking,
-		ready: func(ctx context.Context, _ string, kept bool) (bool, *protocol.Refusal) {
-			var err error
-			if binary, err = s.harnessHeldBy("pi").Path(ctx); err != nil {
-				return false, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no Pi to run: " + err.Error()}
+		ready: func(_ context.Context, _ string, kept bool) (bool, *protocol.Refusal) {
+			held, runs := s.harnessBackend(agentLinePi)
+			if !runs {
+				return false, piIsOff()
 			}
+			backend = held
 			return kept, nil
 		},
 		run: func(t turnRun) (proto.Message, error) {
-			answer, err := said(binary, t.session, t.says, t.env).Run(s.ctx, func(e pi.Event) { t.write(t.writes.rowsOfPi(e, t.now())) })
+			var answer pi.Answer
+			ended, err := saidInBackend(s.ctx, backend, t.says, said("", t.session, "", t.env), func(event a2asdk.Event) error {
+				var record pi.Event
+				carries, err := harnesswire.PrintedIn(event, &record)
+				if carries && err == nil {
+					t.write(t.writes.rowsOfPi(record, t.now()))
+				}
+				return err
+			})
+			if err == nil {
+				_, err = harnesswire.AnswerIn(ended, &answer)
+			}
 			if err != nil {
 				t.write(t.writes.rowsOfPi(pi.Event{Type: "message_end", Message: &pi.Message{Role: "assistant", StopReason: "error", ErrorMessage: err.Error()}}, t.now()))
 				return nil, err
