@@ -50,7 +50,7 @@ func admit(h *Handler, key ed25519.PrivateKey, signer, did, label string, t *tes
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", signedScheme+signature(t, key, signer, signedNodeOrigin, time.Minute))
 	w := httptest.NewRecorder()
-	h.Routes()[admitPath](w, req)
+	h.handleAdmit(w, req)
 	return w
 }
 
