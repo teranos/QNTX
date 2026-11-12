@@ -110,16 +110,16 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 // (ADR-031). A client's own token is issued anew under another DID each time
 // (auth.TokenStrategy.GenerateAccessToken), so a name on it would not last.
 //
-// "I WANT TO MAKE EVERY SESSION BE ABLE TO NAME ITSELF"
-// A key the person said yes to at the passkey (auth/device.go) is recorded as
-// its own client. It signs as itself and its next signature is the same DID,
-// so it is named by that DID.
+// "「[Opus 5.5] I WANT TO MAKE EVERY SESSION BE ABLE TO NAME ITSELF」"
+// 「[Opus 5.5] A key the person said yes to at the passkey (auth/device.go) is recorded as」
+// 「[Opus 5.5] its own client. It signs as itself and its next signature is the same DID,」
+// 「[Opus 5.5] so it is named by that DID.」
 //
 // "I EXPECT EACH SESSION TO ALSO HAVE ITS OWN KEY AND NAME"
-// Such a key is admitted as the person who said yes, with no Grant
-// (auth.admittedAsThePerson): it is known by the DID it signs as being the
-// client it was issued through. A connector's token is issued under another
-// DID than its client's, and is refused as the person it asks as.
+// 「[Fable 5.1, Fable 5.2] Such a key is admitted as the person who said yes, with no Grant」
+// 「[Fable 5.1, Fable 5.2] (auth.admittedAsThePerson): it is known by the DID it signs as being the」
+// 「[Fable 5.1, Fable 5.2] client it was issued through. A connector's token is issued under another」
+// 「[Fable 5.1, Fable 5.2] DID than its client's, and is refused as the person it asks as.」
 func itsOwnDID(admitted auth.Admission) (string, *protocol.Refusal) {
 	if admitted.Grant == nil && admitted.TokenDID != "" && admitted.TokenDID == admitted.ClientDID {
 		return admitted.TokenDID, nil
