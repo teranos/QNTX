@@ -475,10 +475,10 @@ func (q *Queue) Cleanup(ctx context.Context, olderThan time.Duration, atMost int
 
 // ForgetPayloads empties the payloads of at most atMost of handler's done or
 // dropped jobs, and says how many. A caller forgetting more calls again.
-func (q *Queue) ForgetPayloads(handler string, atMost int) (int, error) {
+func (q *Queue) ForgetPayloads(ctx context.Context, handler string, atMost int) (int, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	return q.store.ForgetPayloads(handler, atMost)
+	return q.store.ForgetPayloads(ctx, handler, atMost)
 }
 
 // 「[Fable 5.1] CancelQueuedBefore cancels at most atMost queued jobs of handler older than」

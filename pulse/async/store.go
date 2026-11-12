@@ -1,6 +1,7 @@
 package async
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"github.com/teranos/QNTX/internal/sqlclose"
@@ -398,8 +399,8 @@ func (s *Store) FailedHandlersSince(since time.Time, limit int) (_ []HandlerFail
 // ForgetPayloads empties the payload of at most atMost of handler's jobs that
 // are done or dropped, and says how many. Their rows stay; what they were run
 // with is not needed again.
-func (s *Store) ForgetPayloads(handler string, atMost int) (int, error) {
-	result, err := s.db.Exec(`
+func (s *Store) ForgetPayloads(ctx context.Context, handler string, atMost int) (int, error) {
+	result, err := s.db.ExecContext(ctx, `
 		UPDATE async_ix_jobs SET payload = NULL
 		WHERE id IN (
 			SELECT id FROM async_ix_jobs

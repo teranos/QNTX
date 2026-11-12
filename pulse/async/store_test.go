@@ -661,7 +661,7 @@ func TestADoneJobForgetsItsPayloadAndADroppedOneIsCleanedUp(t *testing.T) {
 			t.Fatalf("CreateJob(%s): %v", id, err)
 		}
 	}
-	forgotten, err := store.ForgetPayloads("github.forward", 10)
+	forgotten, err := store.ForgetPayloads(t.Context(), "github.forward", 10)
 	if err != nil || forgotten != 2 {
 		t.Fatalf("ForgetPayloads = %d, %v; want the done and the dropped one", forgotten, err)
 	}
