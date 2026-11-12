@@ -114,3 +114,19 @@ func TestASessionsKeyEndsWithTheAdmittingKeys(t *testing.T) {
 	require.Contains(t, byDID, sessionDID)
 	assert.Equal(t, *byDID[groundDID].ExpiresAt, *byDID[sessionDID].ExpiresAt)
 }
+
+// The gate presented the signature already, which spent its id: the handler
+// reads the gate's admission and does not present it again.
+func TestTheGatesAdmissionIsNotPresentedAgain(t *testing.T) {
+	h, _, ground, groundDID := saidYesTo(t)
+	_, sessionDID := aSessionsKey(t)
+	form := url.Values{"did": {sessionDID}, "label": {"Alder"}}
+	req := httptest.NewRequest(http.MethodPost, admitPath, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", signedScheme+signature(t, ground, groundDID, signedNodeOrigin, time.Minute))
+	gated, ok := h.admissionOf(h.presented(req))
+	require.True(t, ok)
+	w := httptest.NewRecorder()
+	h.handleAdmit(w, req.WithContext(WithAdmission(req.Context(), gated)))
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
