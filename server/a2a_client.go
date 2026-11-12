@@ -327,10 +327,10 @@ func (s *QNTXServer) a2aCalled(op a2aOperation, input protoreflect.MessageDescri
 		if err := protojson.Unmarshal(said, request); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Says: "what was sent is no " + string(input.FullName()) + ": " + err.Error()}
 		}
-		// What is said to a name is a Task that ends when it was received or
-		// not, which can be minutes: the one who says it is answered with the
-		// Task at once, and reads how it ended by its id, unless they said how
-		// they wait.
+		// 「[Fable 5.2] What is said to a name is a Task that ends when it was received or」
+		// 「[Fable 5.2] not, which can be minutes: the one who says it is answered with the」
+		// 「[Fable 5.2] Task at once, and reads how it ended by its id, unless they said how」
+		// 「[Fable 5.2] they wait.」
 		if said, sends := request.(*a2apb.SendMessageRequest); sends && sent["peer"] == "" && sent["card"] == "" &&
 			sent["configuration"] == "" && s.holdsAName(strings.TrimSpace(sent["tenant"])) {
 			said.Configuration = &a2apb.SendMessageConfiguration{ReturnImmediately: true}
@@ -413,8 +413,8 @@ func a2aRequestJSON(input protoreflect.MessageDescriptor, sent sigil.Sent) ([]by
 // a2a-go's card resolver (§8.2) and asked as no one.
 func (s *QNTXServer) a2aClientOf(ctx context.Context, sent sigil.Sent) (*a2aclient.Client, string, *protocol.Refusal) {
 	label, at := sent["peer"], sent["card"]
-	// Neither: the agent this node serves at the tenant, one that holds it as
-	// its name among them (ADR-059).
+	// 「[Fable 5.2] Neither: the agent this node serves at the tenant, one that holds it as」
+	// 「[Fable 5.2] its name among them (ADR-059).」
 	if label == "" && at == "" && strings.TrimSpace(sent["tenant"]) != "" {
 		return s.ownClient(ctx, strings.TrimSpace(sent["tenant"]))
 	}
