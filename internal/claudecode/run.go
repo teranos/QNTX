@@ -44,9 +44,9 @@ type Said struct {
 	// Allow is the tools the session may use without being asked, each by
 	// Claude Code's own name for it.
 	Allow []string
-	// In is the repository of its work the turn is said in, as owner/repo: it
-	// runs in that checkout, so what stands there, a project's rituals, is
-	// where its hooks stand. Empty, it runs in its work.
+	// 「[Opus 5.5] In is the repository of its work the turn is said in, as owner/repo: it」
+	// 「[Opus 5.5] runs in that checkout, so what stands there, a project's rituals, is」
+	// 「[Opus 5.5] where its hooks stand. Empty, it runs in its work.」
 	In string
 	// Env is what the session's environment holds beyond what this sets, each
 	// NAME=value. What the session runs inherits it.
@@ -277,8 +277,8 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	return answer, err
 }
 
-// place is where the turn runs: its work, or the checkout of the repository In names there.
-// Anything but an owner/repo checked out in its work is no place to say it in.
+// 「[Opus 5.5] place is where the turn runs: its work, or the checkout of the repository In names there.」
+// 「[Opus 5.5] Anything but an owner/repo checked out in its work is no place to say it in.」
 func (s Said) place(work string) (string, error) {
 	if s.In == "" {
 		return work, nil
@@ -289,12 +289,12 @@ func (s Said) place(work string) (string, error) {
 		return "", refused
 	}
 	for _, part := range parts {
-		// A name that is only dots climbs out of the work.
+		// 「[Opus 5.5] A name that is only dots climbs out of the work.」
 		if part == "" || strings.Trim(part, ".") == "" || strings.ContainsAny(part, `\`) {
 			return "", refused
 		}
 	}
-	// Resolved, so a link in the work that leads out of it is no checkout of it.
+	// 「[Opus 5.5] Resolved, so a link in the work that leads out of it is no checkout of it.」
 	root, err := filepath.EvalSymlinks(work)
 	if err != nil {
 		return "", errors.WithSecondaryError(refused, err)
