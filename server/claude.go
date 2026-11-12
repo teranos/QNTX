@@ -248,8 +248,8 @@ func spokenBy(caller *http.Request) string {
 	admitted, gated := auth.AdmissionFrom(caller.Context())
 	switch {
 	case !gated:
-		// A turn a verified GitHub delivery started is said by the app that
-		// wrote the comment; any other request without a login says nobody.
+		// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] A turn a verified GitHub delivery started is said by the app that」
+		// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] wrote the comment; any other request without a login says nobody.」
 		return speakerOf(caller.Context())
 	case admitted.Grant != nil:
 		return admitted.Grant.DID
