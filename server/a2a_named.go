@@ -22,30 +22,30 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "AGENTS CAN TALK TO EACH OTHER BY THEIR NAME"
-// "AND GROUND DELIVERS IT VIA UG AND STATUSLINE"
-// "A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT, AND WE DONT INVENT HERE, WE TAKE THE A2A CONVENTIONS, WE TAKE THE SDK SERIOUSLY"
+// "「[Opus 5.5] AGENTS CAN TALK TO EACH OTHER BY THEIR NAME」"
+// "「[Opus 5.5] AND GROUND DELIVERS IT VIA UG AND STATUSLINE」"
+// "「[Opus 5.5] A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT, AND WE DONT INVENT HERE, WE TAKE THE A2A CONVENTIONS, WE TAKE THE SDK SERIOUSLY」"
 //
-// A name an agent holds (i name) is a tenant: SendMessage at it is a Task of
-// that agent. The node runs no turn for it. What was said is left on the
-// status row as news for the agent, where ug sees it and writes it into
-// ground's store (ADR-059). The Task is the delivery. Nothing tells the node
-// yet that the agent received it: ground writes a row for a session or a
-// project, and no agent by its name, so the Task fails when the row lets go
-// of it. What completes it is ground's own receipt of the hand-over.
+// 「[Fable 5.2] A name an agent holds (i name) is a tenant: SendMessage at it is a Task of」
+// 「[Fable 5.2] that agent. The node runs no turn for it. What was said is left on the」
+// 「[Fable 5.2] status row as news for the agent, where ug sees it and writes it into」
+// 「[Fable 5.2] ground's store (ADR-059). The Task is the delivery. Nothing tells the node」
+// 「[Fable 5.2] yet that the agent received it: ground writes a row for a session or a」
+// 「[Fable 5.2] project, and no agent by its name, so the Task fails when the row lets go」
+// 「[Fable 5.2] of it. What completes it is ground's own receipt of the hand-over.」
 
-// saidToANameContext is what the first line of a Task said to a named agent
-// is in beside its task: no turn of the node stands behind it, so a node that
-// stopped does not fail it for one (settleTasksNoTurnLeft).
+// 「[Fable 5.2] saidToANameContext is what the first line of a Task said to a named agent」
+// 「[Fable 5.2] is in beside its task: no turn of the node stands behind it, so a node that」
+// 「[Fable 5.2] stopped does not fail it for one (settleTasksNoTurnLeft).」
 const saidToANameContext = "said:to-a-name"
 
-// toldWithin is how long what was said to a name stays on the status row for
-// a ground to take: the row's own hold.
+// 「[Fable 5.2] toldWithin is how long what was said to a name stays on the status row for」
+// 「[Fable 5.2] a ground to take: the row's own hold.」
 var toldWithin = statusline.NewsHold
 
-// agentNamedAt is the agent served at tenant by the name it holds. A
-// namespace by that name is the namespace's: a name is a tenant only where no
-// namespace is.
+// 「[Fable 5.2] agentNamedAt is the agent served at tenant by the name it holds. A」
+// 「[Fable 5.2] namespace by that name is the namespace's: a name is a tenant only where no」
+// 「[Fable 5.2] namespace is.」
 func (s *QNTXServer) agentNamedAt(tenant string) (agentName, bool, error) {
 	if s.held == nil || strings.TrimSpace(tenant) == "" {
 		return agentName{}, false, nil
@@ -55,7 +55,7 @@ func (s *QNTXServer) agentNamedAt(tenant string) (agentName, bool, error) {
 		return agentName{}, false, nil
 	}
 	names, err := s.agentNames()
-	// A node that serves no system keeps no names: nobody holds one there.
+	// 「[Fable 5.2] A node that serves no system keeps no names: nobody holds one there.」
 	if errors.As(err, &notServed) {
 		return agentName{}, false, nil
 	}
@@ -69,20 +69,20 @@ func (s *QNTXServer) agentNamedAt(tenant string) (agentName, bool, error) {
 	return names[at], true, nil
 }
 
-// holdsAName is whether an agent is served at tenant by its name.
+// 「[Fable 5.2] holdsAName is whether an agent is served at tenant by its name.」
 func (s *QNTXServer) holdsAName(tenant string) bool {
 	_, held, err := s.agentNamedAt(tenant)
 	return err == nil && held
 }
 
-// namedTaskAgent is the agent that holds a name, its Tasks in system, where
-// its name is kept.
+// 「[Fable 5.2] namedTaskAgent is the agent that holds a name, its Tasks in system, where」
+// 「[Fable 5.2] its name is kept.」
 func (s *QNTXServer) namedTaskAgent(named agentName) taskAgent {
 	return taskAgent{taskLines: s.systemTasks(named.did), called: named.name, named: true}
 }
 
-// saidToAName is the Task of what was said to a named agent: submitted, left
-// on the status row, and then received or not.
+// 「[Fable 5.2] saidToAName is the Task of what was said to a named agent: submitted, left」
+// 「[Fable 5.2] on the status row, and then received or not.」
 func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContext, call a2aCall, yield func(a2asdk.Event, error) bool) {
 	ta, id := call.agent, ec.TaskID
 	says, err := textSaidIn(ec.Message)
@@ -127,8 +127,8 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	}
 }
 
-// leaveForAName leaves what by said to the named agent on the status row, as
-// news for the person its key speaks for: the row their ug polls.
+// 「[Fable 5.2] leaveForAName leaves what by said to the named agent on the status row, as」
+// 「[Fable 5.2] news for the person its key speaks for: the row their ug polls.」
 func (s *QNTXServer) leaveForAName(ta taskAgent, id, by, says string, whole func(auth.Admission)) {
 	from := by
 	if names, err := s.agentNames(); err == nil {
@@ -153,11 +153,11 @@ func (s *QNTXServer) leaveForAName(ta taskAgent, id, by, says string, whole func
 	s.logger.Infow("what was said to a named agent is on the status row", "to", ta.called, "did", ta.did, "from", from, "task", id, "for", addressee)
 }
 
-// "AGENTS CAN TALK TO EACH OTHER BY THEIR NAME"
+// "「[Opus 5.5] AGENTS CAN TALK TO EACH OTHER BY THEIR NAME」"
 //
-// ownClient is a2a-go's client of the agent this node serves at tenant, asked
-// as whoever asks here, in process: the node's own A2A binding answers, as it
-// answers a request that came over the wire, and who reaches /a2a reaches it.
+// 「[Fable 5.2] ownClient is a2a-go's client of the agent this node serves at tenant, asked」
+// 「[Fable 5.2] as whoever asks here, in process: the node's own A2A binding answers, as it」
+// 「[Fable 5.2] answers a request that came over the wire, and who reaches /a2a reaches it.」
 func (s *QNTXServer) ownClient(ctx context.Context, tenant string) (*a2aclient.Client, string, *protocol.Refusal) {
 	admitted, gated := auth.AdmissionFrom(ctx)
 	if !gated {
@@ -178,23 +178,23 @@ func (s *QNTXServer) ownClient(ctx context.Context, tenant string) (*a2aclient.C
 	return client, tenant, nil
 }
 
-// askedInProcess answers a request with the node's own A2A binding, as the
-// one who asks.
+// 「[Fable 5.2] askedInProcess answers a request with the node's own A2A binding, as the」
+// 「[Fable 5.2] one who asks.」
 type askedInProcess struct {
 	serve http.HandlerFunc
 	as    auth.Admission
 }
 
 func (a askedInProcess) RoundTrip(r *http.Request) (*http.Response, error) {
-	// What the binding writes is read as it writes it: a stream's events and
-	// its keep-alives reach the one who asks as they are sent.
+	// 「[Fable 5.2] What the binding writes is read as it writes it: a stream's events and」
+	// 「[Fable 5.2] its keep-alives reach the one who asks as they are sent.」
 	ctx, cancel := context.WithCancel(auth.WithAdmission(r.Context(), a.as))
 	reads, writes := io.Pipe()
 	answered := &answeredInProcess{header: http.Header{}, status: http.StatusOK, body: writes, began: make(chan struct{})}
 	sacred.Go("an agent of this node, asked in process", func() {
 		defer cancel()
-		// A binding that panicked answered nothing more: the one who asks is
-		// told so, and does not wait on it.
+		// 「[Fable 5.2] A binding that panicked answered nothing more: the one who asks is」
+		// 「[Fable 5.2] told so, and does not wait on it.」
 		served := false
 		defer func() {
 			if served {
@@ -222,7 +222,7 @@ func (a askedInProcess) RoundTrip(r *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-// answeredInProcess is what the binding writes, handed on as it is written.
+// 「[Fable 5.2] answeredInProcess is what the binding writes, handed on as it is written.」
 type answeredInProcess struct {
 	header http.Header
 	body   *io.PipeWriter
@@ -231,8 +231,8 @@ type answeredInProcess struct {
 	once   sync.Once
 }
 
-// begin is the answer's head being settled: its status and headers are read
-// from here on.
+// 「[Fable 5.2] begin is the answer's head being settled: its status and headers are read」
+// 「[Fable 5.2] from here on.」
 func (w *answeredInProcess) begin() { w.once.Do(func() { close(w.began) }) }
 
 func (w *answeredInProcess) Header() http.Header { return w.header }
@@ -250,7 +250,7 @@ func (w *answeredInProcess) WriteHeader(status int) {
 }
 func (w *answeredInProcess) Flush() { w.begin() }
 
-// leftWhenClosed tells the binding its caller left when the answer is closed.
+// 「[Fable 5.2] leftWhenClosed tells the binding its caller left when the answer is closed.」
 type leftWhenClosed struct {
 	io.ReadCloser
 	left func()
@@ -261,9 +261,9 @@ func (b leftWhenClosed) Close() error {
 	return b.ReadCloser.Close()
 }
 
-// textSaidIn is what a message's text parts say, one after another. What is
-// said to a name crosses the status row as text: a part that is not text is
-// refused (ContentTypeNotSupportedError).
+// 「[Fable 5.2] textSaidIn is what a message's text parts say, one after another. What is」
+// 「[Fable 5.2] said to a name crosses the status row as text: a part that is not text is」
+// 「[Fable 5.2] refused (ContentTypeNotSupportedError).」
 func textSaidIn(message *a2asdk.Message) (string, error) {
 	if message == nil {
 		return "", a2aRefusal(a2asdk.ErrInvalidParams, "a SendMessageRequest carries a message")
