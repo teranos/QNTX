@@ -26,8 +26,8 @@ type a2aCall struct {
 	agent   taskAgent
 	tenant  string
 	request *http.Request
-	// accepts is the media types the client takes back (acceptedOutputModes),
-	// none when it named none.
+	// 「[Opus 5.5] accepts is the media types the client takes back (acceptedOutputModes),」
+	// 「[Opus 5.5] none when it named none.」
 	accepts []string
 }
 
