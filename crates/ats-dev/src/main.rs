@@ -859,14 +859,22 @@ fn push(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
             },
         }
         if batch.len() == PUSH_BATCH {
-            if let Err(why) = p.send(&agent, &url, &origin, &sg, &mut batch) {
-                broken = Some(why);
-                break;
+            match p.send(&agent, &url, &origin, &sg, &mut batch) {
+                Ok(()) => {}
+                Err(Halt::Unanswered(why)) => {
+                    broken = Some(why);
+                    break;
+                }
+                Err(Halt::Unsaid(e)) => return Err(e),
             }
         }
     }
     if broken.is_none() && !batch.is_empty() {
-        broken = p.send(&agent, &url, &origin, &sg, &mut batch).err();
+        match p.send(&agent, &url, &origin, &sg, &mut batch) {
+            Ok(()) => {}
+            Err(Halt::Unanswered(why)) => broken = Some(why),
+            Err(Halt::Unsaid(e)) => return Err(e),
+        }
     }
     if let Some(why) = &broken {
         for id in ids {
@@ -892,6 +900,14 @@ struct Tally {
     not_taken: usize,
 }
 
+/// Why a batch stopped push: the node did not answer it, and the rows after it
+/// go unsent; or a row's line could not be written, and push ends there, whatever
+/// the node took, since a row whose answer was not said is not one to call done.
+enum Halt {
+    Unanswered(String),
+    Unsaid(Box<Error>),
+}
+
 /// Where push says what became of each row.
 struct Pushing<W: Write> {
     out: W,
@@ -909,7 +925,7 @@ impl<W: Write> Pushing<W> {
     }
 
     /// One request for the batch, and a line for each of its rows; the batch is
-    /// emptied either way. `Err` is a request the node did not answer, with why.
+    /// emptied either way.
     fn send(
         &mut self,
         agent: &ureq::Agent,
@@ -917,13 +933,13 @@ impl<W: Write> Pushing<W> {
         origin: &str,
         sg: &sign::Signer,
         batch: &mut Vec<(String, serde_json::Value)>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Halt> {
         let rows: Vec<(String, serde_json::Value)> = std::mem::take(batch);
-        let unanswered = |p: &mut Self, why: String| -> Result<(), String> {
+        let unanswered = |p: &mut Self, why: String| -> Result<(), Halt> {
             for (id, _) in &rows {
-                p.refused(id, &why).map_err(|e| e.why)?;
+                p.refused(id, &why).map_err(Halt::Unsaid)?;
             }
-            Err(why)
+            Err(Halt::Unanswered(why))
         };
         let auth = match sg.authorization(origin, PUSH_SIGNED_FOR) {
             Ok(a) => a,
@@ -952,7 +968,7 @@ impl<W: Write> Pushing<W> {
                         200 if existed => self.tally.existed += 1,
                         _ => self.tally.not_taken += 1,
                     }
-                    self.say(serde_json::json!({ "id": id, "status": st, "answer": r.get("answer") })).map_err(|e| e.why)?;
+                    self.say(serde_json::json!({ "id": id, "status": st, "answer": r.get("answer") })).map_err(Halt::Unsaid)?;
                 }
             }
             // The request itself was not taken (the gate, a body the node did
@@ -960,7 +976,7 @@ impl<W: Write> Pushing<W> {
             None => {
                 for (id, _) in &rows {
                     self.tally.not_taken += 1;
-                    self.say(serde_json::json!({ "id": id, "status": status, "answer": answer })).map_err(|e| e.why)?;
+                    self.say(serde_json::json!({ "id": id, "status": status, "answer": answer })).map_err(Halt::Unsaid)?;
                 }
             }
         }
@@ -968,23 +984,25 @@ impl<W: Write> Pushing<W> {
     }
 }
 
-/// The origin a request's signature is made out to: scheme and host, lowercase,
-/// without a port that is the scheme's own. The node compares its configured
-/// origin exactly, so `https://Node.example:443/x` is `https://node.example`.
+/// The origin a request's signature is made out to: the scheme and the
+/// authority as the node url names them, as `qntx sign` makes it
+/// (`cmd/qntx/commands/element.go`, `signedFor`) and ground's signer does. The
+/// node compares it with its configured origin exactly, so the url is named as
+/// the node names itself, an explicit port included. A query or a fragment is
+/// refused: `/api/attestations` is appended to the url, and would land in it.
 fn origin_of(node: &str) -> Result<String, Box<Error>> {
+    if node.contains(['?', '#']) {
+        return Err(fail("a node url names no query or fragment", node));
+    }
     let (scheme, rest) = node.split_once("://").ok_or_else(|| fail("a node is a url", node))?;
-    let scheme = scheme.to_ascii_lowercase();
-    let default_port = match scheme.as_str() {
-        "http" => ":80",
-        "https" => ":443",
-        _ => return Err(fail("a node is reached over http or https", node)),
-    };
-    let host = rest.split(['/', '?', '#']).next().unwrap_or("").to_ascii_lowercase();
-    let host = host.strip_suffix(default_port).unwrap_or(&host);
-    if host.is_empty() {
+    if scheme != "http" && scheme != "https" {
+        return Err(fail("a node is reached over http or https", node));
+    }
+    let authority = rest.split('/').next().unwrap_or("");
+    if authority.is_empty() {
         return Err(fail("a node url names a host", node));
     }
-    Ok(format!("{scheme}://{host}"))
+    Ok(format!("{scheme}://{authority}"))
 }
 
 /// One row as `POST /api/attestations` takes it: the timestamp in seconds, the
@@ -1013,21 +1031,20 @@ fn wire(a: &Attestation) -> Result<serde_json::Value, String> {
 mod tests {
     use super::origin_of;
 
-    /// The node compares the audience with its configured origin exactly.
+    /// The node compares the audience with its configured origin exactly, so
+    /// it is the url's own, as `qntx sign` makes it.
     #[test]
-    fn a_node_url_is_made_out_to_its_origin_as_the_node_names_itself() {
+    fn a_node_url_is_made_out_to_its_origin_as_qntx_sign_makes_it() {
         for (url, origin) in [
             ("https://node.example", "https://node.example"),
             ("https://node.example/", "https://node.example"),
-            ("https://node.example:443/api", "https://node.example"),
-            ("HTTPS://Node.Example:443", "https://node.example"),
-            ("http://127.0.0.1:80", "http://127.0.0.1"),
-            ("http://127.0.0.1:8820/x?y#z", "http://127.0.0.1:8820"),
-            ("https://node.example:8443", "https://node.example:8443"),
+            ("https://node.example/api/", "https://node.example"),
+            ("https://node.example:443", "https://node.example:443"),
+            ("http://127.0.0.1:8820/x", "http://127.0.0.1:8820"),
         ] {
             assert_eq!(origin_of(url).unwrap(), origin, "{url}");
         }
-        for bad in ["node.example", "ftp://node.example", "https://", "https:///x"] {
+        for bad in ["node.example", "ftp://node.example", "HTTPS://node.example", "https://", "https:///x", "https://node.example?x=y", "https://node.example/#a"] {
             assert!(origin_of(bad).is_err(), "{bad}");
         }
     }

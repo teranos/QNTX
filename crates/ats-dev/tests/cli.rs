@@ -1097,3 +1097,38 @@ fn a_row_the_node_already_had_is_said_apart_from_one_it_took() {
     assert!(err(&o).contains("0 created, 1 the node already had under that id (what it holds was not compared)"), "{}", err(&o));
     node.join().unwrap();
 }
+
+/// A push whose answers cannot be said is not a push that succeeded: the node
+/// took the row, but nobody was told, and the exit says so.
+#[test]
+fn a_push_whose_lines_cannot_be_written_does_not_exit_0() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    let (url, node) = fake_node(200, all_created);
+    let mut c = bin()
+        .env("HOME", p.parent().unwrap())
+        .arg("--db")
+        .arg(&p)
+        .args(["push", &url])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    // nobody reads what push says
+    drop(c.stdout.take());
+    let o = c.wait_with_output().unwrap();
+    node.join().unwrap();
+    assert!(!o.status.success(), "push exited 0 with its lines unwritten: {}", err(&o));
+    assert!(err(&o).contains("could not write stdout"), "{}", err(&o));
+}
+
+#[test]
+fn a_node_url_is_reached_as_written_and_names_no_query() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    for (url, why) in [("https://node.example?x=y", "no query or fragment"), ("https://node.example/#a", "no query or fragment")] {
+        let o = run(&p, &["push", url], "");
+        assert!(!o.status.success() && err(&o).contains(why), "{url}: {}", err(&o));
+    }
+}
