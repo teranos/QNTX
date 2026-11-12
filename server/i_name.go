@@ -109,12 +109,26 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 // A session and a connector ask as a person, who is named as they arrive
 // (ADR-031). A client's own token is issued anew under another DID each time
 // (auth.TokenStrategy.GenerateAccessToken), so a name on it would not last.
+//
+// "I WANT TO MAKE EVERY SESSION BE ABLE TO NAME ITSELF"
+// A key the person said yes to at the passkey (auth/device.go) is recorded as
+// its own client. It signs as itself and its next signature is the same DID,
+// so it is named by that DID.
+//
+// "I EXPECT EACH SESSION TO ALSO HAVE ITS OWN KEY AND NAME"
+// Such a key is admitted as the person who said yes, with no Grant
+// (auth.admittedAsThePerson): it is known by the DID it signs as being the
+// client it was issued through. A connector's token is issued under another
+// DID than its client's, and is refused as the person it asks as.
 func itsOwnDID(admitted auth.Admission) (string, *protocol.Refusal) {
+	if admitted.Grant == nil && admitted.TokenDID != "" && admitted.TokenDID == admitted.ClientDID {
+		return admitted.TokenDID, nil
+	}
 	if admitted.Grant == nil {
 		return "", &protocol.Refusal{Why: sigil.NotAllowed,
 			Says: "i name names an agent by its own DID, and this asks as a person: a person is named as they arrive"}
 	}
-	if admitted.ClientDID != "" {
+	if admitted.ClientDID != "" && admitted.ClientDID != admitted.Grant.DID {
 		return "", &protocol.Refusal{Why: sigil.NotAllowed,
 			Says: "this token was issued through the client " + admitted.ClientDID + ", which is issued its next one under another DID: a name on it would not last"}
 	}

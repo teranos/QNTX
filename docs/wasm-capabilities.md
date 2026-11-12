@@ -39,7 +39,7 @@ The server classifies through the cgo query path, not these.
 |---|---|---|
 | Attribute schema | `ats/attrs/` | `reflect`: Rust has no runtime reflection, so struct-tag schemas need a redesign, not a translation |
 | SO action payloads | `ats/so/` | Rust parses the `so` actions (`ax_filter` returns them); Go turns them into a job |
-| SO prompt execution | `ats/so/actions/prompt/` | holds a `database/sql` handle, calls `internal/ai/provider`, submits through `pulse/async` |
+| SO prompt execution | `ats/so/actions/prompt/` | holds a `database/sql` handle, calls `internal/ai/provider`, runs as a `so.Handler` that `pulse/async` adapts via `ForSo` |
 | Pulse scheduling | `pulse/` | job orchestration, goroutines, database-bound |
 
 ## Elsewhere
