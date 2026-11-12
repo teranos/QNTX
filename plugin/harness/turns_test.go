@@ -1,4 +1,4 @@
-package piharness
+package harness
 
 import (
 	"context"

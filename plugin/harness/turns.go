@@ -1,4 +1,4 @@
-package piharness
+package harness
 
 import (
 	"context"
@@ -9,10 +9,11 @@ import (
 	"github.com/a2aproject/a2a-go/v2/a2asrv/taskstore"
 )
 
-// turnsKept is how many Tasks whose turn ended the plugin still answers for.
-const turnsKept = 16
+// TurnsKept is how many Tasks whose turn ended a harness plugin still answers
+// for.
+const TurnsKept = 16
 
-// turns is the Tasks a Pi harness plugin holds: every one whose turn runs,
+// turns is the Tasks a harness plugin holds: every one whose turn runs,
 // and the newest kept of those that ended. a2a-go's own in-memory store keeps
 // every Task for as long as the process lives.
 type turns struct {
@@ -30,8 +31,35 @@ type turn struct {
 
 var _ taskstore.Store = (*turns)(nil)
 
+// Turns is the Task store of a harness plugin. Core writes every turn down
+// (ADR-059) and asks for none again, so the plugin keeps a Task only while its
+// turn runs, and kept after.
+func Turns(kept int) taskstore.Store { return newTurns(kept) }
+
 func newTurns(kept int) *turns {
 	return &turns{kept: kept, held: map[a2asdk.TaskID]*turn{}}
+}
+
+// Running is each turn a harness plugin runs, by its Task, and how it is
+// stopped. a2a-go runs a turn apart from the call that asked for it, so a
+// caller that left does not end the turn's context: Cancel does, which core
+// asks for when it gives a turn up.
+type Running struct {
+	stops sync.Map
+}
+
+// Began has the Task's turn stopped by stop, until the ended it answers with
+// is called.
+func (r *Running) Began(id a2asdk.TaskID, stop context.CancelFunc) (ended func()) {
+	r.stops.Store(id, stop)
+	return func() { r.stops.Delete(id) }
+}
+
+// Stop stops the Task's turn, when one runs that may be stopped.
+func (r *Running) Stop(id a2asdk.TaskID) {
+	if stop, runs := r.stops.Load(id); runs {
+		stop.(context.CancelFunc)()
+	}
 }
 
 func (s *turns) Create(_ context.Context, task *a2asdk.Task) (taskstore.TaskVersion, error) {
@@ -69,7 +97,7 @@ func (s *turns) Update(_ context.Context, update *taskstore.UpdateRequest) (task
 }
 
 // settle counts a Task whose turn ended among those kept, and lets go of the
-// oldest past turnsKept.
+// oldest past kept.
 func (s *turns) settle(task *a2asdk.Task) {
 	held := s.held[task.ID]
 	if held.ended || !task.Status.State.Terminal() {

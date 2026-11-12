@@ -476,9 +476,9 @@ func TestATurnCoreGivesUpStopsPiInThePlugin(t *testing.T) {
 		"Pi runs on in the plugin after the node gave its turn up")
 }
 
-// Only a harness whose turn core says to a plugin is held by one: Claude Code
-// is run by the node, from a binary the node holds, whatever a plugin named
-// claude declares.
+// Only a harness the node holds no binary of is held by its plugin: where
+// Claude Code's binary is looked for (a ritual's PATH, a login), a running
+// claude plugin's label is no path.
 func TestAPluginNamedForAHarnessTheNodeRunsHoldsNothing(t *testing.T) {
 	s := &QNTXServer{}
 	s.pluginRegistry = plugin.NewRegistry("0.1.0", zaptest.NewLogger(t).Sugar())

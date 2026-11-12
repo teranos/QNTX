@@ -6,7 +6,6 @@ package piharness
 import (
 	"context"
 	"iter"
-	"sync"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
@@ -30,17 +29,14 @@ type Executor struct {
 	// Binary is where the plugin's Pi is, or why it has none.
 	Binary func(ctx context.Context) (string, error)
 
-	// running is each turn's run, by its Task, and how it is stopped.
-	running sync.Map
+	running harness.Running
 }
 
 var _ a2asrv.AgentExecutor = (*Executor)(nil)
 
-// Handler is what a Pi harness plugin hands back as its Harness. Core writes
-// every turn down (ADR-059) and asks for none again, so the plugin keeps a
-// Task only while its turn runs, and turnsKept after.
+// Handler is what a Pi harness plugin hands back as its Harness.
 func Handler(binary func(ctx context.Context) (string, error)) a2asrv.RequestHandler {
-	return a2asrv.NewHandler(&Executor{Binary: binary}, a2asrv.WithTaskStore(newTurns(turnsKept)))
+	return a2asrv.NewHandler(&Executor{Binary: binary}, a2asrv.WithTaskStore(harness.Turns(harness.TurnsKept)))
 }
 
 func (e *Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
@@ -71,8 +67,7 @@ func (e *Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter
 		// a person stops it, and its session is left as written.
 		running, stop := context.WithCancel(ctx)
 		defer stop()
-		e.running.Store(ec.TaskID, stop)
-		defer e.running.Delete(ec.TaskID)
+		defer e.running.Began(ec.TaskID, stop)()
 		listening := true
 		answer, err := said.Run(running, func(record Record) {
 			if !listening {
@@ -104,9 +99,7 @@ func (e *Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter
 // Cancel stops the Task's run and ends the Task canceled.
 func (e *Executor) Cancel(_ context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
 	return func(yield func(a2asdk.Event, error) bool) {
-		if stop, runs := e.running.Load(ec.TaskID); runs {
-			stop.(context.CancelFunc)()
-		}
+		e.running.Stop(ec.TaskID)
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateCanceled, nil), nil)
 	}
 }

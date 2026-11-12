@@ -34,10 +34,12 @@ type harnessRunning interface {
 
 var _ harnessRunning = (*grpcplugin.ExternalDomainProxy)(nil)
 
-// harnessesAPluginRuns is each harness whose turn core says to a plugin. The
-// others are run by the node, from a binary it holds, until their turn is
-// routed here too.
-var harnessesAPluginRuns = map[string]bool{agentLinePi: true}
+// harnessesAPluginHolds is each harness the node holds no binary of: its
+// plugin's alone to run, and held where the plugin is. Claude Code is run by
+// the claude plugin when one runs and by the node's own binary when none
+// does, and what the node does with that binary beside a turn (a ritual's
+// PATH, a login) needs the binary, so a plugin's label never stands for it.
+var harnessesAPluginHolds = map[string]bool{agentLinePi: true}
 
 // turnGivenUpWithin is how long core waits for a plugin to say a turn it gave
 // up was canceled.
