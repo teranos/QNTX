@@ -277,9 +277,9 @@ type agentCard struct {
 	Name, Description, Version string
 	// URL is where the binding answers, and Tenant the agent behind it.
 	URL, Tenant string
-	// GRPC is where A2A over gRPC is reached, as am.toml's a2a.grpc names it
-	// (host:port): the node serves it on its own port, and whether its front
-	// door passes HTTP/2 is the deployment's to say. Empty lists none.
+	// 「[Fable 5.2] GRPC is where A2A over gRPC is reached, as am.toml's a2a.grpc names it」
+	// 「[Fable 5.2] (host:port): the node serves it on its own port, and whether its front」
+	// 「[Fable 5.2] door passes HTTP/2 is the deployment's to say. Empty lists none.」
 	GRPC string
 	// OutputModes is the card's default output modes, which a skill's Modes
 	// override.
@@ -292,7 +292,7 @@ type agentCard struct {
 }
 
 // sdk is the card as a2a-go's AgentCard. It is reached over HTTP+JSON and
-// JSON-RPC, both at its URL, and over gRPC where am.toml says where.
+// 「[Fable 5.2] JSON-RPC, both at its URL, and over gRPC where am.toml says where.」
 func (c agentCard) sdk() *a2asdk.AgentCard {
 	bearer := a2asdk.SecurityRequirements{"bearer": {}}
 	card := &a2asdk.AgentCard{
