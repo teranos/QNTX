@@ -67,9 +67,9 @@ func ReadFrom(told string) (string, error) {
 // "Don't wake me for my own words"
 // "Drop the Switch Trust pii/phone lines from what wakes me"
 
-// Unheard is whether a message is left out of what a turn is told: the agent's
-// own words, its App's comments said back into the room, and Switch Trust's
-// flags on them. The room keeps them.
+// 「[Fable 5.2] Unheard is whether a message is left out of what a turn is told: the agent's」
+// 「[Fable 5.2] own words, its App's comments said back into the room, and Switch Trust's」
+// 「[Fable 5.2] flags on them. The room keeps them.」
 func Unheard(s Said, agent string) bool {
 	switch strings.ToLower(s.Sender) {
 	case strings.ToLower(agent), "sbvh-qntx":
@@ -78,8 +78,8 @@ func Unheard(s Said, agent string) bool {
 	return trustFlag.MatchString(strings.TrimSpace(s.Body))
 }
 
-// trustFlag is the whole of a message Switch Trust says to flag another: a
-// comment that only quotes it is still heard.
+// 「[Fable 5.2] trustFlag is the whole of a message Switch Trust says to flag another: a」
+// 「[Fable 5.2] comment that only quotes it is still heard.」
 var trustFlag = regexp.MustCompile(`^⚠️\s*_Switch Trust flagged this message \([^)\n]*\)\._$`)
 
 // Digest is what a turn is told of what the room said: each message by who
