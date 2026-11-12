@@ -2,11 +2,13 @@ package grpc
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"go.uber.org/zap/zaptest"
 )
@@ -210,4 +212,92 @@ func TestSetupPluginSchedules_MultipleSchedules(t *testing.T) {
 	require.NotNil(t, job2)
 	assert.Equal(t, schedule.StateActive, job1.State)
 	assert.Equal(t, schedule.StatePaused, job2.State)
+}
+
+// A plugin switched off has its schedules paused, and switched on again they
+// run: what was paused by declaration stays paused.
+func TestPluginSchedulesFollowThePlugin(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zaptest.NewLogger(t).Sugar()
+	declared := []*protocol.ScheduleInfo{
+		{HandlerName: "poll", IntervalSeconds: 120, EnabledByDefault: true, Description: "polls"},
+		{HandlerName: "held", IntervalSeconds: 120, EnabledByDefault: false, Description: "declared paused"},
+	}
+	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
+	other := []*protocol.ScheduleInfo{{HandlerName: "poll", IntervalSeconds: 60, EnabledByDefault: true}}
+	require.NoError(t, SetupPluginSchedules(db, "other", other, logger))
+
+	states := func() map[string]string {
+		jobs, err := schedule.NewStore(db).ListAllScheduledJobs()
+		require.NoError(t, err)
+		got := map[string]string{}
+		for _, j := range jobs {
+			got[j.HandlerName] = j.State
+		}
+		return got
+	}
+
+	// Metadata that is no JSON object keeps no plugin running.
+	for id, metadata := range map[string]string{"AS-null": "null", "AS-text": "polls the pond"} {
+		_, err := db.Exec(`UPDATE scheduled_pulse_jobs SET metadata = ? WHERE handler_name = 'duif/poll'`, metadata)
+		require.NoError(t, err, id)
+		require.NoError(t, PausePluginSchedules(db, "duif", logger), id)
+		require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger), id)
+	}
+
+	require.NoError(t, PausePluginSchedules(db, "duif", logger))
+	assert.Equal(t, map[string]string{
+		"duif/poll":  schedule.StateInactive,
+		"duif/held":  schedule.StatePaused,
+		"other/poll": schedule.StateActive,
+	}, states())
+
+	// Back: the one the switch-off took out runs; the one declared paused does not.
+	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
+	assert.Equal(t, map[string]string{
+		"duif/poll":  schedule.StateActive,
+		"duif/held":  schedule.StatePaused,
+		"other/poll": schedule.StateActive,
+	}, states())
+
+	// Paused by hand while the plugin is off, it is paused when the plugin is back.
+	require.NoError(t, PausePluginSchedules(db, "duif", logger))
+	jobs, err := schedule.NewStore(db).ListAllScheduledJobs()
+	require.NoError(t, err)
+	for _, j := range jobs {
+		if j.HandlerName == "duif/poll" {
+			require.NoError(t, schedule.NewStore(db).UpdateJobState(j.Id, schedule.StatePaused))
+		}
+	}
+	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
+	assert.Equal(t, schedule.StatePaused, states()["duif/poll"], "enabling the plugin woke what a person paused")
+}
+
+// A plugin taken off the node has no schedules left, and is added again with none.
+func TestDeletePluginSchedules(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zaptest.NewLogger(t).Sugar()
+	declared := []*protocol.ScheduleInfo{{HandlerName: "poll", IntervalSeconds: 120, EnabledByDefault: true}}
+	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
+	require.NoError(t, SetupPluginSchedules(db, "other", declared, logger))
+
+	// A schedule another caller made, whose metadata names duif and whose
+	// handler is not duif's: not duif's to pause or delete, whatever it says.
+	require.NoError(t, schedule.NewStore(db).CreateJob(&schedule.Job{
+		MadeBy: string(async.MadeByNoCaller), Id: "AS-someone-elses", HandlerName: "report", IntervalSeconds: 60,
+		NextRunAt: time.Now().Format(time.RFC3339), State: schedule.StateActive, Metadata: `{"plugin":"duif"}`,
+		CreatedAt: time.Now().Format(time.RFC3339), UpdatedAt: time.Now().Format(time.RFC3339),
+	}))
+
+	require.NoError(t, PausePluginSchedules(db, "duif", logger))
+	require.NoError(t, DeletePluginSchedules(db, "duif", logger))
+
+	jobs, err := schedule.NewStore(db).ListAllScheduledJobs()
+	require.NoError(t, err)
+	listed := map[string]string{}
+	for _, j := range jobs {
+		listed[j.HandlerName] = j.State
+	}
+	assert.Equal(t, map[string]string{"other/poll": schedule.StateActive, "report": schedule.StateActive}, listed,
+		"duif's are deleted, and nobody else's is touched")
 }
