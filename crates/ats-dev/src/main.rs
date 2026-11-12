@@ -3,8 +3,8 @@
 //! Tablet of Reach. It reads and writes attestations in one SQLite file.
 //!
 //! ```text
-//! ats-dev [--backend sqlite|duckdb|postgres] [--db FILE|LOCATION|URL] [--namespace NS] [--ca FILE]   # before any command; see below
-//! ats-dev [--db FILE] [--sync full|normal|off] [--key FILE] [--unsigned] put "ALICE is author of GITHUB by BOB" [--attr k=v]...
+//! 「[Sonnet 5.5] ats-dev [--backend sqlite|duckdb|postgres] [--db FILE|LOCATION|URL] [--namespace NS] [--ca FILE]   # before any command; see below」
+//! 「[Sonnet 5.5] ats-dev [--db FILE] [--sync full|normal|off] [--key FILE] [--unsigned] put "ALICE is author of GITHUB by BOB" [--attr k=v]...」
 //! ats-dev [--db FILE] [--sync …] put -          # JSON attestations, one per line, on stdin
 //! ats-dev [--db FILE] ax "ALICE is author of GITHUB since last month" [--limit N]
 //! ats-dev [--db FILE] get ID
@@ -16,36 +16,36 @@
 //! ats-dev [--db FILE] clear --yes
 //! ats-dev [--db FILE] subjects | predicates | contexts | actors   # distinct values, one per line
 //! ats-dev [--db FILE] stats
-//! ats-dev [--db FILE] key                       # the signing key's did:key and file (minted if there is none)
-//! ats-dev [--db FILE] bench load N [--step S] [--batch K] [--replace] | probe N | query   # see bench/README.md
-//! ats-dev [--db FILE] verify [ID]               # valid / invalid / unsigned, one line each; exit 1 if any is invalid
+//! 「[Sonnet 5.5] ats-dev [--db FILE] key                       # the signing key's did:key and file (minted if there is none)」
+//! 「[Sonnet 5.5] ats-dev [--db FILE] bench load N [--step S] [--batch K] [--replace] | probe N | query   # see bench/README.md」
+//! 「[Sonnet 5.5] ats-dev [--db FILE] verify [ID]               # valid / invalid / unsigned, one line each; exit 1 if any is invalid」
 //! ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X
 //! ```
 //!
-//! `put` signs with ats-dev's own ed25519 key (`--key`, else `$ATS_DEV_KEY`, else
-//! `<db>.key`, minted on first use) over the bytes `ats/signing` signs in Go.
-//! `--unsigned` writes without a signature. This is not the node's key. An existing
-//! key file that group or other can reach (mode other than 0600) is refused.
+//! 「[Sonnet 5.5] `put` signs with ats-dev's own ed25519 key (`--key`, else `$ATS_DEV_KEY`, else」
+//! 「[Sonnet 5.5] `<db>.key`, minted on first use) over the bytes `ats/signing` signs in Go.」
+//! 「[Sonnet 5.5] `--unsigned` writes without a signature. This is not the node's key. An existing」
+//! 「[Sonnet 5.5] key file that group or other can reach (mode other than 0600) is refused.」
 //!
 //! `--db` defaults to `$ATS_DEV_DB`, else `ats-dev.db`. Rows come out as JSON,
 //! one attestation per line. A failure goes to stderr as a sacred-error `Error`
 //! and exits 1.
 //!
-//! `--backend` (or `$ATS_DEV_BACKEND`) picks the store. `sqlite` is the default.
-//! `duckdb` and `postgres` are built with `--features duckdb` / `--features
-//! postgres` (duckdb links libduckdb dynamically, as the node does) and run
-//! what `AttestationStore` has: put, get, exists, count, ids, update, delete,
-//! clear, verify. `ax`, the listings, `stats` and `alias` need `QueryStore` /
-//! `AliasStore`, which only `SqliteStore` implements, so they refuse on the
-//! others. `--db` is DuckDB's location (a path, or an `s3://` / `file://` url)
-//! and Postgres's connection url (`$QNTX_POSTGRES_URL` if not given); `--ca`
-//! is Postgres's CA file when the url is TLS; `--namespace` (default
-//! `ats-dev`) is the namespace both open. The signing key goes beside a path
-//! `--db`; for a url, name it with `--key` or `$ATS_DEV_KEY`.
+//! 「[Sonnet 5.5] `--backend` (or `$ATS_DEV_BACKEND`) picks the store. `sqlite` is the default.」
+//! 「[Sonnet 5.5] `duckdb` and `postgres` are built with `--features duckdb` / `--features」
+//! 「[Sonnet 5.5] postgres` (duckdb links libduckdb dynamically, as the node does) and run」
+//! 「[Sonnet 5.5] what `AttestationStore` has: put, get, exists, count, ids, update, delete,」
+//! 「[Sonnet 5.5] clear, verify. `ax`, the listings, `stats` and `alias` need `QueryStore` /」
+//! 「[Sonnet 5.5] `AliasStore`, which only `SqliteStore` implements, so they refuse on the」
+//! 「[Sonnet 5.5] others. `--db` is DuckDB's location (a path, or an `s3://` / `file://` url)」
+//! 「[Sonnet 5.5] and Postgres's connection url (`$QNTX_POSTGRES_URL` if not given); `--ca`」
+//! 「[Sonnet 5.5] is Postgres's CA file when the url is TLS; `--namespace` (default」
+//! 「[Sonnet 5.5] `ats-dev`) is the namespace both open. The signing key goes beside a path」
+//! 「[Sonnet 5.5] `--db`; for a url, name it with `--key` or `$ATS_DEV_KEY`.」
 //!
-//! `duckdb` is one writer per location (ADR-024: "One node writes a namespace
-//! prefix"). `ats-dev` does not coordinate two processes writing the same one,
-//! and two that put the same id at once can both succeed.
+//! 「[Sonnet 5.5] `duckdb` is one writer per location (ADR-024: "One node writes a namespace」
+//! 「[Sonnet 5.5] prefix"). `ats-dev` does not coordinate two processes writing the same one,」
+//! 「[Sonnet 5.5] and two that put the same id at once can both succeed.」
 
 mod backend;
 mod bench;
@@ -168,8 +168,8 @@ fn opts(args: &[String]) -> Result<Opts, Box<Error>> {
 }
 
 impl Opts {
-    /// The path the signing key goes beside, if `--db` is one: a SQLite file,
-    /// or a DuckDB location that is a plain path. A url has no file to sit beside.
+    /// 「[Sonnet 5.5] The path the signing key goes beside, if `--db` is one: a SQLite file,」
+    /// 「[Sonnet 5.5] or a DuckDB location that is a plain path. A url has no file to sit beside.」
     fn beside(&self) -> Option<&str> {
         match self.backend {
             Kind::Sqlite => Some(&self.db),
@@ -224,12 +224,12 @@ fn open(o: &Opts) -> Result<Store, Box<Error>> {
     }
 }
 
-/// The location DuckDB is opened at: a plain path is a directory on this machine,
-/// made absolute, a url is taken as given. ats-duckdb writes the location, the
-/// namespace and the file name into a COPY statement inside quotes and does not
-/// escape them, so an apostrophe in any of what it will write fails at the first
-/// flush, after the directories are made. Refused here, on the resolved value:
-/// a relative `--db` under a working directory with an apostrophe has one too.
+/// 「[Sonnet 5.5] The location DuckDB is opened at: a plain path is a directory on this machine,」
+/// 「[Sonnet 5.5] made absolute, a url is taken as given. ats-duckdb writes the location, the」
+/// 「[Sonnet 5.5] namespace and the file name into a COPY statement inside quotes and does not」
+/// 「[Sonnet 5.5] escape them, so an apostrophe in any of what it will write fails at the first」
+/// 「[Sonnet 5.5] flush, after the directories are made. Refused here, on the resolved value:」
+/// 「[Sonnet 5.5] a relative `--db` under a working directory with an apostrophe has one too.」
 fn duckdb_location(o: &Opts) -> Result<String, Box<Error>> {
     let location = if o.db.contains("://") {
         o.db.clone()
@@ -256,8 +256,8 @@ fn unbuilt(feature: &str) -> Box<Error> {
     )
 }
 
-/// ats-dev's signing key, loaded (or minted) the first time something needs a
-/// signature made, never for reading, `--unsigned`, or a signature already given.
+/// 「[Sonnet 5.5] ats-dev's signing key, loaded (or minted) the first time something needs a」
+/// 「[Sonnet 5.5] signature made, never for reading, `--unsigned`, or a signature already given.」
 struct Keys {
     path: Result<std::path::PathBuf, Box<Error>>,
     unsigned: bool,
@@ -276,7 +276,7 @@ impl Keys {
         }
     }
 
-    /// The key if one exists already; nothing is minted to find out.
+    /// 「[Sonnet 5.5] The key if one exists already; nothing is minted to find out.」
     fn existing(&self) -> Result<Option<&sign::Signer>, Box<Error>> {
         if self.unsigned {
             return Ok(None);
@@ -299,8 +299,8 @@ impl Keys {
     }
 }
 
-/// What is written: a signature already given is checked and kept, none given
-/// is made with ats-dev's key.
+/// 「[Sonnet 5.5] What is written: a signature already given is checked and kept, none given」
+/// 「[Sonnet 5.5] is made with ats-dev's key.」
 fn seal(keys: &Keys, a: Attestation) -> Result<Attestation, Box<Error>> {
     if a.signature.is_none() && a.signer_did.is_some() {
         return Err(fail("a signer without a signature", format!("{}: name a signature too, or neither", a.id)));
@@ -369,8 +369,8 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
             if s.delete(id).map_err(|e| fail("delete failed", e))? {
                 return s.persist();
             }
-            // false says nothing was removed. If the store still has it, the
-            // delete did not reach the row, and "no such attestation" would be untrue.
+            // 「[Sonnet 5.5] false says nothing was removed. If the store still has it, the」
+            // 「[Sonnet 5.5] delete did not reach the row, and "no such attestation" would be untrue.」
             if s.exists(id).map_err(|e| fail("exists failed", e))? {
                 return Err(fail(
                     "delete removed nothing, and the attestation is still there",
@@ -386,7 +386,7 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
             let mut s = open(&o)?;
             s.clear().map_err(|e| fail("clear failed", e))?;
             s.persist()?;
-            // Cleared, or said so: Ok with rows left is a clear that did not reach them.
+            // 「[Sonnet 5.5] Cleared, or said so: Ok with rows left is a clear that did not reach them.」
             let left = s.count().map_err(|e| fail("count failed", e))?;
             if left != 0 {
                 return Err(fail(
@@ -410,14 +410,14 @@ fn run(args: &[String]) -> Result<(), Box<Error>> {
     }
 }
 
-/// Every id the store holds, or a refusal. `ids` and `count` are two questions
-/// to a store, and one that answers fewer ids than it counts (DuckDB's `ids` reads
-/// its buffer, `count` the Parquet files too) would make `verify` check nothing
-/// and say so with an exit 0.
+/// 「[Sonnet 5.5] Every id the store holds, or a refusal. `ids` and `count` are two questions」
+/// 「[Sonnet 5.5] to a store, and one that answers fewer ids than it counts (DuckDB's `ids` reads」
+/// 「[Sonnet 5.5] its buffer, `count` the Parquet files too) would make `verify` check nothing」
+/// 「[Sonnet 5.5] and say so with an exit 0.」
 ///
-/// They are two reads, so a writer committing between them makes them differ
-/// for a moment on a store that is complete. A mismatch that is still there on
-/// the third reading is the store's.
+/// 「[Sonnet 5.5] They are two reads, so a writer committing between them makes them differ」
+/// 「[Sonnet 5.5] for a moment on a store that is complete. A mismatch that is still there on」
+/// 「[Sonnet 5.5] the third reading is the store's.」
 fn listed(s: &Store) -> Result<Vec<String>, Box<Error>> {
     let mut last = (0, 0);
     for _ in 0..3 {
@@ -452,8 +452,8 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     if !unknown.is_empty() {
         return Err(fail("not an attestation field", unknown.join(", ")));
     }
-    // A signature is made, not edited: a patch that names one could swap the
-    // signer of a row, or store one that does not hold.
+    // 「[Sonnet 5.5] A signature is made, not edited: a patch that names one could swap the」
+    // 「[Sonnet 5.5] signer of a row, or store one that does not hold.」
     if let Some(k) = ["signature", "signer_did"].into_iter().find(|k| patch.contains_key(*k)) {
         return Err(fail("an update cannot name a signature", format!("{k}: ats-dev signs what it changes")));
     }
@@ -467,11 +467,11 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         }
     }
     let mut a: Attestation = serde_json::from_value(v).map_err(|e| fail("not an attestation", e))?;
-    // A signature covers what was just changed. It stays only if it still
-    // holds; else ats-dev re-signs what its own key signed, and refuses the rest.
+    // 「[Sonnet 5.5] A signature covers what was just changed. It stays only if it still」
+    // 「[Sonnet 5.5] holds; else ats-dev re-signs what its own key signed, and refuses the rest.」
     if stored.signature.is_some() {
         if !matches!(sign::verify(&a), sign::Verdict::Valid(_)) {
-            // Whose key it must be is known from the stored row; no key is minted to find out.
+            // 「[Sonnet 5.5] Whose key it must be is known from the stored row; no key is minted to find out.」
             let keys = Keys::of(o);
             let sg = match keys.existing()? {
                 Some(sg) if stored.signer_did.as_deref() == Some(sg.did.as_str()) => sg,
@@ -492,7 +492,7 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
                     ))
                 }
             };
-            // The actors are under the signature; a signed row with none is out of every actor's claims.
+            // 「[Sonnet 5.5] The actors are under the signature; a signed row with none is out of every actor's claims.」
             if a.actors.is_empty() {
                 return Err(fail("a signed attestation must name its actors", format!("{id}: the update would leave none")));
             }
@@ -501,16 +501,16 @@ fn update(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
             a = sg.sign(a)?;
         }
     } else {
-        // An unsigned row is authored as put authors it: an update that empties
-        // the actors would otherwise hide the row from every actor's claims.
+        // 「[Sonnet 5.5] An unsigned row is authored as put authors it: an update that empties」
+        // 「[Sonnet 5.5] the actors would otherwise hide the row from every actor's claims.」
         a = a.authored_by(ACTOR);
     }
     s.update(a.clone()).map_err(|e| fail("update failed", e))?;
     s.persist()?;
     // What is on disk, not what was asked for: `created_at` is kept as it was.
     let kept = s.get(id).map_err(|e| fail("get failed", e))?.ok_or_else(|| fail("no such attestation", id))?;
-    // An update that said Ok but left something else stored is a store that
-    // did not do what its trait says; say so, with both rows.
+    // 「[Sonnet 5.5] An update that said Ok but left something else stored is a store that」
+    // 「[Sonnet 5.5] did not do what its trait says; say so, with both rows.」
     if (Attestation { created_at: a.created_at, ..kept.clone() }) != a {
         let held = serde_json::to_string(&kept).map_err(|e| fail("could not encode an attestation", e))?;
         let asked = serde_json::to_string(&a).map_err(|e| fail("could not encode an attestation", e))?;
@@ -665,7 +665,7 @@ fn put_stdin(s: &mut Store, keys: &Keys) -> Result<(), Box<Error>> {
         let at = n + 1;
         let line = match line {
             Ok(l) => l,
-            // Rows before this one are already stored on a backend with no batch to undo.
+            // 「[Sonnet 5.5] Rows before this one are already stored on a backend with no batch to undo.」
             Err(e) => return abandon(s, &batch, fail(&format!("line {at}: could not read stdin"), e)),
         };
         if line.trim().is_empty() { continue; }
@@ -701,9 +701,9 @@ fn put_stdin(s: &mut Store, keys: &Keys) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-/// Make the open batch durable, then say its ids: an id on stdout is a row
-/// that is stored. SQLite COMMITs the transaction the batch ran in; the others
-/// have no transaction across puts, so it is the backend's own `persist`.
+/// 「[Sonnet 5.5] Make the open batch durable, then say its ids: an id on stdout is a row」
+/// 「[Sonnet 5.5] that is stored. SQLite COMMITs the transaction the batch ran in; the others」
+/// 「[Sonnet 5.5] have no transaction across puts, so it is the backend's own `persist`.」
 fn commit(s: &Store, batch: &mut Vec<String>) -> Result<(), Box<Error>> {
     if batch.is_empty() { return Ok(()); }
     match s.as_sqlite() {
@@ -714,9 +714,9 @@ fn commit(s: &Store, batch: &mut Vec<String>) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-/// A line failed. SQLite rolls the open batch back and none of its ids are
-/// said. Another backend has already stored each put, so those rows stay: they
-/// are made durable and their ids said, and the failure follows.
+/// 「[Sonnet 5.5] A line failed. SQLite rolls the open batch back and none of its ids are」
+/// 「[Sonnet 5.5] said. Another backend has already stored each put, so those rows stay: they」
+/// 「[Sonnet 5.5] are made durable and their ids said, and the failure follows.」
 fn abandon(s: &Store, batch: &[String], why: Box<Error>) -> Result<(), Box<Error>> {
     if batch.is_empty() { return Err(why); }
     match s.as_sqlite() {
