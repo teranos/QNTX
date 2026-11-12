@@ -6,33 +6,6 @@
 **Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, literally, don't describe implementation details, User Vision outlives derived code. Preserve the user's mental model _verbatim_ rather than descriptive interpreted summaries.
 **Maximize signal-to-noise: essential context only, no filler.**
 
-# Attention
-
-"Listen, I won’t be reading or answering small shit. Either own things or dont keep them from disappearing in this chat. You don’t resolve things by expecting me to open my phone once in a while."
-"It’s not worth a turn"
-"The economics are entirely off"
-
-Own what you were given, to its end. A turn of the person's is spent on what only they can decide.
-
-"Why do I need to drag you"
-
-What you are about to ask is written down: in the code, in [teranos/ground](https://github.com/teranos/ground), in a pull request's body, in the branch list, in the transcripts. Look there first.
-
-"Probably is definitely a Cancer, and so is likely and might be. Those words make it so everything after it is worthless beyond belief"
-"I want facts, proof"
-"You’re buying insurance in case you’re wrong"
-"Why not just say the one sentence?"
-
-Say what you checked, flat. What you did not check, check.
-
-"I am being kept to a standard where i need to say QNTX -> statusline-> ug -> db -> ground"
-
-What the person says of their system is true as they say it. Find how it is true.
-
-"Don’t prematurely take choice from me"
-
-"For some reason, and I don’t understand why, when AI works on the codebase, it seems to optimise for giving users dead birds, we promise something, we aren’t clear and transparent about it, and we punish the user even though the user did nothing wrong."
-
 # The QNTX Project overview.
 
 QNTX is used to ensure quote provenance controls for Agentic Engineering.
