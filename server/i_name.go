@@ -59,6 +59,12 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 	if says, refused := noName(name); refused {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: says}
 	}
+	// "and it needs to be more clear if a session named itself, or if the User gave it that name]"
+	given := sent["given"]
+	if given != "" && !slices.Contains(nameGivers, given) {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "given",
+			Says: strconv.Quote(given) + " is not who gives a name: " + strings.Join(nameGivers, ", ")}
+	}
 	if s.held == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no store to keep a name in"}
 	}
@@ -96,7 +102,7 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 		}
 	}
 	if gone >= 0 {
-		let, err := s.keepNameLine(predicateAgentUnnamed, names[gone].did, did, names[gone].name, newest, newestStamp)
+		let, err := s.keepNameLine(predicateAgentUnnamed, names[gone].did, did, names[gone].name, "", newest, newestStamp)
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 		}
@@ -106,7 +112,7 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 			newestStamp = let
 		}
 	}
-	if _, err := s.keepNameLine(predicateAgentNamed, did, did, name, newest, newestStamp); err != nil {
+	if _, err := s.keepNameLine(predicateAgentNamed, did, did, name, given, newest, newestStamp); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	if left != "" {
@@ -206,6 +212,13 @@ func canBeSaid(word string) bool {
 	}
 	return voiced
 }
+
+// nameGivers is who gives an agent its name, as the agent says it of its own
+// name: the person, the agent itself, or the harness the session runs in.
+var nameGivers = []string{"user", "itself", "harness"}
+
+// nameGivenAttribute is the attribute a name line keeps its giver under.
+const nameGivenAttribute = "given"
 
 // predicateAgentUnnamed is the line a revoked token's name is let go of in:
 // its subject is the DID that held the name, its actor the agent that asked
@@ -403,7 +416,7 @@ var namingNow = time.Now
 
 // keepNameLine writes one line of either kind, about did by the agent asking,
 // and answers when it is stamped.
-func (s *QNTXServer) keepNameLine(predicate, did, by, name string, newest int64, newestStamp time.Time) (time.Time, error) {
+func (s *QNTXServer) keepNameLine(predicate, did, by, name, given string, newest int64, newestStamp time.Time) (time.Time, error) {
 	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
 		return time.Time{}, errors.Wrapf(err, "no store to keep the name of %s in", did)
@@ -413,10 +426,14 @@ func (s *QNTXServer) keepNameLine(predicate, did, by, name string, newest int64,
 		return time.Time{}, errors.Wrapf(err, "failed to name the %s line of %s", predicate, did)
 	}
 	now := namingNow()
+	said := map[string]any{"name": name, nameSequenceAttribute: newest + 1, nameAfterAttribute: max(newestStamp.UnixMilli(), 1)}
+	if given != "" {
+		said[nameGivenAttribute] = given
+	}
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{did}, Predicates: []string{predicate}, Contexts: []string{auth.NamespaceSystem},
 		Actors: []string{by}, Timestamp: now, CreatedAt: now, Source: by,
-		Attributes: map[string]any{"name": name, nameSequenceAttribute: newest + 1, nameAfterAttribute: max(newestStamp.UnixMilli(), 1)},
+		Attributes: said,
 	}); err != nil {
 		return time.Time{}, errors.Wrapf(err, "the %s line of %s was not kept", predicate, did)
 	}

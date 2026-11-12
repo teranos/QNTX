@@ -216,3 +216,38 @@ func TestABindingThatPanicsDoesNotLeaveItsCallerWaiting(t *testing.T) {
 		t.Fatal("the caller is still waiting on a binding that panicked")
 	}
 }
+
+// "A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT"
+// The agent itself asking for the whole of what was said to it has received
+// it, and the Task says so. Another agent of the same person asking has not.
+func TestWhatTheNamedAgentItselfAsksTheWholeOfIsReceived(t *testing.T) {
+	srv, root := namedOverA2A(t)
+
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send", saidToTheNode("the build is red", `{"returnImmediately": true}`), root)
+	require.Equal(t, http.StatusOK, code, answered)
+	id := answered["task"].(map[string]any)["id"].(string)
+	var left []statusline.News
+	require.Eventually(t, func() bool {
+		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
+		return len(left) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+	require.NotNil(t, left[0].Whole, "what was said to a name does not hear who asks for the whole of it")
+
+	asking := func(did string) auth.Admission {
+		by := auth.Admitted(auth.LevelToken, "garden")
+		by.Grant = &auth.Grant{DID: did, Level: auth.LevelToken}
+		return by
+	}
+	left[0].Whole(asking("did:key:z6Mkhazel"))
+	_, still := a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+	assert.Equal(t, "TASK_STATE_SUBMITTED", taskStateIn(still), "another agent asking received it for Birch")
+
+	left[0].Whole(asking("did:key:z6Mkbirch"))
+	var ended map[string]any
+	require.Eventually(t, func() bool {
+		_, ended = a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+		return taskStateIn(ended) == "TASK_STATE_COMPLETED"
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.Contains(t, toJSON(t, ended), "Birch received it")
+	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()), "received, it is off the row")
+}
