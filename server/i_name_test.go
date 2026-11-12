@@ -664,7 +664,7 @@ func TestTheNameOfARevokedTokenIsTakenByTheAgentAsking(t *testing.T) {
 	assert.Contains(t, refusal.GetSays(), "is taken")
 }
 
-// "and it needs to be more clear if a session named itself, or if the User gave it that name]"
+// "「[Opus 5.5] and it needs to be more clear if a session named itself, or if the User gave it that name]」"
 func TestANameLineSaysWhoGaveTheName(t *testing.T) {
 	s := rootKnowingServer(t)
 	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "Alder", "given": "user"})
