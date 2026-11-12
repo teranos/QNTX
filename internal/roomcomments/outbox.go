@@ -21,8 +21,8 @@ func (o Outbox) Keep(ctx context.Context, c *Comment) error {
 	return errors.Wrap(err, "the room comment was not kept")
 }
 
-// One node owns the outbox. Its single sweep retries failures and pins the
-// destination before posting. Receipts remain; delivered bodies leave the DB.
+// 「[Sonnet 5.5] One node owns the outbox. Its single sweep retries failures and pins the」
+// 「[Sonnet 5.5] destination before posting. Receipts remain; delivered bodies leave the DB.」
 func (o Outbox) Flush(ctx context.Context, locate func(context.Context) (Target, error), post func(context.Context, Target, Comment) (string, error)) error {
 	for range 25 {
 		var key string
@@ -58,8 +58,8 @@ func (o Outbox) Flush(ctx context.Context, locate func(context.Context) (Target,
 			}
 			return errors.Wrapf(err, "%s was not said into the Node Room", c.URL)
 		}
-		// A provider post and this receipt cannot be one transaction. A crash
-		// between them can repeat the message: Rooms has no idempotency key.
+		// 「[Sonnet 5.5] A provider post and this receipt cannot be one transaction. A crash」
+		// 「[Sonnet 5.5] between them can repeat the message: Rooms has no idempotency key.」
 		_, err = o.DB.ExecContext(ctx, `UPDATE github_room_comments SET payload=NULL,message_id=?,delivered_at=?,last_error='' WHERE key=?`, id, time.Now().UTC().Format(time.RFC3339Nano), key)
 		if err != nil {
 			return errors.Wrap(err, "the room comment arrived but its receipt was not kept")
