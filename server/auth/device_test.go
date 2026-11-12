@@ -104,6 +104,11 @@ func TestAnAgentIsSignedInByThePersonsPasskey(t *testing.T) {
 	require.True(t, in)
 	assert.Equal(t, string(LevelRoot), admitted.LevelName())
 	assert.Equal(t, mastodonAccount, admitted.Identity)
+	// The key is its own client, and that is how it is told from a connector:
+	// i name names it by the DID it signs as (server/i_name.go itsOwnDID).
+	assert.Nil(t, admitted.Grant)
+	assert.Equal(t, did, admitted.TokenDID)
+	assert.Equal(t, did, admitted.ClientDID)
 
 	code, said = pollForToken(t, h, deviceCode)
 	assert.Equal(t, http.StatusBadRequest, code)

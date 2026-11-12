@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,15 +12,22 @@ import (
 	"testing"
 	"time"
 
+	a2agrpc "github.com/a2aproject/a2a-go/v2/a2agrpc/v1"
+	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/signing"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/pi"
+	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/harness/piharness"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
+	"go.uber.org/zap/zaptest"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // "NOT BE ENTIRELY DEPENDENT ON ONE HARNESS"
@@ -43,10 +51,37 @@ func runningPiToo(t *testing.T) (s *QNTXServer, claudeRan, piRan string) {
 	named.Pi = sonnetThroughTheGateway
 	s, claudeRan = runningTheNodeAgent(t, named)
 	binary, piRan := claudeStandIn(t, piAnswered)
-	fetched := make(chan struct{})
-	close(fetched)
-	s.holdHarness("pi", &harnessHeld{name: "Pi", fetched: fetched, path: binary})
+	piPluginRuns(t, s, binary)
 	return s, claudeRan, piRan
+}
+
+// piPlugin is a plugin named pi that runs Pi: it declared harness_provider,
+// and what it serves is reached over gRPC, as a plugin's is (ADR-059).
+type piPlugin struct {
+	fakePlugin
+	served a2apb.A2AServiceClient
+}
+
+func (p *piPlugin) IsHarnessProvider() bool                  { return true }
+func (p *piPlugin) A2AServiceClient() a2apb.A2AServiceClient { return p.served }
+
+// piPluginRuns has a pi plugin running on s, whose Pi is the stand-in at
+// binary: a2a-go's gRPC binding of piharness, served and dialed on loopback.
+func piPluginRuns(t *testing.T, s *QNTXServer, binary string) {
+	t.Helper()
+	listening, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	serving := grpc.NewServer()
+	a2agrpc.NewHandler(piharness.Handler(func(context.Context) (string, error) { return binary, nil })).RegisterWith(serving)
+	go func() { _ = serving.Serve(listening) }()
+	t.Cleanup(serving.Stop)
+	conn, err := grpc.NewClient(listening.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+
+	s.pluginRegistry = plugin.NewRegistry("0.1.0", zaptest.NewLogger(t).Sugar())
+	require.NoError(t, s.pluginRegistry.Register(&piPlugin{fakePlugin: fakePlugin{name: agentLinePi}, served: a2apb.NewA2AServiceClient(conn)}))
+	s.pluginRegistry.MarkReady(agentLinePi)
 }
 
 func sayingToPi(s *QNTXServer, sent sigil.Sent) (*protocol.PiSaid, *protocol.Refusal) {
@@ -339,4 +374,54 @@ func TestATurnInPiCarriesOnlyItsOwnCredential(t *testing.T) {
 	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.nodeAgent.did)
 	assert.NotContains(t, env, "QNTX_TEST_PLAN_TOKEN=the-plan-token")
 	assert.NotContains(t, env, "QNTX_NODE_SECRET=the node's")
+}
+
+// "Harness is a plugin that speaks grpc A2A": Pi is the pi plugin's to run. A
+// node that names Pi and runs no such plugin has no Pi, and nothing answers in
+// its place; a plugin still loading runs nothing yet.
+func TestPiIsRunByThePiPluginAndNothingElse(t *testing.T) {
+	named := opusLow
+	named.Pi = sonnetThroughTheGateway
+	s, _ := runningTheNodeAgent(t, named)
+	s.pluginRegistry = plugin.NewRegistry("0.1.0", zaptest.NewLogger(t).Sugar())
+
+	_, refused := sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "no plugin on this node runs Pi")
+
+	// A binary the node itself holds is not Pi's way in any more.
+	binary, ran := claudeStandIn(t, piAnswered)
+	fetched := make(chan struct{})
+	close(fetched)
+	s.holdHarness("pi", &harnessHeld{name: "Pi", fetched: fetched, path: binary})
+	_, refused = sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "no plugin on this node runs Pi")
+	entries, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "Pi was run by the node itself")
+
+	// Loading is not running.
+	s.holdHarness("pi", nil)
+	s.pluginRegistry.PreRegister(agentLinePi)
+	require.NoError(t, s.pluginRegistry.Register(&piPlugin{fakePlugin: fakePlugin{name: agentLinePi}}))
+	_, runs := s.harnessBackend(agentLinePi)
+	assert.False(t, runs)
+	s.pluginRegistry.MarkReady(agentLinePi)
+	_, runs = s.harnessBackend(agentLinePi)
+	assert.True(t, runs)
+}
+
+// A run Pi does not answer is the turn failing in Pi's own words, carried back
+// from the plugin as the Task failed.
+func TestARunThePiPluginCannotAnswerSaysWhy(t *testing.T) {
+	named := opusLow
+	named.Pi = sonnetThroughTheGateway
+	s, _ := runningTheNodeAgent(t, named)
+	piPluginRuns(t, s, filepath.Join(t.TempDir(), "no-pi-here"))
+
+	_, refused := sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "Pi did not answer")
+	assert.Contains(t, refused.GetSays(), "no-pi-here")
 }
