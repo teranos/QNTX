@@ -472,7 +472,19 @@ func (s *QNTXServer) googleHaltChanged() {
 			continue
 		}
 		if halted {
-			s.tellGoogleOutcome(googleOutcomeMail("What "+item.called()+" spends at Google Cloud is halted", why+".\n\nThe node stays connected, and nothing else halts for it. It resumes by itself when the budget frees up.\n"))
+			subject := "What " + item.called() + " spends at Google Cloud is halted"
+			// "I wish that mail, just had the one click answer somehow"
+			// 「[Opus 5.5] A halt only Connect costs ends carries it, as the
+			// element's own press opens it: no budget frees up for it.」
+			if why == googleUnmeteredWhy(item) {
+				if connect, err := s.googleCostsConnect(); err == nil {
+					s.tellGoogleOutcome(googleConnectCostsMail(subject, why, connect))
+					continue
+				} else {
+					s.logger.Errorw("The halt is mailed without Connect costs, which was not read", "item", item.name, "error", err)
+				}
+			}
+			s.tellGoogleOutcome(googleOutcomeMail(subject, why+".\n\nThe node stays connected, and nothing else halts for it. It resumes by itself when the budget frees up.\n"))
 			continue
 		}
 		s.tellGoogleOutcome(googleOutcomeMail("What "+item.called()+" spends at Google Cloud has resumed", "The budget freed up.\n"))
@@ -564,9 +576,32 @@ func (s *QNTXServer) watchGoogleCosts() {
 	}
 }
 
+// 「[Opus 5.5] googleCostsConnectAt is where ROOT presses Connect costs: Google's
+// consent for the node's project, from connect.」
+func googleCostsConnectAt(connect, project string) string {
+	return connect + "?project=" + url.QueryEscape(project) + "&thing=costs"
+}
+
+// 「[Opus 5.5] googleCostsConnect is where ROOT presses Connect costs, as the
+// node's Google Cloud element offers it.」
+func (s *QNTXServer) googleCostsConnect() (string, error) {
+	i, err := s.theIssuer()
+	if err != nil {
+		return "", err
+	}
+	kept, held, err := s.googleLine()
+	if err != nil {
+		return "", err
+	}
+	if !held {
+		return "", errors.New("the node is not connected to Google Cloud, so it has no project to connect costs for")
+	}
+	return googleCostsConnectAt(i.url+auth.GoogleCloudPath(), kept.project.ProjectID), nil
+}
+
 // googleCostsAm fills in what the node knows of its costs.
 func (s *QNTXServer) googleCostsAm(am *protocol.NodeGoogle, connect string) *protocol.Refusal {
-	am.CostsConnect = connect + "?project=" + url.QueryEscape(am.GetProjectId()) + "&thing=costs"
+	am.CostsConnect = googleCostsConnectAt(connect, am.GetProjectId())
 	am.KeyConnect = connect + "?project=" + url.QueryEscape(am.GetProjectId()) + "&thing=key&namespace="
 	wired, err := s.googleCostsWired()
 	if err != nil {
