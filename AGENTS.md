@@ -52,7 +52,6 @@ Who may log in, the provider ceremony, and what a passkey carries:
 
 ## Ground
 
-"Name any file in the teranos/ground project"
 "Be better informed"
 
 A session on a person's machine is ground's ([teranos/ground](https://github.com/teranos/ground), public). Before saying what does or does not reach a session, read there:
