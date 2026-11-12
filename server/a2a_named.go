@@ -310,9 +310,9 @@ func textSaidIn(message *a2asdk.Message) (string, error) {
 
 // "do you think the ground say should show near misses ?"
 //
-// nearNames is the names agents hold that are near one nobody holds: the same
-// letters whatever the spaces and the case, or two letters off at most. Kwi
-// Kwi is near Kwikwi.
+// 「[Fable 5.2] nearNames is the names agents hold that are near one nobody holds: the same」
+// 「[Fable 5.2] letters whatever the spaces and the case, or two letters off at most. Kwi」
+// 「[Fable 5.2] Kwi is near Kwikwi.」
 func (s *QNTXServer) nearNames(tenant string) []string {
 	if s.held == nil {
 		return nil
@@ -338,7 +338,7 @@ func (s *QNTXServer) nearNames(tenant string) []string {
 	return near
 }
 
-// nearSaid is the names near tenant as a refusal ends with them, or nothing.
+// 「[Fable 5.2] nearSaid is the names near tenant as a refusal ends with them, or nothing.」
 func (s *QNTXServer) nearSaid(tenant string) string {
 	near := s.nearNames(tenant)
 	if len(near) == 0 {
@@ -347,8 +347,8 @@ func (s *QNTXServer) nearSaid(tenant string) string {
 	return ". Near it: " + strings.Join(near, ", ")
 }
 
-// lettersApart is how many letters are to be put in, taken out or changed to
-// make a of b.
+// 「[Fable 5.2] lettersApart is how many letters are to be put in, taken out or changed to」
+// 「[Fable 5.2] make a of b.」
 func lettersApart(a, b string) int {
 	row := make([]int, len(b)+1)
 	for j := range row {
