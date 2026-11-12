@@ -412,7 +412,10 @@ func (s *QNTXServer) messageTaken(ta taskAgent, sent *a2asdk.SendMessageRequest)
 		return a2aRefusal(a2asdk.ErrInvalidParams, "a message sent to "+ta.called+" is the user's, and this one's role is "+string(m.Role))
 	}
 	// "acceptedOutputModes": what the client takes, of what the agent gives.
-	if config := sent.Config; config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTurnMode) {
+	if config := sent.Config; ta.named && config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTextPlain) {
+		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" is told in "+textPlain+", which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" does not take")
+	}
+	if config := sent.Config; !ta.named && config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTurnMode) {
 		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" gives "+strings.Join(turnModes, ", ")+", none of which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" takes")
 	}
 	// A turn takes nothing more once it is said: a message naming a task is
@@ -458,7 +461,13 @@ func (s *QNTXServer) a2aServed(r *http.Request, tenant string) (bool, error) {
 	opted, err := s.optedIntoAgent(tenant)
 	var notServed namespaces.NotServed
 	var disabled namespaces.Disabled
-	if errors.As(err, &notServed) || errors.As(err, &disabled) {
+	if errors.As(err, &notServed) {
+		// No namespace by that name: an agent that holds it as its name is
+		// served at it (ADR-059).
+		_, held, err := s.agentNamedAt(tenant)
+		return held, err
+	}
+	if errors.As(err, &disabled) {
 		return false, nil
 	}
 	if err != nil {
@@ -503,6 +512,11 @@ func (s *QNTXServer) a2aCardAt(r *http.Request, tenant string) (agentCard, error
 		card = s.cardBase(r)
 		card.Name, card.Description, card.Tenant = "the element "+element, elements.GetDescription(), tenant
 		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: elements.GetTags(), Modes: turnModes}}
+	case s.holdsAName(tenant):
+		card = s.cardBase(r)
+		card.Name, card.Tenant = tenant, tenant
+		card.Description = "An agent that named itself " + tenant + " (i name). What is said to it is handed to it where it runs, and the Task says whether it was."
+		card.Skills = []cardSkill{{ID: "told", Name: "told", Description: "Takes what is said to it.", Tags: []string{"agent", "session"}, Modes: []string{textPlain}}}
 	case tenant != "":
 		model, err := s.namespaceAgentModel(tenant)
 		if err != nil {
