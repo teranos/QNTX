@@ -196,3 +196,23 @@ func TestAStreamToANameArrivesAsItIsWritten(t *testing.T) {
 	assert.Contains(t, string(first[:n]), "TASK_STATE_SUBMITTED")
 	assert.Less(t, time.Since(asked), toldWithin, "it came before the row let go of it")
 }
+
+// A binding that panics answers nothing more: the one who asked in process is
+// answered with that, and does not wait on it.
+func TestABindingThatPanicsDoesNotLeaveItsCallerWaiting(t *testing.T) {
+	asked := askedInProcess{serve: func(http.ResponseWriter, *http.Request) { panic("the binding broke") }}
+	r, err := http.NewRequest(http.MethodGet, "http://node/a2a/Birch/tasks/1", nil)
+	require.NoError(t, err)
+	done := make(chan *http.Response, 1)
+	go func() {
+		answered, _ := asked.RoundTrip(r)
+		done <- answered
+	}()
+	select {
+	case answered := <-done:
+		require.NotNil(t, answered)
+		assert.Equal(t, http.StatusInternalServerError, answered.StatusCode)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the caller is still waiting on a binding that panicked")
+	}
+}

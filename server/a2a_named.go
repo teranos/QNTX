@@ -177,9 +177,20 @@ func (a askedInProcess) RoundTrip(r *http.Request) (*http.Response, error) {
 	answered := &answeredInProcess{header: http.Header{}, status: http.StatusOK, body: writes, began: make(chan struct{})}
 	sacred.Go("an agent of this node, asked in process", func() {
 		defer cancel()
+		// A binding that panicked answered nothing more: the one who asks is
+		// told so, and does not wait on it.
+		served := false
+		defer func() {
+			if served {
+				answered.begin()
+				_ = writes.Close()
+				return
+			}
+			answered.WriteHeader(http.StatusInternalServerError)
+			_ = writes.CloseWithError(errors.New("the node's A2A binding stopped before it answered"))
+		}()
 		a.serve(answered, r.WithContext(ctx))
-		answered.begin()
-		_ = writes.Close()
+		served = true
 	})
 	select {
 	case <-answered.began:
