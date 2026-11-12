@@ -133,9 +133,9 @@ When HDBSCAN re-clustering runs (manually or via Pulse schedule), the system emi
 
 ### Ground delivery protocol
 
-Nothing delivers these rows today. The node still writes `deferred:cluster-update` (`server/embeddings/clustering.go`) and `deferred:pulse-summary` (`server/embeddings/pulse.go`) into its own store. Ground no longer reads a `deferred:*` queue: what a project is told now is an immediate row keyed by project, which sky carries (ground `source/sessionstart.d`, where the queue was read). The node reads no `delivered:` line either, so nothing accumulates across runs.
+Ground no longer reads a `deferred:*` queue: what a project is told now is an immediate row keyed by project, which sky carries (ground `source/sessionstart.d`). The node still writes `deferred:cluster-update` (`server/embeddings/clustering.go`) and `deferred:pulse-summary` (`server/embeddings/pulse.go`) into its own store.
 
-What reaches a session now is the status row's news, written into ground's store by ug and carried by sky: [ADR-059](adr/ADR-059-Harness-is-a-Plugin.md), "How a session on a machine is told".
+How a message reaches a session now: [ADR-059](adr/ADR-059-Harness-is-a-Plugin.md), "How a session on a machine is told".
 
 ## Open Work
 

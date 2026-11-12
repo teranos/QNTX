@@ -52,15 +52,11 @@ Who may log in, the provider ceremony, and what a passkey carries:
 
 ## Ground
 
-A session on a person's machine is ground's ([teranos/ground](https://github.com/teranos/ground), public). Before saying what does or does not reach a session, read there:
+A session on a person's machine is ground's ([teranos/ground](https://github.com/teranos/ground), public). QNTX writes into ground's db: the node leaves news on the status row, ug writes it into ground's store, and sky hands it to the session.
 
-- `source/stream.d`: what ground sees, written to the node.
-- `source/immediate.d` and `source/sky.d`: the row a session is told by, and the courier that hands it over.
-- `ug/tmux.d` (`newsPass`): what the node left on the status row, written into ground's store.
-
-Here: `server/statusline/news.go`, `server/am_ground.go`, and [ADR-059](docs/adr/ADR-059-Harness-is-a-Plugin.md), "How a session on a machine is told".
-
-An ADR that says nothing of a thing does not say the thing is absent: search the code of both repositories before calling it missing.
+- Here: `server/statusline/news.go`, `server/am_ground.go`.
+- In ground: `ug/tmux.d` (`newsPass`), `source/immediate.d`, `source/sky.d`, `source/stream.d`.
+- [ADR-059](docs/adr/ADR-059-Harness-is-a-Plugin.md), "How a session on a machine is told".
 
 ## Connectors
 

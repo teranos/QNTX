@@ -43,24 +43,17 @@ What holds there holds here:
 
 ## How a session on a machine is told
 
-"does QNTX write deferred msg into ground db"
-"I know the answer and it’s yes"
-
 "Messages from QNTX can end up in ground and we need no new path"
 
-The node reaches no machine: sky polls every five seconds and ug polls the status line ([[ADR-050-comet]], Landing). What is built on that, in this repository and in [teranos/ground](https://github.com/teranos/ground):
+QNTX writes a message into ground's db, and ground hands it to the session:
 
-- **A session is known to the node by its session id.** Every row a hook writes goes to the node as well, carried by sky (ground `source/stream.d`), in a `session:<id>` context. Ground speaks to its node as the key in `~/.qntx/key` (ground `source/signed.d`). `am ground` answers the sessions started and left (`server/am_ground.go`).
-- **The node leaves news on the status row**, for the person, naming the session it is for: the return leg (`server/statusline/news.go`). An item stays two minutes (`NewsHold`) and is held in memory: a restart empties it. Today what is left is a CI verdict (`server/ci_pulse.go`).
-- **ug writes it into ground's store.** `newsPass` asks `/am/statusline?format=json`, then `/am/statusline/{id}` for an item it has not seen, and writes one `immediate:news` row in the context `session:<id>`, or `project:<repo>` when the node names no session (ground `ug/tmux.d`, `ug/sql.d`).
-- **sky hands it to the session**: it reads what is addressed to its session or its project, writes it to stderr and exits 2, which wakes the session, and a `delivered:<id>` row per session makes it once (ground `source/sky.d`, `source/immediate.d`). A deferred message is an immediate row with an `after` gate (ground `CLAUDE.md`).
-- So QNTX writes into ground's db, and a message to a session needs no new path: status row, ug, ground's store, sky. The node's news reaches a session only through `ug tmux` (ground `UNDERGROUND.md`, Limitation): with no tmux drawing it, the session is never told.
+1. The node leaves the message on the status row as news, for the person, naming the session it is for (`server/statusline/news.go`). It stays there two minutes (`NewsHold`). CI verdicts are left this way today (`server/ci_pulse.go`).
+2. ug polls the status row and writes each item it has not seen into ground's db: one `immediate:news` row in the context `session:<id>`, or `project:<repo>` when the node names no session (`newsPass` in ground `ug/tmux.d`, and `ug/sql.d`). It does so while `ug tmux` draws (ground `UNDERGROUND.md`, Limitation).
+3. sky reads what is addressed to its session or its project and wakes the session with it. A `delivered:<id>` row per session makes it once (ground `source/sky.d`, `source/immediate.d`).
 
-Not joined to it:
+The node knows which session to name because every row a ground hook writes goes to the node as well, in a `session:<id>` context (ground `source/stream.d`). `am ground` answers the sessions started and left (`server/am_ground.go`).
 
-- A name (`agent:named`, by the agent's DID) to a session id. The node holds each, and nothing ties one to the other.
-- What a session answers, back to who said it.
-- A session on another node.
+A deferred message is the same row with an `after` gate (ground `CLAUDE.md`).
 
 ## A session's key and its name
 
