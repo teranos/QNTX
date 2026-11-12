@@ -46,9 +46,9 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 			return
 		}
 		ta, id := call.agent, ec.TaskID
-		// What is sent and given back as files lies in the turn's work, under
-		// the Task, and goes once the Task ends; a turn the next node reads
-		// on (settleLeftTask) keeps it.
+		// 「[Opus 5.5] What is sent and given back as files lies in the turn's work, under」
+		// 「[Opus 5.5] the Task, and goes once the Task ends; a turn the next node reads」
+		// 「[Opus 5.5] on (settleLeftTask) keeps it.」
 		files := taskFiles(ta.agent, string(id))
 		in, out := filepath.Join(files, "in"), filepath.Join(files, "out")
 		defer func() {
@@ -179,14 +179,14 @@ func (e turnExecutor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) i
 	}
 }
 
-// taskFiles is where what a Task is sent and gives back as files lies: in the
-// turn's work, under the Task.
+// 「[Opus 5.5] taskFiles is where what a Task is sent and gives back as files lies: in the」
+// 「[Opus 5.5] turn's work, under the Task.」
 func taskFiles(agent *rootAgent, id string) string {
 	return filepath.Join(agent.home, "work", "a2a", id)
 }
 
-// takesText is whether a client that named accepts takes text back: one that
-// named none takes what the agent gives (acceptedOutputModes).
+// 「[Opus 5.5] takesText is whether a client that named accepts takes text back: one that」
+// 「[Opus 5.5] named none takes what the agent gives (acceptedOutputModes).」
 func takesText(accepts []string) bool {
 	return len(accepts) == 0 || slices.ContainsFunc(accepts, isTextPlain)
 }
@@ -253,8 +253,8 @@ func (e turnExecutor) ended(ec *a2asrv.ExecutorContext, ta taskAgent, submitted 
 		completed := *submitted
 		now := time.Now()
 		completed.Status = a2asdk.TaskStatus{State: a2asdk.TaskStateCompleted, Timestamp: &now}
-		// A client that does not take text back is given the files alone
-		// ("Agents SHOULD use this to tailor their output").
+		// 「[Opus 5.5] A client that does not take text back is given the files alone」
+		// 「[Opus 5.5] ("Agents SHOULD use this to tailor their output").」
 		completed.Artifacts = nil
 		if text {
 			completed.Artifacts = append(completed.Artifacts, answerArtifact(masked(claude.GetAnswer())))
@@ -314,12 +314,12 @@ func (e turnExecutor) Cleanup(_ context.Context, ec *a2asrv.ExecutorContext, _ a
 	e.s.taskStreams.Delete(string(ec.TaskID))
 }
 
-// saidIn is what a message says, part after part, as the turn reads it:
-// text as it is; JSON data as its JSON (§4.1.6); a URL as the URL, which the
-// node does not fetch, as "File references within A2A messages MUST be
-// validated to prevent server-side request forgery" (§14.1.1); and a file's
-// bytes written into in, named where it lies. out, when named, is where a file
-// the turn writes is given back with its answer (§3.7, §6.7).
+// 「[Opus 5.5] saidIn is what a message says, part after part, as the turn reads it:」
+// 「[Opus 5.5] text as it is; JSON data as its JSON (§4.1.6); a URL as the URL, which the」
+// 「[Opus 5.5] node does not fetch, as "File references within A2A messages MUST be」
+// 「[Opus 5.5] validated to prevent server-side request forgery" (§14.1.1); and a file's」
+// 「[Opus 5.5] bytes written into in, named where it lies. out, when named, is where a file」
+// 「[Opus 5.5] the turn writes is given back with its answer (§3.7, §6.7).」
 func saidIn(message *a2asdk.Message, in, out string) (string, error) {
 	if message == nil {
 		return "", a2aRefusal(a2asdk.ErrInvalidParams, "a SendMessageRequest carries a message")
@@ -357,7 +357,7 @@ func saidIn(message *a2asdk.Message, in, out string) (string, error) {
 	return strings.Join(says, "\n"), nil
 }
 
-// partNamed is what a part says of the file it carries: its name and media type.
+// 「[Opus 5.5] partNamed is what a part says of the file it carries: its name and media type.」
 func partNamed(part *a2asdk.Part) string {
 	var named []string
 	if part.Filename != "" {
@@ -372,9 +372,9 @@ func partNamed(part *a2asdk.Part) string {
 	return " (" + strings.Join(named, ", ") + ")"
 }
 
-// fileIn writes part i's bytes into in, through in so its name leaves it
-// never, as the name it was sent with when that is a plain name, and part-i
-// otherwise.
+// 「[Opus 5.5] fileIn writes part i's bytes into in, through in so its name leaves it」
+// 「[Opus 5.5] never, as the name it was sent with when that is a plain name, and part-i」
+// 「[Opus 5.5] otherwise.」
 func fileIn(in string, i int, part *a2asdk.Part, raw a2asdk.Raw) (string, error) {
 	if err := os.MkdirAll(in, 0o700); err != nil {
 		return "", a2aRefusal(a2asdk.ErrInternalError, "the files of the message were not written: "+err.Error())
@@ -400,9 +400,9 @@ func fileIn(in string, i int, part *a2asdk.Part, raw a2asdk.Raw) (string, error)
 	return name, nil
 }
 
-// filesOut is what a turn wrote into out, each an artifact of the Task (§3.7)
-// as its bytes, name and media type (§6.7), the most answerFiles carries into a
-// room, and only of a media type the agent gives and the client takes.
+// 「[Opus 5.5] filesOut is what a turn wrote into out, each an artifact of the Task (§3.7)」
+// 「[Opus 5.5] as its bytes, name and media type (§6.7), the most answerFiles carries into a」
+// 「[Opus 5.5] room, and only of a media type the agent gives and the client takes.」
 func (s *QNTXServer) filesOut(out string, accepts []string) []*a2asdk.Artifact {
 	var artifacts []*a2asdk.Artifact
 	for _, file := range s.answerFiles(out) {
