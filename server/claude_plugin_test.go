@@ -4,8 +4,14 @@ import (
 	"context"
 	"net"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
 	"testing"
+	"time"
 
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	a2agrpc "github.com/a2aproject/a2a-go/v2/a2agrpc/v1"
 	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	"github.com/stretchr/testify/assert"
@@ -55,11 +61,54 @@ func TestWhatIsSaidToClaudeCodeIsRunByTheClaudePlugin(t *testing.T) {
 
 	args := ranWith(t, pluginRan, "0", "args")
 	assert.Equal(t, answer.GetSession(), after(args, "--session-id"))
-	assert.Equal(t, "how long has the box been up?", args[len(args)-1])
+	assert.Equal(t, "how long has the box been up?", after(args, "-p"))
 	ranHere, err := os.ReadDir(nodeRan)
 	require.NoError(t, err)
 	assert.Empty(t, ranHere, "the node ran its own Claude Code while the plugin runs it")
 
 	said := sessionSaid(t, s)
 	assert.Contains(t, said, [2]string{"human", "how long has the box been up?"})
+}
+
+// A turn core gives up stops Claude Code in the plugin, as it stops Pi: one
+// that does not run apart.
+func TestATurnCoreGivesUpStopsClaudeCodeInThePlugin(t *testing.T) {
+	dir := t.TempDir()
+	started := filepath.Join(dir, "pid")
+	binary := filepath.Join(dir, "claude")
+	require.NoError(t, os.WriteFile(binary, []byte("#!/bin/sh\necho $$ > '"+started+"'\nexec sleep 120\n"), 0o755))
+	s := &QNTXServer{}
+	claudePluginRuns(t, s, binary)
+	backend, runs := s.harnessBackend(agentLineClaude)
+	require.True(t, runs)
+
+	asking, giveUp := context.WithCancel(context.Background())
+	defer giveUp()
+	gaveUp := make(chan error, 1)
+	go func() {
+		_, err := saidInBackend(asking, backend, "how long has the box been up?",
+			claudeharness.Run{Home: filepath.Join(dir, "home"), Session: "s-1", Model: "claude-opus-5-5", Effort: "low", Mode: "dontAsk", Token: "the-plan-token"},
+			func(a2asdk.Event) error { return nil })
+		gaveUp <- err
+	}()
+
+	var running int
+	require.Eventually(t, func() bool {
+		select {
+		case err := <-gaveUp:
+			t.Fatalf("the turn ended before Claude Code was started: %v", err)
+		default:
+		}
+		written, err := os.ReadFile(started)
+		if err != nil {
+			return false
+		}
+		running, err = strconv.Atoi(strings.TrimSpace(string(written)))
+		return err == nil
+	}, 10*time.Second, 20*time.Millisecond, "Claude Code was not started")
+
+	giveUp()
+	require.Error(t, <-gaveUp)
+	assert.Eventually(t, func() bool { return syscall.Kill(running, 0) != nil }, 10*time.Second, 50*time.Millisecond,
+		"Claude Code runs on in the plugin after the node gave its turn up")
 }

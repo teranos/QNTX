@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
@@ -32,6 +33,17 @@ type harnessRunning interface {
 }
 
 var _ harnessRunning = (*grpcplugin.ExternalDomainProxy)(nil)
+
+// harnessesAPluginHolds is each harness the node holds no binary of: its
+// plugin's alone to run, and held where the plugin is. Claude Code is run by
+// the claude plugin when one runs and by the node's own binary when none
+// does, and what the node does with that binary beside a turn (a ritual's
+// PATH, a login) needs the binary, so a plugin's label never stands for it.
+var harnessesAPluginHolds = map[string]bool{agentLinePi: true}
+
+// turnGivenUpWithin is how long core waits for a plugin to say a turn it gave
+// up was canceled.
+const turnGivenUpWithin = 5 * time.Second
 
 // harnessBackend is the plugin that runs the harness named, when one does and
 // is running: "a name that is not registered" is refused, and "no other
@@ -72,10 +84,26 @@ func saidInBackend(ctx context.Context, backend a2apb.A2AServiceClient, says str
 	}
 	defer func() { _ = client.Destroy() }()
 
+	// a2a-go runs a turn apart from the call that asked for it, so a turn
+	// core gives up (the node stopping, a record it could not take, a stream
+	// that broke) is canceled by name: the harness stops, and writes no more
+	// into a session core holds to be over.
 	var ended *a2asdk.Task
+	var running a2asdk.TaskID
+	defer func() {
+		if running == "" || (ended != nil && ended.Status.State.Terminal()) {
+			return
+		}
+		giving, done := context.WithTimeout(context.WithoutCancel(ctx), turnGivenUpWithin)
+		defer done()
+		_, _ = client.CancelTask(giving, &a2asdk.CancelTaskRequest{ID: running})
+	}()
 	for event, err := range client.SendStreamingMessage(ctx, &a2asdk.SendMessageRequest{Message: message}) {
 		if err != nil {
 			return nil, err
+		}
+		if running == "" {
+			running = event.TaskInfo().TaskID
 		}
 		if task, isTask := event.(*a2asdk.Task); isTask {
 			ended = task

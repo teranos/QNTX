@@ -28,16 +28,18 @@ type Answer = pi.Answer
 type Executor struct {
 	// Binary is where the plugin's Pi is, or why it has none.
 	Binary func(ctx context.Context) (string, error)
+
+	running harness.Running
 }
 
-var _ a2asrv.AgentExecutor = Executor{}
+var _ a2asrv.AgentExecutor = (*Executor)(nil)
 
 // Handler is what a Pi harness plugin hands back as its Harness.
 func Handler(binary func(ctx context.Context) (string, error)) a2asrv.RequestHandler {
-	return a2asrv.NewHandler(Executor{Binary: binary})
+	return a2asrv.NewHandler(&Executor{Binary: binary}, a2asrv.WithTaskStore(harness.Turns(harness.TurnsKept)))
 }
 
-func (e Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
+func (e *Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
 	return func(yield func(a2asdk.Event, error) bool) {
 		var said Run
 		says, err := harness.SaidIn(ec.Message, &said)
@@ -59,10 +61,13 @@ func (e Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter.
 			return
 		}
 
-		// A caller that stopped listening stops the run: Pi is stopped the
-		// way a person stops it, and its session is left as written.
+		// a2a-go runs a turn apart from the call that asked for it, so a
+		// caller that left does not end ctx: the run is stopped by Cancel,
+		// which core asks for when it gives a turn up. Pi is stopped the way
+		// a person stops it, and its session is left as written.
 		running, stop := context.WithCancel(ctx)
 		defer stop()
+		defer e.running.Began(ec.TaskID, stop)()
 		listening := true
 		answer, err := said.Run(running, func(record Record) {
 			if !listening {
@@ -91,9 +96,10 @@ func (e Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter.
 	}
 }
 
-// Cancel ends the Task canceled: the run stops as its execution's context ends.
-func (Executor) Cancel(_ context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
+// Cancel stops the Task's run and ends the Task canceled.
+func (e *Executor) Cancel(_ context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
 	return func(yield func(a2asdk.Event, error) bool) {
+		e.running.Stop(ec.TaskID)
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateCanceled, nil), nil)
 	}
 }

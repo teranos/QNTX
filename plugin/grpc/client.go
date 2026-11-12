@@ -70,6 +70,9 @@ type ExternalDomainProxy struct {
 	// serves A2AService (populated during Initialize, ADR-059). Atomic, as
 	// roomsProvider is.
 	harnessProvider atomic.Bool
+	// harnessToken is the token handed to the plugin at Initialize, which a
+	// call to its harness presents.
+	harnessToken atomic.Value
 
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
@@ -284,8 +287,34 @@ func (c *ExternalDomainProxy) IsHarnessProvider() bool {
 
 // A2AServiceClient returns a2a-go's A2AServiceClient using this plugin's
 // existing gRPC connection. Only meaningful when IsHarnessProvider() is true.
+//
+// Each call presents the token the node handed this plugin at Initialize: the
+// plugin's harness answers the node, and nobody else who reaches its port.
 func (c *ExternalDomainProxy) A2AServiceClient() a2apb.A2AServiceClient {
-	return a2apb.NewA2AServiceClient(c.conn)
+	token, _ := c.harnessToken.Load().(string)
+	return a2apb.NewA2AServiceClient(PresentingHarnessToken(c.conn, token))
+}
+
+// harnessTokenKey is the metadata a call to a plugin's harness carries the
+// plugin's token under.
+const harnessTokenKey = "authorization"
+
+// PresentingHarnessToken is conn with every call on it presenting token.
+func PresentingHarnessToken(conn grpc.ClientConnInterface, token string) grpc.ClientConnInterface {
+	return presentingToken{conn: conn, token: token}
+}
+
+type presentingToken struct {
+	conn  grpc.ClientConnInterface
+	token string
+}
+
+func (p presentingToken) Invoke(ctx context.Context, method string, args, reply any, opts ...grpc.CallOption) error {
+	return p.conn.Invoke(metadata.AppendToOutgoingContext(ctx, harnessTokenKey, "Bearer "+p.token), method, args, reply, opts...)
+}
+
+func (p presentingToken) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	return p.conn.NewStream(metadata.AppendToOutgoingContext(ctx, harnessTokenKey, "Bearer "+p.token), desc, method, opts...)
 }
 
 // GetSigilsFrom returns where the plugin said, at Initialize, its sigils are
@@ -531,6 +560,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store Python provider capability
 	c.pythonProvider = resp.GetPythonProvider()
 	c.roomsProvider.Store(resp.GetRoomsProvider())
+	c.harnessToken.Store(authToken)
 	c.harnessProvider.Store(resp.GetHarnessProvider())
 
 	// Store and create watcher registrations. Declaring none withdraws

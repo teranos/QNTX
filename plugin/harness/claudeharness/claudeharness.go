@@ -79,16 +79,18 @@ func (r Run) said(binary, says string, started func(string)) claudecode.Said {
 type Executor struct {
 	// Binary is where the plugin's Claude Code is, or why it has none.
 	Binary func(ctx context.Context) (string, error)
+
+	running harness.Running
 }
 
-var _ a2asrv.AgentExecutor = Executor{}
+var _ a2asrv.AgentExecutor = (*Executor)(nil)
 
 // Handler is what a Claude Code harness plugin hands back as its Harness.
 func Handler(binary func(ctx context.Context) (string, error)) a2asrv.RequestHandler {
-	return a2asrv.NewHandler(Executor{Binary: binary})
+	return a2asrv.NewHandler(&Executor{Binary: binary}, a2asrv.WithTaskStore(harness.Turns(harness.TurnsKept)))
 }
 
-func (e Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
+func (e *Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
 	return func(yield func(a2asdk.Event, error) bool) {
 		var run Run
 		says, err := harness.SaidIn(ec.Message, &run)
@@ -107,10 +109,15 @@ func (e Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter.
 		if ec.StoredTask == nil && !yield(submitted, nil) {
 			return
 		}
-		// A caller that stopped listening stops the run, unless the turn runs
+		// a2a-go runs a turn apart from the call that asked for it, so a
+		// caller that left does not end ctx: the run is stopped by Cancel,
+		// which core asks for when it gives a turn up. Unless the turn runs
 		// apart: then it outlives the caller, as it outlives the node (ADR-048).
 		running, stop := context.WithCancel(ctx)
 		defer stop()
+		if !run.Apart {
+			defer e.running.Began(ec.TaskID, stop)()
+		}
 		listening := true
 		print := func(record Record) {
 			if !listening {
@@ -142,9 +149,11 @@ func (e Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter.
 	}
 }
 
-// Cancel ends the Task canceled: the run stops as its execution's context ends.
-func (Executor) Cancel(_ context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
+// Cancel stops the Task's run, one that runs apart aside, and ends the Task
+// canceled.
+func (e *Executor) Cancel(_ context.Context, ec *a2asrv.ExecutorContext) iter.Seq2[a2asdk.Event, error] {
 	return func(yield func(a2asdk.Event, error) bool) {
+		e.running.Stop(ec.TaskID)
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateCanceled, nil), nil)
 	}
 }
