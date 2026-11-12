@@ -669,6 +669,7 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 		a2asdk.TaskStateWorking:   "the node stopped while its turn ran, and no stream was left to read how it ended",
 	}
 	newest := map[string]*types.As{}
+	toAName := map[string]bool{}
 	for _, line := range lines {
 		id, found := taskIn(line)
 		if !found {
@@ -676,6 +677,10 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 		}
 		if held, seen := newest[id]; !seen || line.Timestamp.After(held.Timestamp) {
 			newest[id] = line
+		}
+		// A Task said to a name says so on its first line, and on no other.
+		if slices.Contains(line.Contexts, saidToANameContext) {
+			toAName[id] = true
 		}
 	}
 	for id, line := range newest {
@@ -686,12 +691,19 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 		if !left || !line.Timestamp.Before(since) {
 			continue
 		}
-		// What was said to a name was on the status row, which the node that
-		// stopped held in memory: it is on no row now, and was not received.
-		if slices.Contains(line.Contexts, saidToANameContext) {
+		did := s.agentOfLine(line)
+		if toAName[id] {
+			// What a ground took off the row before the node stopped is in
+			// that ground's store, on its way to the session: the Task waits
+			// on for the agent to say it received it, as it did before.
+			if a2asdk.TaskState(line.Predicates[0]) == a2asdk.TaskStateWorking {
+				s.awaitReceived(did, id, line.Timestamp)
+				continue
+			}
+			// Never taken, it was on the status row, which the node that
+			// stopped held in memory: it is on no row now, and was not received.
 			said = "the node stopped while it was on the status row, and it was not received"
 		}
-		did := s.agentOfLine(line)
 		if err := s.endTask(s.systemTasks(did), id, a2asdk.TaskStateFailed, did, "", "", said); err != nil {
 			return err
 		}

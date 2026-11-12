@@ -333,3 +333,43 @@ func TestATakenTaskOutlastsTheQuietLimit(t *testing.T) {
 	_, still := a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
 	assert.Equal(t, "TASK_STATE_WORKING", taskStateIn(still), "taken and waiting, it was ended as quiet")
 }
+
+// What a ground took off the row before the node stopped waits on after the
+// restart: the agent saying it received it then is it received, and it is not
+// ended as lost with the row.
+func TestWhatAGroundTookOutlivesARestart(t *testing.T) {
+	srv, root := namedOverA2A(t)
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send", saidToTheNode("before the restart", `{"returnImmediately": true}`), root)
+	require.Equal(t, http.StatusOK, code, answered)
+	id := answered["task"].(map[string]any)["id"].(string)
+	var left []statusline.News
+	require.Eventually(t, func() bool {
+		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
+		return len(left) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+	asking := func(did string) auth.Admission {
+		by := auth.Admitted(auth.LevelToken, "garden")
+		by.Grant = &auth.Grant{DID: did, Level: auth.LevelToken}
+		return by
+	}
+	left[0].Whole(asking("did:key:z6Mkhazel"))
+	require.Eventually(t, func() bool {
+		_, still := a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+		return taskStateIn(still) == "TASK_STATE_WORKING"
+	}, 5*time.Second, 10*time.Millisecond)
+
+	require.NoError(t, srv.settleTasksNoTurnLeft(srv.nodeAgent, time.Now().Add(time.Minute)))
+	_, still := a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+	assert.Equal(t, "TASK_STATE_WORKING", taskStateIn(still), "taken before the restart, it was ended as lost with the row")
+	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()), "it is on the row again, for a ground to write a second time")
+
+	again, found := srv.news.ByID("did:key:z6Mkbirch", id)
+	require.True(t, found, "it is not found by its id after the restart")
+	again.Whole(asking("did:key:z6Mkbirch"))
+	var ended map[string]any
+	require.Eventually(t, func() bool {
+		_, ended = a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+		return taskStateIn(ended) == "TASK_STATE_COMPLETED"
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.Contains(t, toJSON(t, ended), "Birch received it")
+}
