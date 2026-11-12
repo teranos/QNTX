@@ -475,7 +475,7 @@ func (s *QNTXServer) googleHaltChanged() {
 			subject := "What " + item.called() + " spends at Google Cloud is halted"
 			// "I wish that mail, just had the one click answer somehow"
 			// 「[Opus 5.5] A halt only Connect costs ends carries it, as the
-			// element's own press opens it: no budget frees up for it.」
+			// 「[Opus 5.5] element's own press opens it: no budget frees up for it.」」
 			if why == googleUnmeteredWhy(item) {
 				connect, err := s.googleCostsConnect()
 				if err != nil {
@@ -577,13 +577,13 @@ func (s *QNTXServer) watchGoogleCosts() {
 }
 
 // 「[Opus 5.5] googleCostsConnectAt is where ROOT presses Connect costs: Google's
-// consent for the node's project, from connect.」
+// 「[Opus 5.5] consent for the node's project, from connect.」」
 func googleCostsConnectAt(connect, project string) string {
 	return connect + "?project=" + url.QueryEscape(project) + "&thing=costs"
 }
 
 // 「[Opus 5.5] googleCostsConnect is where ROOT presses Connect costs, as the
-// node's Google Cloud element offers it.」
+// 「[Opus 5.5] node's Google Cloud element offers it.」」
 func (s *QNTXServer) googleCostsConnect() (string, error) {
 	i, err := s.theIssuer()
 	if err != nil {
