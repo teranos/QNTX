@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// "I WANT A SESSION TO BE ABLE TO NAME ITSELF"
+// "「[Opus 5.5] I WANT A SESSION TO BE ABLE TO NAME ITSELF」"
 
-// saidYesTo is a node holding a key the person said yes to at the passkey, as
-// device.go records one: its own client, signing as itself.
+// 「[Opus 5.5] saidYesTo is a node holding a key the person said yes to at the passkey, as」
+// 「[Opus 5.5] device.go records one: its own client, signing as itself.」
 func saidYesTo(t *testing.T) (h *Handler, store *memTokenStore, key ed25519.PrivateKey, did string) {
 	t.Helper()
 	store = newMemTokenStore()
@@ -34,7 +34,7 @@ func saidYesTo(t *testing.T) (h *Handler, store *memTokenStore, key ed25519.Priv
 	return h, store, key, did
 }
 
-// aSessionsKey is a key made where a session starts.
+// 「[Opus 5.5] aSessionsKey is a key made where a session starts.」
 func aSessionsKey(t *testing.T) (ed25519.PrivateKey, string) {
 	t.Helper()
 	_, key, err := ed25519.GenerateKey(rand.Reader)
@@ -42,7 +42,7 @@ func aSessionsKey(t *testing.T) (ed25519.PrivateKey, string) {
 	return key, EncodeDIDKey(key.Public().(ed25519.PublicKey))
 }
 
-// admit asks /auth/admit for did under label, signed by key as signer.
+// 「[Opus 5.5] admit asks /auth/admit for did under label, signed by key as signer.」
 func admit(h *Handler, key ed25519.PrivateKey, signer, did, label string, t *testing.T) *httptest.ResponseRecorder {
 	t.Helper()
 	form := url.Values{"did": {did}, "label": {label}}
@@ -62,7 +62,7 @@ func TestAKeySaidYesToAdmitsASessionsKey(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.Contains(t, w.Body.String(), `"token_type":"Signed"`)
 
-	// The session signs as itself, and is its own DID: what i name names.
+	// 「[Opus 5.5] The session signs as itself, and is its own DID: what i name names.」
 	admitted, ok := presentedSigned(h, signature(t, sessionKey, sessionDID, signedNodeOrigin, time.Minute))
 	require.True(t, ok, "the session's key is not admitted")
 	assert.Nil(t, admitted.Grant)
@@ -78,8 +78,8 @@ func TestASessionsKeyAdmitsNoKeyOfItsOwn(t *testing.T) {
 	sessionKey, sessionDID := aSessionsKey(t)
 	require.Equal(t, http.StatusOK, admit(h, ground, groundDID, sessionDID, "Alder", t).Code)
 
-	// 「[Fable 5.1] A session's key is its own client too, so it admits as the said-yes key does:」
-	// 「[Fable 5.1] the chain is the person's yes, carried on. What it admits ends when it ends.」
+	// 「[Opus 5.5] A session's key is its own client too, so it admits as the said-yes key does:」
+	// 「[Opus 5.5] the chain is the person's yes, carried on. What it admits ends when it ends.」
 	_, grandchildDID := aSessionsKey(t)
 	w := admit(h, sessionKey, sessionDID, grandchildDID, "Slate", t)
 	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -115,8 +115,8 @@ func TestASessionsKeyEndsWithTheAdmittingKeys(t *testing.T) {
 	assert.Equal(t, *byDID[groundDID].ExpiresAt, *byDID[sessionDID].ExpiresAt)
 }
 
-// The gate presented the signature already, which spent its id: the handler
-// reads the gate's admission and does not present it again.
+// 「[Fable 5.1] The gate presented the signature already, which spent its id: the handler」
+// 「[Fable 5.1] reads the gate's admission and does not present it again.」
 func TestTheGatesAdmissionIsNotPresentedAgain(t *testing.T) {
 	h, _, ground, groundDID := saidYesTo(t)
 	_, sessionDID := aSessionsKey(t)
