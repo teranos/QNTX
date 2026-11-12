@@ -197,8 +197,8 @@ func (b Builder) prepareFrom(ctx context.Context, ground Source, work string, sa
 }
 
 // ground builds ground's branch in work with sand beside its own controls, natively, and keeps
-// each binary kept names at its path, with its digest beside it. It answers where it built, and
-// the environment its steps ran in.
+// 「[Opus 5.5] each binary kept names at its path, with its digest beside it. It answers where it built, and」
+// 「[Opus 5.5] the environment its steps ran in.」
 func (b Builder) ground(ctx context.Context, work string, sand map[string]string, of string, kept map[string]string) (string, []string, error) {
 	src, env, err := b.prepare(ctx, work, sand, of)
 	if err != nil {
