@@ -327,6 +327,14 @@ func (s *QNTXServer) a2aCalled(op a2aOperation, input protoreflect.MessageDescri
 		if err := protojson.Unmarshal(said, request); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Says: "what was sent is no " + string(input.FullName()) + ": " + err.Error()}
 		}
+		// What is said to a name is a Task that ends when it was received or
+		// not, which can be minutes: the one who says it is answered with the
+		// Task at once, and reads how it ended by its id, unless they said how
+		// they wait.
+		if said, sends := request.(*a2apb.SendMessageRequest); sends && sent["peer"] == "" && sent["card"] == "" &&
+			sent["configuration"] == "" && s.holdsAName(strings.TrimSpace(sent["tenant"])) {
+			said.Configuration = &a2apb.SendMessageConfiguration{ReturnImmediately: true}
+		}
 		ctx, span := a2aTracer().Start(withA2ASaid(ctx), "a2a."+op.rpc, trace.WithSpanKind(trace.SpanKindClient),
 			trace.WithAttributes(attribute.String("a2a.peer", sent["peer"]), attribute.String("a2a.card.url", bounded(sent["card"], saidPathMost))))
 		defer span.End()

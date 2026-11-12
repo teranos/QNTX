@@ -121,9 +121,8 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	signum, err := srv.a2aClientSignum()
 	require.NoError(t, err)
 	answered, refusal := signum.Answers["SendMessage"](asAlder, sigil.Sent{
-		"tenant":        "Birch",
-		"message":       `{"messageId": "m1", "role": "ROLE_USER", "parts": [{"text": "your commit broke the build"}]}`,
-		"configuration": `{"returnImmediately": true}`,
+		"tenant":  "Birch",
+		"message": `{"messageId": "m1", "role": "ROLE_USER", "parts": [{"text": "your commit broke the build"}]}`,
 	})
 	require.Nil(t, refusal, refusal.GetSays())
 	said, err := protojson.Marshal(answered.(proto.Message))
