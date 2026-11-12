@@ -651,7 +651,7 @@ pub extern "C" fn duckdb_storage_file_count(store: *const DuckdbStore) -> CountR
 }
 
 // ============================================================================
-// Access tokens (ADR-025)
+// Access tokens
 // ============================================================================
 //
 // A separate handle from the attestation store: tokens are objects under

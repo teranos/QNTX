@@ -25,7 +25,7 @@ func Permits(words []string, predicate string) bool { return admission.Permits(w
 func Names(words []string) bool { return admission.Names(words) }
 
 // TokenStore is the full access-token contract used by middleware and the
-// /auth/tokens endpoints. See ADR-025.
+// /auth/tokens endpoints.
 type TokenStore interface {
 	// Lookup resolves a token hash to what it grants. False means no live token
 	// has this hash — revoked, expired, unknown, or the store did not answer.

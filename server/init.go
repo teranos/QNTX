@@ -158,6 +158,8 @@ func NewQNTXServer(db *sql.DB, held *namespaces.Held, dbPath string, verbosity i
 		ctx:        ctx,
 		cancel:     cancel,
 	}
+	// Before anything this process logs is raised: a restart continues the day's cap.
+	server.seedIssues()
 	server.verbosity.Store(int32(verbosity))
 	server.pluginHealthCache.Store(notProbed())
 	server.state.Store(int32(ServerStateRunning))

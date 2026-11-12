@@ -37,6 +37,8 @@ type QNTXServer struct {
 	// its doors, and the health of the file underneath. What a namespace keeps
 	// is the namespace's, and is reached through it.
 	nodeDB                *sql.DB
+	issuesSeeded          atomic.Bool                   // today's issues_seen was read into the ledger, so a write may replace its rows
+	issuesWrite           sync.Mutex                    // one take-and-write of the issue ledger at a time, the last one included
 	nodeAgentApart        bool                          // The Node Agent's turns run apart from this process; set as the agent subsystem boots
 	startedAt             time.Time                     // When this process began answering; zero until New runs
 	dbPath                string                        // Database file path (for display in banner)

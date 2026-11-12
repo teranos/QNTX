@@ -15,7 +15,7 @@ Status: Implemented, mostly
   `agent:element:<element>` ([[ADR-048-Node-Agent]]: an agent has its own DID
   and attests as itself), its own token of ROOT's kind, its own session under
   `elements/<element>/`, its own turn. It stands where the Node Agent stands:
-  the Node Agent's home, its ground, its credential, its git, as `[agent.root]`
+  the Node Agent's home, its ground, its credential, its git, as `[agent.root.claude]`
   says. Nothing is built, set or waited for: it answers from the first shake.
 - What it does is what ROOT said: no repo is chosen for it, no task is given
   beyond the prompt.
