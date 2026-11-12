@@ -463,10 +463,11 @@ func TestRegistry_validateVersion(t *testing.T) {
 			wantErr:     false,
 		},
 		{
+			// A version that is no semantic version is a branch build, as l-stack is.
 			name:        "invalid QNTX version",
 			qntxVersion: "invalid",
 			constraint:  "^1.0.0",
-			wantErr:     true,
+			wantErr:     false,
 		},
 		{
 			name:        "invalid constraint syntax",
