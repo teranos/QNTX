@@ -979,8 +979,7 @@ fn origin_of(node: &str) -> Result<String, Box<Error>> {
         "https" => ":443",
         _ => return Err(fail("a node is reached over http or https", node)),
     };
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
-    let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h).to_ascii_lowercase();
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("").to_ascii_lowercase();
     let host = host.strip_suffix(default_port).unwrap_or(&host);
     if host.is_empty() {
         return Err(fail("a node url names a host", node));
@@ -1025,7 +1024,6 @@ mod tests {
             ("http://127.0.0.1:80", "http://127.0.0.1"),
             ("http://127.0.0.1:8820/x?y#z", "http://127.0.0.1:8820"),
             ("https://node.example:8443", "https://node.example:8443"),
-            ("https://user@node.example", "https://node.example"),
         ] {
             assert_eq!(origin_of(url).unwrap(), origin, "{url}");
         }
