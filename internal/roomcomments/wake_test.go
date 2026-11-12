@@ -18,8 +18,8 @@ func TestACommentCarriesItsAppAndThePullRequestsDescription(t *testing.T) {
 			words := map[string]any{"id": 7, "body": "A finding.", "user": map[string]any{"login": "qodo-code-review[bot]"}, "updated_at": "2026-11-09T20:00:00Z", "performed_via_github_app": map[string]any{"slug": "qodo-code-review"}}
 			payload := map[string]any{
 				"action": action, "repository": map[string]any{"full_name": "teranos/QNTX"},
-				"issue":        map[string]any{"number": 9, "body": description, "pull_request": map[string]any{}},
-				"pull_request": map[string]any{"number": 9, "body": description},
+				"issue":        map[string]any{"number": 9, "body": description, "pull_request": map[string]any{}, "user": map[string]any{"type": "Bot"}},
+				"pull_request": map[string]any{"number": 9, "body": description, "user": map[string]any{"type": "Bot"}},
 				"comment":      words, "review": words,
 			}
 			b, err := json.Marshal(payload)
@@ -36,7 +36,7 @@ func TestACommentCarriesItsAppAndThePullRequestsDescription(t *testing.T) {
 
 func TestWhoIsOnTheList(t *testing.T) {
 	claude := "🤖 " + ClaudeFooter
-	qodo := Comment{App: "qodo-code-review", PRBody: claude}
+	qodo := Comment{App: "qodo-code-review", PRBody: claude, PRByApp: true}
 
 	assert.True(t, qodo.Wakes(Guests{Everyone: {"qodo-code-review"}}, "Node Room"), "on the list for every room")
 	assert.True(t, qodo.Wakes(Guests{"node room": {"Qodo-Code-Review"}}, "Node Room"), "on the list for the room, by name and slug in any case")
@@ -46,4 +46,15 @@ func TestWhoIsOnTheList(t *testing.T) {
 
 	assert.False(t, Comment{App: "", PRBody: claude}.Wakes(Guests{Everyone: {""}}, "Node Room"), "a person has no app, and an empty slug is no guest")
 	assert.False(t, Comment{App: "qodo-code-review", PRBody: "Not Claude's."}.Wakes(Guests{Everyone: {"qodo-code-review"}}, "Node Room"), "a pull request Claude Code did not open")
+	assert.False(t, Comment{App: "qodo-code-review", PRBody: claude}.Wakes(Guests{Everyone: {"qodo-code-review"}}, "Node Room"), "a pull request a person opened, the person holds")
+}
+
+func TestAnEditFindingTheSameFindsTheSame(t *testing.T) {
+	first := Comment{Body: "Reviewed 1a2b3c4d at 2026-11-12 10:00 · 3 findings\n- Missing check in told.go"}
+	again := Comment{Body: "Reviewed 9f8e7d6c at 2026-11-12 11:30 · 3 findings\n- Missing check in told.go"}
+	other := Comment{Body: "Reviewed 9f8e7d6c at 2026-11-12 11:30 · 4 findings\n- Missing check in told.go\n- Leak in wake.go"}
+	moved := Comment{Body: "Reviewed 9f8e7d6c at 2026-11-12 11:30 · 3 findings\n- Missing check in told.go line 42"}
+	assert.Equal(t, first.Findings(), again.Findings(), "a new commit and time find the same")
+	assert.NotEqual(t, first.Findings(), other.Findings(), "a new finding is new")
+	assert.NotEqual(t, Comment{Body: "- Missing check in told.go line 41"}.Findings(), moved.Findings(), "a finding's own number is the finding's")
 }
