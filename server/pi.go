@@ -53,7 +53,7 @@ func (s *QNTXServer) thereIsNoPi() *protocol.Refusal {
 	return piIsOff()
 }
 
-// piIsOff is why no agent runs in Pi: no plugin on the node runs it (ADR-059).
+// 「[Fable 5.2, Fable 5.1] piIsOff is why no agent runs in Pi: no plugin on the node runs it (ADR-059).」
 func piIsOff() *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.Failed, Says: "no plugin on this node runs Pi, so no agent runs in it, the Node Agent nor a namespace's: a plugin named pi runs it by declaring harness_provider"}
 }
@@ -67,8 +67,8 @@ func (s *QNTXServer) piPart(named appcfg.PiConfig, agent *rootAgent) aTurn {
 
 // piTurn is Pi's part of one turn, run as said gives it.
 func (s *QNTXServer) piTurn(thinking string, said func(binary, session, says string, env []string) pi.Said) aTurn {
-	// Pi is the pi plugin's to run (ADR-059): the turn is said to it over
-	// A2A, and the binary is the plugin's own to name.
+	// 「[Fable 5.2, Fable 5.1] Pi is the pi plugin's to run (ADR-059): the turn is said to it over」
+	// 「[Fable 5.2, Fable 5.1] A2A, and the binary is the plugin's own to name.」
 	var backend a2apb.A2AServiceClient
 	return aTurn{
 		effort: thinking,
