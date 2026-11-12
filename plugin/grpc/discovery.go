@@ -392,7 +392,7 @@ func (m *PluginManager) SetPulseResources(db *sql.DB, registry *async.HandlerReg
 	m.joints["pulse"] = pulseJoint{m: m, db: db, handlers: registry}
 }
 
-// pulseDB is Pulse's database, once the manager has been handed it.
+// 「[Sonnet 5.5, Fable 5.2] pulseDB is Pulse's database, once the manager has been handed it.」
 func (m *PluginManager) pulseDB() (*sql.DB, error) {
 	m.wiringMu.RLock()
 	defer m.wiringMu.RUnlock()
@@ -403,8 +403,8 @@ func (m *PluginManager) pulseDB() (*sql.DB, error) {
 	return j.db, nil
 }
 
-// PauseSchedules pauses a plugin's schedules, loaded or not: a plugin that is
-// off has nothing to run them.
+// 「[Sonnet 5.5, Fable 5.2] PauseSchedules pauses a plugin's schedules, loaded or not: a plugin that is」
+// 「[Sonnet 5.5, Fable 5.2] off has nothing to run them.」
 func (m *PluginManager) PauseSchedules(name string) error {
 	db, err := m.pulseDB()
 	if err != nil {
@@ -413,7 +413,7 @@ func (m *PluginManager) PauseSchedules(name string) error {
 	return PausePluginSchedules(db, name, m.logger)
 }
 
-// DeleteSchedules deletes a plugin's schedules, for a plugin taken off the node.
+// 「[Sonnet 5.5, Fable 5.2] DeleteSchedules deletes a plugin's schedules, for a plugin taken off the node.」
 func (m *PluginManager) DeleteSchedules(name string) error {
 	db, err := m.pulseDB()
 	if err != nil {
