@@ -10,21 +10,30 @@ package grpc
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 
+	a2agrpc "github.com/a2aproject/a2a-go/v2/a2agrpc/v1"
+	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
+	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/harness"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // PluginServer wraps a DomainPlugin to expose it via gRPC.
@@ -42,14 +51,23 @@ type PluginServer struct {
 	// initOnce ensures Initialize is only executed once; concurrent calls block until completion
 	initOnce sync.Once
 	initErr  error
+
+	// harnessSecret is the secret of this launch, which the node that started
+	// the process handed it: what a call to the plugin's harness presents.
+	harnessSecret string
 }
 
 // NewPluginServer creates a new gRPC server wrapper for a DomainPlugin.
 func NewPluginServer(plugin plugin.DomainPlugin, logger *zap.SugaredLogger) *PluginServer {
+	// Read once and taken out of the environment: what the plugin starts (a
+	// harness's own process, with its tools) is handed none of it.
+	secret := os.Getenv(HarnessSecretEnv)
+	_ = os.Unsetenv(HarnessSecretEnv)
 	return &PluginServer{
-		plugin:  plugin,
-		logger:  logger,
-		httpMux: http.NewServeMux(),
+		plugin:        plugin,
+		logger:        logger,
+		httpMux:       http.NewServeMux(),
+		harnessSecret: secret,
 	}
 }
 
@@ -79,7 +97,7 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	// This goes to stdout and will be captured by pluginLogger
 	fmt.Printf("QNTX_PLUGIN_PORT=%d\n", actualPort)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(s.harnessUnary), grpc.ChainStreamInterceptor(s.harnessStream))
 	protocol.RegisterDomainPluginServiceServer(grpcServer, s)
 
 	// A plugin serving the whole LLMService registers its own server; one
@@ -100,6 +118,13 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 		s.logger.Infow("Registered SearchService on plugin server", "plugin", s.plugin.Metadata().Name)
 	}
 
+	// "Harness is a plugin that speaks grpc A2A": a2a-go's gRPC binding of
+	// what the plugin's harness handles, on the same server (ADR-059).
+	if provider, ok := s.plugin.(HarnessProvider); ok {
+		a2agrpc.NewHandler(provider.Harness()).RegisterWith(grpcServer)
+		s.logger.Infow("Registered A2AService on plugin server", "plugin", s.plugin.Metadata().Name)
+	}
+
 	s.logger.Infow("Starting gRPC plugin server", "address", actualAddr, "port", actualPort)
 
 	// Handle graceful shutdown
@@ -115,6 +140,60 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 
 	return nil
 }
+
+// harnessCalls is every method of A2A's A2AService, as gRPC names them.
+var harnessCalls = "/" + a2apb.A2AService_ServiceDesc.ServiceName + "/"
+
+// fromTheNode refuses a call to the plugin's harness that does not present
+// the secret of this launch. A turn names the harness's home, its environment
+// and its provider, so it is the node's alone to say: a plugin no node
+// started, or one reached by whoever else is on the machine, answers no turn.
+func (s *PluginServer) fromTheNode(ctx context.Context, method string) error {
+	if !strings.HasPrefix(method, harnessCalls) {
+		return nil
+	}
+	if s.harnessSecret == "" {
+		return status.Error(codes.Unauthenticated, "this plugin's harness answers the node that started it, and no node handed this process a secret ("+HarnessSecretEnv+")")
+	}
+	presented, _ := strings.CutPrefix(strings.Join(metadata.ValueFromIncomingContext(ctx, harnessTokenKey), ""), "Bearer ")
+	if subtle.ConstantTimeCompare([]byte(presented), []byte(s.harnessSecret)) != 1 {
+		return status.Error(codes.Unauthenticated, "this plugin's harness answers the node that started it, and this call does not present the secret of its launch")
+	}
+	return nil
+}
+
+func (s *PluginServer) harnessUnary(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	if err := s.fromTheNode(ctx, info.FullMethod); err != nil {
+		return nil, err
+	}
+	return handler(ctx, req)
+}
+
+// harnessStream has a turn's run stopped when the caller of its stream leaves
+// before the turn ended: a2a-go runs a turn apart from the call that asked
+// for it, and core may leave before it was told which Task to cancel.
+func (s *PluginServer) harnessStream(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	if err := s.fromTheNode(stream.Context(), info.FullMethod); err != nil {
+		return err
+	}
+	if !strings.HasPrefix(info.FullMethod, harnessCalls) {
+		return handler(srv, stream)
+	}
+	ctx, caller := harness.WithCaller(stream.Context())
+	err := handler(srv, &callersStream{ServerStream: stream, ctx: ctx})
+	if stream.Context().Err() != nil {
+		caller.Left()
+	}
+	return err
+}
+
+// callersStream is a stream whose context says who to tell the caller left.
+type callersStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (c *callersStream) Context() context.Context { return c.ctx }
 
 // listenAttempts is how many ports listen tries, from the one asked for up.
 const listenAttempts = 64
@@ -274,6 +353,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 	}
 	_, isSearchProvider := s.plugin.(plugin.SearchProvider)
 	_, isEmbeddingProvider := s.plugin.(plugin.EmbeddingProvider)
+	_, isHarnessProvider := s.plugin.(HarnessProvider)
 
 	return &protocol.InitializeResponse{
 		HandlerNames:      handlerNames,
@@ -281,6 +361,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		LlmProvider:       isLLMProvider,
 		SearchProvider:    isSearchProvider,
 		EmbeddingProvider: isEmbeddingProvider,
+		HarnessProvider:   isHarnessProvider,
 		HttpRoutes:        routes,
 		SigilsFrom:        sigilsFrom,
 	}, nil
@@ -552,6 +633,17 @@ func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobR
 		LogEntries:    logs,
 		PluginVersion: version,
 	}, nil
+}
+
+// HarnessProvider is an optional interface for a Go plugin that runs a Coding
+// Agent Harness (ADR-059). What Harness hands back is served as A2A's own
+// A2AService, by a2a-go's gRPC binding, and core's harness service routes a
+// turn to it by the plugin's name.
+type HarnessProvider interface {
+	plugin.DomainPlugin
+
+	// Harness is what answers A2A for the harness: a2a-go's request handler.
+	Harness() a2asrv.RequestHandler
 }
 
 // LLMServiceProvider is an optional interface for a Go plugin that serves the
