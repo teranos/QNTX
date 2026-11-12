@@ -7,5 +7,5 @@ CREATE TABLE room_agent_wake_due (
     speaker TEXT NOT NULL,
     since TEXT NOT NULL,
     due_at TEXT NOT NULL,
-    PRIMARY KEY (room, agent)
+    PRIMARY KEY (provider, room, agent)
 );

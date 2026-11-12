@@ -130,7 +130,9 @@ func (s *QNTXServer) dueWakes() roomcomments.Due {
 }
 
 // tellDueAgents tells each agent whose room has been quiet long enough. A wake
-// that could not be carried out waits another quiet stretch.
+// is held for another quiet stretch while its agent is told, and removed once
+// it was: one that could not be carried out, or that the node stopped in the
+// middle of, comes again when the hold is out.
 func (s *QNTXServer) tellDueAgents() {
 	for {
 		select {
@@ -148,13 +150,13 @@ func (s *QNTXServer) tellDueAgents() {
 			s.logger.Errorw("The wakes waiting for a quiet room were not read", "error", err)
 		}
 		for _, w := range ready {
-			took, err := due.Take(ctx, w)
+			held, took, err := due.Claim(ctx, w, time.Now().Add(wakeQuiet()))
 			if err != nil {
-				s.logger.Errorw("A wake waiting for a quiet room was not taken", "room", w.Target.Room, "agent", w.Agent, "error", err)
+				s.logger.Errorw("A wake waiting for a quiet room was not claimed", "room", w.Target.Room, "agent", w.Agent, "error", err)
 				continue
 			}
 			if took {
-				s.tellWhenQuiet(w)
+				s.tellWhenQuiet(held)
 			}
 		}
 		cancel()
@@ -163,13 +165,17 @@ func (s *QNTXServer) tellDueAgents() {
 
 func (s *QNTXServer) tellWhenQuiet(w roomcomments.Wake) {
 	wakes.ask(w.Target.Provider+"/"+w.Target.Room+"/"+w.Agent, w.Speaker, func(speaker string) {
-		err := s.tellAgentTheRoom(w.Target, w.Agent, speaker, w.Since)
-		if err == nil {
+		if err := s.tellAgentTheRoom(w.Target, w.Agent, speaker, w.Since); err != nil {
+			// The wake is still held: it comes again when the hold is out,
+			// and a comment that came since keeps its own speaker and time.
+			s.logger.Errorw("The room went quiet and the agent was not told", "agent", w.Agent, "room", w.Target.Room, "error", err)
 			return
 		}
-		s.logger.Errorw("The room went quiet and the agent was not told", "agent", w.Agent, "room", w.Target.Room, "error", err)
-		if err := s.dueWakes().Defer(s.lifetime(), w.Target, w.Agent, speaker, w.Since, time.Now().Add(wakeQuiet())); err != nil {
-			s.logger.Errorw("The wake that failed was not kept to try again", "agent", w.Agent, "room", w.Target.Room, "error", err)
+		// Not the node's lifetime: a node that is stopping still removes what it told.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(s.lifetime()), 10*time.Second)
+		defer cancel()
+		if err := s.dueWakes().Done(ctx, w); err != nil {
+			s.logger.Errorw("The agent was told the quiet room and its wake was not removed", "agent", w.Agent, "room", w.Target.Room, "error", err)
 		}
 	})
 }
@@ -224,6 +230,14 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 	if err != nil {
 		return errors.Wrap(err, "the asking did not build")
 	}
-	s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", roomcomments.Digest(said, read.GetTruncated()))
+	if err := s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", roomcomments.Digest(said, read.GetTruncated())); err != nil {
+		// Its answer did not reach the room, so it is told the same again.
+		back, cancel := context.WithTimeout(context.WithoutCancel(lifetime), 10*time.Second)
+		defer cancel()
+		if kept := told.Back(back, target.Room, agent, marked); kept != nil {
+			return errors.Wrapf(err, "and %v", kept)
+		}
+		return err
+	}
 	return nil
 }

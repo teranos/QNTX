@@ -38,6 +38,16 @@ func (t Told) Keep(ctx context.Context, room, agent, at string) error {
 	return errors.Wrap(err, "what the agent was told was not kept")
 }
 
+// Back puts the mark where it was before a telling that did not reach the
+// room: at was, or none when the agent had never been told.
+func (t Told) Back(ctx context.Context, room, agent, was string) error {
+	if was != "" {
+		return t.Keep(ctx, room, agent, was)
+	}
+	_, err := t.DB.ExecContext(ctx, `DELETE FROM room_agent_told WHERE room=? AND agent=?`, room, agent)
+	return errors.Wrap(err, "what the agent was told was not put back")
+}
+
 // roomTime is a time as a room says it: RFC3339 to the microsecond, in UTC.
 const roomTime = "2006-01-02T15:04:05.000000Z"
 

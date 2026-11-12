@@ -27,10 +27,11 @@ const dueTime = "2006-01-02T15:04:05.000000000Z"
 
 // Defer says the agent is to be told the room at due. A comment that arrives
 // while one is waiting moves it later and keeps the earliest since: what the
-// agent is told begins at the first comment of the stretch.
+// agent is told begins at the first comment of the stretch. A wake is one
+// provider's: two providers that call a room alike wait apart.
 func (d Due) Defer(ctx context.Context, target Target, agent, speaker, since string, due time.Time) error {
 	_, err := d.DB.ExecContext(ctx, `INSERT INTO room_agent_wake_due(room,agent,provider,speaker,since,due_at) VALUES(?,?,?,?,?,?)
-		ON CONFLICT(room,agent) DO UPDATE SET due_at=excluded.due_at, speaker=excluded.speaker, provider=excluded.provider`,
+		ON CONFLICT(provider,room,agent) DO UPDATE SET due_at=excluded.due_at, speaker=excluded.speaker`,
 		target.Room, agent, target.Provider, speaker, since, due.UTC().Format(dueTime))
 	return errors.Wrap(err, "the wake waiting for a quiet room was not kept")
 }
@@ -57,13 +58,31 @@ func (d Due) Ready(ctx context.Context, now time.Time) (_ []Wake, err error) {
 	return ready, errors.Wrap(rows.Err(), "the wakes waiting for a quiet room were not all read")
 }
 
-// Take removes the wake and says whether it was this call that did. A comment
-// that moved it later in the meantime leaves it, and it is not taken.
-func (d Due) Take(ctx context.Context, w Wake) (bool, error) {
-	taken, err := d.DB.ExecContext(ctx, `DELETE FROM room_agent_wake_due WHERE room=? AND agent=? AND due_at=?`, w.Target.Room, w.Agent, w.DueAt)
+// Claim holds a wake whose time has come until a later time, and says whether
+// it was this call that did: the wake as it is held, to be done or to come
+// again. The row stays, so a node that stops before the agent was told tells
+// it after the hold. A comment that moved it later in the meantime leaves it,
+// and it is not claimed.
+func (d Due) Claim(ctx context.Context, w Wake, until time.Time) (Wake, bool, error) {
+	held := until.UTC().Format(dueTime)
+	claimed, err := d.DB.ExecContext(ctx, `UPDATE room_agent_wake_due SET due_at=? WHERE provider=? AND room=? AND agent=? AND due_at=?`,
+		held, w.Target.Provider, w.Target.Room, w.Agent, w.DueAt)
 	if err != nil {
-		return false, errors.Wrap(err, "the wake waiting for a quiet room was not taken")
+		return w, false, errors.Wrap(err, "the wake waiting for a quiet room was not claimed")
 	}
-	n, err := taken.RowsAffected()
-	return n == 1, errors.Wrap(err, "the wake waiting for a quiet room was not counted")
+	n, err := claimed.RowsAffected()
+	if err != nil {
+		return w, false, errors.Wrap(err, "the wake waiting for a quiet room was not counted")
+	}
+	w.DueAt = held
+	return w, n == 1, nil
+}
+
+// Done removes a claimed wake once the agent was told. A comment that came
+// while it was being told moved the wake later, and that one stays: it is the
+// next stretch's.
+func (d Due) Done(ctx context.Context, w Wake) error {
+	_, err := d.DB.ExecContext(ctx, `DELETE FROM room_agent_wake_due WHERE provider=? AND room=? AND agent=? AND due_at=?`,
+		w.Target.Provider, w.Target.Room, w.Agent, w.DueAt)
+	return errors.Wrap(err, "the wake the agent was told was not removed")
 }

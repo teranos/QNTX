@@ -40,9 +40,9 @@ func TestAWakeWaitsUntilNoCommentCameForTheQuietStretch(t *testing.T) {
 	assert.Equal(t, "2026-11-10T09:00:00Z", ready[0].Since, "the agent is told from the first comment of the stretch")
 }
 
-// A comment that moves the wake while it is being taken leaves it, and a wake
-// is taken once.
-func TestAWakeIsTakenOnceAndNotWhenACommentMovedIt(t *testing.T) {
+// A comment that moves the wake while it is being claimed leaves it, and a
+// wake is claimed once.
+func TestAWakeIsClaimedOnceAndNotWhenACommentMovedIt(t *testing.T) {
 	due := Due{DB: qntxtest.CreateTestDB(t)}
 	room := Target{Provider: "switchai-py", Room: "node"}
 	start := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
@@ -52,19 +52,75 @@ func TestAWakeIsTakenOnceAndNotWhenACommentMovedIt(t *testing.T) {
 	require.Len(t, ready, 1)
 
 	require.NoError(t, due.Defer(t.Context(), room, "claude", "s", "2026-11-10T09:05:00Z", start.Add(time.Hour)))
-	took, err := due.Take(t.Context(), ready[0])
+	_, took, err := due.Claim(t.Context(), ready[0], start.Add(30*time.Minute))
 	require.NoError(t, err)
 	assert.False(t, took, "moved later since it was read")
 
 	ready, err = due.Ready(t.Context(), start.Add(time.Hour))
 	require.NoError(t, err)
 	require.Len(t, ready, 1)
-	took, err = due.Take(t.Context(), ready[0])
+	held, took, err := due.Claim(t.Context(), ready[0], start.Add(90*time.Minute))
 	require.NoError(t, err)
 	assert.True(t, took)
-	took, err = due.Take(t.Context(), ready[0])
+	_, took, err = due.Claim(t.Context(), ready[0], start.Add(90*time.Minute))
 	require.NoError(t, err)
 	assert.False(t, took, "once")
+
+	require.NoError(t, due.Done(t.Context(), held))
+	ready, err = due.Ready(t.Context(), start.Add(24*time.Hour))
+	require.NoError(t, err)
+	assert.Empty(t, ready, "told, it waits no more")
+}
+
+// A wake claimed and never done, as when the node stops while the agent is
+// being told or the telling fails, comes again when the hold is out.
+func TestAClaimedWakeThatWasNotDoneComesAgain(t *testing.T) {
+	due := Due{DB: qntxtest.CreateTestDB(t)}
+	room := Target{Provider: "switchai-py", Room: "node"}
+	start := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	require.NoError(t, due.Defer(t.Context(), room, "claude", "github-app:qodo-code-review", "2026-11-10T09:00:00Z", start))
+	ready, err := due.Ready(t.Context(), start)
+	require.NoError(t, err)
+	require.Len(t, ready, 1)
+	held, took, err := due.Claim(t.Context(), ready[0], start.Add(30*time.Minute))
+	require.NoError(t, err)
+	require.True(t, took)
+
+	ready, err = due.Ready(t.Context(), start.Add(29*time.Minute))
+	require.NoError(t, err)
+	assert.Empty(t, ready, "held while the agent is told")
+	ready, err = due.Ready(t.Context(), start.Add(30*time.Minute))
+	require.NoError(t, err)
+	require.Len(t, ready, 1, "never done, it comes again")
+	assert.Equal(t, "2026-11-10T09:00:00Z", ready[0].Since)
+
+	// A newer comment while it is held is the wake's speaker and time from then
+	// on, and done of the older claim leaves it.
+	require.NoError(t, due.Defer(t.Context(), room, "claude", "github:teranos", "2026-11-10T09:20:00Z", start.Add(50*time.Minute)))
+	require.NoError(t, due.Done(t.Context(), held))
+	ready, err = due.Ready(t.Context(), start.Add(50*time.Minute))
+	require.NoError(t, err)
+	require.Len(t, ready, 1)
+	assert.Equal(t, "github:teranos", ready[0].Speaker)
+}
+
+// Two providers that call a room alike each have their wake.
+func TestTwoProvidersWithOneRoomNameWaitApart(t *testing.T) {
+	due := Due{DB: qntxtest.CreateTestDB(t)}
+	start := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	for _, provider := range []string{"switchai-py", "otaripy"} {
+		require.NoError(t, due.Defer(t.Context(), Target{Provider: provider, Room: "node"}, "claude", "s-"+provider, "2026-11-10T09:00:00Z", start))
+	}
+	ready, err := due.Ready(t.Context(), start)
+	require.NoError(t, err)
+	require.Len(t, ready, 2)
+	held, took, err := due.Claim(t.Context(), ready[0], start.Add(time.Hour))
+	require.NoError(t, err)
+	require.True(t, took)
+	require.NoError(t, due.Done(t.Context(), held))
+	ready, err = due.Ready(t.Context(), start)
+	require.NoError(t, err)
+	require.Len(t, ready, 1, "the other provider's wake is its own")
 }
 
 // A review's comments wait for a quiet room; a comment on the pull request
