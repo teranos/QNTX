@@ -303,8 +303,8 @@ func TestATaskNoIdNamesIsNotFound(t *testing.T) {
 	assert.Contains(t, string(said), "TASK_NOT_FOUND")
 }
 
-// The card says what the Node Agent takes and gives, turnModes: what a client
-// reads before it sends (§3.3.4).
+// 「[Opus 5.5] The card says what the Node Agent takes and gives, turnModes: what a client」
+// 「[Opus 5.5] reads before it sends (§3.3.4).」
 func TestTheNodeAgentsSkillTakesWhatATurnReads(t *testing.T) {
 	namedNode(t)
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
@@ -736,10 +736,10 @@ func TestJSONRPCIsAnsweredWhereTheCardNamesIt(t *testing.T) {
 	assert.NotNil(t, answered["error"], "a task no id names is not found")
 }
 
-// A message carries a file, a URL and JSON data, and the turn reads them all:
-// the file written where the turn works, the URL and data in what it is told.
-// What the turn writes for its answer comes back as the Task's artifacts, each
-// its bytes, name and media type (§6.7), of the media types the client takes.
+// 「[Opus 5.5] A message carries a file, a URL and JSON data, and the turn reads them all:」
+// 「[Opus 5.5] the file written where the turn works, the URL and data in what it is told.」
+// 「[Opus 5.5] What the turn writes for its answer comes back as the Task's artifacts, each」
+// 「[Opus 5.5] its bytes, name and media type (§6.7), of the media types the client takes.」
 func TestFilesGoInAndComeBackOut(t *testing.T) {
 	srv, tokens, ran := nodeAgentOverA2A(t, "")
 	srv.harnessBinaries.mu.Lock()
@@ -790,32 +790,32 @@ func TestFilesGoInAndComeBackOut(t *testing.T) {
 	assert.Equal(t, "text/plain", at(byName["report.txt"], "parts.0.mediaType"))
 	assert.Equal(t, "image/png", at(byName["chart.png"], "parts.0.mediaType"))
 
-	// "Agents SHOULD use this to tailor their output" (acceptedOutputModes).
+	// 「[Opus 5.5] "Agents SHOULD use this to tailor their output" (acceptedOutputModes).」
 	answered = sent("m-2", `"text/plain", "text/csv"`)
 	for _, artifact := range at(answered, "task.artifacts").([]any) {
 		assert.NotEqual(t, "chart.png", at(artifact, "name"), "a file the client does not take was given")
 	}
 
-	// A client that takes a PNG alone is given the PNG alone: no text.
+	// 「[Opus 5.5] A client that takes a PNG alone is given the PNG alone: no text.」
 	answered = sent("m-3", `"image/png"`)
 	artifacts := at(answered, "task.artifacts").([]any)
 	require.Len(t, artifacts, 1, answered)
 	assert.Equal(t, "chart.png", at(artifacts[0], "name"))
 
-	// A mode with parameters takes its media type: the PNG is still given.
+	// 「[Opus 5.5] A mode with parameters takes its media type: the PNG is still given.」
 	answered = sent("m-4", `"image/png; profile=x"`)
 	artifacts = at(answered, "task.artifacts").([]any)
 	require.Len(t, artifacts, 1, answered)
 	assert.Equal(t, "chart.png", at(artifacts[0], "name"))
 
-	// The files went with the Task.
+	// 「[Opus 5.5] The files went with the Task.」
 	left, err := filepath.Glob(filepath.Join(srv.nodeAgent.home, "work", "a2a", "*"))
 	require.NoError(t, err)
 	assert.Empty(t, left, "a Task's files stayed after it ended")
 }
 
-// A Task whose turn wrote a file before the node stopped is given that file
-// when the next node settles it, and its files go once it is settled.
+// 「[Opus 5.5] A Task whose turn wrote a file before the node stopped is given that file」
+// 「[Opus 5.5] when the next node settles it, and its files go once it is settled.」
 func TestATaskSettledFromItsStreamGivesTheFilesItsTurnWrote(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	before := time.Now().Add(-time.Minute)
@@ -836,9 +836,9 @@ func TestATaskSettledFromItsStreamGivesTheFilesItsTurnWrote(t *testing.T) {
 	assert.NoDirExists(t, taskFiles(srv.nodeAgent, "left"), "a settled task's files stayed")
 }
 
-// A secret sent in JSON data or in a file of text is masked in what the Task
-// keeps, as one sent as text is (§14.1.1: "Sensitive information in task
-// history and artifacts MUST be protected").
+// 「[Opus 5.5] A secret sent in JSON data or in a file of text is masked in what the Task」
+// 「[Opus 5.5] keeps, as one sent as text is (§14.1.1: "Sensitive information in task」
+// 「[Opus 5.5] history and artifacts MUST be protected").」
 func TestASecretInDataOrATextFileIsNotKept(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123"
