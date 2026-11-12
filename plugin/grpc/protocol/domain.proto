@@ -290,10 +290,10 @@ message InitializeResponse {
   // Core's rooms signum reaches the rooms it holds by the plugin's name.
   bool rooms_provider = 12;
 
-  // "Harness is a plugin that speaks grpc A2A"
-  // harness_provider indicates this plugin runs a Coding Agent Harness and
-  // serves A2A's own A2AService (lf.a2a.v1) on its port (ADR-059). Core's
-  // harness service routes a turn to it by the plugin's name.
+  // "「[Opus 5.5] Harness is a plugin that speaks grpc A2A」"
+  // 「[Fable 5.2, Fable 5.1] harness_provider indicates this plugin runs a Coding Agent Harness and」
+  // 「[Fable 5.2, Fable 5.1] serves A2A's own A2AService (lf.a2a.v1) on its port (ADR-059). Core's」
+  // 「[Fable 5.2, Fable 5.1] harness service routes a turn to it by the plugin's name.」
   bool harness_provider = 13;
 }
 
