@@ -238,8 +238,8 @@ func TestWhatTheNamedAgentItselfAsksTheWholeOfIsReceived(t *testing.T) {
 		by.Grant = &auth.Grant{DID: did, Level: auth.LevelToken}
 		return by
 	}
-	// Another key of the person asking is their ground taking it off the row:
-	// the Task is working, not received, and outlasts the row's hold.
+	// 「[Fable 5.2] Another key of the person asking is their ground taking it off the row:」
+	// 「[Fable 5.2] the Task is working, not received, and outlasts the row's hold.」
 	within := toldWithin
 	toldWithin = 200 * time.Millisecond
 	t.Cleanup(func() { toldWithin = within })
@@ -264,8 +264,8 @@ func TestWhatTheNamedAgentItselfAsksTheWholeOfIsReceived(t *testing.T) {
 	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()), "received, it is off the row")
 }
 
-// What a ground took and the agent never said it received is not received,
-// and the Task says which of the two happened.
+// 「[Fable 5.2] What a ground took and the agent never said it received is not received,」
+// 「[Fable 5.2] and the Task says which of the two happened.」
 func TestWhatAGroundTookAndTheAgentNeverReceivedIsNotReceived(t *testing.T) {
 	srv, root := namedOverA2A(t)
 	within := receivedWithin
