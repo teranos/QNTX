@@ -1,4 +1,4 @@
-// Package roomcomments carries PR comments into the Node Room.
+// 「[Sonnet 5.5] Package roomcomments carries PR comments into the Node Room.」
 //
 // "When a PR comment lands on QNTX, QNTX-Web, QNTX-App"
 // "It get’s said into the Room"
@@ -112,8 +112,8 @@ func Parse(event string, body []byte) (*Comment, error) {
 	}
 	c := &Comment{Repo: repo, Number: number, ID: w.ID, Author: w.User.Login, Body: w.Body, At: at, Action: sent.Action, Path: w.Path, Line: w.Line}
 	c.URL = fmt.Sprintf("https://github.com/%s/pull/%d#%s%d", repo, number, fragment, w.ID)
-	// A redelivery has the same key; an edit is a new version, including a
-	// later edit restoring earlier words. Delivery IDs need not be retained.
+	// 「[Sonnet 5.5] A redelivery has the same key; an edit is a new version, including a」
+	// 「[Sonnet 5.5] later edit restoring earlier words. Delivery IDs need not be retained.」
 	key, err := json.Marshal([]string{event, c.URL, at, sent.Action, w.Body})
 	if err != nil {
 		return nil, errors.Wrap(err, "the PR comment's identity did not encode")
@@ -139,9 +139,9 @@ func (c Comment) Message() string {
 	return header + readable(c.Body) + "\n\n[View comment on GitHub](" + c.URL + ")"
 }
 
-// The room reads Markdown. Qodo's presentation tags become text and line
-// breaks; the original, unmodified body travels as a Markdown attachment.
-// Fenced code and inline backticks retain their literal HTML examples.
+// 「[Sonnet 5.5] The room reads Markdown. Qodo's presentation tags become text and line」
+// 「[Sonnet 5.5] breaks; the original, unmodified body travels as a Markdown attachment.」
+// 「[Sonnet 5.5] Fenced code and inline backticks retain their literal HTML examples.」
 func readable(body string) string {
 	var out strings.Builder
 	fence := ""
