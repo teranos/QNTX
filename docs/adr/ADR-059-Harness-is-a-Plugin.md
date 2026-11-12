@@ -57,6 +57,14 @@ A deferred message is the same row with an `after` gate (ground `CLAUDE.md`).
 
 ## A session's key and its name
 
+"I have two nodes running at the moment"
+"Why wouldn’t the agents talk to each other through A2A?"
+"Why can’t we make Node Agents aware of each other?"
+"As Peer Node"
+"The condition is no handwritten A2A, use spec faithfully, be opportunistic, make sure discovery is implemented in a way that we can move forwards and make it ship to sentry, so next time I come back when I have it deployed and then I can ask you"
+
+Agents talk to each other through A2A: first two nodes, then their Node Agents as peers (`a2a Peers`, `server/a2a_peer_client.go`), on a2a-go's server and client and nothing hand-written (`server/a2a_route.go`, `server/a2a_client.go`). A session is the next agent in that line.
+
 "The true way forwards is A2A"
 "if every session is its own addresable A2A via QNTX so Alder would be addressable"
 "I WANT TO MAKE EVERY SESSION BE ABLE TO NAME ITSELF"
