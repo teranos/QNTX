@@ -310,3 +310,15 @@ func TestAnUnmeteredHaltIsMailedWithConnectCosts(t *testing.T) {
 	assert.Contains(t, page, `href="`+html.EscapeString(connect)+`">Connect costs</a>`)
 	assert.NotContains(t, text, "resumes by itself", "no budget frees up a halt the node does not meter")
 }
+
+// 「[Opus 5.5] With Connect costs not read, the halt still says nothing of
+// resuming by itself, and gives no link it does not have.」
+func TestAnUnmeteredHaltWithoutConnectCostsSaysNoResume(t *testing.T) {
+	m := googleConnectCostsMail("What the node spends at Google Cloud is halted", "ROOT set a limit on the node, and the node does not meter what it spends: ROOT presses Connect costs again", "")
+	require.Len(t, m.Bodies, 2)
+	for _, body := range m.Bodies {
+		assert.NotContains(t, body.Content, "resumes by itself")
+		assert.NotContains(t, body.Content, "href=")
+		assert.Contains(t, body.Content, "presses Connect costs again")
+	}
+}

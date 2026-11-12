@@ -477,12 +477,12 @@ func (s *QNTXServer) googleHaltChanged() {
 			// 「[Opus 5.5] A halt only Connect costs ends carries it, as the
 			// element's own press opens it: no budget frees up for it.」
 			if why == googleUnmeteredWhy(item) {
-				if connect, err := s.googleCostsConnect(); err == nil {
-					s.tellGoogleOutcome(googleConnectCostsMail(subject, why, connect))
-					continue
-				} else {
+				connect, err := s.googleCostsConnect()
+				if err != nil {
 					s.logger.Errorw("The halt is mailed without Connect costs, which was not read", "item", item.name, "error", err)
 				}
+				s.tellGoogleOutcome(googleConnectCostsMail(subject, why, connect))
+				continue
 			}
 			s.tellGoogleOutcome(googleOutcomeMail(subject, why+".\n\nThe node stays connected, and nothing else halts for it. It resumes by itself when the budget frees up.\n"))
 			continue
