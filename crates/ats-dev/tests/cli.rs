@@ -1132,3 +1132,105 @@ fn a_node_url_is_reached_as_written_and_names_no_query() {
         assert!(!o.status.success() && err(&o).contains(why), "{url}: {}", err(&o));
     }
 }
+
+/// A node that takes `n` requests, each answered as taken, and keeps the size
+/// of each body and how many rows it carried.
+fn fake_node_n(n: usize) -> (String, std::thread::JoinHandle<Vec<(usize, usize)>>) {
+    use std::io::{BufRead, BufReader, Read};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", l.local_addr().unwrap());
+    let h = std::thread::spawn(move || {
+        let mut seen = Vec::new();
+        for _ in 0..n {
+            let (mut s, _) = l.accept().unwrap();
+            let mut r = BufReader::new(s.try_clone().unwrap());
+            let mut len = 0usize;
+            loop {
+                let mut h = String::new();
+                r.read_line(&mut h).unwrap();
+                if h.trim_end().is_empty() {
+                    break;
+                }
+                if let Some((k, v)) = h.split_once(':') {
+                    if k.eq_ignore_ascii_case("content-length") {
+                        len = v.trim().parse().unwrap();
+                    }
+                }
+            }
+            let mut body = vec![0; len];
+            r.read_exact(&mut body).unwrap();
+            let sent: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            let reply = all_created(&sent).to_string();
+            write!(s, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reply}", reply.len()).unwrap();
+            seen.push((len, sent.as_array().unwrap().len()));
+        }
+        seen
+    });
+    (url, h)
+}
+
+/// The node refuses a request past 10 MB whole, so rows are sent in requests
+/// under it, and a row too large for any request is said and not sent.
+#[test]
+fn push_keeps_each_request_under_what_the_node_reads() {
+    let (_d, p) = db();
+    let blob = |mib: usize| "x".repeat(mib * 1024 * 1024);
+    let rows = format!(
+        "{{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"attributes\":{{\"b\":\"{}\"}}}}\n{{\"subjects\":[\"B\"],\"predicates\":[\"p\"],\"attributes\":{{\"b\":\"{}\"}}}}\n{{\"subjects\":[\"C\"],\"predicates\":[\"p\"],\"attributes\":{{\"b\":\"{}\"}}}}\n",
+        blob(5), blob(5), blob(9)
+    );
+    let o = run(&p, &["--unsigned", "put", "-"], &rows);
+    assert!(o.status.success(), "{}", err(&o));
+    let (url, node) = fake_node_n(2);
+    let o = run(&p, &["push", &url], "");
+    let said = lines_of(&o);
+    assert_eq!(said.len(), 3, "{}", err(&o));
+    assert_eq!(said.iter().filter(|l| l["status"] == 201).count(), 2, "{said:?}");
+    let too_big: Vec<_> = said.iter().filter(|l| l["refused"].as_str().is_some_and(|w| w.contains("carries at most"))).collect();
+    assert_eq!(too_big.len(), 1, "{said:?}");
+    assert!(!o.status.success(), "a row not sent is a row not taken");
+    let seen = node.join().unwrap();
+    assert_eq!(seen.iter().map(|(_, rows)| *rows).collect::<Vec<_>>(), [1, 1], "{seen:?}");
+    assert!(seen.iter().all(|(bytes, _)| *bytes < 10 * 1000 * 1000), "{seen:?}");
+}
+
+/// A row that names a signer and no signature, or a signature and no signer,
+/// is not sent as unsigned: the node would sign it as itself and the claim of a
+/// signer would be gone. ats-dev never writes one; another writer of the file can.
+#[test]
+fn push_refuses_a_row_with_half_a_signature() {
+    use ats::AttestationStore;
+    let (_d, p) = db();
+    {
+        let mut s = ats_sqlite::SqliteStore::open(&p).unwrap();
+        for (id, sig, did) in [
+            ("AS-half-1", Some(vec![1u8, 2, 3]), None),
+            ("AS-half-2", None, Some("did:key:zSomeone".to_string())),
+        ] {
+            let a = ats::Attestation {
+                id: id.into(), subjects: vec!["S".into()], predicates: vec!["p".into()], actors: vec!["x".into()],
+                timestamp: 1_000, created_at: 1_000, signature: sig, signer_did: did, ..ats::Attestation::default()
+            };
+            s.put(a).unwrap();
+        }
+    }
+    let ok = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
+    let (url, node) = fake_node(200, all_created);
+    let o = run(&p, &["push", &url], "");
+    assert!(!o.status.success());
+    let said = lines_of(&o);
+    for id in ["AS-half-1", "AS-half-2"] {
+        let l = said.iter().find(|l| l["id"] == id).unwrap();
+        assert!(l["refused"].as_str().unwrap().contains("together or not at all"), "{l}");
+    }
+    let (_, _, sent) = node.join().unwrap();
+    let ids: Vec<_> = sent.as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect();
+    assert_eq!(ids, [ok]);
+}
+
+#[test]
+fn an_empty_home_names_no_key() {
+    let (_d, p) = db();
+    let o = bin().env("HOME", "").arg("--db").arg(&p).args(["put", "ALICE is author of GITHUB by BOB"]).output().unwrap();
+    assert!(!o.status.success() && err(&o).contains("home directory is unknown"), "{}", err(&o));
+}

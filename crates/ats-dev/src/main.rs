@@ -814,6 +814,12 @@ fn verify(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
 /// a list row by row, in the order sent (`handleCreateAttestation`).
 const PUSH_BATCH: usize = 100;
 
+/// Bytes a request's body may reach: the node reads at most 10 MB of one
+/// (`maxAttestationBody`) and refuses the whole request past it, so a batch is
+/// sent before a row would take it over this, and a row larger on its own is
+/// not sent at all.
+const PUSH_BODY_BUDGET: usize = 8 * 1024 * 1024;
+
 /// Seconds a request's signature lasts: long enough to reach the node, well
 /// inside the five minutes the node allows one (what `qntx sign` gives).
 const PUSH_SIGNED_FOR: i64 = 60;
@@ -848,17 +854,44 @@ fn push(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         .into();
     let mut p = Pushing { out: std::io::stdout().lock(), tally: Tally::default() };
     let mut batch: Vec<(String, serde_json::Value)> = Vec::with_capacity(PUSH_BATCH);
+    // The body is `[` rows joined by `,` `]`.
+    let mut bytes = 2usize;
     let mut ids = ids.into_iter();
     let mut broken: Option<String> = None;
     for id in ids.by_ref() {
-        match s.get(&id).map_err(|e| fail("get failed", e))? {
-            None => p.refused(&id, "no such attestation")?,
+        let row = match s.get(&id).map_err(|e| fail("get failed", e))? {
+            None => {
+                p.refused(&id, "no such attestation")?;
+                continue;
+            }
             Some(a) => match wire(&a) {
-                Ok(v) => batch.push((id, v)),
-                Err(why) => p.refused(&id, &why)?,
+                Ok(v) => v,
+                Err(why) => {
+                    p.refused(&id, &why)?;
+                    continue;
+                }
             },
+        };
+        let size = row.to_string().len();
+        if size + 2 > PUSH_BODY_BUDGET {
+            p.refused(&id, &format!("the row is {size} bytes; a request to the node carries at most {PUSH_BODY_BUDGET}"))?;
+            continue;
         }
+        if !batch.is_empty() && bytes + size + 1 > PUSH_BODY_BUDGET {
+            match p.send(&agent, &url, &origin, &sg, &mut batch) {
+                Ok(()) => bytes = 2,
+                Err(Halt::Unanswered(why)) => {
+                    broken = Some(why);
+                    p.refused(&id, &format!("not sent: {}", broken.as_deref().unwrap_or("")))?;
+                    break;
+                }
+                Err(Halt::Unsaid(e)) => return Err(e),
+            }
+        }
+        bytes += size + 1;
+        batch.push((id, row));
         if batch.len() == PUSH_BATCH {
+            bytes = 2;
             match p.send(&agent, &url, &origin, &sg, &mut batch) {
                 Ok(()) => {}
                 Err(Halt::Unanswered(why)) => {
@@ -1019,9 +1052,15 @@ fn wire(a: &Attestation) -> Result<serde_json::Value, String> {
         "actors": a.actors, "timestamp": a.timestamp.div_euclid(1000), "source": a.source,
         "attributes": a.attributes,
     });
-    if let (Some(sig), Some(did), Some(m)) = (&a.signature, &a.signer_did, v.as_object_mut()) {
-        m.insert("signature".into(), base64::engine::general_purpose::STANDARD.encode(sig).into());
-        m.insert("signer_did".into(), did.clone().into());
+    match (&a.signature, &a.signer_did, v.as_object_mut()) {
+        (Some(sig), Some(did), Some(m)) => {
+            m.insert("signature".into(), base64::engine::general_purpose::STANDARD.encode(sig).into());
+            m.insert("signer_did".into(), did.clone().into());
+        }
+        (None, None, _) => {}
+        // Sent without the half it has, the node would store it unsigned and
+        // sign it as itself: a row that claimed a signer would lose the claim.
+        _ => return Err("a signature and a signer are given together or not at all; this row has one".into()),
     }
     Ok(v)
 }

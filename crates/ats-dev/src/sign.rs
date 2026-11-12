@@ -30,8 +30,12 @@ pub fn key_path(flag: Option<&str>) -> Result<PathBuf, Box<Error>> {
     if let Ok(e) = std::env::var("ATS_DEV_KEY") {
         return Ok(PathBuf::from(e));
     }
-    let home = std::env::var("HOME")
-        .map_err(|e| fail("the home directory is unknown, so ~/.qntx/key is not found", e))?;
+    // An empty HOME names no directory: `qntx` refuses it too (Go's
+    // os.UserHomeDir), rather than read a key from wherever ats-dev was started.
+    let home = std::env::var("HOME").unwrap_or_default();
+    if home.is_empty() {
+        return Err(fail("the home directory is unknown, so ~/.qntx/key is not found", "HOME is not set"));
+    }
     Ok(PathBuf::from(home).join(".qntx").join("key"))
 }
 
