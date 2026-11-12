@@ -94,7 +94,7 @@ func (repo *standInRepo) serve(w http.ResponseWriter, r *http.Request) bool {
 		delete(notes, file)
 		repo.commits = append(repo.commits, sent["branch"]+": "+sent["message"])
 		give(http.StatusOK, map[string]any{"commit": map[string]any{"sha": "c"}})
-	case strings.HasPrefix(rest, "/contents/docs/adr"):
+	case strings.HasPrefix(rest, "/contents/docs/adr"), strings.HasPrefix(rest, "/contents/") && r.Method == http.MethodGet && r.URL.Query().Get("ref") != "main":
 		repo.contents(strings.TrimPrefix(rest, "/contents/"), r.URL.Query().Get("ref"), give)
 	case rest == "/pulls" && r.Method == http.MethodGet:
 		open := []any{}
@@ -140,15 +140,19 @@ func (repo *standInRepo) contents(asked, ref string, give func(int, any)) {
 		return
 	}
 	entries, listed := []any{}, map[string]bool{}
+	prefix := asked + "/"
+	if asked == "." {
+		prefix = ""
+	}
 	for p, content := range notes {
-		under, inside := strings.CutPrefix(p, asked+"/")
+		under, inside := strings.CutPrefix(p, prefix)
 		if !inside {
 			continue
 		}
 		if dir, _, deeper := strings.Cut(under, "/"); deeper {
 			if !listed[dir] {
 				listed[dir] = true
-				entries = append(entries, map[string]any{"type": "dir", "name": dir, "path": asked + "/" + dir})
+				entries = append(entries, map[string]any{"type": "dir", "name": dir, "path": prefix + dir})
 			}
 			continue
 		}

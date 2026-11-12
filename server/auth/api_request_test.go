@@ -12,3 +12,8 @@ func TestACometIsAskedForByAProgram(t *testing.T) {
 	assert.True(t, isAPIRequest(httptest.NewRequest("GET", "/comet/abcd-nl/grove/aarch64-darwin", nil)))
 	assert.False(t, isAPIRequest(httptest.NewRequest("GET", "/canvas", nil)))
 }
+
+// 「[Opus 5.5] An OTLP exporter posts to ix/otel: refused, it is answered 401, never redirected, because the Claude API disables a destination that answers a 3xx.」
+func TestAnExportIsSentByAProgram(t *testing.T) {
+	assert.True(t, isAPIRequest(httptest.NewRequest("POST", "/ix/otel/v1/traces", nil)))
+}

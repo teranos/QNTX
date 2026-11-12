@@ -127,15 +127,74 @@ func vaultNotesAt(root string) (map[string][]byte, error) {
 	return notes, nil
 }
 
-// boundVaultNotes is every note a binding holds in the vault's copy: those
-// directly in its folder, or its one note when the vault has it as a file of
-// its own; a link to one is not.
+// vaultNotesWhole is every note in root and in every folder under it, by its
+// path below root, and its content: a repository binding's. A folder or note
+// starting with a dot is not one, and a link is not followed.
+func vaultNotesWhole(root string) (map[string][]byte, error) {
+	notes := map[string][]byte{}
+	placed, err := os.Lstat(root)
+	// A repository's folder that is not there is not an empty one: sent as
+	// empty, every note on the branch would be removed.
+	if errors.Is(err, fs.ErrNotExist) {
+		return notes, errors.Newf("%s is not in the vault, so nothing is sent from it", root)
+	}
+	if err != nil {
+		return notes, errors.Wrapf(err, "the notes in %s were not read", root)
+	}
+	if placed.Mode()&os.ModeSymlink != 0 {
+		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", root)
+	}
+	if !placed.IsDir() {
+		return notes, errors.Newf("%s is a file, not the folder the repository is bound to, so nothing is sent", root)
+	}
+	err = filepath.WalkDir(root, func(at string, d fs.DirEntry, err error) error {
+		if err != nil || at == root {
+			return err
+		}
+		if strings.HasPrefix(d.Name(), ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		// A link, to a folder or a note, is refused: skipped, the notes under
+		// it would read as gone and be removed from the branch.
+		if d.Type()&fs.ModeSymlink != 0 {
+			return errors.Newf("%s is a link, not a folder or note of the vault, so nothing is sent", at)
+		}
+		if !d.Type().IsRegular() || !strings.HasSuffix(d.Name(), noteSuffix) {
+			return nil
+		}
+		content, err := os.ReadFile(at)
+		if err != nil {
+			return err
+		}
+		under, err := filepath.Rel(root, at)
+		if err != nil {
+			return err
+		}
+		notes[filepath.ToSlash(under)] = content
+		return nil
+	})
+	return notes, errors.Wrapf(err, "the notes in %s were not read", root)
+}
+
+// 「[Opus 5.5] boundVaultNotes is every note a binding holds in the vault's copy: those」
+// 「[Opus 5.5] directly in its folder, or its one note when the vault has it as a file of」
+// 「[Opus 5.5] its own; a link to one is not.」
 func boundVaultNotes(vaultPath string, b vaultBinding) (map[string][]byte, error) {
+	if b.repository {
+		// The vault reaches the folder through no link, so what is sent is the vault's.
+		if err := noLinkOnTheWay(vaultPath, b.rootIn(vaultPath)); err != nil {
+			return nil, err
+		}
+		return vaultNotesWhole(b.rootIn(vaultPath))
+	}
 	if !b.note {
 		return vaultNotesAt(b.rootIn(vaultPath))
 	}
 	notes := map[string][]byte{}
-	// A note's folder that is a link is not a folder of the vault, as a bound folder's is not.
+	// 「[Opus 5.5] A note's folder that is a link is not a folder of the vault, as a bound folder's is not.」
 	if folder, err := os.Lstat(b.rootIn(vaultPath)); err == nil && folder.Mode()&os.ModeSymlink != 0 {
 		return notes, errors.Newf("%s is a link, not a folder of the vault, so nothing in it is sent", b.rootIn(vaultPath))
 	}

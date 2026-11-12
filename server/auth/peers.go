@@ -48,13 +48,28 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 	}
 	p := h.presented(r)
 	carriedAs := ""
-	if p.SessionLive {
+	// What this node admitted is carried, a session or a signature: what was
+	// presented here is spent here, and the peer is handed this node's word.
+	//
+	// "k should be delegating auth to the node entirely to q"
+	carries := p.SessionLive || p.Bearer != nil
+	if carries {
 		admitted, ok := h.admissionOf(p)
 		if !ok {
-			h.writeError(w, http.StatusUnauthorized, "the session here admits nobody")
+			h.writeError(w, http.StatusUnauthorized, "what was presented here admits nobody")
 			return
 		}
-		signed, err := h.carriedSignature(admitted.Identity, p.DisplayName, peer, time.Now())
+		level, name, namespaces := h.levelOf(admitted.Identity), p.DisplayName, peer.Namespaces
+		if !p.SessionLive {
+			// A grant goes as far as it reaches here, and no further.
+			level, name, namespaces = Level(admitted.LevelName()), admitted.DisplayName, nil
+			for _, namespace := range peer.Namespaces {
+				if admitted.MayActIn(namespace) {
+					namespaces = append(namespaces, namespace)
+				}
+			}
+		}
+		signed, err := h.carriedSignature(admitted.Identity, name, level, peer, namespaces, time.Now())
 		if err != nil {
 			h.writeError(w, http.StatusInternalServerError, "this node did not sign to carry you to "+peer.Label+": "+err.Error())
 			return
@@ -69,7 +84,7 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 			out.Out.URL.RawPath = ""
 			out.Out.Host = peer.Origin.Host
 			out.Out.Header.Del("Cookie")
-			if p.SessionLive {
+			if carries {
 				out.Out.Header.Set("Authorization", carriedAs)
 			}
 		},
@@ -95,10 +110,11 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 
 // carriedSignature is the Authorization a request carrying identity to peer
 // goes with: this node signing, as its own did:key, who the person is, for that
-// peer alone and for one request.
+// 「[Opus 5.5] peer alone and for one request. What it names is where the peer lets them act:」
+// 「[Opus 5.5] the namespaces handed in, of those the peer serves.」
 //
 // "A signature proves the key, and nothing reusable leaves the node."
-func (h *Handler) carriedSignature(identity, name string, peer Client, now time.Time) (string, error) {
+func (h *Handler) carriedSignature(identity, name string, level Level, peer Client, namespaces []string, now time.Time) (string, error) {
 	did, err := h.ownDID()
 	if err != nil {
 		return "", err
@@ -117,8 +133,8 @@ func (h *Handler) carriedSignature(identity, name string, peer Client, now time.
 			ID:        hex.EncodeToString(jti),
 		},
 		Name:       name,
-		Level:      string(h.levelOf(identity)),
-		Namespaces: peer.Namespaces,
+		Level:      string(level),
+		Namespaces: namespaces,
 		Label:      peer.Label,
 		Client:     peer.DID,
 	}).SignedString(h.nodeKey)

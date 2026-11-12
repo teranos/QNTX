@@ -63,6 +63,14 @@ func TestATurnTheNodeStoppedReadingIsReadOnByTheNext(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// The turn's process is gone by now, as Claude Code is once it printed its last result.
+	ended := exec.Command("true")
+	if err := ended.Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(ended.Process.Pid)), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	var secondRead []string
 	answer, err = pending[0].Follow(context.Background(), func(m Message) { secondRead = append(secondRead, m.Type) })
 	if err != nil {
@@ -80,6 +88,47 @@ func TestATurnTheNodeStoppedReadingIsReadOnByTheNext(t *testing.T) {
 	}
 	if len(left) != 0 {
 		t.Errorf("a turn read to its end is still pending: %+v", left)
+	}
+}
+
+// "i actually think the node agent got it, i can see it now. but weirdly enough, it did not respond"
+// A resumed session answers what was queued before what was said: background
+// tasks that ended between turns are a prompt of their own, with a result of
+// their own. The turn's answer is its last result, read once the process is gone.
+func TestATurnIsAnsweredByItsLastResult(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(turnsDir(home), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stream := filepath.Join(turnsDir(home), "s-4.1791900000000000000"+streamExt)
+	notice := `{"type":"result","subtype":"success","session_id":"s-4","is_error":false,"result":""}` + "\n"
+	if err := os.WriteFile(stream, []byte(notice), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	printing := exec.Command("sleep", "2")
+	if err := printing.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(printing.Process.Pid)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(5 * followEvery)
+		appended, err := os.OpenFile(stream, os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			return
+		}
+		_, _ = appended.WriteString(`{"type":"result","subtype":"success","session_id":"s-4","is_error":false,"result":"#1594 merged."}` + "\n")
+		_ = appended.Close()
+		_ = printing.Wait()
+	}()
+
+	answer, err := Turn{Session: "s-4", Stream: stream}.Follow(context.Background(), func(Message) {})
+	if err != nil {
+		t.Fatalf("Follow: %v", err)
+	}
+	if answer.Text != "#1594 merged." {
+		t.Fatalf("the turn was answered with %q, and not with what was said last", answer.Text)
 	}
 }
 

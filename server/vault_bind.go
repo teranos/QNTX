@@ -110,9 +110,9 @@ func vaultHasDir(vault Vault, place string) (bool, error) {
 	return info.IsDir(), nil
 }
 
-// vaultPlaceRefused is why place is no place of the vault's copy to bind to,
-// or empty: a folder's place is a folder on the box; a note's is no folder,
-// and it and the folders it is in are written when it is filled.
+// 「[Opus 5.5] vaultPlaceRefused is why place is no place of the vault's copy to bind to,」
+// 「[Opus 5.5] or empty: a folder's place is a folder on the box; a note's is no folder,」
+// 「[Opus 5.5] and it and the folders it is in are written when it is filled.」
 func vaultPlaceRefused(vault Vault, place string, note bool) (string, error) {
 	if !note {
 		there, err := vaultHasDir(vault, place)
@@ -300,7 +300,54 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	folder := repo.String() + "@" + branch + ":" + sent["path"] + "=" + place
+	return s.boundAt(ctx, sent, vault, repo.String()+"@"+branch+":"+sent["path"]+"="+place, place)
+}
+
+// "we are missing some bindings like the ground CLAUDE.md, its other markdown document's"
+// "so, perhaps we should introduce another vault binding, which is different from a directory or single file binding, namely;"
+// "- the repository/git binding"
+// "- named as one git repository under one name, like teranos/ground currently is."
+func (s *QNTXServer) vaultBindRepository(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	vault, refused := s.vaultNamed(sent["name"])
+	if refused != nil {
+		return nil, refused
+	}
+	repo, refused := repoOf(sent["repo"])
+	if refused != nil {
+		return nil, refused
+	}
+	place := sent["place"]
+	if place == "" {
+		place = repo.Path
+	}
+	// The vault itself is no repository's place: bound there, a send would
+	// carry every note of the vault into the repository.
+	if cleaned := path.Clean(filepath.ToSlash(place)); cleaned == "." || cleaned == "/" || cleaned == ".." || strings.HasPrefix(cleaned, "../") || strings.HasPrefix(cleaned, "/") {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is the vault itself or outside it; a repository is bound under a folder of the vault"}
+	}
+	// The name is a folder's place; it is written when the repository's notes
+	// are, so it need not be on the box yet.
+	if strings.HasSuffix(place, noteSuffix) {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is a note's place; a repository is bound under a folder's"}
+	}
+	at := filepath.Join(vault.Path, filepath.FromSlash(place))
+	if err := noLinkOnTheWay(vault.Path, at); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: err.Error()}
+	}
+	if info, err := os.Stat(at); err == nil && !info.IsDir() {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is a file of " + vault.Name + ", not a folder"}
+	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: errors.Wrapf(err, "whether %s is a folder of %s was not read", at, vault.Name).Error()}
+	}
+	branch, err := s.repoDefaultBranch(ctx, repo)
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	return s.boundAt(ctx, sent, vault, repo.String()+"@"+branch+":"+forge.Root+"="+place, place)
+}
+
+// boundAt keeps folder beside the vault's others, and fills it.
+func (s *QNTXServer) boundAt(ctx context.Context, sent sigil.Sent, vault Vault, folder, place string) (any, *protocol.Refusal) {
 	folders, err := vaultFoldersOf(append(slices.Clone(vault.Folders), folder))
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Says: err.Error()}

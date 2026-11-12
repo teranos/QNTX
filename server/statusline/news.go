@@ -134,7 +134,7 @@ func (l *NewsLog) ByID(caller, id string) (News, bool) {
 }
 
 // NewsKey is the name a caller's news is filed under: the person. A token
-// speaks for whoever minted it (ADR-025) and carries that as Identity, and
+// speaks for whoever minted it and carries that as Identity, and
 // so does their session, so news left for a push one token attested is found
 // by another of theirs, or by them at the browser. The DID is the key only
 // for a caller that is nobody's.

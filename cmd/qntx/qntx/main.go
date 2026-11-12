@@ -127,6 +127,13 @@ func init() {
 		if len(toSentry) > 0 && otlp.Running() {
 			logger.Infow("Shipping spans to Sentry", "traces_sample_rate", opt.TracesSampleRate)
 		}
+		// 「[Opus 5.5] The numbers measure takes leave over OTLP as well, when the environment names where.」
+		if err := otlp.StartMetrics(context.Background(), version.VersionTag); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP metric export: %v\n", err)
+		}
+		if endpoint, _ := otlp.MetricsSaid(); otlp.MetricsRunning() {
+			logger.Infow("Shipping metrics over OTLP", "endpoint", endpoint, "release", version.VersionTag)
+		}
 
 		if logger.SentryRunning() {
 			// Logs and numbers leaving the machine is a thing the operator gets
@@ -156,6 +163,7 @@ func init() {
 	rootCmd.AddCommand(commands.HandlerCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
+	rootCmd.AddCommand(commands.SignCmd)
 	rootCmd.AddCommand(commands.VersionCmd)
 }
 

@@ -134,8 +134,8 @@ func (q *Queue) Dequeue() (*Job, error) {
 
 	// "we also need to fix the actual issue, why is pulse failing in the first place"
 	//
-	// The oldest queued job, not the newest: ListJobs reads newest first, and a
-	// worker that dequeued from it starved whatever was not taken at once.
+	// 「[Fable 5.1] The oldest queued job, not the newest: ListJobs reads newest first, and a」
+	// 「[Fable 5.1] worker that dequeued from it starved whatever was not taken at once.」
 	job, err := q.store.OldestQueued()
 	if err != nil {
 		if errors.Is(err, ErrJobNotFound) {
@@ -473,9 +473,9 @@ func (q *Queue) Cleanup(ctx context.Context, olderThan time.Duration, atMost int
 	return q.store.CleanupOldJobs(olderThan, atMost, keep...)
 }
 
-// CancelQueuedBefore cancels at most atMost queued jobs of handler older than
-// olderThan, with reason as their error, tells the subscribers of each, and
-// says how many.
+// 「[Fable 5.1] CancelQueuedBefore cancels at most atMost queued jobs of handler older than」
+// 「[Fable 5.1] olderThan, with reason as their error, tells the subscribers of each, and」
+// 「[Fable 5.1] says how many.」
 func (q *Queue) CancelQueuedBefore(handler string, olderThan time.Duration, reason string, atMost int) (int, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()

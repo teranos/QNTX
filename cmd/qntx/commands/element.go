@@ -2,6 +2,9 @@ package commands
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,8 +15,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/element"
+	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	errors "github.com/teranos/sacred-error"
@@ -62,16 +67,15 @@ var elementListCmd = &cobra.Command{
 	Short: "What a node serves from /g/",
 	Long: `List the element modules a node publishes, newest first by name.
 
-Answers for the namespace the token acts in — an element published in one
+Answers for the namespace the key acts in — an element published in one
 namespace is not served to another.`,
 	Args: cobra.NoArgs,
 	RunE: runElementList,
 }
 
 var (
-	elementFile  string
-	elementTo    string
-	elementToken string
+	elementFile string
+	elementTo   string
 	// atDoor is --to being the door the node opened for the agent asking,
 	// which admits that agent and is presented nothing.
 	atDoor bool
@@ -85,7 +89,6 @@ func init() {
 
 	for _, c := range []*cobra.Command{elementPublishCmd, elementListCmd} {
 		c.Flags().StringVar(&elementTo, "to", "", "Node to reach (default: this machine's, from am.toml)")
-		c.Flags().StringVar(&elementToken, "token", "", "Bearer token (default: $QNTX_TOKEN, then ~/.qntx/token)")
 	}
 
 	ElementCmd.AddCommand(elementPublishCmd, elementListCmd)
@@ -108,44 +111,77 @@ func nodeURL() (string, error) {
 	return fmt.Sprintf("http://127.0.0.1:%d", port), nil
 }
 
-// bearer is the token to present, and where it came from, so a refusal can say
-// which credential was refused.
-func bearer() (token string, from string, err error) {
-	if elementToken != "" {
-		return elementToken, "--token", nil
-	}
-	if fromEnv := os.Getenv("QNTX_TOKEN"); fromEnv != "" {
-		return fromEnv, "$QNTX_TOKEN", nil
-	}
+// "A signature proves the key, and nothing reusable leaves the node."
+//
+// A request is signed for itself by the key kept in ~/.qntx/key, the one ground
+// signs with, made out to the node it goes to (QNTX server/auth/signed.go): what
+// crosses the wire is spent once, and the key never does.
 
+// signedLife is how long a signature lasts: long enough to reach the node,
+// well inside the five minutes the node allows one.
+const signedLife = time.Minute
+
+// keyPath is where the key is kept.
+func keyPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", "", errors.Wrap(err, "no --token, no $QNTX_TOKEN, and the home directory is unknown")
+		return "", errors.Wrap(err, "the home directory is unknown, so ~/.qntx/key is not found")
 	}
-	path := filepath.Join(home, ".qntx", "token")
+	return filepath.Join(home, ".qntx", "key"), nil
+}
+
+// signedFor is the Authorization a request to url goes with: a JWT the kept
+// key signs as its did:key, for the node's origin, once.
+func signedFor(url string) (string, error) {
+	path, err := keyPath()
+	if err != nil {
+		return "", err
+	}
 	held, err := os.ReadFile(path)
 	if err != nil {
-		return "", "", errors.Wrapf(err,
-			"no --token and no $QNTX_TOKEN, and %s could not be read", path)
+		return "", errors.Wrapf(err, "no key is kept at %s to sign with: ground code login keeps one", path)
 	}
-	return strings.TrimSpace(string(held)), path, nil
+	seed, err := hex.DecodeString(strings.TrimSpace(string(held)))
+	if err != nil || len(seed) != ed25519.SeedSize {
+		return "", errors.Newf("%s holds no %d-byte seed in hex", path, ed25519.SeedSize)
+	}
+	key := ed25519.NewKeyFromSeed(seed)
+	did := access.EncodeDIDKey(key.Public().(ed25519.PublicKey))
+	jti := make([]byte, 16)
+	if _, err := rand.Read(jti); err != nil {
+		return "", errors.Wrap(err, "no id could be drawn for the signature")
+	}
+	origin := url
+	if scheme, rest, found := strings.Cut(url, "://"); found {
+		host, _, _ := strings.Cut(rest, "/")
+		origin = scheme + "://" + host
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.RegisteredClaims{
+		Issuer: did, Subject: did, Audience: jwt.ClaimStrings{origin},
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(signedLife)), ID: hex.EncodeToString(jti),
+	}).SignedString(key)
+	if err != nil {
+		return "", errors.Wrapf(err, "the request to %s was not signed", origin)
+	}
+	return "Signed " + signed, nil
 }
 
 // ask sends one request to the node and hands back what it answered.
 func ask(method, url string, body []byte) (answer []byte, err error) {
-	token, from := "", "the door"
+	authorization, from := "", "the door"
 	if !atDoor {
-		if token, from, err = bearer(); err != nil {
+		if authorization, err = signedFor(url); err != nil {
 			return nil, err
 		}
+		from = "the key in ~/.qntx/key"
 	}
 
 	req, err := http.NewRequest(method, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not build the request to %s", url)
 	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -163,7 +199,7 @@ func ask(method, url string, body []byte) (answer []byte, err error) {
 		return nil, errors.Wrapf(readErr, "%s answered %d and the body could not be read", url, resp.StatusCode)
 	}
 	if resp.StatusCode >= 300 {
-		return nil, errors.Newf("%s answered %d (token from %s): %s",
+		return nil, errors.Newf("%s answered %d (asked by %s): %s",
 			url, resp.StatusCode, from, strings.TrimSpace(string(answer)))
 	}
 	return answer, nil

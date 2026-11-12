@@ -35,7 +35,7 @@ REACH is '/auth/door/home' '/auth/door/home/result'                       of ANY
 # Who sent the person home, answered from the ticket they hold, so the face
 # can name a client. A stranger holding no ticket is told nothing.
 REACH is '/auth/door/journey'                                             of ANYONE
-# A client is a door (ADR-025): it sends a stranger here for the passkey, and
+# A client is a door: it sends a stranger here for the passkey, and
 # the code goes back by ticket. Both are the way home, for a client.
 REACH is '/auth/authorize' '/auth/authorize/done'                         of ANYONE
 # The client comes for its token with the code and its secret, holding no
@@ -59,6 +59,9 @@ REACH is '/n/'                                                            of ANY
 # The GitHub App's webhook, at the path ROOT sets under /github/. The
 # delivery's signature is the credential; every other path answers nobody.
 REACH is '/github/'                                                       of ANYONE
+# 「[Opus 5.5] ix/otel takes OpenTelemetry in as attestations: who reaches it is who writes」
+# 「[Opus 5.5] attestations, and a token's spans land where it acts, under its WRITE lines.」
+REACH is '/ix/otel/'                                                      of ROOT SUPER TOKEN ATTESTOR
 # Discovery documents (RFC 8414, RFC 9728): how a client that has never seen
 # this node finds its doors without being configured by hand. Read before it
 # sends anybody anywhere, so by a stranger.
@@ -112,7 +115,7 @@ REACH is '/s/'                                                            of ANY
 # line above.
 REACH is '/g/'                                                            of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION USER
 
-# Tokens (ADR-025) and Users (ADR-031). A write on either is a session's
+# Tokens and Users (ADR-031). A write on either is a session's
 # alone, gated by the handler and not by this line.
 REACH is '/auth/tokens' '/auth/tokens/'                                   of ROOT SUPER
 REACH is '/auth/users' '/auth/users/'                                     of ROOT SUPER
@@ -183,6 +186,7 @@ REACH is '/api/vault'                                                     of ROO
 REACH is '/api/vault/dirs' '/api/vault/states' '/api/vault/bind'          of ROOT
 REACH is '/api/vault/unbind' '/api/vault/disable' '/api/vault/enable'     of ROOT
 REACH is '/api/vault/send'                                                of ROOT
+REACH is '/api/vault/repository'                                          of ROOT
 REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
 
 # The Node Agent (the agent signum, ADR-048), in a Coding Agent Harness. Who may

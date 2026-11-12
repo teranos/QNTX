@@ -156,8 +156,10 @@ func (s *QNTXServer) keepCheckpointing(handler *checkpointHandler) {
 
 // keepCleaningJobs removes completed and failed jobs older than jobsKeptFor, in
 // passes of jobsRemovedPerPass, and the pulse executions of the same age, so an
-// execution never points at a job that is gone. Forwards stay: their rows are
-// the ledger of what a delivery already reached.
+// execution never points at a job that is gone. A forward goes with them: its
+// row refuses a redelivery, and GitHub redelivers only what it sent within
+// three days; a forward is dropped or done within forwardKeptFor. On q the rows
+// kept for every forward stood at 31,054 on 2026-11-08 (#1586).
 func (s *QNTXServer) keepCleaningJobs() {
 	if s.daemon == nil {
 		return
@@ -180,14 +182,14 @@ func (s *QNTXServer) keepCleaningJobs() {
 // cleanJobsOnce runs the passes of one cleanup, until a pass takes fewer than it
 // may or the node stops.
 func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
-	// First, and apart from how the rest goes: a stale forward queued is a
-	// stale forward the worker may run.
+	// 「[Fable 5.1] First, and apart from how the rest goes: a stale forward queued is a」
+	// 「[Fable 5.1] stale forward the worker may run.」
 	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
 		log.Errorw("Stale forwards were not dropped", "error", err)
 	}
 	removed := 0
 	for {
-		n, err := s.daemon.GetQueue().Cleanup(s.ctx, jobsKeptFor, jobsRemovedPerPass, forwardHandlerName)
+		n, err := s.daemon.GetQueue().Cleanup(s.ctx, jobsKeptFor, jobsRemovedPerPass)
 		if err != nil {
 			log.Errorw("Old jobs were not removed", "kept_for", jobsKeptFor.String(), "removed_before", removed, "error", err)
 			return
@@ -248,13 +250,14 @@ func (s *QNTXServer) setupCheckpointSchedule() {
 
 	s.ensureCheckpointSchedule(s.held.ServedUniverse().Schedules())
 	s.keepCheckpointing(handler)
-	// Before the worker takes its first job: it takes the oldest, and on q the
-	// oldest were 12,915 forwards from five weeks that the far node must not
-	// get replayed at it.
+	// 「[Fable 5.1] Before the worker takes its first job: it takes the oldest, and on q the」
+	// 「[Fable 5.1] oldest were 12,915 forwards from five weeks that the far node must not」
+	// 「[Fable 5.1] get replayed at it.」
 	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
 		s.logger.Named("jobs").Errorw("Stale forwards were not dropped at boot", "error", err)
 	}
 	s.keepCleaningJobs()
+	s.keepIssues()
 }
 
 // ensureCheckpointSchedule creates the checkpoint job, or moves the one this

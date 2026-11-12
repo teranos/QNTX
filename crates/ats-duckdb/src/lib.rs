@@ -14,6 +14,7 @@
 //! `ats::storage`. See ADR-024 for the design.
 
 pub mod error;
+pub mod held;
 pub mod json;
 pub mod migrate;
 pub mod namespace;

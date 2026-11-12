@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"net/http"
 	"net/url"
 	"strings"
@@ -118,7 +120,7 @@ type Handler struct {
 	githubLocationForPeers GitHubLocate
 	// nodes.peers: this primary's peers, by did:key and by name.
 	nodes    map[string]Client
-	tokens   TokenStore // ADR-025: bearer token path; may be nil during init
+	tokens   TokenStore // bearer token path; may be nil during init
 	attestor Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
@@ -286,8 +288,15 @@ func (h *Handler) SetNodeKey(key ed25519.PrivateKey) {
 func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) http.HandlerFunc {
 	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
+		// The served request's span is named by its route, so what a caller
+		// was answered is read in the trace and not in the node's log.
+		span := trace.SpanFromContext(r.Context())
+		span.SetName(r.Method + " " + route)
+		span.SetAttributes(attribute.String("http.route", route))
+
 		p := h.presented(r)
 		if p.turnedAway {
+			refusedOn(r, "turned-away")
 			h.rejectTurnedAway(w)
 			return
 		}
@@ -301,18 +310,22 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 		// every token already out there (ADR-031).
 		by, err := h.switchedOff(admitted)
 		if err != nil {
+			refusedOn(r, "unanswered")
 			h.rejectUnanswered(w, r, admitted, err)
 			return
 		}
 		if by != "" {
+			refusedOn(r, "switched-off")
 			h.rejectSwitchedOff(w, r, admitted, by)
 			return
 		}
 		if by, refused := h.notThemselves(p, admitted.UserID); refused {
+			refusedOn(r, "become")
 			h.rejectBecome(w, r, admitted.UserID, by)
 			return
 		}
 		if !reach.Admits(admitted) {
+			refusedOn(r, "out-of-reach")
 			h.rejectOutOfReach(w, r, admitted, route, reach)
 			return
 		}
@@ -320,6 +333,7 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 			measure.String(measure.AttrLevel, admitted.LevelName()),
 			measure.String(measure.AttrRoute, route),
 		)
+		span.SetAttributes(attribute.String("qntx.level", admitted.LevelName()))
 		next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
 	}
 }
@@ -332,8 +346,8 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	// The token names its own namespace, so this is where a request is routed
 	// rather than defaulted.
 	if grant := p.Bearer; grant != nil {
-		// A client authenticates at the token endpoint and nowhere else
-		// (ADR-025). The secret an app holds is not a credential that reaches
+		// A client authenticates at the token endpoint and nowhere else.
+		// The secret an app holds is not a credential that reaches
 		// a route, whoever minted it.
 		if grant.Level == LevelOAuth {
 			h.logger.Infow("Bearer token refused",
@@ -357,7 +371,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 				"reason", "a GitHub token is not a bearer")
 			return Admission{}, false
 		}
-		// A token speaks for whoever minted it (ADR-025), so striking them out
+		// A token speaks for whoever minted it, so striking them out
 		// of am.toml has to reach it too. An empty list strikes out everyone.
 		if !h.stillAdmitted(grant.MintedBy) {
 			h.logger.Infow("Bearer token refused",
@@ -399,7 +413,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// 「[Opus 5.5] A token holds roles by its label, its name.」
 		holder := grant.Label
 		// 「[Opus 5.5] An agent's token is the token it runs under, under a DID of its own」
-		// 「[Opus 5.5] (ADR-025): its level, its namespaces and its roles are that token's,」
+		// 「[Opus 5.5] Its level, its namespaces and its roles are that token's,」
 		// 「[Opus 5.5] read now, and it stands while that token does.」
 		if asking, isAgents, stands := h.runsUnder(grant.Label, grant.DID); isAgents {
 			if !stands {
@@ -544,14 +558,14 @@ func (h *Handler) holdingsOf(identity, namespace string) ([]string, bool) {
 
 // RegisterRoutes registers all /auth/* routes on the default mux.
 // Ceremony routes use CORS middleware but bypass auth middleware.
-// Token management routes (ADR-025) require an authenticated passkey
+// Token management routes require an authenticated passkey
 // session — bearer tokens cannot mint new tokens.
 // Routes is what this package can answer, by the path it answers on.
 
 // It hands them back rather than registering them. A package that could put a
 // route on the mux itself would be a second way onto it, and there is one way
 // and it is a line in server/reach.
-// MintedBy is who a token speaks for, by its DID (ADR-025). What a token
+// MintedBy is who a token speaks for, by its DID. What a token
 // wrote is filed under its DID; what is left for it on the row is filed
 // under the person, so the person's other tokens and their session see it.
 func (h *Handler) MintedBy(did string) (string, bool) {
@@ -606,7 +620,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(homewardResultPath, h.handleHomewardResult)
 	// Who sent the person home, so the face can name them.
 	mux.answer(journeyPath, h.handleJourney)
-	// A client is a door (ADR-025): it sends the person here, the passkey is
+	// A client is a door: it sends the person here, the passkey is
 	// done at home, and the code goes back by ticket through the done page.
 	mux.answer(authorizePath, h.handleAuthorize)
 	mux.answer(authorizeDonePath, h.handleAuthorizeDone)
@@ -728,7 +742,7 @@ func (h *Handler) readOrSession(next gated) http.HandlerFunc {
 }
 
 // sessionOnly gates a handler on a valid passkey session cookie. Bearer
-// tokens are rejected — ADR-025 forbids tokens from minting new tokens.
+// tokens are rejected: a token mints no token.
 func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := h.presented(r)
@@ -807,6 +821,7 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 	}
 
 	measure.Count(measure.Refused, 1, measure.String(measure.AttrOutcome, why))
+	refusedOn(r, why)
 
 	if isAPIRequest(r) {
 		// Where this resource says who issues tokens for it (RFC 9728 §5.1).
@@ -817,6 +832,11 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.String()), http.StatusSeeOther)
+}
+
+// refusedOn puts why the gate refused a request on the request's span.
+func refusedOn(r *http.Request, why string) {
+	trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("qntx.refused", why))
 }
 
 // rejectOutOfReach turns away somebody the node knows. They are admitted; no
@@ -848,6 +868,10 @@ var a2aStatus = map[int]string{http.StatusUnauthorized: "UNAUTHENTICATED", http.
 // "HTTP error responses use the google.rpc.Status JSON representation" (A2A
 // §11.6), and as every other refusal here elsewhere.
 func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, message string) {
+	if strings.HasPrefix(r.URL.Path, ixOtelPrefix) {
+		h.refuseOTLP(w, r, status, message)
+		return
+	}
 	if !strings.HasPrefix(r.URL.Path, a2aPrefix) {
 		h.writeError(w, status, message)
 		return
@@ -874,7 +898,7 @@ func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, mes
 // it can act on. Without the slash, because that is the URL a connector is given.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp", "/comet/", a2aPrefix} {
+	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/ix/", "/mcp", "/comet/", a2aPrefix} {
 		if strings.HasPrefix(path, asked) {
 			return true
 		}

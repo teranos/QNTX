@@ -67,6 +67,8 @@ aws-smithy-runtime-api = { version = "=1.12.3" }
 tokio = { version = "=1.53.1", default-features = false, features = ["rt"] }
 
 [dev-dependencies]
+# storage::conformance, the check this backend runs on itself
+ats = { workspace = true, features = ["conformance"] }
 tempfile = "3.0"
 pretty_assertions = "1.4"
 

@@ -15,6 +15,7 @@ import (
 	"context"
 	"crypto/sha1" //nolint:gosec // git names a blob by its SHA-1, used only to compare with GitHub's
 	"encoding/hex"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -40,8 +41,8 @@ const noteSuffix = ".md"
 
 // "i see, but i want those .feature files to be authored in Obsidian"
 
-// storySuffix is what a story of a repository's folder ends with. In the vault
-// a story is a note, named as the story with noteSuffix after it.
+// 「[Opus 5.5] storySuffix is what a story of a repository's folder ends with. In the vault」
+// 「[Opus 5.5] a story is a note, named as the story with noteSuffix after it.」
 const storySuffix = ".feature"
 
 // noteFile says whether a file of the repository is one note in the vault:
@@ -56,7 +57,7 @@ func noteBound(repoPath, place string) bool {
 	return strings.HasSuffix(repoPath, noteSuffix) || (strings.HasSuffix(repoPath, storySuffix) && strings.HasSuffix(place, noteSuffix))
 }
 
-// placedName is what a file of the repository is named in the vault.
+// 「[Opus 5.5] placedName is what a file of the repository is named in the vault.」
 func placedName(name string) string {
 	if strings.HasSuffix(name, storySuffix) {
 		return name + noteSuffix
@@ -64,8 +65,8 @@ func placedName(name string) string {
 	return name
 }
 
-// repoName is what a note of the vault is named in the repository: a story's
-// note is the story.
+// 「[Opus 5.5] repoName is what a note of the vault is named in the repository: a story's」
+// 「[Opus 5.5] note is the story.」
 func repoName(name string) string {
 	if story, ok := strings.CutSuffix(name, noteSuffix); ok && strings.HasSuffix(story, storySuffix) {
 		return story
@@ -112,7 +113,7 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 			continue
 		}
 		under := placedName(strings.TrimPrefix(entry.Path, folder+"/"))
-		// A story and a note named as its note would be one note in the vault.
+		// 「[Opus 5.5] A story and a note named as its note would be one note in the vault.」
 		if other, taken := placed[under]; taken {
 			return nil, errors.Newf("%s and %s of %s on %s are both %s in the vault", other, entry.Path, repo, branch, under)
 		}
@@ -122,9 +123,57 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 	return notes, nil
 }
 
-// boundNotes is every note of a binding on branch: the notes under its folder,
-// or its one note, placed by its own name, and none when that is not on branch.
+// "its other markdown document's"
+
+// dotted says whether a path of the repository is in, or is, a folder or file
+// starting with a dot: none of it is a repository binding's.
+func dotted(p string) bool {
+	return slices.ContainsFunc(strings.Split(p, "/"), func(part string) bool { return strings.HasPrefix(part, ".") && part != "." })
+}
+
+// repoNotesWhole is every note of repo on branch, in every folder of it, by its
+// path from the repository's top.
+func (s *QNTXServer) repoNotesWhole(ctx context.Context, repo forge.Repo, branch string) ([]repoNote, error) {
+	reader, err := s.forges().For(repo)
+	if err != nil {
+		return nil, err
+	}
+	var notes []repoNote
+	placed := map[string]string{}
+	for dirs := []string{forge.Root}; len(dirs) > 0; {
+		dir := dirs[0]
+		dirs = dirs[1:]
+		entries, err := reader.Entries(ctx, forge.AsApp, repo, branch, dir)
+		if err != nil {
+			return nil, errors.Wrapf(err, "%s of %s on %s was not listed", dir, repo, branch)
+		}
+		for _, entry := range entries {
+			if dotted(entry.Path) {
+				continue
+			}
+			switch {
+			case entry.Kind == forge.Dir:
+				dirs = append(dirs, entry.Path)
+			case entry.Kind == forge.File && noteFile(path.Base(entry.Path)):
+				under := placedName(entry.Path)
+				// 「[Opus 5.5] A story and a note named as its note would be one note in the vault.」
+				if other, taken := placed[under]; taken {
+					return nil, errors.Newf("%s and %s of %s on %s are both %s in the vault", other, entry.Path, repo, branch, under)
+				}
+				placed[under] = entry.Path
+				notes = append(notes, repoNote{under: under, path: entry.Path, sha: entry.SHA})
+			}
+		}
+	}
+	return notes, nil
+}
+
+// 「[Opus 5.5] boundNotes is every note of a binding on branch: the notes under its folder,」
+// 「[Opus 5.5] or its one note, placed by its own name, and none when that is not on branch.」
 func (s *QNTXServer) boundNotes(ctx context.Context, b vaultBinding, branch string) ([]repoNote, error) {
+	if b.repository {
+		return s.repoNotesWhole(ctx, b.source.Repo, branch)
+	}
 	if !b.note {
 		return s.repoNotes(ctx, b.source.Repo, branch, b.source.Path)
 	}
@@ -159,10 +208,10 @@ func (s *QNTXServer) boundNotes(ctx context.Context, b vaultBinding, branch stri
 	return nil, nil
 }
 
-// folderGone says whether dir, which the forge refused to list, is gone from
-// branch: git keeps no empty folder, so a note's folder goes with its last
-// note. It is gone when the nearest folder above it that the forge lists does
-// not hold it; one that holds it was refused for another reason.
+// 「[Opus 5.5] folderGone says whether dir, which the forge refused to list, is gone from」
+// 「[Opus 5.5] branch: git keeps no empty folder, so a note's folder goes with its last」
+// 「[Opus 5.5] note. It is gone when the nearest folder above it that the forge lists does」
+// 「[Opus 5.5] not hold it; one that holds it was refused for another reason.」
 func folderGone(ctx context.Context, reader forge.Reader, repo forge.Repo, branch, dir string) (bool, error) {
 	for dir != forge.Root {
 		parent := path.Dir(dir)
@@ -213,6 +262,31 @@ func readIfThere(at string) ([]byte, bool, error) {
 	return content, true, nil
 }
 
+// noLinkOnTheWay refuses at when the vault reaches it through a link: any
+// folder from the vault down to it, or it itself. A fill writes, reads and
+// removes only inside the vault.
+func noLinkOnTheWay(vaultPath, at string) error {
+	under, err := filepath.Rel(vaultPath, at)
+	if err != nil || under == ".." || strings.HasPrefix(under, ".."+string(filepath.Separator)) {
+		return errors.Newf("%s is not inside the vault at %s", at, vaultPath)
+	}
+	step := vaultPath
+	for _, part := range strings.Split(under, string(filepath.Separator)) {
+		step = filepath.Join(step, part)
+		info, err := os.Lstat(step)
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return errors.Wrapf(err, "whether %s is a link was not read", step)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return errors.Newf("%s is a link; the vault is not written, read or removed through one", step)
+		}
+	}
+	return nil
+}
+
 // writeNote writes a note, and the folders it is in.
 func writeNote(at string, content []byte, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(at), 0o755); err != nil {
@@ -237,8 +311,8 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		return filled
 	}
 	root := binding.rootIn(vault.Path)
-	// A note's base is kept where a folder bound at its folder keeps it, so a
-	// place bound again as the other keeps what main last agreed on.
+	// 「[Opus 5.5] A note's base is kept where a folder bound at its folder keeps it, so a」
+	// 「[Opus 5.5] place bound again as the other keeps what main last agreed on.」
 	bases, err := vaultBases(vault.Name, place)
 	if err != nil {
 		filled.Refused = err
@@ -251,6 +325,10 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		baseAt := filepath.Join(bases, filepath.FromSlash(path.Clean(note.under)))
 		if !strings.HasPrefix(at, root+string(filepath.Separator)) || !strings.HasPrefix(baseAt, bases+string(filepath.Separator)) {
 			filled.Refused = errors.Newf("%s of %s would be written outside %s, at %s", note.path, repo, root, at)
+			return filled
+		}
+		if err := noLinkOnTheWay(vault.Path, at); err != nil {
+			filled.Refused = err
 			return filled
 		}
 		placed := path.Join(place, note.under)
@@ -316,8 +394,11 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 	// "yes"
 	// A note main no longer has is gone from the vault too, unless the vault changed it.
 	gone, err := basesNotIn(bases, now)
+	if binding.repository {
+		gone, err = basesNotInWhole(bases, now)
+	}
 	if binding.note {
-		// The bases beside a note's are other notes', bound apart: only its own is its.
+		// 「[Opus 5.5] The bases beside a note's are other notes', bound apart: only its own is its.」
 		gone = slices.DeleteFunc(gone, func(under string) bool { return under != binding.under() })
 	}
 	if err != nil {
@@ -329,6 +410,10 @@ func (s *QNTXServer) fillVaultFolder(ctx context.Context, vault Vault, folder st
 		baseAt := filepath.Join(bases, filepath.FromSlash(path.Clean(under)))
 		if !strings.HasPrefix(at, root+string(filepath.Separator)) {
 			filled.Refused = errors.Newf("%s, which main no longer has, would be removed outside %s, at %s", under, root, at)
+			return filled
+		}
+		if err := noLinkOnTheWay(vault.Path, at); err != nil {
+			filled.Refused = err
 			return filled
 		}
 		held, inVault, err := readIfThere(at)
@@ -377,7 +462,7 @@ func vaultBases(name, place string) (string, error) {
 	}
 	kept := filepath.Join(dir, name)
 	at := filepath.Join(kept, filepath.FromSlash(path.Clean(place)))
-	// A note at the vault's top keeps its base at the top of the vault's bases.
+	// 「[Opus 5.5] A note at the vault's top keeps its base at the top of the vault's bases.」
 	if at != kept && !strings.HasPrefix(at, kept+string(filepath.Separator)) {
 		return "", errors.Newf("the bases of %s would be kept outside %s, at %s", place, kept, at)
 	}
@@ -406,6 +491,32 @@ func basesNotIn(bases string, now map[string]bool) ([]string, error) {
 		}
 	}
 	return gone, nil
+}
+
+// basesNotInWhole is every note a base is kept for, in any folder under bases,
+// that main does not have now: a repository binding's.
+func basesNotInWhole(bases string, now map[string]bool) ([]string, error) {
+	var gone []string
+	err := filepath.WalkDir(bases, func(at string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(d.Name(), noteSuffix) {
+			return nil
+		}
+		under, err := filepath.Rel(bases, at)
+		if err != nil {
+			return err
+		}
+		if under = filepath.ToSlash(under); !now[under] {
+			gone = append(gone, under)
+		}
+		return nil
+	})
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	return gone, errors.Wrapf(err, "the bases in %s did not read", bases)
 }
 
 // folderMoved says whether a bound folder is to be filled now.
@@ -464,12 +575,15 @@ func (s *QNTXServer) fillPlaceSoon(name, place string) {
 	})
 }
 
-// movedBy is whether push changed a file directly in source's folder on its
-// branch, or the one note source names.
+// 「[Opus 5.5] movedBy is whether push changed a file directly in source's folder on its」
+// 「[Opus 5.5] branch, or the one note source names.」
 func movedBy(push forge.Push) folderMoved {
 	return func(source buildSource, place string) bool {
 		touched := push.TouchedIn(source.Path)
-		if noteBound(source.Path, place) {
+		switch {
+		case source.Path == forge.Root:
+			touched = slices.ContainsFunc(push.Changed, func(p string) bool { return noteFile(path.Base(p)) && !dotted(p) })
+		case noteBound(source.Path, place):
 			touched = push.Touched(source.Path)
 		}
 		return source.Repo.Is(push.Repo) && source.Branch == push.Branch() && touched

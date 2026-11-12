@@ -50,7 +50,7 @@ func TestAStoryAuthoredInTheVaultReachesTheBranchAsTheStory(t *testing.T) {
 	assert.NotContains(t, branch, "docs/adr/14-user-sets-an-openrouter-key.feature.md")
 }
 
-// A story and a note named as its note would be one note in the vault: the folder is not filled.
+// 「[Opus 5.5] A story and a note named as its note would be one note in the vault: the folder is not filled.」
 func TestAStoryAndItsNoteNameAreNotBothFilled(t *testing.T) {
 	s, vault := vaultBindingServer(t)
 	mainNotes["docs/adr/13-user-connects-obsidian.feature"] = story

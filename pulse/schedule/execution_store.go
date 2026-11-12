@@ -471,8 +471,8 @@ func (s *ExecutionStore) GetAsyncJobIDForScheduledJob(scheduledJobID string) (st
 // Returns the number of executions deleted.
 //
 // This implements TTL cleanup to prevent unbounded growth of pulse_executions and task_logs tables.
-// A pass removes at most atMost rows: on q pulse_executions held 249,855 rows,
-// and one statement over them holds the write lock for all of them at once.
+// 「[Fable 5.1] A pass removes at most atMost rows: on q pulse_executions held 249,855 rows,」
+// 「[Fable 5.1] and one statement over them holds the write lock for all of them at once.」
 func (s *ExecutionStore) CleanupOldExecutions(retentionDays int, atMost int) (int, error) {
 	// Calculate cutoff time in Go for clarity and portability
 	cutoffTime := time.Now().AddDate(0, 0, -retentionDays).Format(time.RFC3339)
