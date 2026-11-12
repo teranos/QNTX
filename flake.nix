@@ -86,9 +86,9 @@
             });
           }) {
           lockFile = ./Cargo.lock;
-          # sacred-error is a git dependency (github.com/teranos/sacred-error,
-          # the rev in Cargo.toml). Change the rev, change this hash: nix hash
-          # path --sri on a `git archive` of that rev.
+          # 「[Fable 5.2, Fable 5.1] sacred-error is a git dependency (github.com/teranos/sacred-error,」
+          # 「[Fable 5.2, Fable 5.1] the rev in Cargo.toml). Change the rev, change this hash: nix hash」
+          # 「[Fable 5.2, Fable 5.1] path --sri on a `git archive` of that rev.」
           outputHashes."sacred-error-0.1.0" = "sha256-AFWB5DT1EjfHvjuODxri3Dw+vGYo/EAnTwF0xpJwSQQ=";
         };
 
@@ -312,8 +312,8 @@
             "-X 'github.com/teranos/QNTX/internal/version.VersionTag=${versionTag}'"
           ];
 
-          # plugins/claude is qntx-claude-plugin (ADR-059): built with the node, so a
-          # node is handed it as it is handed qntx, and builds nothing itself.
+          # 「[Fable 5.2, Fable 5.1] plugins/claude is qntx-claude-plugin (ADR-059): built with the node, so a」
+          # 「[Fable 5.2, Fable 5.1] node is handed it as it is handed qntx, and builds nothing itself.」
           subPackages = [ "cmd/qntx" "plugins/claude" ];
           postInstall = ''
             mv $out/bin/claude $out/bin/qntx-claude-plugin
