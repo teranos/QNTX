@@ -10,8 +10,8 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
-// "review comments need to wake only when no comment was placed 30min since the
-// last comment"
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] "review comments need to wake only when no comment was placed 30min since the」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] last comment"」
 func TestAWakeWaitsUntilNoCommentCameForTheQuietStretch(t *testing.T) {
 	due := Due{DB: qntxtest.CreateTestDB(t)}
 	room := Target{Provider: "switchai-py", Room: "node"}
@@ -24,7 +24,7 @@ func TestAWakeWaitsUntilNoCommentCameForTheQuietStretch(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, ready, "not before the stretch is out")
 
-	// A second comment ten minutes in moves the wake to thirty minutes after it.
+	// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] A second comment ten minutes in moves the wake to thirty minutes after it.」
 	later := start.Add(10 * time.Minute)
 	require.NoError(t, due.Defer(t.Context(), room, "claude", "github-app:qodo-code-review", "2026-11-10T09:10:00Z", later.Add(quiet)))
 
@@ -40,8 +40,8 @@ func TestAWakeWaitsUntilNoCommentCameForTheQuietStretch(t *testing.T) {
 	assert.Equal(t, "2026-11-10T09:00:00Z", ready[0].Since, "the agent is told from the first comment of the stretch")
 }
 
-// A comment that moves the wake while it is being claimed leaves it, and a
-// wake is claimed once.
+// 「[Opus 5.5] A comment that moves the wake while it is being claimed leaves it, and a」
+// 「[Opus 5.5] wake is claimed once.」
 func TestAWakeIsClaimedOnceAndNotWhenACommentMovedIt(t *testing.T) {
 	due := Due{DB: qntxtest.CreateTestDB(t)}
 	room := Target{Provider: "switchai-py", Room: "node"}
@@ -72,8 +72,8 @@ func TestAWakeIsClaimedOnceAndNotWhenACommentMovedIt(t *testing.T) {
 	assert.Empty(t, ready, "told, it waits no more")
 }
 
-// A wake claimed and never done, as when the node stops while the agent is
-// being told or the telling fails, comes again when the hold is out.
+// 「[Opus 5.5] A wake claimed and never done, as when the node stops while the agent is」
+// 「[Opus 5.5] being told or the telling fails, comes again when the hold is out.」
 func TestAClaimedWakeThatWasNotDoneComesAgain(t *testing.T) {
 	due := Due{DB: qntxtest.CreateTestDB(t)}
 	room := Target{Provider: "switchai-py", Room: "node"}
@@ -94,8 +94,8 @@ func TestAClaimedWakeThatWasNotDoneComesAgain(t *testing.T) {
 	require.Len(t, ready, 1, "never done, it comes again")
 	assert.Equal(t, "2026-11-10T09:00:00Z", ready[0].Since)
 
-	// A newer comment while it is held is the wake's speaker and time from then
-	// on, and done of the older claim leaves it.
+	// 「[Opus 5.5] A newer comment while it is held is the wake's speaker and time from then」
+	// 「[Opus 5.5] on, and done of the older claim leaves it.」
 	require.NoError(t, due.Defer(t.Context(), room, "claude", "github:teranos", "2026-11-10T09:20:00Z", start.Add(50*time.Minute)))
 	require.NoError(t, due.Done(t.Context(), held))
 	ready, err = due.Ready(t.Context(), start.Add(50*time.Minute))
@@ -104,7 +104,7 @@ func TestAClaimedWakeThatWasNotDoneComesAgain(t *testing.T) {
 	assert.Equal(t, "github:teranos", ready[0].Speaker)
 }
 
-// Two providers that call a room alike each have their wake.
+// 「[Opus 5.5] Two providers that call a room alike each have their wake.」
 func TestTwoProvidersWithOneRoomNameWaitApart(t *testing.T) {
 	due := Due{DB: qntxtest.CreateTestDB(t)}
 	start := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
@@ -123,8 +123,8 @@ func TestTwoProvidersWithOneRoomNameWaitApart(t *testing.T) {
 	require.Len(t, ready, 1, "the other provider's wake is its own")
 }
 
-// A review's comments wait for a quiet room; a comment on the pull request
-// itself wakes at once.
+// 「[Opus 5.5] A review's comments wait for a quiet room; a comment on the pull request」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] itself wakes at once.」
 func TestWhichCommentsWaitForAQuietRoom(t *testing.T) {
 	for event, quiet := range map[string]bool{"pull_request_review_comment": true, "pull_request_review": true, "issue_comment": false} {
 		action := "created"
@@ -151,8 +151,8 @@ func draftDelivery(t *testing.T, action string) []byte {
 	return b
 }
 
-// "Draft->Ready change that should wake. but, Ready->Draft needs not wake, but
-// should still enter the room."
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] "Draft->Ready change that should wake. but, Ready->Draft needs not wake, but」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] should still enter the room."」
 func TestAPullRequestReadyForReviewWakesAndBackToDraftDoesNot(t *testing.T) {
 	ready, err := Parse("pull_request", draftDelivery(t, "ready_for_review"))
 	require.NoError(t, err)
@@ -179,7 +179,7 @@ func TestAPullRequestReadyForReviewWakesAndBackToDraftDoesNot(t *testing.T) {
 	}
 }
 
-// Only a pull request Claude Code opened wakes the agent that opened it.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] Only a pull request Claude Code opened wakes the agent that opened it.」
 func TestAReadyPullRequestThatIsNotClaudesWakesNoOne(t *testing.T) {
 	var sent map[string]any
 	require.NoError(t, json.Unmarshal(draftDelivery(t, "ready_for_review"), &sent))
