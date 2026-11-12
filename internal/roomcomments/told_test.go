@@ -8,7 +8,7 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
-// What an agent was told is kept per room and per agent, and read back.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] What an agent was told is kept per room and per agent, and read back.」
 func TestWhatAnAgentWasToldIsKept(t *testing.T) {
 	told := Told{DB: qntxtest.CreateTestDB(t)}
 
@@ -31,8 +31,8 @@ func TestWhatAnAgentWasToldIsKept(t *testing.T) {
 	assert.Empty(t, at, "another room has its own")
 }
 
-// A room reads at or after a time, so what was told is held out by reading
-// from the next millisecond, in the form q's Node Room was read in.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] A room reads at or after a time, so what was told is held out by reading」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] from the next millisecond, in the form q's Node Room was read in.」
 func TestWhatWasToldIsNotToldTwice(t *testing.T) {
 	from, err := ReadFrom("2026-11-07T20:11:05.173000Z")
 	require.NoError(t, err)
@@ -52,7 +52,7 @@ func TestWhatTheTurnIsToldOfTheRoom(t *testing.T) {
 	assert.Contains(t, Digest(said, true), "(Older than this was not read.)")
 }
 
-// The Room shows a comment as said by whoever wrote it, not by the node.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] The Room shows a comment as said by whoever wrote it, not by the node.」
 func TestWhoTheRoomShowsAsSayingIt(t *testing.T) {
 	assert.Equal(t, "qodo-code-review", Comment{App: "qodo-code-review", Author: "qodo-code-review[bot]"}.Poster(), "an app by its slug")
 	assert.Equal(t, "teranos", Comment{Author: "teranos"}.Poster(), "a person by their login")
