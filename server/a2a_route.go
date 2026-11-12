@@ -62,7 +62,6 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		a2asrv.WithLogger(a2aSaid()),
 		a2asrv.WithAgentInactivityTimeout(turnQuietMost),
 		a2asrv.WithExtendedAgentCardProducer(a2asrv.ExtendedAgentCardProducerFn(s.a2aExtendedCardOf)),
-		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true}),
 	)
 	// A turn can be quiet for minutes: a stream is kept alive through the
 	// gateways in front of the node, which drop idle connections.
@@ -353,11 +352,28 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 	if err != nil {
 		return ctx, nil, err
 	}
-	ctx = withA2ACall(ctx, a2aCall{agent: ta, tenant: tenant, request: r})
-	if asked, sends := req.Payload.(*a2asdk.SendMessageRequest); sends {
-		return ctx, nil, g.s.messageTaken(ta, asked)
+	// What the agent's card says it does and takes is what it is asked: a2a-go's
+	// enforcer refuses a capability it does not have and a part whose media
+	// type no skill takes, with ContentTypeNotSupportedError (§3.1.1, §13.4).
+	card, err := g.s.a2aCardAt(r, tenant)
+	if err != nil {
+		return ctx, nil, err
 	}
-	return ctx, nil, nil
+	enforcer, err := a2asrv.NewAgentCardEnforcer(card.sdk())
+	if err != nil {
+		return ctx, nil, a2aRefusal(a2asdk.ErrInternalError, "the card of "+ta.called+" is not one a2a-go enforces: "+err.Error())
+	}
+	if ctx, _, err = enforcer.Before(ctx, callCtx, req); err != nil {
+		return ctx, nil, err
+	}
+	call := a2aCall{agent: ta, tenant: tenant, request: r}
+	if asked, sends := req.Payload.(*a2asdk.SendMessageRequest); sends {
+		if asked.Config != nil {
+			call.accepts = asked.Config.AcceptedOutputModes
+		}
+		return withA2ACall(ctx, call), nil, g.s.messageTaken(ta, asked)
+	}
+	return withA2ACall(ctx, call), nil, nil
 }
 
 // After leaves a push config's credentials out of what is answered: the SDK
@@ -395,9 +411,9 @@ func (s *QNTXServer) messageTaken(ta taskAgent, sent *a2asdk.SendMessageRequest)
 	if m.Role != a2asdk.MessageRoleUser {
 		return a2aRefusal(a2asdk.ErrInvalidParams, "a message sent to "+ta.called+" is the user's, and this one's role is "+string(m.Role))
 	}
-	// "acceptedOutputModes": what the client takes, and the agent gives text.
-	if config := sent.Config; config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTextPlain) {
-		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" answers in "+textPlain+", which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" does not take")
+	// "acceptedOutputModes": what the client takes, of what the agent gives.
+	if config := sent.Config; config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTurnMode) {
+		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" gives "+strings.Join(turnModes, ", ")+", none of which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" takes")
 	}
 	// A turn takes nothing more once it is said: a message naming a task is
 	// one no task here accepts (§3.1.1, §3.4.2).
@@ -468,17 +484,31 @@ func (s *QNTXServer) a2aExtendedCardOf(ctx context.Context, req *a2asdk.GetExten
 	if peer := slices.IndexFunc(s.peers(), serving(tenant)); tenant != "" && peer >= 0 {
 		return s.peersAgentCard(r, s.peers()[peer], tenant)
 	}
+	card, err := s.a2aCardAt(r, tenant)
+	if err != nil {
+		return nil, err
+	}
+	signed, err := s.signedCard(ctx, card.sdk())
+	if err != nil {
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not signed: "+err.Error())
+	}
+	return signed, nil
+}
+
+// a2aCardAt is the card of the agent the node serves at tenant, the node's at
+// none, as the caller of r is given it.
+func (s *QNTXServer) a2aCardAt(r *http.Request, tenant string) (agentCard, error) {
 	var card agentCard
 	switch element, isElement := strings.CutPrefix(tenant, elementTenantPrefix); {
 	case isElement:
 		elements := s.elementsSignum()
 		say, err := sayIn(elements.Signum, "the element "+element)
 		if err != nil {
-			return nil, err
+			return agentCard{}, err
 		}
 		card = s.cardBase(r)
 		card.Name, card.Description, card.Tenant = "the element "+element, elements.GetDescription(), tenant
-		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: elements.GetTags(), Modes: []string{textPlain}}}
+		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: elements.GetTags(), Modes: turnModes}}
 	case s.holdsAName(tenant):
 		card = s.cardBase(r)
 		card.Name, card.Tenant = tenant, tenant
@@ -487,29 +517,25 @@ func (s *QNTXServer) a2aExtendedCardOf(ctx context.Context, req *a2asdk.GetExten
 	case tenant != "":
 		model, err := s.namespaceAgentModel(tenant)
 		if err != nil {
-			return nil, err
+			return agentCard{}, err
 		}
 		agents := s.agentsSignum()
 		say, err := sayIn(agents.Signum, "the agent of "+tenant)
 		if err != nil {
-			return nil, err
+			return agentCard{}, err
 		}
 		card = s.cardBase(r)
 		card.Name, card.Description, card.Tenant = "the agent of "+tenant+", "+model, agents.GetDescription(), tenant
-		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: agents.GetTags(), Modes: []string{textPlain}}}
+		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: agents.GetTags(), Modes: turnModes}}
 	default:
 		// "MUST require authentication" (§13.3).
 		admission, admitted := auth.AdmissionFrom(r.Context())
 		if !admitted {
-			return nil, a2aRefusal(a2asdk.ErrUnauthenticated, "the extended agent card is given to a caller the node admitted, and this one came through no gate")
+			return agentCard{}, a2aRefusal(a2asdk.ErrUnauthenticated, "the extended agent card is given to a caller the node admitted, and this one came through no gate")
 		}
 		card = s.a2aCardOf(r, admission, admitted)
 	}
-	signed, err := s.signedCard(ctx, card.sdk())
-	if err != nil {
-		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not signed: "+err.Error())
-	}
-	return signed, nil
+	return card, nil
 }
 
 // sayIn is the say sigil of signum, which an agent's card describes it by.

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -81,7 +82,7 @@ func (s *QNTXServer) namedTaskAgent(named agentName) taskAgent {
 // on the status row, and then received or not.
 func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContext, call a2aCall, yield func(a2asdk.Event, error) bool) {
 	ta, id := call.agent, ec.TaskID
-	says, err := saidIn(ec.Message)
+	says, err := textSaidIn(ec.Message)
 	if err != nil {
 		yield(nil, err)
 		return
@@ -201,3 +202,21 @@ func (w *answeredInProcess) Header() http.Header         { return w.header }
 func (w *answeredInProcess) Write(b []byte) (int, error) { return w.body.Write(b) }
 func (w *answeredInProcess) WriteHeader(status int)      { w.status = status }
 func (w *answeredInProcess) Flush()                      {}
+
+// textSaidIn is what a message's text parts say, one after another. What is
+// said to a name crosses the status row as text: a part that is not text is
+// refused (ContentTypeNotSupportedError).
+func textSaidIn(message *a2asdk.Message) (string, error) {
+	if message == nil {
+		return "", a2aRefusal(a2asdk.ErrInvalidParams, "a SendMessageRequest carries a message")
+	}
+	texts := make([]string, 0, len(message.Parts))
+	for i, part := range message.Parts {
+		text, isText := part.Content.(a2asdk.Text)
+		if !isText {
+			return "", a2aRefusal(a2asdk.ErrUnsupportedContentType, "part "+strconv.Itoa(i)+" carries no text, and what is said to a name is "+textPlain)
+		}
+		texts = append(texts, string(text))
+	}
+	return strings.Join(texts, "\n"), nil
+}

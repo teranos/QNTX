@@ -26,6 +26,9 @@ type a2aCall struct {
 	agent   taskAgent
 	tenant  string
 	request *http.Request
+	// accepts is the media types the client takes back (acceptedOutputModes),
+	// none when it named none.
+	accepts []string
 }
 
 func withA2ACall(ctx context.Context, call a2aCall) context.Context {
