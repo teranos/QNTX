@@ -9,17 +9,17 @@ import (
 	"github.com/teranos/QNTX/plugin/harness/claudeharness"
 )
 
-// "Harness is a plugin that speaks grpc A2A"
+// "「[Opus 5.5] Harness is a plugin that speaks grpc A2A」"
 //
-// Claude Code as a plugin's harness (ADR-059): a plugin named claude that
-// declares harness_provider runs every Claude Code turn of this node, as the pi
-// plugin runs Pi's. While none runs, the node runs the Claude Code it holds, as
-// before.
+// 「[Opus 5.5] Claude Code as a plugin's harness (ADR-059): a plugin named claude that」
+// 「[Opus 5.5] declares harness_provider runs every Claude Code turn of this node, as the pi」
+// 「[Opus 5.5] plugin runs Pi's. While none runs, the node runs the Claude Code it holds, as」
+// 「[Opus 5.5] before.」
 
-// runClaude runs said in Claude Code: in the claude plugin when one runs, and
-// in the Claude Code the node holds when none does. Each record the plugin
-// prints reaches each as Claude Code's own line; the one that says the turn's
-// process runs reaches said.Started, as it does when the node runs the turn.
+// 「[Opus 5.5] runClaude runs said in Claude Code: in the claude plugin when one runs, and」
+// 「[Opus 5.5] in the Claude Code the node holds when none does. Each record the plugin」
+// 「[Opus 5.5] prints reaches each as Claude Code's own line; the one that says the turn's」
+// 「[Opus 5.5] process runs reaches said.Started, as it does when the node runs the turn.」
 func (s *QNTXServer) runClaude(ctx context.Context, said claudecode.Said, each func(claudecode.Message)) (claudecode.Answer, error) {
 	backend, runs := s.harnessBackend(agentLineClaude)
 	if !runs {
