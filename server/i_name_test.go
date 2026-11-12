@@ -562,7 +562,7 @@ func TestANameLineWithNoSequenceToReadIsNoName(t *testing.T) {
 
 	named, refusal := s.iName(asAgent("did:key:z6Mkash"), sigil.Sent{"name": "Birch"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "birch", named.(*protocol.Named).GetName(), "the line that reads as no name holds no name")
+	assert.Equal(t, "Birch", named.(*protocol.Named).GetName(), "the line that reads as no name holds no name")
 	names, err := s.agentNames()
 	require.NoError(t, err)
 	require.Len(t, names, 1)
