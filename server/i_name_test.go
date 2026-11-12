@@ -663,3 +663,25 @@ func TestTheNameOfARevokedTokenIsTakenByTheAgentAsking(t *testing.T) {
 	require.NotNil(t, refusal, "a token enabled again took back the name it was let go of")
 	assert.Contains(t, refusal.GetSays(), "is taken")
 }
+
+// "and it needs to be more clear if a session named itself, or if the User gave it that name]"
+func TestANameLineSaysWhoGaveTheName(t *testing.T) {
+	s := rootKnowingServer(t)
+	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "Alder", "given": "user"})
+	require.Nil(t, refusal, refusal.GetSays())
+	_, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "Birch", "given": "itself"})
+	require.Nil(t, refusal, refusal.GetSays())
+	_, refusal = s.iName(asAgent("did:key:z6Mkpecan"), sigil.Sent{"name": "Cedar"})
+	require.Nil(t, refusal, refusal.GetSays())
+
+	gave := map[string]any{}
+	for _, line := range nameLinesHeld(t, s) {
+		gave[line.Attributes["name"].(string)] = line.Attributes[nameGivenAttribute]
+	}
+	assert.Equal(t, map[string]any{"Alder": "user", "Birch": "itself", "Cedar": nil}, gave)
+
+	_, refusal = s.iName(asAgent("did:key:z6Mkoak"), sigil.Sent{"name": "Oak", "given": "the node"})
+	require.NotNil(t, refusal, "a giver nobody is was kept")
+	assert.Equal(t, sigil.Invalid, refusal.GetWhy())
+	assert.Equal(t, "given", refusal.GetParam())
+}
