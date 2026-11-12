@@ -13,6 +13,11 @@ See [Installation Guide](docs/installation.md) for all installation methods incl
 
 See [config package](internal/config/README.md) for details on multi-source configuration and precedence.
 
+## ATS
+
+QNTX is heavily built on [ATS](ats/README.md) — the server, plugins, glyphs, ꩜ Pulse and the CLI all reach
+claims through it.
+
 ## Testing
 
 ```bash
