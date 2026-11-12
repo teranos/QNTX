@@ -35,7 +35,7 @@ func TestRoomCommentSurvivesFailureAndRedelivery(t *testing.T) {
 	require.NoError(t, db.QueryRow("SELECT payload,last_error FROM github_room_comments WHERE key=?", c.Key).Scan(&payload, &failure))
 	assert.NotEmpty(t, payload)
 	assert.Contains(t, failure, "provider offline")
-	// A new worker reads the pinned destination and pending body from SQLite.
+	// 「[Sonnet 5.5] A new worker reads the pinned destination and pending body from SQLite.」
 	o = Outbox{DB: db}
 	require.NoError(t, o.Flush(t.Context(), locate, post))
 	require.NoError(t, o.Keep(t.Context(), c))
