@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// checkout makes a git checkout of owner/repo in the agent's work.
+// 「[Opus 5.5] checkout makes a git checkout of owner/repo in the agent's work.」
 func checkout(t *testing.T, home, ownerRepo string) string {
 	t.Helper()
 	dir := filepath.Join(home, "work", filepath.FromSlash(ownerRepo))
@@ -20,10 +20,10 @@ func checkout(t *testing.T, home, ownerRepo string) string {
 	return dir
 }
 
-// A turn said in a repository the agent keeps in its work runs in that checkout, so the hooks
-// it fires stand where the repository's rituals are switched on (ground source/ritual/onoff.d).
-// It resumes the session it is in: Claude Code finds a session from a directory under the one
-// it was started in (measured with claude -p --resume from a subdirectory, 2026-11-05).
+// 「[Opus 5.5] A turn said in a repository the agent keeps in its work runs in that checkout, so the hooks」
+// 「[Opus 5.5] it fires stand where the repository's rituals are switched on (ground source/ritual/onoff.d).」
+// 「[Opus 5.5] It resumes the session it is in: Claude Code finds a session from a directory under the one」
+// 「[Opus 5.5] it was started in (measured with claude -p --resume from a subdirectory, 2026-11-05).」
 func TestATurnSaidInARepositoryOfItsWorkRunsInThatCheckout(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	home := t.TempDir()
@@ -43,7 +43,7 @@ func TestATurnSaidInARepositoryOfItsWorkRunsInThatCheckout(t *testing.T) {
 	}
 }
 
-// A turn named in nothing is said in its work, as every turn was.
+// 「[Opus 5.5] A turn named in nothing is said in its work, as every turn was.」
 func TestATurnSaidInNothingRunsInItsWork(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	home := t.TempDir()
@@ -57,8 +57,8 @@ func TestATurnSaidInNothingRunsInItsWork(t *testing.T) {
 	}
 }
 
-// Only a checkout of the agent's own work is a place a turn is said in: anything else is
-// refused before Claude Code runs.
+// 「[Opus 5.5] Only a checkout of the agent's own work is a place a turn is said in: anything else is」
+// 「[Opus 5.5] refused before Claude Code runs.」
 func TestATurnIsSaidInNoPlaceOutsideItsWorksCheckouts(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	home := t.TempDir()
@@ -78,8 +78,8 @@ func TestATurnIsSaidInNoPlaceOutsideItsWorksCheckouts(t *testing.T) {
 	}
 }
 
-// Qodo on #1536: a name in the work that is a link to a checkout elsewhere is no checkout of its
-// work, whichever part of owner/repo the link is.
+// 「[Opus 5.5] Qodo on #1536: a name in the work that is a link to a checkout elsewhere is no checkout of its」
+// 「[Opus 5.5] work, whichever part of owner/repo the link is.」
 func TestATurnIsNotSaidInACheckoutALinkTakesOutsideItsWork(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	home := t.TempDir()
