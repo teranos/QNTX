@@ -405,10 +405,13 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 		return nil
 	}
 
-	// Parse QNTX version
+	// A node built from a branch says the branch as its version: l-stack,
+	// q-stack. That is a development build as "dev" is, and no plugin is
+	// refused on it: nothing it could say would make the branch a version.
 	qntxVer, err := semver.NewVersion(r.version)
 	if err != nil {
-		return errors.Wrapf(err, "invalid QNTX version %s", r.version)
+		r.logger.Debugw("Skipping version validation: the node's version is no semantic version, a branch build", "version", r.version, "plugin", metadata.Name)
+		return nil
 	}
 
 	// Check compatibility
