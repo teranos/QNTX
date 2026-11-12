@@ -9,13 +9,13 @@ import (
 	"github.com/a2aproject/a2a-go/v2/a2asrv/taskstore"
 )
 
-// TurnsKept is how many Tasks whose turn ended a harness plugin still answers
-// for.
+// 「[Fable 5.2, Fable 5.1] TurnsKept is how many Tasks whose turn ended a harness plugin still answers」
+// 「[Fable 5.2, Fable 5.1] for.」
 const TurnsKept = 16
 
-// turns is the Tasks a harness plugin holds: every one whose turn runs,
-// and the newest kept of those that ended. a2a-go's own in-memory store keeps
-// every Task for as long as the process lives.
+// 「[Fable 5.2, Fable 5.1] turns is the Tasks a harness plugin holds: every one whose turn runs,」
+// 「[Fable 5.2, Fable 5.1] and the newest kept of those that ended. a2a-go's own in-memory store keeps」
+// 「[Fable 5.2, Fable 5.1] every Task for as long as the process lives.」
 type turns struct {
 	mu    sync.Mutex
 	kept  int
@@ -31,31 +31,31 @@ type turn struct {
 
 var _ taskstore.Store = (*turns)(nil)
 
-// Turns is the Task store of a harness plugin. Core writes every turn down
-// (ADR-059) and asks for none again, so the plugin keeps a Task only while its
-// turn runs, and kept after.
+// 「[Fable 5.2, Fable 5.1] Turns is the Task store of a harness plugin. Core writes every turn down」
+// 「[Fable 5.2, Fable 5.1] (ADR-059) and asks for none again, so the plugin keeps a Task only while its」
+// 「[Fable 5.2, Fable 5.1] turn runs, and kept after.」
 func Turns(kept int) taskstore.Store { return newTurns(kept) }
 
 func newTurns(kept int) *turns {
 	return &turns{kept: kept, held: map[a2asdk.TaskID]*turn{}}
 }
 
-// Running is each turn a harness plugin runs, by its Task, and how it is
-// stopped. a2a-go runs a turn apart from the call that asked for it, so a
-// caller that left does not end the turn's context: Cancel does, which core
-// asks for when it gives a turn up.
+// 「[Fable 5.2, Fable 5.1] Running is each turn a harness plugin runs, by its Task, and how it is」
+// 「[Fable 5.2, Fable 5.1] stopped. a2a-go runs a turn apart from the call that asked for it, so a」
+// 「[Fable 5.2, Fable 5.1] caller that left does not end the turn's context: Cancel does, which core」
+// 「[Fable 5.2, Fable 5.1] asks for when it gives a turn up.」
 type Running struct {
 	stops sync.Map
 }
 
-// Began has the Task's turn stopped by stop, until the ended it answers with
-// is called.
+// 「[Fable 5.2, Fable 5.1] Began has the Task's turn stopped by stop, until the ended it answers with」
+// 「[Fable 5.2, Fable 5.1] is called.」
 func (r *Running) Began(id a2asdk.TaskID, stop context.CancelFunc) (ended func()) {
 	r.stops.Store(id, stop)
 	return func() { r.stops.Delete(id) }
 }
 
-// Stop stops the Task's turn, when one runs that may be stopped.
+// 「[Fable 5.2, Fable 5.1] Stop stops the Task's turn, when one runs that may be stopped.」
 func (r *Running) Stop(id a2asdk.TaskID) {
 	if stop, runs := r.stops.Load(id); runs {
 		stop.(context.CancelFunc)()
@@ -96,8 +96,8 @@ func (s *turns) Update(_ context.Context, update *taskstore.UpdateRequest) (task
 	return held.version, nil
 }
 
-// settle counts a Task whose turn ended among those kept, and lets go of the
-// oldest past kept.
+// 「[Fable 5.2, Fable 5.1] settle counts a Task whose turn ended among those kept, and lets go of the」
+// 「[Fable 5.2, Fable 5.1] oldest past kept.」
 func (s *turns) settle(task *a2asdk.Task) {
 	held := s.held[task.ID]
 	if held.ended || !task.Status.State.Terminal() {
@@ -130,15 +130,15 @@ func (s *turns) Get(_ context.Context, id a2asdk.TaskID) (*taskstore.StoredTask,
 	return &taskstore.StoredTask{Task: &task, Version: version}, nil
 }
 
-// List answers with no Task: core asks a harness plugin for none, and what a
-// turn said is the node's to answer for, where it is written down.
+// 「[Fable 5.2, Fable 5.1] List answers with no Task: core asks a harness plugin for none, and what a」
+// 「[Fable 5.2, Fable 5.1] turn said is the node's to answer for, where it is written down.」
 func (s *turns) List(context.Context, *a2asdk.ListTasksRequest) (*a2asdk.ListTasksResponse, error) {
 	return &a2asdk.ListTasksResponse{Tasks: []*a2asdk.Task{}}, nil
 }
 
-// Caller is the caller of one turn's stream, as the plugin's server knows
-// them: told when they left, they stop the run they asked for. A turn core
-// gives up before it was told which Task it is has no Task to cancel.
+// 「[Fable 5.2, Fable 5.1] Caller is the caller of one turn's stream, as the plugin's server knows」
+// 「[Fable 5.2, Fable 5.1] them: told when they left, they stop the run they asked for. A turn core」
+// 「[Fable 5.2, Fable 5.1] gives up before it was told which Task it is has no Task to cancel.」
 type Caller struct {
 	mu   sync.Mutex
 	left bool
@@ -147,15 +147,15 @@ type Caller struct {
 
 type callerKey struct{}
 
-// WithCaller is ctx carrying a Caller, for the server of a turn's stream.
+// 「[Fable 5.2, Fable 5.1] WithCaller is ctx carrying a Caller, for the server of a turn's stream.」
 func WithCaller(ctx context.Context) (context.Context, *Caller) {
 	caller := &Caller{}
 	return context.WithValue(ctx, callerKey{}, caller), caller
 }
 
-// StoppedWhenTheCallerLeaves has stop called when the caller of ctx's stream
-// leaves: at once, when they already have. A ctx no server gave a Caller is
-// stopped by Cancel alone.
+// 「[Fable 5.2, Fable 5.1] StoppedWhenTheCallerLeaves has stop called when the caller of ctx's stream」
+// 「[Fable 5.2, Fable 5.1] leaves: at once, when they already have. A ctx no server gave a Caller is」
+// 「[Fable 5.2, Fable 5.1] stopped by Cancel alone.」
 func StoppedWhenTheCallerLeaves(ctx context.Context, stop context.CancelFunc) {
 	caller, served := ctx.Value(callerKey{}).(*Caller)
 	if !served {
@@ -170,7 +170,7 @@ func StoppedWhenTheCallerLeaves(ctx context.Context, stop context.CancelFunc) {
 	}
 }
 
-// Left says the caller left before the turn ended.
+// 「[Fable 5.2, Fable 5.1] Left says the caller left before the turn ended.」
 func (c *Caller) Left() {
 	c.mu.Lock()
 	c.left = true
