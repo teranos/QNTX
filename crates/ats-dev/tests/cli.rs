@@ -116,7 +116,7 @@ fn a_signed_attestation_without_actors_is_refused_not_authored_over_its_signatur
     assert!(err(&o).contains("signed attestation must name its actors"), "{}", err(&o));
     assert_eq!(out(&o), "");
     assert_eq!(count(&p), "0");
-    // named actors under a real signature stand, untouched
+    // 「[Sonnet 5.5] named actors under a real signature stand, untouched」
     let (_d2, q) = db();
     let line = out(&run(&q, &["put", "ALICE is author of GITHUB by BOB"], "")).lines().next().unwrap().to_string();
     let o = run(&p, &["put", "-"], &line);
@@ -245,10 +245,10 @@ fn a_signature_given_that_does_not_hold_is_refused_and_one_that_holds_is_kept() 
     assert!(o.status.success(), "{}", err(&o));
     let line = out(&o).lines().next().unwrap().to_string();
     let (_d2, p2) = db();
-    // carried to another db, the signature holds and the signer stays the other key's
+    // 「[Sonnet 5.5] carried to another db, the signature holds and the signer stays the other key's」
     assert!(run(&p2, &["put", "-"], &line).status.success());
     assert_eq!(verdicts(&p2)[0]["signature"], "valid");
-    // one field changed under the signature
+    // 「[Sonnet 5.5] one field changed under the signature」
     let tampered = line.replace("ALICE", "MALLORY");
     let (_d3, p3) = db();
     let o = run(&p3, &["put", "-"], &tampered);
@@ -291,7 +291,7 @@ fn an_update_cannot_leave_a_signed_row_without_actors_or_name_a_signature() {
     assert_eq!(out(&run(&p, &["actors"], "")).trim(), "BOB");
     assert_eq!(verdicts(&p)[0]["signature"], "valid");
 
-    // a signature is made, not edited: not on a signed row, not on an unsigned one
+    // 「[Sonnet 5.5] a signature is made, not edited: not on a signed row, not on an unsigned one」
     for patch in [
         format!("{{\"id\":\"{id}\",\"signer_did\":\"did:key:zFAKE\"}}"),
         format!("{{\"id\":\"{id}\",\"signature\":[1,2,3]}}"),
@@ -447,13 +447,13 @@ fn a_key_file_open_to_group_or_other_is_refused_by_every_command_that_reads_it()
         assert!(!o.status.success() && err(&o).contains("open to other users"), "{mode:o}: {}", err(&o));
     }
     assert_eq!(count(&p), "1");
-    // reading and `--unsigned` need no key
+    // 「[Sonnet 5.5] reading and `--unsigned` need no key」
     assert!(run(&p, &["ax", "ALICE"], "").status.success());
     assert!(run(&p, &["--unsigned", "put", "DAVE is author of GITHUB by BOB"], "").status.success());
-    // and the fix is the one the error names
+    // 「[Sonnet 5.5] and the fix is the one the error names」
     std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600)).unwrap();
     assert!(run(&p, &["put", "CAROL is author of GITHUB by BOB"], "").status.success());
-    // a key that is not a regular file is not a key
+    // 「[Sonnet 5.5] a key that is not a regular file is not a key」
     let d = tempfile::tempdir().unwrap();
     let o = run(&p, &["--key", d.path().to_str().unwrap(), "key"], "");
     assert!(!o.status.success() && err(&o).contains("not a regular file"), "{}", err(&o));
@@ -475,7 +475,7 @@ fn bench_load_prints_a_line_per_step_and_the_queries_and_keeps_its_workload_fixe
     assert!(steps[2].starts_with("300,"), "{}", steps[2]);
     assert!(lines.iter().any(|l| l.starts_with("# final db_bytes=")), "{lines:?}");
     assert_eq!(count(&p), "300");
-    // the query rows are a function of the workload, so a second load of the same size agrees
+    // 「[Sonnet 5.5] the query rows are a function of the workload, so a second load of the same size agrees」
     let rows = |lines: &[String]| -> Vec<String> {
         let q = lines.iter().position(|l| l.starts_with("# queries")).unwrap();
         lines[q + 1..].iter().map(|l| l.split(',').take(2).collect::<Vec<_>>().join(",")).collect()
@@ -553,8 +553,8 @@ fn the_bytes_written_are_printed_to_two_decimals_not_rounded_to_whole_megabytes(
     assert!(frac.len() == 2 && whole.parse::<u64>().is_ok(), "{row}");
 }
 
-/// `run` for a backend: the global flags go before `--db`, and `db` is whatever
-/// that backend calls its location (a path, a url, a connection string).
+/// 「[Sonnet 5.5] `run` for a backend: the global flags go before `--db`, and `db` is whatever」
+/// 「[Sonnet 5.5] that backend calls its location (a path, a url, a connection string).」
 fn run_on(backend: &[&str], db: &str, args: &[&str], stdin: &str) -> Output {
     let mut c = Command::new(env!("CARGO_BIN_EXE_ats-dev"))
         .args(backend)
@@ -606,11 +606,11 @@ fn a_url_has_no_file_for_the_key_to_sit_beside_and_a_duckdb_path_does() {
         let o = run_on(&["--backend", backend], db, &["key"], "");
         assert!(!o.status.success() && err(&o).contains("no key file to default to"), "{backend} {db}: {}", err(&o));
     }
-    // named, it is made
+    // 「[Sonnet 5.5] named, it is made」
     let key = d.path().join("k");
     let o = run_on(&["--backend", "postgres", "--key", key.to_str().unwrap()], "host=/nowhere", &["key"], "");
     assert!(o.status.success() && out(&o).contains("did:key:"), "{}", err(&o));
-    // a plain path is a place on this machine, so the default is beside it
+    // 「[Sonnet 5.5] a plain path is a place on this machine, so the default is beside it」
     let loc = d.path().join("parquet");
     let o = run_on(&["--backend", "duckdb"], loc.to_str().unwrap(), &["key"], "");
     assert!(o.status.success() && out(&o).contains("parquet.key"), "{}", err(&o));
@@ -643,9 +643,9 @@ fn postgres_without_a_url_says_where_one_comes_from() {
     assert!(!o.status.success() && err(&o).contains("QNTX_POSTGRES_URL"), "{}", err(&o));
 }
 
-/// What every backend must do for the commands `AttestationStore` has, run
-/// against one location. A change is either made or refused, never reported
-/// as made and not there: the property that holds whichever backend answers.
+/// 「[Sonnet 5.5] What every backend must do for the commands `AttestationStore` has, run」
+/// 「[Sonnet 5.5] against one location. A change is either made or refused, never reported」
+/// 「[Sonnet 5.5] as made and not there: the property that holds whichever backend answers.」
 #[cfg(any(feature = "duckdb", feature = "postgres"))]
 fn holds_what_attestation_store_promises(backend: &[&str], db: &str, key: &str) {
     let r = |args: &[&str]| {
@@ -656,9 +656,9 @@ fn holds_what_attestation_store_promises(backend: &[&str], db: &str, key: &str) 
     let put = r(&["put", "ALICE is author of GITHUB by BOB"]);
     assert!(put.status.success(), "{}", err(&put));
     let id = out(&put).split("\"id\":\"").nth(1).unwrap().split('"').next().unwrap().to_string();
-    // a new process each time: what one wrote is what the next reads
+    // 「[Sonnet 5.5] a new process each time: what one wrote is what the next reads」
     assert_eq!(out(&r(&["count"])).trim(), "1");
-    // ids and verify list what count counts, or say they cannot; never fewer with an exit 0
+    // 「[Sonnet 5.5] ids and verify list what count counts, or say they cannot; never fewer with an exit 0」
     for args in [vec!["ids"], vec!["verify"]] {
         let o = r(&args);
         assert!(!o.status.success() || out(&o).lines().count() == 1, "{args:?} exit {} listed {:?} of 1: {}", o.status, out(&o), err(&o));
@@ -668,25 +668,25 @@ fn holds_what_attestation_store_promises(backend: &[&str], db: &str, key: &str) 
     let v = r(&["verify", &id]);
     assert!(v.status.success() && out(&v).contains("\"valid\""), "{}{}", out(&v), err(&v));
 
-    // update: changed, or refused; never Ok with the old row left
+    // 「[Sonnet 5.5] update: changed, or refused; never Ok with the old row left」
     let patch = format!("{{\"id\":\"{id}\",\"source\":\"changed\"}}");
     let u = r(&["update", &patch]);
     let now_changed = out(&r(&["get", &id])).contains("\"source\":\"changed\"");
     assert_eq!(u.status.success(), now_changed, "update exit {} but stored changed={now_changed}: {}", u.status, err(&u));
 
-    // delete: removed, or refused; never Ok with the row still there
+    // 「[Sonnet 5.5] delete: removed, or refused; never Ok with the row still there」
     let d = r(&["delete", &id]);
     let still = out(&r(&["exists", &id])).trim() == "true";
     assert_eq!(d.status.success(), !still, "delete exit {} but exists={still}: {}", d.status, err(&d));
 
-    // clear: cleared, or refused; never Ok with rows left
+    // 「[Sonnet 5.5] clear: cleared, or refused; never Ok with rows left」
     let again = r(&["put", "BOB is author of GITHUB by ALICE"]);
     assert!(again.status.success(), "{}", err(&again));
     let c = r(&["clear", "--yes"]);
     let left = out(&r(&["count"])).trim().to_string();
     assert_eq!(c.status.success(), left == "0", "clear exit {} but {left} left: {}", c.status, err(&c));
 
-    // and what only SqliteStore implements is refused by name, not answered from nothing
+    // 「[Sonnet 5.5] and what only SqliteStore implements is refused by name, not answered from nothing」
     for (args, needs) in [
         (vec!["ax", "ALICE"], "QueryStore and AliasStore"),
         (vec!["subjects"], "QueryStore"),
@@ -728,7 +728,7 @@ fn duckdb_put_stdin_stops_at_a_bad_line_and_keeps_and_says_what_came_before() {
     let o = run_on(&b, loc.to_str().unwrap(), &["put", "-"], "{\"subjects\":[\"A\"]}\nnot json\n{\"subjects\":[\"C\"]}\n");
     assert!(!o.status.success() && err(&o).contains("line 2"), "{}", err(&o));
     assert!(err(&o).contains("no batch to roll back"), "{}", err(&o));
-    // the id said is a row stored, and the line after the bad one was never read
+    // 「[Sonnet 5.5] the id said is a row stored, and the line after the bad one was never read」
     assert_eq!(out(&o).lines().count(), 1);
     assert_eq!(out(&run_on(&b, loc.to_str().unwrap(), &["count"], "")).trim(), "1");
 }
@@ -782,7 +782,7 @@ fn a_refused_bench_load_replace_deletes_nothing() {
     drop(d);
 }
 
-/// `run_on` with raw bytes on stdin and a working directory.
+/// 「[Sonnet 5.5] `run_on` with raw bytes on stdin and a working directory.」
 fn run_raw(backend: &[&str], cwd: &std::path::Path, db: &str, args: &[&str], stdin: &[u8]) -> Output {
     let mut c = Command::new(env!("CARGO_BIN_EXE_ats-dev"))
         .args(backend)
@@ -828,12 +828,12 @@ fn duckdb_says_the_id_of_a_row_kept_before_a_stdin_that_cannot_be_read() {
 #[test]
 fn a_duckdb_namespace_or_resolved_path_with_an_apostrophe_is_refused_before_anything_is_made() {
     let d = tempfile::tempdir().unwrap();
-    // the namespace
+    // 「[Sonnet 5.5] the namespace」
     let loc = d.path().join("loc");
     let o = run_on(&["--backend", "duckdb", "--unsigned", "--namespace", "O'Brien"], loc.to_str().unwrap(), &["put", "ALICE is author of GITHUB"], "");
     assert!(!o.status.success() && err(&o).contains("DuckDB namespace cannot contain an apostrophe"), "{}", err(&o));
     assert!(!loc.exists(), "no directory was made");
-    // a relative --db under a working directory that has one
+    // 「[Sonnet 5.5] a relative --db under a working directory that has one」
     let cwd = d.path().join("O'Brien");
     std::fs::create_dir(&cwd).unwrap();
     let o = run_raw(&["--backend", "duckdb", "--unsigned"], &cwd, "rel", &["put", "ALICE is author of GITHUB"], b"");
