@@ -436,11 +436,11 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 		if err := written(); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: err.Error()}
 		}
-		// Its schedules go with it, loaded or not: a plugin that is off has
-		// nothing to run them, and they would fail at every tick.
+		// 「[Sonnet 5.5, Fable 5.2] Its schedules go with it, loaded or not: a plugin that is off has」
+		// 「[Sonnet 5.5, Fable 5.2] nothing to run them, and they would fail at every tick.」
 		kept := map[string]func(string) error{"disable": pm.PauseSchedules, "archive": pm.DeleteSchedules}[action]
-		// Its record says off, so the plugin stops whatever its schedules did:
-		// what they did not do is said once it has.
+		// 「[Sonnet 5.5, Fable 5.2] Its record says off, so the plugin stops whatever its schedules did:」
+		// 「[Sonnet 5.5, Fable 5.2] what they did not do is said once it has.」
 		unkept := kept(name)
 		if unkept != nil {
 			s.logger.Warnw("A plugin was switched off and its schedules were not", "plugin", name, "action", action, "error", unkept)
