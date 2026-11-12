@@ -25,7 +25,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
 	github.com/tetratelabs/wazero v1.11.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/time v0.15.0
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
@@ -40,7 +40,12 @@ require (
 	github.com/teranos/sacred-error v0.0.0-20261010164404-b510f6387028
 )
 
-require github.com/a2aproject/a2a-go/v2 v2.7.0
+require (
+	github.com/a2aproject/a2a-go/v2 v2.7.0
+	go.opentelemetry.io/contrib/bridges/otelzap v0.21.0
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.23.0
+	go.opentelemetry.io/otel/sdk/log v1.47.0
+)
 
 require (
 	github.com/a2aproject/a2a-go v0.3.15 // indirect
@@ -202,7 +207,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/net v0.59.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0

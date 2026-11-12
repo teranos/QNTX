@@ -10,6 +10,10 @@ Without centralized control, this never ends. You add another cron job, another 
 
 **Pulse is the answer**: A single place to reason about continuous compute, system resources, and priorities. It ensures you stay within API limits and schedule work intelligently.
 
+## Semantic operations
+
+ATS actions (⟶) run asynchronously as Pulse jobs. The actions and their configuration are described in [ats/so](../ats/so/README.md).
+
 ## Documentation
 
 - **Architecture**: `docs/architecture/pulse-async-ix.md`
