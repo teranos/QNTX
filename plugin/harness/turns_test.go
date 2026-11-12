@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The plugin keeps a Task while its turn runs, and the newest few after: core
-// writes every turn down and asks for none again.
+// 「[Fable 5.2, Fable 5.1] The plugin keeps a Task while its turn runs, and the newest few after: core」
+// 「[Fable 5.2, Fable 5.1] writes every turn down and asks for none again.」
 func TestThePluginLetsGoOfTurnsThatEnded(t *testing.T) {
 	ctx := context.Background()
 	held := newTurns(2)

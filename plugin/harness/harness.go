@@ -1,16 +1,16 @@
-// Package harness is what core and a harness plugin say to each other over
-// A2A (ADR-059): "Harness is a plugin that speaks grpc A2A".
+// 「[Fable 5.2, Fable 5.1] Package harness is what core and a harness plugin say to each other over」
+// 「[Fable 5.2, Fable 5.1] A2A (ADR-059): "Harness is a plugin that speaks grpc A2A".」
 //
-// A turn is one A2A Message, the user's: what is said as its text, and how
-// the harness runs it as one record, the harness's own shape. What the
-// harness prints as it goes is a working status with that record in its
-// message (A2A §3.7, "Status Messages"), and how the turn ended is the
-// Task completed: what it answered as its artifact's text, and what the
-// harness says of the run as that artifact's record.
+// 「[Fable 5.2, Fable 5.1] A turn is one A2A Message, the user's: what is said as its text, and how」
+// 「[Fable 5.2, Fable 5.1] the harness runs it as one record, the harness's own shape. What the」
+// 「[Fable 5.2, Fable 5.1] harness prints as it goes is a working status with that record in its」
+// 「[Fable 5.2, Fable 5.1] message (A2A §3.7, "Status Messages"), and how the turn ended is the」
+// 「[Fable 5.2, Fable 5.1] Task completed: what it answered as its artifact's text, and what the」
+// 「[Fable 5.2, Fable 5.1] harness says of the run as that artifact's record.」
 //
-// A record crosses as its JSON, byte for byte, in a raw part: a data part is
-// a protobuf Struct on gRPC, whose every number is a float64, and a number a
-// tool was called with is the number the harness printed.
+// 「[Fable 5.2, Fable 5.1] A record crosses as its JSON, byte for byte, in a raw part: a data part is」
+// 「[Fable 5.2, Fable 5.1] a protobuf Struct on gRPC, whose every number is a float64, and a number a」
+// 「[Fable 5.2, Fable 5.1] tool was called with is the number the harness printed.」
 package harness
 
 import (
@@ -20,11 +20,11 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// AnswerArtifactID is the artifact a turn's answer is.
+// 「[Fable 5.2, Fable 5.1] AnswerArtifactID is the artifact a turn's answer is.」
 const AnswerArtifactID = "answer"
 
-// Said is a turn as the Message core sends: says, and run, how the harness
-// runs it.
+// 「[Fable 5.2, Fable 5.1] Said is a turn as the Message core sends: says, and run, how the harness」
+// 「[Fable 5.2, Fable 5.1] runs it.」
 func Said(says string, run any) (*a2asdk.Message, error) {
 	record, err := asRecord(run)
 	if err != nil {
@@ -33,7 +33,7 @@ func Said(says string, run any) (*a2asdk.Message, error) {
 	return a2asdk.NewMessage(a2asdk.MessageRoleUser, a2asdk.NewTextPart(says), record), nil
 }
 
-// SaidIn is what message says, and how it is run read into run.
+// 「[Fable 5.2, Fable 5.1] SaidIn is what message says, and how it is run read into run.」
 func SaidIn(message *a2asdk.Message, run any) (string, error) {
 	if message == nil {
 		return "", errors.New("a turn is a message, and none was sent")
@@ -56,7 +56,7 @@ func SaidIn(message *a2asdk.Message, run any) (string, error) {
 	return says, nil
 }
 
-// Printed is one record the harness printed while the turn runs.
+// 「[Fable 5.2, Fable 5.1] Printed is one record the harness printed while the turn runs.」
 func Printed(info a2asdk.TaskInfoProvider, record any) (*a2asdk.TaskStatusUpdateEvent, error) {
 	carried, err := asRecord(record)
 	if err != nil {
@@ -66,8 +66,8 @@ func Printed(info a2asdk.TaskInfoProvider, record any) (*a2asdk.TaskStatusUpdate
 	return a2asdk.NewStatusUpdateEvent(info, a2asdk.TaskStateWorking, message), nil
 }
 
-// PrintedIn reads the record event carries into record, and reports whether it
-// carries one.
+// 「[Fable 5.2, Fable 5.1] PrintedIn reads the record event carries into record, and reports whether it」
+// 「[Fable 5.2, Fable 5.1] carries one.」
 func PrintedIn(event a2asdk.Event, record any) (bool, error) {
 	update, isUpdate := event.(*a2asdk.TaskStatusUpdateEvent)
 	if !isUpdate || update.Status.State != a2asdk.TaskStateWorking || update.Status.Message == nil {
@@ -81,8 +81,8 @@ func PrintedIn(event a2asdk.Event, record any) (bool, error) {
 	return false, nil
 }
 
-// Answered is the Task completed: text, what the turn answered, and answer,
-// what the harness says of the run.
+// 「[Fable 5.2, Fable 5.1] Answered is the Task completed: text, what the turn answered, and answer,」
+// 「[Fable 5.2, Fable 5.1] what the harness says of the run.」
 func Answered(submitted *a2asdk.Task, text string, answer any) (*a2asdk.Task, error) {
 	record, err := asRecord(answer)
 	if err != nil {
@@ -97,9 +97,9 @@ func Answered(submitted *a2asdk.Task, text string, answer any) (*a2asdk.Task, er
 	return &completed, nil
 }
 
-// AnswerIn is what the Task completed answered, and what the harness says of
-// the run read into answer. A Task that failed is an error in the harness's
-// words.
+// 「[Fable 5.2, Fable 5.1] AnswerIn is what the Task completed answered, and what the harness says of」
+// 「[Fable 5.2, Fable 5.1] the run read into answer. A Task that failed is an error in the harness's」
+// 「[Fable 5.2, Fable 5.1] words.」
 func AnswerIn(task *a2asdk.Task, answer any) (string, error) {
 	if task == nil {
 		return "", errors.New("the harness ended the turn with no Task")
@@ -139,10 +139,10 @@ func AnswerIn(task *a2asdk.Task, answer any) (string, error) {
 	return "", errors.New("the harness completed the turn with no answer")
 }
 
-// recordType is the media type a record crosses as.
+// 「[Fable 5.2, Fable 5.1] recordType is the media type a record crosses as.」
 const recordType = "application/json"
 
-// asRecord is v as the part a record crosses in: its JSON, as marshalled.
+// 「[Fable 5.2, Fable 5.1] asRecord is v as the part a record crosses in: its JSON, as marshalled.」
 func asRecord(v any) (*a2asdk.Part, error) {
 	raw, err := json.Marshal(v)
 	if err != nil {
@@ -153,8 +153,8 @@ func asRecord(v any) (*a2asdk.Part, error) {
 	return part, nil
 }
 
-// recordIn reads the record part carries into v, and reports whether it
-// carries one.
+// 「[Fable 5.2, Fable 5.1] recordIn reads the record part carries into v, and reports whether it」
+// 「[Fable 5.2, Fable 5.1] carries one.」
 func recordIn(part *a2asdk.Part, v any) (bool, error) {
 	raw, isRaw := part.Content.(a2asdk.Raw)
 	if !isRaw || part.MediaType != recordType {

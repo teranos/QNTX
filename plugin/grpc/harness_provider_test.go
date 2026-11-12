@@ -26,10 +26,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// "Harness is a plugin that speaks grpc A2A" (ADR-059).
+// 「[Fable 5.2, Fable 5.1] "Harness is a plugin that speaks grpc A2A" (ADR-059).」
 
-// harnessPlugin is a Go plugin that runs a harness: each turn is answered
-// with what was said.
+// 「[Fable 5.2, Fable 5.1] harnessPlugin is a Go plugin that runs a harness: each turn is answered」
+// 「[Fable 5.2, Fable 5.1] with what was said.」
 type harnessPlugin struct {
 	*mockPlugin
 }
@@ -46,8 +46,8 @@ func (p *harnessPlugin) Harness() a2asrv.RequestHandler {
 	}))
 }
 
-// A plugin that runs a harness says so at Initialize, and one that runs none
-// does not.
+// 「[Fable 5.2, Fable 5.1] A plugin that runs a harness says so at Initialize, and one that runs none」
+// 「[Fable 5.2, Fable 5.1] does not.」
 func TestPluginServer_APluginRunningAHarnessIsAHarnessProvider(t *testing.T) {
 	runs := NewPluginServer(&harnessPlugin{mockPlugin: newMockPlugin()}, zaptest.NewLogger(t).Sugar())
 	resp, err := runs.Initialize(context.Background(), &protocol.InitializeRequest{})
@@ -60,7 +60,7 @@ func TestPluginServer_APluginRunningAHarnessIsAHarnessProvider(t *testing.T) {
 	assert.False(t, resp.GetHarnessProvider())
 }
 
-// served is server serving on loopback, and a connection to it.
+// 「[Fable 5.2, Fable 5.1] served is server serving on loopback, and a connection to it.」
 func served(t *testing.T, server *PluginServer) (context.Context, *grpc.ClientConn) {
 	t.Helper()
 	free, err := net.Listen("tcp", "127.0.0.1:0")
@@ -75,7 +75,7 @@ func served(t *testing.T, server *PluginServer) (context.Context, *grpc.ClientCo
 	conn, err := grpc.NewClient(fmt.Sprintf("127.0.0.1:%d", port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
-	// "A2A-Version": the version spoken, which a2a-go's own client says itself.
+	// 「[Fable 5.2, Fable 5.1] "A2A-Version": the version spoken, which a2a-go's own client says itself.」
 	return metadata.AppendToOutgoingContext(ctx, "a2a-version", string(a2asdk.Version)), conn
 }
 
@@ -83,9 +83,9 @@ var aTurn = &a2apb.SendMessageRequest{
 	Message: &a2apb.Message{MessageId: "m1", Role: a2apb.Role_ROLE_USER, Parts: []*a2apb.Part{{Content: &a2apb.Part_Text{Text: "how is the harvest?"}}}},
 }
 
-// Its harness answers as A2A's own A2AService on the plugin's port, the one
-// connection core holds to it, and answers the node that started it alone: a
-// call presents the secret that node handed the plugin's process.
+// 「[Fable 5.2, Fable 5.1] Its harness answers as A2A's own A2AService on the plugin's port, the one」
+// 「[Fable 5.2, Fable 5.1] connection core holds to it, and answers the node that started it alone: a」
+// 「[Fable 5.2, Fable 5.1] call presents the secret that node handed the plugin's process.」
 func TestPluginServer_ServesThePluginsHarnessAsA2AService(t *testing.T) {
 	t.Setenv(HarnessSecretEnv, "the-launch-secret")
 	server := NewPluginServer(&harnessPlugin{mockPlugin: newMockPlugin()}, zaptest.NewLogger(t).Sugar())
@@ -93,7 +93,7 @@ func TestPluginServer_ServesThePluginsHarnessAsA2AService(t *testing.T) {
 	assert.False(t, handedOn, "what the plugin starts would be handed the secret of its launch")
 	asking, conn := served(t, server)
 
-	// Whoever else reaches the port is refused: no secret, and another.
+	// 「[Fable 5.2, Fable 5.1] Whoever else reaches the port is refused: no secret, and another.」
 	require.Eventually(t, func() bool {
 		_, err := a2apb.NewA2AServiceClient(conn).SendMessage(asking, aTurn)
 		return status.Code(err) == codes.Unauthenticated
@@ -106,15 +106,15 @@ func TestPluginServer_ServesThePluginsHarnessAsA2AService(t *testing.T) {
 	}
 	assert.Equal(t, codes.Unauthenticated, status.Code(err), "a streamed call presenting no secret ran a turn")
 
-	// Initialize is answered to whoever reaches the port, so what it carries
-	// is nothing the harness knows the node by.
+	// 「[Fable 5.2, Fable 5.1] Initialize is answered to whoever reaches the port, so what it carries」
+	// 「[Fable 5.2, Fable 5.1] is nothing the harness knows the node by.」
 	_, err = server.Initialize(asking, &protocol.InitializeRequest{AuthToken: "claimed-by-the-first-to-ask"})
 	require.NoError(t, err)
 	_, err = a2apb.NewA2AServiceClient(PresentingHarnessSecret(conn, "claimed-by-the-first-to-ask")).SendMessage(asking, aTurn)
 	assert.Equal(t, codes.Unauthenticated, status.Code(err), "whoever initialized the plugin first chose what its harness answers to")
 
-	// The node's own token changes as its config is saved; the launch's
-	// secret does not.
+	// 「[Fable 5.2, Fable 5.1] The node's own token changes as its config is saved; the launch's」
+	// 「[Fable 5.2, Fable 5.1] secret does not.」
 	_, err = server.Initialize(asking, &protocol.InitializeRequest{AuthToken: "minted-again"})
 	require.NoError(t, err)
 	answered, err := a2apb.NewA2AServiceClient(PresentingHarnessSecret(conn, "the-launch-secret")).SendMessage(asking, aTurn)
@@ -125,8 +125,8 @@ func TestPluginServer_ServesThePluginsHarnessAsA2AService(t *testing.T) {
 	assert.Equal(t, "how is the harvest?", task.GetArtifacts()[0].GetParts()[0].GetText())
 }
 
-// A plugin no node started was handed no secret, and its harness answers
-// nobody.
+// 「[Fable 5.2, Fable 5.1] A plugin no node started was handed no secret, and its harness answers」
+// 「[Fable 5.2, Fable 5.1] nobody.」
 func TestPluginServer_APluginNoNodeStartedAnswersNoTurn(t *testing.T) {
 	asking, conn := served(t, NewPluginServer(&harnessPlugin{mockPlugin: newMockPlugin()}, zaptest.NewLogger(t).Sugar()))
 	require.Eventually(t, func() bool {
@@ -135,8 +135,8 @@ func TestPluginServer_APluginNoNodeStartedAnswersNoTurn(t *testing.T) {
 	}, 10*time.Second, 50*time.Millisecond, "a plugin handed no secret ran a turn")
 }
 
-// waitingPlugin runs a harness whose turn says nothing and runs until it is
-// stopped.
+// 「[Fable 5.2, Fable 5.1] waitingPlugin runs a harness whose turn says nothing and runs until it is」
+// 「[Fable 5.2, Fable 5.1] stopped.」
 type waitingPlugin struct {
 	*mockPlugin
 	started chan struct{}
@@ -160,8 +160,8 @@ func (p *waitingPlugin) Harness() a2asrv.RequestHandler {
 	}))
 }
 
-// A caller that leaves before it was told which Task its turn is has no Task
-// to cancel: the plugin's server stops the run its stream asked for.
+// 「[Fable 5.2, Fable 5.1] A caller that leaves before it was told which Task its turn is has no Task」
+// 「[Fable 5.2, Fable 5.1] to cancel: the plugin's server stops the run its stream asked for.」
 func TestPluginServer_ACallerLeavingBeforeAnyEventStopsItsTurn(t *testing.T) {
 	t.Setenv(HarnessSecretEnv, "the-launch-secret")
 	runs := &waitingPlugin{mockPlugin: newMockPlugin(), started: make(chan struct{}), stopped: make(chan struct{})}
@@ -176,7 +176,7 @@ func TestPluginServer_ACallerLeavingBeforeAnyEventStopsItsTurn(t *testing.T) {
 			return true
 		default:
 		}
-		// A stream the server was not yet up for ends at once, and is asked again.
+		// 「[Fable 5.2, Fable 5.1] A stream the server was not yet up for ends at once, and is asked again.」
 		streamed, err := client.SendStreamingMessage(calling, aTurn)
 		if err == nil {
 			go func() { _, _ = streamed.Recv() }()
@@ -198,8 +198,8 @@ func TestPluginServer_ACallerLeavingBeforeAnyEventStopsItsTurn(t *testing.T) {
 	}
 }
 
-// The secret of a launch is in the environment of the process the node
-// starts, and is what the node's connection to it presents.
+// 「[Fable 5.2, Fable 5.1] The secret of a launch is in the environment of the process the node」
+// 「[Fable 5.2, Fable 5.1] starts, and is what the node's connection to it presents.」
 func TestPluginManager_HandsEachLaunchItsHarnessSecret(t *testing.T) {
 	dir := t.TempDir()
 	handed := filepath.Join(dir, "handed")

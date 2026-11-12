@@ -24,11 +24,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// "Harness is a plugin that speaks grpc A2A"
+// "「[Opus 5.5] Harness is a plugin that speaks grpc A2A」"
 
-// claudePluginRuns has a claude plugin running on s, whose Claude Code is the
-// stand-in at binary: a2a-go's gRPC binding of claudeharness, served and
-// dialed on loopback, as piPluginRuns does for Pi.
+// 「[Opus 5.5] claudePluginRuns has a claude plugin running on s, whose Claude Code is the」
+// 「[Opus 5.5] stand-in at binary: a2a-go's gRPC binding of claudeharness, served and」
+// 「[Opus 5.5] dialed on loopback, as piPluginRuns does for Pi.」
 func claudePluginRuns(t *testing.T, s *QNTXServer, binary string) {
 	t.Helper()
 	listening, err := net.Listen("tcp", "127.0.0.1:0")
@@ -45,9 +45,9 @@ func claudePluginRuns(t *testing.T, s *QNTXServer, binary string) {
 	s.pluginRegistry.MarkReady(agentLineClaude)
 }
 
-// With a claude plugin running, what is said to the Node Agent in Claude Code
-// is run by the plugin's Claude Code, not the node's: its records are written
-// down as before, and the answer is Claude Code's.
+// 「[Opus 5.5] With a claude plugin running, what is said to the Node Agent in Claude Code」
+// 「[Opus 5.5] is run by the plugin's Claude Code, not the node's: its records are written」
+// 「[Opus 5.5] down as before, and the answer is Claude Code's.」
 func TestWhatIsSaidToClaudeCodeIsRunByTheClaudePlugin(t *testing.T) {
 	s, nodeRan := runningTheNodeAgent(t, opusLow)
 	binary, pluginRan := claudeStandIn(t, claudeAnswered)
@@ -70,8 +70,8 @@ func TestWhatIsSaidToClaudeCodeIsRunByTheClaudePlugin(t *testing.T) {
 	assert.Contains(t, said, [2]string{"human", "how long has the box been up?"})
 }
 
-// A turn core gives up stops Claude Code in the plugin, as it stops Pi: one
-// that does not run apart.
+// 「[Fable 5.2, Fable 5.1] A turn core gives up stops Claude Code in the plugin, as it stops Pi: one」
+// 「[Fable 5.2, Fable 5.1] that does not run apart.」
 func TestATurnCoreGivesUpStopsClaudeCodeInThePlugin(t *testing.T) {
 	dir := t.TempDir()
 	started := filepath.Join(dir, "pid")

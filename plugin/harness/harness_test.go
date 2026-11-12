@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A number a tool was called with is the number the harness printed: past
-// 2^53 a float64 holds another.
+// 「[Fable 5.2, Fable 5.1] A number a tool was called with is the number the harness printed: past」
+// 「[Fable 5.2, Fable 5.1] 2^53 a float64 holds another.」
 func TestARecordsNumbersCrossAsPrinted(t *testing.T) {
 	type record struct {
 		Args json.RawMessage `json:"args"`

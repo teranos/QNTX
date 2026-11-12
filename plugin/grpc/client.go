@@ -68,13 +68,13 @@ type ExternalDomainProxy struct {
 	// Atomic: a plugin initialized again while a room is asked for writes it.
 	roomsProvider atomic.Bool
 
-	// harnessProvider indicates this plugin runs a Coding Agent Harness and
-	// serves A2AService (populated during Initialize, ADR-059). Atomic, as
-	// roomsProvider is.
+	// 「[Fable 5.2, Fable 5.1] harnessProvider indicates this plugin runs a Coding Agent Harness and」
+	// 「[Fable 5.2, Fable 5.1] serves A2AService (populated during Initialize, ADR-059). Atomic, as」
+	// 「[Fable 5.2, Fable 5.1] roomsProvider is.」
 	harnessProvider atomic.Bool
-	// harnessSecret is the secret the node handed the plugin's process when
-	// it started it, which a call to its harness presents. Set before the
-	// proxy is registered, and never after.
+	// 「[Fable 5.2, Fable 5.1] harnessSecret is the secret the node handed the plugin's process when」
+	// 「[Fable 5.2, Fable 5.1] it started it, which a call to its harness presents. Set before the」
+	// 「[Fable 5.2, Fable 5.1] proxy is registered, and never after.」
 	harnessSecret string
 
 	// Watchers this plugin wants registered (populated during Initialize)
@@ -282,32 +282,32 @@ func (c *ExternalDomainProxy) RoomsServiceClient() protocol.RoomsServiceClient {
 	return protocol.NewRoomsServiceClient(c.conn)
 }
 
-// IsHarnessProvider returns true if the plugin runs a Coding Agent Harness
-// (A2AService over gRPC, ADR-059).
+// 「[Fable 5.2, Fable 5.1] IsHarnessProvider returns true if the plugin runs a Coding Agent Harness」
+// 「[Fable 5.2, Fable 5.1] (A2AService over gRPC, ADR-059).」
 func (c *ExternalDomainProxy) IsHarnessProvider() bool {
 	return c.harnessProvider.Load()
 }
 
-// A2AServiceClient returns a2a-go's A2AServiceClient using this plugin's
-// existing gRPC connection. Only meaningful when IsHarnessProvider() is true.
+// 「[Fable 5.2, Fable 5.1] A2AServiceClient returns a2a-go's A2AServiceClient using this plugin's」
+// 「[Fable 5.2, Fable 5.1] existing gRPC connection. Only meaningful when IsHarnessProvider() is true.」
 //
-// Each call presents the secret the node handed this plugin's process when it
-// started it: the plugin's harness answers that node, and nobody else who
-// reaches its port.
+// 「[Fable 5.2, Fable 5.1] Each call presents the secret the node handed this plugin's process when it」
+// 「[Fable 5.2, Fable 5.1] started it: the plugin's harness answers that node, and nobody else who」
+// 「[Fable 5.2, Fable 5.1] reaches its port.」
 func (c *ExternalDomainProxy) A2AServiceClient() a2apb.A2AServiceClient {
 	return a2apb.NewA2AServiceClient(PresentingHarnessSecret(c.conn, c.harnessSecret))
 }
 
-// HarnessSecretEnv is where a plugin's process finds the secret of its launch.
-// Initialize is answered to whoever reaches the port, so nothing it carries is
-// what the harness knows the node by.
+// 「[Fable 5.2, Fable 5.1] HarnessSecretEnv is where a plugin's process finds the secret of its launch.」
+// 「[Fable 5.2, Fable 5.1] Initialize is answered to whoever reaches the port, so nothing it carries is」
+// 「[Fable 5.2, Fable 5.1] what the harness knows the node by.」
 const HarnessSecretEnv = "QNTX_PLUGIN_HARNESS_SECRET"
 
-// harnessTokenKey is the metadata a call to a plugin's harness carries the
-// launch's secret under.
+// 「[Fable 5.2, Fable 5.1] harnessTokenKey is the metadata a call to a plugin's harness carries the」
+// 「[Fable 5.2, Fable 5.1] launch's secret under.」
 const harnessTokenKey = "authorization"
 
-// newHarnessSecret is a secret for one launch of one plugin.
+// 「[Fable 5.2, Fable 5.1] newHarnessSecret is a secret for one launch of one plugin.」
 func newHarnessSecret() (string, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
@@ -316,7 +316,7 @@ func newHarnessSecret() (string, error) {
 	return hex.EncodeToString(secret), nil
 }
 
-// PresentingHarnessSecret is conn with every call on it presenting secret.
+// 「[Fable 5.2, Fable 5.1] PresentingHarnessSecret is conn with every call on it presenting secret.」
 func PresentingHarnessSecret(conn grpc.ClientConnInterface, secret string) grpc.ClientConnInterface {
 	return presentingToken{conn: conn, token: secret}
 }

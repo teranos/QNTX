@@ -122,7 +122,7 @@
           mkdir -p release/lib
           cp result/bin/qntx release/qntx
           chmod +w release/qntx
-          # The claude plugin travels with the node (ADR-059): patched as qntx is, below.
+          # 「[Fable 5.2, Fable 5.1] The claude plugin travels with the node (ADR-059): patched as qntx is, below.」
           cp result/bin/qntx-claude-plugin release/qntx-claude-plugin
           chmod +w release/qntx-claude-plugin
           DUCKDB_SO=$(ldd result/bin/qntx | awk '/libduckdb/ {print $3}')

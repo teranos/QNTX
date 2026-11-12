@@ -1,9 +1,9 @@
-// plugins/claude is qntx-claude-plugin: it runs Claude Code as a harness plugin (ADR-059): it
-// declares harness_provider, and what it serves is A2A's A2AService, run by
-// plugin/harness/claudeharness in the Claude Code it holds, pinned as the
-// node's is and fetched under the plugin's own directory.
+// 「[Fable 5.2, Fable 5.1] plugins/claude is qntx-claude-plugin: it runs Claude Code as a harness plugin (ADR-059): it」
+// 「[Opus 5.5] declares harness_provider, and what it serves is A2A's A2AService, run by」
+// 「[Opus 5.5] plugin/harness/claudeharness in the Claude Code it holds, pinned as the」
+// 「[Opus 5.5] node's is and fetched under the plugin's own directory.」
 //
-// "Harness is a plugin that speaks grpc A2A"
+// "「[Opus 5.5] Harness is a plugin that speaks grpc A2A」"
 package main
 
 import (
@@ -21,7 +21,7 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// pluginName is what the plugin is called, and the harness core routes to it by.
+// 「[Opus 5.5] pluginName is what the plugin is called, and the harness core routes to it by.」
 const pluginName = "claude"
 
 type claudePlugin struct {
@@ -59,13 +59,13 @@ func (p *claudePlugin) Health(context.Context) plugin.HealthStatus {
 	return plugin.HealthStatus{Healthy: true, Message: "Claude Code harness", Details: map[string]any{"claude": p.binary}}
 }
 
-// Harness is Claude Code run by claudeharness, in the binary held returns.
+// 「[Opus 5.5] Harness is Claude Code run by claudeharness, in the binary held returns.」
 func (p *claudePlugin) Harness() a2asrv.RequestHandler {
 	return claudeharness.Handler(p.held)
 }
 
-// held is the pinned Claude Code under the plugin's own directory,
-// ~/.qntx/plugins/claude, fetched the first time it is asked for.
+// 「[Opus 5.5] held is the pinned Claude Code under the plugin's own directory,」
+// 「[Opus 5.5] ~/.qntx/plugins/claude, fetched the first time it is asked for.」
 func (p *claudePlugin) held(ctx context.Context) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
