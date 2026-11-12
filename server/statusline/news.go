@@ -40,6 +40,9 @@ type News struct {
 	Quiet bool
 	// AtMs is when it was left, stamped by the log.
 	AtMs int64
+	// Taken is told when a ground asks for the whole of the item: what ug does
+	// to write it into ground's store. Nil for an item nobody waits on.
+	Taken func()
 }
 
 // NewsLog holds recent news in memory. A restart empties it, which is correct:
@@ -173,6 +176,11 @@ func (h *StatusLineHandler) newsDetail(a auth.Admission, id string) (map[string]
 	n, ok := h.News().ByID(NewsKey(a), id)
 	if !ok {
 		return nil, false
+	}
+	// Ground asks as the key the person said yes to, which is its own client
+	// (auth/device.go); a person at the browser asks as themselves.
+	if n.Taken != nil && a.Grant == nil && a.TokenDID != "" && a.TokenDID == a.ClientDID {
+		n.Taken()
 	}
 	detail := map[string]any{
 		"id":      n.ID,

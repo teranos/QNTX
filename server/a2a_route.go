@@ -442,7 +442,13 @@ func (s *QNTXServer) a2aServed(r *http.Request, tenant string) (bool, error) {
 	opted, err := s.optedIntoAgent(tenant)
 	var notServed namespaces.NotServed
 	var disabled namespaces.Disabled
-	if errors.As(err, &notServed) || errors.As(err, &disabled) {
+	if errors.As(err, &notServed) {
+		// No namespace by that name: an agent that holds it as its name is
+		// served at it (ADR-059).
+		_, held, err := s.agentNamedAt(tenant)
+		return held, err
+	}
+	if errors.As(err, &disabled) {
 		return false, nil
 	}
 	if err != nil {
@@ -473,6 +479,11 @@ func (s *QNTXServer) a2aExtendedCardOf(ctx context.Context, req *a2asdk.GetExten
 		card = s.cardBase(r)
 		card.Name, card.Description, card.Tenant = "the element "+element, elements.GetDescription(), tenant
 		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: elements.GetTags(), Modes: []string{textPlain}}}
+	case s.holdsAName(tenant):
+		card = s.cardBase(r)
+		card.Name, card.Tenant = tenant, tenant
+		card.Description = "An agent that named itself " + tenant + " (i name). What is said to it is handed to it where it runs, and the Task says whether it was."
+		card.Skills = []cardSkill{{ID: "told", Name: "told", Description: "Takes what is said to it.", Tags: []string{"agent", "session"}, Modes: []string{textPlain}}}
 	case tenant != "":
 		model, err := s.namespaceAgentModel(tenant)
 		if err != nil {

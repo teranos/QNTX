@@ -69,6 +69,9 @@ type taskAgent struct {
 	// their streams (followLeftTurns): the Node Agent's and an element agent's,
 	// which are under the Node Agent's home.
 	followed bool
+	// named is an agent that holds a name (i name) and that the node runs no
+	// turn for: what is said to it goes to it over the status row (a2a_named.go).
+	named bool
 }
 
 // systemTasks is where the Task lines of the agent did are when they are in
@@ -100,10 +103,23 @@ func (s *QNTXServer) taskAgentAt(r *http.Request, tenant string) (taskAgent, err
 	case isElement:
 		ta, err = s.elementTaskAgent(element)
 	default:
-		ta, err = s.namespaceTaskAgent(admitted, tenant)
+		named, held, nameErr := s.agentNamedAt(tenant)
+		switch {
+		case nameErr != nil:
+			err = a2aRefusal(a2asdk.ErrInternalError, nameErr.Error())
+		case held:
+			ta = s.namedTaskAgent(named)
+		default:
+			ta, err = s.namespaceTaskAgent(admitted, tenant)
+		}
 	}
 	if err != nil {
 		return taskAgent{}, err
+	}
+	// Who reaches /a2a reaches an agent by its name: it has no say of its own
+	// for a line to be about.
+	if ta.named {
+		return ta, nil
 	}
 	// What the lines say of the say over A2A, before anything is written or
 	// read: the gate asks again when the turn is asked.
@@ -178,6 +194,14 @@ func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace strin
 // new contextId, it MUST be included in the response" (§3.4.1). Its first turn
 // then starts the session under that id.
 func (s *QNTXServer) contextOf(ta taskAgent, asked string) (string, error) {
+	// A named agent's session is its own, where it runs: the context its Tasks
+	// are in here is the agent, by its DID.
+	if ta.named {
+		if asked != "" && asked != ta.did {
+			return "", a2aRefusal(a2asdk.ErrInvalidParams, ta.called+" is one agent, and context "+asked+" is not it")
+		}
+		return ta.did, nil
+	}
 	// Two first messages at once are one session.
 	s.taskEnds.Lock()
 	defer s.taskEnds.Unlock()
@@ -592,7 +616,7 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 			return errors.Newf("%s line %s of task %s names %d states, and a line is one", taskLineSubject, line.ID, id, len(line.Predicates))
 		}
 		said, left := why[a2asdk.TaskState(line.Predicates[0])]
-		if !left || !line.Timestamp.Before(since) {
+		if !left || !line.Timestamp.Before(since) || slices.Contains(line.Contexts, saidToANameContext) {
 			continue
 		}
 		did := s.agentOfLine(line)
