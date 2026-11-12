@@ -70,7 +70,12 @@ func StartLogs(ctx context.Context, release string) (zapcore.Core, error) {
 		sdklog.WithProcessor(sdklog.NewBatchProcessor(exporter)),
 		sdklog.WithResource(described),
 	)
-	return otelzap.NewCore("github.com/teranos/QNTX", otelzap.WithLoggerProvider(logs)), nil
+	// Info and above, as the console and the file take: a Debug line stays on the box.
+	core, err := zapcore.NewIncreaseLevelCore(otelzap.NewCore("github.com/teranos/QNTX", otelzap.WithLoggerProvider(logs)), zapcore.InfoLevel)
+	if err != nil {
+		return nil, errors.Wrap(err, "the OTLP log core did not take the Info level")
+	}
+	return core, nil
 }
 
 // 「[Opus 5.5] LogsRunning reports whether the node's logs are leaving over OTLP.」
