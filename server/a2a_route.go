@@ -462,8 +462,8 @@ func (s *QNTXServer) a2aServed(r *http.Request, tenant string) (bool, error) {
 	var notServed namespaces.NotServed
 	var disabled namespaces.Disabled
 	if errors.As(err, &notServed) {
-		// No namespace by that name: an agent that holds it as its name is
-		// served at it (ADR-059).
+		// 「[Fable 5.2] No namespace by that name: an agent that holds it as its name is」
+		// 「[Fable 5.2] served at it (ADR-059).」
 		_, held, err := s.agentNamedAt(tenant)
 		return held, err
 	}
