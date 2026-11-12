@@ -211,8 +211,8 @@ func (s *QNTXServer) claudeHarness() *harness {
 		name: "claude", called: "Claude Code", file: claudeSessionFile,
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs this in. Not sent, it is the one am.toml gives."},
-			// "the hardcoded list is BS": the node keeps no list of models. The name
-			// goes to Claude Code, which runs the model and refuses a name it does not know.
+			// 「[Fable 5.1, Fable 5.2] "the hardcoded list is BS": the node keeps no list of models. The name」
+			// 「[Fable 5.1, Fable 5.2] goes to Claude Code, which runs the model and refuses a name it does not know.」
 			{Name: "model", Says: "The model it answers with, by Claude Code's name for it. Not sent, it is the one am.toml gives."},
 		},
 		// "Let's say that I don't like how it's putting Claude on a pedestal."
