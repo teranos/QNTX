@@ -59,7 +59,7 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 	if says, refused := noName(name); refused {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: says}
 	}
-	// "and it needs to be more clear if a session named itself, or if the User gave it that name]"
+	// "「[Opus 5.5] and it needs to be more clear if a session named itself, or if the User gave it that name]」"
 	given := sent["given"]
 	if given != "" && !slices.Contains(nameGivers, given) {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "given",
@@ -213,11 +213,11 @@ func canBeSaid(word string) bool {
 	return voiced
 }
 
-// nameGivers is who gives an agent its name, as the agent says it of its own
-// name: the person, the agent itself, or the harness the session runs in.
+// 「[Fable 5.2] nameGivers is who gives an agent its name, as the agent says it of its own」
+// 「[Fable 5.2] name: the person, the agent itself, or the harness the session runs in.」
 var nameGivers = []string{"user", "itself", "harness"}
 
-// nameGivenAttribute is the attribute a name line keeps its giver under.
+// 「[Fable 5.2] nameGivenAttribute is the attribute a name line keeps its giver under.」
 const nameGivenAttribute = "given"
 
 // predicateAgentUnnamed is the line a revoked token's name is let go of in:
