@@ -1,19 +1,19 @@
-//! `ats-dev bench`: what the store takes, and where it falls, as numbers.
+//! 「[Sonnet 5.5] `ats-dev bench`: what the store takes, and where it falls, as numbers.」
 //!
-//! ```text
-//! ats-dev bench load N [--step S] [--batch K] [--replace]   fresh db, N synthetic puts, a line per S puts
-//! ats-dev bench probe N                                     N per-put writes onto the existing db, then the queries
-//! ats-dev bench query                                       the queries, on the existing db
-//! ```
+//! 「[Sonnet 5.5] ```text」
+//! 「[Sonnet 5.5] ats-dev bench load N [--step S] [--batch K] [--replace]   fresh db, N synthetic puts, a line per S puts」
+//! 「[Sonnet 5.5] ats-dev bench probe N                                     N per-put writes onto the existing db, then the queries」
+//! 「[Sonnet 5.5] ats-dev bench query                                       the queries, on the existing db」
+//! 「[Sonnet 5.5] ```」
 //!
-//! `load` without `--batch` is the library's own path: every put commits on its
-//! own. `--batch K` puts K per transaction. The workload is synthetic, unsigned
-//! and fixed (the same attestations on every run), so two runs, two disks or two
-//! versions of the store compare. `load` replaces the database file, so it
-//! refuses one that exists unless `--replace` says so.
+//! 「[Sonnet 5.5] `load` without `--batch` is the library's own path: every put commits on its」
+//! 「[Sonnet 5.5] own. `--batch K` puts K per transaction. The workload is synthetic, unsigned」
+//! 「[Sonnet 5.5] and fixed (the same attestations on every run), so two runs, two disks or two」
+//! 「[Sonnet 5.5] versions of the store compare. `load` replaces the database file, so it」
+//! 「[Sonnet 5.5] refuses one that exists unless `--replace` says so.」
 //!
-//! The columns are raw. `crates/ats-dev/bench/README.md` says what they are and
-//! how to run this against a slower disk than the one you have.
+//! 「[Sonnet 5.5] The columns are raw. `crates/ats-dev/bench/README.md` says what they are and」
+//! 「[Sonnet 5.5] how to run this against a slower disk than the one you have.」
 
 use std::time::Instant;
 
@@ -25,7 +25,7 @@ use sacred_error::Error;
 use crate::backend::Kind;
 use crate::{fail, open_sqlite, Opts};
 
-/// xorshift64: fixed seed, no dependency, the same stream on every machine.
+/// 「[Sonnet 5.5] xorshift64: fixed seed, no dependency, the same stream on every machine.」
 struct Rng(u64);
 
 impl Rng {
@@ -40,7 +40,7 @@ impl Rng {
 }
 
 const SEED: u64 = 0x9E37_79B9_7F4A_7C15;
-/// `timestamp` of attestation 0, and a second apart after it.
+/// 「[Sonnet 5.5] `timestamp` of attestation 0, and a second apart after it.」
 const EPOCH_MS: i64 = 1_700_000_000_000;
 
 fn make(i: u64, rng: &mut Rng, subjects: u64) -> Attestation {
@@ -61,7 +61,7 @@ fn make(i: u64, rng: &mut Rng, subjects: u64) -> Attestation {
     a
 }
 
-/// The `p` quantile (0..1) of `v`, sorted in place.
+/// 「[Sonnet 5.5] The `p` quantile (0..1) of `v`, sorted in place.」
 fn quantile(v: &mut [f64], p: f64) -> f64 {
     v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let at = ((v.len().saturating_sub(1)) as f64 * p) as usize;
@@ -72,8 +72,8 @@ fn ms(t: Instant) -> f64 {
     t.elapsed().as_secs_f64() * 1e3
 }
 
-/// What this process has asked of the kernel's block layer (`/proc/self/io`);
-/// `None` where there is no /proc.
+/// 「[Sonnet 5.5] What this process has asked of the kernel's block layer (`/proc/self/io`);」
+/// 「[Sonnet 5.5] `None` where there is no /proc.」
 #[derive(Clone, Copy, Default)]
 struct Io {
     read_syscalls: u64,
@@ -109,12 +109,12 @@ fn since(a: Option<Io>, b: Option<Io>) -> Option<Io> {
     })
 }
 
-/// A column that needs /proc, or `-` without it.
+/// 「[Sonnet 5.5] A column that needs /proc, or `-` without it.」
 fn col(v: Option<f64>, places: usize) -> String {
     v.map_or_else(|| "-".into(), |x| format!("{x:.places$}"))
 }
 
-/// Peak resident set, MB (`VmHWM`).
+/// 「[Sonnet 5.5] Peak resident set, MB (`VmHWM`).」
 fn peak_rss_mb() -> Option<f64> {
     let text = std::fs::read_to_string("/proc/self/status").ok()?;
     let kb: f64 = text.lines().find(|l| l.starts_with("VmHWM"))?.split_whitespace().nth(1)?.parse().ok()?;
@@ -125,8 +125,8 @@ fn file_mb(path: &str) -> f64 {
     std::fs::metadata(path).map(|m| m.len()).unwrap_or(0) as f64 / 1e6
 }
 
-/// `put()` runs a PASSIVE checkpoint after every 5000th put, which SQLite
-/// refuses inside a transaction. The row is already inserted.
+/// 「[Sonnet 5.5] `put()` runs a PASSIVE checkpoint after every 5000th put, which SQLite」
+/// 「[Sonnet 5.5] refuses inside a transaction. The row is already inserted.」
 fn put_in_txn(s: &mut SqliteStore, a: Attestation) -> Result<(), Box<Error>> {
     match s.put(a) {
         Ok(()) => Ok(()),
@@ -173,8 +173,8 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
         }
     }
     let step = step.unwrap_or((total / 10).max(1));
-    // Before anything is looked at or removed: `--replace` deletes the files named by
-    // `--db`, and what another backend calls `--db` is not a SQLite file to replace.
+    // 「[Sonnet 5.5] Before anything is looked at or removed: `--replace` deletes the files named by」
+    // 「[Sonnet 5.5] `--db`, and what another backend calls `--db` is not a SQLite file to replace.」
     if o.backend != Kind::Sqlite {
         return Err(fail("this command is SQLite's", format!("--backend {} given", o.backend.name())));
     }
@@ -226,7 +226,7 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
                     s.connection().execute_batch("COMMIT").map_err(|e| fail("COMMIT failed", e))?;
                     lat.push(ms(t));
                 }
-                // wal_autocheckpoint is 0 in SqliteStore::open: nothing else folds the WAL back.
+                // 「[Sonnet 5.5] wal_autocheckpoint is 0 in SqliteStore::open: nothing else folds the WAL back.」
                 s.wal_checkpoint_truncate().map_err(|e| fail("checkpoint failed", e))?;
             }
         }
@@ -257,12 +257,12 @@ fn probe(o: &Opts, n: Option<&String>) -> Result<(), Box<Error>> {
     }
     let mut s = open_sqlite(o)?;
     let rows = s.count().map_err(|e| fail("count failed", e))?;
-    // the subject pool a load of the resulting size would draw from
+    // 「[Sonnet 5.5] the subject pool a load of the resulting size would draw from」
     let subjects = ((rows as u64 + n) / 10).max(100);
     let mut rng = Rng(SEED);
-    // The series goes on where the load left off: ids and timestamps of rows
-    // `rows`.., so the queries, which are timed by the row count, read the same
-    // kind of rows after a probe as after a load of that many.
+    // 「[Sonnet 5.5] The series goes on where the load left off: ids and timestamps of rows」
+    // 「[Sonnet 5.5] `rows`.., so the queries, which are timed by the row count, read the same」
+    // 「[Sonnet 5.5] kind of rows after a probe as after a load of that many.」
     let first = rows as u64;
     let (io0, t0) = (io(), Instant::now());
     let mut lat = Vec::new();
@@ -286,8 +286,8 @@ fn probe(o: &Opts, n: Option<&String>) -> Result<(), Box<Error>> {
     queries(&s, (rows as u64 + n) as i64)
 }
 
-/// The query set the workload is built for: subjects, predicates, contexts and
-/// actors it drew from, times it spaced a second apart.
+/// 「[Sonnet 5.5] The query set the workload is built for: subjects, predicates, contexts and」
+/// 「[Sonnet 5.5] actors it drew from, times it spaced a second apart.」
 fn queries(s: &SqliteStore, rows: i64) -> Result<(), Box<Error>> {
     let f = |subjects: &[&str], predicates: &[&str], contexts: &[&str], actors: &[&str], from: Option<i64>, to: Option<i64>| AxFilter {
         subjects: subjects.iter().map(|x| x.to_string()).collect(),

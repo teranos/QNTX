@@ -15,8 +15,8 @@ name = "ats-dev"
 path = "src/main.rs"
 
 [features]
-# `--backend duckdb` links libduckdb (dynamically, as the node does); `--backend
-# postgres` speaks the wire protocol itself. Neither is in the default binary.
+# 「[Sonnet 5.5] `--backend duckdb` links libduckdb (dynamically, as the node does); `--backend」
+# 「[Sonnet 5.5] postgres` speaks the wire protocol itself. Neither is in the default binary.」
 duckdb = ["dep:ats-duckdb"]
 postgres = ["dep:ats-postgres"]
 

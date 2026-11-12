@@ -1,12 +1,12 @@
-// fsyncdelay: make every fsync/fdatasync cost FSYNC_US microseconds, and count them.
+// 「[Sonnet 5.5] fsyncdelay: make every fsync/fdatasync cost FSYNC_US microseconds, and count them.」
 //
-//   cc -shared -fPIC -O2 -o fsyncdelay.so fsyncdelay.c -ldl
-//   LD_PRELOAD=$PWD/fsyncdelay.so FSYNC_US=8000 FSYNC_REPORT=1 ats-dev bench load 20000
+//   「[Sonnet 5.5] cc -shared -fPIC -O2 -o fsyncdelay.so fsyncdelay.c -ldl」
+//   「[Sonnet 5.5] LD_PRELOAD=$PWD/fsyncdelay.so FSYNC_US=8000 FSYNC_REPORT=1 ats-dev bench load 20000」
 //
-// The data still reaches the real disk (the real fsync is called after the nap);
-// the delay stands in for a slower disk. FSYNC_US unset or 0 adds no delay.
-// FSYNC_REPORT=1 prints the totals to stderr at exit:
-//   fsyncdelay: fsync=<n> fdatasync=<n> delay_us=<n>
+// 「[Sonnet 5.5] The data still reaches the real disk (the real fsync is called after the nap);」
+// 「[Sonnet 5.5] the delay stands in for a slower disk. FSYNC_US unset or 0 adds no delay.」
+// 「[Sonnet 5.5] FSYNC_REPORT=1 prints the totals to stderr at exit:」
+//   「[Sonnet 5.5] fsyncdelay: fsync=<n> fdatasync=<n> delay_us=<n>」
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
