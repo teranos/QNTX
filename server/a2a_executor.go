@@ -407,7 +407,7 @@ func (s *QNTXServer) filesOut(out string, accepts []string) []*a2asdk.Artifact {
 	var artifacts []*a2asdk.Artifact
 	for _, file := range s.answerFiles(out) {
 		kind, _, err := mime.ParseMediaType(file.GetType())
-		if err != nil || !slices.Contains(turnModes, kind) || (len(accepts) > 0 && !slices.Contains(accepts, kind)) {
+		if err != nil || !slices.Contains(turnModes, kind) || (len(accepts) > 0 && !slices.ContainsFunc(accepts, func(mode string) bool { return sameMediaType(mode, kind) })) {
 			s.logger.Warnw("a file a turn wrote is no media type its Task gives", "file", file.GetName(), "type", file.GetType())
 			continue
 		}

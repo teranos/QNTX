@@ -536,6 +536,13 @@ func isTurnMode(mediaType string) bool {
 	return err == nil && slices.Contains(turnModes, parsed)
 }
 
+// sameMediaType is whether mode, whatever its parameters, names kind: a client
+// taking image/png; profile=x takes a PNG.
+func sameMediaType(mode, kind string) bool {
+	parsed, _, err := mime.ParseMediaType(mode)
+	return err == nil && strings.EqualFold(parsed, kind)
+}
+
 // endTask writes that task id ended in state, as by, unless it ended already:
 // a Task ends once, by its turn, a restart or a cancel, whichever is first.
 // answer is what it gave when it completed, why why it did not.

@@ -802,6 +802,12 @@ func TestFilesGoInAndComeBackOut(t *testing.T) {
 	require.Len(t, artifacts, 1, answered)
 	assert.Equal(t, "chart.png", at(artifacts[0], "name"))
 
+	// A mode with parameters takes its media type: the PNG is still given.
+	answered = sent("m-4", `"image/png; profile=x"`)
+	artifacts = at(answered, "task.artifacts").([]any)
+	require.Len(t, artifacts, 1, answered)
+	assert.Equal(t, "chart.png", at(artifacts[0], "name"))
+
 	// The files went with the Task.
 	left, err := filepath.Glob(filepath.Join(srv.nodeAgent.home, "work", "a2a", "*"))
 	require.NoError(t, err)
