@@ -100,12 +100,27 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "this node keeps no status row to leave it on")), nil)
 		return
 	}
-	e.s.leaveForAName(ta, string(id), spokenBy(call.request), says)
+	// "A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT"
+	// Received is the agent itself asking for the whole of it, by the key its
+	// name is held by: its ground does so as it hands it to the session.
+	// Anyone else of the person asking is not the agent, and receives nothing.
+	received := make(chan struct{})
+	var once sync.Once
+	e.s.leaveForAName(ta, string(id), spokenBy(call.request), says, func(by auth.Admission) {
+		if did, refusal := itsOwnDID(by); refusal == nil && did == ta.did {
+			once.Do(func() { close(received) })
+		}
+	})
 	defer e.s.news.Drop(string(id))
 	hold := time.NewTimer(toldWithin)
 	defer hold.Stop()
 	select {
 	case <-ctx.Done():
+	case <-received:
+		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateCompleted, &a2asdk.Message{
+			ID: string(id) + "-received", ContextID: ec.ContextID, TaskID: id, Role: a2asdk.MessageRoleAgent,
+			Parts: a2asdk.ContentParts{textPart(ta.called + " received it")},
+		}), nil)
 	case <-hold.C:
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID,
 			"it was on the status row for "+toldWithin.String()+", and nothing says "+ta.called+" received it")), nil)
@@ -114,7 +129,7 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 
 // leaveForAName leaves what by said to the named agent on the status row, as
 // news for the person its key speaks for: the row their ug polls.
-func (s *QNTXServer) leaveForAName(ta taskAgent, id, by, says string) {
+func (s *QNTXServer) leaveForAName(ta taskAgent, id, by, says string, whole func(auth.Admission)) {
 	from := by
 	if names, err := s.agentNames(); err == nil {
 		if at := slices.IndexFunc(names, func(kept agentName) bool { return kept.did == by }); at >= 0 {
@@ -133,6 +148,7 @@ func (s *QNTXServer) leaveForAName(ta taskAgent, id, by, says string) {
 		Item:    statusline.StatusItem{Name: from + " to " + ta.called, Note: masked(says), Symbol: statusline.SymbolWell},
 		Detail:  map[string]any{"to": ta.called, "did": ta.did, "from": from, "task": id},
 		UntilMs: time.Now().Add(toldWithin).UnixMilli(),
+		Whole:   whole,
 	})
 	s.logger.Infow("what was said to a named agent is on the status row", "to", ta.called, "did", ta.did, "from", from, "task", id, "for", addressee)
 }

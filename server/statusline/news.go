@@ -41,6 +41,9 @@ type News struct {
 	Quiet bool
 	// AtMs is when it was left, stamped by the log.
 	AtMs int64
+	// Whole is told who asked for the whole of the item, each time one does:
+	// what the item is for can know its addressee took it.
+	Whole func(by auth.Admission)
 }
 
 // NewsLog holds recent news in memory. A restart empties it, which is correct:
@@ -174,6 +177,9 @@ func (h *StatusLineHandler) newsDetail(a auth.Admission, id string) (map[string]
 	n, ok := h.News().ByID(NewsKey(a), id)
 	if !ok {
 		return nil, false
+	}
+	if n.Whole != nil {
+		n.Whole(a)
 	}
 	detail := map[string]any{
 		"id":      n.ID,
