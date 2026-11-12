@@ -88,9 +88,9 @@ func (w *roomWakes) ask(key, speaker string, tell func(speaker string)) {
 	})
 }
 
-// findingsSeen is, by comment, the sum of what it found when it last woke the
-// agent and the agent took the turn. An edit finding the same wakes no one. It
-// lives as long as the node: after a restart the first edit wakes once more.
+// 「[Fable 5.2] findingsSeen is, by comment, the sum of what it found when it last woke the」
+// 「[Fable 5.2] agent and the agent took the turn. An edit finding the same wakes no one. It」
+// 「[Fable 5.2] lives as long as the node: after a restart the first edit wakes once more.」
 type findingsSeen struct {
 	mu   sync.Mutex
 	seen map[string]string
@@ -104,8 +104,8 @@ func (f *findingsSeen) same(c roomcomments.Comment) bool {
 	return f.seen[c.URL] == c.Findings()
 }
 
-// keep is said once the agent took the turn the comment woke: a turn refused
-// leaves the next edit, finding the same, to wake it again.
+// 「[Fable 5.2] keep is said once the agent took the turn the comment woke: a turn refused」
+// 「[Fable 5.2] leaves the next edit, finding the same, to wake it again.」
 func (f *findingsSeen) keep(c roomcomments.Comment) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -135,8 +135,8 @@ func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments
 	s.tellNow(target, speaker, c)
 }
 
-// tellNow tells the agent the room, one wake of it at a time, and keeps what
-// the comment found once the agent was told it.
+// 「[Opus 5.5] tellNow tells the agent the room, one wake of it at a time, and keeps what」
+// 「[Opus 5.5] the comment found once the agent was told it.」
 func (s *QNTXServer) tellNow(target roomcomments.Target, speaker string, c roomcomments.Comment) {
 	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, speaker, func(speaker string) {
 		if err := s.tellAgentTheRoom(target, wakeAgent, speaker, c.At); err != nil {
@@ -214,8 +214,8 @@ func (s *QNTXServer) tellWhenQuiet(w roomcomments.Wake) {
 
 // tellAgentTheRoom runs a turn of the Node Agent told everything said in the
 // room since it was last told, and posts its answer into the room as it. What
-// it was told is kept once it took the turn, not before: a turn it refused
-// leaves it to be told again.
+// 「[Fable 5.2] it was told is kept once it took the turn, not before: a turn it refused」
+// 「[Fable 5.2] leaves it to be told again.」
 //
 // An agent never told is told from since, the time of the comment that woke it:
 // a room reads oldest first, so reading it all would tell the oldest.
@@ -269,12 +269,12 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 	}
 	took, err := s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", roomcomments.Digest(said, read.GetTruncated()))
 	if err != nil {
-		// Its answer did not reach the room: nothing is kept, so it is told the same again.
+		// 「[Opus 5.5] Its answer did not reach the room: nothing is kept, so it is told the same again.」
 		return err
 	}
 	if !took {
 		return errors.Newf("%s did not take the turn, so what it was to be told is told again with the next", agent)
 	}
-	// Kept once the agent took the turn: what is said during it is the next one's.
+	// 「[Opus 5.5] Kept once the agent took the turn: what is said during it is the next one's.」
 	return told.Keep(context.WithoutCancel(ctx), target.Room, agent, last)
 }
