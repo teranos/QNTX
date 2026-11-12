@@ -13,6 +13,14 @@ See [Installation Guide](docs/installation.md) for all installation methods incl
 
 See [config package](internal/config/README.md) for details on multi-source configuration and precedence.
 
+## ATS - System of Record
+
+QNTX is built on [ATS](ats/README.md) — everything reaches signed attestations through it.
+
+## Ground Code
+
+- [ground](https://github.com/teranos/ground)
+
 ## Testing
 
 ```bash
@@ -23,21 +31,29 @@ make test
 ```
 
 The frontend is [QNTX-Web](https://github.com/teranos/QNTX-Web); the phone and desktop shell is [QNTX-App](https://github.com/teranos/QNTX-App).
+- [elements](https://github.com/teranos/elements)
+
 
 Works with:
 
 - [Nix](https://nixos.org/)
 - [Obsidian](https://obsidian.md/)
 - [Sentry](https://sentry.io/)
+- [OpenTelemetry](https://opentelemetry.io/)
+  
 - [AWS](https://aws.amazon.com/)
+  
 - [GitHub](https://github.com/)
+  
 - [Claude](https://claude.com/product/claude-code)
 - [Codex](https://github.com/openai/codex)
 - [Agy](https://antigravity.google/)
-- [Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
 - [Pi](https://pi.dev/)
+
+- [Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
+
+- [Otari](https://otari.ai/)
 - [OpenRouter](https://openrouter.ai/)
+
 - [Supabase](https://supabase.com/)
 - [DuckDB](https://duckdb.org/)
-- [ground](https://github.com/teranos/ground)
-- [elements](https://github.com/teranos/elements)

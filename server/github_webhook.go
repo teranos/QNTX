@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/teranos/QNTX/internal/forge"
+	"github.com/teranos/QNTX/internal/roomcomments"
 	"io"
 	"net/http"
 	"slices"
@@ -146,6 +147,18 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	event := r.Header.Get("X-GitHub-Event")
 	// 「[Opus 5.5] Before the delivery is handled: this node being slow over it holds nobody else back.」
 	g.forward(event, r.Header.Get("X-GitHub-Delivery"), r.Header.Get("X-Hub-Signature-256"), body)
+	comment, err := roomcomments.Parse(event, body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if comment != nil {
+		if err := g.host.keepRoomComment(r.Context(), comment); err != nil {
+			g.host.log().Errorw("A PR comment was not kept for the Node Room", "comment", comment.URL, "error", err)
+			writeError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+	}
 	if event == "workflow_run" {
 		var run gitHubWorkflowRun
 		if err := json.Unmarshal(body, &run); err != nil {
@@ -206,7 +219,6 @@ func (g *gitHub) deliveredInto(answer map[string]any, ctx context.Context, event
 		answer[name] = said
 	}
 }
-
 
 // fixturesOf is what the node put fixtures in for one delivery, asked after the
 // rest of the delivery was taken. A scanner that did not run is said in the log

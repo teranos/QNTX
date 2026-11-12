@@ -200,6 +200,47 @@ func TestOnlyATokenAskingAsItselfIsNamed(t *testing.T) {
 	assert.Empty(t, systemHolds(t, s), "a name was written for a caller that holds no DID of its own")
 }
 
+// "I WANT TO MAKE EVERY SESSION BE ABLE TO NAME ITSELF"
+//
+// "I HAVE 4 SESSIONS ON MY LAPTOP"
+// "EACH OF THEM SHOULD BE ABLE TO GIVE THEMSELVES A NAME THAT HAS NOT BEEN TAKEN"
+//
+// A key the person said yes to at the passkey (auth/device.go) is recorded as
+// its own client and admitted as the person, with no Grant: what
+// TestAnAgentIsSignedInByThePersonsPasskey holds the admission to. It signs as
+// itself, and its next signature is the same DID, so a name on it lasts.
+func TestEachSessionsKeyNamesItself(t *testing.T) {
+	s := rootKnowingServer(t)
+
+	session := func(did string) context.Context {
+		key := auth.Admitted(auth.LevelRoot, "garden")
+		key.Identity, key.ClientDID, key.TokenDID = rootAccount, did, did
+		return auth.WithAdmission(context.Background(), key)
+	}
+
+	named, refusal := s.iName(session("did:key:z6Mkalder"), sigil.Sent{"name": "Alder"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "Alder", named.(*protocol.Named).GetName())
+	assert.Equal(t, "did:key:z6Mkalder", named.(*protocol.Named).GetDid())
+
+	// Another session of the same person, under its own key: the name the
+	// first holds is taken, and one that is not is its own.
+	_, refusal = s.iName(session("did:key:z6Mkbirch"), sigil.Sent{"name": "Alder"})
+	require.NotNil(t, refusal, "two sessions hold one name")
+	assert.Equal(t, sigil.NotAllowed, refusal.GetWhy())
+	named, refusal = s.iName(session("did:key:z6Mkbirch"), sigil.Sent{"name": "Birch"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "did:key:z6Mkbirch", named.(*protocol.Named).GetDid())
+
+	// A key said yes to by somebody at TOKEN is admitted as the token it is.
+	token := auth.Admitted(auth.LevelToken, "garden")
+	token.ClientDID = "did:key:z6Mkcedar"
+	token.Grant = &auth.Grant{DID: "did:key:z6Mkcedar", ClientDID: "did:key:z6Mkcedar", Level: auth.LevelToken}
+	named, refusal = s.iName(auth.WithAdmission(context.Background(), token), sigil.Sent{"name": "Cedar"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "did:key:z6Mkcedar", named.(*protocol.Named).GetDid())
+}
+
 // What a display_name is held to: one line of text, 64 characters at most,
 // and root is nobody's to take.
 func TestWhatIsNoNameIsRefused(t *testing.T) {
