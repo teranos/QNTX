@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// An app's comment on a pull request Claude Code opened is read with the app
-// that wrote it and the description it is on, whichever of the three events
-// carried it.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] An app's comment on a pull request Claude Code opened is read with the app」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] that wrote it and the description it is on, whichever of the three events」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] carried it.」
 func TestACommentCarriesItsAppAndThePullRequestsDescription(t *testing.T) {
 	description := "Why.\n\n🤖 " + ClaudeFooter + "(https://claude.com/claude-code)"
 	for event, action := range map[string]string{"issue_comment": "created", "pull_request_review_comment": "created", "pull_request_review": "submitted"} {
