@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A turn a verified delivery started is said by the app that wrote the
-// comment; a request nobody was admitted on and no delivery started says nobody.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] A turn a verified delivery started is said by the app that wrote the」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] comment; a request nobody was admitted on and no delivery started says nobody.」
 func TestADeliverysTurnIsSaidByTheApp(t *testing.T) {
 	said, err := http.NewRequestWithContext(withSpeaker(context.Background(), "github-app:qodo-code-review"), http.MethodPost, "/github/comments", nil)
 	require.NoError(t, err)
