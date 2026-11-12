@@ -58,8 +58,8 @@ func runningPiToo(t *testing.T) (s *QNTXServer, claudeRan, piRan string) {
 	return s, claudeRan, piRan
 }
 
-// piPlugin is a plugin named pi that runs Pi: it declared harness_provider,
-// and what it serves is reached over gRPC, as a plugin's is (ADR-059).
+// 「[Fable 5.2, Fable 5.1] piPlugin is a plugin named pi that runs Pi: it declared harness_provider,」
+// 「[Fable 5.2, Fable 5.1] and what it serves is reached over gRPC, as a plugin's is (ADR-059).」
 type piPlugin struct {
 	fakePlugin
 	served a2apb.A2AServiceClient
@@ -68,8 +68,8 @@ type piPlugin struct {
 func (p *piPlugin) IsHarnessProvider() bool                  { return true }
 func (p *piPlugin) A2AServiceClient() a2apb.A2AServiceClient { return p.served }
 
-// piPluginRuns has a pi plugin running on s, whose Pi is the stand-in at
-// binary: a2a-go's gRPC binding of piharness, served and dialed on loopback.
+// 「[Fable 5.2, Fable 5.1] piPluginRuns has a pi plugin running on s, whose Pi is the stand-in at」
+// 「[Fable 5.2, Fable 5.1] binary: a2a-go's gRPC binding of piharness, served and dialed on loopback.」
 func piPluginRuns(t *testing.T, s *QNTXServer, binary string) {
 	t.Helper()
 	s.pluginRegistry = plugin.NewRegistry("0.1.0", zaptest.NewLogger(t).Sugar())
@@ -77,8 +77,8 @@ func piPluginRuns(t *testing.T, s *QNTXServer, binary string) {
 	s.pluginRegistry.MarkReady(agentLinePi)
 }
 
-// piServed is a pi plugin's harness as core reaches it: a2a-go's gRPC binding
-// of piharness, served and dialed on loopback, its Pi the stand-in at binary.
+// 「[Fable 5.2, Fable 5.1] piServed is a pi plugin's harness as core reaches it: a2a-go's gRPC binding」
+// 「[Fable 5.2, Fable 5.1] of piharness, served and dialed on loopback, its Pi the stand-in at binary.」
 func piServed(t *testing.T, binary string) a2apb.A2AServiceClient {
 	t.Helper()
 	listening, err := net.Listen("tcp", "127.0.0.1:0")
@@ -385,9 +385,9 @@ func TestATurnInPiCarriesOnlyItsOwnCredential(t *testing.T) {
 	assert.NotContains(t, env, "QNTX_NODE_SECRET=the node's")
 }
 
-// "Harness is a plugin that speaks grpc A2A": Pi is the pi plugin's to run. A
-// node that names Pi and runs no such plugin has no Pi, and nothing answers in
-// its place; a plugin still loading runs nothing yet.
+// 「[Fable 5.2, Fable 5.1] "Harness is a plugin that speaks grpc A2A": Pi is the pi plugin's to run. A」
+// 「[Fable 5.2, Fable 5.1] node that names Pi and runs no such plugin has no Pi, and nothing answers in」
+// 「[Fable 5.2, Fable 5.1] its place; a plugin still loading runs nothing yet.」
 func TestPiIsRunByThePiPluginAndNothingElse(t *testing.T) {
 	named := opusLow
 	named.Pi = sonnetThroughTheGateway
@@ -398,7 +398,7 @@ func TestPiIsRunByThePiPluginAndNothingElse(t *testing.T) {
 	require.NotNil(t, refused)
 	assert.Contains(t, refused.GetSays(), "no plugin on this node runs Pi")
 
-	// A binary the node itself holds is not Pi's way in any more.
+	// 「[Fable 5.2, Fable 5.1] A binary the node itself holds is not Pi's way in any more.」
 	binary, ran := claudeStandIn(t, piAnswered)
 	fetched := make(chan struct{})
 	close(fetched)
@@ -410,7 +410,7 @@ func TestPiIsRunByThePiPluginAndNothingElse(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, entries, "Pi was run by the node itself")
 
-	// Loading is not running.
+	// 「[Fable 5.2, Fable 5.1] Loading is not running.」
 	s.holdHarness("pi", nil)
 	s.pluginRegistry.PreRegister(agentLinePi)
 	require.NoError(t, s.pluginRegistry.Register(&piPlugin{fakePlugin: fakePlugin{name: agentLinePi}}))
@@ -421,8 +421,8 @@ func TestPiIsRunByThePiPluginAndNothingElse(t *testing.T) {
 	assert.True(t, runs)
 }
 
-// A run Pi does not answer is the turn failing in Pi's own words, carried back
-// from the plugin as the Task failed.
+// 「[Fable 5.2, Fable 5.1] A run Pi does not answer is the turn failing in Pi's own words, carried back」
+// 「[Fable 5.2, Fable 5.1] from the plugin as the Task failed.」
 func TestARunThePiPluginCannotAnswerSaysWhy(t *testing.T) {
 	named := opusLow
 	named.Pi = sonnetThroughTheGateway
@@ -435,9 +435,9 @@ func TestARunThePiPluginCannotAnswerSaysWhy(t *testing.T) {
 	assert.Contains(t, refused.GetSays(), "no-pi-here")
 }
 
-// A turn core gives up is canceled in the plugin: a2a-go runs a turn apart
-// from the call that asked for it, so Pi would run on, writing into a session
-// the node holds to be over.
+// 「[Fable 5.2, Fable 5.1] A turn core gives up is canceled in the plugin: a2a-go runs a turn apart」
+// 「[Fable 5.2, Fable 5.1] from the call that asked for it, so Pi would run on, writing into a session」
+// 「[Fable 5.2, Fable 5.1] the node holds to be over.」
 func TestATurnCoreGivesUpStopsPiInThePlugin(t *testing.T) {
 	dir := t.TempDir()
 	started := filepath.Join(dir, "pid")
@@ -476,9 +476,9 @@ func TestATurnCoreGivesUpStopsPiInThePlugin(t *testing.T) {
 		"Pi runs on in the plugin after the node gave its turn up")
 }
 
-// Only a harness the node holds no binary of is held by its plugin: where
-// Claude Code's binary is looked for (a ritual's PATH, a login), a running
-// claude plugin's label is no path.
+// 「[Fable 5.2, Fable 5.1] Only a harness the node holds no binary of is held by its plugin: where」
+// 「[Fable 5.2, Fable 5.1] Claude Code's binary is looked for (a ritual's PATH, a login), a running」
+// 「[Fable 5.2, Fable 5.1] claude plugin's label is no path.」
 func TestAPluginNamedForAHarnessTheNodeRunsHoldsNothing(t *testing.T) {
 	s := &QNTXServer{}
 	s.pluginRegistry = plugin.NewRegistry("0.1.0", zaptest.NewLogger(t).Sugar())
