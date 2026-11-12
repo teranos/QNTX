@@ -97,8 +97,8 @@ func (s *QNTXServer) keepNumbers(admitted auth.Admission, store ats.AttestationS
 		}
 	}
 	actors := s.otlpActors(admitted)
-	// Who sent it is who the kept point is attested by, a session's person as
-	// much as a token.
+	// Who sent it is who the kept point is attested by, an agent through its
+	// door as much as a session's person.
 	sender := strings.Join(actors, "\x00")
 	for _, resourceMetrics := range export.GetResourceMetrics() {
 		service := otlpServiceOf(resourceMetrics.GetResource().GetAttributes())
