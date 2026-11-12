@@ -105,9 +105,9 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "this node keeps no status row to leave it on")), nil)
 		return
 	}
-	// "A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT"
-	// Received is the agent itself asking for the whole of it, by the key its
-	// name is held by: its ground does so as it hands it to the session.
+	// "「[Opus 5.5] A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT」"
+	// 「[Fable 5.2] Received is the agent itself asking for the whole of it, by the key its」
+	// 「[Fable 5.2] name is held by: its ground does so as it hands it to the session.」
 	// Anyone else of the person asking is not the agent: that is their ground
 	// taking it off the row for the session, and the Task is working from
 	// then, with longer to be received in. ug wrote one two minutes after it
