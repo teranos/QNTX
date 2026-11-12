@@ -2,7 +2,9 @@ package grpc
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
@@ -14,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/internal/admission"
 	"github.com/teranos/QNTX/internal/measure"
@@ -64,6 +67,15 @@ type ExternalDomainProxy struct {
 	// roomsProvider indicates this plugin holds rooms (populated during Initialize).
 	// Atomic: a plugin initialized again while a room is asked for writes it.
 	roomsProvider atomic.Bool
+
+	// harnessProvider indicates this plugin runs a Coding Agent Harness and
+	// serves A2AService (populated during Initialize, ADR-059). Atomic, as
+	// roomsProvider is.
+	harnessProvider atomic.Bool
+	// harnessSecret is the secret the node handed the plugin's process when
+	// it started it, which a call to its harness presents. Set before the
+	// proxy is registered, and never after.
+	harnessSecret string
 
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
@@ -268,6 +280,58 @@ func (c *ExternalDomainProxy) IsRoomsProvider() bool {
 // RoomsServiceClient returns a RoomsServiceClient using this plugin's existing gRPC connection.
 func (c *ExternalDomainProxy) RoomsServiceClient() protocol.RoomsServiceClient {
 	return protocol.NewRoomsServiceClient(c.conn)
+}
+
+// IsHarnessProvider returns true if the plugin runs a Coding Agent Harness
+// (A2AService over gRPC, ADR-059).
+func (c *ExternalDomainProxy) IsHarnessProvider() bool {
+	return c.harnessProvider.Load()
+}
+
+// A2AServiceClient returns a2a-go's A2AServiceClient using this plugin's
+// existing gRPC connection. Only meaningful when IsHarnessProvider() is true.
+//
+// Each call presents the secret the node handed this plugin's process when it
+// started it: the plugin's harness answers that node, and nobody else who
+// reaches its port.
+func (c *ExternalDomainProxy) A2AServiceClient() a2apb.A2AServiceClient {
+	return a2apb.NewA2AServiceClient(PresentingHarnessSecret(c.conn, c.harnessSecret))
+}
+
+// HarnessSecretEnv is where a plugin's process finds the secret of its launch.
+// Initialize is answered to whoever reaches the port, so nothing it carries is
+// what the harness knows the node by.
+const HarnessSecretEnv = "QNTX_PLUGIN_HARNESS_SECRET"
+
+// harnessTokenKey is the metadata a call to a plugin's harness carries the
+// launch's secret under.
+const harnessTokenKey = "authorization"
+
+// newHarnessSecret is a secret for one launch of one plugin.
+func newHarnessSecret() (string, error) {
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(secret), nil
+}
+
+// PresentingHarnessSecret is conn with every call on it presenting secret.
+func PresentingHarnessSecret(conn grpc.ClientConnInterface, secret string) grpc.ClientConnInterface {
+	return presentingToken{conn: conn, token: secret}
+}
+
+type presentingToken struct {
+	conn  grpc.ClientConnInterface
+	token string
+}
+
+func (p presentingToken) Invoke(ctx context.Context, method string, args, reply any, opts ...grpc.CallOption) error {
+	return p.conn.Invoke(metadata.AppendToOutgoingContext(ctx, harnessTokenKey, "Bearer "+p.token), method, args, reply, opts...)
+}
+
+func (p presentingToken) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	return p.conn.NewStream(metadata.AppendToOutgoingContext(ctx, harnessTokenKey, "Bearer "+p.token), desc, method, opts...)
 }
 
 // GetSigilsFrom returns where the plugin said, at Initialize, its sigils are
@@ -513,6 +577,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store Python provider capability
 	c.pythonProvider = resp.GetPythonProvider()
 	c.roomsProvider.Store(resp.GetRoomsProvider())
+	c.harnessProvider.Store(resp.GetHarnessProvider())
 
 	// Store and create watcher registrations. Declaring none withdraws
 	// every watcher the plugin declared before.

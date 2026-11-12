@@ -64,11 +64,12 @@ var storeWriters = map[string]string{
 	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
 		"Reached from the github sigils, which the reach table gives to ROOT",
 
-	"keepAgentName": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
+	"keepNameLine": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
 		"a name is one agent's on the whole node, and an agent acting in one namespace does not see system. " +
 		"Reached from i name, which the reach table gives to ROOT, SUPER and TOKEN, after itsOwnDID says the " +
 		"caller is a token asking as itself and iName says no other DID holds the name; the line's subject and " +
-		"actor are that DID and its predicate is agent:named, whatever was sent",
+		"actor are that DID and its predicate is agent:named, whatever was sent; and, before it, the line a revoked " +
+		"token's name is let go of in, agent:unnamed, about the DID that held the name by the agent asking for it",
 
 	"sessionStoreOf": "where an agent's session lands (ADR-048): the Node Agent's in system, which is " +
 		"the node's own record whoever spoke to it, reached from the claude and pi sigils, which the " +
