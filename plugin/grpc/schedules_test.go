@@ -237,13 +237,6 @@ func TestPluginSchedulesFollowThePlugin(t *testing.T) {
 		return got
 	}
 
-	// A schedule another caller made, whose metadata names duif and whose
-	// handler is not duif's: not duif's, whatever it says of itself.
-	require.NoError(t, schedule.NewStore(db).CreateJob(&schedule.Job{
-		MadeBy: string(async.MadeByNoCaller), Id: "AS-someone-elses", HandlerName: "report", IntervalSeconds: 60,
-		NextRunAt: time.Now().Format(time.RFC3339), State: schedule.StateActive, Metadata: `{"plugin":"duif"}`,
-		CreatedAt: time.Now().Format(time.RFC3339), UpdatedAt: time.Now().Format(time.RFC3339),
-	}))
 	// Metadata that is no JSON object keeps no plugin running.
 	for id, metadata := range map[string]string{"AS-null": "null", "AS-text": "polls the pond"} {
 		_, err := db.Exec(`UPDATE scheduled_pulse_jobs SET metadata = ? WHERE handler_name = 'duif/poll'`, metadata)
@@ -257,7 +250,6 @@ func TestPluginSchedulesFollowThePlugin(t *testing.T) {
 		"duif/poll":  schedule.StateInactive,
 		"duif/held":  schedule.StatePaused,
 		"other/poll": schedule.StateActive,
-		"report":     schedule.StateActive,
 	}, states())
 
 	// Back: the one the switch-off took out runs; the one declared paused does not.
@@ -266,7 +258,6 @@ func TestPluginSchedulesFollowThePlugin(t *testing.T) {
 		"duif/poll":  schedule.StateActive,
 		"duif/held":  schedule.StatePaused,
 		"other/poll": schedule.StateActive,
-		"report":     schedule.StateActive,
 	}, states())
 
 	// Paused by hand while the plugin is off, it is paused when the plugin is back.
@@ -290,12 +281,23 @@ func TestDeletePluginSchedules(t *testing.T) {
 	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
 	require.NoError(t, SetupPluginSchedules(db, "other", declared, logger))
 
+	// A schedule another caller made, whose metadata names duif and whose
+	// handler is not duif's: not duif's to pause or delete, whatever it says.
+	require.NoError(t, schedule.NewStore(db).CreateJob(&schedule.Job{
+		MadeBy: string(async.MadeByNoCaller), Id: "AS-someone-elses", HandlerName: "report", IntervalSeconds: 60,
+		NextRunAt: time.Now().Format(time.RFC3339), State: schedule.StateActive, Metadata: `{"plugin":"duif"}`,
+		CreatedAt: time.Now().Format(time.RFC3339), UpdatedAt: time.Now().Format(time.RFC3339),
+	}))
+
+	require.NoError(t, PausePluginSchedules(db, "duif", logger))
 	require.NoError(t, DeletePluginSchedules(db, "duif", logger))
 
 	jobs, err := schedule.NewStore(db).ListAllScheduledJobs()
 	require.NoError(t, err)
+	listed := map[string]string{}
 	for _, j := range jobs {
-		assert.NotEqual(t, "duif/poll", j.HandlerName, "a deleted schedule is not listed")
+		listed[j.HandlerName] = j.State
 	}
-	assert.Len(t, jobs, 1)
+	assert.Equal(t, map[string]string{"other/poll": schedule.StateActive, "report": schedule.StateActive}, listed,
+		"duif's are deleted, and nobody else's is touched")
 }
