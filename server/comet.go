@@ -94,7 +94,7 @@ func (s *QNTXServer) groundAgent(home string) {
 		build()
 		return
 	}
-	// A ground that stands holds the sand its grove checkout's rituals make now, or is built again.
+	// 「[Opus 5.5] A ground that stands holds the sand its grove checkout's rituals make now, or is built again.」
 	if err := comet.SandStands(home, s.ownURL); err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built again: its sand does not stand", "home", home, "because", err.Error())
 		s.cometHandler().Builder.GroundAgent(s.ctx, home, s.ownURL, s.keepAgentGround, s.logger.Named("comet").Infow)
