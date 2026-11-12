@@ -50,6 +50,7 @@ func stateString(state ServerState) string {
 
 // startBackgroundServices starts all background service goroutines
 func (s *QNTXServer) startBackgroundServices() {
+	s.wg.Go("rooms.githubComments", s.sayWaitingRoomComments)
 	// Pulse runs because the node runs. It is not separate enough from the node
 	// to be worth turning on and off, so there is no state to consult here and
 	// nothing that can leave a node up with its scheduled work silently dead.
@@ -325,6 +326,9 @@ waiting:
 			s.logger.Debugw("Config watcher stopped")
 		}
 	}
+
+	// The last of what the node logged as it stopped is counted; it is written now.
+	s.flushIssues()
 
 	// Opening/Closing Phase 4: Mark shutdown complete
 	s.setState(ServerStateStopped)

@@ -3,23 +3,34 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	a2agrpc "github.com/a2aproject/a2a-go/v2/a2agrpc/v1"
+	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/signing"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/pi"
+	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/harness/piharness"
 	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
+	"go.uber.org/zap/zaptest"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // "NOT BE ENTIRELY DEPENDENT ON ONE HARNESS"
@@ -43,10 +54,43 @@ func runningPiToo(t *testing.T) (s *QNTXServer, claudeRan, piRan string) {
 	named.Pi = sonnetThroughTheGateway
 	s, claudeRan = runningTheNodeAgent(t, named)
 	binary, piRan := claudeStandIn(t, piAnswered)
-	fetched := make(chan struct{})
-	close(fetched)
-	s.holdHarness("pi", &harnessHeld{name: "Pi", fetched: fetched, path: binary})
+	piPluginRuns(t, s, binary)
 	return s, claudeRan, piRan
+}
+
+// piPlugin is a plugin named pi that runs Pi: it declared harness_provider,
+// and what it serves is reached over gRPC, as a plugin's is (ADR-059).
+type piPlugin struct {
+	fakePlugin
+	served a2apb.A2AServiceClient
+}
+
+func (p *piPlugin) IsHarnessProvider() bool                  { return true }
+func (p *piPlugin) A2AServiceClient() a2apb.A2AServiceClient { return p.served }
+
+// piPluginRuns has a pi plugin running on s, whose Pi is the stand-in at
+// binary: a2a-go's gRPC binding of piharness, served and dialed on loopback.
+func piPluginRuns(t *testing.T, s *QNTXServer, binary string) {
+	t.Helper()
+	s.pluginRegistry = plugin.NewRegistry("0.1.0", zaptest.NewLogger(t).Sugar())
+	require.NoError(t, s.pluginRegistry.Register(&piPlugin{fakePlugin: fakePlugin{name: agentLinePi}, served: piServed(t, binary)}))
+	s.pluginRegistry.MarkReady(agentLinePi)
+}
+
+// piServed is a pi plugin's harness as core reaches it: a2a-go's gRPC binding
+// of piharness, served and dialed on loopback, its Pi the stand-in at binary.
+func piServed(t *testing.T, binary string) a2apb.A2AServiceClient {
+	t.Helper()
+	listening, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	serving := grpc.NewServer()
+	a2agrpc.NewHandler(piharness.Handler(func(context.Context) (string, error) { return binary, nil })).RegisterWith(serving)
+	go func() { _ = serving.Serve(listening) }()
+	t.Cleanup(serving.Stop)
+	conn, err := grpc.NewClient(listening.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	return a2apb.NewA2AServiceClient(conn)
 }
 
 func sayingToPi(s *QNTXServer, sent sigil.Sent) (*protocol.PiSaid, *protocol.Refusal) {
@@ -165,6 +209,24 @@ func TestANodeThatNamesNoPiHasNoneToSpeakTo(t *testing.T) {
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.GetWhy())
 	assert.Contains(t, refused.GetSays(), "[agent.root.pi]")
+}
+
+// "Let's say that I don't like how it's putting Claude on a pedestal."
+//
+// 「[Opus 5.5] A Node Agent am.toml names in Pi alone answers in Pi, and asked
+// in Claude Code says that harness is not named, not that there is no Node Agent.」
+func TestNodeAgentInPiAloneIsNotInClaudeCode(t *testing.T) {
+	s, _, _ := runningPiToo(t)
+	s.deps.cfg.Agent.Root.Claude = appcfg.ClaudeConfig{}
+	require.True(t, s.deps.cfg.Agent.Root.Named())
+
+	_, refused := s.harnessAm(s.piHarness())
+	require.Nil(t, refused)
+	_, refused = s.harnessAm(s.claudeHarness())
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.NotFound, refused.GetWhy())
+	assert.Contains(t, refused.GetSays(), "[agent.root.claude]")
+	assert.NotContains(t, refused.GetSays(), "names no Node Agent")
 }
 
 // Pi says who answers in it and how it is run, which the Pi element draws.
@@ -321,4 +383,110 @@ func TestATurnInPiCarriesOnlyItsOwnCredential(t *testing.T) {
 	assert.Contains(t, env, "QNTX_PI_PROVIDER_KEY="+s.nodeAgent.did)
 	assert.NotContains(t, env, "QNTX_TEST_PLAN_TOKEN=the-plan-token")
 	assert.NotContains(t, env, "QNTX_NODE_SECRET=the node's")
+}
+
+// "Harness is a plugin that speaks grpc A2A": Pi is the pi plugin's to run. A
+// node that names Pi and runs no such plugin has no Pi, and nothing answers in
+// its place; a plugin still loading runs nothing yet.
+func TestPiIsRunByThePiPluginAndNothingElse(t *testing.T) {
+	named := opusLow
+	named.Pi = sonnetThroughTheGateway
+	s, _ := runningTheNodeAgent(t, named)
+	s.pluginRegistry = plugin.NewRegistry("0.1.0", zaptest.NewLogger(t).Sugar())
+
+	_, refused := sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "no plugin on this node runs Pi")
+
+	// A binary the node itself holds is not Pi's way in any more.
+	binary, ran := claudeStandIn(t, piAnswered)
+	fetched := make(chan struct{})
+	close(fetched)
+	s.holdHarness("pi", &harnessHeld{name: "Pi", fetched: fetched, path: binary})
+	_, refused = sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "no plugin on this node runs Pi")
+	entries, err := os.ReadDir(ran)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "Pi was run by the node itself")
+
+	// Loading is not running.
+	s.holdHarness("pi", nil)
+	s.pluginRegistry.PreRegister(agentLinePi)
+	require.NoError(t, s.pluginRegistry.Register(&piPlugin{fakePlugin: fakePlugin{name: agentLinePi}}))
+	_, runs := s.harnessBackend(agentLinePi)
+	assert.False(t, runs)
+	s.pluginRegistry.MarkReady(agentLinePi)
+	_, runs = s.harnessBackend(agentLinePi)
+	assert.True(t, runs)
+}
+
+// A run Pi does not answer is the turn failing in Pi's own words, carried back
+// from the plugin as the Task failed.
+func TestARunThePiPluginCannotAnswerSaysWhy(t *testing.T) {
+	named := opusLow
+	named.Pi = sonnetThroughTheGateway
+	s, _ := runningTheNodeAgent(t, named)
+	piPluginRuns(t, s, filepath.Join(t.TempDir(), "no-pi-here"))
+
+	_, refused := sayingToPi(s, sigil.Sent{"says": "how long has the box been up?"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "Pi did not answer")
+	assert.Contains(t, refused.GetSays(), "no-pi-here")
+}
+
+// A turn core gives up is canceled in the plugin: a2a-go runs a turn apart
+// from the call that asked for it, so Pi would run on, writing into a session
+// the node holds to be over.
+func TestATurnCoreGivesUpStopsPiInThePlugin(t *testing.T) {
+	dir := t.TempDir()
+	started := filepath.Join(dir, "pid")
+	binary := filepath.Join(dir, "pi")
+	require.NoError(t, os.WriteFile(binary, []byte("#!/bin/sh\necho $$ > '"+started+"'\nexec sleep 120\n"), 0o755))
+	backend := piServed(t, binary)
+
+	asking, giveUp := context.WithCancel(context.Background())
+	defer giveUp()
+	gaveUp := make(chan error, 1)
+	go func() {
+		_, err := saidInBackend(asking, backend, "how long has the box been up?",
+			pi.Said{Home: filepath.Join(dir, "home"), Session: "s-1", Model: "qntx/anthropic/claude-sonnet-4.6", Tools: pi.PisOwnTools},
+			func(a2asdk.Event) error { return nil })
+		gaveUp <- err
+	}()
+
+	var running int
+	require.Eventually(t, func() bool {
+		select {
+		case err := <-gaveUp:
+			t.Fatalf("the turn ended before Pi was started: %v", err)
+		default:
+		}
+		written, err := os.ReadFile(started)
+		if err != nil {
+			return false
+		}
+		running, err = strconv.Atoi(strings.TrimSpace(string(written)))
+		return err == nil
+	}, 10*time.Second, 20*time.Millisecond, "Pi was not started")
+
+	giveUp()
+	require.Error(t, <-gaveUp)
+	assert.Eventually(t, func() bool { return syscall.Kill(running, 0) != nil }, 10*time.Second, 50*time.Millisecond,
+		"Pi runs on in the plugin after the node gave its turn up")
+}
+
+// Only a harness the node holds no binary of is held by its plugin: where
+// Claude Code's binary is looked for (a ritual's PATH, a login), a running
+// claude plugin's label is no path.
+func TestAPluginNamedForAHarnessTheNodeRunsHoldsNothing(t *testing.T) {
+	s := &QNTXServer{}
+	s.pluginRegistry = plugin.NewRegistry("0.1.0", zaptest.NewLogger(t).Sugar())
+	for _, name := range []string{"claude", agentLinePi} {
+		require.NoError(t, s.pluginRegistry.Register(&piPlugin{fakePlugin: fakePlugin{name: name}}))
+		s.pluginRegistry.MarkReady(name)
+	}
+
+	assert.Nil(t, s.harnessHeldBy("claude"), "a plugin's label stands where Claude Code's binary is looked for")
+	require.NotNil(t, s.harnessHeldBy(agentLinePi))
 }

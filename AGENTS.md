@@ -23,7 +23,6 @@ See [github.com/teranos/sacred-error](https://github.com/teranos/sacred-error) a
 ## Tablet of REACH
 
 A sigil handles a server capability, the reach table governs it with attestation DSL policy lines like this:
-`REACH is '/i/standing' of ROOT SUPER TOKEN ATTESTOR PUBLIC_REGISTRATION`
 `REACH is '/am/syscap' of ROOT`
 
 ## Plugins
@@ -50,7 +49,14 @@ TODO: sweep every repository and file for the old am.toml way of managing QNTX p
 Who may log in, the provider ceremony, and what a passkey carries:
 
 - [ADR-030](docs/adr/ADR-030-identity-providers.md).
-- Access tokens: [ADR-025](docs/adr/ADR-025-access-tokens.md).
+
+## Ground
+
+A session on a person's machine is ground's ([teranos/ground](https://github.com/teranos/ground), public). QNTX writes into ground's db: the node leaves news on the status row, ug writes it into ground's store, and sky hands it to the session.
+
+- Here: `server/statusline/news.go`, `server/am_ground.go`.
+- In ground: `ug/tmux.d` (`newsPass`), `source/immediate.d`, `source/sky.d`, `source/stream.d`.
+- [ADR-059](docs/adr/ADR-059-Harness-is-a-Plugin.md), "How a session on a machine is told".
 
 ## Connectors
 

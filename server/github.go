@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/internal/forge"
+	"github.com/teranos/QNTX/internal/roomcomments"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -66,6 +67,7 @@ type gitHubHost interface {
 	vaultsMovedBy(forge.Push) []string
 	cometsMovedBy(forge.Push) []string
 	enqueueForward(*async.Job) error
+	keepRoomComment(context.Context, *roomcomments.Comment) error
 }
 
 // TODO(forge): Credentials per forge host (see GitHubKeeper).

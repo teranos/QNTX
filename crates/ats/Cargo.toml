@@ -15,6 +15,10 @@ std = []
 # WASM target (excludes native-only deps)
 wasm = []
 
+# `storage::conformance`: the check a backend runs on itself. Off for
+# everything that ships; a backend's dev-dependencies turn it on.
+conformance = []
+
 [lints]
 workspace = true
 

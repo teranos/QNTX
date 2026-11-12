@@ -64,11 +64,12 @@ var storeWriters = map[string]string{
 	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
 		"Reached from the github sigils, which the reach table gives to ROOT",
 
-	"keepAgentName": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
+	"keepNameLine": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
 		"a name is one agent's on the whole node, and an agent acting in one namespace does not see system. " +
 		"Reached from i name, which the reach table gives to ROOT, SUPER and TOKEN, after itsOwnDID says the " +
 		"caller is a token asking as itself and iName says no other DID holds the name; the line's subject and " +
-		"actor are that DID and its predicate is agent:named, whatever was sent",
+		"actor are that DID and its predicate is agent:named, whatever was sent; and, before it, the line a revoked " +
+		"token's name is let go of in, agent:unnamed, about the DID that held the name by the agent asking for it",
 
 	"sessionStoreOf": "where an agent's session lands (ADR-048): the Node Agent's in system, which is " +
 		"the node's own record whoever spoke to it, reached from the claude and pi sigils, which the " +
@@ -197,9 +198,15 @@ func asksToWrite(body *ast.BlockStmt) bool {
 // it is a claim somebody makes in the open, or it is a thing a namespace has.
 var nodeReaders = map[string]string{
 	"handlers.go:health":                          "the health of the file underneath, which is the node's to answer",
+	"issues_kept.go:flushIssues":                  "what the node logged, kept as it stops: one process's errors, not a namespace's",
+	"issues_kept.go:keepIssues":                   "what the node logged, kept every minute: one process's errors, not a namespace's",
+	"issues_kept.go:seedIssues":                   "today's issues as the node kept them, read back after a restart",
+	"issues_kept.go:writeIssuesOnce":              "one write of what the node logged to issues_seen",
 	"operational_watchdog.go:askOperationalStore": "the same ping on a tick, so a node that has stopped answering says so",
 	"operational_watchdog.go:operationalPool":     "where the connections to the node's own file are while a ping waits on it",
 	"lifecycle.go:Stop":                           "shutdown compares the pulse read connection with the node's own",
+	"rooms_github.go:keepRoomComment":             "the comments waiting to be said into the Node Room, kept in the node's own file until the Room has them",
+	"rooms_github.go:sayWaitingRoomComments":      "the sweep that says those waiting comments into the Node Room, from the node's own file",
 	"sub_auth.go:Init":                            "the doors, which are the node's edge: am.toml says which namespace is behind each",
 	"sub_config_watcher.go:Init":                  "am.toml is the node's configuration, and watching it is the node's",
 	"sub_nodedid.go:Init":                         "the node's own identity, the row keyed self",

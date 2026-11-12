@@ -120,7 +120,7 @@ type Handler struct {
 	githubLocationForPeers GitHubLocate
 	// nodes.peers: this primary's peers, by did:key and by name.
 	nodes    map[string]Client
-	tokens   TokenStore // ADR-025: bearer token path; may be nil during init
+	tokens   TokenStore // bearer token path; may be nil during init
 	attestor Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
@@ -346,8 +346,8 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 	// The token names its own namespace, so this is where a request is routed
 	// rather than defaulted.
 	if grant := p.Bearer; grant != nil {
-		// A client authenticates at the token endpoint and nowhere else
-		// (ADR-025). The secret an app holds is not a credential that reaches
+		// A client authenticates at the token endpoint and nowhere else.
+		// The secret an app holds is not a credential that reaches
 		// a route, whoever minted it.
 		if grant.Level == LevelOAuth {
 			h.logger.Infow("Bearer token refused",
@@ -371,7 +371,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 				"reason", "a GitHub token is not a bearer")
 			return Admission{}, false
 		}
-		// A token speaks for whoever minted it (ADR-025), so striking them out
+		// A token speaks for whoever minted it, so striking them out
 		// of am.toml has to reach it too. An empty list strikes out everyone.
 		if !h.stillAdmitted(grant.MintedBy) {
 			h.logger.Infow("Bearer token refused",
@@ -413,7 +413,7 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		// 「[Opus 5.5] A token holds roles by its label, its name.」
 		holder := grant.Label
 		// 「[Opus 5.5] An agent's token is the token it runs under, under a DID of its own」
-		// 「[Opus 5.5] (ADR-025): its level, its namespaces and its roles are that token's,」
+		// 「[Opus 5.5] Its level, its namespaces and its roles are that token's,」
 		// 「[Opus 5.5] read now, and it stands while that token does.」
 		if asking, isAgents, stands := h.runsUnder(grant.Label, grant.DID); isAgents {
 			if !stands {
@@ -558,14 +558,14 @@ func (h *Handler) holdingsOf(identity, namespace string) ([]string, bool) {
 
 // RegisterRoutes registers all /auth/* routes on the default mux.
 // Ceremony routes use CORS middleware but bypass auth middleware.
-// Token management routes (ADR-025) require an authenticated passkey
+// Token management routes require an authenticated passkey
 // session — bearer tokens cannot mint new tokens.
 // Routes is what this package can answer, by the path it answers on.
 
 // It hands them back rather than registering them. A package that could put a
 // route on the mux itself would be a second way onto it, and there is one way
 // and it is a line in server/reach.
-// MintedBy is who a token speaks for, by its DID (ADR-025). What a token
+// MintedBy is who a token speaks for, by its DID. What a token
 // wrote is filed under its DID; what is left for it on the row is filed
 // under the person, so the person's other tokens and their session see it.
 func (h *Handler) MintedBy(did string) (string, bool) {
@@ -620,7 +620,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(homewardResultPath, h.handleHomewardResult)
 	// Who sent the person home, so the face can name them.
 	mux.answer(journeyPath, h.handleJourney)
-	// A client is a door (ADR-025): it sends the person here, the passkey is
+	// A client is a door: it sends the person here, the passkey is
 	// done at home, and the code goes back by ticket through the done page.
 	mux.answer(authorizePath, h.handleAuthorize)
 	mux.answer(authorizeDonePath, h.handleAuthorizeDone)
@@ -629,6 +629,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
 	mux.answer(deviceApprovePath, h.handleDeviceApprove)
 	mux.answer(deviceDonePath, h.handleDeviceDone)
+	// A key that was said yes to admits a session's key, signing as itself (ADR-059).
+	mux.answer(admitPath, h.handleAdmit)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
 	// A peer asks for the lines about the namespaces it serves, signing as itself.
@@ -742,7 +744,7 @@ func (h *Handler) readOrSession(next gated) http.HandlerFunc {
 }
 
 // sessionOnly gates a handler on a valid passkey session cookie. Bearer
-// tokens are rejected — ADR-025 forbids tokens from minting new tokens.
+// tokens are rejected: a token mints no token.
 func (h *Handler) sessionOnly(next gated) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := h.presented(r)
@@ -868,6 +870,10 @@ var a2aStatus = map[int]string{http.StatusUnauthorized: "UNAUTHENTICATED", http.
 // "HTTP error responses use the google.rpc.Status JSON representation" (A2A
 // §11.6), and as every other refusal here elsewhere.
 func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, message string) {
+	if strings.HasPrefix(r.URL.Path, ixOtelPrefix) {
+		h.refuseOTLP(w, r, status, message)
+		return
+	}
 	if !strings.HasPrefix(r.URL.Path, a2aPrefix) {
 		h.writeError(w, status, message)
 		return
@@ -894,7 +900,7 @@ func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, mes
 // it can act on. Without the slash, because that is the URL a connector is given.
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/mcp", "/comet/", a2aPrefix} {
+	for _, asked := range []string{"/api/", "/ws", "/i/", "/am/", "/ix/", "/mcp", "/comet/", a2aPrefix} {
 		if strings.HasPrefix(path, asked) {
 			return true
 		}

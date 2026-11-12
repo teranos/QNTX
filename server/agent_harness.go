@@ -348,11 +348,46 @@ type harnessesHeld struct {
 	held map[string]*harnessHeld
 }
 
-// harnessHeldBy is the binary of the harness named, or nil when the node holds none.
+// harnessHeldBy is the binary of the harness named, or nil when the node holds
+// none. A harness a plugin runs is held where the plugin is (ADR-059): the
+// binary is the plugin's own. Only a harness the node holds no binary of is
+// held so (harnessesAPluginHolds).
 func (s *QNTXServer) harnessHeldBy(name string) *harnessHeld {
 	s.harnessBinaries.mu.Lock()
+	held := s.harnessBinaries.held[name]
+	s.harnessBinaries.mu.Unlock()
+	if held != nil {
+		return held
+	}
+	if !harnessesAPluginHolds[name] {
+		return nil
+	}
+	if _, runs := s.harnessBackend(name); !runs {
+		return nil
+	}
+	arrived := make(chan struct{})
+	close(arrived)
+	return &harnessHeld{name: name, fetched: arrived, path: harnessPluginHeld(name)}
+}
+
+// 「[Opus 5.5] holdHarnessOnce is the binary of the harness named, kept by
+// fetch the first time it is needed when the node holds none: asked twice at
+// once, it is fetched once.」
+func (s *QNTXServer) holdHarnessOnce(name string, fetch func() (*harnessHeld, error)) (*harnessHeld, error) {
+	s.harnessBinaries.mu.Lock()
 	defer s.harnessBinaries.mu.Unlock()
-	return s.harnessBinaries.held[name]
+	if held := s.harnessBinaries.held[name]; held != nil {
+		return held, nil
+	}
+	held, err := fetch()
+	if err != nil {
+		return nil, err
+	}
+	if s.harnessBinaries.held == nil {
+		s.harnessBinaries.held = map[string]*harnessHeld{}
+	}
+	s.harnessBinaries.held[name] = held
+	return held, nil
 }
 
 // holdHarness keeps the binary of the harness named.

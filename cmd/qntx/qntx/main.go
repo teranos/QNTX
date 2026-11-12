@@ -101,8 +101,19 @@ func init() {
 			}
 		}
 
+		// "THE LANGUAGE OF OBSERVABILITY NEEDS TO BE OTEL"
+		// 「[Opus 5.5] Logs leave over OTLP when the environment names where, beside Sentry.」
+		logsOut, logsErr := otlp.StartLogs(context.Background(), version.VersionTag)
+		if logsErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP log export: %v\n", logsErr)
+		}
+		logger.AddOTLPOutput(logsOut)
+
 		// After every output is on, so one count decides for all of them.
 		logger.CollectRepeats()
+		if endpoint, said := otlp.LogsSaid(); said && otlp.LogsRunning() {
+			logger.Infow("Shipping logs over OTLP", "endpoint", endpoint, "release", version.VersionTag)
+		}
 
 		// The numbers ride the same client. Started unconditionally: with no
 		// client the meter is a no-op, and a call site that has to ask whether
@@ -126,6 +137,13 @@ func init() {
 		}
 		if len(toSentry) > 0 && otlp.Running() {
 			logger.Infow("Shipping spans to Sentry", "traces_sample_rate", opt.TracesSampleRate)
+		}
+		// 「[Opus 5.5] The numbers measure takes leave over OTLP as well, when the environment names where.」
+		if err := otlp.StartMetrics(context.Background(), version.VersionTag); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP metric export: %v\n", err)
+		}
+		if endpoint, _ := otlp.MetricsSaid(); otlp.MetricsRunning() {
+			logger.Infow("Shipping metrics over OTLP", "endpoint", endpoint, "release", version.VersionTag)
 		}
 
 		if logger.SentryRunning() {

@@ -22,7 +22,7 @@ func getAxUpgrader() websocket.Upgrader {
 // A missing Origin header is rejected. Every legitimate client — browsers,
 // Tauri, and cross-origin JS — sends an Origin. Raw clients that omit the
 // header would otherwise bypass origin validation entirely; machine access
-// belongs on the bearer token path (ADR-025) served over HTTP, not raw WS.
+// belongs on the bearer token path served over HTTP, not raw WS.
 func checkOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {

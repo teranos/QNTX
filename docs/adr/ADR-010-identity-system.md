@@ -14,28 +14,18 @@ QNTX's identity system has four orthogonal layers, each with distinct properties
 | **Node DID** | Signer identity | Globally unique (ed25519 keypair) | Generated once per node | `did:key:z6Mk...` |
 | **User DID** | The person | Globally unique (ed25519 keypair) | Derived from biometrics via WebAuthn PRF | `did:key:z6Mk...` |
 
-A node was a server when this table was written. Since ADR-012 it is also a
-browser, and `internal/nodedid/` cannot reach one.
+A node was a server when this table was written. Since ADR-012 it is also a browser, and `internal/nodedid/` cannot reach one.
 
 User DID was written here before anything derived one. It is real since [[ADR-030-identity-providers]] passkey gate: the browser asks the authenticator for a PRF output
 and derives the key from it, so the same finger gives the same DID.
 
-Of the three, only ASUID has a generator. Subjects carry names a human supplies,
-checked by a write-time warning rather than derived. Node DID is minted in
-`internal/nodedid/`.
+Of the three, only ASUID has a generator. Subjects carry names a human supplies, checked by a write-time warning rather than derived. Node DID is minted in `internal/nodedid/`.
 
 Node DIDs already exist (`internal/nodedid/`). This ADR defines the first two layers and commits to implementing them in Rust.
 
-The third layer is described here and decided nowhere. `internal/nodedid/store.go`
-holds one ed25519 keypair per node under `id = 'self'`, and no ADR specifies it.
-ADR-012 made that gap load-bearing by accepting the browser as a node.
-Tracked in #840.
+The third layer is described here and decided nowhere. `internal/nodedid/store.go` holds one ed25519 keypair per node under `id = 'self'`, and no ADR specifies it. ADR-012 made that gap load-bearing by accepting the browser as a node. Tracked in #840.
 
-A browser takes its signer identity from `laye-p2p` (`teranos/laye`), which
-ships with QNTX web. laye-p2p mints an ed25519 keypair and persists it to
-IndexedDB, so a tab holds the same key across reloads. That key is what a node
-DID names — `did:key:z` + base58btc(`0xed 0x01` ‖ pubkey) — so a browser's
-node DID is an encoding of its peer key, not a second identity.
+A browser takes its signer identity from `laye-p2p` (`teranos/laye`), which ships with QNTX web. laye-p2p mints an ed25519 keypair and persists it to IndexedDB, so a tab holds the same key across reloads. That key is what a node DID names — `did:key:z` + base58btc(`0xed 0x01` ‖ pubkey) — so a browser's node DID is an encoding of its peer key, not a second identity.
 
 ### Vanity IDs
 
@@ -83,10 +73,7 @@ Both layers are implemented in the Rust crate `ats-id`, maintained in this repos
 - **No regex.** String methods only (CLAUDE.md).
 - **Expose via WASM.** Both wazero (Go server) and browser (wasm-bindgen) targets, following the pattern established in ADR-005.
 
-Shipped in phases, each independently releasable, and all of it landed except
-one: **Vanity ID generation was dropped** — deriving a handle from a name is not
-needed, so subjects carry names a human supplies. The generator also covers
-non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
+Shipped in phases, each independently releasable, and all of it landed except one: **Vanity ID generation was dropped** — deriving a handle from a name is not needed, so subjects carry names a human supplies. The generator also covers non-attestation IDs (embedding IDs, run IDs), which is why it outgrew its name.
 
 ## Consequences
 
