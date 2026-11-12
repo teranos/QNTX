@@ -35,6 +35,9 @@ type Comment struct {
 	App string
 	// PRBody is the description of the pull request the comment is on.
 	PRBody string
+	// PRByApp is whether a GitHub App opened the pull request: the node's own
+	// pull requests are opened by its App, a person's by the person.
+	PRByApp bool
 }
 
 // "For example given the Qodo comments we see on many of our PR’s"
@@ -57,6 +60,9 @@ func Parse(event string, body []byte) (*Comment, error) {
 			Slug string `json:"slug"`
 		} `json:"performed_via_github_app"`
 	}
+	type opener struct {
+		Type string `json:"type"`
+	}
 	var sent struct {
 		Action     string `json:"action"`
 		Repository struct {
@@ -66,10 +72,12 @@ func Parse(event string, body []byte) (*Comment, error) {
 			Number int64           `json:"number"`
 			Body   string          `json:"body"`
 			PR     json.RawMessage `json:"pull_request"`
+			User   opener          `json:"user"`
 		} `json:"issue"`
 		PR struct {
 			Number int64  `json:"number"`
 			Body   string `json:"body"`
+			User   opener `json:"user"`
 		} `json:"pull_request"`
 		Comment words `json:"comment"`
 		Review  words `json:"review"`
@@ -86,12 +94,12 @@ func Parse(event string, body []byte) (*Comment, error) {
 	if repo == "" {
 		return nil, nil
 	}
-	w, number, fragment, prBody := sent.Comment, sent.PR.Number, "discussion_r", sent.PR.Body
+	w, number, fragment, prBody, opened := sent.Comment, sent.PR.Number, "discussion_r", sent.PR.Body, sent.PR.User
 	if event == "issue_comment" {
 		if len(sent.Issue.PR) == 0 || string(sent.Issue.PR) == "null" {
 			return nil, nil
 		}
-		number, fragment, prBody = sent.Issue.Number, "issuecomment-", sent.Issue.Body
+		number, fragment, prBody, opened = sent.Issue.Number, "issuecomment-", sent.Issue.Body, sent.Issue.User
 	}
 	if event == "pull_request_review" {
 		if sent.Action != "submitted" && sent.Action != "edited" {
@@ -120,7 +128,7 @@ func Parse(event string, body []byte) (*Comment, error) {
 	if _, err := time.Parse(time.RFC3339Nano, at); err != nil {
 		return nil, errors.Wrap(err, "the PR comment's time did not read")
 	}
-	c := &Comment{Repo: repo, Number: number, ID: w.ID, Author: w.User.Login, Body: w.Body, At: at, Action: sent.Action, Path: w.Path, Line: w.Line, App: w.App.Slug, PRBody: prBody}
+	c := &Comment{Repo: repo, Number: number, ID: w.ID, Author: w.User.Login, Body: w.Body, At: at, Action: sent.Action, Path: w.Path, Line: w.Line, App: w.App.Slug, PRBody: prBody, PRByApp: opened.Type == "Bot"}
 	c.URL = fmt.Sprintf("https://github.com/%s/pull/%d#%s%d", repo, number, fragment, w.ID)
 	// A redelivery has the same key; an edit is a new version, including a
 	// later edit restoring earlier words. Delivery IDs need not be retained.

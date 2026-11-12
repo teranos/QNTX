@@ -58,3 +58,11 @@ func TestWhoTheRoomShowsAsSayingIt(t *testing.T) {
 	assert.Equal(t, "teranos", Comment{Author: "teranos"}.Poster(), "a person by their login")
 	assert.Equal(t, "some-bot", Comment{Author: "some-bot[bot]"}.Poster(), "a bot with no app by its login without the suffix")
 }
+
+func TestWhatATurnIsNotTold(t *testing.T) {
+	assert.True(t, Unheard(Said{Sender: "claude", Body: "Merged."}, "claude"), "the agent's own words")
+	assert.True(t, Unheard(Said{Sender: "sbvh-qntx", Body: "/review"}, "claude"), "its App's comments said back")
+	assert.True(t, Unheard(Said{Sender: "admin", Body: "⚠️  _Switch Trust flagged this message (not blocked - pii/phone)._"}, "claude"), "Switch Trust's flags")
+	assert.False(t, Unheard(Said{Sender: "admin", Body: "Land it."}, "claude"), "a person saying something as admin")
+	assert.False(t, Unheard(Said{Sender: "qodo-code-review", Body: "A finding."}, "claude"), "a review")
+}

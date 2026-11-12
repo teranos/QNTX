@@ -88,10 +88,34 @@ func (w *roomWakes) ask(key, speaker string, tell func(speaker string)) {
 	})
 }
 
+// findingsSeen is, by comment, the sum of what it found when it last woke the
+// agent. An edit finding the same wakes no one. It lives as long as the node: a
+// restart forgets it, and the first edit after one wakes the agent once more.
+type findingsSeen struct {
+	mu   sync.Mutex
+	seen map[string]string
+}
+
+var findings = &findingsSeen{seen: map[string]string{}}
+
+func (f *findingsSeen) changed(c roomcomments.Comment) bool {
+	key, sum := c.URL, c.Findings()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.seen[key] == sum {
+		return false
+	}
+	f.seen[key] = sum
+	return true
+}
+
 // wakeAfterComment tells the agent the room, when the comment just said into
 // it is one the agent is to be woken by.
 func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments.Comment) {
 	if !c.Wakes(wakeApps(), nodeRoomName) {
+		return
+	}
+	if !findings.changed(c) {
 		return
 	}
 	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, "github-app:"+c.App, func(speaker string) {
@@ -138,11 +162,19 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 		return errors.Wrap(err, "the Node Room was not read")
 	}
 	var said []roomcomments.Said
+	var last string
 	for _, m := range read.GetMessages() {
-		said = append(said, roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()})
+		heard := roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()}
+		last = heard.At
+		if !roomcomments.Unheard(heard, agent) {
+			said = append(said, heard)
+		}
 	}
 	if len(said) == 0 {
-		return nil
+		if last == "" {
+			return nil
+		}
+		return told.Keep(ctx, target.Room, agent, last)
 	}
 	request, err := http.NewRequestWithContext(withSpeaker(lifetime, speaker), http.MethodPost, "/github/comments", nil)
 	if err != nil {
@@ -152,5 +184,5 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 		return errors.Newf("%s did not take the turn, so what it was to be told is told again with the next", agent)
 	}
 	// Kept once the agent took the turn: what is said during it is the next one's.
-	return told.Keep(context.WithoutCancel(ctx), target.Room, agent, said[len(said)-1].At)
+	return told.Keep(context.WithoutCancel(ctx), target.Room, agent, last)
 }
