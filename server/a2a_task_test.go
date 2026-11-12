@@ -576,8 +576,11 @@ func TestWhatATurnSaysIsStreamedAsItSaysIt(t *testing.T) {
 // A turn Claude Code prints in past turnQuietMost is working, not quiet: it is
 // left to answer.
 func TestATurnThatPrintsPastItsQuietTimeIsNotStopped(t *testing.T) {
+	// A second, and a line every twentieth of it: on a runner that stalls a
+	// shell for 400ms the turn was ended as quiet, and the test failed on a
+	// pull request that touched none of this.
 	quiet := turnQuietMost
-	turnQuietMost = 400 * time.Millisecond
+	turnQuietMost = time.Second
 	t.Cleanup(func() { turnQuietMost = quiet })
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	srv.harnessBinaries.mu.Lock()
@@ -585,12 +588,12 @@ func TestATurnThatPrintsPastItsQuietTimeIsNotStopped(t *testing.T) {
 	srv.harnessBinaries.mu.Unlock()
 	prints := filepath.Join(filepath.Dir(held.path), "claude-printing")
 	require.NoError(t, os.WriteFile(prints, []byte("#!/bin/sh\n"+
-		"i=0\nwhile [ $i -lt 30 ]; do echo '{\"type\":\"system\",\"subtype\":\"status\"}'; sleep 0.05; i=$((i+1)); done\n"+
+		"i=0\nwhile [ $i -lt 70 ]; do echo '{\"type\":\"system\",\"subtype\":\"status\"}'; sleep 0.05; i=$((i+1)); done\n"+
 		"exec '"+held.path+"' \"$@\"\n"), 0o755))
 	srv.holdHarness("claude", &harnessHeld{fetched: held.fetched, path: prints})
 
 	started := time.Now()
-	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to thirty", ""), tokens[auth.LevelRoot])
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to seventy", ""), tokens[auth.LevelRoot])
 	assert.Greater(t, time.Since(started), 3*turnQuietMost, "the turn did not print past its quiet time")
 	assert.Equal(t, "TASK_STATE_COMPLETED", at(sent, "task.status.state"), sent)
 }

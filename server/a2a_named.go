@@ -379,3 +379,60 @@ func lettersApart(a, b string) int {
 	}
 	return row[len(b)]
 }
+
+// awaitReceived waits on, after a restart, for the agent to say it received
+// what a ground took off the row at takenAt: the item is found by its id
+// again, off the row, and the Task is ended as the turn that waited on it
+// would have ended it.
+//
+// Kwikwi's Task ended as not received when q restarted for a deploy, with the
+// words already in the session's hands on k.
+func (s *QNTXServer) awaitReceived(did, id string, takenAt time.Time) {
+	lines, called, addressee := s.systemTasks(did), did, did
+	if names, err := s.agentNames(); err == nil {
+		if at := slices.IndexFunc(names, func(kept agentName) bool { return kept.did == did }); at >= 0 {
+			called = names[at].name
+		}
+	}
+	if s.authHandler != nil {
+		if who, speaksFor := s.authHandler.MintedBy(did); speaksFor {
+			addressee = who
+		}
+	}
+	var once sync.Once
+	end := func(state a2asdk.TaskState, gave, why string) {
+		once.Do(func() {
+			if s.news != nil {
+				s.news.Drop(id)
+			}
+			if err := s.endTask(lines, id, state, did, "", gave, why); err != nil {
+				s.logger.Errorw("a Task said to a name that waited across a restart was not ended", "task", id, "to", called, "error", err)
+			}
+		})
+	}
+	wait := time.Until(takenAt.Add(receivedWithin))
+	if s.news == nil || wait <= 0 {
+		end(a2asdk.TaskStateFailed, "", "a ground took it off the status row, and nothing says "+called+" received it within "+receivedWithin.String())
+		return
+	}
+	// Off the row: its time there is over, and it is found by its id.
+	s.news.Leave(statusline.News{
+		ID: id, For: addressee, Quiet: true,
+		Item:   statusline.StatusItem{Name: "to " + called, Symbol: statusline.SymbolWell},
+		Detail: map[string]any{"to": called, "did": did, "task": id},
+		Whole: func(by auth.Admission) {
+			if asking, refusal := itsOwnDID(by); refusal == nil && asking == did {
+				end(a2asdk.TaskStateCompleted, called+" received it", "")
+			}
+		},
+	})
+	sacred.Go("a task said to a name, waited on across a restart", func() {
+		hold := time.NewTimer(wait)
+		defer hold.Stop()
+		select {
+		case <-s.ctx.Done():
+		case <-hold.C:
+			end(a2asdk.TaskStateFailed, "", "a ground took it off the status row, and nothing says "+called+" received it within "+receivedWithin.String())
+		}
+	})
+}
