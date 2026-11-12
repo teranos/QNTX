@@ -43,9 +43,9 @@ const saidToANameContext = "said:to-a-name"
 // a ground to take: the row's own hold.
 var toldWithin = statusline.NewsHold
 
-// receivedWithin is how long what a ground took off the row waits for the
-// agent itself to say it received it: a session is handed it when it next
-// looks, which is not when it was said.
+// 「[Fable 5.2] receivedWithin is how long what a ground took off the row waits for the」
+// 「[Fable 5.2] agent itself to say it received it: a session is handed it when it next」
+// 「[Fable 5.2] looks, which is not when it was said.」
 var receivedWithin = time.Hour
 
 // agentNamedAt is the agent served at tenant by the name it holds. A
@@ -108,10 +108,10 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	// "A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT"
 	// Received is the agent itself asking for the whole of it, by the key its
 	// name is held by: its ground does so as it hands it to the session.
-	// Anyone else of the person asking is not the agent: that is their ground
-	// taking it off the row for the session, and the Task is working from
-	// then, with longer to be received in. ug wrote one two minutes after it
-	// was said, and the Task had already ended as not received.
+	// 「[Fable 5.2] Anyone else of the person asking is not the agent: that is their ground」
+	// 「[Fable 5.2] taking it off the row for the session, and the Task is working from」
+	// 「[Fable 5.2] then, with longer to be received in. ug wrote one two minutes after it」
+	// 「[Fable 5.2] was said, and the Task had already ended as not received.」
 	received, taken := make(chan struct{}), make(chan struct{})
 	var once, onceTaken sync.Once
 	e.s.leaveForAName(ta, string(id), spokenBy(call.request), says, func(by auth.Admission) {
@@ -121,7 +121,7 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 		}
 		onceTaken.Do(func() { close(taken) })
 	})
-	// The item is found by its id past its time on the row, until it is dropped.
+	// 「[Fable 5.2] The item is found by its id past its time on the row, until it is dropped.」
 	defer e.s.news.Drop(string(id))
 	hold := time.NewTimer(toldWithin)
 	defer hold.Stop()
