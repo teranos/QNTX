@@ -336,7 +336,7 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 			return ctx, nil, a2aRefusal(a2asdk.ErrInternalError, "whether an agent is served at tenant "+tenant+" was not answered: "+err.Error())
 		}
 		if !served {
-			return ctx, nil, a2aRefusal(a2asdk.ErrTaskNotFound, "no agent is served at tenant "+tenant)
+			return ctx, nil, a2aRefusal(a2asdk.ErrTaskNotFound, "no agent is served at tenant "+tenant+g.s.nearSaid(tenant))
 		}
 	}
 	// The card is the caller's, and needs no agent to give it.

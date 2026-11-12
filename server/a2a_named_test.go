@@ -291,3 +291,20 @@ func TestWhatAGroundTookAndTheAgentNeverReceivedIsNotReceived(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 	assert.Contains(t, toJSON(t, ended), "a ground took it off the status row, and nothing says Birch received it")
 }
+
+// "do you think the ground say should show near misses ?"
+func TestANameNobodyHoldsIsAnsweredWithTheNamesNearIt(t *testing.T) {
+	srv, root := namedOverA2A(t)
+
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Bir%20ch/message:send", saidToTheNode("hello", `{"returnImmediately": true}`), root)
+	assert.Equal(t, http.StatusNotFound, code, answered)
+	assert.Contains(t, toJSON(t, answered), "no agent is served at tenant Bir ch. Near it: Birch")
+
+	code, answered = a2aAsked(t, srv, http.MethodPost, "/a2a/Slate/message:send", saidToTheNode("hello", `{"returnImmediately": true}`), root)
+	assert.Equal(t, http.StatusNotFound, code, answered)
+	assert.NotContains(t, toJSON(t, answered), "Near it", "a name far from every name held was answered with one")
+
+	assert.Equal(t, 0, lettersApart("kwikwi", "kwikwi"))
+	assert.Equal(t, 1, lettersApart("birch", "brch"))
+	assert.Equal(t, 5, lettersApart("slate", "birch"))
+}
