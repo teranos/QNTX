@@ -1,8 +1,8 @@
-//! ats-dev's own signing identity: an ed25519 key it mints on first use and
-//! keeps in a file beside the database. The bytes signed are `ats-sign`'s, the
-//! ones Go's `ats/signing` signs and verifies; the signer is named by its
-//! `did:key`, as the node names itself. This is not the node's key and its DID
-//! is not in the node's DID document. Unix only, as QNTX is (ADR-029).
+//! 「[Sonnet 5.5] ats-dev's own signing identity: an ed25519 key it mints on first use and」
+//! 「[Sonnet 5.5] keeps in a file beside the database. The bytes signed are `ats-sign`'s, the」
+//! 「[Sonnet 5.5] ones Go's `ats/signing` signs and verifies; the signer is named by its」
+//! 「[Sonnet 5.5] `did:key`, as the node names itself. This is not the node's key and its DID」
+//! 「[Sonnet 5.5] is not in the node's DID document. Unix only, as QNTX is (ADR-029).」
 
 use std::path::{Path, PathBuf};
 
@@ -19,8 +19,8 @@ pub struct Signer {
     pub did: String,
 }
 
-/// Where the key lives: `--key`, else `$ATS_DEV_KEY`, else `<db>.key` when the
-/// database is a path (`beside`). A url has no file to sit beside, so it is told.
+/// 「[Sonnet 5.5] Where the key lives: `--key`, else `$ATS_DEV_KEY`, else `<db>.key` when the」
+/// 「[Sonnet 5.5] database is a path (`beside`). A url has no file to sit beside, so it is told.」
 pub fn key_path(flag: Option<&str>, beside: Option<&str>, backend: &str) -> Result<PathBuf, Box<Error>> {
     match (flag, std::env::var("ATS_DEV_KEY"), beside) {
         (Some(f), _, _) => Ok(PathBuf::from(f)),
@@ -34,9 +34,9 @@ pub fn key_path(flag: Option<&str>, beside: Option<&str>, backend: &str) -> Resu
 }
 
 impl Signer {
-    /// The key at `path`, or a fresh one written there (0600) if there is none.
-    /// A file that exists and is not a key is an error, never replaced. Two
-    /// processes minting at once end with one key: the loser loads the winner's.
+    /// 「[Sonnet 5.5] The key at `path`, or a fresh one written there (0600) if there is none.」
+    /// 「[Sonnet 5.5] A file that exists and is not a key is an error, never replaced. Two」
+    /// 「[Sonnet 5.5] processes minting at once end with one key: the loser loads the winner's.」
     pub fn load_or_mint(path: &Path) -> Result<Self, Box<Error>> {
         match read_key(path) {
             Ok(Some(bytes)) => Self::from_file(path, &bytes),
@@ -54,7 +54,7 @@ impl Signer {
         }
     }
 
-    /// The key at `path` if there is one; none is not minted.
+    /// 「[Sonnet 5.5] The key at `path` if there is one; none is not minted.」
     pub fn load_existing(path: &Path) -> Result<Option<Self>, Box<Error>> {
         read_key(path)?.map(|bytes| Self::from_file(path, &bytes)).transpose()
     }
@@ -74,8 +74,8 @@ impl Signer {
         Ok(Self { key, did })
     }
 
-    /// The attestation, signed over `ats-sign`'s canonical bytes. The actors
-    /// are under the signature, so they must be settled before this is called.
+    /// 「[Sonnet 5.5] The attestation, signed over `ats-sign`'s canonical bytes. The actors」
+    /// 「[Sonnet 5.5] are under the signature, so they must be settled before this is called.」
     pub fn sign(&self, mut a: Attestation) -> Result<Attestation, Box<Error>> {
         let bytes = canonical(&a)?;
         a.signature = Some(self.key.sign(bytes.as_bytes()).map_err(|e| fail("could not sign", e))?);
@@ -84,7 +84,7 @@ impl Signer {
     }
 }
 
-/// What a signature on an attestation amounts to.
+/// 「[Sonnet 5.5] What a signature on an attestation amounts to.」
 #[derive(Debug, PartialEq, Eq)]
 pub enum Verdict {
     Unsigned,
@@ -112,7 +112,7 @@ pub fn verify(a: &Attestation) -> Verdict {
     }
 }
 
-/// `ats-sign`'s canonical JSON of an attestation as ats-dev holds it.
+/// 「[Sonnet 5.5] `ats-sign`'s canonical JSON of an attestation as ats-dev holds it.」
 pub fn canonical(a: &Attestation) -> Result<String, Box<Error>> {
     let wire = serde_json::to_string(a).map_err(|e| fail("could not encode an attestation", e))?;
     Signable::from_wire_json(&wire)
@@ -120,15 +120,15 @@ pub fn canonical(a: &Attestation) -> Result<String, Box<Error>> {
         .map_err(|e| fail("could not produce the bytes to sign", e))
 }
 
-/// The bytes of the key file, `None` if there is none. A key that group or
-/// other can reach is refused, as ssh refuses one: whoever can read it can sign
-/// as this identity.
+/// 「[Sonnet 5.5] The bytes of the key file, `None` if there is none. A key that group or」
+/// 「[Sonnet 5.5] other can reach is refused, as ssh refuses one: whoever can read it can sign」
+/// 「[Sonnet 5.5] as this identity.」
 fn read_key(path: &Path) -> Result<Option<Vec<u8>>, Box<Error>> {
     use std::io::Read;
     use std::os::unix::fs::PermissionsExt;
     let unreadable = |e: std::io::Error| fail("could not read the key file", format!("{}: {e}", path.display()));
-    // One open, then the checks and the read through that handle: the file
-    // that was checked is the file that is read, whatever happens to the path.
+    // 「[Sonnet 5.5] One open, then the checks and the read through that handle: the file」
+    // 「[Sonnet 5.5] that was checked is the file that is read, whatever happens to the path.」
     let mut file = match std::fs::File::open(path) {
         Ok(f) => f,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -150,11 +150,11 @@ fn read_key(path: &Path) -> Result<Option<Vec<u8>>, Box<Error>> {
     Ok(Some(bytes))
 }
 
-/// The key, written whole to a private temporary file beside `path` and then
-/// linked into place, which fails if `path` exists: a reader never sees half a
-/// key, and nothing is replaced. `false` means someone else's key is there.
-/// The temporary name is this attempt's alone, and only a file this attempt
-/// created is removed.
+/// 「[Sonnet 5.5] The key, written whole to a private temporary file beside `path` and then」
+/// 「[Sonnet 5.5] linked into place, which fails if `path` exists: a reader never sees half a」
+/// 「[Sonnet 5.5] key, and nothing is replaced. `false` means someone else's key is there.」
+/// 「[Sonnet 5.5] The temporary name is this attempt's alone, and only a file this attempt」
+/// 「[Sonnet 5.5] created is removed.」
 fn publish_new(path: &Path, bytes: &[u8]) -> Result<bool, Box<Error>> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
@@ -187,8 +187,8 @@ fn publish_new(path: &Path, bytes: &[u8]) -> Result<bool, Box<Error>> {
     }
 }
 
-/// Make the key's directory entry durable before anything is signed with it:
-/// rows signed by a key that a power loss un-links could never be re-signed.
+/// 「[Sonnet 5.5] Make the key's directory entry durable before anything is signed with it:」
+/// 「[Sonnet 5.5] rows signed by a key that a power loss un-links could never be re-signed.」
 fn sync_dir_of(path: &Path) -> Result<(), Box<Error>> {
     let dir = match path.parent() {
         Some(d) if !d.as_os_str().is_empty() => d,
@@ -208,8 +208,8 @@ mod tests {
         (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
     }
 
-    /// Go's vectors: the same seed, the same attestations, the signatures
-    /// `ats/signing` made. ed25519 is deterministic, so ats-dev's must be equal.
+    /// 「[Sonnet 5.5] Go's vectors: the same seed, the same attestations, the signatures」
+    /// 「[Sonnet 5.5] `ats/signing` made. ed25519 is deterministic, so ats-dev's must be equal.」
     #[test]
     fn it_signs_what_go_signed_byte_for_byte() {
         let sigs: serde_json::Value = serde_json::from_str(include_str!("../../../ats/signing/testdata/signatures.json")).unwrap();
