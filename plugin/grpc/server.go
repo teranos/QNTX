@@ -52,15 +52,15 @@ type PluginServer struct {
 	initOnce sync.Once
 	initErr  error
 
-	// harnessSecret is the secret of this launch, which the node that started
-	// the process handed it: what a call to the plugin's harness presents.
+	// 「[Fable 5.2, Fable 5.1] harnessSecret is the secret of this launch, which the node that started」
+	// 「[Fable 5.2, Fable 5.1] the process handed it: what a call to the plugin's harness presents.」
 	harnessSecret string
 }
 
 // NewPluginServer creates a new gRPC server wrapper for a DomainPlugin.
 func NewPluginServer(plugin plugin.DomainPlugin, logger *zap.SugaredLogger) *PluginServer {
-	// Read once and taken out of the environment: what the plugin starts (a
-	// harness's own process, with its tools) is handed none of it.
+	// 「[Fable 5.2, Fable 5.1] Read once and taken out of the environment: what the plugin starts (a」
+	// 「[Fable 5.2, Fable 5.1] harness's own process, with its tools) is handed none of it.」
 	secret := os.Getenv(HarnessSecretEnv)
 	_ = os.Unsetenv(HarnessSecretEnv)
 	return &PluginServer{
@@ -118,8 +118,8 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 		s.logger.Infow("Registered SearchService on plugin server", "plugin", s.plugin.Metadata().Name)
 	}
 
-	// "Harness is a plugin that speaks grpc A2A": a2a-go's gRPC binding of
-	// what the plugin's harness handles, on the same server (ADR-059).
+	// 「[Fable 5.2, Fable 5.1] "Harness is a plugin that speaks grpc A2A": a2a-go's gRPC binding of」
+	// 「[Fable 5.2, Fable 5.1] what the plugin's harness handles, on the same server (ADR-059).」
 	if provider, ok := s.plugin.(HarnessProvider); ok {
 		a2agrpc.NewHandler(provider.Harness()).RegisterWith(grpcServer)
 		s.logger.Infow("Registered A2AService on plugin server", "plugin", s.plugin.Metadata().Name)
@@ -141,13 +141,13 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	return nil
 }
 
-// harnessCalls is every method of A2A's A2AService, as gRPC names them.
+// 「[Fable 5.2, Fable 5.1] harnessCalls is every method of A2A's A2AService, as gRPC names them.」
 var harnessCalls = "/" + a2apb.A2AService_ServiceDesc.ServiceName + "/"
 
-// fromTheNode refuses a call to the plugin's harness that does not present
-// the secret of this launch. A turn names the harness's home, its environment
-// and its provider, so it is the node's alone to say: a plugin no node
-// started, or one reached by whoever else is on the machine, answers no turn.
+// 「[Fable 5.2, Fable 5.1] fromTheNode refuses a call to the plugin's harness that does not present」
+// 「[Fable 5.2, Fable 5.1] the secret of this launch. A turn names the harness's home, its environment」
+// 「[Fable 5.2, Fable 5.1] and its provider, so it is the node's alone to say: a plugin no node」
+// 「[Fable 5.2, Fable 5.1] started, or one reached by whoever else is on the machine, answers no turn.」
 func (s *PluginServer) fromTheNode(ctx context.Context, method string) error {
 	if !strings.HasPrefix(method, harnessCalls) {
 		return nil
@@ -169,9 +169,9 @@ func (s *PluginServer) harnessUnary(ctx context.Context, req any, info *grpc.Una
 	return handler(ctx, req)
 }
 
-// harnessStream has a turn's run stopped when the caller of its stream leaves
-// before the turn ended: a2a-go runs a turn apart from the call that asked
-// for it, and core may leave before it was told which Task to cancel.
+// 「[Fable 5.2, Fable 5.1] harnessStream has a turn's run stopped when the caller of its stream leaves」
+// 「[Fable 5.2, Fable 5.1] before the turn ended: a2a-go runs a turn apart from the call that asked」
+// 「[Fable 5.2, Fable 5.1] for it, and core may leave before it was told which Task to cancel.」
 func (s *PluginServer) harnessStream(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	if err := s.fromTheNode(stream.Context(), info.FullMethod); err != nil {
 		return err
@@ -187,7 +187,7 @@ func (s *PluginServer) harnessStream(srv any, stream grpc.ServerStream, info *gr
 	return err
 }
 
-// callersStream is a stream whose context says who to tell the caller left.
+// 「[Fable 5.2, Fable 5.1] callersStream is a stream whose context says who to tell the caller left.」
 type callersStream struct {
 	grpc.ServerStream
 	ctx context.Context
@@ -635,14 +635,14 @@ func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobR
 	}, nil
 }
 
-// HarnessProvider is an optional interface for a Go plugin that runs a Coding
-// Agent Harness (ADR-059). What Harness hands back is served as A2A's own
-// A2AService, by a2a-go's gRPC binding, and core's harness service routes a
-// turn to it by the plugin's name.
+// 「[Fable 5.2, Fable 5.1] HarnessProvider is an optional interface for a Go plugin that runs a Coding」
+// 「[Fable 5.2, Fable 5.1] Agent Harness (ADR-059). What Harness hands back is served as A2A's own」
+// 「[Fable 5.2, Fable 5.1] A2AService, by a2a-go's gRPC binding, and core's harness service routes a」
+// 「[Fable 5.2, Fable 5.1] turn to it by the plugin's name.」
 type HarnessProvider interface {
 	plugin.DomainPlugin
 
-	// Harness is what answers A2A for the harness: a2a-go's request handler.
+	// 「[Fable 5.2, Fable 5.1] Harness is what answers A2A for the harness: a2a-go's request handler.」
 	Harness() a2asrv.RequestHandler
 }
 
