@@ -53,10 +53,18 @@ func (s *QNTXServer) keepRecords(admitted auth.Admission, store ats.AttestationS
 		if err != nil {
 			return rejected, "", errors.Wrap(err, "a resource did not write as OTLP/JSON")
 		}
+		resourceSaid, err := proto.MarshalOptions{Deterministic: true}.Marshal(resourceLogs.GetResource())
+		if err != nil {
+			return rejected, "", errors.Wrap(err, "a resource did not marshal")
+		}
 		for _, scopeLogs := range resourceLogs.GetScopeLogs() {
 			scope, err := otlpJSONOf(scopeLogs.GetScope())
 			if err != nil {
 				return rejected, "", errors.Wrap(err, "a scope did not write as OTLP/JSON")
+			}
+			scopeSaid, err := proto.MarshalOptions{Deterministic: true}.Marshal(scopeLogs.GetScope())
+			if err != nil {
+				return rejected, "", errors.Wrap(err, "a scope did not marshal")
 			}
 			for _, record := range scopeLogs.GetLogRecords() {
 				event := otlpEventOf(record)
@@ -64,12 +72,12 @@ func (s *QNTXServer) keepRecords(admitted auth.Admission, store ats.AttestationS
 					reject(fmt.Sprintf("%s holding %v may not write %q", admitted.LevelName(), admitted.Roles(), event))
 					continue
 				}
-				// 「[Opus 5.5] A record is its service, its scope and the record itself, so the same record sent again is kept once.」
+				// A record is who sent it, its whole resource and scope, and the record itself, so the same record sent again is kept once.
 				said, err := proto.MarshalOptions{Deterministic: true}.Marshal(record)
 				if err != nil {
 					return rejected, "", errors.Wrapf(err, "a log record of %s did not marshal", event)
 				}
-				sum := sha256.Sum256([]byte(strings.Join([]string{service, scopeLogs.GetScope().GetName(), string(said)}, "\x00")))
+				sum := sha256.Sum256([]byte(strings.Join([]string{strings.Join(actors, "\x00"), string(resourceSaid), string(scopeSaid), string(said)}, "\x00")))
 				id := "AS-otel-log-" + hex.EncodeToString(sum[:16])
 				if store.AttestationExists(id) {
 					continue
@@ -90,18 +98,19 @@ func (s *QNTXServer) keepRecords(admitted auth.Admission, store ats.AttestationS
 					severity = record.GetSeverityNumber().String()
 				}
 				contexts := []string{"log:" + severity}
-				if len(record.GetTraceId()) == 16 {
+				// An all-zero id is OTLP's "none": it ties the record to no trace or span.
+				if len(record.GetTraceId()) == 16 && !otlpZero(record.GetTraceId()) {
 					contexts = append(contexts, "trace:"+hex.EncodeToString(record.GetTraceId()))
 				}
-				if len(record.GetSpanId()) == 8 {
+				if len(record.GetSpanId()) == 8 && !otlpZero(record.GetSpanId()) {
 					contexts = append(contexts, "span:"+hex.EncodeToString(record.GetSpanId()))
 				}
 				now := time.Now()
 				at := now
 				if happened := record.GetTimeUnixNano(); happened != 0 {
-					at = time.Unix(0, int64(happened)).UTC()
+					at = time.Unix(int64(happened/1e9), int64(happened%1e9)).UTC()
 				} else if observed := record.GetObservedTimeUnixNano(); observed != 0 {
-					at = time.Unix(0, int64(observed)).UTC()
+					at = time.Unix(int64(observed/1e9), int64(observed%1e9)).UTC()
 				}
 				err = store.CreateAttestation(&types.As{
 					ID:         id,
@@ -115,7 +124,7 @@ func (s *QNTXServer) keepRecords(admitted auth.Admission, store ats.AttestationS
 					Attributes: attributes,
 				})
 				switch {
-				case err == nil, ats.AlreadyExists(err):
+				case err == nil, ats.AlreadyExists(err), keptMeanwhile(store, id, err):
 				case ats.Unwritable(err):
 					reject(err.Error())
 				default:

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -50,9 +52,9 @@ func logsAnswered(t *testing.T, code int, body []byte) *collogspb.ExportLogsServ
 	return said
 }
 
-// 「[Opus 5.5] Each log record lands in the namespace its sender's token acts in, by that token, at the moment it happened.」
+// Each log record lands in the namespace the one the gate admitted acts in, by that one, at the moment it happened.
 // 「[Opus 5.5] Its event name is what it says happened; one with none is a log, and one inside a span names its trace and span.」
-func TestALogRecordLandsInTheNamespaceItsTokenActsIn(t *testing.T) {
+func TestALogRecordLandsInTheNamespaceItsSenderActsIn(t *testing.T) {
 	s, _, markets := standServer(t, "pond")
 	rec := exporting(s, pondToken("*"), ixOtelLogs, "application/x-protobuf", "", protobufOf(t, twoRecords()))
 	if said := logsAnswered(t, rec.Code, rec.Body.Bytes()); said.GetPartialSuccess() != nil {
@@ -67,7 +69,7 @@ func TestALogRecordLandsInTheNamespaceItsTokenActsIn(t *testing.T) {
 	for i, record := range kept {
 		byName[record.Predicates[0]] = i
 		if !slices.Equal(record.Subjects, []string{"claude-code"}) || !slices.Equal(record.Actors, []string{tokenDID}) || !record.Timestamp.Equal(ixOtelLogsAt) {
-			t.Fatalf("kept %v %v by %v at %s, want claude-code's record by the token at the moment it happened", record.Subjects, record.Predicates, record.Actors, record.Timestamp)
+			t.Fatalf("kept %v %v by %v at %s, want claude-code's record by its sender at the moment it happened", record.Subjects, record.Predicates, record.Actors, record.Timestamp)
 		}
 	}
 	request := kept[byName["claude_code.api_request"]]
@@ -97,8 +99,8 @@ func TestALogRecordSentTwiceIsKeptOnce(t *testing.T) {
 	}
 }
 
-// 「[Opus 5.5] A token writes the records its role's WRITE lines say, and the rest are counted as rejected records.」
-func TestALogRecordItsTokenMayNotWriteIsRejected(t *testing.T) {
+// A sender writes the records its role's WRITE lines say, and the rest are counted as rejected records.
+func TestALogRecordItsSenderMayNotWriteIsRejected(t *testing.T) {
 	s, _, markets := standServer(t, "pond")
 	rec := exporting(s, pondToken("claude_code.api_request"), ixOtelLogs, "application/x-protobuf", "", protobufOf(t, twoRecords()))
 	said := logsAnswered(t, rec.Code, rec.Body.Bytes())
@@ -107,5 +109,22 @@ func TestALogRecordItsTokenMayNotWriteIsRejected(t *testing.T) {
 	}
 	if kept := everythingIn(t, markets["pond"]); len(kept) != 1 || kept[0].Predicates[0] != "claude_code.api_request" {
 		t.Fatalf("pond holds %v, want the api request alone", kept)
+	}
+}
+
+// An all-zero trace or span id is OTLP's none: it ties the record to nothing,
+// and no trace: or span: context is kept for it.
+func TestALogRecordWithZeroIdsNamesNoTrace(t *testing.T) {
+	s, _, markets := standServer(t, "pond")
+	export := twoRecords()
+	for _, record := range export.ResourceLogs[0].ScopeLogs[0].LogRecords {
+		record.TraceId, record.SpanId = make([]byte, 16), make([]byte, 8)
+	}
+	rec := exporting(s, pondToken("*"), ixOtelLogs, "application/x-protobuf", "", protobufOf(t, export))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	for _, kept := range everythingIn(t, markets["pond"]) {
+		for _, context := range kept.Contexts {
+			assert.False(t, strings.HasPrefix(context, "trace:") || strings.HasPrefix(context, "span:"), "a zero id was kept as %s", context)
+		}
 	}
 }

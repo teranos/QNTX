@@ -288,6 +288,13 @@ func otlpExportIDs(export any) error {
 	return nil
 }
 
+// keptMeanwhile is whether a write that failed failed because another export
+// of the same thing kept it after this one looked: a sender retrying while its
+// first try was still being kept is answered as kept, not told to retry again.
+func keptMeanwhile(store ats.AttestationStore, id string, err error) bool {
+	return err != nil && store.AttestationExists(id)
+}
+
 // otlpZero is whether an id is all zero bytes, which OTLP names invalid.
 func otlpZero(id []byte) bool {
 	for _, b := range id {
@@ -423,7 +430,7 @@ func (s *QNTXServer) keepSpans(admitted auth.Admission, store ats.AttestationSto
 					Attributes: attributes,
 				})
 				switch {
-				case err == nil, ats.AlreadyExists(err):
+				case err == nil, ats.AlreadyExists(err), keptMeanwhile(store, id, err):
 				case ats.Unwritable(err):
 					reject(err.Error())
 				default:
