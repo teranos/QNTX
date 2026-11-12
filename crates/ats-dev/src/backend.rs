@@ -1,11 +1,11 @@
-//! The stores `ats-dev` can open behind `--backend`.
+//! 「[Sonnet 5.5] The stores `ats-dev` can open behind `--backend`.」
 //!
-//! `AttestationStore` is the one trait all three implement; `Store` forwards
-//! each of its methods to the backend, so a command written against the trait
-//! runs on any of them and what comes out is that backend's own answer.
-//! `QueryStore` and `AliasStore` exist for `SqliteStore` only
-//! (`crates/ats/src/storage/traits.rs`); a command that needs either says so
-//! and stops rather than answering from something else.
+//! 「[Sonnet 5.5] `AttestationStore` is the one trait all three implement; `Store` forwards」
+//! 「[Sonnet 5.5] each of its methods to the backend, so a command written against the trait」
+//! 「[Sonnet 5.5] runs on any of them and what comes out is that backend's own answer.」
+//! 「[Sonnet 5.5] `QueryStore` and `AliasStore` exist for `SqliteStore` only」
+//! 「[Sonnet 5.5] (`crates/ats/src/storage/traits.rs`); a command that needs either says so」
+//! 「[Sonnet 5.5] and stops rather than answering from something else.」
 
 use ats::{Attestation, AttestationStore};
 use ats::storage::StoreResult;
@@ -39,8 +39,8 @@ impl Kind {
         }
     }
 
-    /// What `--db` is called when it is not given: SQLite's file, DuckDB's
-    /// location, and for Postgres the url the repo's own scripts export.
+    /// 「[Sonnet 5.5] What `--db` is called when it is not given: SQLite's file, DuckDB's」
+    /// 「[Sonnet 5.5] location, and for Postgres the url the repo's own scripts export.」
     pub fn default_db(self) -> Result<String, Box<Error>> {
         match self {
             Kind::Sqlite => Ok("ats-dev.db".into()),
@@ -63,7 +63,7 @@ pub enum Store {
     Postgres(ats_postgres::PostgresStore),
 }
 
-/// Forward to whichever backend is open.
+/// 「[Sonnet 5.5] Forward to whichever backend is open.」
 macro_rules! each {
     ($self:expr, $s:ident => $e:expr) => {
         match $self {
@@ -87,8 +87,8 @@ impl Store {
         }
     }
 
-    /// The SQLite store, if that is what is open: the connection `put -`
-    /// batches on, and the only store with `QueryStore` and `AliasStore`.
+    /// 「[Sonnet 5.5] The SQLite store, if that is what is open: the connection `put -`」
+    /// 「[Sonnet 5.5] batches on, and the only store with `QueryStore` and `AliasStore`.」
     pub fn as_sqlite(&self) -> Option<&SqliteStore> {
         match self {
             Store::Sqlite(s) => Some(s),
@@ -105,8 +105,8 @@ impl Store {
         }
     }
 
-    /// The SQLite store for a command that needs `needs` (a trait name), or the
-    /// refusal that says which backend lacks it.
+    /// 「[Sonnet 5.5] The SQLite store for a command that needs `needs` (a trait name), or the」
+    /// 「[Sonnet 5.5] refusal that says which backend lacks it.」
     pub fn sqlite(&self, needs: &str) -> Result<&SqliteStore, Box<Error>> {
         self.as_sqlite().ok_or_else(|| lacks(self.kind(), needs))
     }
@@ -116,10 +116,10 @@ impl Store {
         self.as_sqlite_mut().ok_or_else(|| lacks(kind, needs))
     }
 
-    /// Make what was written durable where the backend holds writes back: the
-    /// DuckDB store keeps them in a buffer until `flush`, and only its `Drop`
-    /// flushes, where a failure can be logged and not returned. A command says
-    /// "written" only after this.
+    /// 「[Sonnet 5.5] Make what was written durable where the backend holds writes back: the」
+    /// 「[Sonnet 5.5] DuckDB store keeps them in a buffer until `flush`, and only its `Drop`」
+    /// 「[Sonnet 5.5] flushes, where a failure can be logged and not returned. A command says」
+    /// 「[Sonnet 5.5] "written" only after this.」
     pub fn persist(&self) -> Result<(), Box<Error>> {
         match self {
             Store::Sqlite(_) => Ok(()),
