@@ -327,6 +327,9 @@ waiting:
 		}
 	}
 
+	// The last of what the node logged as it stopped is counted; it is written now.
+	s.flushIssues()
+
 	// Opening/Closing Phase 4: Mark shutdown complete
 	s.setState(ServerStateStopped)
 

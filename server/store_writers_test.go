@@ -197,6 +197,10 @@ func asksToWrite(body *ast.BlockStmt) bool {
 // it is a claim somebody makes in the open, or it is a thing a namespace has.
 var nodeReaders = map[string]string{
 	"handlers.go:health":                          "the health of the file underneath, which is the node's to answer",
+	"issues_kept.go:flushIssues":                  "what the node logged, kept as it stops: one process's errors, not a namespace's",
+	"issues_kept.go:keepIssues":                   "what the node logged, kept every minute: one process's errors, not a namespace's",
+	"issues_kept.go:seedIssues":                   "today's issues as the node kept them, read back after a restart",
+	"issues_kept.go:writeIssuesOnce":              "one write of what the node logged to issues_seen",
 	"operational_watchdog.go:askOperationalStore": "the same ping on a tick, so a node that has stopped answering says so",
 	"operational_watchdog.go:operationalPool":     "where the connections to the node's own file are while a ping waits on it",
 	"lifecycle.go:Stop":                           "shutdown compares the pulse read connection with the node's own",

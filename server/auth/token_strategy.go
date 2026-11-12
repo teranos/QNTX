@@ -15,8 +15,8 @@ import (
 
 // "ory/fosite is what we're going to use"
 
-// The flow in Go with fosite, its storage where tokens are stored now
-// (ADR-025). What the flow hands out is the token QNTX already hands out.
+// The flow in Go with fosite, its storage where tokens are stored now.
+// What the flow hands out is the token QNTX already hands out.
 
 // tokenPrefix and tokenSeedBytes are the raw token's shape, drawn in
 // internal/access where MintToken lives.
@@ -37,7 +37,7 @@ type TokenSession struct {
 	fosite.DefaultSession
 	// DID is the did:key the token's seed names. Set by GenerateAccessToken.
 	DID string `json:"did"`
-	// Who said yes at the door, carried to the mint (ADR-025): the token
+	// Who said yes at the door, carried to the mint: the token
 	// speaks for them, the way a token minted in the element speaks for the
 	// session that minted it.
 	MintedBy            string `json:"minted_by"`

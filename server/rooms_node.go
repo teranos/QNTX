@@ -50,7 +50,7 @@ func (s *QNTXServer) nodeAgentRuns(harness string) (model, effort string) {
 	root := s.deps.cfg.Agent.Root
 	switch harness {
 	case agentLineClaude:
-		return root.Model, root.Effort
+		return root.Claude.Model, root.Claude.Effort
 	case agentLinePi:
 		return root.Pi.Model, root.Pi.Thinking
 	case agentLineCodex:

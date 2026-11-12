@@ -17,8 +17,6 @@ Status: Implemented mostly, Next up is to be more clear in this document about w
   one and enables it again. Data never leaves, and a person is not an exception.
 - "user should be able to disable their acc, but reawaken (enable) it later as well"
 - The record says who switched a User off, and only they switch it on. What a person did  to themselves is theirs to undo; what ROOT did is not.
-- A disabled User is admitted at no gate. They still prove a route and still get a session, because the switch is the one thing a disabled User has to reach. What they  minted stops with them — a token speaks for whoever minted it ([[ADR-025-access-tokens]]), so it is
-  disabled by the same switch, read on every request rather than at login.
 - That switch is why revoking a person is one act. Striking a route out of
   `auth.root_identities` closes one way in, and a User holds several; disabling the User
   is the person, not the door.
@@ -45,7 +43,7 @@ You claim the ROOT User by proving you own a root identity. It happens once and
 cannot happen again, so it is attested as `node:claimed`. Recording never fails
 the thing it records ([[ADR-030-identity-providers]]), which makes this the one attestation whose loss cannot be made up later.
 
-## Becoming and Unbecoming (!!remove pre-1.0.0)
+## Becoming and Unbecoming (!!remove pre-0.995.0)
 
 "i wish i was able to assume the identity of another user, 
 one that isn't ROOT, but also be able to go back."
@@ -61,12 +59,6 @@ one that isn't ROOT, but also be able to go back."
 "Not while ROOT is them."
 
 "So, yes, this can be destructive in the sense that a session may get revoked."
-
-"But for tokens its tmp access loss."
-
-- Becoming ends the User's own sessions. Their tokens are refused until ROOT
-  unbecomes them, and work again after.
-- A token minted while ROOT is them lives as long as the becoming.
 
 "and to become or unbecome, is actually in the specific User in the Users Element, the i element is to get back to ROOT"
 
@@ -84,8 +76,7 @@ one that isn't ROOT, but also be able to go back."
 
 ## What is recorded
 
-A User is one object per person under `<location>/system/users/` on the parquet
-backend, holding an id, a display_name, any number of emails and phone numbers,
+A User is one object per person under `<location>/system/users/` on the parquet backend, holding an id, a display_name, any number of emails and phone numbers,
 the level, who switched it off, the keys it holds and the accounts that reach it.
 The record is [`auth.User`](https://github.com/teranos/QNTX/blob/main/server/auth/users.go),
 mirrored by [`UserRecord`](https://github.com/teranos/QNTX/blob/main/crates/ats-duckdb/src/users.rs)

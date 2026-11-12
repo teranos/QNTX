@@ -45,10 +45,8 @@ tells the page when one moved.
 
 "Me, the human the logged in user." The answer is a route, `POST
 /api/approvals/answer`, no sigil and no tool, as the git credential is
-([[ADR-048-Node-Agent]]): a sigil is a tool to whoever reaches it, and the agent reaches
-every tool. The reach table names it and the list of ROOT, and the handler
-refuses a token however ROOT the token is, and a session that names nobody. The actor on
-the line is the route the human logged in by.
+([[ADR-048-Node-Agent]]): a sigil is a tool to whoever reaches it, and the agent reaches every tool. 
+
 
 The node merges as the App's installation where the repository is ([[ADR-043-CodeForge-service]]),
 at the head the human saw: GitHub refuses a merge whose `sha` moved. The merge is written down by the human.
@@ -72,3 +70,54 @@ NO."
 - Merge again: merges now.
 - Don't merge while a merge waits: cancels it. Again: definitely no.
 
+---
+
+Multiple places where an Approval Request can pop-up.
+
+it depends
+
+it depends on if you are using the App or not
+
+it depends on if you are looking at a Chat right now
+
+it depends on if you are in a Room and are okay with that Room Participants requesting Approval for something. 
+
+Approval's should only really be for things that only a human can resolve.
+It means that not every little PR needs to go through Human Approval.
+ChatGPT: The current [`server/approvals.go`](https://github.com/teranos/QNTX/blob/main/server/approvals.go?utm_source=chatgpt.com) follows the earlier model.
+
+Approval's are Human
+
+Human time is expensive
+
+There is a cost to putting something in front of a Human being.
+
+A human being that sleeps can obviously not approve anything.
+
+A human being that is having lunch, also cannot, and we aren't supposed to disrupt it's lunch or dinner.
+
+---
+
+### Via Magic Island 
+
+"Push notifications is something I want though, especially for approvals"
+"the magic island"
+- https://github.com/teranos/QNTX-App/issues/10
+- https://github.com/teranos/QNTX-App/issues/11
+- https://github.com/teranos/QNTX-App/pull/12
+- https://github.com/teranos/QNTX-Web/pull/22
+- https://github.com/teranos/QNTX/issues/1409 
+- https://github.com/teranos/QNTX/issues/1410
+- 
+
+### Via Rooms
+
+**Not Started** 
+
+- Indirect to Room, any human approval would do.
+
+### Via Agent
+
+**Not Started** 
+
+- Direct to specifc human.

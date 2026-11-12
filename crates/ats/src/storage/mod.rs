@@ -34,6 +34,8 @@
 //! - `ats-indexeddb`: IndexedDB backend for browser WASM (async API matching
 //!   the same trait contract)
 
+#[cfg(any(test, feature = "conformance"))]
+pub mod conformance;
 mod error;
 mod memory;
 mod traits;
