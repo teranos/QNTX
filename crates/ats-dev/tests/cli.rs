@@ -1036,3 +1036,64 @@ fn push_needs_the_key_and_a_node_url() {
     assert!(!o.status.success() && err(&o).contains("no key is kept"), "{}", err(&o));
     assert_eq!(out(&o), "");
 }
+
+/// A node that reads one request and hangs up without a word.
+fn node_that_hangs_up() -> (String, std::thread::JoinHandle<usize>) {
+    use std::io::{BufRead, BufReader, Read};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", l.local_addr().unwrap());
+    let h = std::thread::spawn(move || {
+        let (s, _) = l.accept().unwrap();
+        let mut r = BufReader::new(s);
+        let mut len = 0usize;
+        loop {
+            let mut h = String::new();
+            r.read_line(&mut h).unwrap();
+            if h.trim_end().is_empty() {
+                break;
+            }
+            if let Some((k, v)) = h.split_once(':') {
+                if k.eq_ignore_ascii_case("content-length") {
+                    len = v.trim().parse().unwrap();
+                }
+            }
+        }
+        let mut body = vec![0; len];
+        r.read_exact(&mut body).unwrap();
+        serde_json::from_slice::<serde_json::Value>(&body).unwrap().as_array().unwrap().len()
+    });
+    (url, h)
+}
+
+#[test]
+fn a_node_that_hangs_up_leaves_no_row_unsaid_and_the_rest_unsent() {
+    let (_d, p) = db();
+    let rows: String = (0..101).map(|i| format!("{{\"subjects\":[\"S{i}\"],\"predicates\":[\"p\"]}}\n")).collect();
+    let o = run(&p, &["--unsigned", "put", "-"], &rows);
+    assert!(o.status.success(), "{}", err(&o));
+    let (url, node) = node_that_hangs_up();
+    let o = run(&p, &["push", &url], "");
+    assert!(!o.status.success());
+    let said = lines_of(&o);
+    assert_eq!(said.len(), 101, "every id has a line");
+    let unanswered = said.iter().filter(|l| l["refused"].as_str().is_some_and(|w| w.starts_with(&url) && w.contains("did not answer"))).count();
+    let unsent = said.iter().filter(|l| l["refused"].as_str().is_some_and(|w| w.starts_with("not sent:"))).count();
+    assert_eq!((unanswered, unsent), (100, 1), "{said:?}");
+    assert!(err(&o).contains("101 not taken"), "{}", err(&o));
+    assert!(err(&o).contains("100 sent"), "the summary is said: {}", err(&o));
+    assert_eq!(node.join().unwrap(), 100, "a request carries one batch, not the store");
+}
+
+#[test]
+fn a_row_the_node_already_had_is_said_apart_from_one_it_took() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    let (url, node) = fake_node(200, |sent| {
+        serde_json::json!({ "results": vec![serde_json::json!({"status": 200, "answer": {"status": "exists"}}); sent.as_array().unwrap().len()] })
+    });
+    let o = run(&p, &["push", &url], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert_eq!(lines_of(&o)[0]["answer"]["status"], "exists");
+    assert!(err(&o).contains("0 created, 1 the node already had under that id (what it holds was not compared)"), "{}", err(&o));
+    node.join().unwrap();
+}

@@ -23,8 +23,8 @@
 //! ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X
 //! ```
 //!
-//! `put` signs as the key kept in `~/.qntx/key` (else `--key FILE`, else
-//! `$ATS_DEV_KEY`): the one `qntx` signs a request to a node with, a 32-byte
+//! `put` signs with `--key FILE`, else `$ATS_DEV_KEY`, else the key kept in
+//! `~/.qntx/key`: the one `qntx` signs a request to a node with, a 32-byte
 //! ed25519 seed in hex that `ground code login` keeps. ats-dev never mints one.
 //! The bytes are the ones the node verifies (`ats-sign`), and a row signed here
 //! is the node's to store as it was signed: its actors lead with the key's
@@ -823,6 +823,11 @@ const PUSH_SIGNED_FOR: i64 = 60;
 /// stdout, as the node gave it. A row signed by the key is stored as signed,
 /// an unsigned one is signed by the node, one signed by another key is refused
 /// there unless the node's grant holds that key.
+///
+/// Rows are read and sent a batch at a time, so a large store is never held
+/// whole. Every id asked for gets a line, whatever happens to the network: a
+/// request the node did not answer reports its rows, and the rows after it are
+/// reported as not sent.
 fn push(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let usage = "ats-dev push https://node.example [ID...]";
     let node = tail.first().ok_or_else(|| fail("push needs a node", usage))?;
@@ -834,78 +839,149 @@ fn push(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         Some(given) if !given.is_empty() => given.iter().map(|x| x.to_string()).collect(),
         _ => listed(&s)?,
     };
-
-    let mut out = std::io::stdout().lock();
-    let mut say = |line: serde_json::Value| -> Result<(), Box<Error>> {
-        writeln!(out, "{line}").map_err(|e| fail("could not write stdout", e))
-    };
-    let mut not_taken = 0usize;
-    let mut rows: Vec<(String, serde_json::Value)> = Vec::new();
-    for id in ids {
+    // A node that accepts the connection and never answers would hold push
+    // forever; past the signature's life the node would refuse it anyway.
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .http_status_as_error(false)
+        .timeout_global(Some(std::time::Duration::from_secs(PUSH_SIGNED_FOR.unsigned_abs())))
+        .build()
+        .into();
+    let mut p = Pushing { out: std::io::stdout().lock(), tally: Tally::default() };
+    let mut batch: Vec<(String, serde_json::Value)> = Vec::with_capacity(PUSH_BATCH);
+    let mut ids = ids.into_iter();
+    let mut broken: Option<String> = None;
+    for id in ids.by_ref() {
         match s.get(&id).map_err(|e| fail("get failed", e))? {
-            None => {
-                not_taken += 1;
-                say(serde_json::json!({ "id": id, "refused": "no such attestation" }))?;
-            }
+            None => p.refused(&id, "no such attestation")?,
             Some(a) => match wire(&a) {
-                Ok(v) => rows.push((id, v)),
-                Err(why) => {
-                    not_taken += 1;
-                    say(serde_json::json!({ "id": id, "refused": why }))?;
-                }
+                Ok(v) => batch.push((id, v)),
+                Err(why) => p.refused(&id, &why)?,
             },
         }
+        if batch.len() == PUSH_BATCH {
+            if let Err(why) = p.send(&agent, &url, &origin, &sg, &mut batch) {
+                broken = Some(why);
+                break;
+            }
+        }
+    }
+    if broken.is_none() && !batch.is_empty() {
+        broken = p.send(&agent, &url, &origin, &sg, &mut batch).err();
+    }
+    if let Some(why) = &broken {
+        for id in ids {
+            p.refused(&id, &format!("not sent: {why}"))?;
+        }
+    }
+    let t = &p.tally;
+    eprintln!(
+        "ats-dev: {} sent to {url} as {}: {} created, {} the node already had under that id (what it holds was not compared), {} not taken",
+        t.sent, sg.did, t.created, t.existed, t.not_taken
+    );
+    if t.not_taken > 0 {
+        return Err(fail("rows the node did not take", t.not_taken));
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+struct Tally {
+    sent: usize,
+    created: usize,
+    existed: usize,
+    not_taken: usize,
+}
+
+/// Where push says what became of each row.
+struct Pushing<W: Write> {
+    out: W,
+    tally: Tally,
+}
+
+impl<W: Write> Pushing<W> {
+    fn say(&mut self, line: serde_json::Value) -> Result<(), Box<Error>> {
+        writeln!(self.out, "{line}").map_err(|e| fail("could not write stdout", e))
     }
 
-    let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
-    let mut sent = 0usize;
-    for chunk in rows.chunks(PUSH_BATCH) {
-        let body = serde_json::Value::Array(chunk.iter().map(|(_, v)| v.clone()).collect()).to_string();
-        let mut resp = agent
-            .post(&url)
-            .header("Authorization", &sg.authorization(&origin, PUSH_SIGNED_FOR)?)
-            .header("Content-Type", "application/json")
-            .send(body)
-            .map_err(|e| fail(&format!("{url} did not answer"), e))?;
+    fn refused(&mut self, id: &str, why: &str) -> Result<(), Box<Error>> {
+        self.tally.not_taken += 1;
+        self.say(serde_json::json!({ "id": id, "refused": why }))
+    }
+
+    /// One request for the batch, and a line for each of its rows; the batch is
+    /// emptied either way. `Err` is a request the node did not answer, with why.
+    fn send(
+        &mut self,
+        agent: &ureq::Agent,
+        url: &str,
+        origin: &str,
+        sg: &sign::Signer,
+        batch: &mut Vec<(String, serde_json::Value)>,
+    ) -> Result<(), String> {
+        let rows: Vec<(String, serde_json::Value)> = std::mem::take(batch);
+        let unanswered = |p: &mut Self, why: String| -> Result<(), String> {
+            for (id, _) in &rows {
+                p.refused(id, &why).map_err(|e| e.why)?;
+            }
+            Err(why)
+        };
+        let auth = match sg.authorization(origin, PUSH_SIGNED_FOR) {
+            Ok(a) => a,
+            Err(e) => return unanswered(self, format!("the request was not signed: {}", e.why)),
+        };
+        let body = serde_json::Value::Array(rows.iter().map(|(_, v)| v.clone()).collect()).to_string();
+        self.tally.sent += rows.len();
+        let mut resp = match agent.post(url).header("Authorization", &auth).header("Content-Type", "application/json").send(body) {
+            Ok(r) => r,
+            Err(e) => return unanswered(self, format!("{url} did not answer: {e}")),
+        };
         let status = resp.status().as_u16();
-        let text = resp.body_mut().read_to_string().map_err(|e| fail(&format!("{url} answered {status}, unread"), e))?;
-        sent += chunk.len();
+        let text = match resp.body_mut().read_to_string() {
+            Ok(t) => t,
+            Err(e) => return unanswered(self, format!("{url} answered {status} and the body did not read: {e}")),
+        };
         let answer: serde_json::Value = serde_json::from_str(&text).unwrap_or(serde_json::Value::String(text.clone()));
-        let results = answer.get("results").and_then(|r| r.as_array()).filter(|r| status == 200 && r.len() == chunk.len());
+        let results = answer.get("results").and_then(|r| r.as_array()).filter(|r| status == 200 && r.len() == rows.len());
         match results {
             Some(results) => {
-                for ((id, _), r) in chunk.iter().zip(results) {
+                for ((id, _), r) in rows.iter().zip(results) {
                     let st = r.get("status").and_then(|x| x.as_u64()).unwrap_or(0);
-                    if st != 200 && st != 201 {
-                        not_taken += 1;
+                    let existed = st == 200 && r.get("answer").and_then(|a| a.get("status")).and_then(|x| x.as_str()) == Some("exists");
+                    match st {
+                        201 => self.tally.created += 1,
+                        200 if existed => self.tally.existed += 1,
+                        _ => self.tally.not_taken += 1,
                     }
-                    say(serde_json::json!({ "id": id, "status": st, "answer": r.get("answer") }))?;
+                    self.say(serde_json::json!({ "id": id, "status": st, "answer": r.get("answer") })).map_err(|e| e.why)?;
                 }
             }
             // The request itself was not taken (the gate, a body the node did
             // not read): every row of it is answered with what the node said.
             None => {
-                for (id, _) in chunk {
-                    not_taken += 1;
-                    say(serde_json::json!({ "id": id, "status": status, "answer": answer }))?;
+                for (id, _) in &rows {
+                    self.tally.not_taken += 1;
+                    self.say(serde_json::json!({ "id": id, "status": status, "answer": answer })).map_err(|e| e.why)?;
                 }
             }
         }
+        Ok(())
     }
-    eprintln!("ats-dev: {sent} sent to {url} as {}, {not_taken} not taken", sg.did);
-    if not_taken > 0 {
-        return Err(fail("rows the node did not take", not_taken));
-    }
-    Ok(())
 }
 
-/// The scheme and host of a node's url: what a request's signature is made out to.
+/// The origin a request's signature is made out to: scheme and host, lowercase,
+/// without a port that is the scheme's own. The node compares its configured
+/// origin exactly, so `https://Node.example:443/x` is `https://node.example`.
 fn origin_of(node: &str) -> Result<String, Box<Error>> {
     let (scheme, rest) = node.split_once("://").ok_or_else(|| fail("a node is a url", node))?;
-    if scheme != "http" && scheme != "https" {
-        return Err(fail("a node is reached over http or https", node));
-    }
-    let host = rest.split('/').next().unwrap_or("");
+    let scheme = scheme.to_ascii_lowercase();
+    let default_port = match scheme.as_str() {
+        "http" => ":80",
+        "https" => ":443",
+        _ => return Err(fail("a node is reached over http or https", node)),
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h).to_ascii_lowercase();
+    let host = host.strip_suffix(default_port).unwrap_or(&host);
     if host.is_empty() {
         return Err(fail("a node url names a host", node));
     }
@@ -931,4 +1007,30 @@ fn wire(a: &Attestation) -> Result<serde_json::Value, String> {
         m.insert("signer_did".into(), did.clone().into());
     }
     Ok(v)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::origin_of;
+
+    /// The node compares the audience with its configured origin exactly.
+    #[test]
+    fn a_node_url_is_made_out_to_its_origin_as_the_node_names_itself() {
+        for (url, origin) in [
+            ("https://node.example", "https://node.example"),
+            ("https://node.example/", "https://node.example"),
+            ("https://node.example:443/api", "https://node.example"),
+            ("HTTPS://Node.Example:443", "https://node.example"),
+            ("http://127.0.0.1:80", "http://127.0.0.1"),
+            ("http://127.0.0.1:8820/x?y#z", "http://127.0.0.1:8820"),
+            ("https://node.example:8443", "https://node.example:8443"),
+            ("https://user@node.example", "https://node.example"),
+        ] {
+            assert_eq!(origin_of(url).unwrap(), origin, "{url}");
+        }
+        for bad in ["node.example", "ftp://node.example", "https://", "https:///x"] {
+            assert!(origin_of(bad).is_err(), "{bad}");
+        }
+    }
 }
