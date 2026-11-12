@@ -593,12 +593,12 @@ func TestARenameWithNoSequenceAfterASequencedOneStands(t *testing.T) {
 	assert.Equal(t, "Late Agent", names[0].name)
 }
 
-// "i want to ban numbers in names"
-// "a name is an Uppercase character followed by normal lowercase characters"
-// "and a name can be two names after each other as well"
-// "or three"
-// "so no special chars in names as well"
-// "a Name needs to be able to be phonetically spoken"
+// "「[Opus 5.5] i want to ban numbers in names」"
+// "「[Opus 5.5] a name is an Uppercase character followed by normal lowercase characters」"
+// "「[Opus 5.5] and a name can be two names after each other as well」"
+// "「[Opus 5.5] or three」"
+// "「[Opus 5.5] so no special chars in names as well」"
+// "「[Opus 5.5] a Name needs to be able to be phonetically spoken」"
 func TestANameIsOneToThreeWordsThatCanBeSaid(t *testing.T) {
 	s := rootKnowingServer(t)
 	for _, asked := range []string{"Alder-1", "Alder1", "alder", "ALDER", "Al der", "Alder  Birch", "Alder_Birch", "Brr", "A",
@@ -618,9 +618,9 @@ func TestANameIsOneToThreeWordsThatCanBeSaid(t *testing.T) {
 }
 
 // "i want false Alder to take a different name for example"
-// "the token can be GONE"
-// A name a revoked token holds is let go of when another agent asks for it,
-// and the agent asking holds it from then on, after a restart too.
+// "「[Opus 5.5] the token can be GONE」"
+// 「[Fable 5.2] A name a revoked token holds is let go of when another agent asks for it,」
+// 「[Fable 5.2] and the agent asking holds it from then on, after a restart too.」
 func TestTheNameOfARevokedTokenIsTakenByTheAgentAsking(t *testing.T) {
 	s := rootKnowingServer(t)
 	tokens, _, err := auth.OpenTokenTable(s.nodeDB, nil)
@@ -650,14 +650,14 @@ func TestTheNameOfARevokedTokenIsTakenByTheAgentAsking(t *testing.T) {
 	assert.Equal(t, "Alder", named.(*protocol.Named).GetName())
 	assert.Equal(t, "did:key:z6Mksession", named.(*protocol.Named).GetDid())
 
-	// Read back from the lines alone, as after a restart.
+	// 「[Fable 5.2] Read back from the lines alone, as after a restart.」
 	names, err := s.agentNames()
 	require.NoError(t, err)
 	require.Len(t, names, 1)
 	assert.Equal(t, "did:key:z6Mksession", names[0].did)
 	assert.Equal(t, "Alder", names[0].name)
 
-	// Enabled again, the token holds no name, and the session's is not its to take.
+	// 「[Fable 5.2] Enabled again, the token holds no name, and the session's is not its to take.」
 	require.NoError(t, tokens.Enable(held[0].ID))
 	_, refusal = s.iName(old, sigil.Sent{"name": "Alder"})
 	require.NotNil(t, refusal, "a token enabled again took back the name it was let go of")

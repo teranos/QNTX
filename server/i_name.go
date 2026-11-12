@@ -78,9 +78,9 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 			return &protocol.Named{Name: left, Did: did}, nil
 		}
 	}
-	// "the token can be GONE"
-	// A name a revoked token holds is held by nobody who can ask: it is let go
-	// of here, in a line of its own, and taken by the agent asking.
+	// "「[Opus 5.5] the token can be GONE」"
+	// 「[Fable 5.2] A name a revoked token holds is held by nobody who can ask: it is let go」
+	// 「[Fable 5.2] of here, in a line of its own, and taken by the agent asking.」
 	gone := slices.IndexFunc(names, func(kept agentName) bool { return kept.did != did && strings.EqualFold(kept.name, name) })
 	if gone >= 0 && !s.revoked(names[gone].did) {
 		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
@@ -117,8 +117,8 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 	return &protocol.Named{Name: name, Did: did}, nil
 }
 
-// revoked is whether the agent whose DID this is was revoked: a token the node
-// holds for it, switched off.
+// 「[Fable 5.2] revoked is whether the agent whose DID this is was revoked: a token the node」
+// 「[Fable 5.2] holds for it, switched off.」
 func (s *QNTXServer) revoked(did string) bool {
 	return s.authHandler != nil && s.authHandler.SwitchedOff(did)
 }
@@ -171,13 +171,13 @@ func noName(name string) (string, bool) {
 	case strings.EqualFold(name, auth.RootName):
 		return auth.RootName + " is not available", true
 	}
-	// "i want to ban numbers in names"
-	// "a name is an Uppercase character followed by normal lowercase characters"
-	// "and a name can be two names after each other as well"
-	// "or three"
-	// "so no special chars in names as well"
-	// "a Name needs to be able to be phonetically spoken"
-	// "Names need to be compatible with STT/TTS"
+	// "「[Opus 5.5] i want to ban numbers in names」"
+	// "「[Opus 5.5] a name is an Uppercase character followed by normal lowercase characters」"
+	// "「[Opus 5.5] and a name can be two names after each other as well」"
+	// "「[Opus 5.5] or three」"
+	// "「[Opus 5.5] so no special chars in names as well」"
+	// "「[Opus 5.5] a Name needs to be able to be phonetically spoken」"
+	// "「[Opus 5.5] Names need to be compatible with STT/TTS」"
 	words := strings.Split(name, " ")
 	if len(words) > 3 {
 		return "a name is one, two or three words", true
@@ -191,8 +191,8 @@ func noName(name string) (string, bool) {
 	return "", false
 }
 
-// canBeSaid is whether word is a capital letter and then lowercase letters, a to
-// z, one of them a vowel.
+// 「[Fable 5.2] canBeSaid is whether word is a capital letter and then lowercase letters, a to」
+// 「[Fable 5.2] z, one of them a vowel.」
 func canBeSaid(word string) bool {
 	if len(word) < 2 || word[0] < 'A' || word[0] > 'Z' {
 		return false
@@ -207,17 +207,17 @@ func canBeSaid(word string) bool {
 	return voiced
 }
 
-// predicateAgentUnnamed is the line a revoked token's name is let go of in:
-// its subject is the DID that held the name, its actor the agent that asked
-// for it.
+// 「[Fable 5.2] predicateAgentUnnamed is the line a revoked token's name is let go of in:」
+// 「[Fable 5.2] its subject is the DID that held the name, its actor the agent that asked」
+// 「[Fable 5.2] for it.」
 const predicateAgentUnnamed = "agent:unnamed"
 
-// agentName is one agent:named line: the DID, and the name it took; or one
-// agent:unnamed line: the DID, and the name it was let go of.
+// 「[Fable 5.2] agentName is one agent:named line: the DID, and the name it took; or one」
+// 「[Fable 5.2] agent:unnamed line: the DID, and the name it was let go of.」
 type agentName struct {
 	did  string
 	name string
-	// let is an agent:unnamed line: did holds name no longer.
+	// 「[Fable 5.2] let is an agent:unnamed line: did holds name no longer.」
 	let bool
 	at  time.Time
 	// 「[Opus 5.5] sequence is the line's place among every name line; 0 is a line written before lines」
@@ -278,7 +278,7 @@ func (s *QNTXServer) agentNames() ([]agentName, error) {
 }
 
 // agentLines is every line an agent wrote naming itself, in the order they
-// were written: by the sequence each carries, which keepNameLine makes one
+// 「[Fable 5.2] were written: by the sequence each carries, which keepNameLine makes one」
 // more than every one before it; lines from before sequences come first, by
 // when each is stamped.
 func (s *QNTXServer) agentLines() ([]agentName, error) {
@@ -293,8 +293,8 @@ func (s *QNTXServer) agentLines() ([]agentName, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read the %s lines", predicateAgentNamed)
 	}
-	// One read per line kind: a filter naming several predicates reads lines
-	// that carry them all.
+	// 「[Fable 5.2] One read per line kind: a filter naming several predicates reads lines」
+	// 「[Fable 5.2] that carry them all.」
 	let, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
 		Predicates: []string{predicateAgentUnnamed},
 		Limit:      ats.EveryRow,
@@ -401,8 +401,8 @@ const stampPrecision = time.Millisecond
 // 「[Opus 5.5] namingNow is when a name line is written: the clock, which a test holds still.」
 var namingNow = time.Now
 
-// keepNameLine writes one line of either kind, about did by the agent asking,
-// and answers when it is stamped.
+// 「[Fable 5.2] keepNameLine writes one line of either kind, about did by the agent asking,」
+// 「[Fable 5.2] and answers when it is stamped.」
 func (s *QNTXServer) keepNameLine(predicate, did, by, name string, newest int64, newestStamp time.Time) (time.Time, error) {
 	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
