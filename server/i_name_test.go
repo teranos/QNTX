@@ -38,9 +38,9 @@ func TestAnAgentIsToldANameIsTakenAndHoldsAnother(t *testing.T) {
 	s := rootKnowingServer(t)
 	walnut, hazel := asAgent("did:key:z6Mkwalnut"), asAgent("did:key:z6Mkhazel")
 
-	named, refusal := s.iName(walnut, sigil.Sent{"name": " room agent "})
+	named, refusal := s.iName(walnut, sigil.Sent{"name": " Room Agent "})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "room agent", named.(*protocol.Named).GetName())
+	assert.Equal(t, "Room Agent", named.(*protocol.Named).GetName())
 	assert.Equal(t, "did:key:z6Mkwalnut", named.(*protocol.Named).GetDid())
 
 	// "why cant i say room agent, and its one thing"
@@ -53,15 +53,15 @@ func TestAnAgentIsToldANameIsTakenAndHoldsAnother(t *testing.T) {
 	assert.Contains(t, refusal.GetSays(), "is taken")
 	assert.NotContains(t, refusal.GetSays(), "walnut", "who holds the name was told to another agent")
 
-	named, refusal = s.iName(hazel, sigil.Sent{"name": "deploy agent"})
+	named, refusal = s.iName(hazel, sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "deploy agent", named.(*protocol.Named).GetName())
+	assert.Equal(t, "Deploy Agent", named.(*protocol.Named).GetName())
 	assert.Equal(t, "did:key:z6Mkhazel", named.(*protocol.Named).GetDid())
 
 	// Asked again by the one that holds it, it answers the same and writes nothing.
-	again, refusal := s.iName(walnut, sigil.Sent{"name": "room agent"})
+	again, refusal := s.iName(walnut, sigil.Sent{"name": "Room Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "room agent", again.(*protocol.Named).GetName())
+	assert.Equal(t, "Room Agent", again.(*protocol.Named).GetName())
 
 	held := systemHolds(t, s)
 	require.Len(t, held, 2, "a name is one line, written once")
@@ -81,18 +81,18 @@ func TestANamedAgentTakesAnotherName(t *testing.T) {
 	s := rootKnowingServer(t)
 	walnut := asAgent("did:key:z6Mkwalnut")
 
-	_, refusal := s.iName(walnut, sigil.Sent{"name": "room agent"})
+	_, refusal := s.iName(walnut, sigil.Sent{"name": "Room Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
 
-	named, refusal := s.iName(walnut, sigil.Sent{"name": "deploy agent"})
+	named, refusal := s.iName(walnut, sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "deploy agent", named.(*protocol.Named).GetName())
+	assert.Equal(t, "Deploy Agent", named.(*protocol.Named).GetName())
 	assert.Equal(t, "did:key:z6Mkwalnut", named.(*protocol.Named).GetDid())
 
 	// The name it holds now is answered again, and writes nothing.
 	again, refusal := s.iName(walnut, sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "deploy agent", again.(*protocol.Named).GetName())
+	assert.Equal(t, "Deploy Agent", again.(*protocol.Named).GetName())
 
 	held := systemHolds(t, s)
 	require.Len(t, held, 2, "a line was deleted or one too many written")
@@ -107,12 +107,12 @@ func TestTheNameAnAgentLeftCanBeTakenByAnother(t *testing.T) {
 	s := rootKnowingServer(t)
 	walnut, hazel := asAgent("did:key:z6Mkwalnut"), asAgent("did:key:z6Mkhazel")
 
-	_, refusal := s.iName(walnut, sigil.Sent{"name": "room agent"})
+	_, refusal := s.iName(walnut, sigil.Sent{"name": "Room Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	_, refusal = s.iName(walnut, sigil.Sent{"name": "deploy agent"})
+	_, refusal = s.iName(walnut, sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
 
-	named, refusal := s.iName(hazel, sigil.Sent{"name": "room agent"})
+	named, refusal := s.iName(hazel, sigil.Sent{"name": "Room Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
 	assert.Equal(t, "did:key:z6Mkhazel", named.(*protocol.Named).GetDid())
 }
@@ -123,12 +123,12 @@ func TestANameAnotherHoldsIsStillRefused(t *testing.T) {
 	s := rootKnowingServer(t)
 	walnut, hazel := asAgent("did:key:z6Mkwalnut"), asAgent("did:key:z6Mkhazel")
 
-	_, refusal := s.iName(walnut, sigil.Sent{"name": "room agent"})
+	_, refusal := s.iName(walnut, sigil.Sent{"name": "Room Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	_, refusal = s.iName(hazel, sigil.Sent{"name": "deploy agent"})
+	_, refusal = s.iName(hazel, sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
 
-	for asking, name := range map[context.Context]string{hazel: "Room Agent", walnut: "deploy agent"} {
+	for asking, name := range map[context.Context]string{hazel: "Room Agent", walnut: "Deploy Agent"} {
 		_, refusal = s.iName(asking, sigil.Sent{"name": name})
 		require.NotNil(t, refusal, "a name another agent holds was given to a second")
 		assert.Equal(t, sigil.NotAllowed, refusal.GetWhy())
@@ -136,9 +136,9 @@ func TestANameAnotherHoldsIsStillRefused(t *testing.T) {
 	}
 
 	// Each still holds its own.
-	named, refusal := s.iName(walnut, sigil.Sent{"name": "room agent"})
+	named, refusal := s.iName(walnut, sigil.Sent{"name": "Room Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "room agent", named.(*protocol.Named).GetName())
+	assert.Equal(t, "Room Agent", named.(*protocol.Named).GetName())
 }
 
 // The lines read back, as after a restart or by a second node, give what the
@@ -150,9 +150,9 @@ func TestTwoLinesReadBackAfterARestartGiveTheNewestHoldableName(t *testing.T) {
 	require.NoError(t, err)
 	first := time.Now().Add(-time.Hour)
 	for at, line := range []struct{ did, name string }{
-		{"did:key:z6Mkwalnut", "room agent"},
-		{"did:key:z6Mkhazel", "room agent"}, // walnut held it then: no name
-		{"did:key:z6Mkwalnut", "deploy agent"},
+		{"did:key:z6Mkwalnut", "Room Agent"},
+		{"did:key:z6Mkhazel", "Room Agent"}, // walnut held it then: no name
+		{"did:key:z6Mkwalnut", "Deploy Agent"},
 		{"did:key:z6Mkwalnut", "oak"},
 	} {
 		written := first.Add(time.Duration(at) * time.Minute)
@@ -170,10 +170,10 @@ func TestTwoLinesReadBackAfterARestartGiveTheNewestHoldableName(t *testing.T) {
 	assert.Equal(t, "oak", names[0].name)
 
 	// Every name walnut left is free, the one it holds is not.
-	named, refusal := s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "deploy agent"})
+	named, refusal := s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "deploy agent", named.(*protocol.Named).GetName())
-	_, refusal = s.iName(asAgent("did:key:z6Mkpecan"), sigil.Sent{"name": "oak"})
+	assert.Equal(t, "Deploy Agent", named.(*protocol.Named).GetName())
+	_, refusal = s.iName(asAgent("did:key:z6Mkpecan"), sigil.Sent{"name": "Oak"})
 	require.NotNil(t, refusal, "the name walnut holds now was given to another")
 }
 
@@ -193,7 +193,7 @@ func TestOnlyATokenAskingAsItselfIsNamed(t *testing.T) {
 	clientsOwn.Grant = &auth.Grant{DID: "did:key:z6Mkissued", ClientDID: "did:key:z6Mkclient", Level: auth.LevelToken}
 
 	for asked, admitted := range map[string]auth.Admission{"a person": person, "a connector": connector, "a client's own token": clientsOwn} {
-		_, refusal := s.iName(auth.WithAdmission(context.Background(), admitted), sigil.Sent{"name": "room agent"})
+		_, refusal := s.iName(auth.WithAdmission(context.Background(), admitted), sigil.Sent{"name": "Room Agent"})
 		require.NotNil(t, refusal, asked)
 		assert.Equal(t, sigil.NotAllowed, refusal.GetWhy(), asked)
 	}
@@ -266,21 +266,21 @@ func TestOfTwoLinesAboutOneNameTheOlderStands(t *testing.T) {
 		require.NoError(t, store.CreateAttestation(&types.As{
 			ID: "AS-named-" + did[len(did)-6:], Subjects: []string{did}, Predicates: []string{predicateAgentNamed},
 			Contexts: []string{auth.NamespaceSystem}, Actors: []string{did}, Timestamp: written, CreatedAt: written,
-			Source: did, Attributes: map[string]any{"name": "room agent"},
+			Source: did, Attributes: map[string]any{"name": "Room Agent"},
 		}))
 	}
 
-	named, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "room agent"})
+	named, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "Room Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "room agent", named.(*protocol.Named).GetName())
+	assert.Equal(t, "Room Agent", named.(*protocol.Named).GetName())
 
-	_, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "room agent"})
+	_, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "Room Agent"})
 	require.NotNil(t, refusal, "the younger line held the name too")
 	assert.Contains(t, refusal.GetSays(), "is taken")
 
-	named, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "deploy agent"})
+	named, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "deploy agent", named.(*protocol.Named).GetName())
+	assert.Equal(t, "Deploy Agent", named.(*protocol.Named).GetName())
 }
 
 // A line about a DID that the DID did not write is not the agent naming
@@ -293,16 +293,16 @@ func TestALineAnotherActorWroteIsNoName(t *testing.T) {
 	require.NoError(t, store.CreateAttestation(&types.As{
 		ID: "AS-somebody-else-said-so", Subjects: []string{"did:key:z6Mkwalnut"}, Predicates: []string{predicateAgentNamed},
 		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkhazel"}, Timestamp: at, CreatedAt: at,
-		Source: "did:key:z6Mkhazel", Attributes: map[string]any{"name": "room agent"},
+		Source: "did:key:z6Mkhazel", Attributes: map[string]any{"name": "Room Agent"},
 	}))
 
-	named, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "deploy agent"})
+	named, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "deploy agent", named.(*protocol.Named).GetName())
+	assert.Equal(t, "Deploy Agent", named.(*protocol.Named).GetName())
 
-	named, refusal = s.iName(asAgent("did:key:z6Mkpecan"), sigil.Sent{"name": "room agent"})
+	named, refusal = s.iName(asAgent("did:key:z6Mkpecan"), sigil.Sent{"name": "Room Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "room agent", named.(*protocol.Named).GetName())
+	assert.Equal(t, "Room Agent", named.(*protocol.Named).GetName())
 }
 
 // Who reaches '/mcp' reaches i name, and a USER does not: the gate's own answer.
@@ -388,7 +388,7 @@ func TestEachAgentUnderOneTokenNamesItself(t *testing.T) {
 	require.Nil(t, refusal, refusal.GetSays())
 	assert.Equal(t, otariDID, named.(*protocol.Named).GetDid())
 
-	_, refusal = s.iName(admitting(sion), sigil.Sent{"name": "wren"})
+	_, refusal = s.iName(admitting(sion), sigil.Sent{"name": "Wren"})
 	require.NotNil(t, refusal, "two agents hold one name")
 	assert.Contains(t, refusal.GetSays(), "is taken")
 
@@ -415,12 +415,12 @@ func TestARenameAndATakeReadBackInTheOrderTheyWereWritten(t *testing.T) {
 	require.NoError(t, store.CreateAttestation(&types.As{
 		ID: "AS-named-ahead", Subjects: []string{"did:key:z6Mkwalnut"}, Predicates: []string{predicateAgentNamed},
 		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkwalnut"}, Timestamp: ahead, CreatedAt: ahead,
-		Source: "did:key:z6Mkwalnut", Attributes: map[string]any{"name": "room agent"},
+		Source: "did:key:z6Mkwalnut", Attributes: map[string]any{"name": "Room Agent"},
 	}))
 
-	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "deploy agent"})
+	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
-	_, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "room agent"})
+	_, refusal = s.iName(asAgent("did:key:z6Mkhazel"), sigil.Sent{"name": "Room Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
 
 	names, err := s.agentNames()
@@ -429,7 +429,7 @@ func TestARenameAndATakeReadBackInTheOrderTheyWereWritten(t *testing.T) {
 	for _, held := range names {
 		holds[held.did] = held.name
 	}
-	assert.Equal(t, map[string]string{"did:key:z6Mkwalnut": "deploy agent", "did:key:z6Mkhazel": "room agent"}, holds)
+	assert.Equal(t, map[string]string{"did:key:z6Mkwalnut": "Deploy Agent", "did:key:z6Mkhazel": "Room Agent"}, holds)
 }
 
 // recordStore is a test store as storage.TakeIn asks of one: it counts what it
@@ -489,7 +489,7 @@ func TestANameLineIsStampedWhenItIsWrittenAndReadInTheOrderOfItsSequence(t *test
 	namingNow = func() time.Time { return instant }
 	t.Cleanup(func() { namingNow = time.Now })
 	for _, asked := range []struct{ did, name string }{
-		{"did:key:z6Mkwalnut", "room agent"}, {"did:key:z6Mkwalnut", "deploy agent"}, {"did:key:z6Mkhazel", "room agent"},
+		{"did:key:z6Mkwalnut", "Room Agent"}, {"did:key:z6Mkwalnut", "Deploy Agent"}, {"did:key:z6Mkhazel", "Room Agent"},
 	} {
 		_, refusal := s.iName(asAgent(asked.did), sigil.Sent{"name": asked.name})
 		require.Nil(t, refusal, refusal.GetSays())
@@ -500,7 +500,7 @@ func TestANameLineIsStampedWhenItIsWrittenAndReadInTheOrderOfItsSequence(t *test
 	for _, held := range names {
 		holds[held.did] = held.name
 	}
-	assert.Equal(t, map[string]string{"did:key:z6Mkwalnut": "deploy agent", "did:key:z6Mkhazel": "room agent"}, holds)
+	assert.Equal(t, map[string]string{"did:key:z6Mkwalnut": "Deploy Agent", "did:key:z6Mkhazel": "Room Agent"}, holds)
 	for _, line := range nameLinesHeld(t, s) {
 		assert.Equal(t, instant.UnixMilli(), line.Timestamp.UnixMilli(), "a line is stamped when it was written, not after the one before")
 	}
@@ -513,10 +513,10 @@ func TestANameLineIsStampedWhenItIsWrittenAndReadInTheOrderOfItsSequence(t *test
 	require.NoError(t, store.CreateAttestation(&types.As{
 		ID: "AS-named-stamped-ahead", Subjects: []string{"did:key:z6Mkoak"}, Predicates: []string{predicateAgentNamed},
 		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkoak"}, Timestamp: ahead, CreatedAt: ahead,
-		Source: "did:key:z6Mkoak", Attributes: map[string]any{"name": "oak", "sequence": 3},
+		Source: "did:key:z6Mkoak", Attributes: map[string]any{"name": "Oak", "sequence": 3},
 	}))
 	before := time.Now()
-	_, refusal := s.iName(asAgent("did:key:z6Mkelm"), sigil.Sent{"name": "elm"})
+	_, refusal := s.iName(asAgent("did:key:z6Mkelm"), sigil.Sent{"name": "Elm"})
 	require.Nil(t, refusal, refusal.GetSays())
 	after := time.Now()
 	var elm *types.As
@@ -557,12 +557,12 @@ func TestANameLineWithNoSequenceToReadIsNoName(t *testing.T) {
 	require.NoError(t, store.CreateAttestation(&types.As{
 		ID: "AS-named-bad-sequence", Subjects: []string{"did:key:z6Mkbirch"}, Predicates: []string{predicateAgentNamed},
 		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkbirch"}, Timestamp: at, CreatedAt: at,
-		Source: "did:key:z6Mkbirch", Attributes: map[string]any{"name": "birch", "sequence": "first"},
+		Source: "did:key:z6Mkbirch", Attributes: map[string]any{"name": "Birch", "sequence": "first"},
 	}))
 
-	named, refusal := s.iName(asAgent("did:key:z6Mkash"), sigil.Sent{"name": "birch"})
+	named, refusal := s.iName(asAgent("did:key:z6Mkash"), sigil.Sent{"name": "Birch"})
 	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, "birch", named.(*protocol.Named).GetName(), "the line that reads as no name holds no name")
+	assert.Equal(t, "Birch", named.(*protocol.Named).GetName(), "the line that reads as no name holds no name")
 	names, err := s.agentNames()
 	require.NoError(t, err)
 	require.Len(t, names, 1)
@@ -577,7 +577,7 @@ func TestANameLineWithNoSequenceToReadIsNoName(t *testing.T) {
 func TestARenameWithNoSequenceAfterASequencedOneStands(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	s := rootKnowingServer(t)
-	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "deploy agent"})
+	_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": "Deploy Agent"})
 	require.Nil(t, refusal, refusal.GetSays())
 	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	require.NoError(t, err)
@@ -585,10 +585,81 @@ func TestARenameWithNoSequenceAfterASequencedOneStands(t *testing.T) {
 	require.NoError(t, store.CreateAttestation(&types.As{
 		ID: "AS-named-by-an-older-build", Subjects: []string{"did:key:z6Mkwalnut"}, Predicates: []string{predicateAgentNamed},
 		Contexts: []string{auth.NamespaceSystem}, Actors: []string{"did:key:z6Mkwalnut"}, Timestamp: later, CreatedAt: later,
-		Source: "did:key:z6Mkwalnut", Attributes: map[string]any{"name": "late agent"},
+		Source: "did:key:z6Mkwalnut", Attributes: map[string]any{"name": "Late Agent"},
 	}))
 	names, err := s.agentNames()
 	require.NoError(t, err)
 	require.Len(t, names, 1)
-	assert.Equal(t, "late agent", names[0].name)
+	assert.Equal(t, "Late Agent", names[0].name)
+}
+
+// "i want to ban numbers in names"
+// "a name is an Uppercase character followed by normal lowercase characters"
+// "and a name can be two names after each other as well"
+// "or three"
+// "so no special chars in names as well"
+// "a Name needs to be able to be phonetically spoken"
+func TestANameIsOneToThreeWordsThatCanBeSaid(t *testing.T) {
+	s := rootKnowingServer(t)
+	for _, asked := range []string{"Alder-1", "Alder1", "alder", "ALDER", "Al der", "Alder  Birch", "Alder_Birch", "Brr", "A",
+		"Élan", "One Two Three Four"} {
+		_, refusal := s.iName(asAgent("did:key:z6Mkwalnut"), sigil.Sent{"name": asked})
+		require.NotNil(t, refusal, asked)
+		assert.Equal(t, sigil.Invalid, refusal.GetWhy(), asked)
+		assert.Equal(t, "name", refusal.GetParam(), asked)
+	}
+	assert.Empty(t, systemHolds(t, s))
+
+	for did, asked := range map[string]string{"did:key:z6Mkwalnut": "Alder", "did:key:z6Mkhazel": "Alder Birch", "did:key:z6Mkpecan": "Ada Lovelace Byron"} {
+		named, refusal := s.iName(asAgent(did), sigil.Sent{"name": asked})
+		require.Nil(t, refusal, refusal.GetSays())
+		assert.Equal(t, asked, named.(*protocol.Named).GetName())
+	}
+}
+
+// "i want false Alder to take a different name for example"
+// "the token can be GONE"
+// A name a revoked token holds is let go of when another agent asks for it,
+// and the agent asking holds it from then on, after a restart too.
+func TestTheNameOfARevokedTokenIsTakenByTheAgentAsking(t *testing.T) {
+	s := rootKnowingServer(t)
+	tokens, _, err := auth.OpenTokenTable(s.nodeDB, nil)
+	require.NoError(t, err)
+	h, err := auth.New(s.nodeDB, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
+		func(next http.HandlerFunc) http.HandlerFunc { return next },
+		tokens, testUsers(t), false, []string{rootAccount}, nil)
+	require.NoError(t, err)
+	s.authHandler = h
+	_, _, err = tokens.Create(auth.NewToken{Label: "GroundToken", MintedBy: rootAccount,
+		Level: auth.LevelAttestor, Namespaces: []string{"garden"}, ExpiresAt: auth.NeverEnds()})
+	require.NoError(t, err)
+	held, err := tokens.List()
+	require.NoError(t, err)
+	require.Len(t, held, 1)
+	old, session := asAgent(held[0].DID), asAgent("did:key:z6Mksession")
+
+	_, refusal := s.iName(old, sigil.Sent{"name": "Alder"})
+	require.Nil(t, refusal, refusal.GetSays())
+	_, refusal = s.iName(session, sigil.Sent{"name": "Alder"})
+	require.NotNil(t, refusal, "a name a live token holds was given to a second")
+	assert.Contains(t, refusal.GetSays(), "is taken")
+
+	require.NoError(t, tokens.Revoke(held[0].ID))
+	named, refusal := s.iName(session, sigil.Sent{"name": "Alder"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "Alder", named.(*protocol.Named).GetName())
+	assert.Equal(t, "did:key:z6Mksession", named.(*protocol.Named).GetDid())
+
+	// Read back from the lines alone, as after a restart.
+	names, err := s.agentNames()
+	require.NoError(t, err)
+	require.Len(t, names, 1)
+	assert.Equal(t, "did:key:z6Mksession", names[0].did)
+	assert.Equal(t, "Alder", names[0].name)
+
+	// Enabled again, the token holds no name, and the session's is not its to take.
+	require.NoError(t, tokens.Enable(held[0].ID))
+	_, refusal = s.iName(old, sigil.Sent{"name": "Alder"})
+	require.NotNil(t, refusal, "a token enabled again took back the name it was let go of")
+	assert.Contains(t, refusal.GetSays(), "is taken")
 }

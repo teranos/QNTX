@@ -4,8 +4,34 @@
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
+/// The seed every test's own key is, kept where `~/.qntx/key` is for the test:
+/// fixed, so a signature a test makes is the same every run.
+const SEED_HEX: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+/// Another key's seed, for a row signed by someone else.
+const OTHER_SEED_HEX: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+
+/// A key kept at `path` as `ground code login` keeps one: the seed in hex, 0600.
+fn write_key(path: &std::path::Path, seed_hex: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, format!("{seed_hex}\n")).unwrap();
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+/// The binary with no key named by the environment and no proxy between it and
+/// a local node; each caller sets HOME, so `~/.qntx/key` is never the machine's.
+fn bin() -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_ats-dev"));
+    c.env_remove("ATS_DEV_KEY");
+    for v in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"] {
+        c.env_remove(v);
+    }
+    c
+}
+
 fn run(db: &std::path::Path, args: &[&str], stdin: &str) -> Output {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_ats-dev"))
+    let mut c = bin()
+        .env("HOME", db.parent().unwrap())
         .arg("--db")
         .arg(db)
         .args(args)
@@ -19,10 +45,19 @@ fn run(db: &std::path::Path, args: &[&str], stdin: &str) -> Output {
 }
 fn out(o: &Output) -> String { String::from_utf8_lossy(&o.stdout).into_owned() }
 fn err(o: &Output) -> String { String::from_utf8_lossy(&o.stderr).into_owned() }
+/// A database in a directory of its own, which is the test's HOME, holding the
+/// test's key at `.qntx/key`.
 fn db() -> (tempfile::TempDir, std::path::PathBuf) {
     let d = tempfile::tempdir().unwrap();
+    write_key(&home_key(d.path()), SEED_HEX);
     let p = d.path().join("t.db");
     (d, p)
+}
+fn home_key(home: &std::path::Path) -> std::path::PathBuf { home.join(".qntx").join("key") }
+/// The did:key the test's key signs as.
+fn did(p: &std::path::Path) -> String {
+    let v: serde_json::Value = serde_json::from_str(out(&run(p, &["key"], "")).trim()).unwrap();
+    v["did"].as_str().unwrap().to_string()
 }
 fn count(p: &std::path::Path) -> String { out(&run(p, &["count"], "")).trim().to_string() }
 
@@ -35,30 +70,39 @@ fn a_sentence_is_written_and_ax_returns_it() {
 }
 
 #[test]
-fn an_attestation_no_actor_was_named_for_is_authored_by_ats_dev_and_ax_returns_it() {
+fn a_signed_row_is_authored_by_its_signer_and_an_unsigned_one_by_ats_dev() {
     let (_d, p) = db();
+    let me = did(&p);
     let o = run(&p, &["put", "ALICE is author of GITHUB"], "");
     assert!(o.status.success(), "{}", err(&o));
+    assert!(out(&o).contains(&format!("\"actors\":[\"{me}\"]")), "{}", out(&o));
+    let o = run(&p, &["--unsigned", "put", "CAROL is reviewer of GITHUB"], "");
     assert!(out(&o).contains("\"actors\":[\"ats-dev\"]"), "{}", out(&o));
-    let o = run(&p, &["put", "-"], "{\"subjects\":[\"CAROL\"],\"predicates\":[\"reviewer\"]}\n");
+    let o = run(&p, &["put", "-"], "{\"subjects\":[\"DAVE\"],\"predicates\":[\"reviewer\"]}\n");
     assert!(o.status.success(), "{}", err(&o));
-    for who in ["ALICE", "CAROL"] {
+    for (who, by) in [("ALICE", me.as_str()), ("CAROL", "ats-dev"), ("DAVE", me.as_str())] {
         let o = run(&p, &["ax", who], "");
-        assert!(out(&o).contains("\"ats-dev\""), "ax {who} returned nothing: {}", err(&o));
+        assert!(out(&o).contains(by), "ax {who} has not {by}: {}", out(&o));
     }
 }
 
+/// The node writes a request admitted as a key with that key leading the
+/// actors, and a signature's actors must be those (`actorsFor`); unsigned, the
+/// actors named stand alone.
 #[test]
-fn an_actor_that_was_named_stands() {
+fn an_actor_that_was_named_stands_after_the_signer() {
     let (_d, p) = db();
+    let me = did(&p);
     let o = run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(out(&o).contains(&format!("\"actors\":[\"{me}\",\"BOB\"]")), "{}", out(&o));
+    let o = run(&p, &["--unsigned", "put", "ALICE is author of GITHUB by BOB"], "");
     assert!(out(&o).contains("\"actors\":[\"BOB\"]"), "{}", out(&o));
 }
 
 #[test]
 fn a_date_no_store_holds_is_refused_not_kept_as_today() {
     let (_d, p) = db();
-    let o = run(&p, &["put", "-"], "{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"timestamp\":9223372036854775807}\n");
+    let o = run(&p, &["--unsigned", "put", "-"], "{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"timestamp\":9223372036854775807}\n");
     assert!(!o.status.success());
     assert!(err(&o).contains("outside the dates"), "{}", err(&o));
     assert_eq!(out(&o), "");
@@ -102,10 +146,31 @@ fn a_sentence_with_a_time_clause_is_refused() {
 #[test]
 fn a_negative_timestamp_with_a_sub_second_is_kept() {
     let (_d, p) = db();
-    let o = run(&p, &["put", "-"], "{\"subjects\":[\"OLD\"],\"predicates\":[\"p\"],\"actors\":[\"x\"],\"timestamp\":-1500,\"created_at\":-1500}\n");
+    let o = run(&p, &["--unsigned", "put", "-"], "{\"subjects\":[\"OLD\"],\"predicates\":[\"p\"],\"actors\":[\"x\"],\"timestamp\":-1500,\"created_at\":-1500}\n");
     assert!(o.status.success(), "{}", err(&o));
     let o = run(&p, &["ax", "OLD"], "");
     assert!(out(&o).contains("\"timestamp\":-1500"), "{}", out(&o));
+}
+
+/// The node takes a timestamp in seconds, so a signature over milliseconds
+/// would not verify there: a signed row's moment is a whole second.
+#[test]
+fn a_signed_row_s_timestamp_is_a_whole_second() {
+    let (_d, p) = db();
+    let o = run(&p, &["put", "-"], "{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"timestamp\":1500}\n");
+    assert!(!o.status.success() && err(&o).contains("whole second"), "{}", err(&o));
+    assert_eq!(count(&p), "0");
+    let o = run(&p, &["put", "-"], "{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"timestamp\":-2000}\n");
+    assert!(o.status.success(), "{}", err(&o));
+    assert!(out(&run(&p, &["ax", "A"], "")).contains("\"timestamp\":-2000"));
+    for o in [run(&p, &["put", "B is p of C"], ""), run(&p, &["put", "-"], "{\"subjects\":[\"D\"],\"predicates\":[\"p\"]}\n")] {
+        assert!(o.status.success(), "{}", err(&o));
+        let id = out(&o).lines().next().unwrap().trim_matches('"').to_string();
+        let id = serde_json::from_str::<serde_json::Value>(&id).ok().and_then(|v| v["id"].as_str().map(str::to_string)).unwrap_or(id);
+        let v: serde_json::Value = serde_json::from_str(out(&run(&p, &["get", &id], "")).trim()).unwrap();
+        let at = v["timestamp"].as_i64().unwrap();
+        assert_eq!(at % 1000, 0, "a timestamp ats-dev filled in is not a whole second: {at}");
+    }
 }
 
 #[test]
@@ -122,7 +187,7 @@ fn a_signed_attestation_without_actors_is_refused_not_authored_over_its_signatur
     let o = run(&p, &["put", "-"], &line);
     assert!(o.status.success(), "{}", err(&o));
     assert_eq!(count(&p), "1");
-    assert!(out(&run(&p, &["actors"], "")).trim() == "BOB");
+    assert!(out(&run(&p, &["actors"], "")).lines().any(|l| l == "BOB"));
 }
 
 fn id_of(o: &Output) -> String {
@@ -184,7 +249,10 @@ fn the_listings_and_stats_read_what_was_written() {
     assert_eq!(out(&run(&p, &["subjects"], "")).trim(), "ALICE");
     assert_eq!(out(&run(&p, &["predicates"], "")).trim(), "author");
     assert_eq!(out(&run(&p, &["contexts"], "")).trim(), "GITHUB");
-    assert_eq!(out(&run(&p, &["actors"], "")).trim(), "BOB");
+    // the signer leads a signed row's actors, then who was named
+    let mut actors: Vec<String> = out(&run(&p, &["actors"], "")).lines().map(str::to_string).collect();
+    actors.sort();
+    assert_eq!(actors, [did(&p), "BOB".to_string()].iter().cloned().collect::<std::collections::BTreeSet<_>>().into_iter().collect::<Vec<_>>());
     let st: serde_json::Value = serde_json::from_str(out(&run(&p, &["stats"], "")).trim()).unwrap();
     assert_eq!(st["total_attestations"], 1);
     assert_eq!(st["unique_subjects"], 1);
@@ -208,32 +276,39 @@ fn verdicts(p: &std::path::Path) -> Vec<serde_json::Value> {
 }
 
 #[test]
-fn put_signs_with_a_key_minted_beside_the_db_and_the_same_key_signs_again() {
-    let (_d, p) = db();
-    let key_file = std::path::PathBuf::from(format!("{}.key", p.display()));
-    assert!(!key_file.exists());
+fn put_signs_as_the_key_kept_in_qntx_key_and_mints_none() {
+    let (d, p) = db();
+    let k: serde_json::Value = serde_json::from_str(out(&run(&p, &["key"], "")).trim()).unwrap();
+    assert_eq!(k["file"], home_key(d.path()).display().to_string());
+    assert!(k["did"].as_str().unwrap().starts_with("did:key:z"));
     run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
-    assert!(key_file.exists());
-    let did1: serde_json::Value = serde_json::from_str(out(&run(&p, &["key"], "")).trim()).unwrap();
     run(&p, &["put", "CAROL is author of GITHUB by BOB"], "");
     let v = verdicts(&p);
     assert_eq!(v.len(), 2);
     for x in &v {
         assert_eq!(x["signature"], "valid");
-        assert_eq!(x["signer"], did1["did"]);
+        assert_eq!(x["signer"], k["did"]);
     }
-    assert!(did1["did"].as_str().unwrap().starts_with("did:key:z"));
-    {
-        use std::os::unix::fs::PermissionsExt;
-        assert_eq!(std::fs::metadata(&key_file).unwrap().permissions().mode() & 0o777, 0o600);
+    // the key is the file as it was kept: read, not rewritten
+    assert_eq!(std::fs::read_to_string(home_key(d.path())).unwrap(), format!("{SEED_HEX}\n"));
+
+    // none kept: refused, with where one comes from, and none made
+    std::fs::remove_file(home_key(d.path())).unwrap();
+    for args in [vec!["put", "DAVE is author of GITHUB by BOB"], vec!["key"]] {
+        let o = run(&p, &args, "");
+        assert!(!o.status.success() && err(&o).contains("no key is kept") && err(&o).contains("ground code login"), "{args:?}: {}", err(&o));
     }
+    assert!(!home_key(d.path()).exists(), "a key was minted");
+    assert_eq!(count(&p), "2");
 }
 
 #[test]
-fn unsigned_writes_no_signature_and_mints_no_key() {
-    let (_d, p) = db();
-    run(&p, &["--unsigned", "put", "ALICE is author of GITHUB by BOB"], "");
-    assert!(!std::path::PathBuf::from(format!("{}.key", p.display())).exists());
+fn unsigned_writes_no_signature_and_needs_no_key() {
+    let (d, p) = db();
+    std::fs::remove_file(home_key(d.path())).unwrap();
+    let o = run(&p, &["--unsigned", "put", "ALICE is author of GITHUB by BOB"], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert!(!home_key(d.path()).exists());
     assert_eq!(verdicts(&p)[0]["signature"], "unsigned");
 }
 
@@ -241,6 +316,7 @@ fn unsigned_writes_no_signature_and_mints_no_key() {
 fn a_signature_given_that_does_not_hold_is_refused_and_one_that_holds_is_kept() {
     let (d, p) = db();
     let other = d.path().join("other.key");
+    write_key(&other, OTHER_SEED_HEX);
     let o = run(&p, &["--key", other.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
     assert!(o.status.success(), "{}", err(&o));
     let line = out(&o).lines().next().unwrap().to_string();
@@ -265,6 +341,7 @@ fn update_re_signs_what_its_own_key_signed_and_refuses_another_signers() {
     assert_eq!(verdicts(&p)[0]["signature"], "valid");
 
     let other = d.path().join("other.key");
+    write_key(&other, OTHER_SEED_HEX);
     let id2 = id_of(&run(&p, &["--key", other.to_str().unwrap(), "put", "CAROL is author of GITHUB by BOB"], ""));
     let o = run(&p, &["update", &format!("{{\"id\":\"{id2}\",\"subjects\":[\"MALLORY\"]}}")], "");
     assert!(!o.status.success() && err(&o).contains("cannot make"), "{}", err(&o));
@@ -272,23 +349,27 @@ fn update_re_signs_what_its_own_key_signed_and_refuses_another_signers() {
 }
 
 #[test]
-fn a_file_that_is_not_a_key_is_never_replaced() {
+fn a_key_file_that_holds_no_seed_is_refused_and_left_as_it_is() {
     let (d, p) = db();
-    let f = d.path().join("not.key");
-    std::fs::write(&f, b"hello").unwrap();
-    std::fs::set_permissions(&f, std::os::unix::fs::PermissionsExt::from_mode(0o600)).unwrap();
-    let o = run(&p, &["--key", f.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
-    assert!(!o.status.success() && err(&o).contains("not a key"), "{}", err(&o));
-    assert_eq!(std::fs::read(&f).unwrap(), b"hello");
+    for held in ["hello".to_string(), "1111".to_string(), format!("{SEED_HEX}00")] {
+        let f = d.path().join("not.key");
+        std::fs::write(&f, &held).unwrap();
+        std::fs::set_permissions(&f, std::os::unix::fs::PermissionsExt::from_mode(0o600)).unwrap();
+        let o = run(&p, &["--key", f.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
+        assert!(!o.status.success() && err(&o).contains("no 32-byte ed25519 seed in hex"), "{}", err(&o));
+        assert_eq!(std::fs::read_to_string(&f).unwrap(), held);
+    }
+    assert_eq!(count(&p), "0");
 }
 
 #[test]
-fn an_update_cannot_leave_a_signed_row_without_actors_or_name_a_signature() {
+fn an_update_that_empties_a_signed_row_s_actors_leaves_its_signer_and_names_no_signature() {
     let (_d, p) = db();
+    let me = did(&p);
     let id = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
     let o = run(&p, &["update", &format!("{{\"id\":\"{id}\",\"actors\":[]}}")], "");
-    assert!(!o.status.success() && err(&o).contains("must name its actors"), "{}", err(&o));
-    assert_eq!(out(&run(&p, &["actors"], "")).trim(), "BOB");
+    assert!(o.status.success(), "{}", err(&o));
+    assert_eq!(out(&run(&p, &["actors"], "")).trim(), me, "the signer leads, as the node writes it");
     assert_eq!(verdicts(&p)[0]["signature"], "valid");
 
     // a signature is made, not edited: not on a signed row, not on an unsigned one
@@ -317,46 +398,19 @@ fn a_signer_without_a_signature_is_refused_signed_or_not() {
 }
 
 #[test]
-fn a_signature_already_made_needs_no_key_and_a_refused_input_mints_none() {
-    let (d, p) = db();
+fn a_signature_already_made_needs_no_key() {
+    let (_d, p) = db();
     let line = out(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], "")).lines().next().unwrap().to_string();
-    let (_d2, q) = db();
-    let no_key = d.path().join("no-such-dir").join("k.key");
-    let o = run(&q, &["--key", no_key.to_str().unwrap(), "put", "-"], &line);
+    let (d2, q) = db();
+    std::fs::remove_file(home_key(d2.path())).unwrap();
+    let o = run(&q, &["put", "-"], &line);
     assert!(o.status.success(), "{}", err(&o));
     assert_eq!(verdicts(&q)[0]["signature"], "valid");
-
-    let (_d3, r) = db();
-    let key = std::path::PathBuf::from(format!("{}.key", r.display()));
-    let o = run(&r, &["put", "-"], "{\"nonsense\":1}\n");
-    assert!(!o.status.success());
-    assert!(!key.exists(), "a refused input minted a key");
+    assert!(!home_key(d2.path()).exists());
 }
 
-#[test]
-fn processes_minting_at_once_end_with_one_key_and_leave_nothing_behind() {
-    let d = tempfile::tempdir().unwrap();
-    let key = d.path().join("shared.key");
-    let handles: Vec<_> = (0..8)
-        .map(|i| {
-            let db = d.path().join(format!("{i}.db"));
-            let key = key.clone();
-            std::thread::spawn(move || {
-                let o = run(&db, &["--key", key.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
-                assert!(o.status.success(), "{}", err(&o));
-                let k = run(&db, &["--key", key.to_str().unwrap(), "key"], "");
-                serde_json::from_str::<serde_json::Value>(out(&k).trim()).unwrap()["did"].as_str().unwrap().to_string()
-            })
-        })
-        .collect();
-    let dids: Vec<String> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-    assert!(dids.iter().all(|x| x == &dids[0]), "{dids:?}");
-    let left: Vec<_> = std::fs::read_dir(d.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).filter(|n| n.ends_with(".tmp")).collect();
-    assert!(left.is_empty(), "{left:?}");
-}
-
-/// A row signed by ats-dev's key on the signing build, carried here as text: this
-/// build has no key, and a signature stays valid wherever the row is put.
+/// A row signed by another key on an earlier build, carried here as text: a
+/// signature stays valid wherever the row is put.
 const SIGNED: &str = r##"{"id":"AS-75847316-caac-45d6-b819-06eecbf8be07","subjects":["ALICE"],"predicates":["author"],"contexts":["GITHUB"],"actors":["BOB"],"timestamp":1794266294644,"source":"ats-dev","attributes":{"n":3,"note":"<a & \"b\">"},"created_at":1794266294644,"signature":[154,101,30,4,174,33,231,130,163,19,62,221,216,85,196,207,112,183,156,27,24,248,47,250,137,19,188,22,86,184,215,151,35,6,77,164,172,202,97,80,81,54,127,39,244,108,1,4,35,240,67,118,113,106,175,97,208,66,119,80,181,32,18,8],"signer_did":"did:key:z6Mkofs97sbDZBoGXR6im4Po2zJmwGdjJe2LQpAudzVx2ekp"}"##;
 
 fn signed_line() -> String {
@@ -393,44 +447,22 @@ fn an_update_that_empties_the_actors_authors_them_and_reports_what_is_on_disk() 
 }
 
 #[test]
-fn refusing_an_edit_to_a_foreign_signed_row_mints_no_key() {
-    let (_d, p) = db();
+fn refusing_an_edit_to_a_foreign_signed_row_with_no_key_kept_mints_none() {
+    let (d, p) = db();
+    std::fs::remove_file(home_key(d.path())).unwrap();
     assert!(run(&p, &["put", "-"], SIGNED).status.success());
-    let key = std::path::PathBuf::from(format!("{}.key", p.display()));
-    assert!(!key.exists(), "importing a signed row minted a key");
     let id = serde_json::from_str::<serde_json::Value>(SIGNED).unwrap()["id"].as_str().unwrap().to_string();
     let o = run(&p, &["update", &format!("{{\"id\":\"{id}\",\"subjects\":[\"ZED\"]}}")], "");
-    assert!(!o.status.success() && err(&o).contains("not made yet"), "{}", err(&o));
-    assert!(!key.exists(), "a refused edit minted a key");
-}
-
-#[test]
-fn a_leftover_temporary_file_does_not_stop_a_key_being_made_and_is_not_removed() {
-    let d = tempfile::tempdir().unwrap();
-    let key = d.path().join("k.key");
-    let stale: Vec<_> = ["k.key.1.tmp", format!("k.key.{}.tmp", std::process::id()).as_str()]
-        .iter()
-        .map(|n| {
-            let f = d.path().join(n);
-            std::fs::write(&f, b"left by something else").unwrap();
-            f
-        })
-        .collect();
-    let db = d.path().join("a.db");
-    let o = run(&db, &["--key", key.to_str().unwrap(), "put", "ALICE is author of GITHUB by BOB"], "");
-    assert!(o.status.success(), "{}", err(&o));
-    assert!(key.exists());
-    for f in stale {
-        assert_eq!(std::fs::read(&f).unwrap(), b"left by something else", "{}", f.display());
-    }
+    assert!(!o.status.success() && err(&o).contains("the key kept is none"), "{}", err(&o));
+    assert!(!home_key(d.path()).exists(), "a refused edit minted a key");
 }
 
 #[test]
 fn a_key_file_open_to_group_or_other_is_refused_by_every_command_that_reads_it() {
     use std::os::unix::fs::PermissionsExt;
-    let (_d, p) = db();
+    let (home, p) = db();
     run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
-    let key = std::path::PathBuf::from(format!("{}.key", p.display()));
+    let key = home_key(home.path());
     let id = out(&run(&p, &["ids"], "")).trim().to_string();
     for mode in [0o644, 0o640, 0o604, 0o660] {
         std::fs::set_permissions(&key, std::fs::Permissions::from_mode(mode)).unwrap();
@@ -556,7 +588,8 @@ fn the_bytes_written_are_printed_to_two_decimals_not_rounded_to_whole_megabytes(
 /// `run` for a backend: the global flags go before `--db`, and `db` is whatever
 /// that backend calls its location (a path, a url, a connection string).
 fn run_on(backend: &[&str], db: &str, args: &[&str], stdin: &str) -> Output {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_ats-dev"))
+    let mut c = bin()
+        .env("HOME", std::env::temp_dir().join("ats-dev-test-home-with-no-key"))
         .args(backend)
         .arg("--db")
         .arg(db)
@@ -600,21 +633,17 @@ fn what_is_sqlites_is_refused_on_another_backend_before_anything_is_opened() {
 }
 
 #[test]
-fn a_url_has_no_file_for_the_key_to_sit_beside_and_a_duckdb_path_does() {
+fn the_key_is_the_same_whatever_the_backend() {
     let d = tempfile::tempdir().unwrap();
-    for (backend, db) in [("postgres", "host=/nowhere user=x"), ("duckdb", "s3://bucket/prefix"), ("duckdb", "file:///x")] {
-        let o = run_on(&["--backend", backend], db, &["key"], "");
-        assert!(!o.status.success() && err(&o).contains("no key file to default to"), "{backend} {db}: {}", err(&o));
-    }
-    // named, it is made
     let key = d.path().join("k");
-    let o = run_on(&["--backend", "postgres", "--key", key.to_str().unwrap()], "host=/nowhere", &["key"], "");
-    assert!(o.status.success() && out(&o).contains("did:key:"), "{}", err(&o));
-    // a plain path is a place on this machine, so the default is beside it
-    let loc = d.path().join("parquet");
-    let o = run_on(&["--backend", "duckdb"], loc.to_str().unwrap(), &["key"], "");
-    assert!(o.status.success() && out(&o).contains("parquet.key"), "{}", err(&o));
-    assert!(d.path().join("parquet.key").exists());
+    write_key(&key, SEED_HEX);
+    let mut dids = Vec::new();
+    for (backend, db) in [("sqlite", d.path().join("t.db").display().to_string()), ("postgres", "host=/nowhere user=x".into()), ("duckdb", "s3://bucket/prefix".into())] {
+        let o = run_on(&["--backend", backend, "--key", key.to_str().unwrap()], &db, &["key"], "");
+        assert!(o.status.success(), "{backend}: {}", err(&o));
+        dids.push(serde_json::from_str::<serde_json::Value>(out(&o).trim()).unwrap()["did"].clone());
+    }
+    assert!(dids.iter().all(|x| x == &dids[0]), "{dids:?}");
 }
 
 #[cfg(not(feature = "duckdb"))]
@@ -704,6 +733,7 @@ fn duckdb_keeps_across_processes_what_put_wrote_and_reports_only_changes_it_made
     let d = tempfile::tempdir().unwrap();
     let loc = d.path().join("parquet");
     let key = d.path().join("k");
+    write_key(&key, SEED_HEX);
     holds_what_attestation_store_promises(&["--backend", "duckdb"], loc.to_str().unwrap(), key.to_str().unwrap());
 }
 
@@ -745,6 +775,7 @@ fn postgres() -> (String, String, tempfile::TempDir) {
 fn postgres_keeps_across_processes_what_put_wrote_and_reports_only_changes_it_made() {
     let (url, ns, d) = postgres();
     let key = d.path().join("k");
+    write_key(&key, SEED_HEX);
     holds_what_attestation_store_promises(&["--backend", "postgres", "--namespace", &ns], &url, key.to_str().unwrap());
 }
 
@@ -784,7 +815,8 @@ fn a_refused_bench_load_replace_deletes_nothing() {
 
 /// `run_on` with raw bytes on stdin and a working directory.
 fn run_raw(backend: &[&str], cwd: &std::path::Path, db: &str, args: &[&str], stdin: &[u8]) -> Output {
-    let mut c = Command::new(env!("CARGO_BIN_EXE_ats-dev"))
+    let mut c = bin()
+        .env("HOME", cwd)
         .args(backend)
         .arg("--db")
         .arg(db)
@@ -848,4 +880,357 @@ fn a_duckdb_location_with_an_apostrophe_is_refused_before_anything_is_written() 
     let o = run_on(&["--backend", "duckdb", "--unsigned"], loc.to_str().unwrap(), &["put", "ALICE is author of GITHUB"], "");
     assert!(!o.status.success() && err(&o).contains("cannot contain an apostrophe"), "{}", err(&o));
     assert!(!loc.exists(), "nothing was created");
+}
+
+/// A node of one request: it keeps the request line, the Authorization and the
+/// body it was sent, and answers `status` with what `answer` makes of the body.
+fn fake_node(
+    status: u16,
+    answer: impl Fn(&serde_json::Value) -> serde_json::Value + Send + 'static,
+) -> (String, std::thread::JoinHandle<(String, String, serde_json::Value)>) {
+    use std::io::{BufRead, BufReader, Read};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", l.local_addr().unwrap());
+    let h = std::thread::spawn(move || {
+        let (mut s, _) = l.accept().unwrap();
+        let mut r = BufReader::new(s.try_clone().unwrap());
+        let mut line = String::new();
+        r.read_line(&mut line).unwrap();
+        let (mut auth, mut len) = (String::new(), 0usize);
+        loop {
+            let mut h = String::new();
+            r.read_line(&mut h).unwrap();
+            let h = h.trim_end();
+            if h.is_empty() {
+                break;
+            }
+            let (k, v) = h.split_once(':').unwrap();
+            match k.to_ascii_lowercase().as_str() {
+                "authorization" => auth = v.trim().to_string(),
+                "content-length" => len = v.trim().parse().unwrap(),
+                _ => {}
+            }
+        }
+        let mut body = vec![0; len];
+        r.read_exact(&mut body).unwrap();
+        let sent: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let reply = answer(&sent).to_string();
+        write!(s, "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reply}", reply.len()).unwrap();
+        (line.trim().to_string(), auth, sent)
+    });
+    (url, h)
+}
+
+/// Every row taken, as the node answers a list it took.
+fn all_created(sent: &serde_json::Value) -> serde_json::Value {
+    let n = sent.as_array().unwrap().len();
+    serde_json::json!({ "results": vec![serde_json::json!({"status": 201, "answer": {"status": "created"}}); n] })
+}
+
+fn lines_of(o: &Output) -> Vec<serde_json::Value> {
+    out(o).lines().map(|l| serde_json::from_str(l).unwrap()).collect()
+}
+
+#[test]
+fn push_sends_each_row_as_the_node_takes_it_on_a_request_signed_for_that_node() {
+    use base64::Engine;
+    let (_d, p) = db();
+    let me = did(&p);
+    let signed = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB", "--attr", "n=3"], ""));
+    let unsigned = id_of(&run(&p, &["--unsigned", "put", "CAROL is author of GITHUB"], ""));
+    let (url, node) = fake_node(200, all_created);
+    let o = run(&p, &["push", &url], "");
+    assert!(o.status.success(), "{}", err(&o));
+    let said = lines_of(&o);
+    assert_eq!(said.len(), 2, "{}", out(&o));
+    assert!(said.iter().all(|l| l["status"] == 201), "{said:?}");
+
+    let (line, auth, sent) = node.join().unwrap();
+    assert_eq!(line, "POST /api/attestations HTTP/1.1");
+
+    // the request: a JWT the key signs as its did:key, made out to this node, once
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let jwt = auth.strip_prefix("Signed ").expect("the request carries a Signed authorization");
+    let parts: Vec<&str> = jwt.split('.').collect();
+    let claims: serde_json::Value = serde_json::from_slice(&b64.decode(parts[1]).unwrap()).unwrap();
+    assert_eq!(claims["iss"], me.as_str());
+    assert_eq!(claims["sub"], me.as_str());
+    assert_eq!(claims["aud"], serde_json::json!([url]));
+    let pk = libp2p_identity::ed25519::PublicKey::try_from_bytes(&ats_sign::didkey::decode(&me).unwrap()).unwrap();
+    assert!(pk.verify(format!("{}.{}", parts[0], parts[1]).as_bytes(), &b64.decode(parts[2]).unwrap()), "the request's signature is not the key's");
+
+    // the rows: seconds, the signature as Go reads []byte, created_at left to the node
+    let rows = sent.as_array().unwrap();
+    let row = |id: &str| rows.iter().find(|r| r["id"] == id).unwrap().clone();
+    let stored: serde_json::Value = serde_json::from_str(out(&run(&p, &["get", &signed], "")).trim()).unwrap();
+    let s = row(&signed);
+    assert_eq!(s["timestamp"].as_i64().unwrap() * 1000, stored["timestamp"].as_i64().unwrap());
+    assert_eq!(s["actors"][0], me.as_str(), "the signer leads, as the node writes a request admitted as it");
+    assert_eq!(s["signer_did"], me.as_str());
+    let sig = base64::engine::general_purpose::STANDARD.decode(s["signature"].as_str().unwrap()).unwrap();
+    assert_eq!(serde_json::json!(sig), stored["signature"]);
+    assert_eq!(s["attributes"]["n"], 3);
+    assert!(s.get("created_at").is_none());
+    let u = row(&unsigned);
+    assert!(u.get("signature").is_none() && u.get("signer_did").is_none(), "{u}");
+}
+
+#[test]
+fn push_says_what_the_node_refused_row_by_row_and_what_it_never_sent() {
+    let (_d, p) = db();
+    let ok = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
+    let late = id_of(&run(&p, &["put", "DAVE is author of GITHUB by BOB"], ""));
+    // `put -` says the ids it wrote, one per line
+    let sub_second = out(&run(&p, &["--unsigned", "put", "-"], "{\"subjects\":[\"S\"],\"predicates\":[\"p\"],\"timestamp\":1500}\n")).trim().to_string();
+    // the node takes the first row it is sent and refuses the second
+    let (url, node) = fake_node(200, |sent| {
+        let first = sent[0]["id"].clone();
+        serde_json::json!({ "results": sent.as_array().unwrap().iter().map(|r| if r["id"] == first {
+            serde_json::json!({"status": 201, "answer": {"status": "created"}})
+        } else {
+            serde_json::json!({"status": 403, "answer": {"error": "a key User does not hold"}})
+        }).collect::<Vec<_>>() })
+    });
+    let o = run(&p, &["push", &url, &ok, &late, &sub_second, "AS-nope"], "");
+    assert!(!o.status.success() && err(&o).contains("not taken"), "{}", err(&o));
+    let said = lines_of(&o);
+    let by_id = |id: &str| said.iter().find(|l| l["id"] == id).expect("a line for every id asked").clone();
+    assert_eq!(by_id(&ok)["status"], 201);
+    assert_eq!(by_id(&late)["status"], 403);
+    assert_eq!(by_id(&late)["answer"]["error"], "a key User does not hold");
+    assert!(by_id(&sub_second)["refused"].as_str().unwrap().contains("whole second"));
+    assert_eq!(by_id("AS-nope")["refused"], "no such attestation");
+    let (_, _, sent) = node.join().unwrap();
+    assert_eq!(sent.as_array().unwrap().len(), 2, "a row that cannot be sent as it is was sent: {sent}");
+}
+
+#[test]
+fn push_says_a_request_the_node_did_not_take_against_every_row_in_it() {
+    let (_d, p) = db();
+    let id = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
+    let (url, node) = fake_node(401, |_| serde_json::json!({ "error": "this node holds no live grant" }));
+    let o = run(&p, &["push", &url], "");
+    assert!(!o.status.success());
+    let said = lines_of(&o);
+    assert_eq!(said.len(), 1);
+    assert_eq!(said[0]["id"], id);
+    assert_eq!(said[0]["status"], 401);
+    assert_eq!(said[0]["answer"]["error"], "this node holds no live grant");
+    node.join().unwrap();
+}
+
+#[test]
+fn push_needs_the_key_and_a_node_url() {
+    let (d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    for (args, why) in [
+        (vec!["push"], "push needs a node"),
+        (vec!["push", "ftp://node.example"], "http or https"),
+        (vec!["push", "node.example"], "a node is a url"),
+    ] {
+        let o = run(&p, &args, "");
+        assert!(!o.status.success() && err(&o).contains(why), "{args:?}: {}", err(&o));
+    }
+    std::fs::remove_file(home_key(d.path())).unwrap();
+    let o = run(&p, &["push", "http://127.0.0.1:9"], "");
+    assert!(!o.status.success() && err(&o).contains("no key is kept"), "{}", err(&o));
+    assert_eq!(out(&o), "");
+}
+
+/// A node that reads one request and hangs up without a word.
+fn node_that_hangs_up() -> (String, std::thread::JoinHandle<usize>) {
+    use std::io::{BufRead, BufReader, Read};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", l.local_addr().unwrap());
+    let h = std::thread::spawn(move || {
+        let (s, _) = l.accept().unwrap();
+        let mut r = BufReader::new(s);
+        let mut len = 0usize;
+        loop {
+            let mut h = String::new();
+            r.read_line(&mut h).unwrap();
+            if h.trim_end().is_empty() {
+                break;
+            }
+            if let Some((k, v)) = h.split_once(':') {
+                if k.eq_ignore_ascii_case("content-length") {
+                    len = v.trim().parse().unwrap();
+                }
+            }
+        }
+        let mut body = vec![0; len];
+        r.read_exact(&mut body).unwrap();
+        serde_json::from_slice::<serde_json::Value>(&body).unwrap().as_array().unwrap().len()
+    });
+    (url, h)
+}
+
+#[test]
+fn a_node_that_hangs_up_leaves_no_row_unsaid_and_the_rest_unsent() {
+    let (_d, p) = db();
+    let rows: String = (0..101).map(|i| format!("{{\"subjects\":[\"S{i}\"],\"predicates\":[\"p\"]}}\n")).collect();
+    let o = run(&p, &["--unsigned", "put", "-"], &rows);
+    assert!(o.status.success(), "{}", err(&o));
+    let (url, node) = node_that_hangs_up();
+    let o = run(&p, &["push", &url], "");
+    assert!(!o.status.success());
+    let said = lines_of(&o);
+    assert_eq!(said.len(), 101, "every id has a line");
+    let unanswered = said.iter().filter(|l| l["refused"].as_str().is_some_and(|w| w.starts_with(&url) && w.contains("did not answer"))).count();
+    let unsent = said.iter().filter(|l| l["refused"].as_str().is_some_and(|w| w.starts_with("not sent:"))).count();
+    assert_eq!((unanswered, unsent), (100, 1), "{said:?}");
+    assert!(err(&o).contains("101 not taken"), "{}", err(&o));
+    assert!(err(&o).contains("100 sent"), "the summary is said: {}", err(&o));
+    assert_eq!(node.join().unwrap(), 100, "a request carries one batch, not the store");
+}
+
+#[test]
+fn a_row_the_node_already_had_is_said_apart_from_one_it_took() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    let (url, node) = fake_node(200, |sent| {
+        serde_json::json!({ "results": vec![serde_json::json!({"status": 200, "answer": {"status": "exists"}}); sent.as_array().unwrap().len()] })
+    });
+    let o = run(&p, &["push", &url], "");
+    assert!(o.status.success(), "{}", err(&o));
+    assert_eq!(lines_of(&o)[0]["answer"]["status"], "exists");
+    assert!(err(&o).contains("0 created, 1 the node already had under that id (what it holds was not compared)"), "{}", err(&o));
+    node.join().unwrap();
+}
+
+/// A push whose answers cannot be said is not a push that succeeded: the node
+/// took the row, but nobody was told, and the exit says so.
+#[test]
+fn a_push_whose_lines_cannot_be_written_does_not_exit_0() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    let (url, node) = fake_node(200, all_created);
+    let mut c = bin()
+        .env("HOME", p.parent().unwrap())
+        .arg("--db")
+        .arg(&p)
+        .args(["push", &url])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    // nobody reads what push says
+    drop(c.stdout.take());
+    let o = c.wait_with_output().unwrap();
+    node.join().unwrap();
+    assert!(!o.status.success(), "push exited 0 with its lines unwritten: {}", err(&o));
+    assert!(err(&o).contains("could not write stdout"), "{}", err(&o));
+}
+
+#[test]
+fn a_node_url_is_reached_as_written_and_names_no_query() {
+    let (_d, p) = db();
+    run(&p, &["put", "ALICE is author of GITHUB by BOB"], "");
+    for (url, why) in [("https://node.example?x=y", "no query or fragment"), ("https://node.example/#a", "no query or fragment")] {
+        let o = run(&p, &["push", url], "");
+        assert!(!o.status.success() && err(&o).contains(why), "{url}: {}", err(&o));
+    }
+}
+
+/// A node that takes `n` requests, each answered as taken, and keeps the size
+/// of each body and how many rows it carried.
+fn fake_node_n(n: usize) -> (String, std::thread::JoinHandle<Vec<(usize, usize)>>) {
+    use std::io::{BufRead, BufReader, Read};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", l.local_addr().unwrap());
+    let h = std::thread::spawn(move || {
+        let mut seen = Vec::new();
+        for _ in 0..n {
+            let (mut s, _) = l.accept().unwrap();
+            let mut r = BufReader::new(s.try_clone().unwrap());
+            let mut len = 0usize;
+            loop {
+                let mut h = String::new();
+                r.read_line(&mut h).unwrap();
+                if h.trim_end().is_empty() {
+                    break;
+                }
+                if let Some((k, v)) = h.split_once(':') {
+                    if k.eq_ignore_ascii_case("content-length") {
+                        len = v.trim().parse().unwrap();
+                    }
+                }
+            }
+            let mut body = vec![0; len];
+            r.read_exact(&mut body).unwrap();
+            let sent: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            let reply = all_created(&sent).to_string();
+            write!(s, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reply}", reply.len()).unwrap();
+            seen.push((len, sent.as_array().unwrap().len()));
+        }
+        seen
+    });
+    (url, h)
+}
+
+/// The node refuses a request past 10 MB whole, so rows are sent in requests
+/// under it, and a row too large for any request is said and not sent.
+#[test]
+fn push_keeps_each_request_under_what_the_node_reads() {
+    let (_d, p) = db();
+    let blob = |mib: usize| "x".repeat(mib * 1024 * 1024);
+    let rows = format!(
+        "{{\"subjects\":[\"A\"],\"predicates\":[\"p\"],\"attributes\":{{\"b\":\"{}\"}}}}\n{{\"subjects\":[\"B\"],\"predicates\":[\"p\"],\"attributes\":{{\"b\":\"{}\"}}}}\n{{\"subjects\":[\"C\"],\"predicates\":[\"p\"],\"attributes\":{{\"b\":\"{}\"}}}}\n",
+        blob(5), blob(5), blob(9)
+    );
+    let o = run(&p, &["--unsigned", "put", "-"], &rows);
+    assert!(o.status.success(), "{}", err(&o));
+    let (url, node) = fake_node_n(2);
+    let o = run(&p, &["push", &url], "");
+    let said = lines_of(&o);
+    assert_eq!(said.len(), 3, "{}", err(&o));
+    assert_eq!(said.iter().filter(|l| l["status"] == 201).count(), 2, "{said:?}");
+    let too_big: Vec<_> = said.iter().filter(|l| l["refused"].as_str().is_some_and(|w| w.contains("carries at most"))).collect();
+    assert_eq!(too_big.len(), 1, "{said:?}");
+    assert!(!o.status.success(), "a row not sent is a row not taken");
+    let seen = node.join().unwrap();
+    assert_eq!(seen.iter().map(|(_, rows)| *rows).collect::<Vec<_>>(), [1, 1], "{seen:?}");
+    assert!(seen.iter().all(|(bytes, _)| *bytes < 10 * 1000 * 1000), "{seen:?}");
+}
+
+/// A row that names a signer and no signature, or a signature and no signer,
+/// is not sent as unsigned: the node would sign it as itself and the claim of a
+/// signer would be gone. ats-dev never writes one; another writer of the file can.
+#[test]
+fn push_refuses_a_row_with_half_a_signature() {
+    use ats::AttestationStore;
+    let (_d, p) = db();
+    {
+        let mut s = ats_sqlite::SqliteStore::open(&p).unwrap();
+        for (id, sig, did) in [
+            ("AS-half-1", Some(vec![1u8, 2, 3]), None),
+            ("AS-half-2", None, Some("did:key:zSomeone".to_string())),
+        ] {
+            let a = ats::Attestation {
+                id: id.into(), subjects: vec!["S".into()], predicates: vec!["p".into()], actors: vec!["x".into()],
+                timestamp: 1_000, created_at: 1_000, signature: sig, signer_did: did, ..ats::Attestation::default()
+            };
+            s.put(a).unwrap();
+        }
+    }
+    let ok = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
+    let (url, node) = fake_node(200, all_created);
+    let o = run(&p, &["push", &url], "");
+    assert!(!o.status.success());
+    let said = lines_of(&o);
+    for id in ["AS-half-1", "AS-half-2"] {
+        let l = said.iter().find(|l| l["id"] == id).unwrap();
+        assert!(l["refused"].as_str().unwrap().contains("together or not at all"), "{l}");
+    }
+    let (_, _, sent) = node.join().unwrap();
+    let ids: Vec<_> = sent.as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect();
+    assert_eq!(ids, [ok]);
+}
+
+#[test]
+fn an_empty_home_names_no_key() {
+    let (_d, p) = db();
+    let o = bin().env("HOME", "").arg("--db").arg(&p).args(["put", "ALICE is author of GITHUB by BOB"]).output().unwrap();
+    assert!(!o.status.success() && err(&o).contains("home directory is unknown"), "{}", err(&o));
 }
