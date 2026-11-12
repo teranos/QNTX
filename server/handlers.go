@@ -439,11 +439,16 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 		// Its schedules go with it, loaded or not: a plugin that is off has
 		// nothing to run them, and they would fail at every tick.
 		kept := map[string]func(string) error{"disable": pm.PauseSchedules, "archive": pm.DeleteSchedules}[action]
-		if err := kept(name); err != nil {
-			s.logger.Warnw("A plugin was switched off and its schedules were not", "plugin", name, "action", action, "error", err)
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		// Its record says off, so the plugin stops whatever its schedules did:
+		// what they did not do is said once it has.
+		unkept := kept(name)
+		if unkept != nil {
+			s.logger.Warnw("A plugin was switched off and its schedules were not", "plugin", name, "action", action, "error", unkept)
 		}
 		if _, loaded := pm.GetPlugin(name); !loaded {
+			if unkept != nil {
+				return nil, &protocol.Refusal{Why: sigil.Failed, Says: unkept.Error()}
+			}
 			return &protocol.PluginAction{Name: name, State: string(plugin.StateStopped), Action: action}, nil
 		}
 		// Capture metadata before disabling (plugin will be gone after)
@@ -471,6 +476,9 @@ func (s *QNTXServer) pluginAction(ctx context.Context, name, action string) (*pr
 			status := fmt.Sprintf("stopped, %d handlers, %d watchers removed", handlerCount, watcherCount)
 			acc.SetHealth(name, true, status, nil)
 			acc.Emit(name, plugingrpc.BannerDisabled)
+		}
+		if unkept != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the plugin is stopped, and " + unkept.Error()}
 		}
 
 	default:

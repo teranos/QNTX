@@ -140,113 +140,61 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 	return resumePluginSchedules(db, pluginName, logger)
 }
 
-// pausedBy is the metadata key that says why a schedule is paused when the
-// node paused it. A schedule paused any other way, by declaration or by hand,
-// does not carry it, and nothing but a person wakes that one.
-const pausedBy = "paused_by"
+// A schedule is a plugin's by its handler: the plugin's name in front of it, as
+// PluginHandlerName writes it, which is what sends a tick to that plugin. What
+// a schedule's metadata says is whatever its maker wrote, and proves nothing.
+const ownedBy = `(substr(handler_name, 1, length(?)) = ? OR substr(handler_name, 1, length(?)) = ?)`
 
-// pausedByDisable is the value for a plugin that was switched off.
-const pausedByDisable = "plugin-disabled"
-
-type pluginSchedule struct {
-	id, handler, state, metadata string
+// owned is the arguments ownedBy takes for one plugin: its name before a
+// slash, and before a dot, as older handlers were written.
+func owned(pluginName string) []any {
+	return []any{pluginName + "/", pluginName + "/", pluginName + ".", pluginName + "."}
 }
 
-// schedulesOf is every live schedule a plugin owns, found as the pruning in
-// SetupPluginSchedules finds them: by the plugin in its metadata, or by the
-// plugin's name in front of its handler.
-func schedulesOf(db *sql.DB, pluginName string) (_ []pluginSchedule, err error) {
-	rows, err := db.Query(`
-		SELECT id, handler_name, state, metadata FROM scheduled_pulse_jobs
-		WHERE state != 'deleted' AND (
-			metadata LIKE '%' || ? || '%'
-			OR handler_name LIKE ?
-			OR handler_name LIKE ?
-		)
-	`, fmt.Sprintf(`"plugin":"%s"`, pluginName), pluginName+".%", pluginName+"/%")
+// movePluginSchedules moves every schedule of a plugin from one state to
+// another in one statement, so no schedule is moved and another left: all of
+// them, or none. It answers how many moved.
+func movePluginSchedules(db *sql.DB, pluginName, from, to string) (int64, error) {
+	query := `UPDATE scheduled_pulse_jobs SET state = ?, updated_at = ? WHERE ` + ownedBy
+	args := append([]any{to, time.Now().UTC().Format(time.RFC3339)}, owned(pluginName)...)
+	if from == "" {
+		query += ` AND state != ?`
+		args = append(args, to)
+	} else {
+		query += ` AND state = ?`
+		args = append(args, from)
+	}
+	moved, err := db.Exec(query, args...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to list schedules of plugin %s", pluginName)
+		return 0, errors.Wrapf(err, "failed to move the schedules of plugin %s to %s", pluginName, to)
 	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for schedulesOf") }()
-	var owned []pluginSchedule
-	for rows.Next() {
-		var sc pluginSchedule
-		var metadata sql.NullString
-		if err := rows.Scan(&sc.id, &sc.handler, &sc.state, &metadata); err != nil {
-			return nil, errors.Wrapf(err, "failed to scan a schedule of plugin %s", pluginName)
-		}
-		sc.metadata = metadata.String
-		owned = append(owned, sc)
-	}
-	return owned, errors.Wrapf(rows.Err(), "failed to iterate schedules of plugin %s", pluginName)
+	count, err := moved.RowsAffected()
+	return count, errors.Wrapf(err, "the schedules of plugin %s moved to %s, and how many is not known", pluginName, to)
 }
 
-// moveSchedule writes one schedule's state and metadata, and fails if the row
-// is not there to take them.
-func moveSchedule(db *sql.DB, sc pluginSchedule, state, metadata string) error {
-	moved, err := db.Exec(`UPDATE scheduled_pulse_jobs SET state = ?, metadata = ?, updated_at = ? WHERE id = ?`,
-		state, metadata, time.Now().UTC().Format(time.RFC3339), sc.id)
-	if err != nil {
-		return errors.Wrapf(err, "failed to move schedule %s to %s", sc.id, state)
-	}
-	return oneRow(moved)
-}
-
-// PausePluginSchedules pauses what a plugin has running, for a plugin that was
-// switched off. A schedule that was already paused is left as it was, so
-// switching the plugin on again does not wake what somebody paused.
+// PausePluginSchedules takes what a plugin has running out of the ticker's
+// sight, for a plugin that was switched off: active becomes inactive, the
+// state of a schedule whose plugin is off. A schedule somebody paused is
+// paused still, and switching the plugin on again does not wake it.
 func PausePluginSchedules(db *sql.DB, pluginName string, logger *zap.SugaredLogger) error {
-	owned, err := schedulesOf(db, pluginName)
+	count, err := movePluginSchedules(db, pluginName, schedule.StateActive, schedule.StateInactive)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "plugin %s is off and its schedules keep running", pluginName)
 	}
-	for _, sc := range owned {
-		if sc.state != schedule.StateActive {
-			continue
-		}
-		metadata := map[string]any{}
-		if sc.metadata != "" {
-			if err := json.Unmarshal([]byte(sc.metadata), &metadata); err != nil {
-				return errors.Wrapf(err, "schedule %s of plugin %s has metadata that is not JSON, so it was not paused", sc.id, pluginName)
-			}
-		}
-		metadata[pausedBy] = pausedByDisable
-		marked, err := json.Marshal(metadata)
-		if err != nil {
-			return errors.Wrapf(err, "failed to mark schedule %s", sc.id)
-		}
-		if err := moveSchedule(db, sc, schedule.StatePaused, string(marked)); err != nil {
-			return errors.Wrapf(err, "plugin %s is off and schedule %s keeps running", pluginName, sc.id)
-		}
-		logger.Infow("Paused schedule of a plugin that was switched off", "plugin", pluginName, "schedule_id", sc.id, "handler", sc.handler)
-	}
+	logger.Infow("The schedules of a plugin that was switched off are inactive", "plugin", pluginName, "schedules", count)
 	return nil
 }
 
-// resumePluginSchedules wakes what PausePluginSchedules paused, for a plugin
-// that came back, and nothing else.
+// resumePluginSchedules wakes what PausePluginSchedules took out, for a plugin
+// that came back, and nothing else: a schedule paused by hand since is paused,
+// not inactive, and stays so.
 func resumePluginSchedules(db *sql.DB, pluginName string, logger *zap.SugaredLogger) error {
-	owned, err := schedulesOf(db, pluginName)
+	count, err := movePluginSchedules(db, pluginName, schedule.StateInactive, schedule.StateActive)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "plugin %s is back and its schedules stay inactive", pluginName)
 	}
-	for _, sc := range owned {
-		if sc.state != schedule.StatePaused {
-			continue
-		}
-		metadata := map[string]any{}
-		if err := json.Unmarshal([]byte(sc.metadata), &metadata); err != nil || metadata[pausedBy] != pausedByDisable {
-			continue
-		}
-		delete(metadata, pausedBy)
-		unmarked, err := json.Marshal(metadata)
-		if err != nil {
-			return errors.Wrapf(err, "failed to unmark schedule %s", sc.id)
-		}
-		if err := moveSchedule(db, sc, schedule.StateActive, string(unmarked)); err != nil {
-			return errors.Wrapf(err, "plugin %s is back and schedule %s stays paused", pluginName, sc.id)
-		}
-		logger.Infow("Resumed schedule of a plugin that came back", "plugin", pluginName, "schedule_id", sc.id, "handler", sc.handler)
+	if count > 0 {
+		logger.Infow("The schedules of a plugin that came back run again", "plugin", pluginName, "schedules", count)
 	}
 	return nil
 }
@@ -254,16 +202,11 @@ func resumePluginSchedules(db *sql.DB, pluginName string, logger *zap.SugaredLog
 // DeletePluginSchedules deletes every schedule of a plugin that was taken off
 // the node. A name added again starts with none.
 func DeletePluginSchedules(db *sql.DB, pluginName string, logger *zap.SugaredLogger) error {
-	owned, err := schedulesOf(db, pluginName)
+	count, err := movePluginSchedules(db, pluginName, "", schedule.StateDeleted)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "plugin %s is archived and its schedules keep their rows", pluginName)
 	}
-	for _, sc := range owned {
-		if err := moveSchedule(db, sc, schedule.StateDeleted, sc.metadata); err != nil {
-			return errors.Wrapf(err, "plugin %s is archived and schedule %s keeps its row", pluginName, sc.id)
-		}
-		logger.Infow("Deleted schedule of an archived plugin", "plugin", pluginName, "schedule_id", sc.id, "handler", sc.handler)
-	}
+	logger.Infow("The schedules of an archived plugin are deleted", "plugin", pluginName, "schedules", count)
 	return nil
 }
 
