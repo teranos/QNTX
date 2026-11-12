@@ -1,6 +1,11 @@
 package roomcomments
 
-import "strings"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"regexp"
+	"strings"
+)
 
 // "it's like a VIP room: you need to be on the list"
 // "if it comes from an App I authorised"
@@ -40,11 +45,13 @@ func (c Comment) OfClaude() bool {
 	return strings.Contains(c.PRBody, ClaudeFooter)
 }
 
+// "Wake me only for PRs I hold; let the rest sit in the Room unread"
+
 // Wakes is whether the comment is to start a turn of the agent that owns the
 // pull request: an app on the room's list wrote it, on a pull request Claude
-// Code opened.
+// Code opened through the node's App. One a person opened, the person holds.
 func (c Comment) Wakes(g Guests, room string) bool {
-	return c.OfClaude() && g.Admits(room, c.App)
+	return c.OfClaude() && c.PRByApp && g.Admits(room, c.App)
 }
 
 // Poster is who the Room shows as having said the comment: the app that wrote
@@ -54,4 +61,19 @@ func (c Comment) Poster() string {
 		return c.App
 	}
 	return strings.TrimSuffix(c.Author, "[bot]")
+}
+
+// "Don't relay Qodo updated their comment edits whose set of findings is
+// unchanged"
+
+// passing is what changes in a comment from one review of a pull request to
+// the next without its findings changing: the commit it reviewed and the time.
+var passing = regexp.MustCompile(`\b[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?`)
+
+// Findings is a sum of what the comment says, less the commit and time that
+// change with every review: two versions of a comment with the same sum found
+// the same things.
+func (c Comment) Findings() string {
+	sum := sha256.Sum256([]byte(strings.Join(strings.Fields(passing.ReplaceAllString(c.Body, "")), " ")))
+	return hex.EncodeToString(sum[:])
 }
