@@ -36,7 +36,13 @@ func (h *Handler) handleAdmit(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusUnauthorized, "a key admits a session's key by signing as itself")
 		return
 	}
-	admitting, ok := h.admissionOf(h.presented(r))
+	// A signature is presented once (signedGrant spends its id): the gate's
+	// admission is read when it made one, and the request is presented here
+	// only when nothing did.
+	admitting, ok := AdmissionFrom(r.Context())
+	if !ok {
+		admitting, ok = h.admissionOf(h.presented(r))
+	}
 	if !ok {
 		h.writeError(w, http.StatusUnauthorized, "the signing key is not admitted")
 		return
