@@ -1,5 +1,5 @@
--- "review comments need to wake only when no comment was placed 30min since
--- the last comment"
+-- 「[Opus 5.5, Sonnet 5.5, Fable 5.2] "review comments need to wake only when no comment was placed 30min since」
+-- 「[Opus 5.5, Sonnet 5.5, Fable 5.2] the last comment"」
 CREATE TABLE room_agent_wake_due (
     room TEXT NOT NULL,
     agent TEXT NOT NULL,

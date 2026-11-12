@@ -2,8 +2,8 @@ package server
 
 // "it's like a VIP room: you need to be on the list"
 // "if it comes from an App I authorised"
-// "it ends up in the room first, and then everything that was in the room since
-// the agent was told gets told all at once as one turn"
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] "it ends up in the room first, and then everything that was in the room since」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] the agent was told gets told all at once as one turn"」
 
 import (
 	"context"
@@ -21,8 +21,8 @@ import (
 
 type speakerKey struct{}
 
-// withSpeaker is ctx with who said what the turn is told, for a turn no
-// admitted caller started. Only the node's own wake for a comment sets it.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] withSpeaker is ctx with who said what the turn is told, for a turn no」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] admitted caller started. Only the node's own wake for a comment sets it.」
 func withSpeaker(ctx context.Context, speaker string) context.Context {
 	return context.WithValue(ctx, speakerKey{}, speaker)
 }
@@ -32,10 +32,10 @@ func speakerOf(ctx context.Context) string {
 	return speaker
 }
 
-// wakeApps is the list of GitHub Apps whose comments wake an agent, read from
-// the config table github.wake_apps. A key is a room's name, or the asterisk
-// for every room; a value is a list of app slugs. Qodo is on it for every
-// room until the node says otherwise.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] wakeApps is the list of GitHub Apps whose comments wake an agent, read from」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] the config table github.wake_apps. A key is a room's name, or the asterisk」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] for every room; a value is a list of app slugs. Qodo is on it for every」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] room until the node says otherwise.」
 func wakeApps() roomcomments.Guests {
 	listed := config.GetViper().GetStringMapStringSlice("github.wake_apps")
 	if len(listed) == 0 {
@@ -48,12 +48,12 @@ func wakeApps() roomcomments.Guests {
 	return guests
 }
 
-// wakeAgent is the Node Agent a comment on a Claude Code pull request wakes.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] wakeAgent is the Node Agent a comment on a Claude Code pull request wakes.」
 const wakeAgent = agentLineClaude
 
-// roomWakes holds one wake of an agent in a room at a time. A comment that
-// arrives while the agent is being told asks for one more, after it: what was
-// said meanwhile is told together, as one turn.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] roomWakes holds one wake of an agent in a room at a time. A comment that」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] arrives while the agent is being told asks for one more, after it: what was」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] said meanwhile is told together, as one turn.」
 type roomWakes struct {
 	mu      sync.Mutex
 	running map[string]bool
@@ -88,16 +88,16 @@ func (w *roomWakes) ask(key, speaker string, tell func(speaker string)) {
 	})
 }
 
-// wakeAfterComment tells the agent the room, when the comment just said into
-// it is one the agent is to be woken by.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] wakeAfterComment tells the agent the room, when the comment just said into」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] it is one the agent is to be woken by.」
 func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments.Comment) {
 	if !c.Wakes(wakeApps(), nodeRoomName) {
 		return
 	}
 	speaker := c.Speaker()
 	if c.Quiet() {
-		// A review is many comments: the agent is told when none has come for
-		// the quiet stretch, and each one that does moves that later.
+		// 「[Opus 5.5] A review is many comments: the agent is told when none has come for」
+		// 「[Opus 5.5] the quiet stretch, and each one that does moves that later.」
 		if err := s.dueWakes().Defer(s.lifetime(), target, wakeAgent, speaker, c.At, time.Now().Add(wakeQuiet())); err != nil {
 			s.logger.Errorw("A review comment was said into the Node Room and the agent's wake was not kept", "agent", wakeAgent, "room", target.Room, "error", err)
 		}
@@ -106,7 +106,7 @@ func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments
 	s.tellNow(target, speaker, c.At)
 }
 
-// tellNow tells the agent the room, one wake of it at a time.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] tellNow tells the agent the room, one wake of it at a time.」
 func (s *QNTXServer) tellNow(target roomcomments.Target, speaker, since string) {
 	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, speaker, func(speaker string) {
 		if err := s.tellAgentTheRoom(target, wakeAgent, speaker, since); err != nil {
@@ -115,8 +115,8 @@ func (s *QNTXServer) tellNow(target roomcomments.Target, speaker, since string) 
 	})
 }
 
-// wakeQuiet is how long the room is to go without a review comment before the
-// agent is told them. The config key is github.wake_quiet, as a duration.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] wakeQuiet is how long the room is to go without a review comment before the」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] agent is told them. The config key is github.wake_quiet, as a duration.」
 func wakeQuiet() time.Duration {
 	if quiet := config.GetViper().GetDuration("github.wake_quiet"); quiet > 0 {
 		return quiet
@@ -124,15 +124,15 @@ func wakeQuiet() time.Duration {
 	return 30 * time.Minute
 }
 
-// dueWakes is the wakes waiting for a quiet room, in the node's own file.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] dueWakes is the wakes waiting for a quiet room, in the node's own file.」
 func (s *QNTXServer) dueWakes() roomcomments.Due {
 	return roomcomments.Due{DB: s.nodeDB}
 }
 
-// tellDueAgents tells each agent whose room has been quiet long enough. A wake
-// is held for another quiet stretch while its agent is told, and removed once
-// it was: one that could not be carried out, or that the node stopped in the
-// middle of, comes again when the hold is out.
+// 「[Opus 5.5] tellDueAgents tells each agent whose room has been quiet long enough. A wake」
+// 「[Opus 5.5] is held for another quiet stretch while its agent is told, and removed once」
+// 「[Opus 5.5] it was: one that could not be carried out, or that the node stopped in the」
+// 「[Opus 5.5] middle of, comes again when the hold is out.」
 func (s *QNTXServer) tellDueAgents() {
 	for {
 		select {
@@ -166,12 +166,12 @@ func (s *QNTXServer) tellDueAgents() {
 func (s *QNTXServer) tellWhenQuiet(w roomcomments.Wake) {
 	wakes.ask(w.Target.Provider+"/"+w.Target.Room+"/"+w.Agent, w.Speaker, func(speaker string) {
 		if err := s.tellAgentTheRoom(w.Target, w.Agent, speaker, w.Since); err != nil {
-			// The wake is still held: it comes again when the hold is out,
-			// and a comment that came since keeps its own speaker and time.
+			// 「[Opus 5.5] The wake is still held: it comes again when the hold is out,」
+			// 「[Opus 5.5] and a comment that came since keeps its own speaker and time.」
 			s.logger.Errorw("The room went quiet and the agent was not told", "agent", w.Agent, "room", w.Target.Room, "error", err)
 			return
 		}
-		// Not the node's lifetime: a node that is stopping still removes what it told.
+		// 「[Opus 5.5] Not the node's lifetime: a node that is stopping still removes what it told.」
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(s.lifetime()), 10*time.Second)
 		defer cancel()
 		if err := s.dueWakes().Done(ctx, w); err != nil {
@@ -180,13 +180,13 @@ func (s *QNTXServer) tellWhenQuiet(w roomcomments.Wake) {
 	})
 }
 
-// tellAgentTheRoom runs a turn of the Node Agent told everything said in the
-// room since it was last told, and posts its answer into the room as it. What
-// it was told is kept before the turn runs: what is said during the turn is
-// the next one's.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] tellAgentTheRoom runs a turn of the Node Agent told everything said in the」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] room since it was last told, and posts its answer into the room as it. What」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] it was told is kept before the turn runs: what is said during the turn is」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] the next one's.」
 //
-// An agent never told is told from since, the time of the comment that woke it:
-// a room reads oldest first, so reading it all would tell the oldest.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] An agent never told is told from since, the time of the comment that woke it:」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] a room reads oldest first, so reading it all would tell the oldest.」
 func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker, since string) error {
 	if s.nodeDB == nil {
 		return errors.New("the node has no operational store for what an agent was told")
@@ -231,7 +231,7 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 		return errors.Wrap(err, "the asking did not build")
 	}
 	if err := s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", roomcomments.Digest(said, read.GetTruncated())); err != nil {
-		// Its answer did not reach the room, so it is told the same again.
+		// 「[Opus 5.5] Its answer did not reach the room, so it is told the same again.」
 		back, cancel := context.WithTimeout(context.WithoutCancel(lifetime), 10*time.Second)
 		defer cancel()
 		if kept := told.Back(back, target.Room, agent, marked); kept != nil {

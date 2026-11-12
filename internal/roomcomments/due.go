@@ -8,27 +8,27 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "review comments need to wake only when no comment was placed 30min since the
-// last comment"
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] "review comments need to wake only when no comment was placed 30min since the」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] last comment"」
 
-// Due is the wakes waiting for a quiet room, kept in the node's file so that a
-// node that restarts in the meantime still wakes the agent.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] Due is the wakes waiting for a quiet room, kept in the node's file so that a」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] node that restarts in the meantime still wakes the agent.」
 type Due struct{ DB *sql.DB }
 
-// Wake is one agent waiting to be told one room.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] Wake is one agent waiting to be told one room.」
 type Wake struct {
 	Target                Target
 	Agent, Speaker, Since string
 	DueAt                 string
 }
 
-// dueTime sorts as time does, to the nanosecond.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] dueTime sorts as time does, to the nanosecond.」
 const dueTime = "2006-01-02T15:04:05.000000000Z"
 
-// Defer says the agent is to be told the room at due. A comment that arrives
-// while one is waiting moves it later and keeps the earliest since: what the
-// agent is told begins at the first comment of the stretch. A wake is one
-// provider's: two providers that call a room alike wait apart.
+// 「[Opus 5.5] Defer says the agent is to be told the room at due. A comment that arrives」
+// 「[Opus 5.5] while one is waiting moves it later and keeps the earliest since: what the」
+// 「[Opus 5.5] agent is told begins at the first comment of the stretch. A wake is one」
+// 「[Opus 5.5] provider's: two providers that call a room alike wait apart.」
 func (d Due) Defer(ctx context.Context, target Target, agent, speaker, since string, due time.Time) error {
 	_, err := d.DB.ExecContext(ctx, `INSERT INTO room_agent_wake_due(room,agent,provider,speaker,since,due_at) VALUES(?,?,?,?,?,?)
 		ON CONFLICT(provider,room,agent) DO UPDATE SET due_at=excluded.due_at, speaker=excluded.speaker`,
@@ -36,7 +36,7 @@ func (d Due) Defer(ctx context.Context, target Target, agent, speaker, since str
 	return errors.Wrap(err, "the wake waiting for a quiet room was not kept")
 }
 
-// Ready is every wake whose time has come, oldest first.
+// 「[Opus 5.5] Ready is every wake whose time has come, oldest first.」
 func (d Due) Ready(ctx context.Context, now time.Time) (_ []Wake, err error) {
 	rows, err := d.DB.QueryContext(ctx, `SELECT provider,room,agent,speaker,since,due_at FROM room_agent_wake_due WHERE due_at<=? ORDER BY due_at,room,agent`, now.UTC().Format(dueTime))
 	if err != nil {
@@ -58,11 +58,11 @@ func (d Due) Ready(ctx context.Context, now time.Time) (_ []Wake, err error) {
 	return ready, errors.Wrap(rows.Err(), "the wakes waiting for a quiet room were not all read")
 }
 
-// Claim holds a wake whose time has come until a later time, and says whether
-// it was this call that did: the wake as it is held, to be done or to come
-// again. The row stays, so a node that stops before the agent was told tells
-// it after the hold. A comment that moved it later in the meantime leaves it,
-// and it is not claimed.
+// 「[Opus 5.5] Claim holds a wake whose time has come until a later time, and says whether」
+// 「[Opus 5.5] it was this call that did: the wake as it is held, to be done or to come」
+// 「[Opus 5.5] again. The row stays, so a node that stops before the agent was told tells」
+// 「[Opus 5.5] it after the hold. A comment that moved it later in the meantime leaves it,」
+// 「[Opus 5.5] and it is not claimed.」
 func (d Due) Claim(ctx context.Context, w Wake, until time.Time) (Wake, bool, error) {
 	held := until.UTC().Format(dueTime)
 	claimed, err := d.DB.ExecContext(ctx, `UPDATE room_agent_wake_due SET due_at=? WHERE provider=? AND room=? AND agent=? AND due_at=?`,
@@ -78,9 +78,9 @@ func (d Due) Claim(ctx context.Context, w Wake, until time.Time) (Wake, bool, er
 	return w, n == 1, nil
 }
 
-// Done removes a claimed wake once the agent was told. A comment that came
-// while it was being told moved the wake later, and that one stays: it is the
-// next stretch's.
+// 「[Opus 5.5] Done removes a claimed wake once the agent was told. A comment that came」
+// 「[Opus 5.5] while it was being told moved the wake later, and that one stays: it is the」
+// 「[Opus 5.5] next stretch's.」
 func (d Due) Done(ctx context.Context, w Wake) error {
 	_, err := d.DB.ExecContext(ctx, `DELETE FROM room_agent_wake_due WHERE provider=? AND room=? AND agent=? AND due_at=?`,
 		w.Target.Provider, w.Target.Room, w.Agent, w.DueAt)

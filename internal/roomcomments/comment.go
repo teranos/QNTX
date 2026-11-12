@@ -28,15 +28,15 @@ type Comment struct {
 	Body   string
 	At     string
 	Action string
-	// Kind is the event it came in: issue_comment, pull_request_review_comment
-	// or pull_request_review.
+	// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] Kind is the event it came in: issue_comment, pull_request_review_comment」
+	// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] or pull_request_review.」
 	Kind string
 	Path string
 	Line int64
-	// App is the slug of the GitHub App the comment was written through, empty
-	// for a person. GitHub sets it; a person cannot.
+	// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] App is the slug of the GitHub App the comment was written through, empty」
+	// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] for a person. GitHub sets it; a person cannot.」
 	App string
-	// PRBody is the description of the pull request the comment is on.
+	// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] PRBody is the description of the pull request the comment is on.」
 	PRBody string
 }
 
@@ -144,11 +144,11 @@ func Parse(event string, body []byte) (*Comment, error) {
 	return c, nil
 }
 
-// "Draft->Ready change that should wake. but, Ready->Draft needs not wake, but
-// should still enter the room."
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] "Draft->Ready change that should wake. but, Ready->Draft needs not wake, but」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] should still enter the room."」
 //
-// draftChange is a pull request going from a draft to ready for review, or
-// back. It has no words of its own: the room is told who changed it.
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] draftChange is a pull request going from a draft to ready for review, or」
+// 「[Opus 5.5, Sonnet 5.5, Fable 5.2] back. It has no words of its own: the room is told who changed it.」
 func draftChange(repo, action string, number, id int64, at, prBody, who string) (*Comment, error) {
 	if action != "ready_for_review" && action != "converted_to_draft" {
 		return nil, nil
