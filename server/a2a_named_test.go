@@ -308,3 +308,28 @@ func TestANameNobodyHoldsIsAnsweredWithTheNamesNearIt(t *testing.T) {
 	assert.Equal(t, 1, lettersApart("birch", "brch"))
 	assert.Equal(t, 5, lettersApart("slate", "birch"))
 }
+
+// A Task a ground took waits past the SDK's quiet limit for its session: it
+// says it is working still, and is not ended as inactive.
+func TestATakenTaskOutlastsTheQuietLimit(t *testing.T) {
+	quiet := turnQuietMost
+	turnQuietMost = 200 * time.Millisecond
+	t.Cleanup(func() { turnQuietMost = quiet })
+	srv, root := namedOverA2A(t)
+
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send", saidToTheNode("anyone there", `{"returnImmediately": true}`), root)
+	require.Equal(t, http.StatusOK, code, answered)
+	id := answered["task"].(map[string]any)["id"].(string)
+	var left []statusline.News
+	require.Eventually(t, func() bool {
+		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
+		return len(left) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+	by := auth.Admitted(auth.LevelToken, "garden")
+	by.Grant = &auth.Grant{DID: "did:key:z6Mkhazel", Level: auth.LevelToken}
+	left[0].Whole(by)
+
+	time.Sleep(5 * turnQuietMost)
+	_, still := a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+	assert.Equal(t, "TASK_STATE_WORKING", taskStateIn(still), "taken and waiting, it was ended as quiet")
+}
