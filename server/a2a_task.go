@@ -71,8 +71,8 @@ type taskAgent struct {
 	// their streams (followLeftTurns): the Node Agent's and an element agent's,
 	// which are under the Node Agent's home.
 	followed bool
-	// named is an agent that holds a name (i name) and that the node runs no
-	// turn for: what is said to it goes to it over the status row (a2a_named.go).
+	// 「[Fable 5.2] named is an agent that holds a name (i name) and that the node runs no」
+	// 「[Fable 5.2] turn for: what is said to it goes to it over the status row (a2a_named.go).」
 	named bool
 }
 
@@ -118,8 +118,8 @@ func (s *QNTXServer) taskAgentAt(r *http.Request, tenant string) (taskAgent, err
 	if err != nil {
 		return taskAgent{}, err
 	}
-	// Who reaches /a2a reaches an agent by its name: it has no say of its own
-	// for a line to be about.
+	// 「[Fable 5.2] Who reaches /a2a reaches an agent by its name: it has no say of its own」
+	// 「[Fable 5.2] for a line to be about.」
 	if ta.named {
 		return ta, nil
 	}
@@ -196,8 +196,8 @@ func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace strin
 // new contextId, it MUST be included in the response" (§3.4.1). Its first turn
 // then starts the session under that id.
 func (s *QNTXServer) contextOf(ta taskAgent, asked string) (string, error) {
-	// A named agent's session is its own, where it runs: the context its Tasks
-	// are in here is the agent, by its DID.
+	// 「[Fable 5.2] A named agent's session is its own, where it runs: the context its Tasks」
+	// 「[Fable 5.2] are in here is the agent, by its DID.」
 	if ta.named {
 		if asked != "" && asked != ta.did {
 			return "", a2aRefusal(a2asdk.ErrInvalidParams, ta.called+" is one agent, and context "+asked+" is not it")
@@ -686,8 +686,8 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 		if !left || !line.Timestamp.Before(since) {
 			continue
 		}
-		// What was said to a name was on the status row, which the node that
-		// stopped held in memory: it is on no row now, and was not received.
+		// 「[Fable 5.2] What was said to a name was on the status row, which the node that」
+		// 「[Fable 5.2] stopped held in memory: it is on no row now, and was not received.」
 		if slices.Contains(line.Contexts, saidToANameContext) {
 			said = "the node stopped while it was on the status row, and it was not received"
 		}
