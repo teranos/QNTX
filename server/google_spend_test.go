@@ -286,7 +286,7 @@ func TestALimitOnAnUnmeteredItemHalts(t *testing.T) {
 // "I wish that mail, just had the one click answer somehow"
 //
 // 「[Opus 5.5] A halt only Connect costs ends is mailed with Connect costs in it,
-// where the element's own press goes, and says nothing of resuming by itself.」
+// 「[Opus 5.5] where the element's own press goes, and says nothing of resuming by itself.」」
 func TestAnUnmeteredHaltIsMailedWithConnectCosts(t *testing.T) {
 	s, _ := connectedToGoogle(t)
 	b := billingStandingIn(t, s, "billingAccounts/0-1", "monthly")
@@ -312,7 +312,7 @@ func TestAnUnmeteredHaltIsMailedWithConnectCosts(t *testing.T) {
 }
 
 // 「[Opus 5.5] With Connect costs not read, the halt still says nothing of
-// resuming by itself, and gives no link it does not have.」
+// 「[Opus 5.5] resuming by itself, and gives no link it does not have.」」
 func TestAnUnmeteredHaltWithoutConnectCostsSaysNoResume(t *testing.T) {
 	m := googleConnectCostsMail("What the node spends at Google Cloud is halted", "ROOT set a limit on the node, and the node does not meter what it spends: ROOT presses Connect costs again", "")
 	require.Len(t, m.Bodies, 2)
