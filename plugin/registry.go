@@ -414,10 +414,13 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 	// tag and the commits past it (v0.55.0-925-gaf1299b51), which semver reads
 	// as a prerelease no ">= 0.1.0" admits. It is a build past that tag, not
 	// before it: its constraint is checked against the tag. A prerelease the
-	// tag itself names (v1.0.0-rc.1) stays one.
+	// tag itself names (v1.0.0-rc.1) stays one. A node built from a branch
+	// says the branch itself as its version: l-stack, q-stack. That is a
+	// development build as "dev" is, and no plugin is refused on it.
 	qntxVer, err := semver.NewVersion(describedPast.ReplaceAllString(r.version, ""))
 	if err != nil {
-		return errors.Wrapf(err, "invalid QNTX version %s", r.version)
+		r.logger.Debugw("Skipping version validation: the node's version is no semantic version, a branch build", "version", r.version, "plugin", metadata.Name)
+		return nil
 	}
 
 	// Check compatibility

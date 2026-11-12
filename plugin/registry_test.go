@@ -449,6 +449,14 @@ func TestRegistry_validateVersion(t *testing.T) {
 			wantErr:     true,
 		},
 		{
+			// A node built from a branch says the branch as its version: a
+			// development build, which refuses no plugin for it.
+			name:        "a branch build",
+			qntxVersion: "l-stack",
+			constraint:  ">= 0.1.0",
+			wantErr:     false,
+		},
+		{
 			name:        "range constraint - compatible",
 			qntxVersion: "1.5.0",
 			constraint:  ">=1.0.0 <2.0.0",
@@ -479,10 +487,11 @@ func TestRegistry_validateVersion(t *testing.T) {
 			wantErr:     true,
 		},
 		{
+			// A version that is no semantic version is a branch build, as l-stack is.
 			name:        "invalid QNTX version",
 			qntxVersion: "invalid",
 			constraint:  "^1.0.0",
-			wantErr:     true,
+			wantErr:     false,
 		},
 		{
 			name:        "invalid constraint syntax",
