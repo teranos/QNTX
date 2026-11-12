@@ -51,7 +51,21 @@ func (c Comment) OfClaude() bool {
 // pull request: an app on the room's list wrote it, on a pull request Claude
 // Code opened through the node's App. One a person opened, the person holds.
 func (c Comment) Wakes(g Guests, room string) bool {
+	if c.Kind == "pull_request" {
+		// Ready for review wakes whoever changed it; back to a draft is said
+		// into the room and wakes no one.
+		return c.Action == "ready_for_review" && c.OfClaude()
+	}
 	return c.OfClaude() && c.PRByApp && g.Admits(room, c.App)
+}
+
+// Speaker is who the turn it starts is said by: the app, or the person who
+// changed the pull request.
+func (c Comment) Speaker() string {
+	if c.App != "" {
+		return "github-app:" + c.App
+	}
+	return "github:" + c.Poster()
 }
 
 // Poster is who the Room shows as having said the comment: the app that wrote
@@ -76,4 +90,10 @@ var passing = regexp.MustCompile(`\b[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}[T ]\d{2}:
 func (c Comment) Findings() string {
 	sum := sha256.Sum256([]byte(strings.Join(strings.Fields(passing.ReplaceAllString(c.Body, "")), " ")))
 	return hex.EncodeToString(sum[:])
+}
+
+// Quiet is whether the comment is a review's: it wakes the agent when the room
+// has gone quiet, not at once, because a review arrives as many comments.
+func (c Comment) Quiet() bool {
+	return c.Kind == "pull_request_review_comment" || c.Kind == "pull_request_review" || c.Kind == "pull_request"
 }
