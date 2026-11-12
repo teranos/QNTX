@@ -125,9 +125,9 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	defer e.s.news.Drop(string(id))
 	hold := time.NewTimer(toldWithin)
 	defer hold.Stop()
-	// A Task that says nothing for turnQuietMost is ended by the SDK as
-	// inactive, with no word why: Kwikwi's ended so four minutes in, taken
-	// and not yet received. It is said to be working still inside that.
+	// 「[Fable 5.2] A Task that says nothing for turnQuietMost is ended by the SDK as」
+	// 「[Fable 5.2] inactive, with no word why: Kwikwi's ended so four minutes in, taken」
+	// 「[Fable 5.2] and not yet received. It is said to be working still inside that.」
 	still := time.NewTicker(turnQuietMost / 2)
 	defer still.Stop()
 	wasTaken := false
