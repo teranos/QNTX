@@ -238,9 +238,21 @@ func TestWhatTheNamedAgentItselfAsksTheWholeOfIsReceived(t *testing.T) {
 		by.Grant = &auth.Grant{DID: did, Level: auth.LevelToken}
 		return by
 	}
+	// Another key of the person asking is their ground taking it off the row:
+	// the Task is working, not received, and outlasts the row's hold.
+	within := toldWithin
+	toldWithin = 200 * time.Millisecond
+	t.Cleanup(func() { toldWithin = within })
 	left[0].Whole(asking("did:key:z6Mkhazel"))
-	_, still := a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
-	assert.Equal(t, "TASK_STATE_SUBMITTED", taskStateIn(still), "another agent asking received it for Birch")
+	var still map[string]any
+	require.Eventually(t, func() bool {
+		_, still = a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+		return taskStateIn(still) == "TASK_STATE_WORKING"
+	}, 5*time.Second, 10*time.Millisecond, "a ground took it and the Task is not working")
+	assert.Contains(t, toJSON(t, still), "a ground took it off the status row for Birch")
+	time.Sleep(300 * time.Millisecond)
+	_, still = a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+	assert.Equal(t, "TASK_STATE_WORKING", taskStateIn(still), "taken, it ended with the row's hold")
 
 	left[0].Whole(asking("did:key:z6Mkbirch"))
 	var ended map[string]any
@@ -250,4 +262,74 @@ func TestWhatTheNamedAgentItselfAsksTheWholeOfIsReceived(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 	assert.Contains(t, toJSON(t, ended), "Birch received it")
 	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()), "received, it is off the row")
+}
+
+// What a ground took and the agent never said it received is not received,
+// and the Task says which of the two happened.
+func TestWhatAGroundTookAndTheAgentNeverReceivedIsNotReceived(t *testing.T) {
+	srv, root := namedOverA2A(t)
+	within := receivedWithin
+	receivedWithin = 50 * time.Millisecond
+	t.Cleanup(func() { receivedWithin = within })
+
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send", saidToTheNode("anyone there", `{"returnImmediately": true}`), root)
+	require.Equal(t, http.StatusOK, code, answered)
+	id := answered["task"].(map[string]any)["id"].(string)
+	var left []statusline.News
+	require.Eventually(t, func() bool {
+		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
+		return len(left) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+	by := auth.Admitted(auth.LevelToken, "garden")
+	by.Grant = &auth.Grant{DID: "did:key:z6Mkhazel", Level: auth.LevelToken}
+	left[0].Whole(by)
+
+	var ended map[string]any
+	require.Eventually(t, func() bool {
+		_, ended = a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+		return taskStateIn(ended) == "TASK_STATE_FAILED"
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.Contains(t, toJSON(t, ended), "a ground took it off the status row, and nothing says Birch received it")
+}
+
+// "do you think the ground say should show near misses ?"
+func TestANameNobodyHoldsIsAnsweredWithTheNamesNearIt(t *testing.T) {
+	srv, root := namedOverA2A(t)
+
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Bir%20ch/message:send", saidToTheNode("hello", `{"returnImmediately": true}`), root)
+	assert.Equal(t, http.StatusNotFound, code, answered)
+	assert.Contains(t, toJSON(t, answered), "no agent is served at tenant Bir ch. Near it: Birch")
+
+	code, answered = a2aAsked(t, srv, http.MethodPost, "/a2a/Slate/message:send", saidToTheNode("hello", `{"returnImmediately": true}`), root)
+	assert.Equal(t, http.StatusNotFound, code, answered)
+	assert.NotContains(t, toJSON(t, answered), "Near it", "a name far from every name held was answered with one")
+
+	assert.Equal(t, 0, lettersApart("kwikwi", "kwikwi"))
+	assert.Equal(t, 1, lettersApart("birch", "brch"))
+	assert.Equal(t, 5, lettersApart("slate", "birch"))
+}
+
+// A Task a ground took waits past the SDK's quiet limit for its session: it
+// says it is working still, and is not ended as inactive.
+func TestATakenTaskOutlastsTheQuietLimit(t *testing.T) {
+	quiet := turnQuietMost
+	turnQuietMost = 200 * time.Millisecond
+	t.Cleanup(func() { turnQuietMost = quiet })
+	srv, root := namedOverA2A(t)
+
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send", saidToTheNode("anyone there", `{"returnImmediately": true}`), root)
+	require.Equal(t, http.StatusOK, code, answered)
+	id := answered["task"].(map[string]any)["id"].(string)
+	var left []statusline.News
+	require.Eventually(t, func() bool {
+		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
+		return len(left) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+	by := auth.Admitted(auth.LevelToken, "garden")
+	by.Grant = &auth.Grant{DID: "did:key:z6Mkhazel", Level: auth.LevelToken}
+	left[0].Whole(by)
+
+	time.Sleep(5 * turnQuietMost)
+	_, still := a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+	assert.Equal(t, "TASK_STATE_WORKING", taskStateIn(still), "taken and waiting, it was ended as quiet")
 }
