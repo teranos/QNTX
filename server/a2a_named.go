@@ -43,6 +43,11 @@ const saidToANameContext = "said:to-a-name"
 // a ground to take: the row's own hold.
 var toldWithin = statusline.NewsHold
 
+// receivedWithin is how long what a ground took off the row waits for the
+// agent itself to say it received it: a session is handed it when it next
+// looks, which is not when it was said.
+var receivedWithin = time.Hour
+
 // agentNamedAt is the agent served at tenant by the name it holds. A
 // namespace by that name is the namespace's: a name is a tenant only where no
 // namespace is.
@@ -103,27 +108,51 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	// "A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT"
 	// Received is the agent itself asking for the whole of it, by the key its
 	// name is held by: its ground does so as it hands it to the session.
-	// Anyone else of the person asking is not the agent, and receives nothing.
-	received := make(chan struct{})
-	var once sync.Once
+	// Anyone else of the person asking is not the agent: that is their ground
+	// taking it off the row for the session, and the Task is working from
+	// then, with longer to be received in. ug wrote one two minutes after it
+	// was said, and the Task had already ended as not received.
+	received, taken := make(chan struct{}), make(chan struct{})
+	var once, onceTaken sync.Once
 	e.s.leaveForAName(ta, string(id), spokenBy(call.request), says, func(by auth.Admission) {
 		if did, refusal := itsOwnDID(by); refusal == nil && did == ta.did {
 			once.Do(func() { close(received) })
+			return
 		}
+		onceTaken.Do(func() { close(taken) })
 	})
+	// The item is found by its id past its time on the row, until it is dropped.
 	defer e.s.news.Drop(string(id))
 	hold := time.NewTimer(toldWithin)
 	defer hold.Stop()
-	select {
-	case <-ctx.Done():
-	case <-received:
-		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateCompleted, &a2asdk.Message{
-			ID: string(id) + "-received", ContextID: ec.ContextID, TaskID: id, Role: a2asdk.MessageRoleAgent,
-			Parts: a2asdk.ContentParts{textPart(ta.called + " received it")},
-		}), nil)
-	case <-hold.C:
-		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID,
-			"it was on the status row for "+toldWithin.String()+", and nothing says "+ta.called+" received it")), nil)
+	wasTaken := false
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-received:
+			yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateCompleted, &a2asdk.Message{
+				ID: string(id) + "-received", ContextID: ec.ContextID, TaskID: id, Role: a2asdk.MessageRoleAgent,
+				Parts: a2asdk.ContentParts{textPart(ta.called + " received it")},
+			}), nil)
+			return
+		case <-taken:
+			taken, wasTaken = nil, true
+			hold.Reset(receivedWithin)
+			if !yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateWorking, &a2asdk.Message{
+				ID: string(id) + "-taken", ContextID: ec.ContextID, TaskID: id, Role: a2asdk.MessageRoleAgent,
+				Parts: a2asdk.ContentParts{textPart("a ground took it off the status row for " + ta.called)},
+			}), nil) {
+				return
+			}
+		case <-hold.C:
+			why := "it was on the status row for " + toldWithin.String() + ", and nothing says " + ta.called + " received it"
+			if wasTaken {
+				why = "a ground took it off the status row, and nothing says " + ta.called + " received it within " + receivedWithin.String()
+			}
+			yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, why)), nil)
+			return
+		}
 	}
 }
 
@@ -277,4 +306,64 @@ func textSaidIn(message *a2asdk.Message) (string, error) {
 		texts = append(texts, string(text))
 	}
 	return strings.Join(texts, "\n"), nil
+}
+
+// "do you think the ground say should show near misses ?"
+//
+// nearNames is the names agents hold that are near one nobody holds: the same
+// letters whatever the spaces and the case, or two letters off at most. Kwi
+// Kwi is near Kwikwi.
+func (s *QNTXServer) nearNames(tenant string) []string {
+	if s.held == nil {
+		return nil
+	}
+	names, err := s.agentNames()
+	if err != nil {
+		return nil
+	}
+	plain := func(name string) string {
+		return strings.ToLower(strings.Join(strings.Fields(name), ""))
+	}
+	asked := plain(tenant)
+	if asked == "" {
+		return nil
+	}
+	var near []string
+	for _, kept := range names {
+		if lettersApart(asked, plain(kept.name)) <= 2 {
+			near = append(near, kept.name)
+		}
+	}
+	slices.Sort(near)
+	return near
+}
+
+// nearSaid is the names near tenant as a refusal ends with them, or nothing.
+func (s *QNTXServer) nearSaid(tenant string) string {
+	near := s.nearNames(tenant)
+	if len(near) == 0 {
+		return ""
+	}
+	return ". Near it: " + strings.Join(near, ", ")
+}
+
+// lettersApart is how many letters are to be put in, taken out or changed to
+// make a of b.
+func lettersApart(a, b string) int {
+	row := make([]int, len(b)+1)
+	for j := range row {
+		row[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		before := row[0]
+		row[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := before
+			if a[i-1] != b[j-1] {
+				cost = min(before, row[j], row[j-1]) + 1
+			}
+			before, row[j] = row[j], cost
+		}
+	}
+	return row[len(b)]
 }
