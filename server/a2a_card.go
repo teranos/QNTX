@@ -88,7 +88,7 @@ func (s *QNTXServer) nodeKey() (*nodedid.Handler, bool) {
 }
 
 // skillOf is a signum as a skill. Its id is the signum. The Node Agent is what
-// a message sent to the node reaches, and it takes and gives turnModes.
+// 「[Opus 5.5] a message sent to the node reaches, and it takes and gives turnModes.」
 func skillOf(signum *protocol.Signum) cardSkill {
 	skill := cardSkill{ID: signum.GetName(), Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags()}
 	if signum.GetName() == nodeAgentSignumName {
