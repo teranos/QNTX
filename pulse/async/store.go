@@ -395,6 +395,24 @@ func (s *Store) FailedHandlersSince(since time.Time, limit int) (_ []HandlerFail
 	return failed, nil
 }
 
+// ForgetPayloads empties the payload of at most atMost of handler's jobs that
+// are done or dropped, and says how many. Their rows stay; what they were run
+// with is not needed again.
+func (s *Store) ForgetPayloads(handler string, atMost int) (int, error) {
+	result, err := s.db.Exec(`
+		UPDATE async_ix_jobs SET payload = NULL
+		WHERE id IN (
+			SELECT id FROM async_ix_jobs
+			WHERE handler_name = ? AND status IN ('completed', 'cancelled') AND payload IS NOT NULL
+			LIMIT ?
+		)`, handler, atMost)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to forget the payloads of %s", handler)
+	}
+	n, err := result.RowsAffected()
+	return int(n), errors.Wrapf(err, "failed to count the payloads of %s forgotten", handler)
+}
+
 // CleanupOldJobs removes completed/failed jobs older than the specified duration
 func (s *Store) CleanupOldJobs(olderThan time.Duration, atMost int, keep ...string) (int, error) {
 	cutoff := time.Now().Add(-olderThan)
@@ -417,7 +435,7 @@ func (s *Store) CleanupOldJobs(olderThan time.Duration, atMost int, keep ...stri
 		DELETE FROM async_ix_jobs
 		WHERE id IN (
 			SELECT j.id FROM async_ix_jobs j
-			WHERE j.status IN ('completed', 'failed')
+			WHERE j.status IN ('completed', 'failed', 'cancelled')
 			  AND j.updated_at < ?` + holders + `
 			  AND NOT EXISTS (
 				SELECT 1 FROM async_ix_jobs c
