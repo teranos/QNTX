@@ -387,8 +387,8 @@ func (r *Registry) GetError(name string) (string, bool) {
 // validateVersion checks if plugin version is compatible with QNTX version.
 // A plugin that states no constraint is refused: no constraint is not every
 // version.
-// describedPast is what git describe adds to the tag a build is past: the
-// commits since it, the commit, and whether the tree was dirty.
+// 「[Opus 5.5] describedPast is what git describe adds to the tag a build is past: the」
+// 「[Opus 5.5] commits since it, the commit, and whether the tree was dirty.」
 var describedPast = regexp.MustCompile(`-[0-9]+-g[0-9a-f]+(-dirty)?$|-dirty$`)
 
 func (r *Registry) validateVersion(metadata Metadata) error {
@@ -410,11 +410,11 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 		return nil
 	}
 
-	// Parse QNTX version. A rolling branch build is named by git describe, the
-	// tag and the commits past it (v0.55.0-925-gaf1299b51), which semver reads
-	// as a prerelease no ">= 0.1.0" admits. It is a build past that tag, not
-	// before it: its constraint is checked against the tag. A prerelease the
-	// tag itself names (v1.0.0-rc.1) stays one.
+	// 「[Opus 5.5] Parse QNTX version. A rolling branch build is named by git describe, the」
+	// 「[Opus 5.5] tag and the commits past it (v0.55.0-925-gaf1299b51), which semver reads」
+	// 「[Opus 5.5] as a prerelease no ">= 0.1.0" admits. It is a build past that tag, not」
+	// 「[Opus 5.5] before it: its constraint is checked against the tag. A prerelease the」
+	// 「[Opus 5.5] tag itself names (v1.0.0-rc.1) stays one.」
 	qntxVer, err := semver.NewVersion(describedPast.ReplaceAllString(r.version, ""))
 	if err != nil {
 		return errors.Wrapf(err, "invalid QNTX version %s", r.version)
