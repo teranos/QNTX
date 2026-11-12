@@ -1,12 +1,12 @@
-//! ats-dev signs as the key kept in `~/.qntx/key`: the one `qntx` signs a
-//! request to a node with, a 32-byte ed25519 seed in hex that `ground code
-//! login` keeps. ats-dev never mints one. The bytes an attestation is signed
-//! over are `ats-sign`'s, the ones the node verifies (through `ats-wasm`); a
-//! request is signed as `qntx sign` signs one (QNTX `server/auth/signed.go`).
+//! 「[Opus 5.5] ats-dev signs as the key kept in `~/.qntx/key`: the one `qntx` signs a」
+//! 「[Opus 5.5] request to a node with, a 32-byte ed25519 seed in hex that `ground code」
+//! 「[Opus 5.5] login` keeps. ats-dev never mints one. The bytes an attestation is signed」
+//! 「[Opus 5.5] over are `ats-sign`'s, the ones the node verifies (through `ats-wasm`); a」
+//! 「[Opus 5.5] request is signed as `qntx sign` signs one (QNTX `server/auth/signed.go`).」
 //!
-//! "A signature proves the key, and nothing reusable leaves the node."
+//! "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
 //!
-//! Unix only, as QNTX is (ADR-029).
+//! 「[Opus 5.5] Unix only, as QNTX is (ADR-029).」
 
 use std::path::{Path, PathBuf};
 
@@ -22,7 +22,7 @@ pub struct Signer {
     pub did: String,
 }
 
-/// Where the key is kept: `--key`, else `$ATS_DEV_KEY`, else `~/.qntx/key`.
+/// 「[Opus 5.5] Where the key is kept: `--key`, else `$ATS_DEV_KEY`, else `~/.qntx/key`.」
 pub fn key_path(flag: Option<&str>) -> Result<PathBuf, Box<Error>> {
     if let Some(f) = flag {
         return Ok(PathBuf::from(f));
@@ -30,8 +30,8 @@ pub fn key_path(flag: Option<&str>) -> Result<PathBuf, Box<Error>> {
     if let Ok(e) = std::env::var("ATS_DEV_KEY") {
         return Ok(PathBuf::from(e));
     }
-    // An empty HOME names no directory: `qntx` refuses it too (Go's
-    // os.UserHomeDir), rather than read a key from wherever ats-dev was started.
+    // 「[Opus 5.5] An empty HOME names no directory: `qntx` refuses it too (Go's」
+    // 「[Opus 5.5] os.UserHomeDir), rather than read a key from wherever ats-dev was started.」
     let home = std::env::var("HOME").unwrap_or_default();
     if home.is_empty() {
         return Err(fail("the home directory is unknown, so ~/.qntx/key is not found", "HOME is not set"));
@@ -40,7 +40,7 @@ pub fn key_path(flag: Option<&str>) -> Result<PathBuf, Box<Error>> {
 }
 
 impl Signer {
-    /// The key at `path`. None kept there is an error: ats-dev does not mint one.
+    /// 「[Opus 5.5] The key at `path`. None kept there is an error: ats-dev does not mint one.」
     pub fn load(path: &Path) -> Result<Self, Box<Error>> {
         Self::load_existing(path)?.ok_or_else(|| {
             fail(
@@ -50,7 +50,7 @@ impl Signer {
         })
     }
 
-    /// The key at `path` if one is kept there.
+    /// 「[Opus 5.5] The key at `path` if one is kept there.」
     pub fn load_existing(path: &Path) -> Result<Option<Self>, Box<Error>> {
         read_key(path)?.map(|bytes| Self::from_file(path, &bytes)).transpose()
     }
@@ -73,8 +73,8 @@ impl Signer {
     }
 
     /// The attestation, signed over `ats-sign`'s canonical bytes. The actors
-    /// and the timestamp are under the signature, so they must be settled
-    /// before this is called (see `ready_to_sign` in main.rs).
+    /// 「[Opus 5.5] and the timestamp are under the signature, so they must be settled」
+    /// 「[Opus 5.5] before this is called (see `ready_to_sign` in main.rs).」
     pub fn sign(&self, mut a: Attestation) -> Result<Attestation, Box<Error>> {
         let bytes = canonical(&a)?;
         a.signature = Some(self.key.sign(bytes.as_bytes()));
@@ -82,9 +82,9 @@ impl Signer {
         Ok(a)
     }
 
-    /// The `Authorization` one request to the node at `origin` goes with: a
-    /// JWT this key signs as its did:key, made out to that origin, lasting
-    /// `lasts` seconds and spent once there (`qntx sign` makes the same).
+    /// 「[Opus 5.5] The `Authorization` one request to the node at `origin` goes with: a」
+    /// 「[Opus 5.5] JWT this key signs as its did:key, made out to that origin, lasting」
+    /// 「[Opus 5.5] `lasts` seconds and spent once there (`qntx sign` makes the same).」
     pub fn authorization(&self, origin: &str, lasts: i64) -> Result<String, Box<Error>> {
         use base64::Engine;
         let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -226,8 +226,8 @@ mod tests {
         assert!(matches!(verify(&a), Verdict::Invalid(_)));
     }
 
-    /// The request JWT: EdDSA, issued by and about the key's did:key, made out
-    /// to the origin, a 16-byte jti in hex, and signed by the key the DID names.
+    /// 「[Opus 5.5] The request JWT: EdDSA, issued by and about the key's did:key, made out」
+    /// 「[Opus 5.5] to the origin, a 16-byte jti in hex, and signed by the key the DID names.」
     #[test]
     fn a_request_is_signed_as_qntx_sign_signs_one() {
         let signer = Signer::from_seed(vec![9; 32]).unwrap();
@@ -246,7 +246,7 @@ mod tests {
         let pk = ed25519::PublicKey::try_from_bytes(&didkey::decode(&signer.did).unwrap()).unwrap();
         let input = format!("{}.{}", parts[0], parts[1]);
         assert!(pk.verify(input.as_bytes(), &b64.decode(parts[2]).unwrap()));
-        // a second is a different jti: each request is its own
+        // 「[Opus 5.5] a second is a different jti: each request is its own」
         assert_ne!(auth, signer.authorization("https://node.example", 60).unwrap());
     }
 }
