@@ -392,6 +392,36 @@ func (m *PluginManager) SetPulseResources(db *sql.DB, registry *async.HandlerReg
 	m.joints["pulse"] = pulseJoint{m: m, db: db, handlers: registry}
 }
 
+// pulseDB is Pulse's database, once the manager has been handed it.
+func (m *PluginManager) pulseDB() (*sql.DB, error) {
+	m.wiringMu.RLock()
+	defer m.wiringMu.RUnlock()
+	j, ok := m.joints["pulse"].(pulseJoint)
+	if !ok {
+		return nil, errors.New("the plugin manager has not been handed Pulse's database")
+	}
+	return j.db, nil
+}
+
+// PauseSchedules pauses a plugin's schedules, loaded or not: a plugin that is
+// off has nothing to run them.
+func (m *PluginManager) PauseSchedules(name string) error {
+	db, err := m.pulseDB()
+	if err != nil {
+		return err
+	}
+	return PausePluginSchedules(db, name, m.logger)
+}
+
+// DeleteSchedules deletes a plugin's schedules, for a plugin taken off the node.
+func (m *PluginManager) DeleteSchedules(name string) error {
+	db, err := m.pulseDB()
+	if err != nil {
+		return err
+	}
+	return DeletePluginSchedules(db, name, m.logger)
+}
+
 // SetOnWatchersSetup adds fn to what is told after plugin watchers are written
 // to DB. The server uses this to reload the watcher engine's in-memory map.
 func (m *PluginManager) SetOnWatchersSetup(fn func()) {
