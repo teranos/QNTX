@@ -170,6 +170,9 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
 	s.httpServer.Protocols = protocols
+	// A turn can be quiet for minutes. HTTP+JSON and JSON-RPC keep a stream
+	// alive with a line (streamKeptAlive); gRPC's is the connection's own ping.
+	s.httpServer.HTTP2 = &http.HTTP2Config{SendPingTimeout: streamKeptAlive}
 	listener, err := net.Listen("tcp", s.httpServer.Addr)
 	if err != nil {
 		return errors.Wrapf(err, "failed to listen on %s", s.httpServer.Addr)

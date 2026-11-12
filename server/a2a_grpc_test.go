@@ -76,14 +76,15 @@ func TestTheNodeAgentIsSpokenToOverGRPC(t *testing.T) {
 func TestA2AOverGRPCGoesThroughTheGate(t *testing.T) {
 	client, tokens := a2aOverGRPCAsked(t)
 
-	// Nobody: the gate turns it away before A2A is asked anything.
+	// Nobody: the gate turns it away as gRPC says a refusal, and to no login page.
 	_, err := client.SendMessage(context.Background(), saidOverGRPC("hi"))
 	require.Error(t, err)
-	assert.Contains(t, []codes.Code{codes.Unauthenticated, codes.PermissionDenied, codes.Unknown, codes.Internal}, status.Code(err), err)
+	assert.Equal(t, codes.Unauthenticated, status.Code(err), err)
 
-	// A2A is ROOT's: a USER is not served it.
-	_, err = client.SendMessage(asOverGRPC(tokens[auth.LevelUser]), saidOverGRPC("hi"))
+	// A2A is ROOT's: SUPER is not served it.
+	_, err = client.SendMessage(asOverGRPC(tokens[auth.LevelSuper]), saidOverGRPC("hi"))
 	require.Error(t, err)
+	assert.Equal(t, codes.PermissionDenied, status.Code(err), err)
 
 	// A tenant no agent is served at does not exist, as over the other bindings (§3.3.2).
 	request := saidOverGRPC("hi")
