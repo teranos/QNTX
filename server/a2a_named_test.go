@@ -309,8 +309,8 @@ func TestANameNobodyHoldsIsAnsweredWithTheNamesNearIt(t *testing.T) {
 	assert.Equal(t, 5, lettersApart("slate", "birch"))
 }
 
-// A Task a ground took waits past the SDK's quiet limit for its session: it
-// says it is working still, and is not ended as inactive.
+// 「[Fable 5.2] A Task a ground took waits past the SDK's quiet limit for its session: it」
+// 「[Fable 5.2] says it is working still, and is not ended as inactive.」
 func TestATakenTaskOutlastsTheQuietLimit(t *testing.T) {
 	quiet := turnQuietMost
 	turnQuietMost = 200 * time.Millisecond
