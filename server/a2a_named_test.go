@@ -14,6 +14,8 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 // "AGENTS CAN TALK TO EACH OTHER BY THEIR NAME"
@@ -105,4 +107,42 @@ func toJSON(t *testing.T, v any) string {
 	raw, err := json.Marshal(v)
 	require.NoError(t, err)
 	return string(raw)
+}
+
+// "AGENTS CAN TALK TO EACH OTHER BY THEIR NAME"
+func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := auth.Admitted(auth.LevelRoot, "garden")
+	alder.Identity, alder.ClientDID, alder.TokenDID = rootAccount, "did:key:z6Mkalder", "did:key:z6Mkalder"
+	asAlder := auth.WithAdmission(context.Background(), alder)
+	_, refusal := srv.iName(asAlder, sigil.Sent{"name": "Alder"})
+	require.Nil(t, refusal, refusal.GetSays())
+
+	signum, err := srv.a2aClientSignum()
+	require.NoError(t, err)
+	answered, refusal := signum.Answers["SendMessage"](asAlder, sigil.Sent{
+		"tenant":        "Birch",
+		"message":       `{"messageId": "m1", "role": "ROLE_USER", "parts": [{"text": "your commit broke the build"}]}`,
+		"configuration": `{"returnImmediately": true}`,
+	})
+	require.Nil(t, refusal, refusal.GetSays())
+	said, err := protojson.Marshal(answered.(proto.Message))
+	require.NoError(t, err)
+	assert.Contains(t, string(said), "TASK_STATE_SUBMITTED")
+
+	var left []statusline.News
+	require.Eventually(t, func() bool {
+		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
+		return len(left) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.Equal(t, "Alder to Birch", left[0].Item.Name, "it is from Alder, by name")
+	assert.Equal(t, "your commit broke the build", left[0].Item.Note)
+
+	// A name nobody holds is no agent, said so.
+	_, refusal = signum.Answers["SendMessage"](asAlder, sigil.Sent{
+		"tenant":  "Rowan",
+		"message": `{"messageId": "m2", "role": "ROLE_USER", "parts": [{"text": "hello"}]}`,
+	})
+	require.NotNil(t, refusal)
+	assert.Contains(t, refusal.GetSays(), "no agent is served at tenant Rowan")
 }

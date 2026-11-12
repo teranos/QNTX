@@ -1,14 +1,21 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2aclient"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
+	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 )
@@ -44,6 +51,10 @@ func (s *QNTXServer) agentNamedAt(tenant string) (agentName, bool, error) {
 		return agentName{}, false, nil
 	}
 	names, err := s.agentNames()
+	// A node that serves no system keeps no names: nobody holds one there.
+	if errors.As(err, &notServed) {
+		return agentName{}, false, nil
+	}
 	if err != nil {
 		return agentName{}, false, errors.Wrapf(err, "whether an agent holds the name %s was not read", tenant)
 	}
@@ -136,3 +147,57 @@ func (s *QNTXServer) leaveForAName(ta taskAgent, id, by, says string, taken func
 	})
 	s.logger.Infow("what was said to a named agent is on the status row", "to", ta.called, "did", ta.did, "from", from, "task", id, "for", addressee)
 }
+
+// "AGENTS CAN TALK TO EACH OTHER BY THEIR NAME"
+//
+// ownClient is a2a-go's client of the agent this node serves at tenant, asked
+// as whoever asks here, in process: the node's own A2A binding answers, as it
+// answers a request that came over the wire, and who reaches /a2a reaches it.
+func (s *QNTXServer) ownClient(ctx context.Context, tenant string) (*a2aclient.Client, string, *protocol.Refusal) {
+	admitted, gated := auth.AdmissionFrom(ctx)
+	if !gated {
+		return nil, "", &protocol.Refusal{Why: sigil.Failed, Says: "an agent of this node is spoken to as whoever asks, and this came through no gate"}
+	}
+	if s.a2aOwn == nil || s.served == nil {
+		return nil, "", &protocol.Refusal{Why: sigil.Failed, Says: "this node serves no A2A to speak to " + tenant + " through"}
+	}
+	if !s.reachesTheRow(admitted, a2aPrefix) {
+		return nil, "", &protocol.Refusal{Why: sigil.NotAllowed, Param: "tenant", Says: "an agent of this node is reached at " + a2aPrefix + ", which is not yours"}
+	}
+	client, err := a2aclient.NewFromEndpoints(ctx,
+		[]*a2asdk.AgentInterface{{URL: "http://node" + strings.TrimSuffix(a2aPrefix, "/"), ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: tenant}},
+		a2aclient.WithRESTTransport(&http.Client{Transport: askedInProcess{serve: s.a2aOwn, as: admitted}}))
+	if err != nil {
+		return nil, "", &protocol.Refusal{Why: sigil.Failed, Says: "no A2A client speaks to " + tenant + " on this node: " + err.Error()}
+	}
+	return client, tenant, nil
+}
+
+// askedInProcess answers a request with the node's own A2A binding, as the
+// one who asks.
+type askedInProcess struct {
+	serve http.HandlerFunc
+	as    auth.Admission
+}
+
+func (a askedInProcess) RoundTrip(r *http.Request) (*http.Response, error) {
+	answered := &answeredInProcess{header: http.Header{}, status: http.StatusOK}
+	a.serve(answered, r.WithContext(auth.WithAdmission(r.Context(), a.as)))
+	return &http.Response{
+		Status: http.StatusText(answered.status), StatusCode: answered.status,
+		Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
+		Header: answered.header, Body: io.NopCloser(&answered.body), ContentLength: int64(answered.body.Len()), Request: r,
+	}, nil
+}
+
+// answeredInProcess is what the binding wrote, kept whole.
+type answeredInProcess struct {
+	header http.Header
+	body   bytes.Buffer
+	status int
+}
+
+func (w *answeredInProcess) Header() http.Header         { return w.header }
+func (w *answeredInProcess) Write(b []byte) (int, error) { return w.body.Write(b) }
+func (w *answeredInProcess) WriteHeader(status int)      { w.status = status }
+func (w *answeredInProcess) Flush()                      {}
