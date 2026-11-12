@@ -412,7 +412,10 @@ func (s *QNTXServer) messageTaken(ta taskAgent, sent *a2asdk.SendMessageRequest)
 		return a2aRefusal(a2asdk.ErrInvalidParams, "a message sent to "+ta.called+" is the user's, and this one's role is "+string(m.Role))
 	}
 	// "acceptedOutputModes": what the client takes, of what the agent gives.
-	if config := sent.Config; config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTurnMode) {
+	if config := sent.Config; ta.named && config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTextPlain) {
+		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" is told in "+textPlain+", which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" does not take")
+	}
+	if config := sent.Config; !ta.named && config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTurnMode) {
 		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" gives "+strings.Join(turnModes, ", ")+", none of which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" takes")
 	}
 	// A turn takes nothing more once it is said: a message naming a task is

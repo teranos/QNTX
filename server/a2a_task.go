@@ -683,8 +683,13 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 			return errors.Newf("%s line %s of task %s names %d states, and a line is one", taskLineSubject, line.ID, id, len(line.Predicates))
 		}
 		said, left := why[a2asdk.TaskState(line.Predicates[0])]
-		if !left || !line.Timestamp.Before(since) || slices.Contains(line.Contexts, saidToANameContext) {
+		if !left || !line.Timestamp.Before(since) {
 			continue
+		}
+		// What was said to a name was on the status row, which the node that
+		// stopped held in memory: it is on no row now, and was not received.
+		if slices.Contains(line.Contexts, saidToANameContext) {
+			said = "the node stopped while it was on the status row, and it was not received"
 		}
 		did := s.agentOfLine(line)
 		if err := s.endTask(s.systemTasks(did), id, a2asdk.TaskStateFailed, did, "", "", said); err != nil {

@@ -1,18 +1,19 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
+	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
@@ -28,8 +29,10 @@ import (
 // A name an agent holds (i name) is a tenant: SendMessage at it is a Task of
 // that agent. The node runs no turn for it. What was said is left on the
 // status row as news for the agent, where ug sees it and writes it into
-// ground's store (ADR-059). The Task is the delivery: completed when a ground
-// took it from the row, failed when the row let go of it untaken.
+// ground's store (ADR-059). The Task is the delivery. Nothing tells the node
+// yet that the agent received it: ground writes a row for a session or a
+// project, and no agent by its name, so the Task fails when the row lets go
+// of it. What completes it is ground's own receipt of the hand-over.
 
 // saidToANameContext is what the first line of a Task said to a named agent
 // is in beside its task: no turn of the node stands behind it, so a node that
@@ -97,35 +100,21 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "this node keeps no status row to leave it on")), nil)
 		return
 	}
-	taken := make(chan struct{}, 1)
-	e.s.leaveForAName(ta, string(id), spokenBy(call.request), says, func() {
-		select {
-		case taken <- struct{}{}:
-		default:
-		}
-	})
+	e.s.leaveForAName(ta, string(id), spokenBy(call.request), says)
 	defer e.s.news.Drop(string(id))
 	hold := time.NewTimer(toldWithin)
 	defer hold.Stop()
 	select {
 	case <-ctx.Done():
-	case <-taken:
-		completed := *submitted
-		now := time.Now()
-		completed.Status = a2asdk.TaskStatus{State: a2asdk.TaskStateCompleted, Timestamp: &now, Message: &a2asdk.Message{
-			ID: string(id) + "-taken", ContextID: ec.ContextID, TaskID: id, Role: a2asdk.MessageRoleAgent,
-			Parts: a2asdk.ContentParts{textPart("ground took it from the status row for " + ta.called)},
-		}}
-		yield(&completed, nil)
 	case <-hold.C:
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID,
-			"no ground took it from the status row within "+toldWithin.String()+": "+ta.called+" was not told")), nil)
+			"it was on the status row for "+toldWithin.String()+", and nothing says "+ta.called+" received it")), nil)
 	}
 }
 
 // leaveForAName leaves what by said to the named agent on the status row, as
 // news for the person its key speaks for: the row their ug polls.
-func (s *QNTXServer) leaveForAName(ta taskAgent, id, by, says string, taken func()) {
+func (s *QNTXServer) leaveForAName(ta taskAgent, id, by, says string) {
 	from := by
 	if names, err := s.agentNames(); err == nil {
 		if at := slices.IndexFunc(names, func(kept agentName) bool { return kept.did == by }); at >= 0 {
@@ -144,7 +133,6 @@ func (s *QNTXServer) leaveForAName(ta taskAgent, id, by, says string, taken func
 		Item:    statusline.StatusItem{Name: from + " to " + ta.called, Note: masked(says), Symbol: statusline.SymbolWell},
 		Detail:  map[string]any{"to": ta.called, "did": ta.did, "from": from, "task": id},
 		UntilMs: time.Now().Add(toldWithin).UnixMilli(),
-		Taken:   taken,
 	})
 	s.logger.Infow("what was said to a named agent is on the status row", "to", ta.called, "did", ta.did, "from", from, "task", id, "for", addressee)
 }
@@ -182,26 +170,69 @@ type askedInProcess struct {
 }
 
 func (a askedInProcess) RoundTrip(r *http.Request) (*http.Response, error) {
-	answered := &answeredInProcess{header: http.Header{}, status: http.StatusOK}
-	a.serve(answered, r.WithContext(auth.WithAdmission(r.Context(), a.as)))
+	// What the binding writes is read as it writes it: a stream's events and
+	// its keep-alives reach the one who asks as they are sent.
+	ctx, cancel := context.WithCancel(auth.WithAdmission(r.Context(), a.as))
+	reads, writes := io.Pipe()
+	answered := &answeredInProcess{header: http.Header{}, status: http.StatusOK, body: writes, began: make(chan struct{})}
+	sacred.Go("an agent of this node, asked in process", func() {
+		defer cancel()
+		a.serve(answered, r.WithContext(ctx))
+		answered.begin()
+		_ = writes.Close()
+	})
+	select {
+	case <-answered.began:
+	case <-r.Context().Done():
+		cancel()
+		_ = reads.CloseWithError(r.Context().Err())
+		return nil, r.Context().Err()
+	}
 	return &http.Response{
 		Status: http.StatusText(answered.status), StatusCode: answered.status,
 		Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
-		Header: answered.header, Body: io.NopCloser(&answered.body), ContentLength: int64(answered.body.Len()), Request: r,
+		Header: answered.header, Body: leftWhenClosed{ReadCloser: reads, left: cancel}, ContentLength: -1, Request: r,
 	}, nil
 }
 
-// answeredInProcess is what the binding wrote, kept whole.
+// answeredInProcess is what the binding writes, handed on as it is written.
 type answeredInProcess struct {
 	header http.Header
-	body   bytes.Buffer
+	body   *io.PipeWriter
 	status int
+	began  chan struct{}
+	once   sync.Once
 }
 
-func (w *answeredInProcess) Header() http.Header         { return w.header }
-func (w *answeredInProcess) Write(b []byte) (int, error) { return w.body.Write(b) }
-func (w *answeredInProcess) WriteHeader(status int)      { w.status = status }
-func (w *answeredInProcess) Flush()                      {}
+// begin is the answer's head being settled: its status and headers are read
+// from here on.
+func (w *answeredInProcess) begin() { w.once.Do(func() { close(w.began) }) }
+
+func (w *answeredInProcess) Header() http.Header { return w.header }
+func (w *answeredInProcess) Write(b []byte) (int, error) {
+	w.begin()
+	return w.body.Write(b)
+}
+func (w *answeredInProcess) WriteHeader(status int) {
+	select {
+	case <-w.began:
+	default:
+		w.status = status
+	}
+	w.begin()
+}
+func (w *answeredInProcess) Flush() { w.begin() }
+
+// leftWhenClosed tells the binding its caller left when the answer is closed.
+type leftWhenClosed struct {
+	io.ReadCloser
+	left func()
+}
+
+func (b leftWhenClosed) Close() error {
+	b.left()
+	return b.ReadCloser.Close()
+}
 
 // textSaidIn is what a message's text parts say, one after another. What is
 // said to a name crosses the status row as text: a part that is not text is

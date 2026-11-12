@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -68,16 +70,11 @@ func TestWhatIsSaidToANameIsATaskAndIsOnTheStatusRow(t *testing.T) {
 	assert.Equal(t, "Birch", left[0].Detail["to"])
 	assert.Equal(t, "did:key:z6Mkbirch", left[0].Detail["did"])
 
-	// A ground takes it from the row: the Task is completed, and off the row.
-	left[0].Taken()
-	require.Eventually(t, func() bool {
-		_, task := a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
-		return taskStateIn(task) == "TASK_STATE_COMPLETED"
-	}, 5*time.Second, 10*time.Millisecond)
-	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()))
 }
 
-func TestWhatNoGroundTookIsNotReceived(t *testing.T) {
+// The row lets go of it with nothing saying it was received: the Task says so,
+// and it is off the row.
+func TestWhatNothingSaysWasReceivedIsNotReceived(t *testing.T) {
 	srv, root := namedOverA2A(t)
 	within := toldWithin
 	toldWithin = 50 * time.Millisecond
@@ -91,7 +88,8 @@ func TestWhatNoGroundTookIsNotReceived(t *testing.T) {
 		_, ended = a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
 		return taskStateIn(ended) == "TASK_STATE_FAILED"
 	}, 5*time.Second, 10*time.Millisecond)
-	assert.Contains(t, toJSON(t, ended), "Birch was not told")
+	assert.Contains(t, toJSON(t, ended), "nothing says Birch received it")
+	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()))
 }
 
 func TestANameNobodyHoldsIsNoAgent(t *testing.T) {
@@ -144,4 +142,57 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	})
 	require.NotNil(t, refusal)
 	assert.Contains(t, refusal.GetSays(), "no agent is served at tenant Rowan")
+}
+
+// What is said to a name is text: a sender that takes only another media type
+// is refused before anything is said.
+func TestASenderThatTakesNoTextIsRefusedForAName(t *testing.T) {
+	srv, root := namedOverA2A(t)
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send",
+		saidToTheNode("hello", `{"returnImmediately": true, "acceptedOutputModes": ["image/png"]}`), root)
+	assert.NotEqual(t, http.StatusOK, code, answered)
+	assert.Contains(t, toJSON(t, answered), "Birch is told in text/plain")
+	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()))
+}
+
+// A node that stopped while something said to a name was on its status row
+// held that row in memory: the node after it says it was not received.
+func TestWhatWasOnTheRowOfANodeThatStoppedWasNotReceived(t *testing.T) {
+	srv, root := namedOverA2A(t)
+	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send", saidToTheNode("before the restart", `{"returnImmediately": true}`), root)
+	require.Equal(t, http.StatusOK, code, answered)
+	id := answered["task"].(map[string]any)["id"].(string)
+
+	require.NoError(t, srv.settleTasksNoTurnLeft(srv.nodeAgent, time.Now().Add(time.Minute)))
+	_, ended := a2aAsked(t, srv, http.MethodGet, "/a2a/Birch/tasks/"+id, "", root)
+	assert.Equal(t, "TASK_STATE_FAILED", taskStateIn(ended))
+	assert.Contains(t, toJSON(t, ended), "the node stopped while it was on the status row")
+}
+
+// A stream to a name is read as it is written: the Task as it was made
+// arrives while it is still on the status row, not when the row lets go.
+func TestAStreamToANameArrivesAsItIsWritten(t *testing.T) {
+	srv, root := namedOverA2A(t)
+	within := toldWithin
+	toldWithin = 3 * time.Second
+	t.Cleanup(func() { toldWithin = within })
+
+	node := httptest.NewServer(srv.served)
+	t.Cleanup(node.Close)
+	body := `{"tenant": "Birch", "message": "{\"messageId\": \"m1\", \"role\": \"ROLE_USER\", \"parts\": [{\"text\": \"are you there\"}]}"}`
+	r, err := http.NewRequest(http.MethodPost, node.URL+"/api/a2a/SendStreamingMessage", strings.NewReader(body))
+	require.NoError(t, err)
+	r.Header.Set("Authorization", "Bearer "+root)
+	r.Header.Set("Content-Type", "application/json")
+	asked := time.Now()
+	answered, err := http.DefaultClient.Do(r)
+	require.NoError(t, err)
+	defer answered.Body.Close()
+	require.Equal(t, http.StatusOK, answered.StatusCode)
+
+	first := make([]byte, 4096)
+	n, err := answered.Body.Read(first)
+	require.NoError(t, err)
+	assert.Contains(t, string(first[:n]), "TASK_STATE_SUBMITTED")
+	assert.Less(t, time.Since(asked), toldWithin, "it came before the row let go of it")
 }
