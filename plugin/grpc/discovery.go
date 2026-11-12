@@ -224,7 +224,7 @@ func (attachedPlugin) logs() (*LogBuffer, error) {
 // log file and a ring for live streaming.
 type launchedPlugin struct {
 	cmd *exec.Cmd
-	// harnessSecret is what a call to this launch's harness presents.
+	// 「[Fable 5.2, Fable 5.1] harnessSecret is what a call to this launch's harness presents.」
 	harnessSecret string
 	stdoutLogger  *pluginLogger
 	stderrLogger  *pluginLogger
@@ -815,8 +815,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, pluginCfg PluginConfig) 
 		return alongside(err, proc.abandon())
 	}
 
-	// A plugin something else runs was handed no secret by this node, and its
-	// harness answers it no turn.
+	// 「[Fable 5.2, Fable 5.1] A plugin something else runs was handed no secret by this node, and its」
+	// 「[Fable 5.2, Fable 5.1] harness answers it no turn.」
 	if launched, started := proc.(*launchedPlugin); started {
 		client.harnessSecret = launched.harnessSecret
 	}
@@ -1032,9 +1032,9 @@ func (m *PluginManager) launchPlugin(ctx context.Context, pluginCfg PluginConfig
 	// Plugins are not killed on context cancellation — graceful shutdown sends
 	// gRPC Shutdown() first. Orphans from crashes are cleaned up on next startup
 	// via pidfile tracking (see pidfile.go).
-	// "Harness is a plugin that speaks grpc A2A": the plugin's harness answers
-	// the node that started it. The secret is this launch's, handed where only
-	// the plugin's process reads it; whoever else reaches its port has none.
+	// 「[Fable 5.2, Fable 5.1] "Harness is a plugin that speaks grpc A2A": the plugin's harness answers」
+	// 「[Fable 5.2, Fable 5.1] the node that started it. The secret is this launch's, handed where only」
+	// 「[Fable 5.2, Fable 5.1] the plugin's process reads it; whoever else reaches its port has none.」
 	harnessSecret, err := newHarnessSecret()
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "plugin %s has no secret for its harness to know the node by", pluginCfg.Name)
