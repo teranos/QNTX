@@ -12,9 +12,9 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// wholeRepository is abcd-nl/clean on trunk, its default branch: notes at its
-// top and in folders deep in it, a story, a folder starting with a dot, and
-// what is no note.
+// 「[Opus 5.5] wholeRepository is abcd-nl/clean on trunk, its default branch: notes at its」
+// 「[Opus 5.5] top and in folders deep in it, a story, a folder starting with a dot, and」
+// 「[Opus 5.5] what is no note.」
 func wholeRepository(t *testing.T) (*QNTXServer, Vault) {
 	t.Helper()
 	s, vault := vaultBindingServer(t)
@@ -30,8 +30,8 @@ func wholeRepository(t *testing.T) (*QNTXServer, Vault) {
 	return s, vault
 }
 
-// "- the repository/git binding"
-// "- named as one git repository under one name, like teranos/ground currently is."
+// "「[Opus 5.5] - the repository/git binding」"
+// "「[Opus 5.5] - named as one git repository under one name, like teranos/ground currently is.」"
 func TestARepositoryIsBoundWholeUnderOneName(t *testing.T) {
 	s, vault := wholeRepository(t)
 	_, refused := askVault(t, s, "repository", sigil.Sent{"name": "abcd", "repo": "github.com/abcd-nl/clean"})
@@ -41,7 +41,7 @@ func TestARepositoryIsBoundWholeUnderOneName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"github.com/abcd-nl/clean@trunk:.=abcd-nl/clean"}, vaults[0].Folders)
 
-	// "we are missing some bindings like the ground CLAUDE.md, its other markdown document's"
+	// "「[Opus 5.5] we are missing some bindings like the ground CLAUDE.md, its other markdown document's」"
 	assert.Equal(t, "# CLAUDE\n", readNote(t, vault, "abcd-nl/clean/CLAUDE.md"))
 	assert.Equal(t, "# docs\n", readNote(t, vault, "abcd-nl/clean/docs/README.md"))
 	assert.Equal(t, "# ADR-001\n", readNote(t, vault, "abcd-nl/clean/docs/adr/ADR-001.md"))
@@ -54,7 +54,7 @@ func TestARepositoryIsBoundWholeUnderOneName(t *testing.T) {
 	assert.Equal(t, vaultActive, state.State, state.Why)
 }
 
-// The one name may be said; it is a folder's place, never a note's.
+// 「[Opus 5.5] The one name may be said; it is a folder's place, never a note's.」
 func TestARepositoryIsBoundUnderTheNameSaid(t *testing.T) {
 	s, vault := wholeRepository(t)
 	_, refused := askVault(t, s, "repository", sigil.Sent{"name": "abcd", "repo": "github.com/abcd-nl/clean", "place": "Course Material"})
@@ -66,8 +66,8 @@ func TestARepositoryIsBoundUnderTheNameSaid(t *testing.T) {
 	assert.Equal(t, "place", refused.GetParam())
 }
 
-// A push changing a note anywhere in the repository reaches the vault; one
-// changing what is no note, or a note under a dot, does not.
+// 「[Opus 5.5] A push changing a note anywhere in the repository reaches the vault; one」
+// 「[Opus 5.5] changing what is no note, or a note under a dot, does not.」
 func TestAPushAnywhereInTheRepositoryReachesIt(t *testing.T) {
 	s, vault := wholeRepository(t)
 	_, refused := askVault(t, s, "repository", sigil.Sent{"name": "abcd", "repo": "github.com/abcd-nl/clean"})
@@ -84,7 +84,7 @@ func TestAPushAnywhereInTheRepositoryReachesIt(t *testing.T) {
 	assert.Equal(t, "# ADR-001\n\nPushed.\n", readNote(t, vault, "abcd-nl/clean/docs/adr/ADR-001.md"))
 }
 
-// A note gone from the repository, deep in it, is gone from the vault.
+// 「[Opus 5.5] A note gone from the repository, deep in it, is gone from the vault.」
 func TestANoteGoneFromTheRepositoryIsGoneFromTheVault(t *testing.T) {
 	s, vault := wholeRepository(t)
 	_, refused := askVault(t, s, "repository", sigil.Sent{"name": "abcd", "repo": "github.com/abcd-nl/clean"})
@@ -98,8 +98,8 @@ func TestANoteGoneFromTheRepositoryIsGoneFromTheVault(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(vault.Path, "abcd-nl", "clean", "docs", "adr", "ADR-001.md"))
 }
 
-// What the vault changes, in any folder of the bound repository, reaches its
-// branch where the repository has it.
+// 「[Opus 5.5] What the vault changes, in any folder of the bound repository, reaches its」
+// 「[Opus 5.5] branch where the repository has it.」
 func TestARepositoryBindingSendsEveryNote(t *testing.T) {
 	s, vault := wholeRepository(t)
 	_, refused := askVault(t, s, "repository", sigil.Sent{"name": "abcd", "repo": "github.com/abcd-nl/clean"})
@@ -122,9 +122,9 @@ func TestARepositoryBindingSendsEveryNote(t *testing.T) {
 	assert.Equal(t, "# template\n", branch[".github/PULL_REQUEST_TEMPLATE.md"])
 }
 
-// "oh, require it to be a dir in the repo , not in its root"
-// A folder binding still is never the repository's top: the top is the
-// repository binding's alone.
+// "「[Opus 5.5] oh, require it to be a dir in the repo , not in its root」"
+// 「[Opus 5.5] A folder binding still is never the repository's top: the top is the」
+// 「[Opus 5.5] repository binding's alone.」
 func TestTheTopIsTheRepositoryBindingsAlone(t *testing.T) {
 	s, _ := wholeRepository(t)
 	_, refused := askVault(t, s, "bind", sigil.Sent{"name": "abcd", "place": "Course Material", "repo": "github.com/abcd-nl/clean", "path": "."})
@@ -132,8 +132,8 @@ func TestTheTopIsTheRepositoryBindingsAlone(t *testing.T) {
 	assert.Equal(t, "path", refused.GetParam())
 }
 
-// The vault itself is no repository's place, however it is spelled: bound
-// there, a send would carry every note of the vault into the repository.
+// 「[Opus 5.5] The vault itself is no repository's place, however it is spelled: bound」
+// 「[Opus 5.5] there, a send would carry every note of the vault into the repository.」
 func TestARepositoryIsNotBoundAtTheVaultItself(t *testing.T) {
 	s, _ := wholeRepository(t)
 	for _, place := range []string{".", "./", "a/..", "/", "../outside"} {
@@ -143,7 +143,7 @@ func TestARepositoryIsNotBoundAtTheVaultItself(t *testing.T) {
 	}
 }
 
-// A repository is not bound under a link, and a fill does not write through one.
+// 「[Opus 5.5] A repository is not bound under a link, and a fill does not write through one.」
 func TestARepositoryIsNotBoundUnderALink(t *testing.T) {
 	s, vault := wholeRepository(t)
 	outside := t.TempDir()
@@ -155,8 +155,8 @@ func TestARepositoryIsNotBoundUnderALink(t *testing.T) {
 	assert.Empty(t, entries, "a note was written outside the vault")
 }
 
-// A repository's folder that is gone, or holds a link, is never sent as empty:
-// that would remove every note on the branch.
+// 「[Opus 5.5] A repository's folder that is gone, or holds a link, is never sent as empty:」
+// 「[Opus 5.5] that would remove every note on the branch.」
 func TestAGoneOrLinkedFolderSendsNothing(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "clean")
 	_, err := vaultNotesWhole(root)
@@ -174,7 +174,7 @@ func TestAGoneOrLinkedFolderSendsNothing(t *testing.T) {
 	require.Error(t, err, "a link under the folder was skipped")
 }
 
-// A send reads the folder only when the vault reaches it through no link.
+// 「[Opus 5.5] A send reads the folder only when the vault reaches it through no link.」
 func TestASendReadsNothingThroughALinkAboveTheFolder(t *testing.T) {
 	vault, outside := t.TempDir(), t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(outside, "b"), 0o755))
