@@ -17,16 +17,17 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	a2agrpc "github.com/a2aproject/a2a-go/v2/a2agrpc/v1"
 	a2apb "github.com/a2aproject/a2a-go/v2/a2apb/v1"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/harness"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -51,17 +52,22 @@ type PluginServer struct {
 	initOnce sync.Once
 	initErr  error
 
-	// harnessToken is the token the node handed at Initialize: what a call to
-	// the plugin's harness presents.
-	harnessToken atomic.Value
+	// harnessSecret is the secret of this launch, which the node that started
+	// the process handed it: what a call to the plugin's harness presents.
+	harnessSecret string
 }
 
 // NewPluginServer creates a new gRPC server wrapper for a DomainPlugin.
 func NewPluginServer(plugin plugin.DomainPlugin, logger *zap.SugaredLogger) *PluginServer {
+	// Read once and taken out of the environment: what the plugin starts (a
+	// harness's own process, with its tools) is handed none of it.
+	secret := os.Getenv(HarnessSecretEnv)
+	_ = os.Unsetenv(HarnessSecretEnv)
 	return &PluginServer{
-		plugin:  plugin,
-		logger:  logger,
-		httpMux: http.NewServeMux(),
+		plugin:        plugin,
+		logger:        logger,
+		httpMux:       http.NewServeMux(),
+		harnessSecret: secret,
 	}
 }
 
@@ -139,20 +145,19 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 var harnessCalls = "/" + a2apb.A2AService_ServiceDesc.ServiceName + "/"
 
 // fromTheNode refuses a call to the plugin's harness that does not present
-// the token the node handed this plugin at Initialize. A turn names the
-// harness's home, its environment and its provider, so it is the node's alone
-// to say: a plugin the node has not initialized answers no turn.
+// the secret of this launch. A turn names the harness's home, its environment
+// and its provider, so it is the node's alone to say: a plugin no node
+// started, or one reached by whoever else is on the machine, answers no turn.
 func (s *PluginServer) fromTheNode(ctx context.Context, method string) error {
 	if !strings.HasPrefix(method, harnessCalls) {
 		return nil
 	}
-	handed, _ := s.harnessToken.Load().(string)
-	if handed == "" {
-		return status.Error(codes.Unauthenticated, "this plugin's harness answers the node, which has handed it no token yet")
+	if s.harnessSecret == "" {
+		return status.Error(codes.Unauthenticated, "this plugin's harness answers the node that started it, and no node handed this process a secret ("+HarnessSecretEnv+")")
 	}
 	presented, _ := strings.CutPrefix(strings.Join(metadata.ValueFromIncomingContext(ctx, harnessTokenKey), ""), "Bearer ")
-	if subtle.ConstantTimeCompare([]byte(presented), []byte(handed)) != 1 {
-		return status.Error(codes.Unauthenticated, "this plugin's harness answers the node, and this call does not present the plugin's token")
+	if subtle.ConstantTimeCompare([]byte(presented), []byte(s.harnessSecret)) != 1 {
+		return status.Error(codes.Unauthenticated, "this plugin's harness answers the node that started it, and this call does not present the secret of its launch")
 	}
 	return nil
 }
@@ -164,12 +169,31 @@ func (s *PluginServer) harnessUnary(ctx context.Context, req any, info *grpc.Una
 	return handler(ctx, req)
 }
 
+// harnessStream has a turn's run stopped when the caller of its stream leaves
+// before the turn ended: a2a-go runs a turn apart from the call that asked
+// for it, and core may leave before it was told which Task to cancel.
 func (s *PluginServer) harnessStream(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	if err := s.fromTheNode(stream.Context(), info.FullMethod); err != nil {
 		return err
 	}
-	return handler(srv, stream)
+	if !strings.HasPrefix(info.FullMethod, harnessCalls) {
+		return handler(srv, stream)
+	}
+	ctx, caller := harness.WithCaller(stream.Context())
+	err := handler(srv, &callersStream{ServerStream: stream, ctx: ctx})
+	if stream.Context().Err() != nil {
+		caller.Left()
+	}
+	return err
 }
+
+// callersStream is a stream whose context says who to tell the caller left.
+type callersStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (c *callersStream) Context() context.Context { return c.ctx }
 
 // listenAttempts is how many ports listen tries, from the one asked for up.
 const listenAttempts = 64
@@ -252,7 +276,6 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		// A plugin answering a sigil presents the call's token to the store here.
 		pluginConfig["_ats_store_endpoint"] = req.AtsStoreEndpoint
 		pluginConfig["_auth_token"] = req.AuthToken
-		s.harnessToken.Store(req.AuthToken)
 
 		services, err := NewRemoteServiceRegistry(
 			ctx,

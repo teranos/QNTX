@@ -2,7 +2,9 @@ package grpc
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
@@ -70,9 +72,10 @@ type ExternalDomainProxy struct {
 	// serves A2AService (populated during Initialize, ADR-059). Atomic, as
 	// roomsProvider is.
 	harnessProvider atomic.Bool
-	// harnessToken is the token handed to the plugin at Initialize, which a
-	// call to its harness presents.
-	harnessToken atomic.Value
+	// harnessSecret is the secret the node handed the plugin's process when
+	// it started it, which a call to its harness presents. Set before the
+	// proxy is registered, and never after.
+	harnessSecret string
 
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
@@ -288,20 +291,34 @@ func (c *ExternalDomainProxy) IsHarnessProvider() bool {
 // A2AServiceClient returns a2a-go's A2AServiceClient using this plugin's
 // existing gRPC connection. Only meaningful when IsHarnessProvider() is true.
 //
-// Each call presents the token the node handed this plugin at Initialize: the
-// plugin's harness answers the node, and nobody else who reaches its port.
+// Each call presents the secret the node handed this plugin's process when it
+// started it: the plugin's harness answers that node, and nobody else who
+// reaches its port.
 func (c *ExternalDomainProxy) A2AServiceClient() a2apb.A2AServiceClient {
-	token, _ := c.harnessToken.Load().(string)
-	return a2apb.NewA2AServiceClient(PresentingHarnessToken(c.conn, token))
+	return a2apb.NewA2AServiceClient(PresentingHarnessSecret(c.conn, c.harnessSecret))
 }
 
+// HarnessSecretEnv is where a plugin's process finds the secret of its launch.
+// Initialize is answered to whoever reaches the port, so nothing it carries is
+// what the harness knows the node by.
+const HarnessSecretEnv = "QNTX_PLUGIN_HARNESS_SECRET"
+
 // harnessTokenKey is the metadata a call to a plugin's harness carries the
-// plugin's token under.
+// launch's secret under.
 const harnessTokenKey = "authorization"
 
-// PresentingHarnessToken is conn with every call on it presenting token.
-func PresentingHarnessToken(conn grpc.ClientConnInterface, token string) grpc.ClientConnInterface {
-	return presentingToken{conn: conn, token: token}
+// newHarnessSecret is a secret for one launch of one plugin.
+func newHarnessSecret() (string, error) {
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(secret), nil
+}
+
+// PresentingHarnessSecret is conn with every call on it presenting secret.
+func PresentingHarnessSecret(conn grpc.ClientConnInterface, secret string) grpc.ClientConnInterface {
+	return presentingToken{conn: conn, token: secret}
 }
 
 type presentingToken struct {
@@ -560,7 +577,6 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store Python provider capability
 	c.pythonProvider = resp.GetPythonProvider()
 	c.roomsProvider.Store(resp.GetRoomsProvider())
-	c.harnessToken.Store(authToken)
 	c.harnessProvider.Store(resp.GetHarnessProvider())
 
 	// Store and create watcher registrations. Declaring none withdraws

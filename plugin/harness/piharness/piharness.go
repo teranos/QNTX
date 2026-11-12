@@ -56,18 +56,24 @@ func (e *Executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter
 
 		// How the turn is run carries what is handed to the process and
 		// offered to no model (ADR-051): the Task keeps none of it.
-		submitted := a2asdk.NewSubmittedTask(ec, a2asdk.NewMessage(a2asdk.MessageRoleUser, a2asdk.NewTextPart(says)))
-		if ec.StoredTask == nil && !yield(submitted, nil) {
-			return
-		}
-
 		// a2a-go runs a turn apart from the call that asked for it, so a
 		// caller that left does not end ctx: the run is stopped by Cancel,
-		// which core asks for when it gives a turn up. Pi is stopped the way
+		// which core asks for when it gives a turn up, and by the plugin's
+		// server when the caller of the stream leaves. Both are in place
+		// before the caller is told which Task this is. Pi is stopped the way
 		// a person stops it, and its session is left as written.
 		running, stop := context.WithCancel(ctx)
 		defer stop()
 		defer e.running.Began(ec.TaskID, stop)()
+		harness.StoppedWhenTheCallerLeaves(ctx, stop)
+
+		submitted := a2asdk.NewSubmittedTask(ec, a2asdk.NewMessage(a2asdk.MessageRoleUser, a2asdk.NewTextPart(says)))
+		if ec.StoredTask == nil && !yield(submitted, nil) {
+			return
+		}
+		if running.Err() != nil {
+			return
+		}
 		listening := true
 		answer, err := said.Run(running, func(record Record) {
 			if !listening {

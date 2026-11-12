@@ -135,3 +135,48 @@ func (s *turns) Get(_ context.Context, id a2asdk.TaskID) (*taskstore.StoredTask,
 func (s *turns) List(context.Context, *a2asdk.ListTasksRequest) (*a2asdk.ListTasksResponse, error) {
 	return &a2asdk.ListTasksResponse{Tasks: []*a2asdk.Task{}}, nil
 }
+
+// Caller is the caller of one turn's stream, as the plugin's server knows
+// them: told when they left, they stop the run they asked for. A turn core
+// gives up before it was told which Task it is has no Task to cancel.
+type Caller struct {
+	mu   sync.Mutex
+	left bool
+	stop context.CancelFunc
+}
+
+type callerKey struct{}
+
+// WithCaller is ctx carrying a Caller, for the server of a turn's stream.
+func WithCaller(ctx context.Context) (context.Context, *Caller) {
+	caller := &Caller{}
+	return context.WithValue(ctx, callerKey{}, caller), caller
+}
+
+// StoppedWhenTheCallerLeaves has stop called when the caller of ctx's stream
+// leaves: at once, when they already have. A ctx no server gave a Caller is
+// stopped by Cancel alone.
+func StoppedWhenTheCallerLeaves(ctx context.Context, stop context.CancelFunc) {
+	caller, served := ctx.Value(callerKey{}).(*Caller)
+	if !served {
+		return
+	}
+	caller.mu.Lock()
+	left := caller.left
+	caller.stop = stop
+	caller.mu.Unlock()
+	if left {
+		stop()
+	}
+}
+
+// Left says the caller left before the turn ended.
+func (c *Caller) Left() {
+	c.mu.Lock()
+	c.left = true
+	stop := c.stop
+	c.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
+}
