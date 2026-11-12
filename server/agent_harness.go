@@ -348,10 +348,10 @@ type harnessesHeld struct {
 	held map[string]*harnessHeld
 }
 
-// harnessHeldBy is the binary of the harness named, or nil when the node holds
-// none. A harness a plugin runs is held where the plugin is (ADR-059): the
-// binary is the plugin's own. Only a harness the node holds no binary of is
-// held so (harnessesAPluginHolds).
+// 「[Fable 5.2, Fable 5.1] harnessHeldBy is the binary of the harness named, or nil when the node holds」
+// 「[Fable 5.2, Fable 5.1] none. A harness a plugin runs is held where the plugin is (ADR-059): the」
+// 「[Fable 5.2, Fable 5.1] binary is the plugin's own. Only a harness the node holds no binary of is」
+// 「[Fable 5.2, Fable 5.1] held so (harnessesAPluginHolds).」
 func (s *QNTXServer) harnessHeldBy(name string) *harnessHeld {
 	s.harnessBinaries.mu.Lock()
 	held := s.harnessBinaries.held[name]
