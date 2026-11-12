@@ -64,7 +64,11 @@ func (t tasksOnLines) Create(ctx context.Context, task *a2asdk.Task) (taskstore.
 		return taskstore.TaskVersionMissing, taskstore.ErrTaskAlreadyExists
 	}
 	// Its user is who spoke, as the turn writes them down (said_by).
-	if err := t.s.writeTask(call.agent.taskLines, task, spokenBy(call.request)); err != nil {
+	var also []string
+	if call.agent.named {
+		also = append(also, saidToANameContext)
+	}
+	if err := t.s.writeTask(call.agent.taskLines, task, spokenBy(call.request), also...); err != nil {
 		return taskstore.TaskVersionMissing, err
 	}
 	return 1, nil
@@ -92,7 +96,7 @@ func (t tasksOnLines) Update(ctx context.Context, update *taskstore.UpdateReques
 	// The node stopping is not a followed turn ending: the next node reads the
 	// turn on from its stream and settles the Task (settleLeftTask). A failure
 	// the agent did not say is the SDK's for the stopping, and is not written.
-	if ta.followed && t.s.ctx.Err() != nil && task.Status.State == a2asdk.TaskStateFailed &&
+	if (ta.followed || ta.named) && t.s.ctx.Err() != nil && task.Status.State == a2asdk.TaskStateFailed &&
 		(task.Status.Message == nil || task.Status.Message.ID != id+"-failed") {
 		return taskstore.TaskVersionMissing, errors.Newf("the node is stopping, and the node after it settles task %s from its turn's stream", id)
 	}
