@@ -104,8 +104,8 @@ func TestAnAgentIsSignedInByThePersonsPasskey(t *testing.T) {
 	require.True(t, in)
 	assert.Equal(t, string(LevelRoot), admitted.LevelName())
 	assert.Equal(t, mastodonAccount, admitted.Identity)
-	// The key is its own client, and that is how it is told from a connector:
-	// i name names it by the DID it signs as (server/i_name.go itsOwnDID).
+	// 「[Fable 5.1, Fable 5.2] The key is its own client, and that is how it is told from a connector:」
+	// 「[Fable 5.1, Fable 5.2] i name names it by the DID it signs as (server/i_name.go itsOwnDID).」
 	assert.Nil(t, admitted.Grant)
 	assert.Equal(t, did, admitted.TokenDID)
 	assert.Equal(t, did, admitted.ClientDID)
