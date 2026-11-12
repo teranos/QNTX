@@ -27,12 +27,12 @@ func AgentDeclaration(work, url string) string {
 	return "project {\n  path: \"" + work + "\"\n}\n\nqntx {\n  url: \"" + url + "\"\n}\n"
 }
 
-// AgentGrove is the agent's checkout of sbvh-nl/grove, where its work keeps each repository as
-// work/<owner>/<repo> (AgentTrust): what a grove ritual needs stands there (ADR-050, Not done).
+// 「[Opus 5.5] AgentGrove is the agent's checkout of sbvh-nl/grove, where its work keeps each repository as」
+// 「[Opus 5.5] work/<owner>/<repo> (AgentTrust): what a grove ritual needs stands there (ADR-050, Not done).」
 func AgentGrove(home string) string { return filepath.Join(home, "work", "sbvh-nl", "grove") }
 
-// AgentSand is the agent's sand besides ground's own controls: its declaration, and each pbt of its
-// grove checkout's controls/, which declare grove's rituals. An agent with no grove checkout has none.
+// 「[Opus 5.5] AgentSand is the agent's sand besides ground's own controls: its declaration, and each pbt of its」
+// 「[Opus 5.5] grove checkout's controls/, which declare grove's rituals. An agent with no grove checkout has none.」
 func AgentSand(home, url string) (map[string]string, error) {
 	sand := map[string]string{"comet.pbt": AgentDeclaration(filepath.Join(home, "work"), url)}
 	controls := filepath.Join(AgentGrove(home), "controls")
@@ -50,8 +50,8 @@ func AgentSand(home, url string) (map[string]string, error) {
 	return sand, nil
 }
 
-// AgentLocalSand is where the agent's ground holds a local sand: under the HOME its turn carries,
-// which is the node's (internal/claudecode run.go, agentenv), as ground's localSandPathInto names it.
+// 「[Opus 5.5] AgentLocalSand is where the agent's ground holds a local sand: under the HOME its turn carries,」
+// 「[Opus 5.5] which is the node's (internal/claudecode run.go, agentenv), as ground's localSandPathInto names it.」
 func AgentLocalSand(platform string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -107,7 +107,7 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	if err != nil {
 		return err
 	}
-	// No rituals left: the sand this agent's build kept goes, and one another agent kept stays.
+	// 「[Opus 5.5] No rituals left: the sand this agent's build kept goes, and one another agent kept stays.」
 	if len(sand) == 1 {
 		if keptBy(held) != home {
 			return nil
@@ -119,8 +119,8 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 		}
 		return nil
 	}
-	// The engine is built from ground's floor alone (ground dub.json -d-version=Floor): the rituals
-	// reach it as the sand it holds beside it (ground source/sand/load.d holdLanded).
+	// 「[Opus 5.5] The engine is built from ground's floor alone (ground dub.json -d-version=Floor): the rituals」
+	// 「[Opus 5.5] reach it as the sand it holds beside it (ground source/sand/load.d holdLanded).」
 	if _, err := b.sandIn(ctx, src, env, native); err != nil {
 		return errors.Wrap(err, "the sand that declares the agent's rituals did not build")
 	}
@@ -133,7 +133,7 @@ func (b Builder) BuildAgent(ctx context.Context, home, url string) error {
 	return errors.Wrapf(os.WriteFile(held+".agent", []byte(home), 0o644), "whose the sand at %s is was not written beside it", held)
 }
 
-// keptBy is the home of the agent whose build kept the sand at held, or empty.
+// 「[Opus 5.5] keptBy is the home of the agent whose build kept the sand at held, or empty.」
 func keptBy(held string) string {
 	said, err := os.ReadFile(held + ".agent")
 	if err != nil {
@@ -142,7 +142,7 @@ func keptBy(held string) string {
 	return string(said)
 }
 
-// controlsDigest is the sha256 of an agent's sand as it is written, file by file in name order.
+// 「[Opus 5.5] controlsDigest is the sha256 of an agent's sand as it is written, file by file in name order.」
 func controlsDigest(sand map[string]string) string {
 	names := make([]string, 0, len(sand))
 	for name := range sand {
@@ -156,9 +156,9 @@ func controlsDigest(sand map[string]string) string {
 	return hex.EncodeToString(sum.Sum(nil))
 }
 
-// SandStands is whether the sand the agent in home holds is the one its grove checkout's controls
-// make now: none where it has no rituals, and built from these controls where it has. Not standing,
-// it says why, and the agent's ground is built again.
+// 「[Opus 5.5] SandStands is whether the sand the agent in home holds is the one its grove checkout's controls」
+// 「[Opus 5.5] make now: none where it has no rituals, and built from these controls where it has. Not standing,」
+// 「[Opus 5.5] it says why, and the agent's ground is built again.」
 func SandStands(home, url string) error {
 	sand, err := AgentSand(home, url)
 	if err != nil {
@@ -191,7 +191,7 @@ func SandStands(home, url string) error {
 	return nil
 }
 
-// Building is whether the agent in home has a ground build going.
+// 「[Opus 5.5] Building is whether the agent in home has a ground build going.」
 func Building(home string) bool {
 	last, ok := agentBuilds.Load(home)
 	return ok && strings.HasPrefix(last.(string), "its ground is building")
