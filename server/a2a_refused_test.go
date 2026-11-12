@@ -340,8 +340,8 @@ func TestWhatA2AGoSaysIsASentryLog(t *testing.T) {
 	}, 5*time.Second, 20*time.Millisecond, "a2a-go's error was not a Sentry log")
 }
 
-// "acceptedOutputModes": a client that takes nothing the agent gives is
-// refused; one that takes a file it gives, and no text, is not.
+// 「[Opus 5.5] "acceptedOutputModes": a client that takes nothing the agent gives is」
+// 「[Opus 5.5] refused; one that takes a file it gives, and no text, is not.」
 func TestAClientThatTakesNothingTheAgentGivesIsRefused(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	code, refused := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send",
