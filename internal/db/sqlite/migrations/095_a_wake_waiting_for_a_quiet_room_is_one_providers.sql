@@ -1,7 +1,7 @@
--- Two providers that call a room alike each have their wake: the key was the
--- room and the agent, and a second provider's comment took the first's row.
+-- 「[Opus 5.5] Two providers that call a room alike each have their wake: the key was the」
+-- 「[Opus 5.5] room and the agent, and a second provider's comment took the first's row.」
 
--- SQLite cannot ALTER a primary key; recreate the table with it.
+-- 「[Opus 5.5] SQLite cannot ALTER a primary key; recreate the table with it.」
 
 CREATE TABLE room_agent_wake_due_new (
     room TEXT NOT NULL,
