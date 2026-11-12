@@ -88,10 +88,37 @@ func (w *roomWakes) ask(key, speaker string, tell func(speaker string)) {
 	})
 }
 
+// findingsSeen is, by comment, the sum of what it found when it last woke the
+// agent and the agent took the turn. An edit finding the same wakes no one. It
+// lives as long as the node: after a restart the first edit wakes once more.
+type findingsSeen struct {
+	mu   sync.Mutex
+	seen map[string]string
+}
+
+var findings = &findingsSeen{seen: map[string]string{}}
+
+func (f *findingsSeen) same(c roomcomments.Comment) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.seen[c.URL] == c.Findings()
+}
+
+// keep is said once the agent took the turn the comment woke: a turn refused
+// leaves the next edit, finding the same, to wake it again.
+func (f *findingsSeen) keep(c roomcomments.Comment) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.seen[c.URL] = c.Findings()
+}
+
 // wakeAfterComment tells the agent the room, when the comment just said into
 // it is one the agent is to be woken by.
 func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments.Comment) {
 	if !c.Wakes(wakeApps(), nodeRoomName) {
+		return
+	}
+	if findings.same(c) {
 		return
 	}
 	speaker := c.Speaker()
@@ -100,18 +127,23 @@ func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments
 		// the quiet stretch, and each one that does moves that later.
 		if err := s.dueWakes().Defer(s.lifetime(), target, wakeAgent, speaker, c.At, time.Now().Add(wakeQuiet())); err != nil {
 			s.logger.Errorw("A review comment was said into the Node Room and the agent's wake was not kept", "agent", wakeAgent, "room", target.Room, "error", err)
+			return
 		}
+		findings.keep(c)
 		return
 	}
-	s.tellNow(target, speaker, c.At)
+	s.tellNow(target, speaker, c)
 }
 
-// tellNow tells the agent the room, one wake of it at a time.
-func (s *QNTXServer) tellNow(target roomcomments.Target, speaker, since string) {
+// tellNow tells the agent the room, one wake of it at a time, and keeps what
+// the comment found once the agent was told it.
+func (s *QNTXServer) tellNow(target roomcomments.Target, speaker string, c roomcomments.Comment) {
 	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, speaker, func(speaker string) {
-		if err := s.tellAgentTheRoom(target, wakeAgent, speaker, since); err != nil {
+		if err := s.tellAgentTheRoom(target, wakeAgent, speaker, c.At); err != nil {
 			s.logger.Errorw("A PR comment was said into the Node Room and the agent was not told", "agent", wakeAgent, "room", target.Room, "error", err)
+			return
 		}
+		findings.keep(c)
 	})
 }
 
@@ -182,8 +214,8 @@ func (s *QNTXServer) tellWhenQuiet(w roomcomments.Wake) {
 
 // tellAgentTheRoom runs a turn of the Node Agent told everything said in the
 // room since it was last told, and posts its answer into the room as it. What
-// it was told is kept before the turn runs: what is said during the turn is
-// the next one's.
+// it was told is kept once it took the turn, not before: a turn it refused
+// leaves it to be told again.
 //
 // An agent never told is told from since, the time of the comment that woke it:
 // a room reads oldest first, so reading it all would tell the oldest.
@@ -217,27 +249,32 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 		return errors.Wrap(err, "the Node Room was not read")
 	}
 	var said []roomcomments.Said
+	var last string
 	for _, m := range read.GetMessages() {
-		said = append(said, roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()})
+		heard := roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()}
+		last = heard.At
+		if !roomcomments.Unheard(heard, agent) {
+			said = append(said, heard)
+		}
 	}
 	if len(said) == 0 {
-		return nil
-	}
-	if err := told.Keep(ctx, target.Room, agent, said[len(said)-1].At); err != nil {
-		return err
+		if last == "" {
+			return nil
+		}
+		return told.Keep(ctx, target.Room, agent, last)
 	}
 	request, err := http.NewRequestWithContext(withSpeaker(lifetime, speaker), http.MethodPost, "/github/comments", nil)
 	if err != nil {
 		return errors.Wrap(err, "the asking did not build")
 	}
-	if err := s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", roomcomments.Digest(said, read.GetTruncated())); err != nil {
-		// Its answer did not reach the room, so it is told the same again.
-		back, cancel := context.WithTimeout(context.WithoutCancel(lifetime), 10*time.Second)
-		defer cancel()
-		if kept := told.Back(back, target.Room, agent, marked); kept != nil {
-			return errors.Wrapf(err, "and %v", kept)
-		}
+	took, err := s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", roomcomments.Digest(said, read.GetTruncated()))
+	if err != nil {
+		// Its answer did not reach the room: nothing is kept, so it is told the same again.
 		return err
 	}
-	return nil
+	if !took {
+		return errors.Newf("%s did not take the turn, so what it was to be told is told again with the next", agent)
+	}
+	// Kept once the agent took the turn: what is said during it is the next one's.
+	return told.Keep(context.WithoutCancel(ctx), target.Room, agent, last)
 }
