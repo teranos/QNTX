@@ -50,10 +50,12 @@ const collectedFile = "collected.json"
 
 // collectedSaid is one thing an agent said to another.
 type collectedSaid struct {
-	From string    `json:"from"`
-	Says string    `json:"says"`
-	At   time.Time `json:"at"`
-	Task string    `json:"task,omitempty"`
+	From string `json:"from"`
+	// FromDID is who said it, by the DID its name may change over.
+	FromDID string    `json:"from_did,omitempty"`
+	Says    string    `json:"says"`
+	At      time.Time `json:"at"`
+	Task    string    `json:"task,omitempty"`
 	// ID is what a person names it by; Edited that a person changed what it says.
 	ID     string `json:"id,omitempty"`
 	Edited bool   `json:"edited,omitempty"`
@@ -547,7 +549,7 @@ func (s *QNTXServer) collectedList(context.Context, sigil.Sent) (any, *protocol.
 			Waiting: []*protocol.CollectedSaid{},
 		}
 		for _, said := range waits.Waiting {
-			one.Waiting = append(one.Waiting, &protocol.CollectedSaid{From: said.From, Says: said.Says, At: stamped(said.At), Task: said.Task, Id: said.ID, Edited: said.Edited})
+			one.Waiting = append(one.Waiting, &protocol.CollectedSaid{From: said.From, Says: said.Says, At: stamped(said.At), Task: said.Task, Id: said.ID, Edited: said.Edited, FromDid: said.FromDID})
 		}
 		answer.Collected = append(answer.Collected, one)
 	}

@@ -438,6 +438,9 @@ message CollectedSaid {
   string id = 5;
   // Whether a person changed what it says.
   bool edited = 6;
+  // 「[Opus 5.5] The DID of who said it, which its name may change over: what a chat's」
+  // 「[Opus 5.5] outbox finds what its agent said by. Empty for what was collected before.」
+  string from_did = 7;
 }
 
 // Collected is what waits for one agent.
