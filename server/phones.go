@@ -91,11 +91,11 @@ func (s *QNTXServer) phones() ([]string, error) {
 	return tokens, nil
 }
 
-// theHumanThemselves is whether a request is the person's own, by their own
-// session: no token, no agent by a key of its own, and no agent acting on a
-// person's word. An agent in a turn a person started speaks for them where
-// what is collected is concerned (collected.go, onAPersonsWord); which phone
-// the node tells is not something said in a turn, and an agent names none.
+// 「[Opus 5.5] theHumanThemselves is whether a request is the person's own, by their own」
+// 「[Opus 5.5] session: no token, no agent by a key of its own, and no agent acting on a」
+// 「[Opus 5.5] person's word. An agent in a turn a person started speaks for them where」
+// 「[Opus 5.5] what is collected is concerned (collected.go, onAPersonsWord); which phone」
+// 「[Opus 5.5] the node tells is not something said in a turn, and an agent names none.」
 func theHumanThemselves(r *http.Request, admitted auth.Admission) bool {
 	if r.Context().Value(onAPersonsWord{}) != nil || r.Context().Value(deliversCollected{}) != nil {
 		return false
