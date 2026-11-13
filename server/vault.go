@@ -43,6 +43,9 @@ type Vault struct {
 	// Sends is, by place, the branch the vault's changes there are committed
 	// to. A place not in it sends nothing: it is opted into, never assumed.
 	Sends map[string]string `json:"sends"`
+	// Memory is the place in the vault agents' memory is kept at (ADR-055):
+	// one folder per Memory Store under it. Empty, the vault backs none.
+	Memory string `json:"memory"`
 }
 
 // texts is a line's attribute that is a list of text.
@@ -175,6 +178,9 @@ func (r NodeRecords) Vaults() ([]Vault, error) {
 		if path, ok := as.Attributes["path"].(string); ok {
 			vault.Path = path
 		}
+		if memory, ok := as.Attributes["memory"].(string); ok {
+			vault.Memory = memory
+		}
 		if vault.Folders, err = texts(as.Attributes, "folders", vaultSubject, as.ID, name); err != nil {
 			return nil, err
 		}
@@ -204,6 +210,7 @@ func (r NodeRecords) SetVault(actor string, vault Vault) error {
 		"folders":  anyOf(vault.Folders),
 		"disabled": anyOf(vault.Disabled),
 		"sends":    sendsOf(vault.Sends),
+		"memory":   vault.Memory,
 	})
 }
 
@@ -359,7 +366,7 @@ func (s *QNTXServer) vaultList(context.Context, sigil.Sent) (any, *protocol.Refu
 	}
 	answer := &protocol.Vaults{Vaults: make([]*protocol.Vault, 0, len(vaults))}
 	for _, v := range vaults {
-		answer.Vaults = append(answer.Vaults, &protocol.Vault{Name: v.Name, Path: v.Path, Folders: v.Folders, Disabled: v.Disabled, Sends: v.Sends, Setup: vaultSetup(v)})
+		answer.Vaults = append(answer.Vaults, &protocol.Vault{Name: v.Name, Path: v.Path, Folders: v.Folders, Disabled: v.Disabled, Sends: v.Sends, Setup: vaultSetup(v), Memory: v.Memory})
 	}
 	return answer, nil
 }
@@ -399,7 +406,9 @@ func (s *QNTXServer) vaultSet(ctx context.Context, sent sigil.Sent) (any, *proto
 		return nil, refused
 	}
 	sends := map[string]string{}
+	memory := ""
 	if refused == nil {
+		memory = was.Memory
 		held := func(place string) bool {
 			return slices.ContainsFunc(folders, func(f string) bool { return strings.HasSuffix(f, "="+place) })
 		}
@@ -414,7 +423,7 @@ func (s *QNTXServer) vaultSet(ctx context.Context, sent sigil.Sent) (any, *proto
 			}
 		}
 	}
-	if err := s.nodeRecords().SetVault(actorOf(ctx), Vault{Name: name, Path: filepath.Clean(path), Folders: folders, Disabled: disabled, Sends: sends}); err != nil {
+	if err := s.nodeRecords().SetVault(actorOf(ctx), Vault{Name: name, Path: filepath.Clean(path), Folders: folders, Disabled: disabled, Sends: sends, Memory: memory}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return s.vaultList(ctx, sent)
