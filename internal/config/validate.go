@@ -212,9 +212,6 @@ func (c *Config) Validate() error {
 			return errors.Newf("sentry.traces_sample_rate must be between 0 and 1, got %f", c.Sentry.TracesSampleRate)
 		}
 	}
-	if err := secretref.Validate(c.Sentry.ReadTokenRef); err != nil {
-		return errors.Wrap(err, "sentry.read_token")
-	}
 
 	// The node's own report (ADR-042): omit for weekly, 0 is never.
 	if c.Mail.Report.IntervalSeconds != nil && *c.Mail.Report.IntervalSeconds < 0 {
