@@ -16,10 +16,10 @@ import (
 // 「[Opus 5.5] Logs are named none: ix/otel takes traces and metrics. A node that serves no」
 // 「[Opus 5.5] ix/otel, or an agent with no door, hands nothing.」
 //
-// An agent whose door admits less than ROOT or SUPER is handed nothing either:
-// ix/otel keeps a span only where its sender may write the span's name, and no
-// WRITE line names Claude Code's (claude_code.*), so every span it sent would be
-// refused.
+// 「[Opus 5.5] An agent whose door admits less than ROOT or SUPER is handed nothing either:」
+// 「[Opus 5.5] ix/otel keeps a span only where its sender may write the span's name, and no」
+// 「[Opus 5.5] WRITE line names Claude Code's (claude_code.*), so every span it sent would be」
+// 「[Opus 5.5] refused.」
 func (s *QNTXServer) harnessOTel(agent *rootAgent) []string {
 	if s.served == nil || agent.door == "" || !s.doorWritesAnything(agent) {
 		return nil
@@ -38,8 +38,8 @@ func (s *QNTXServer) harnessOTel(agent *rootAgent) []string {
 	}
 }
 
-// doorWritesAnything is whether the door agent arrives at admits ROOT or SUPER,
-// who write any name.
+// 「[Opus 5.5] doorWritesAnything is whether the door agent arrives at admits ROOT or SUPER,」
+// 「[Opus 5.5] who write any name.」
 func (s *QNTXServer) doorWritesAnything(agent *rootAgent) bool {
 	s.doors.mu.Lock()
 	door, open := s.doors.byDID[agent.did]
