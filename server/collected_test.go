@@ -105,6 +105,7 @@ func TestWhatAgentsSayToAnAgentIsCollectedAndAPersonReleasesIt(t *testing.T) {
 	assert.Equal(t, "6h0m0s", waits.GetWaits())
 	require.Len(t, waits.GetWaiting(), 3)
 	assert.Equal(t, "Alder", waits.GetWaiting()[0].GetFrom())
+	assert.Equal(t, "did:key:z6Mkalder", waits.GetWaiting()[0].GetFromDid(), "who said it, by the DID a chat's outbox finds it by")
 	assert.Equal(t, "the pond is drained", waits.GetWaiting()[1].GetSays())
 
 	// It is not due: the node delivers none of it.

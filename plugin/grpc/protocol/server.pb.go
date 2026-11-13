@@ -2675,7 +2675,10 @@ type CollectedSaid struct {
 	// What collected edit and cancel name it by.
 	Id string `protobuf:"bytes,5,opt,name=id,proto3" json:"id,omitempty"`
 	// Whether a person changed what it says.
-	Edited        bool `protobuf:"varint,6,opt,name=edited,proto3" json:"edited,omitempty"`
+	Edited bool `protobuf:"varint,6,opt,name=edited,proto3" json:"edited,omitempty"`
+	// 「[Opus 5.5] The DID of who said it, which its name may change over: what a chat's」
+	// 「[Opus 5.5] outbox finds what its agent said by. Empty for what was collected before.」
+	FromDid       string `protobuf:"bytes,7,opt,name=from_did,json=fromDid,proto3" json:"from_did,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2750,6 +2753,13 @@ func (x *CollectedSaid) GetEdited() bool {
 		return x.Edited
 	}
 	return false
+}
+
+func (x *CollectedSaid) GetFromDid() string {
+	if x != nil {
+		return x.FromDid
+	}
+	return ""
 }
 
 // Collected is what waits for one agent.
@@ -4388,14 +4398,15 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\fMemoryStores\x12\x14\n" +
 	"\x05vault\x18\x01 \x01(\tR\x05vault\x12\x14\n" +
 	"\x05place\x18\x02 \x01(\tR\x05place\x12-\n" +
-	"\x06stores\x18\x03 \x03(\v2\x15.protocol.MemoryStoreR\x06stores\"\x83\x01\n" +
+	"\x06stores\x18\x03 \x03(\v2\x15.protocol.MemoryStoreR\x06stores\"\x9e\x01\n" +
 	"\rCollectedSaid\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x12\n" +
 	"\x04says\x18\x02 \x01(\tR\x04says\x12\x0e\n" +
 	"\x02at\x18\x03 \x01(\tR\x02at\x12\x12\n" +
 	"\x04task\x18\x04 \x01(\tR\x04task\x12\x0e\n" +
 	"\x02id\x18\x05 \x01(\tR\x02id\x12\x16\n" +
-	"\x06edited\x18\x06 \x01(\bR\x06edited\"\xdb\x01\n" +
+	"\x06edited\x18\x06 \x01(\bR\x06edited\x12\x19\n" +
+	"\bfrom_did\x18\a \x01(\tR\afromDid\"\xdb\x01\n" +
 	"\tCollected\x12\x0e\n" +
 	"\x02to\x18\x01 \x01(\tR\x02to\x12\x10\n" +
 	"\x03did\x18\x02 \x01(\tR\x03did\x12\x14\n" +
