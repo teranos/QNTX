@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// What the developer portal hands an operator for push: the app, the team,
-// and a key by its id and by reference to where it is kept.
+// 「[Fable 5.2] What the developer portal hands an operator for push: the app, the team,」
+// 「[Fable 5.2] and a key by its id and by reference to where it is kept.」
 func TestApnsLoads(t *testing.T) {
 	cfg, err := LoadFromFile(writeConfig(t, `
 [apns]
@@ -29,8 +29,8 @@ private_key = "ssm:///q/box/apns/private-key"
 	}
 }
 
-// The key is the secret, and am.toml is read by more than the node: a key
-// written here is already disclosed.
+// 「[Fable 5.2] The key is the secret, and am.toml is read by more than the node: a key」
+// 「[Fable 5.2] written here is already disclosed.」
 func TestApnsPrivateKeyLiteralRejected(t *testing.T) {
 	cfg, err := LoadFromFile(writeConfig(t, `
 [apns]
@@ -54,7 +54,7 @@ private_key = "-----BEGIN PRIVATE KEY-----\nMIGT\n-----END PRIVATE KEY-----"
 	}
 }
 
-// A key with no app to reach, or an app with no key, is said when the node starts.
+// 「[Fable 5.2] A key with no app to reach, or an app with no key, is said when the node starts.」
 func TestApnsIsAllFourOrNone(t *testing.T) {
 	cfg, err := LoadFromFile(writeConfig(t, `
 [apns]

@@ -237,10 +237,10 @@ func validateProviders(at string, p ProviderConfig) error {
 	return validateAppleClient(at+".apple", p.Apple)
 }
 
-// validateApns holds the node's way to a phone to all four or nothing: a key
-// with no app to reach, or an app with no key, reaches no phone and says
-// nothing of it until a notification is due. The key is named, never written:
-// am.toml is read by more than the node.
+// 「[Opus 5.5] validateApns holds the node's way to a phone to all four or nothing: a key」
+// 「[Opus 5.5] with no app to reach, or an app with no key, reaches no phone and says」
+// 「[Opus 5.5] nothing of it until a notification is due. The key is named, never written:」
+// 「[Opus 5.5] am.toml is read by more than the node.」
 func validateApns(a ApnsConfig) error {
 	given := 0
 	for _, field := range []string{a.BundleID, a.KeyID, a.TeamID, a.PrivateKeyRef} {
