@@ -475,7 +475,7 @@ func queryLine(q queryTimes) string {
 func downtimeLine(d downtime) string {
 	s := fmt.Sprintf("last week %s, last 3 weeks %s", minutesIn(d.WeekMinutes), minutesIn(d.ThreeWeeksMinutes))
 	if !d.Since.IsZero() {
-		s += fmt.Sprintf(" (counted from %s UTC, the first hour Sentry holds a sample for)", d.Since.UTC().Format("2006-01-02 15:04"))
+		s += fmt.Sprintf(" (counted from %s UTC, the first day Sentry holds a sample for)", d.Since.UTC().Format("2006-01-02 15:04"))
 	}
 	return s
 }
@@ -511,16 +511,16 @@ func seriesLine(points []sentryread.Point) string {
 	if n == 0 {
 		return "No samples."
 	}
-	return fmt.Sprintf("mean %.1f%%, lowest hour %.1f%%, highest hour %.1f%%", mean, lo, hi)
+	return fmt.Sprintf("mean %.1f%%, lowest day %.1f%%, highest day %.1f%%", mean, lo, hi)
 }
 
 // ---------------------------------------------------------------------------
 // graphs
 // ---------------------------------------------------------------------------
 
-// drawPercentGraph draws hourly percentages on 0 to 100 in the window the
+// drawPercentGraph draws a percentage per bucket on 0 to 100 in the window the
 // report stands in: QNTX's accent over its fill, a rule at every quarter and
-// at every UTC midnight. An hour with no sample is a gap, not a fall to zero.
+// at every UTC midnight. A bucket with no sample is a gap, not a fall to zero.
 func drawPercentGraph(points []sentryread.Point) ([]byte, error) {
 	ink, err := services.MailGraphColours()
 	if err != nil {

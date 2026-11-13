@@ -124,13 +124,14 @@ backup_interval_seconds = 3600
 # Default: 0
 # traces_sample_rate = 1.0
 
-# Reading back what was shipped, for the weekly report (ADR-042). All
-# four, or the report leaves Sentry out and says which is missing.
-# read_token is a token that may read events — never a literal.
-# read_token   = "ssm:///path/to/sentry/read-token"
+# Reading back what was shipped, for the weekly report (ADR-042). The
+# report asks the Sentry MCP server the node consumes, named sentry
+# (mcp connect sentry https://mcp.sentry.dev/mcp); the node holds no
+# Sentry token. All three, or the report leaves Sentry out and says
+# which is missing.
 # api          = "https://<region>.sentry.io"
 # organization = "<org slug>"
-# project      = "<project id, the last segment of the DSN>"
+# project      = "<project slug or id>"
 
 # ════════════════════════════════════════════════════════════════
 # Mail (ADR-041, ADR-042)

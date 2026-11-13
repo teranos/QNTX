@@ -29,6 +29,9 @@ import (
 const (
 	reportWeek       = 7 * 24 * time.Hour
 	reportThreeWeeks = 21 * 24 * time.Hour
+	// A series is a day a bucket: Sentry's MCP answers a period back from now, so each bucket is one more question
+	// (report_sentry.go), and a day is seven of them a week.
+	reportBucket = 24 * time.Hour
 	// The ranked sections: "top 3 4xx, top 3 5xx", "top 3 handler failures".
 	reportTop = 3
 )
@@ -408,11 +411,11 @@ func metricQuery(name, kind, env string) string {
 // "CPU over 7 days graph", "MEM over 7 days graph", "host swap over 7d graph"
 func gaugeSeries(ctx context.Context, sentry sentryAsker, name, env string, w sentryread.Window) series {
 	points, err := sentry.Series(ctx, sentryread.SeriesQuery{
-		Dataset:  sentryread.DatasetMetrics,
-		YAxis:    "avg(value," + name + ",gauge,-)",
-		Query:    metricQuery(name, "gauge", env),
-		Interval: "1h",
-		Window:   w,
+		Dataset: sentryread.DatasetMetrics,
+		YAxis:   "avg(value," + name + ",gauge,-)",
+		Query:   metricQuery(name, "gauge", env),
+		Bucket:  reportBucket,
+		Window:  w,
 	})
 	if err != nil {
 		return series{Err: err.Error()}
@@ -585,28 +588,28 @@ func errorLinesIn(ctx context.Context, sentry sentryAsker, env string, w sentryr
 
 // "downtime over last week", "downtime over last 3 weeks"
 //
-// Minutes without a CPU sample, counted a whole hour at a time up to the start
-// of the current hour, which is not over yet.
+// Minutes without a CPU sample, counted a whole day at a time back from now.
 func downtimeUpTo(ctx context.Context, sentry sentryAsker, env string, now time.Time) downtime {
-	end := now.UTC().Truncate(time.Hour)
+	end := now.UTC()
 	w := sentryread.Window{Start: end.Add(-reportThreeWeeks), End: end}
 	points, err := sentry.Series(ctx, sentryread.SeriesQuery{
-		Dataset:  sentryread.DatasetMetrics,
-		YAxis:    "count(value,qntx.host.cpu,gauge,-)",
-		Query:    metricQuery("qntx.host.cpu", "gauge", env),
-		Interval: "1h",
-		Window:   w,
+		Dataset: sentryread.DatasetMetrics,
+		YAxis:   "count(value,qntx.host.cpu,gauge,-)",
+		Query:   metricQuery("qntx.host.cpu", "gauge", env),
+		Bucket:  reportBucket,
+		Window:  w,
 	})
 	if err != nil {
 		return downtime{Err: err.Error()}
 	}
-	return downtimeFrom(points, end)
+	return downtimeFrom(points, end, reportBucket)
 }
 
-// downtimeFrom reads hourly sample counts. An hour holds sixty samples when the
-// node was up all of it. Hours before the first sample Sentry holds are not
-// counted: no data yet is not down.
-func downtimeFrom(points []sentryread.Point, end time.Time) downtime {
+// downtimeFrom reads a sample count per bucket. A bucket holds a sample a minute
+// when the node was up all of it. Buckets before the first sample Sentry holds
+// are not counted: no data yet is not down.
+func downtimeFrom(points []sentryread.Point, end time.Time, bucket time.Duration) downtime {
+	minutes := int(bucket / time.Minute)
 	var d downtime
 	weekStart := end.Add(-reportWeek)
 	started := false
@@ -621,7 +624,7 @@ func downtimeFrom(points []sentryread.Point, end time.Time) downtime {
 			started = true
 			d.Since = p.At
 		}
-		missing := 60 - int(math.Round(p.Value))
+		missing := minutes - int(math.Round(p.Value))
 		if missing < 0 {
 			missing = 0
 		}

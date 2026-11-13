@@ -218,12 +218,12 @@ type SentryConfig struct {
 	// as prose. 0 ships none. 1 ships all.
 	TracesSampleRate float64 `mapstructure:"traces_sample_rate"`
 
-	// Reading back what the node shipped, for the weekly report (ADR-042). All
-	// four or the report says which is missing and leaves Sentry out.
-	ReadTokenRef string `mapstructure:"read_token"`   // ssm:// or env: reference to a Sentry token that may read events — a literal is rejected
-	API          string `mapstructure:"api"`          // The API origin the organization lives in (e.g. "https://de.sentry.io")
+	// Reading back what the node shipped, for the weekly report (ADR-042), through the Sentry MCP server the
+	// node consumes, named sentry (mcp connect): "the node gives Agents access to the MCP of Sentry". No token:
+	// "ADR-025 is DEAD ok?" All three, or the report says which is missing and leaves Sentry out.
+	API          string `mapstructure:"api"`          // The region the organization lives in (e.g. "https://de.sentry.io")
 	Organization string `mapstructure:"organization"` // The organization's slug
-	Project      string `mapstructure:"project"`      // The project's id: the last segment of the DSN
+	Project      string `mapstructure:"project"`      // The project's slug or id
 }
 
 // LLMConfig configures LLM request queuing and rate limiting at the core routing layer.

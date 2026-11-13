@@ -130,7 +130,7 @@ func TestDowntimeIsTheMinutesWithoutASample(t *testing.T) {
 		points = append(points, sentryread.Point{At: at, Value: count})
 	}
 
-	d := downtimeFrom(points, end)
+	d := downtimeFrom(points, end, time.Hour)
 	assert.Empty(t, d.Err)
 	assert.Equal(t, 5, d.WeekMinutes)
 	assert.Equal(t, 35, d.ThreeWeeksMinutes)
@@ -143,10 +143,10 @@ type answeringSentry struct{}
 
 func (answeringSentry) Series(_ context.Context, q sentryread.SeriesQuery) ([]sentryread.Point, error) {
 	var points []sentryread.Point
-	for at := q.Window.Start; at.Before(q.Window.End); at = at.Add(time.Hour) {
+	for at := q.Window.Start; at.Before(q.Window.End); at = at.Add(q.Bucket) {
 		v := 40.0
 		if strings.HasPrefix(q.YAxis, "count(") {
-			v = 60
+			v = q.Bucket.Minutes()
 		}
 		points = append(points, sentryread.Point{At: at, Value: v})
 	}
@@ -263,7 +263,7 @@ func TestTheGraphStandsInTheWindow(t *testing.T) {
 // have filled says why it is empty.
 func TestAReportWithoutSentrySaysWhy(t *testing.T) {
 	s := rootKnowingServer(t)
-	_, why := sentryReaderFrom(context.Background(), appcfg.SentryConfig{API: "https://sentry.example"})
+	_, why := sentryOver(appcfg.SentryConfig{API: "https://sentry.example"}, nil)
 	require.Error(t, why)
 
 	r := s.gatherReport(context.Background(), reportEnd, nil, why)
@@ -274,26 +274,22 @@ func TestAReportWithoutSentrySaysWhy(t *testing.T) {
 
 	// Why Sentry was not asked is said once, not under every section it
 	// would have filled.
-	assert.Equal(t, 1, strings.Count(nodeBody(t, mail, services.MailText), "sentry.read_token"), nodeBody(t, mail, services.MailText))
-	assert.Equal(t, 1, strings.Count(nodeBody(t, mail, services.MailHTML), "sentry.read_token"))
+	assert.Equal(t, 1, strings.Count(nodeBody(t, mail, services.MailText), "sentry.organization"), nodeBody(t, mail, services.MailText))
+	assert.Equal(t, 1, strings.Count(nodeBody(t, mail, services.MailHTML), "sentry.organization"))
 	assert.NotContains(t, nodeBody(t, mail, services.MailText), "CPU over 7 days")
 }
 
-// A token created after the node started is read by the next report: Sentry's
-// settings are resolved when the report is written, not once at boot.
-func TestSentryIsResolvedWhenTheReportIsWritten(t *testing.T) {
+// "ADR-025 is DEAD ok?"
+//
+// "And the node gives Agents access to the MCP of Sentry"
+//
+// A node that consumes no Sentry MCP server is not asked through a token: the report says it consumes none.
+func TestTheReportAsksSentryOnlyThroughTheNodesSentryMCP(t *testing.T) {
 	s := rootKnowingServer(t)
-	s.sentryConfig = appcfg.SentryConfig{API: "https://sentry.example", Organization: "garden", Project: "1234"}
-
-	t.Setenv("QNTX_TEST_SENTRY_TOKEN", "")
-	s.sentryConfig.ReadTokenRef = "env:QNTX_TEST_SENTRY_TOKEN"
+	s.sentryConfig = appcfg.SentryConfig{API: "https://de.sentry.io", Organization: "garden", Project: "qntx-go"}
 	_, why := s.sentryReader(context.Background())
 	require.Error(t, why)
-
-	t.Setenv("QNTX_TEST_SENTRY_TOKEN", "sntryu_read")
-	reader, why := s.sentryReader(context.Background())
-	require.NoError(t, why)
-	assert.Equal(t, "sntryu_read", reader.Token)
+	assert.Contains(t, why.Error(), "the node consumes no MCP server sentry")
 }
 
 // The report goes to the ROOT User's primary address, as the node's own mail.
@@ -313,10 +309,12 @@ func TestTheReportIsMailedToTheRootUser(t *testing.T) {
 		Recipients: services.Having[services.MailRecipients](s.mailRecipient), Records: s.mailRecords, Actor: services.MailActor("did:key:z6Mkgardennode")})
 	s.nodeMailer = mail
 
-	// Sentry is not set up here; the report says so and goes.
+	// Sentry is not set up here; the report says so and goes. No plugin holds rooms here either: the mail goes,
+	// and that the Node Room was not said to is the report's failure.
 	s.sentryConfig = appcfg.SentryConfig{}
 	sent, err := s.sendReport(context.Background())
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no Node Room")
 	assert.Equal(t, "root@garden.test", sent.GetTo())
 	require.Len(t, box.mails, 1)
 	assert.Equal(t, "root@garden.test", box.mails[0].To)
