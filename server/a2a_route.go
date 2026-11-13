@@ -515,7 +515,7 @@ func (s *QNTXServer) a2aCardAt(r *http.Request, tenant string) (agentCard, error
 		card.Name, card.Description, card.Tenant = "the element "+element, elements.GetDescription(), tenant
 		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: elements.GetTags(), Modes: turnModes}}
 	case s.isTheNodeAgentsName(tenant):
-		// The Node Agent's card, at its name: given to a caller the node admitted (§13.3).
+		// 「[Opus 5.5] The Node Agent's card, at its name: given to a caller the node admitted (§13.3).」
 		admission, admitted := auth.AdmissionFrom(r.Context())
 		if !admitted {
 			return agentCard{}, a2aRefusal(a2asdk.ErrUnauthenticated, "the extended agent card is given to a caller the node admitted, and this one came through no gate")
