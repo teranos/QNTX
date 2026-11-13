@@ -624,7 +624,7 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
 	mux.answer(deviceApprovePath, h.handleDeviceApprove)
 	mux.answer(deviceDonePath, h.handleDeviceDone)
-	// A key that was said yes to admits a session's key, signing as itself (ADR-059).
+	// 「[Fable 5.1] A key that was said yes to admits a session's key, signing as itself (ADR-059).」
 	mux.answer(admitPath, h.handleAdmit)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
