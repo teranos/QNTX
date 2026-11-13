@@ -198,13 +198,14 @@ type PeerConfig struct {
 }
 
 // ApnsConfig is how the node reaches a phone through Apple: the app it reaches
-// and the team's APNs auth key. The key itself is a file on the node, named
-// here and never written here.
+// and the team's APNs auth key. The key itself is kept where secrets are kept
+// and named here, as the identity providers' keys are. See internal/secretref.
 type ApnsConfig struct {
 	BundleID string `mapstructure:"bundle_id"` // The app's bundle id, which is the topic a notification is sent to.
 	KeyID    string `mapstructure:"key_id"`    // The id Apple gave the key.
 	TeamID   string `mapstructure:"team_id"`   // The Apple Developer team's id.
-	KeyFile  string `mapstructure:"key_file"`  // Where the .p8 is on the node. Empty = the node reaches no phone.
+	// PrivateKeyRef names the .p8 as Apple gave it: ssm:///path or env:VAR. Empty = the node reaches no phone.
+	PrivateKeyRef string `mapstructure:"private_key"`
 	// Development is whether the app the phones run was built for development:
 	// Apple takes its tokens at another host, and refuses them at the one a
 	// TestFlight or App Store build is reached at.

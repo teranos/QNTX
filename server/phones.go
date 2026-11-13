@@ -6,13 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/internal/apns"
+	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 )
@@ -53,14 +53,15 @@ func (s *QNTXServer) theNotifier() (notifier, error) {
 		return nil, errors.New("this node has no configuration, so no key to reach a phone with")
 	}
 	said := s.deps.cfg.Apns
-	if said.KeyFile == "" {
-		return nil, errors.New("am.toml names no [apns] key_file, so this node reaches no phone")
+	if said.PrivateKeyRef == "" {
+		return nil, errors.New("am.toml names no [apns] private_key, so this node reaches no phone")
 	}
-	p8, err := os.ReadFile(said.KeyFile)
+	// Named, never held in the config: resolved where the node keeps its secrets, when a phone is first told.
+	p8, err := secretref.Resolve(s.ctx, said.PrivateKeyRef)
 	if err != nil {
-		return nil, errors.Wrapf(err, "the APNs key at %s was not read", said.KeyFile)
+		return nil, errors.Wrap(err, "the APNs key [apns] private_key names was not read")
 	}
-	sender, err := apns.New(said.BundleID, apns.Key{P8: p8, KeyID: said.KeyID, TeamID: said.TeamID})
+	sender, err := apns.New(said.BundleID, apns.Key{P8: []byte(p8), KeyID: said.KeyID, TeamID: said.TeamID})
 	if err != nil {
 		return nil, err
 	}
