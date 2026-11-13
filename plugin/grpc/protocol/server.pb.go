@@ -2314,8 +2314,8 @@ type Vault struct {
 	// What still stands between this vault and its folders working: its copy
 	// not being on the box at path (#1091). Empty is nothing.
 	Setup string `protobuf:"bytes,6,opt,name=setup,proto3" json:"setup,omitempty"`
-	// The place in the vault agents' memory is kept at (ADR-055): one folder
-	// per Memory Store under it. Empty, the vault backs no memory.
+	// 「[Opus 5.5] The place in the vault agents' memory is kept at (ADR-055): one folder」
+	// 「[Opus 5.5] per Memory Store under it. Empty, the vault backs no memory.」
 	Memory        string `protobuf:"bytes,7,opt,name=memory,proto3" json:"memory,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2400,16 +2400,16 @@ func (x *Vault) GetMemory() string {
 	return ""
 }
 
-// Memory is one memory of a store: a note in the vault.
+// 「[Opus 5.5] Memory is one memory of a store: a note in the vault.」
 type Memory struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The store it is in.
+	// 「[Opus 5.5] The store it is in.」
 	Store string `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
-	// Its name: the note's, without .md.
+	// 「[Opus 5.5] Its name: the note's, without .md.」
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	// What it says, whole. Not sent where memories are listed.
+	// 「[Opus 5.5] What it says, whole. Not sent where memories are listed.」
 	Text string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
-	// When the note was last written, RFC3339.
+	// 「[Opus 5.5] When the note was last written, RFC3339.」
 	Modified      string `protobuf:"bytes,4,opt,name=modified,proto3" json:"modified,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2440,7 +2440,7 @@ func (x *Memory) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Memory.ProtoReflect.Descriptor instead.
+// 「[Fable 5.2] Deprecated: Use Memory.ProtoReflect.Descriptor instead.」
 func (*Memory) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{27}
 }
@@ -2473,13 +2473,13 @@ func (x *Memory) GetModified() string {
 	return ""
 }
 
-// Memories is what memory list answers, and what a sigil that changes a store
-// answers after it.
+// 「[Opus 5.5] Memories is what memory list answers, and what a sigil that changes a store」
+// 「[Opus 5.5] answers after it.」
 type Memories struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The store they are of.
+	// 「[Fable 5.2] The store they are of.」
 	Store string `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
-	// Every memory of the store, by name. Each without its text.
+	// 「[Opus 5.5] Every memory of the store, by name. Each without its text.」
 	Memories      []*Memory `protobuf:"bytes,2,rep,name=memories,proto3" json:"memories,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2510,7 +2510,7 @@ func (x *Memories) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Memories.ProtoReflect.Descriptor instead.
+// 「[Fable 5.2] Deprecated: Use Memories.ProtoReflect.Descriptor instead.」
 func (*Memories) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{28}
 }
@@ -2529,15 +2529,15 @@ func (x *Memories) GetMemories() []*Memory {
 	return nil
 }
 
-// MemoryStore is one agent's memory, as the node holds it.
+// 「[Opus 5.5] MemoryStore is one agent's memory, as the node holds it.」
 type MemoryStore struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The store's name: the name its agent holds (i name), or what the node
-	// calls an agent that holds none.
+	// 「[Opus 5.5] The store's name: the name its agent holds (i name), or what the node」
+	// 「[Opus 5.5] calls an agent that holds none.」
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// How many memories it holds.
+	// 「[Opus 5.5] How many memories it holds.」
 	Memories int32 `protobuf:"varint,2,opt,name=memories,proto3" json:"memories,omitempty"`
-	// Where it is in the vault.
+	// 「[Opus 5.5] Where it is in the vault.」
 	Place         string `protobuf:"bytes,3,opt,name=place,proto3" json:"place,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2568,7 +2568,7 @@ func (x *MemoryStore) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MemoryStore.ProtoReflect.Descriptor instead.
+// 「[Fable 5.2] Deprecated: Use MemoryStore.ProtoReflect.Descriptor instead.」
 func (*MemoryStore) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{29}
 }
@@ -2594,14 +2594,14 @@ func (x *MemoryStore) GetPlace() string {
 	return ""
 }
 
-// MemoryStores is what memory stores answers.
+// 「[Opus 5.5] MemoryStores is what memory stores answers.」
 type MemoryStores struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The vault that backs memory, by its name.
+	// 「[Fable 5.2] The vault that backs memory, by its name.」
 	Vault string `protobuf:"bytes,1,opt,name=vault,proto3" json:"vault,omitempty"`
-	// The place in that vault memory is kept at.
+	// 「[Fable 5.2] The place in that vault memory is kept at.」
 	Place string `protobuf:"bytes,2,opt,name=place,proto3" json:"place,omitempty"`
-	// Every store under that place, one per folder.
+	// 「[Fable 5.2] Every store under that place, one per folder.」
 	Stores        []*MemoryStore `protobuf:"bytes,3,rep,name=stores,proto3" json:"stores,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2632,7 +2632,7 @@ func (x *MemoryStores) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MemoryStores.ProtoReflect.Descriptor instead.
+// 「[Fable 5.2] Deprecated: Use MemoryStores.ProtoReflect.Descriptor instead.」
 func (*MemoryStores) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{30}
 }

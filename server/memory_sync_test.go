@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// "I OPEN MY OBSIDIAN, I SEE LIVE STATE OF AGENT MEMORY"
-// "I CAN EDIT IT, IT GOES TO QNTX, IT GOES TO AGENT MEMORY"
-// "AND AGENT MEMORIES COME BACK VIA QNTX TO THE VAULT AS WELL"
+// "「[Opus 5.5] I OPEN MY OBSIDIAN, I SEE LIVE STATE OF AGENT MEMORY」"
+// "「[Opus 5.5] I CAN EDIT IT, IT GOES TO QNTX, IT GOES TO AGENT MEMORY」"
+// "「[Opus 5.5] AND AGENT MEMORIES COME BACK VIA QNTX TO THE VAULT AS WELL」"
 
-// memoryOfAnAgent is a node whose vault backs memory at Minds, and an agent it
-// runs in home, whose Claude Code keeps memory for its work directory.
+// 「[Opus 5.5] memoryOfAnAgent is a node whose vault backs memory at Minds, and an agent it」
+// 「[Opus 5.5] runs in home, whose Claude Code keeps memory for its work directory.」
 func memoryOfAnAgent(t *testing.T) (s *QNTXServer, harness, vault, held string) {
 	t.Helper()
 	s, kept := memoryServer(t)
@@ -40,7 +40,7 @@ func gone(t *testing.T, dir, note string) {
 	assert.True(t, os.IsNotExist(err), "%s is still in %s", note, dir)
 }
 
-// What the agent's harness holds is in the vault: its live state.
+// 「[Opus 5.5] What the agent's harness holds is in the vault: its live state.」
 func TestTheLiveStateOfAgentMemoryIsInTheVault(t *testing.T) {
 	s, harness, vault, held := memoryOfAnAgent(t)
 	require.NoError(t, os.WriteFile(filepath.Join(harness, "frost.md"), []byte("Cover the beds.\n"), 0o644))
@@ -49,46 +49,46 @@ func TestTheLiveStateOfAgentMemoryIsInTheVault(t *testing.T) {
 	assert.Equal(t, "Cover the beds.\n", noteSays(t, vault, "frost.md"))
 	assert.Equal(t, "Cover the beds.\n", noteSays(t, held, "frost.md"), "the node does not hold what it carried")
 
-	// The agent writes on: the vault follows.
+	// 「[Opus 5.5] The agent writes on: the vault follows.」
 	require.NoError(t, os.WriteFile(filepath.Join(harness, "frost.md"), []byte("Cover the beds before November.\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(harness, "pond.md"), []byte("Drained in March.\n"), 0o644))
 	require.NoError(t, s.memoriesInStep())
 	assert.Equal(t, "Cover the beds before November.\n", noteSays(t, vault, "frost.md"))
 	assert.Equal(t, "Drained in March.\n", noteSays(t, vault, "pond.md"))
 
-	// The agent lets one go: it is gone from the vault.
+	// 「[Opus 5.5] The agent lets one go: it is gone from the vault.」
 	require.NoError(t, os.Remove(filepath.Join(harness, "pond.md")))
 	require.NoError(t, s.memoriesInStep())
 	gone(t, vault, "pond.md")
 	gone(t, held, "pond.md")
 }
 
-// What the person edits in the vault goes to the node, and to the agent's
-// memory in its harness.
+// 「[Opus 5.5] What the person edits in the vault goes to the node, and to the agent's」
+// 「[Opus 5.5] memory in its harness.」
 func TestAnEditInTheVaultIsTheAgentsMemory(t *testing.T) {
 	s, harness, vault, held := memoryOfAnAgent(t)
 	require.NoError(t, os.WriteFile(filepath.Join(harness, "frost.md"), []byte("Cover the beds.\n"), 0o644))
 	require.NoError(t, s.memoriesInStep())
 
-	// Edited.
+	// 「[Opus 5.5] Edited.」
 	require.NoError(t, os.WriteFile(filepath.Join(vault, "frost.md"), []byte("Never cover the beds.\n"), 0o644))
 	require.NoError(t, s.memoriesInStep())
 	assert.Equal(t, "Never cover the beds.\n", noteSays(t, held, "frost.md"), "the edit did not go to the node")
 	assert.Equal(t, "Never cover the beds.\n", noteSays(t, harness, "frost.md"), "the edit did not go to the agent's memory")
 
-	// Authored: a memory the agent never wrote.
+	// 「[Opus 5.5] Authored: a memory the agent never wrote.」
 	require.NoError(t, os.WriteFile(filepath.Join(vault, "rule.md"), []byte("Ask nobody for a key.\n"), 0o644))
 	require.NoError(t, s.memoriesInStep())
 	assert.Equal(t, "Ask nobody for a key.\n", noteSays(t, harness, "rule.md"))
 
-	// Erased: a memory the person deletes is held no more, anywhere.
+	// 「[Opus 5.5] Erased: a memory the person deletes is held no more, anywhere.」
 	require.NoError(t, os.Remove(filepath.Join(vault, "frost.md")))
 	require.NoError(t, s.memoriesInStep())
 	gone(t, harness, "frost.md")
 	gone(t, held, "frost.md")
 }
 
-// Written on both sides since the node last held it, the person's stands.
+// 「[Opus 5.5] Written on both sides since the node last held it, the person's stands.」
 func TestThePersonsEditStandsOverTheAgents(t *testing.T) {
 	s, harness, vault, _ := memoryOfAnAgent(t)
 	require.NoError(t, os.WriteFile(filepath.Join(harness, "frost.md"), []byte("Cover the beds.\n"), 0o644))
@@ -101,7 +101,7 @@ func TestThePersonsEditStandsOverTheAgents(t *testing.T) {
 	assert.Equal(t, "The person's.\n", noteSays(t, vault, "frost.md"))
 }
 
-// In step, a second pass moves nothing.
+// 「[Opus 5.5] In step, a second pass moves nothing.」
 func TestInStepNothingMoves(t *testing.T) {
 	s, harness, vault, _ := memoryOfAnAgent(t)
 	require.NoError(t, os.WriteFile(filepath.Join(harness, "frost.md"), []byte("Cover the beds.\n"), 0o644))
@@ -115,20 +115,20 @@ func TestInStepNothingMoves(t *testing.T) {
 	assert.Zero(t, toHarness+toVault, "memories moved between two sides that were in step")
 }
 
-// A vault whose copy is not on the box is no vault with every memory deleted:
-// the agent keeps what it holds, and the node says why nothing was done.
+// 「[Opus 5.5] A vault whose copy is not on the box is no vault with every memory deleted:」
+// 「[Opus 5.5] the agent keeps what it holds, and the node says why nothing was done.」
 func TestAVaultThatIsNotThereForgetsNothing(t *testing.T) {
 	s, harness, vault, _ := memoryOfAnAgent(t)
 	require.NoError(t, os.WriteFile(filepath.Join(harness, "frost.md"), []byte("Cover the beds.\n"), 0o644))
 	require.NoError(t, s.memoriesInStep())
 
-	// The store's folder alone goes: it is written again from what the node holds.
+	// 「[Opus 5.5] The store's folder alone goes: it is written again from what the node holds.」
 	require.NoError(t, os.RemoveAll(vault))
 	require.NoError(t, s.memoriesInStep())
 	assert.Equal(t, "Cover the beds.\n", noteSays(t, harness, "frost.md"), "the agent forgot what a missing folder never asked it to")
 	assert.Equal(t, "Cover the beds.\n", noteSays(t, vault, "frost.md"))
 
-	// The whole copy goes.
+	// 「[Opus 5.5] The whole copy goes.」
 	kept, _, refused := s.memoryKept()
 	require.Nil(t, refused)
 	require.NoError(t, os.RemoveAll(kept.Path))
@@ -138,7 +138,7 @@ func TestAVaultThatIsNotThereForgetsNothing(t *testing.T) {
 	assert.Equal(t, "Cover the beds.\n", noteSays(t, harness, "frost.md"))
 }
 
-// A node whose vault backs no memory keeps nothing in step and writes nowhere.
+// 「[Opus 5.5] A node whose vault backs no memory keeps nothing in step and writes nowhere.」
 func TestNoVaultBackingMemoryMovesNothing(t *testing.T) {
 	s, _ := vaultBindingServer(t)
 	home := t.TempDir()

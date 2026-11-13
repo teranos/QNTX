@@ -43,8 +43,8 @@ type Vault struct {
 	// Sends is, by place, the branch the vault's changes there are committed
 	// to. A place not in it sends nothing: it is opted into, never assumed.
 	Sends map[string]string `json:"sends"`
-	// Memory is the place in the vault agents' memory is kept at (ADR-055):
-	// one folder per Memory Store under it. Empty, the vault backs none.
+	// 「[Fable 5.2] Memory is the place in the vault agents' memory is kept at (ADR-055):」
+	// 「[Fable 5.2] one folder per Memory Store under it. Empty, the vault backs none.」
 	Memory string `json:"memory"`
 }
 
