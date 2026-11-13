@@ -32,7 +32,7 @@ pub enum Object {
     Namespace,
     Namespaces,
     NamespaceDefinition,
-    /// A DuckDB a subsystem holds for itself, in a file of the node's.
+    /// 「[Opus 5.5] A DuckDB a subsystem holds for itself, in a file of the node's.」
     Held,
 }
 

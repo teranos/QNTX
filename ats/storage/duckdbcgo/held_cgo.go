@@ -18,22 +18,22 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// Held is a DuckDB a subsystem holds for itself (crates/ats-duckdb/src/held.rs):
-// its own tables, made by its own migrations, in one file of the node's.
+// 「[Opus 5.5] Held is a DuckDB a subsystem holds for itself (crates/ats-duckdb/src/held.rs):」
+// 「[Opus 5.5] its own tables, made by its own migrations, in one file of the node's.」
 type Held struct {
 	ptr  unsafe.Pointer // *C.HeldDb
 	path string
 	mu   sync.Mutex
 }
 
-// HeldMigration is one of a subsystem's migrations: its version, and its SQL.
+// 「[Opus 5.5] HeldMigration is one of a subsystem's migrations: its version, and its SQL.」
 type HeldMigration struct {
 	Version string `json:"version"`
 	SQL     string `json:"sql"`
 }
 
-// OpenHeld opens the DuckDB at path, making it when there is none, and applies
-// the migrations not yet applied, in order. One process holds a file once.
+// 「[Opus 5.5] OpenHeld opens the DuckDB at path, making it when there is none, and applies」
+// 「[Opus 5.5] the migrations not yet applied, in order. One process holds a file once.」
 func OpenHeld(path string, migrations []HeldMigration) (*Held, error) {
 	body, err := json.Marshal(append(make([]HeldMigration, 0, len(migrations)), migrations...))
 	if err != nil {
@@ -52,7 +52,7 @@ func OpenHeld(path string, migrations []HeldMigration) (*Held, error) {
 	return &Held{ptr: unsafe.Pointer(ptr), path: path}, nil
 }
 
-// Close releases the DuckDB.
+// 「[Opus 5.5] Close releases the DuckDB.」
 func (h *Held) Close() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -62,8 +62,8 @@ func (h *Held) Close() {
 	}
 }
 
-// Exec runs SQL answering no rows, params bound in order, and answers how many
-// rows it changed. With no params, sql may hold several statements.
+// 「[Opus 5.5] Exec runs SQL answering no rows, params bound in order, and answers how many」
+// 「[Opus 5.5] rows it changed. With no params, sql may hold several statements.」
 func (h *Held) Exec(sql string, params ...any) (int, error) {
 	cSQL, cParams, err := h.statement(sql, params)
 	if err != nil {
@@ -85,8 +85,8 @@ func (h *Held) Exec(sql string, params ...any) (int, error) {
 	return int(result.count), nil
 }
 
-// Query runs SQL, params bound in order, and decodes the rows it answered,
-// a JSON array of objects by column name, into into.
+// 「[Opus 5.5] Query runs SQL, params bound in order, and decodes the rows it answered,」
+// 「[Opus 5.5] a JSON array of objects by column name, into into.」
 func (h *Held) Query(into any, sql string, params ...any) error {
 	cSQL, cParams, err := h.statement(sql, params)
 	if err != nil {

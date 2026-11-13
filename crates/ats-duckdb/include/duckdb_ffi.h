@@ -446,7 +446,7 @@ SchemaResultC duckdb_schema_tables(void);
 void duckdb_schema_result_free(SchemaResultC result);
 
 /* A DuckDB a subsystem holds for itself (crates/ats-duckdb/src/held.rs): its
- * own tables, made by its own migrations, in one file of the node's. */
+ * 「[Opus 5.5] own tables, made by its own migrations, in one file of the node's. */」
 
 typedef struct HeldDb HeldDb;
 
@@ -457,17 +457,17 @@ typedef struct {
 } HeldResultC;
 
 /** Open the DuckDB at path and apply migrations_json, a JSON array of
- *  {"version","sql"}, those not yet applied, in order. NULL on failure, the
- *  reason in error_out. Free with duckdb_held_free. */
+ *  「[Opus 5.5] {"version","sql"}, those not yet applied, in order. NULL on failure, the」
+ *  「[Opus 5.5] reason in error_out. Free with duckdb_held_free. */」
 HeldDb *duckdb_held_new(const char *path, const char *migrations_json, char **error_out);
 void    duckdb_held_free(HeldDb *held);
 
 /** Run SQL answering no rows. params_json is a JSON array bound in order;
- *  with none, the SQL may hold several statements. count is the rows changed. */
+ *  「[Opus 5.5] with none, the SQL may hold several statements. count is the rows changed. */」
 CountResultC duckdb_held_exec(const HeldDb *held, const char *sql, const char *params_json);
 
 /** The rows SQL answers, as a JSON array of objects by column name in
- *  rows_json. Free with duckdb_held_result_free. */
+ *  「[Opus 5.5] rows_json. Free with duckdb_held_result_free. */」
 HeldResultC  duckdb_held_query(const HeldDb *held, const char *sql, const char *params_json);
 void         duckdb_held_result_free(HeldResultC result);
 
