@@ -345,9 +345,9 @@ func TestATakenTaskOutlastsTheQuietLimit(t *testing.T) {
 	assert.Equal(t, "TASK_STATE_WORKING", taskStateIn(still), "taken and waiting, it was ended as quiet")
 }
 
-// What a ground took off the row before the node stopped waits on after the
-// restart: the agent saying it received it then is it received, and it is not
-// ended as lost with the row.
+// 「[Fable 5.2] What a ground took off the row before the node stopped waits on after the」
+// 「[Fable 5.2] restart: the agent saying it received it then is it received, and it is not」
+// 「[Fable 5.2] ended as lost with the row.」
 func TestWhatAGroundTookOutlivesARestart(t *testing.T) {
 	srv, root := namedOverA2A(t)
 	code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/Birch/message:send", saidToTheNode("before the restart", `{"returnImmediately": true}`), root)

@@ -403,13 +403,13 @@ func lettersApart(a, b string) int {
 	return row[len(b)]
 }
 
-// awaitReceived waits on, after a restart, for the agent to say it received
-// what a ground took off the row at takenAt: the item is found by its id
-// again, off the row, and the Task is ended as the turn that waited on it
-// would have ended it.
+// 「[Fable 5.2] awaitReceived waits on, after a restart, for the agent to say it received」
+// 「[Fable 5.2] what a ground took off the row at takenAt: the item is found by its id」
+// 「[Fable 5.2] again, off the row, and the Task is ended as the turn that waited on it」
+// 「[Fable 5.2] would have ended it.」
 //
-// Kwikwi's Task ended as not received when q restarted for a deploy, with the
-// words already in the session's hands on k.
+// 「[Fable 5.2] Kwikwi's Task ended as not received when q restarted for a deploy, with the」
+// 「[Fable 5.2] words already in the session's hands on k.」
 func (s *QNTXServer) awaitReceived(did, id string, takenAt time.Time) {
 	lines, called, addressee := s.systemTasks(did), did, did
 	if names, err := s.agentNames(); err == nil {
@@ -438,7 +438,7 @@ func (s *QNTXServer) awaitReceived(did, id string, takenAt time.Time) {
 		end(a2asdk.TaskStateFailed, "", "a ground took it off the status row, and nothing says "+called+" received it within "+receivedWithin.String())
 		return
 	}
-	// Off the row: its time there is over, and it is found by its id.
+	// 「[Fable 5.2] Off the row: its time there is over, and it is found by its id.」
 	s.news.Leave(statusline.News{
 		ID: id, For: addressee, Quiet: true,
 		Item:   statusline.StatusItem{Name: "to " + called, Symbol: statusline.SymbolWell},

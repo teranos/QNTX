@@ -682,7 +682,7 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 		if held, seen := newest[id]; !seen || line.Timestamp.After(held.Timestamp) {
 			newest[id] = line
 		}
-		// A Task said to a name says so on its first line, and on no other.
+		// 「[Fable 5.2] A Task said to a name says so on its first line, and on no other.」
 		if slices.Contains(line.Contexts, saidToANameContext) {
 			toAName[id] = true
 		}
@@ -697,15 +697,15 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 		}
 		did := s.agentOfLine(line)
 		if toAName[id] {
-			// What a ground took off the row before the node stopped is in
-			// that ground's store, on its way to the session: the Task waits
-			// on for the agent to say it received it, as it did before.
+			// 「[Fable 5.2] What a ground took off the row before the node stopped is in」
+			// 「[Fable 5.2] that ground's store, on its way to the session: the Task waits」
+			// 「[Fable 5.2] on for the agent to say it received it, as it did before.」
 			if a2asdk.TaskState(line.Predicates[0]) == a2asdk.TaskStateWorking {
 				s.awaitReceived(did, id, line.Timestamp)
 				continue
 			}
-			// Never taken, it was on the status row, which the node that
-			// stopped held in memory: it is on no row now, and was not received.
+			// 「[Fable 5.2] Never taken, it was on the status row, which the node that」
+			// 「[Fable 5.2] stopped held in memory: it is on no row now, and was not received.」
 			said = "the node stopped while it was on the status row, and it was not received"
 		}
 		if err := s.endTask(s.systemTasks(did), id, a2asdk.TaskStateFailed, did, "", "", said); err != nil {
