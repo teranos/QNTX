@@ -232,6 +232,11 @@ REACH is '/auth/mcp/return'                                               of ANY
 # element", which the handler asks of the admission: a token is refused.
 REACH is '/api/approvals' '/api/approvals/answer'                         of ROOT
 
+# The phone that is told what is about to be said to an agent (phones.go): its
+# app hands the node its push token. The human's own session, and no token's,
+# which the handler asks of the admission as an approval's answer does.
+REACH is '/api/phones'                                                    of ROOT
+
 # A2A over HTTP+JSON, one line for every operation: a route like
 # /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the
 # foreseeable future" (ADR-039); a2a:<signum> lines say who reaches a skill.
