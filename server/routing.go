@@ -67,6 +67,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// tool; the reach table names it of ROOT.
 	s.answer(approvalsAnswerPath, s.HandleApprovalAnswer)
 
+	// The phone that is told what waits (phones.go): the app hands the node its
+	// token in ROOT's own session. A route and no sigil, as an approval's answer is.
+	s.answer(phonesPath, s.HandlePhone)
+
 	// A staand answers the public pixel on /s/{namespace}/{slug} (ADR-035). The
 	// handler reads the market and the slug off the path.
 	s.answer(staandPathPrefix, s.HandleStaand)
@@ -139,7 +143,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/prompt/", s.HandlePrompt)                                           // Prompt operations (preview/execute/list/save/get/versions)
 	s.answer("/api/plugins/{name}/logs", s.HandlePluginLogs)                           // Plugin log stream (SSE)
 	s.answer("/api/agent/live", s.HandleNodeAgentLive)                                 // The Node Agent's turn as it prints it (SSE)
-	s.answer("/api/elements/{element}/live", s.HandleElementLive)                     // An element agent's turn as it prints it (SSE)
+	s.answer("/api/elements/{element}/live", s.HandleElementLive)                      // An element agent's turn as it prints it (SSE)
 	s.answer("/api/plugins/{name}/config", s.HandlePluginConfig)                       // Plugin configuration (GET/PUT)
 	s.answer("/am/statusline", s.statusLine)                                           // What a status line draws (GET)
 	s.answer("/api/types/", s.HandleTypes)                                             // Get specific type (GET /api/types/{typename})

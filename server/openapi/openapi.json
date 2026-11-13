@@ -577,6 +577,11 @@
         "ROOT"
       ]
     },
+    "/api/phones": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/plugins": {
       "x-qntx-reach": [
         "ROOT",
