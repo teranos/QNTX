@@ -18,12 +18,12 @@ import (
 //
 // An approval that waits on ROOT is a Live Activity, the same shape a batch
 // is (phones.go): the pull request, its checks as segments, and ROOT's
-// answers as presses. It is started when it moves: asked, or a check on its
-// head changed, within shownBefore of now. One that has waited longer than
-// that is not put in front of ROOT anew, and a phone named today is not
-// handed every pull request that was already open. Started, it stands until
-// ROOT answers it or it is over, showing its checks as they run; its presses
-// are there once it can be decided (ADR-052).
+// 「[Fable 5.2] answers as presses. It is started when it moves: asked, or a check on its」
+// 「[Fable 5.2] head changed, within shownBefore of now. One that has waited longer than」
+// 「[Fable 5.2] that is not put in front of ROOT anew, and a phone named today is not」
+// 「[Fable 5.2] handed every pull request that was already open. Started, it stands until」
+// 「[Fable 5.2] ROOT answers it or it is over, showing its checks as they run; its presses」
+// 「[Fable 5.2] are there once it can be decided (ADR-052).」
 
 // begunSubject is what the lines about Live Activities the node started are
 // about. Each line's predicate names one phone and one thing that waits, and
