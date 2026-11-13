@@ -214,6 +214,11 @@ func aPersonSpeaks(r *http.Request) bool {
 	if r.Context().Value(deliversCollected{}) != nil {
 		return true
 	}
+	// "I said it here. Release it."
+	// An agent in a turn a person started acts on that person's word.
+	if r.Context().Value(onAPersonsWord{}) != nil {
+		return true
+	}
 	admitted, gated := auth.AdmissionFrom(r.Context())
 	if !gated {
 		// A node with no gate admits nobody, and whoever speaks there is its
@@ -223,6 +228,13 @@ func aPersonSpeaks(r *http.Request) bool {
 	}
 	_, noAgent := itsOwnDID(admitted)
 	return noAgent != nil
+}
+
+// startedByAPerson is whether a turn asked for by r is a person talking to the
+// agent. A delivery of what was collected is the node's, whoever released it:
+// a turn it starts speaks for no one.
+func startedByAPerson(r *http.Request) bool {
+	return aPersonSpeaks(r) && r.Context().Value(deliversCollected{}) == nil
 }
 
 // collect keeps what an agent said to another, to be delivered with what else
