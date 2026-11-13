@@ -227,12 +227,12 @@ func TestTheReportIsSaidInTheNodeRoom(t *testing.T) {
 	mail, err := renderReport(s.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil))
 	require.NoError(t, err)
 
-	require.NoError(t, sayReportIn(context.Background(), rooms, "switchai-py", "did:key:z6Mkgardennode", mail))
+	require.NoError(t, sayReportIn(context.Background(), rooms, "switchai-py", mail))
 	require.Len(t, rooms.said, 1)
 	said := rooms.said[0]
 	assert.Equal(t, "3479956d", said.GetRoom())
 	assert.Equal(t, "switchai-py", said.GetProvider())
-	assert.Equal(t, "did:key:z6Mkgardennode", said.GetBy().GetDid())
+	assert.Nil(t, said.GetBy(), "the report named someone to say it, whom the room would take for a person at the node")
 	assert.Equal(t, mail.Subject, said.GetBody())
 
 	require.Len(t, said.GetFiles(), 1+len(mail.Inline))
@@ -248,7 +248,7 @@ func TestTheReportIsSaidInTheNodeRoom(t *testing.T) {
 // A provider that holds no Node Room is the report's failure, said, and nothing is posted elsewhere.
 func TestNoNodeRoomIsSaid(t *testing.T) {
 	rooms := &commentsRoom{t: t, list: []*protocol.Room{{Id: "telegram-chat", Name: "Elsewhere"}}}
-	err := sayReportIn(context.Background(), rooms, "switchai-py", "did:key:z6Mkgardennode", services.NodeMail{Subject: "QNTX week"})
+	err := sayReportIn(context.Background(), rooms, "switchai-py", services.NodeMail{Subject: "QNTX week"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "the provider holds no Node Room")
 	assert.Empty(t, rooms.said)

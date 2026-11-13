@@ -95,15 +95,16 @@ func (s *QNTXServer) sayReportInNodeRoom(ctx context.Context, mail services.Node
 	if refused != nil {
 		return errors.Newf("the report has no Node Room to be said in: %s", refused.GetSays())
 	}
-	return sayReportIn(ctx, rooms, provider, s.nodeActor(), mail)
+	return sayReportIn(ctx, rooms, provider, mail)
 }
-
-// reportSaidBy is who says the report in the Node Room: the node, which wrote it.
-const reportSaidBy = "QNTX"
 
 // sayReportIn says the report in the Node Room provider holds, as the node: what the mail is called, with the
 // report whole as text and its graphs beside it.
-func sayReportIn(ctx context.Context, rooms protocol.RoomsServiceClient, provider, node string, mail services.NodeMail) error {
+//
+// It names nobody as who says it. A room's provider says what nobody is named for as the node itself, under the
+// name the node has there (qntx-node in switchai-py); a name it does not hold it takes for a person at the node,
+// registers and brings into the room.
+func sayReportIn(ctx context.Context, rooms protocol.RoomsServiceClient, provider string, mail services.NodeMail) error {
 	target, err := nodeRoomForComments(ctx, rooms, provider)
 	if err != nil {
 		return errors.Wrap(err, "the report has no Node Room to be said in")
@@ -117,7 +118,7 @@ func sayReportIn(ctx context.Context, rooms protocol.RoomsServiceClient, provide
 		files = append(files, &protocol.RoomFile{Name: img.FileName, Type: img.ContentType, Data: img.Data})
 	}
 	if _, err := rooms.PostToRoom(ctx, &protocol.PostToRoomRequest{
-		Provider: provider, Room: target.Room, By: &protocol.RoomAgent{Did: node, Name: reportSaidBy}, Body: mail.Subject, Files: files,
+		Provider: provider, Room: target.Room, Body: mail.Subject, Files: files,
 	}); err != nil {
 		return errors.Wrap(err, "the report was not said in the Node Room")
 	}
