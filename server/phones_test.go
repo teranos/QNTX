@@ -228,9 +228,9 @@ func TestWithNoPhoneNothingIsToldAndNothingFails(t *testing.T) {
 	require.NoError(t, srv.announceDue(context.Background(), time.Now().Add(6*time.Hour-10*time.Minute)))
 }
 
-// An agent in a turn a person started speaks for them where what is collected
-// is concerned. It names no phone all the same: neither by its own key on the
-// person's word, nor as the person themselves through its door.
+// 「[Fable 5.2] An agent in a turn a person started speaks for them where what is collected」
+// 「[Fable 5.2] is concerned. It names no phone all the same: neither by its own key on the」
+// 「[Fable 5.2] person's word, nor as the person themselves through its door.」
 func TestAnAgentOnAPersonsWordNamesNoPhone(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
