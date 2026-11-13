@@ -462,6 +462,36 @@
         "ROOT"
       ]
     },
+    "/api/memory": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/keep": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}/merge": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}/{memory}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}/{memory}/forget": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/namespaces": {
       "x-qntx-reach": [
         "ROOT",
