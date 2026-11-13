@@ -214,6 +214,11 @@ func aPersonSpeaks(r *http.Request) bool {
 	if r.Context().Value(deliversCollected{}) != nil {
 		return true
 	}
+	// "I said it here. Release it."
+	// An agent in a turn a person started acts on that person's word.
+	if r.Context().Value(onAPersonsWord{}) != nil {
+		return true
+	}
 	admitted, gated := auth.AdmissionFrom(r.Context())
 	if !gated {
 		// A node with no gate admits nobody, and whoever speaks there is its

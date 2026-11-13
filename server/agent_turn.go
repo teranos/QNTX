@@ -94,6 +94,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 
 	t.in.answering.Store(&turnInSession{session: session})
 	defer t.in.answering.Store(nil)
+	defer s.aPersonsTurn(agent.did, aPersonSpeaks(caller))()
 
 	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: t.effort, element: t.element, screenshot: t.screenshot}
 	write, unwritten := s.sessionRows(agent, store, session, t.called)
