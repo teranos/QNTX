@@ -106,8 +106,8 @@ func TestAFolderNamedAsAStoryIsBoundAsAFolder(t *testing.T) {
 	assert.Equal(t, story, readNote(t, vault, "Course Material/13-user-connects-obsidian.feature.md"))
 }
 
-// "in reality its still one story"
-// What a repository's folder offers to be bound: its folders, and its notes and stories beside them.
+// "「[Opus 5.5] in reality its still one story」"
+// 「[Opus 5.5] What a repository's folder offers to be bound: its folders, and its notes and stories beside them.」
 func TestARepositoryFolderOffersItsFoldersNotesAndStories(t *testing.T) {
 	s, _ := vaultBindingServer(t)
 	mainNotes["docs/adr/13-root-connects-obsidian.feature"] = story
