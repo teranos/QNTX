@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -50,6 +51,44 @@ func TestAClientSpeaking03IsAnswered(t *testing.T) {
 			assert.Equal(t, "Up 3 days.", task.Artifacts[0].Parts[0].Text())
 		})
 	}
+}
+
+// The extended card asked over 0.3 is written in 0.3, naming where 0.3 is
+// answered, and verifies by the node's key over the bytes served.
+func TestTheExtendedCardIn03IsSignedAsServed(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/a2a/v1/card", tokens[auth.LevelRoot]))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.NoError(t, verifiedBy(context.Background(), w.Body.Bytes(), srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), w.Body.String())
+	var card struct {
+		URL             string `json:"url"`
+		ProtocolVersion string `json:"protocolVersion"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &card))
+	assert.Equal(t, "0.3", card.ProtocolVersion)
+	assert.True(t, strings.HasSuffix(card.URL, "/a2a"), card.URL)
+}
+
+// A caller naming 0.3 is answered by 0.3's binding whatever its body holds: a
+// method 0.3 does not have is not found there, not read as 1.0's.
+func TestACallerNaming03IsAnsweredIn03(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	body := `{"jsonrpc": "2.0", "id": 1, "method": "GetTask", "params": {"id": "no-such-task"}}`
+	r := asBearer(http.MethodPost, "/a2a", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("A2A-Version", "0.3")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	var answered struct {
+		Error struct {
+			Code int `json:"code"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answered), w.Body.String())
+	assert.Equal(t, -32601, answered.Error.Code, "GetTask is 1.0's method, and 0.3 has none by that name: "+w.Body.String())
 }
 
 // A 1.0 request naming no version, which a2a-go alone reads as 0.3, is answered

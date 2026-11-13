@@ -155,9 +155,11 @@ func (s *QNTXServer) HandleAgentCard(w http.ResponseWriter, r *http.Request) {
 	cardCached(a2asrv.NewAgentCardHandler(cardIn03And10{s: s, card: s.publicCard(r).sdk()})).ServeHTTP(w, r)
 }
 
-// cardIn03And10 is a card both versions read: a2a-go's a2av0 writes it as
-// the union of 1.0's and 0.3's, and it is signed as written, since a card is
-// verified over the bytes it is served as.
+// cardIn03And10 is a card both versions read: 1.0's as a2a-go writes it, and
+// 0.3's as a2av0 writes it, merged key by key, each version's reader taking its
+// own keys and passing over the other's. a2av0's own union writes the security
+// schemes in 0.3's shape alone, which a2a-go's 1.0 reader refuses. It is signed
+// as written, since a card is verified over the bytes it is served as.
 type cardIn03And10 struct {
 	s    *QNTXServer
 	card *a2asdk.AgentCard
@@ -168,27 +170,78 @@ func (c cardIn03And10) Card(ctx context.Context) (*a2asdk.AgentCard, error) {
 }
 
 func (c cardIn03And10) CardJSON(ctx context.Context) ([]byte, error) {
-	written := func(card *a2asdk.AgentCard) ([]byte, error) {
-		return a2av0.NewStaticAgentCardProducer(card).(a2asrv.AgentCardJSONProducer).CardJSON(ctx)
-	}
-	raw, err := written(c.card)
+	in10, err := json.Marshal(c.card)
 	if err != nil {
-		return nil, errors.Wrap(err, "the card was not written in 0.3 and 1.0")
+		return nil, errors.Wrap(err, "the card was not written in 1.0")
+	}
+	in03, err := a2av0.NewStaticAgentCardProducer(c.card).(a2asrv.AgentCardJSONProducer).CardJSON(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "the card was not written in 0.3")
+	}
+	var held10, held03 any
+	if err := json.Unmarshal(in10, &held10); err != nil {
+		return nil, errors.Wrap(err, "the card written in 1.0 did not read back")
+	}
+	if err := json.Unmarshal(in03, &held03); err != nil {
+		return nil, errors.Wrap(err, "the card written in 0.3 did not read back")
+	}
+	union, isObject := merged(held10, held03).(map[string]any)
+	if !isObject {
+		return nil, errors.New("the card is no JSON object")
+	}
+	delete(union, "signatures")
+	raw, err := json.Marshal(union)
+	if err != nil {
+		return nil, errors.Wrap(err, "the card in 0.3 and 1.0 was not written")
 	}
 	signers, err := c.s.cardSigners(ctx)
 	if err != nil {
 		return nil, err
 	}
-	signed := *c.card
-	signed.Signatures = slices.Clone(c.card.Signatures)
+	sigs := []*a2asdk.AgentCardSignature{}
 	for _, signer := range signers {
 		sig, err := signer.Sign(ctx, raw)
 		if err != nil {
 			return nil, errors.Wrap(err, "the card was not signed")
 		}
-		signed.Signatures = append(signed.Signatures, *sig)
+		sigs = append(sigs, sig)
 	}
-	return written(&signed)
+	union["signatures"] = sigs
+	return json.Marshal(union)
+}
+
+// merged is a and b as one JSON value: objects key by key, arrays of one
+// length item by item, and a where both hold something else.
+func merged(a, b any) any {
+	switch inA := a.(type) {
+	case map[string]any:
+		inB, isObject := b.(map[string]any)
+		if !isObject {
+			return a
+		}
+		both := make(map[string]any, len(inA)+len(inB))
+		for key, value := range inB {
+			both[key] = value
+		}
+		for key, value := range inA {
+			if fromB, held := inB[key]; held {
+				value = merged(value, fromB)
+			}
+			both[key] = value
+		}
+		return both
+	case []any:
+		inB, isArray := b.([]any)
+		if !isArray || len(inB) != len(inA) {
+			return a
+		}
+		both := make([]any, len(inA))
+		for i := range inA {
+			both[i] = merged(inA[i], inB[i])
+		}
+		return both
+	}
+	return a
 }
 
 // cardMaxAge is how long a client keeps the public card: short, because health
