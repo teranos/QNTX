@@ -143,9 +143,11 @@ func TestWhatIsPendingStandsOnThePhone(t *testing.T) {
 	assert.NotNil(t, shown.Segments, "the phone decodes no list from nothing")
 }
 
-// Apple ends a Live Activity by itself after eight hours: what is pending
-// longer than that is started again, and not before.
-func TestWhatIsPendingLongerThanOneStandsIsStartedAgain(t *testing.T) {
+// "SO THE 6H ONE STAYS FOR 6H"
+// "SO WE NEVER BREAK APPLES RULE YOU KNOW"
+// One stands for its wait and no longer: what a person holds for longer
+// stands for the wait before it goes, and not before.
+func TestWhatIsHeldLongerStandsForTheWaitBeforeItGoes(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
 	srv.shows = apple
@@ -154,15 +156,16 @@ func TestWhatIsPendingLongerThanOneStandsIsStartedAgain(t *testing.T) {
 	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
 	sayTo(t, srv, alder, "Birch", "pull request one is open")
 	began := time.Now()
-	_, refused := askCollected(t, srv, asAPerson(), "hold", map[string]string{"to": "Birch", "until": began.Add(20 * time.Hour).Format(time.RFC3339)})
+	goes := began.Add(20 * time.Hour)
+	_, refused := askCollected(t, srv, asAPerson(), "hold", map[string]string{"to": "Birch", "until": goes.Format(time.RFC3339)})
 	require.Nil(t, refused, refused.GetSays())
 
 	require.NoError(t, srv.showWhatWaits(context.Background(), began))
-	require.NoError(t, srv.showWhatWaits(context.Background(), began.Add(7*time.Hour+59*time.Minute)))
-	require.Len(t, apple.sent, 1, "it was started again while the first could still stand")
-	require.NoError(t, srv.showWhatWaits(context.Background(), began.Add(8*time.Hour+time.Minute)))
-	require.Len(t, apple.sent, 2, "what is pending longer than one stands was not started again")
-	assert.Equal(t, apns.ActivityStarts, apple.sent[1].Event)
+	require.NoError(t, srv.showWhatWaits(context.Background(), goes.Add(-6*time.Hour-time.Minute)))
+	assert.Empty(t, apple.sent, "it stood longer before it goes than its wait")
+	require.NoError(t, srv.showWhatWaits(context.Background(), goes.Add(-6*time.Hour+time.Minute)))
+	require.Len(t, apple.sent, 1, "it did not stand for the wait before it goes")
+	assert.Equal(t, apns.ActivityStarts, apple.sent[0].Event)
 }
 
 // A phone Apple did not take it for has it started when the node next looks,
@@ -213,10 +216,11 @@ func TestWhatWasCanceledIsNotStartedOnAPhone(t *testing.T) {
 	assert.Empty(t, apple.sent, "what a person canceled stood on a phone")
 }
 
-// One that stands is moved when what waits changes, by its own token: more
-// things, and another time when ROOT delays it. It is not ended for a delay,
-// and no second is started beside it.
-func TestOneThatStandsIsMovedByItsOwnToken(t *testing.T) {
+// "WHEN DELAY CANT WE MAKE IT BE DISMISSED UNTIL ITS TIME TO SHOW AGAIN /"
+// One that stands is moved when what waits changes, by its own token. Delayed,
+// it is dismissed at once, and stands again for the wait before its new time,
+// with what came in meanwhile.
+func TestOneThatStandsIsMovedAndADelayDismissesIt(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
 	srv.shows = apple
@@ -249,19 +253,30 @@ func TestOneThatStandsIsMovedByItsOwnToken(t *testing.T) {
 	assert.Equal(t, "2 wait", moved.State.(waitsShown).Says)
 	assert.Contains(t, moved.State.(waitsShown).Preview, "pull request two is open")
 
-	// ROOT delays it: it is still pending, and counts down to its new time where it stands.
+	// ROOT delays it: it is dismissed at once, saying so, and nothing is said to it after.
 	all, refused := askCollected(t, srv, asAPerson(), "later", map[string]string{"to": "Birch"})
 	require.Nil(t, refused, refused.GetSays())
 	later, err := time.Parse(time.RFC3339, all.GetCollected()[0].GetDue())
 	require.NoError(t, err)
-	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-7*time.Minute)))
+	at := due.Add(-7 * time.Minute)
+	require.NoError(t, srv.showWhatWaits(context.Background(), at))
+	require.Len(t, apple.sent, 3)
+	dismissed := apple.sent[2]
+	assert.Equal(t, anActivity, dismissed.Token)
+	assert.Equal(t, apns.ActivityEnds, dismissed.Event)
+	assert.Equal(t, waitsShown{Says: "delayed", Segments: []waitsSegment{}, Presses: []waitsPress{}}, dismissed.State)
+	assert.Equal(t, at.Unix(), dismissed.Gone.Unix(), "what was delayed was left standing")
 	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-6*time.Minute)))
-	require.Len(t, apple.sent, 3, "a delay did not move it once, or started a second beside it")
-	delayed := apple.sent[2]
-	assert.Equal(t, anActivity, delayed.Token)
-	assert.Equal(t, apns.ActivityMoves, delayed.Event)
-	assert.InDelta(t, float64(later.Unix()), delayed.State.(waitsShown).Due, 5, "it does not count down to its new time")
-	assert.Len(t, delayed.State.(waitsShown).Presses, 3, "what is delayed can still be answered")
+	require.Len(t, apple.sent, 3, "something was said to one that was dismissed, or it was started before its time")
+
+	// The wait before its new time: it stands again, with what came in meanwhile.
+	require.NoError(t, srv.showWhatWaits(context.Background(), later.Add(-5*time.Hour)))
+	require.Len(t, apple.sent, 4, "what was delayed did not stand again before its new time")
+	again := apple.sent[3]
+	assert.Equal(t, aPhone, again.Token)
+	assert.Equal(t, apns.ActivityStarts, again.Event)
+	assert.Equal(t, "2 wait", again.State.(waitsShown).Says)
+	assert.InDelta(t, float64(later.Unix()), again.State.(waitsShown).Due, 5)
 }
 
 // One ROOT canceled ends saying so.

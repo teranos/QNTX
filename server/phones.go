@@ -22,10 +22,17 @@ import (
 // "THE BATCH IS A LIVE ACTIVITY"
 // "DONT DO THE 15 MINUTE THING ANYMORE"
 // "ANY PENDING IS LIVE ACTIVITY"
+// "ANY PENDING COLLECITON"
+// "SO THE 6H ONE STAYS FOR 6H"
+// "WHEN DELAY CANT WE MAKE IT BE DISMISSED UNTIL ITS TIME TO SHOW AGAIN /"
+// "SO WE NEVER BREAK APPLES RULE YOU KNOW"
 //
-// What waits on ROOT is a Live Activity: it stands on their iPhone's island
-// and lock screen, and in their Mac's menu bar, for as long as it is pending,
-// with what it is, what it says, the time left and its presses. The node
+// A pending collection is a Live Activity: it stands on ROOT's iPhone's
+// island and lock screen, and in their Mac's menu bar, for its wait, with
+// what it is, what it says, the time left and its presses. Delayed, it is
+// dismissed, and stands again for the wait before its new time. So one never
+// stands longer than its wait, which is under the eight hours Apple lets one
+// stand. The node
 // starts it through Apple with the app closed, moves it when what waits
 // changes, and ends it when nothing waits. A press on it is ROOT's own, in the
 // session the app is in (collected.go answers it).
@@ -41,11 +48,6 @@ const phonesSubject = "ACTIVITY-STARTS"
 // about; each line's predicate is one activity's own token, which moves and
 // ends it.
 const activitiesSubject = "ACTIVITIES"
-
-// activityLasts is how long Apple lets one Live Activity stand before it ends
-// it by itself (Apple, Displaying live data with Live Activities: eight
-// hours). What is pending longer is started again when that is over.
-var activityLasts = 8 * time.Hour
 
 // sentWithin is how long after what waited was delivered one that stood for it ends saying it was sent.
 var sentWithin = 15 * time.Minute
@@ -372,6 +374,15 @@ func pending(due, now time.Time) bool {
 	return !due.IsZero() && now.Before(due)
 }
 
+// stands is whether a collection stands in front of ROOT now: pending, and
+// within its own wait of when it goes. What was just said waits that long, so
+// it stands from then; what was delayed or held stands again for the wait
+// before its new time.
+func (c collectedFor) stands(now time.Time) bool {
+	due := c.due()
+	return len(c.Waiting) > 0 && pending(due, now) && !now.Before(due.Add(-waitOf(c.Model)))
+}
+
 // standsOn is whether a Live Activity of waits stands on the phone a token
 // starts them on, as far as the app said: one whose phone the app did not
 // name stands on every phone.
@@ -406,7 +417,7 @@ func (s *QNTXServer) showWhatWaits(ctx context.Context, now time.Time) error {
 		}
 		held, batchesKnown = read, true
 		for did, looked := range held {
-			if len(looked.Waiting) == 0 || !pending(looked.due(), now) {
+			if !looked.stands(now) {
 				continue
 			}
 			if err := s.startBatch(ctx, kept, live, did, now); err != nil {
@@ -464,20 +475,14 @@ func (s *QNTXServer) startBatch(ctx context.Context, kept *collection, live map[
 	if !found || len(waits.Waiting) == 0 {
 		return nil
 	}
-	// Asked again now that nothing else changes it: delivered meanwhile, it is not pending.
+	// Asked again now that nothing else changes it: delivered or delayed meanwhile, it does not stand.
 	due := waits.due()
-	if !pending(due, now) {
+	if !waits.stands(now) {
 		return nil
 	}
-	// Not started where it stands, as the app said or as the node started it
-	// within what Apple lets one stand: held to another time, the one that
-	// stands is moved, and no second is started beside it.
+	// Started once for each time it is due, and not where it stands already as the app said.
 	without := slices.DeleteFunc(slices.Clone(tokens), func(token string) bool {
-		if standsOn(live, batchWaits(did), token) {
-			return true
-		}
-		at, begun := waits.ShownAt[token]
-		return begun && now.Sub(at) < activityLasts
+		return waits.Shown[token].Equal(due) || standsOn(live, batchWaits(did), token)
 	})
 	if len(without) == 0 {
 		return nil
@@ -515,12 +520,8 @@ func (s *QNTXServer) startBatch(ctx context.Context, kept *collection, live map[
 				if waits.Shown == nil {
 					waits.Shown = map[string]time.Time{}
 				}
-				if waits.ShownAt == nil {
-					waits.ShownAt = map[string]time.Time{}
-				}
 				for _, token := range begun {
 					waits.Shown[token] = due
-					waits.ShownAt[token] = now
 				}
 			}
 			return nil
@@ -558,12 +559,15 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 			}
 			batch := held[did]
 			switch {
-			case batch != nil && len(batch.Waiting) > 0 && pending(batch.due(), now):
+			case batch != nil && batch.stands(now):
 				shown := batchShown(batch, batch.due())
 				waits, stale = &shown, batch.due()
-			case batch != nil && len(batch.Waiting) > 0:
+			case batch != nil && len(batch.Waiting) > 0 && !pending(batch.due(), now):
 				// Due, and not delivered yet: it is left as it stands, and ends when it is sent.
 				continue
+			case batch != nil && len(batch.Waiting) > 0:
+				// Delayed past its wait: dismissed, and started again for the wait before its new time.
+				became = "delayed"
 			case batch != nil && !batch.Delivered.IsZero() && now.Sub(batch.Delivered) < sentWithin:
 				became = "sent"
 			default:
@@ -594,6 +598,10 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 			recorded["gone"], recorded["shows"] = false, as
 		} else {
 			says.Event, says.State, says.Gone = apns.ActivityEnds, ended(became), now.Add(leavesAfter)
+			if became == "delayed" {
+				// Dismissed at once: it is not over, it stands again later.
+				says.Gone = now
+			}
 			recorded["gone"] = true
 		}
 		within, done := context.WithTimeout(ctx, shownWithin)

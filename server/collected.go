@@ -84,10 +84,7 @@ type collectedFor struct {
 	// it was due when it was started there (phones.go): held to another time,
 	// it is started again before that one, and on a phone that was not reached
 	// when it is.
-	Shown map[string]time.Time `json:"shown,omitempty"`
-	// ShownAt is when it was last started on each phone: Apple ends a Live
-	// Activity by itself after a time, and what is pending longer is started again.
-	ShownAt map[string]time.Time `json:"shown_at,omitempty"`
+	Shown   map[string]time.Time `json:"shown,omitempty"`
 	Waiting []collectedSaid      `json:"waiting"`
 }
 
