@@ -47,6 +47,32 @@ Status: Unpolished
 
 "SO THEY KNOW DURING THE NEXT WAKE"
 
+"PREVIOUSLY THIS IDEA ALSO HAD ANOTHER NAME, CALLED APPROVAL PACKS, WHICH ARE COMPLETE PACKAGES OF PR'S AND OTHER THINGS THAT CAN GET APPROVED. AN APPROVAL PACK IS ACCUMULATED, AND THEN RELEASED BY THE USER"
+
+"I GUESS THE APPROVAL PACK IS STILL A DISTINCT THING"
+
+"BUT THE LAYERING IS"
+
+"APPROVAL PACK -> CAN IMPACT AND PLACE -> INTO COLLECTIONS -> PR'S THINGS TO SAY TO SESSIONS, HANDOVERS, REQUEST FOR REVIEW, ETC."
+
+"AND JUST AS YOU CAN APPROVE AN INDIVIDUAL PR IN A COLLECTION, YOU CAN APPROVE OR DENY AN INDIVIDUAL ITEM IN A PACK"
+
+## Approval packs
+
+An approval pack is a thing of its own: a complete package of pull requests
+and other things that can be approved. It accumulates, and the person
+releases it.
+
+The layering is one way. A pack can impact collections and place things into
+them, and a collection holds what goes to its receiver: pull requests, things
+to say to sessions, handovers, requests for review.
+
+The person decides on the whole or on one item, at both levels: one pull
+request in a collection is approved there, and one item in a pack is approved
+or denied there.
+
+**Not built.** Nothing in the node is a pack yet.
+
 ## What stands is the collection
 
 One thing stands in front of a person: the collection, by who it is for. It
