@@ -94,9 +94,7 @@ func (s *QNTXServer) sayInHarness(ctx context.Context, caller *http.Request, age
 
 	t.in.answering.Store(&turnInSession{session: session})
 	defer t.in.answering.Store(nil)
-	// A delivery of what was collected is the node's, whoever released it: a
-	// turn it starts speaks for no one.
-	defer s.aPersonsTurn(agent.did, aPersonSpeaks(caller) && caller.Context().Value(deliversCollected{}) == nil)()
+	defer s.aPersonsTurn(agent.did, startedByAPerson(caller))()
 
 	writes := sessionWriter{did: agent.did, session: session, resumed: resumes, effort: t.effort, element: t.element, screenshot: t.screenshot}
 	write, unwritten := s.sessionRows(agent, store, session, t.called)

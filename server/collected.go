@@ -230,6 +230,13 @@ func aPersonSpeaks(r *http.Request) bool {
 	return noAgent != nil
 }
 
+// startedByAPerson is whether a turn asked for by r is a person talking to the
+// agent. A delivery of what was collected is the node's, whoever released it:
+// a turn it starts speaks for no one.
+func startedByAPerson(r *http.Request) bool {
+	return aPersonSpeaks(r) && r.Context().Value(deliversCollected{}) == nil
+}
+
 // collect keeps what an agent said to another, to be delivered with what else
 // is collected for it, and answers when that is if nobody holds or releases it.
 func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, error) {

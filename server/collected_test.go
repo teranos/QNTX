@@ -399,5 +399,5 @@ func TestAnAgentInAPersonsTurnSpeaksForThem(t *testing.T) {
 	delivery := httptest.NewRequest(http.MethodPost, collectedPath, nil)
 	delivery = delivery.WithContext(context.WithValue(delivery.Context(), deliversCollected{}, true))
 	assert.True(t, aPersonSpeaks(delivery))
-	assert.False(t, aPersonSpeaks(delivery) && delivery.Context().Value(deliversCollected{}) == nil, "a delivery's turn was counted as a person's")
+	assert.False(t, startedByAPerson(delivery), "a delivery's turn was counted as a person's")
 }
