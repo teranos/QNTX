@@ -127,14 +127,14 @@ func vaultNotesAt(root string) (map[string][]byte, error) {
 	return notes, nil
 }
 
-// vaultNotesWhole is every note in root and in every folder under it, by its
-// path below root, and its content: a repository binding's. A folder or note
-// starting with a dot is not one, and a link is not followed.
+// 「[Opus 5.5] vaultNotesWhole is every note in root and in every folder under it, by its」
+// 「[Opus 5.5] path below root, and its content: a repository binding's. A folder or note」
+// 「[Opus 5.5] starting with a dot is not one, and a link is not followed.」
 func vaultNotesWhole(root string) (map[string][]byte, error) {
 	notes := map[string][]byte{}
 	placed, err := os.Lstat(root)
-	// A repository's folder that is not there is not an empty one: sent as
-	// empty, every note on the branch would be removed.
+	// 「[Opus 5.5] A repository's folder that is not there is not an empty one: sent as」
+	// 「[Opus 5.5] empty, every note on the branch would be removed.」
 	if errors.Is(err, fs.ErrNotExist) {
 		return notes, errors.Newf("%s is not in the vault, so nothing is sent from it", root)
 	}
@@ -157,8 +157,8 @@ func vaultNotesWhole(root string) (map[string][]byte, error) {
 			}
 			return nil
 		}
-		// A link, to a folder or a note, is refused: skipped, the notes under
-		// it would read as gone and be removed from the branch.
+		// 「[Opus 5.5] A link, to a folder or a note, is refused: skipped, the notes under」
+		// 「[Opus 5.5] it would read as gone and be removed from the branch.」
 		if d.Type()&fs.ModeSymlink != 0 {
 			return errors.Newf("%s is a link, not a folder or note of the vault, so nothing is sent", at)
 		}
@@ -184,7 +184,7 @@ func vaultNotesWhole(root string) (map[string][]byte, error) {
 // 「[Opus 5.5] its own; a link to one is not.」
 func boundVaultNotes(vaultPath string, b vaultBinding) (map[string][]byte, error) {
 	if b.repository {
-		// The vault reaches the folder through no link, so what is sent is the vault's.
+		// 「[Opus 5.5] The vault reaches the folder through no link, so what is sent is the vault's.」
 		if err := noLinkOnTheWay(vaultPath, b.rootIn(vaultPath)); err != nil {
 			return nil, err
 		}

@@ -123,16 +123,16 @@ func (s *QNTXServer) repoNotes(ctx context.Context, repo forge.Repo, branch, fol
 	return notes, nil
 }
 
-// "its other markdown document's"
+// "「[Opus 5.5] its other markdown document's」"
 
-// dotted says whether a path of the repository is in, or is, a folder or file
-// starting with a dot: none of it is a repository binding's.
+// 「[Opus 5.5] dotted says whether a path of the repository is in, or is, a folder or file」
+// 「[Opus 5.5] starting with a dot: none of it is a repository binding's.」
 func dotted(p string) bool {
 	return slices.ContainsFunc(strings.Split(p, "/"), func(part string) bool { return strings.HasPrefix(part, ".") && part != "." })
 }
 
-// repoNotesWhole is every note of repo on branch, in every folder of it, by its
-// path from the repository's top.
+// 「[Opus 5.5] repoNotesWhole is every note of repo on branch, in every folder of it, by its」
+// 「[Opus 5.5] path from the repository's top.」
 func (s *QNTXServer) repoNotesWhole(ctx context.Context, repo forge.Repo, branch string) ([]repoNote, error) {
 	reader, err := s.forges().For(repo)
 	if err != nil {
@@ -262,9 +262,9 @@ func readIfThere(at string) ([]byte, bool, error) {
 	return content, true, nil
 }
 
-// noLinkOnTheWay refuses at when the vault reaches it through a link: any
-// folder from the vault down to it, or it itself. A fill writes, reads and
-// removes only inside the vault.
+// 「[Opus 5.5] noLinkOnTheWay refuses at when the vault reaches it through a link: any」
+// 「[Opus 5.5] folder from the vault down to it, or it itself. A fill writes, reads and」
+// 「[Opus 5.5] removes only inside the vault.」
 func noLinkOnTheWay(vaultPath, at string) error {
 	under, err := filepath.Rel(vaultPath, at)
 	if err != nil || under == ".." || strings.HasPrefix(under, ".."+string(filepath.Separator)) {
@@ -493,8 +493,8 @@ func basesNotIn(bases string, now map[string]bool) ([]string, error) {
 	return gone, nil
 }
 
-// basesNotInWhole is every note a base is kept for, in any folder under bases,
-// that main does not have now: a repository binding's.
+// 「[Opus 5.5] basesNotInWhole is every note a base is kept for, in any folder under bases,」
+// 「[Opus 5.5] that main does not have now: a repository binding's.」
 func basesNotInWhole(bases string, now map[string]bool) ([]string, error) {
 	var gone []string
 	err := filepath.WalkDir(bases, func(at string, d fs.DirEntry, err error) error {
