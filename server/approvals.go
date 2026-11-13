@@ -357,7 +357,7 @@ func (s *QNTXServer) HandleApprovalAnswer(w http.ResponseWriter, r *http.Request
 	// A press decides what is merged: who pressed, what, and from what it was
 	// pressed stand in the node's log beside the line it wrote.
 	s.logger.Infow("An approval is answered by the human", "approval", st.subject, "sha", st.sha,
-		"option", sent.Option, "said", sent.Said, "by", admitted.Identity, "from", r.UserAgent(), "merges_now", mergeNow)
+		"option", sent.Option, "said", sent.Said, "by", admitted.Identity, "client_named_itself", namedItself(r), "merges_now", mergeNow)
 
 	answered := &protocol.ApprovalAnswered{Subject: st.subject, Sha: st.sha, Option: st.option, Said: st.said, Did: didNothing}
 	if st.waits() {
@@ -367,12 +367,12 @@ func (s *QNTXServer) HandleApprovalAnswer(w http.ResponseWriter, r *http.Request
 		mergeSha, err := s.mergeApproval(r.Context(), st)
 		if err != nil {
 			s.logger.Errorw("An approval the human answered was not merged", "approval", st.subject, "sha", st.sha,
-				"by", admitted.Identity, "from", r.UserAgent(), "error", err)
+				"by", admitted.Identity, "client_named_itself", namedItself(r), "error", err)
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
 		s.logger.Infow("An approval is merged on the human's answer", "approval", st.subject, "sha", st.sha,
-			"merge_sha", mergeSha, "by", admitted.Identity, "from", r.UserAgent())
+			"merge_sha", mergeSha, "by", admitted.Identity, "client_named_itself", namedItself(r))
 		answered.Did, answered.MergeSha = didMerged, mergeSha
 	}
 	respond(w, s.logger, http.StatusOK, answered)

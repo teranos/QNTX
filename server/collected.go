@@ -616,7 +616,8 @@ func (s *QNTXServer) collectedHold(ctx context.Context, sent sigil.Sent) (any, *
 	}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	s.logger.Infow("What is collected for an agent is held by a person", "to", sent["to"], "until", until.UTC().Format(time.RFC3339), "from", saidFrom(ctx))
+	by, client := decidedBy(ctx)
+	s.logger.Infow("What is collected for an agent is held by a person", "to", did, "until", until.UTC().Format(time.RFC3339), "by", by, "client_named_itself", client)
 	return s.collectedList(ctx, sent)
 }
 
@@ -634,10 +635,12 @@ func (s *QNTXServer) collectedRelease(ctx context.Context, sent sigil.Sent) (any
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "ids", Says: "ids names each thing said that goes, separated by commas, and this names nothing in one of its places: leave it out to release everything that waits"}
 	}
 	if err := s.deliverCollected(ctx, did, sent["says"], only, time.Time{}); err != nil {
-		s.logger.Errorw("What a person released was not delivered", "to", sent["to"], "from", saidFrom(ctx), "error", err)
+		by, client := decidedBy(ctx)
+		s.logger.Errorw("What a person released was not delivered", "to", did, "by", by, "client_named_itself", client, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	s.logger.Infow("What is collected for an agent is released by a person", "to", sent["to"], "ids", sent["ids"], "from", saidFrom(ctx))
+	by, client := decidedBy(ctx)
+	s.logger.Infow("What is collected for an agent is released by a person", "to", did, "things_named", len(only), "authored", sent["says"] != "", "by", by, "client_named_itself", client)
 	return s.collectedList(ctx, sent)
 }
 
@@ -657,16 +660,19 @@ func (s *QNTXServer) collectedLater(ctx context.Context, sent sigil.Sent) (any, 
 	}
 	kept.settling.Lock()
 	defer kept.settling.Unlock()
+	var until time.Time
 	if err := kept.change(func(held map[string]*collectedFor) error {
 		waits := held[did]
 		if due := waits.due(); !due.IsZero() {
 			waits.HeldUntil = due.Add(waitOf(waits.Model))
+			until = waits.HeldUntil
 		}
 		return nil
 	}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	s.logger.Infow("What is collected for an agent is delayed by a person", "to", sent["to"], "from", saidFrom(ctx))
+	by, client := decidedBy(ctx)
+	s.logger.Infow("What is collected for an agent is delayed by a person", "to", did, "until", stamped(until), "by", by, "client_named_itself", client)
 	return s.collectedList(ctx, sent)
 }
 
@@ -723,7 +729,8 @@ func (s *QNTXServer) collectedCancel(ctx context.Context, sent sigil.Sent) (any,
 	}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	s.logger.Infow("What was collected for an agent is canceled by a person", "to", called, "things", len(canceled), "from", saidFrom(ctx))
+	by, client := decidedBy(ctx)
+	s.logger.Infow("What was collected for an agent is canceled by a person", "to", did, "things", len(canceled), "by", by, "client_named_itself", client)
 	return s.collectedList(ctx, sent)
 }
 
@@ -759,13 +766,37 @@ func (s *QNTXServer) collectedEdit(ctx context.Context, sent sigil.Sent) (any, *
 	return s.collectedList(ctx, sent)
 }
 
-// saidFrom is what the person's word about what waits came from, as the
-// client named itself: the page, or what stands on their phone.
-func saidFrom(ctx context.Context) string {
-	if r := sigil.Caller(ctx); r != nil {
-		return r.UserAgent()
+// namedItself is how a client named itself, as fit for a log: the page, or
+// what stands on a phone. It is the client's own word and proves nothing, so
+// it is written as that and never as who decided; cut where it runs long, and
+// with nothing in it that would start a line of its own.
+func namedItself(r *http.Request) string {
+	if r == nil {
+		return ""
 	}
-	return ""
+	said := strings.Map(func(c rune) rune {
+		if c < 0x20 || c == 0x7f {
+			return -1
+		}
+		return c
+	}, r.UserAgent())
+	if cut := []rune(said); len(cut) > 120 {
+		said = string(cut[:120]) + "…"
+	}
+	return said
+}
+
+// decidedBy is who decided something about what waits, as the node admitted
+// them, and how the client they decided from named itself.
+func decidedBy(ctx context.Context) (by, client string) {
+	r := sigil.Caller(ctx)
+	if r == nil {
+		return "", ""
+	}
+	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
+		by = admitted.ActsAs()
+	}
+	return by, namedItself(r)
 }
 
 // idsOf is the ids a person named, separated by commas.
