@@ -13,41 +13,41 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "AND SO IS THE APPROCAL"
-// "ITS KIND OF THE SAME THING"
+// "「[Opus 5.5] AND SO IS THE APPROCAL」"
+// "「[Opus 5.5] ITS KIND OF THE SAME THING」"
 //
-// An approval that waits on ROOT is a Live Activity, the same shape a batch
-// is (phones.go): the pull request, its checks as segments, and ROOT's
-// answers as presses. It stands from when it is asked until ROOT answers it
-// or it is over, showing its checks as they run; its presses are there once
-// it can be decided (ADR-052).
+// 「[Opus 5.5] An approval that waits on ROOT is a Live Activity, the same shape a batch」
+// 「[Opus 5.5] is (phones.go): the pull request, its checks as segments, and ROOT's」
+// 「[Fable 5.2] answers as presses. It stands from when it is asked until ROOT answers it」
+// 「[Fable 5.2] or it is over, showing its checks as they run; its presses are there once」
+// 「[Fable 5.2] it can be decided (ADR-052).」
 
-// begunSubject is what the lines about Live Activities the node started are
-// about. Each line's predicate names one phone and one thing that waits, and
-// says the head it was started for: an approval is started once for each head.
+// 「[Opus 5.5] begunSubject is what the lines about Live Activities the node started are」
+// 「[Opus 5.5] about. Each line's predicate names one phone and one thing that waits, and」
+// 「[Opus 5.5] says the head it was started for: an approval is started once for each head.」
 const begunSubject = "WAITS-BEGUN"
 
-// segmentsAtMost is how many of an approval's checks a Live Activity shows each by its own name.
+// 「[Fable 5.2] segmentsAtMost is how many of an approval's checks a Live Activity shows each by its own name.」
 const segmentsAtMost = 16
 
-// startedFor is how long Apple is given to reach a phone with an approval that waits.
+// 「[Fable 5.2] startedFor is how long Apple is given to reach a phone with an approval that waits.」
 const startedFor = time.Hour
 
-// approvalWaits names an approval, as a Live Activity is of it.
+// 「[Opus 5.5] approvalWaits names an approval, as a Live Activity is of it.」
 func approvalWaits(subject string) string { return "approval/" + subject }
 
-// begunOn names one phone and one thing that waits on it, in what a predicate takes.
+// 「[Opus 5.5] begunOn names one phone and one thing that waits on it, in what a predicate takes.」
 func begunOn(token, waits string) string {
 	sum := sha256.Sum256([]byte(token + "\n" + waits))
 	return hex.EncodeToString(sum[:20])
 }
 
-// approvalShown is what a Live Activity of an approval shows while it waits:
-// its title and each check on its head, and, once every check is done, the
-// yes and the no as HandleApprovalAnswer takes them. Until then it cannot be
-// decided, and it has nothing to press.
+// 「[Fable 5.2] approvalShown is what a Live Activity of an approval shows while it waits:」
+// 「[Fable 5.2] its title and each check on its head, and, once every check is done, the」
+// 「[Fable 5.2] yes and the no as HandleApprovalAnswer takes them. Until then it cannot be」
+// 「[Fable 5.2] decided, and it has nothing to press.」
 func approvalShown(st *approvalState) waitsShown {
-	// As many checks as a phone draws and Apple carries: the rest are counted in the last.
+	// 「[Fable 5.2] As many checks as a phone draws and Apple carries: the rest are counted in the last.」
 	segments := []waitsSegment{}
 	for at, check := range st.checks {
 		if at == segmentsAtMost-1 && len(st.checks) > segmentsAtMost {
@@ -82,9 +82,9 @@ func approvalShown(st *approvalState) waitsShown {
 	return shown
 }
 
-// startApprovals starts each approval ROOT has not answered as a Live
-// Activity, on each phone it was not started on for the head it is at. One
-// that stands already is moved to its new head and not started beside itself.
+// 「[Fable 5.2] startApprovals starts each approval ROOT has not answered as a Live」
+// 「[Fable 5.2] Activity, on each phone it was not started on for the head it is at. One」
+// 「[Fable 5.2] that stands already is moved to its new head and not started beside itself.」
 func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, live map[string]started, open []*approvalState, now time.Time) error {
 	waiting := slices.DeleteFunc(slices.Clone(open), func(st *approvalState) bool { return st.said != "" })
 	if len(tokens) == 0 || len(waiting) == 0 {
@@ -107,7 +107,7 @@ func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, live m
 			if line, found := begun[on]; found && attrString(line.Attributes, "once") == st.sha {
 				continue
 			}
-			// It stands on this phone already, or on one the app did not name: moved there, not started again.
+			// 「[Fable 5.2] It stands on this phone already, or on one the app did not name: moved there, not started again.」
 			stands := false
 			for _, one := range live {
 				if one.Waits == waits && (one.Phone == token || one.Phone == "") {
@@ -135,7 +135,7 @@ func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, live m
 				}
 				s.logger.Infow("An approval that waits on ROOT stands on their phone as a Live Activity", "approval", st.subject, "sha", st.sha)
 			case errors.As(err, &refused) && refused.Gone:
-				// The app is off that phone: nothing is started on it again.
+				// 「[Opus 5.5] The app is off that phone: nothing is started on it again.」
 				if err := s.nodeRecords().nodeRecord(s.nodeActor(), phonesSubject, token, "_", map[string]any{"platform": "ios", "gone": true}); err != nil {
 					failed = append(failed, err.Error())
 				}
