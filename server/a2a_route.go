@@ -72,8 +72,8 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	atNoTenant := a2asrv.NewRESTHandler(handler, alive)
 	atTenant := a2asrv.NewTenantRESTHandler("/{*}", handler, alive)
 	jsonRPC := a2asrv.NewJSONRPCHandler(handler, alive)
-	// The node speaks what the a2a-go it pins speaks: 1.0, and 0.3 by its
-	// a2acompat, on the one handler, gate and Tasks.
+	// 「[Fable 5.2] The node speaks what the a2a-go it pins speaks: 1.0, and 0.3 by its」
+	// 「[Fable 5.2] a2acompat, on the one handler, gate and Tasks.」
 	rest03 := a2av0.NewRESTHandler(tenantIn03{handler, s}, alive)
 	jsonRPC03 := a2av0.NewJSONRPCHandler(tenantIn03{handler, s}, alive)
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -90,8 +90,8 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 			r.Body = &a2aBodyRead{ReadCloser: http.MaxBytesReader(w, r.Body, nodeBodyMost), exchange: exchange}
 		}
 		spoken, tenant, path, overJSONRPC := spokenIn(r)
-		// Which version a caller names, or names none, does not matter: the
-		// version its request is in is the one it is answered in.
+		// 「[Fable 5.2] Which version a caller names, or names none, does not matter: the」
+		// 「[Fable 5.2] version its request is in is the one it is answered in.」
 		r.Header.Set(a2asdk.SvcParamVersion, string(spoken))
 		if spoken == a2av0.Version {
 			r.URL.Path = path
@@ -138,11 +138,11 @@ func tenantOf(method, path string) (string, string, bool) {
 	return first, strings.TrimPrefix(path, "/"+first), true
 }
 
-// spokenIn is the A2A version r is in, by its shape: 0.3's HTTP+JSON is under
-// /v1, and its JSON-RPC methods are named with a slash (message/send), 1.0's
-// are neither. A caller naming 1.0 is held to it. 0.3 carries no tenant, so
-// its agent at a tenant is reached under the tenant's path: tenant is that
-// path's first segment, and path what 0.3's binding reads after it.
+// 「[Fable 5.2] spokenIn is the A2A version r is in, by its shape: 0.3's HTTP+JSON is under」
+// 「[Fable 5.2] /v1, and its JSON-RPC methods are named with a slash (message/send), 1.0's」
+// 「[Fable 5.2] are neither. A caller naming 1.0 is held to it. 0.3 carries no tenant, so」
+// 「[Fable 5.2] its agent at a tenant is reached under the tenant's path: tenant is that」
+// 「[Fable 5.2] path's first segment, and path what 0.3's binding reads after it.」
 func spokenIn(r *http.Request) (spoken a2asdk.ProtocolVersion, tenant, path string, overJSONRPC bool) {
 	named := r.Header.Get(a2asdk.SvcParamVersion)
 	if named == "" {
@@ -152,7 +152,7 @@ func spokenIn(r *http.Request) (spoken a2asdk.ProtocolVersion, tenant, path stri
 	trimmed := strings.TrimPrefix(r.URL.Path, "/")
 	first, after, _ := strings.Cut(trimmed, "/")
 	if r.Method == http.MethodPost && !strings.Contains(trimmed, "/") && !a2aRoute(r.Method, r.URL.Path) {
-		// A caller naming 0.3 is answered in 0.3, whatever its body holds.
+		// 「[Fable 5.2] A caller naming 0.3 is answered in 0.3, whatever its body holds.」
 		if in03 || (!in10 && jsonRPCMethodIn03(r)) {
 			return a2av0.Version, first, "/", true
 		}
@@ -169,8 +169,8 @@ func spokenIn(r *http.Request) (spoken a2asdk.ProtocolVersion, tenant, path stri
 	return a2asdk.Version, "", r.URL.Path, false
 }
 
-// jsonRPCMethodIn03 is whether r's JSON-RPC method is one of 0.3's. The body
-// is read, and put back for the binding to read again.
+// 「[Fable 5.2] jsonRPCMethodIn03 is whether r's JSON-RPC method is one of 0.3's. The body」
+// 「[Fable 5.2] is read, and put back for the binding to read again.」
 func jsonRPCMethodIn03(r *http.Request) bool {
 	if r.Body == nil {
 		return false
@@ -187,22 +187,22 @@ func jsonRPCMethodIn03(r *http.Request) bool {
 	return json.Unmarshal(body, &said) == nil && strings.Contains(said.Method, "/")
 }
 
-// bodyAgain is a body read once, read again from what was read.
+// 「[Fable 5.2] bodyAgain is a body read once, read again from what was read.」
 type bodyAgain struct {
 	io.Reader
 	io.Closer
 }
 
-// readFails is how reading a body failed, said again to the binding.
+// 「[Fable 5.2] readFails is how reading a body failed, said again to the binding.」
 type readFails struct{ err error }
 
 func (f readFails) Read([]byte) (int, error) { return 0, f.err }
 
-// tenantIn03Key holds the tenant a 0.3 request's path names.
+// 「[Fable 5.2] tenantIn03Key holds the tenant a 0.3 request's path names.」
 type tenantIn03Key struct{}
 
-// tenantIn03 is the handler 0.3 is answered by: the one 1.0 is, each request
-// given the tenant its path named, which 0.3's requests have no field for.
+// 「[Fable 5.2] tenantIn03 is the handler 0.3 is answered by: the one 1.0 is, each request」
+// 「[Fable 5.2] given the tenant its path named, which 0.3's requests have no field for.」
 type tenantIn03 struct {
 	a2asrv.RequestHandler
 	s *QNTXServer
@@ -284,10 +284,10 @@ func (h tenantIn03) DeleteTaskPushConfig(ctx context.Context, req *a2asdk.Delete
 	return h.RequestHandler.DeleteTaskPushConfig(ctx, req)
 }
 
-// GetExtendedAgentCard is the card 0.3's bindings write as a2av0's
-// FromV1AgentCard, which reads its url and protocolVersion off the first
-// interface: 0.3's come first, and the card is signed over the bytes written.
-// A peer's card is the peer's, and is handed over as the peer signed it.
+// 「[Fable 5.2] GetExtendedAgentCard is the card 0.3's bindings write as a2av0's」
+// 「[Fable 5.2] FromV1AgentCard, which reads its url and protocolVersion off the first」
+// 「[Fable 5.2] interface: 0.3's come first, and the card is signed over the bytes written.」
+// 「[Fable 5.2] A peer's card is the peer's, and is handed over as the peer signed it.」
 func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExtendedAgentCardRequest) (*a2asdk.AgentCard, error) {
 	if req != nil {
 		tenantFrom03(ctx, &req.Tenant)
@@ -323,7 +323,7 @@ func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExt
 	return &in03, nil
 }
 
-// cmpBool orders false before true.
+// 「[Fable 5.2] cmpBool orders false before true.」
 func cmpBool(a, b bool) int {
 	switch {
 	case a == b:
