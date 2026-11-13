@@ -25,7 +25,7 @@ func TestAnApprovalThatWaitsOnROOTStandsAsALiveActivity(t *testing.T) {
 	code, said := handsOver(t, s, inROOTsSession(), naming(aPhone))
 	require.Equal(t, http.StatusOK, code, said)
 
-	// One that was asked long before the phone was named is not put in front of ROOT now.
+	// 「[Fable 5.2] One that was asked long before the phone was named is not put in front of ROOT now.」
 	delivered(t, s, "pull_request", pullRequest("opened", 28, "0ldhead", ""))
 	require.NoError(t, s.showWhatWaits(context.Background(), time.Now().Add(16*time.Minute)))
 	assert.Empty(t, apple.sent, "an approval that had waited longer than fifteen minutes was started")
@@ -90,8 +90,8 @@ func TestAnApprovalThatWaitsOnROOTStandsAsALiveActivity(t *testing.T) {
 	assert.Len(t, apple.sent, 4, "something was said to an approval that is over")
 }
 
-// A check said again in the state it was in moves nothing: an approval that
-// has waited is not put in front of ROOT anew by it.
+// 「[Fable 5.2] A check said again in the state it was in moves nothing: an approval that」
+// 「[Fable 5.2] has waited is not put in front of ROOT anew by it.」
 func TestACheckSaidAgainMovesNoApproval(t *testing.T) {
 	lines := func(at time.Time, predicate string, attributes map[string]any) *types.As {
 		return &types.As{Subjects: []string{"teranos/elements#29"}, Predicates: []string{predicate}, Timestamp: at, Attributes: attributes}
