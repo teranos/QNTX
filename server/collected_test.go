@@ -361,14 +361,14 @@ func TestIDsThatNameNothingReleaseNothing(t *testing.T) {
 }
 
 // "I said it here. Release it."
-// An agent in a turn a person started acts on that person's word; in a turn
-// nobody started, or beside one, it does not.
+// 「[Opus 5.5] An agent in a turn a person started acts on that person's word; in a turn」
+// 「[Opus 5.5] nobody started, or beside one, it does not.」
 func TestAnAgentInAPersonsTurnSpeaksForThem(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
 	sayTo(t, srv, alder, "Birch", "pull request one is open")
 
-	// What the door marks while a person's turn of Alder runs.
+	// 「[Opus 5.5] What the door marks while a person's turn of Alder runs.」
 	throughTheDoor := func() context.Context {
 		ctx := alder
 		if srv.speaksForAPerson("did:key:z6Mkalder") {
@@ -395,7 +395,7 @@ func TestAnAgentInAPersonsTurnSpeaksForThem(t *testing.T) {
 	_, refused = askCollected(t, srv, throughTheDoor(), "release", sigil.Sent{"to": "Birch"})
 	require.NotNil(t, refused, "the agent still spoke for the person once their turn ended")
 
-	// A turn the node's delivery started speaks for no one, though a delivery counts as said by a person.
+	// 「[Opus 5.5] A turn the node's delivery started speaks for no one, though a delivery counts as said by a person.」
 	delivery := httptest.NewRequest(http.MethodPost, collectedPath, nil)
 	delivery = delivery.WithContext(context.WithValue(delivery.Context(), deliversCollected{}, true))
 	assert.True(t, aPersonSpeaks(delivery))

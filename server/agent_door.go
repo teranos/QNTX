@@ -35,22 +35,22 @@ type agentDoors struct {
 	byDID map[string]*agentDoor
 	// byHome is the door an agent's ground reaches the node at, by its home.
 	byHome map[string]string
-	// turns is, by agent DID, how many of its turns run now that a person
-	// started, and how many nobody did.
+	// 「[Opus 5.5] turns is, by agent DID, how many of its turns run now that a person」
+	// 「[Opus 5.5] started, and how many nobody did.」
 	turns map[string]*turnsRunning
 }
 
-// turnsRunning counts an agent's turns running now, by who started them.
+// 「[Opus 5.5] turnsRunning counts an agent's turns running now, by who started them.」
 type turnsRunning struct{ byPerson, byNoPerson int }
 
 // "I said it here. Release it."
 //
-// onAPersonsWord marks what arrives at an agent's door while a person is
-// talking to it: what the agent does in that turn, it does on their word.
+// 「[Opus 5.5] onAPersonsWord marks what arrives at an agent's door while a person is」
+// 「[Opus 5.5] talking to it: what the agent does in that turn, it does on their word.」
 type onAPersonsWord struct{}
 
-// aPersonsTurn counts a turn of the agent with did as running until the
-// returned func is called: started by a person, or by none.
+// 「[Opus 5.5] aPersonsTurn counts a turn of the agent with did as running until the」
+// 「[Opus 5.5] returned func is called: started by a person, or by none.」
 func (s *QNTXServer) aPersonsTurn(did string, byPerson bool) func() {
 	s.doors.mu.Lock()
 	defer s.doors.mu.Unlock()
@@ -78,8 +78,8 @@ func (s *QNTXServer) aPersonsTurn(did string, byPerson bool) func() {
 	}
 }
 
-// speaksForAPerson is whether every turn of the agent with did running now is
-// one a person started: a turn nobody started running beside it speaks for no one.
+// 「[Opus 5.5] speaksForAPerson is whether every turn of the agent with did running now is」
+// 「[Opus 5.5] one a person started: a turn nobody started running beside it speaks for no one.」
 func (s *QNTXServer) speaksForAPerson(did string) bool {
 	s.doors.mu.Lock()
 	defer s.doors.mu.Unlock()

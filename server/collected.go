@@ -215,7 +215,7 @@ func aPersonSpeaks(r *http.Request) bool {
 		return true
 	}
 	// "I said it here. Release it."
-	// An agent in a turn a person started acts on that person's word.
+	// 「[Opus 5.5] An agent in a turn a person started acts on that person's word.」
 	if r.Context().Value(onAPersonsWord{}) != nil {
 		return true
 	}
@@ -230,9 +230,9 @@ func aPersonSpeaks(r *http.Request) bool {
 	return noAgent != nil
 }
 
-// startedByAPerson is whether a turn asked for by r is a person talking to the
-// agent. A delivery of what was collected is the node's, whoever released it:
-// a turn it starts speaks for no one.
+// 「[Opus 5.5] startedByAPerson is whether a turn asked for by r is a person talking to the」
+// 「[Opus 5.5] agent. A delivery of what was collected is the node's, whoever released it:」
+// 「[Opus 5.5] a turn it starts speaks for no one.」
 func startedByAPerson(r *http.Request) bool {
 	return aPersonSpeaks(r) && r.Context().Value(deliversCollected{}) == nil
 }
