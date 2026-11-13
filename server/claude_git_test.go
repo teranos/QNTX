@@ -60,9 +60,9 @@ func TestTheNodeAgentIsToldHowItsGitWorks(t *testing.T) {
 	assert.Contains(t, told, "github_ask")
 }
 
-// "I NEED TO BE ABLE TO EDIT SYSTEM PROMPTS IN MY OBSIDIAN"
-// What the node's own file says is what the Node Agent is told, as the file
-// reads at that turn; a file that cannot be read is said, not passed over.
+// "「[Opus 5.5] I NEED TO BE ABLE TO EDIT SYSTEM PROMPTS IN MY OBSIDIAN」"
+// 「[Opus 5.5] What the node's own file says is what the Node Agent is told, as the file」
+// 「[Opus 5.5] reads at that turn; a file that cannot be read is said, not passed over.」
 func TestTheNodeAgentIsToldWhatItsNodesFileSays(t *testing.T) {
 	s, _ := runningTheNodeAgent(t, opusLow)
 	assert.NotContains(t, s.nodeAgent.isSaidToBe(), "What this node tells you", "a node that names no file told it something")
