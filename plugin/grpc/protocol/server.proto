@@ -394,6 +394,7 @@ message Memory {
 // Memories is what memory list answers, and what a sigil that changes a store
 // answers after it.
 message Memories {
+  // The store they are of.
   string store = 1;
   // Every memory of the store, by name. Each without its text.
   repeated Memory memories = 2;
@@ -412,9 +413,11 @@ message MemoryStore {
 
 // MemoryStores is what memory stores answers.
 message MemoryStores {
-  // The vault that backs memory, and the place in it.
+  // The vault that backs memory, by its name.
   string vault = 1;
+  // The place in that vault memory is kept at.
   string place = 2;
+  // Every store under that place, one per folder.
   repeated MemoryStore stores = 3;
 }
 
