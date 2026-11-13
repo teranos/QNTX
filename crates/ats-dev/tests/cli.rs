@@ -4,13 +4,13 @@
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
-/// The seed every test's own key is, kept where `~/.qntx/key` is for the test:
-/// fixed, so a signature a test makes is the same every run.
+/// 「[Opus 5.5] The seed every test's own key is, kept where `~/.qntx/key` is for the test:」
+/// 「[Opus 5.5] fixed, so a signature a test makes is the same every run.」
 const SEED_HEX: &str = "1111111111111111111111111111111111111111111111111111111111111111";
-/// Another key's seed, for a row signed by someone else.
+/// 「[Opus 5.5] Another key's seed, for a row signed by someone else.」
 const OTHER_SEED_HEX: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 
-/// A key kept at `path` as `ground code login` keeps one: the seed in hex, 0600.
+/// 「[Opus 5.5] A key kept at `path` as `ground code login` keeps one: the seed in hex, 0600.」
 fn write_key(path: &std::path::Path, seed_hex: &str) {
     use std::os::unix::fs::PermissionsExt;
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -18,8 +18,8 @@ fn write_key(path: &std::path::Path, seed_hex: &str) {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
 }
 
-/// The binary with no key named by the environment and no proxy between it and
-/// a local node; each caller sets HOME, so `~/.qntx/key` is never the machine's.
+/// 「[Opus 5.5] The binary with no key named by the environment and no proxy between it and」
+/// 「[Opus 5.5] a local node; each caller sets HOME, so `~/.qntx/key` is never the machine's.」
 fn bin() -> Command {
     let mut c = Command::new(env!("CARGO_BIN_EXE_ats-dev"));
     c.env_remove("ATS_DEV_KEY");
@@ -45,8 +45,8 @@ fn run(db: &std::path::Path, args: &[&str], stdin: &str) -> Output {
 }
 fn out(o: &Output) -> String { String::from_utf8_lossy(&o.stdout).into_owned() }
 fn err(o: &Output) -> String { String::from_utf8_lossy(&o.stderr).into_owned() }
-/// A database in a directory of its own, which is the test's HOME, holding the
-/// test's key at `.qntx/key`.
+/// 「[Opus 5.5] A database in a directory of its own, which is the test's HOME, holding the」
+/// 「[Opus 5.5] test's key at `.qntx/key`.」
 fn db() -> (tempfile::TempDir, std::path::PathBuf) {
     let d = tempfile::tempdir().unwrap();
     write_key(&home_key(d.path()), SEED_HEX);
@@ -54,7 +54,7 @@ fn db() -> (tempfile::TempDir, std::path::PathBuf) {
     (d, p)
 }
 fn home_key(home: &std::path::Path) -> std::path::PathBuf { home.join(".qntx").join("key") }
-/// The did:key the test's key signs as.
+/// 「[Opus 5.5] The did:key the test's key signs as.」
 fn did(p: &std::path::Path) -> String {
     let v: serde_json::Value = serde_json::from_str(out(&run(p, &["key"], "")).trim()).unwrap();
     v["did"].as_str().unwrap().to_string()
@@ -86,9 +86,9 @@ fn a_signed_row_is_authored_by_its_signer_and_an_unsigned_one_by_ats_dev() {
     }
 }
 
-/// The node writes a request admitted as a key with that key leading the
-/// actors, and a signature's actors must be those (`actorsFor`); unsigned, the
-/// actors named stand alone.
+/// 「[Opus 5.5] The node writes a request admitted as a key with that key leading the」
+/// 「[Opus 5.5] actors, and a signature's actors must be those (`actorsFor`); unsigned, the」
+/// 「[Opus 5.5] actors named stand alone.」
 #[test]
 fn an_actor_that_was_named_stands_after_the_signer() {
     let (_d, p) = db();
@@ -152,8 +152,8 @@ fn a_negative_timestamp_with_a_sub_second_is_kept() {
     assert!(out(&o).contains("\"timestamp\":-1500"), "{}", out(&o));
 }
 
-/// The node takes a timestamp in seconds, so a signature over milliseconds
-/// would not verify there: a signed row's moment is a whole second.
+/// 「[Opus 5.5] The node takes a timestamp in seconds, so a signature over milliseconds」
+/// 「[Opus 5.5] would not verify there: a signed row's moment is a whole second.」
 #[test]
 fn a_signed_row_s_timestamp_is_a_whole_second() {
     let (_d, p) = db();
@@ -249,7 +249,7 @@ fn the_listings_and_stats_read_what_was_written() {
     assert_eq!(out(&run(&p, &["subjects"], "")).trim(), "ALICE");
     assert_eq!(out(&run(&p, &["predicates"], "")).trim(), "author");
     assert_eq!(out(&run(&p, &["contexts"], "")).trim(), "GITHUB");
-    // the signer leads a signed row's actors, then who was named
+    // 「[Opus 5.5] the signer leads a signed row's actors, then who was named」
     let mut actors: Vec<String> = out(&run(&p, &["actors"], "")).lines().map(str::to_string).collect();
     actors.sort();
     assert_eq!(actors, [did(&p), "BOB".to_string()].iter().cloned().collect::<std::collections::BTreeSet<_>>().into_iter().collect::<Vec<_>>());
@@ -289,10 +289,10 @@ fn put_signs_as_the_key_kept_in_qntx_key_and_mints_none() {
         assert_eq!(x["signature"], "valid");
         assert_eq!(x["signer"], k["did"]);
     }
-    // the key is the file as it was kept: read, not rewritten
+    // 「[Opus 5.5] the key is the file as it was kept: read, not rewritten」
     assert_eq!(std::fs::read_to_string(home_key(d.path())).unwrap(), format!("{SEED_HEX}\n"));
 
-    // none kept: refused, with where one comes from, and none made
+    // 「[Opus 5.5] none kept: refused, with where one comes from, and none made」
     std::fs::remove_file(home_key(d.path())).unwrap();
     for args in [vec!["put", "DAVE is author of GITHUB by BOB"], vec!["key"]] {
         let o = run(&p, &args, "");
@@ -409,8 +409,8 @@ fn a_signature_already_made_needs_no_key() {
     assert!(!home_key(d2.path()).exists());
 }
 
-/// A row signed by another key on an earlier build, carried here as text: a
-/// signature stays valid wherever the row is put.
+/// 「[Opus 5.5] A row signed by another key on an earlier build, carried here as text: a」
+/// 「[Opus 5.5] signature stays valid wherever the row is put.」
 const SIGNED: &str = r##"{"id":"AS-75847316-caac-45d6-b819-06eecbf8be07","subjects":["ALICE"],"predicates":["author"],"contexts":["GITHUB"],"actors":["BOB"],"timestamp":1794266294644,"source":"ats-dev","attributes":{"n":3,"note":"<a & \"b\">"},"created_at":1794266294644,"signature":[154,101,30,4,174,33,231,130,163,19,62,221,216,85,196,207,112,183,156,27,24,248,47,250,137,19,188,22,86,184,215,151,35,6,77,164,172,202,97,80,81,54,127,39,244,108,1,4,35,240,67,118,113,106,175,97,208,66,119,80,181,32,18,8],"signer_did":"did:key:z6Mkofs97sbDZBoGXR6im4Po2zJmwGdjJe2LQpAudzVx2ekp"}"##;
 
 fn signed_line() -> String {
@@ -882,8 +882,8 @@ fn a_duckdb_location_with_an_apostrophe_is_refused_before_anything_is_written() 
     assert!(!loc.exists(), "nothing was created");
 }
 
-/// A node of one request: it keeps the request line, the Authorization and the
-/// body it was sent, and answers `status` with what `answer` makes of the body.
+/// 「[Opus 5.5] A node of one request: it keeps the request line, the Authorization and the」
+/// 「[Opus 5.5] body it was sent, and answers `status` with what `answer` makes of the body.」
 fn fake_node(
     status: u16,
     answer: impl Fn(&serde_json::Value) -> serde_json::Value + Send + 'static,
@@ -921,7 +921,7 @@ fn fake_node(
     (url, h)
 }
 
-/// Every row taken, as the node answers a list it took.
+/// 「[Opus 5.5] Every row taken, as the node answers a list it took.」
 fn all_created(sent: &serde_json::Value) -> serde_json::Value {
     let n = sent.as_array().unwrap().len();
     serde_json::json!({ "results": vec![serde_json::json!({"status": 201, "answer": {"status": "created"}}); n] })
@@ -948,7 +948,7 @@ fn push_sends_each_row_as_the_node_takes_it_on_a_request_signed_for_that_node() 
     let (line, auth, sent) = node.join().unwrap();
     assert_eq!(line, "POST /api/attestations HTTP/1.1");
 
-    // the request: a JWT the key signs as its did:key, made out to this node, once
+    // 「[Opus 5.5] the request: a JWT the key signs as its did:key, made out to this node, once」
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let jwt = auth.strip_prefix("Signed ").expect("the request carries a Signed authorization");
     let parts: Vec<&str> = jwt.split('.').collect();
@@ -959,7 +959,7 @@ fn push_sends_each_row_as_the_node_takes_it_on_a_request_signed_for_that_node() 
     let pk = libp2p_identity::ed25519::PublicKey::try_from_bytes(&ats_sign::didkey::decode(&me).unwrap()).unwrap();
     assert!(pk.verify(format!("{}.{}", parts[0], parts[1]).as_bytes(), &b64.decode(parts[2]).unwrap()), "the request's signature is not the key's");
 
-    // the rows: seconds, the signature as Go reads []byte, created_at left to the node
+    // 「[Opus 5.5] the rows: seconds, the signature as Go reads []byte, created_at left to the node」
     let rows = sent.as_array().unwrap();
     let row = |id: &str| rows.iter().find(|r| r["id"] == id).unwrap().clone();
     let stored: serde_json::Value = serde_json::from_str(out(&run(&p, &["get", &signed], "")).trim()).unwrap();
@@ -980,9 +980,9 @@ fn push_says_what_the_node_refused_row_by_row_and_what_it_never_sent() {
     let (_d, p) = db();
     let ok = id_of(&run(&p, &["put", "ALICE is author of GITHUB by BOB"], ""));
     let late = id_of(&run(&p, &["put", "DAVE is author of GITHUB by BOB"], ""));
-    // `put -` says the ids it wrote, one per line
+    // 「[Opus 5.5] `put -` says the ids it wrote, one per line」
     let sub_second = out(&run(&p, &["--unsigned", "put", "-"], "{\"subjects\":[\"S\"],\"predicates\":[\"p\"],\"timestamp\":1500}\n")).trim().to_string();
-    // the node takes the first row it is sent and refuses the second
+    // 「[Opus 5.5] the node takes the first row it is sent and refuses the second」
     let (url, node) = fake_node(200, |sent| {
         let first = sent[0]["id"].clone();
         serde_json::json!({ "results": sent.as_array().unwrap().iter().map(|r| if r["id"] == first {
@@ -1037,7 +1037,7 @@ fn push_needs_the_key_and_a_node_url() {
     assert_eq!(out(&o), "");
 }
 
-/// A node that reads one request and hangs up without a word.
+/// 「[Opus 5.5] A node that reads one request and hangs up without a word.」
 fn node_that_hangs_up() -> (String, std::thread::JoinHandle<usize>) {
     use std::io::{BufRead, BufReader, Read};
     let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -1098,8 +1098,8 @@ fn a_row_the_node_already_had_is_said_apart_from_one_it_took() {
     node.join().unwrap();
 }
 
-/// A push whose answers cannot be said is not a push that succeeded: the node
-/// took the row, but nobody was told, and the exit says so.
+/// 「[Opus 5.5] A push whose answers cannot be said is not a push that succeeded: the node」
+/// 「[Opus 5.5] took the row, but nobody was told, and the exit says so.」
 #[test]
 fn a_push_whose_lines_cannot_be_written_does_not_exit_0() {
     let (_d, p) = db();
@@ -1115,7 +1115,7 @@ fn a_push_whose_lines_cannot_be_written_does_not_exit_0() {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    // nobody reads what push says
+    // 「[Opus 5.5] nobody reads what push says」
     drop(c.stdout.take());
     let o = c.wait_with_output().unwrap();
     node.join().unwrap();
@@ -1133,8 +1133,8 @@ fn a_node_url_is_reached_as_written_and_names_no_query() {
     }
 }
 
-/// A node that takes `n` requests, each answered as taken, and keeps the size
-/// of each body and how many rows it carried.
+/// 「[Opus 5.5] A node that takes `n` requests, each answered as taken, and keeps the size」
+/// 「[Opus 5.5] of each body and how many rows it carried.」
 fn fake_node_n(n: usize) -> (String, std::thread::JoinHandle<Vec<(usize, usize)>>) {
     use std::io::{BufRead, BufReader, Read};
     let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -1169,8 +1169,8 @@ fn fake_node_n(n: usize) -> (String, std::thread::JoinHandle<Vec<(usize, usize)>
     (url, h)
 }
 
-/// The node refuses a request past 10 MB whole, so rows are sent in requests
-/// under it, and a row too large for any request is said and not sent.
+/// 「[Opus 5.5] The node refuses a request past 10 MB whole, so rows are sent in requests」
+/// 「[Opus 5.5] under it, and a row too large for any request is said and not sent.」
 #[test]
 fn push_keeps_each_request_under_what_the_node_reads() {
     let (_d, p) = db();
@@ -1194,9 +1194,9 @@ fn push_keeps_each_request_under_what_the_node_reads() {
     assert!(seen.iter().all(|(bytes, _)| *bytes < 10 * 1000 * 1000), "{seen:?}");
 }
 
-/// A row that names a signer and no signature, or a signature and no signer,
-/// is not sent as unsigned: the node would sign it as itself and the claim of a
-/// signer would be gone. ats-dev never writes one; another writer of the file can.
+/// 「[Opus 5.5] A row that names a signer and no signature, or a signature and no signer,」
+/// 「[Opus 5.5] is not sent as unsigned: the node would sign it as itself and the claim of a」
+/// 「[Opus 5.5] signer would be gone. ats-dev never writes one; another writer of the file can.」
 #[test]
 fn push_refuses_a_row_with_half_a_signature() {
     use ats::AttestationStore;

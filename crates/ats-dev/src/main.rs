@@ -16,26 +16,26 @@
 //! ats-dev [--db FILE] clear --yes
 //! ats-dev [--db FILE] subjects | predicates | contexts | actors   # distinct values, one per line
 //! ats-dev [--db FILE] stats
-//! ats-dev [--db FILE] key                       # the signing key's did:key and file
-//! ats-dev [--db FILE] push NODE [ID...]         # send rows to a node, the request signed by the key; one JSON line per row
+//! 「[Opus 5.5] ats-dev [--db FILE] key                       # the signing key's did:key and file」
+//! 「[Opus 5.5] ats-dev [--db FILE] push NODE [ID...]         # send rows to a node, the request signed by the key; one JSON line per row」
 //! ats-dev [--db FILE] bench load N [--step S] [--batch K] [--replace] | probe N | query   # see bench/README.md
 //! ats-dev [--db FILE] verify [ID]               # valid / invalid / unsigned, one line each; exit 1 if any is invalid
 //! ats-dev [--db FILE] alias add A B | rm A B | ls | resolve X
 //! ```
 //!
-//! `put` signs with `--key FILE`, else `$ATS_DEV_KEY`, else the key kept in
-//! `~/.qntx/key`: the one `qntx` signs a request to a node with, a 32-byte
-//! ed25519 seed in hex that `ground code login` keeps. ats-dev never mints one.
-//! The bytes are the ones the node verifies (`ats-sign`), and a row signed here
-//! is the node's to store as it was signed: its actors lead with the key's
-//! did:key and its timestamp is a whole second, as the node writes them under
-//! a signature. `--unsigned` writes without a signature, authored by `ats-dev`.
-//! A key file that group or other can reach (mode other than 0600) is refused.
+//! 「[Opus 5.5] `put` signs with `--key FILE`, else `$ATS_DEV_KEY`, else the key kept in」
+//! 「[Opus 5.5] `~/.qntx/key`: the one `qntx` signs a request to a node with, a 32-byte」
+//! 「[Opus 5.5] ed25519 seed in hex that `ground code login` keeps. ats-dev never mints one.」
+//! 「[Opus 5.5] The bytes are the ones the node verifies (`ats-sign`), and a row signed here」
+//! 「[Opus 5.5] is the node's to store as it was signed: its actors lead with the key's」
+//! 「[Opus 5.5] did:key and its timestamp is a whole second, as the node writes them under」
+//! 「[Opus 5.5] a signature. `--unsigned` writes without a signature, authored by `ats-dev`.」
+//! 「[Opus 5.5] A key file that group or other can reach (mode other than 0600) is refused.」
 //!
-//! "A signature proves the key, and nothing reusable leaves the node."
-//! `push NODE` posts rows to `NODE/api/attestations`, each request carrying a
-//! JWT the same key signs for that node, spent once there; the node stores a
-//! row signed by that key as signed, and signs an unsigned one as itself.
+//! "「[Sonnet 5.5] A signature proves the key, and nothing reusable leaves the node.」"
+//! 「[Opus 5.5] `push NODE` posts rows to `NODE/api/attestations`, each request carrying a」
+//! 「[Opus 5.5] JWT the same key signs for that node, spent once there; the node stores a」
+//! 「[Opus 5.5] row signed by that key as signed, and signs an unsigned one as itself.」
 //!
 //! `--db` defaults to `$ATS_DEV_DB`, else `ats-dev.db`. Rows come out as JSON,
 //! one attestation per line. A failure goes to stderr as a sacred-error `Error`
@@ -50,7 +50,7 @@
 //! others. `--db` is DuckDB's location (a path, or an `s3://` / `file://` url)
 //! and Postgres's connection url (`$QNTX_POSTGRES_URL` if not given); `--ca`
 //! is Postgres's CA file when the url is TLS; `--namespace` (default
-//! `ats-dev`) is the namespace both open.
+//! 「[Opus 5.5] `ats-dev`) is the namespace both open.」
 //!
 //! `duckdb` is one writer per location (ADR-024: "One node writes a namespace
 //! prefix"). `ats-dev` does not coordinate two processes writing the same one,
@@ -256,8 +256,8 @@ fn unbuilt(feature: &str) -> Box<Error> {
     )
 }
 
-/// The signing key, loaded the first time something needs a signature made,
-/// never for reading, `--unsigned`, or a signature already given.
+/// 「[Opus 5.5] The signing key, loaded the first time something needs a signature made,」
+/// 「[Opus 5.5] never for reading, `--unsigned`, or a signature already given.」
 struct Keys {
     path: Result<std::path::PathBuf, Box<Error>>,
     unsigned: bool,
@@ -276,7 +276,7 @@ impl Keys {
         }
     }
 
-    /// The key if one is kept; none kept is not an error here.
+    /// 「[Opus 5.5] The key if one is kept; none kept is not an error here.」
     fn existing(&self) -> Result<Option<&sign::Signer>, Box<Error>> {
         if self.unsigned {
             return Ok(None);
@@ -300,7 +300,7 @@ impl Keys {
 }
 
 /// What is written: a signature already given is checked and kept, none given
-/// is made with the key, and an unsigned row is authored by ats-dev.
+/// 「[Opus 5.5] is made with the key, and an unsigned row is authored by ats-dev.」
 fn seal(keys: &Keys, a: Attestation) -> Result<Attestation, Box<Error>> {
     if a.signature.is_none() && a.signer_did.is_some() {
         return Err(fail("a signer without a signature", format!("{}: name a signature too, or neither", a.id)));
@@ -317,12 +317,12 @@ fn seal(keys: &Keys, a: Attestation) -> Result<Attestation, Box<Error>> {
     }
 }
 
-/// The attestation as the node writes it under this key's signature, so that
-/// what is signed here is what the node verifies there. The node writes a
-/// request admitted as a key with that key's did:key leading the actors
-/// (`actorsFor`, QNTX `server/attestation_handlers.go`), and a signature's
-/// actors must be those; it takes a timestamp in seconds (`time.Unix(s, 0)`),
-/// so a signature over a sub-second moment would not verify there.
+/// 「[Opus 5.5] The attestation as the node writes it under this key's signature, so that」
+/// 「[Opus 5.5] what is signed here is what the node verifies there. The node writes a」
+/// 「[Opus 5.5] request admitted as a key with that key's did:key leading the actors」
+/// 「[Opus 5.5] (`actorsFor`, QNTX `server/attestation_handlers.go`), and a signature's」
+/// 「[Opus 5.5] actors must be those; it takes a timestamp in seconds (`time.Unix(s, 0)`),」
+/// 「[Opus 5.5] so a signature over a sub-second moment would not verify there.」
 fn ready_to_sign(sg: &sign::Signer, mut a: Attestation) -> Result<Attestation, Box<Error>> {
     if a.timestamp.rem_euclid(1000) != 0 {
         return Err(fail(
@@ -336,7 +336,7 @@ fn ready_to_sign(sg: &sign::Signer, mut a: Attestation) -> Result<Attestation, B
     Ok(a)
 }
 
-/// Now, to the whole second: a timestamp the node carries as it was signed.
+/// 「[Opus 5.5] Now, to the whole second: a timestamp the node carries as it was signed.」
 fn now_whole_ms() -> i64 {
     now_ms().div_euclid(1000) * 1000
 }
@@ -810,30 +810,30 @@ fn verify(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-/// Rows per request: one signature is spent per request, and the node answers
-/// a list row by row, in the order sent (`handleCreateAttestation`).
+/// 「[Opus 5.5] Rows per request: one signature is spent per request, and the node answers」
+/// 「[Opus 5.5] a list row by row, in the order sent (`handleCreateAttestation`).」
 const PUSH_BATCH: usize = 100;
 
-/// Bytes a request's body may reach: the node reads at most 10 MB of one
-/// (`maxAttestationBody`) and refuses the whole request past it, so a batch is
-/// sent before a row would take it over this, and a row larger on its own is
-/// not sent at all.
+/// 「[Opus 5.5] Bytes a request's body may reach: the node reads at most 10 MB of one」
+/// 「[Opus 5.5] (`maxAttestationBody`) and refuses the whole request past it, so a batch is」
+/// 「[Opus 5.5] sent before a row would take it over this, and a row larger on its own is」
+/// 「[Opus 5.5] not sent at all.」
 const PUSH_BODY_BUDGET: usize = 8 * 1024 * 1024;
 
-/// Seconds a request's signature lasts: long enough to reach the node, well
-/// inside the five minutes the node allows one (what `qntx sign` gives).
+/// 「[Opus 5.5] Seconds a request's signature lasts: long enough to reach the node, well」
+/// 「[Opus 5.5] inside the five minutes the node allows one (what `qntx sign` gives).」
 const PUSH_SIGNED_FOR: i64 = 60;
 
-/// Send rows to a node: `POST NODE/api/attestations`, each request signed by
-/// the key for that node. The node answers every row; each answer is a line on
-/// stdout, as the node gave it. A row signed by the key is stored as signed,
-/// an unsigned one is signed by the node, one signed by another key is refused
-/// there unless the node's grant holds that key.
+/// 「[Opus 5.5] Send rows to a node: `POST NODE/api/attestations`, each request signed by」
+/// 「[Opus 5.5] the key for that node. The node answers every row; each answer is a line on」
+/// 「[Opus 5.5] stdout, as the node gave it. A row signed by the key is stored as signed,」
+/// 「[Opus 5.5] an unsigned one is signed by the node, one signed by another key is refused」
+/// 「[Opus 5.5] there unless the node's grant holds that key.」
 ///
-/// Rows are read and sent a batch at a time, so a large store is never held
-/// whole. Every id asked for gets a line, whatever happens to the network: a
-/// request the node did not answer reports its rows, and the rows after it are
-/// reported as not sent.
+/// 「[Opus 5.5] Rows are read and sent a batch at a time, so a large store is never held」
+/// 「[Opus 5.5] whole. Every id asked for gets a line, whatever happens to the network: a」
+/// 「[Opus 5.5] request the node did not answer reports its rows, and the rows after it are」
+/// 「[Opus 5.5] reported as not sent.」
 fn push(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let usage = "ats-dev push https://node.example [ID...]";
     let node = tail.first().ok_or_else(|| fail("push needs a node", usage))?;
@@ -845,8 +845,8 @@ fn push(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         Some(given) if !given.is_empty() => given.iter().map(|x| x.to_string()).collect(),
         _ => listed(&s)?,
     };
-    // A node that accepts the connection and never answers would hold push
-    // forever; past the signature's life the node would refuse it anyway.
+    // 「[Opus 5.5] A node that accepts the connection and never answers would hold push」
+    // 「[Opus 5.5] forever; past the signature's life the node would refuse it anyway.」
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
         .timeout_global(Some(std::time::Duration::from_secs(PUSH_SIGNED_FOR.unsigned_abs())))
@@ -854,7 +854,7 @@ fn push(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
         .into();
     let mut p = Pushing { out: std::io::stdout().lock(), tally: Tally::default() };
     let mut batch: Vec<(String, serde_json::Value)> = Vec::with_capacity(PUSH_BATCH);
-    // The body is `[` rows joined by `,` `]`.
+    // 「[Opus 5.5] The body is `[` rows joined by `,` `]`.」
     let mut bytes = 2usize;
     let mut ids = ids.into_iter();
     let mut broken: Option<String> = None;
@@ -933,15 +933,15 @@ struct Tally {
     not_taken: usize,
 }
 
-/// Why a batch stopped push: the node did not answer it, and the rows after it
-/// go unsent; or a row's line could not be written, and push ends there, whatever
-/// the node took, since a row whose answer was not said is not one to call done.
+/// 「[Opus 5.5] Why a batch stopped push: the node did not answer it, and the rows after it」
+/// 「[Opus 5.5] go unsent; or a row's line could not be written, and push ends there, whatever」
+/// 「[Opus 5.5] the node took, since a row whose answer was not said is not one to call done.」
 enum Halt {
     Unanswered(String),
     Unsaid(Box<Error>),
 }
 
-/// Where push says what became of each row.
+/// 「[Opus 5.5] Where push says what became of each row.」
 struct Pushing<W: Write> {
     out: W,
     tally: Tally,
@@ -957,8 +957,8 @@ impl<W: Write> Pushing<W> {
         self.say(serde_json::json!({ "id": id, "refused": why }))
     }
 
-    /// One request for the batch, and a line for each of its rows; the batch is
-    /// emptied either way.
+    /// 「[Opus 5.5] One request for the batch, and a line for each of its rows; the batch is」
+    /// 「[Opus 5.5] emptied either way.」
     fn send(
         &mut self,
         agent: &ureq::Agent,
@@ -1004,8 +1004,8 @@ impl<W: Write> Pushing<W> {
                     self.say(serde_json::json!({ "id": id, "status": st, "answer": r.get("answer") })).map_err(Halt::Unsaid)?;
                 }
             }
-            // The request itself was not taken (the gate, a body the node did
-            // not read): every row of it is answered with what the node said.
+            // 「[Opus 5.5] The request itself was not taken (the gate, a body the node did」
+            // 「[Opus 5.5] not read): every row of it is answered with what the node said.」
             None => {
                 for (id, _) in &rows {
                     self.tally.not_taken += 1;
@@ -1017,12 +1017,12 @@ impl<W: Write> Pushing<W> {
     }
 }
 
-/// The origin a request's signature is made out to: the scheme and the
-/// authority as the node url names them, as `qntx sign` makes it
-/// (`cmd/qntx/commands/element.go`, `signedFor`) and ground's signer does. The
-/// node compares it with its configured origin exactly, so the url is named as
-/// the node names itself, an explicit port included. A query or a fragment is
-/// refused: `/api/attestations` is appended to the url, and would land in it.
+/// 「[Opus 5.5] The origin a request's signature is made out to: the scheme and the」
+/// 「[Opus 5.5] authority as the node url names them, as `qntx sign` makes it」
+/// 「[Opus 5.5] (`cmd/qntx/commands/element.go`, `signedFor`) and ground's signer does. The」
+/// 「[Opus 5.5] node compares it with its configured origin exactly, so the url is named as」
+/// 「[Opus 5.5] the node names itself, an explicit port included. A query or a fragment is」
+/// 「[Opus 5.5] refused: `/api/attestations` is appended to the url, and would land in it.」
 fn origin_of(node: &str) -> Result<String, Box<Error>> {
     if node.contains(['?', '#']) {
         return Err(fail("a node url names no query or fragment", node));
@@ -1038,10 +1038,10 @@ fn origin_of(node: &str) -> Result<String, Box<Error>> {
     Ok(format!("{scheme}://{authority}"))
 }
 
-/// One row as `POST /api/attestations` takes it: the timestamp in seconds, the
-/// signature as Go reads a `[]byte`, `created_at` left to the node. A row whose
-/// timestamp is not a whole second is not sent: the node would store another
-/// moment, and a signature over this one would not verify there.
+/// 「[Opus 5.5] One row as `POST /api/attestations` takes it: the timestamp in seconds, the」
+/// 「[Opus 5.5] signature as Go reads a `[]byte`, `created_at` left to the node. A row whose」
+/// 「[Opus 5.5] timestamp is not a whole second is not sent: the node would store another」
+/// 「[Opus 5.5] moment, and a signature over this one would not verify there.」
 fn wire(a: &Attestation) -> Result<serde_json::Value, String> {
     use base64::Engine;
     if a.timestamp.rem_euclid(1000) != 0 {
@@ -1058,8 +1058,8 @@ fn wire(a: &Attestation) -> Result<serde_json::Value, String> {
             m.insert("signer_did".into(), did.clone().into());
         }
         (None, None, _) => {}
-        // Sent without the half it has, the node would store it unsigned and
-        // sign it as itself: a row that claimed a signer would lose the claim.
+        // 「[Opus 5.5] Sent without the half it has, the node would store it unsigned and」
+        // 「[Opus 5.5] sign it as itself: a row that claimed a signer would lose the claim.」
         _ => return Err("a signature and a signer are given together or not at all; this row has one".into()),
     }
     Ok(v)
@@ -1070,8 +1070,8 @@ fn wire(a: &Attestation) -> Result<serde_json::Value, String> {
 mod tests {
     use super::origin_of;
 
-    /// The node compares the audience with its configured origin exactly, so
-    /// it is the url's own, as `qntx sign` makes it.
+    /// 「[Opus 5.5] The node compares the audience with its configured origin exactly, so」
+    /// 「[Opus 5.5] it is the url's own, as `qntx sign` makes it.」
     #[test]
     fn a_node_url_is_made_out_to_its_origin_as_qntx_sign_makes_it() {
         for (url, origin) in [
