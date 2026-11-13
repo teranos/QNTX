@@ -3,11 +3,10 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	appcfg "github.com/teranos/QNTX/internal/config"
-	"github.com/teranos/QNTX/internal/secretref"
-	"github.com/teranos/QNTX/internal/sentryread"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
@@ -67,13 +66,63 @@ func (s *QNTXServer) sendReport(ctx context.Context) (*protocol.MailReport, erro
 	if err != nil {
 		return nil, errors.Wrap(err, "the report could not be rendered")
 	}
+	// "make the report also get delivered to the Node Room"
+	//
+	// "i do feel like the NODE Agent should be receiving this as well, so i receive it, and the NODE Agent at the
+	// same time"
+	roomErr := s.sayReportInNodeRoom(ctx, mail)
+	if roomErr != nil {
+		s.logger.Errorw("The weekly report was not said in the Node Room", "error", roomErr)
+	}
 	messageID, attestationID, err := s.nodeMailer.SendAsNode(ctx, root.ID, mail)
 	sent := &protocol.MailReport{To: root.PrimaryEmail(), MessageId: messageID, AttestationId: attestationID}
 	if err != nil {
-		return sent, errors.Wrapf(err, "the report to the ROOT User %s was not sent", root.ID)
+		err = errors.Wrapf(err, "the report to the ROOT User %s was not sent", root.ID)
+		if roomErr != nil {
+			err = errors.WithSecondaryError(err, roomErr)
+		}
+		return sent, err
 	}
 	s.logger.Infow("Weekly report sent", "user", root.ID, "message_id", messageID, "attestation", attestationID)
+	// The mail went: a report asked for again would mail it twice. That the Node Room was not said to is the error
+	// line logged above, which next week's report counts among its error lines.
 	return sent, nil
+}
+
+// sayReportInNodeRoom says the report in the Node Room of the one plugin that holds rooms.
+func (s *QNTXServer) sayReportInNodeRoom(ctx context.Context, mail services.NodeMail) error {
+	provider, rooms, refused := s.roomsOf("")
+	if refused != nil {
+		return errors.Newf("the report has no Node Room to be said in: %s", refused.GetSays())
+	}
+	return sayReportIn(ctx, rooms, provider, mail)
+}
+
+// sayReportIn says the report in the Node Room provider holds, as the node: what the mail is called, with the
+// report whole as text and its graphs beside it.
+//
+// It names nobody as who says it. A room's provider says what nobody is named for as the node itself, under the
+// name the node has there (qntx-node in switchai-py); a name it does not hold it takes for a person at the node,
+// registers and brings into the room.
+func sayReportIn(ctx context.Context, rooms protocol.RoomsServiceClient, provider string, mail services.NodeMail) error {
+	target, err := nodeRoomForComments(ctx, rooms, provider)
+	if err != nil {
+		return errors.Wrap(err, "the report has no Node Room to be said in")
+	}
+	text, err := services.BodyOf(mail.Bodies, services.MailText)
+	if err != nil {
+		return errors.Wrap(err, "the report has no text to say in the Node Room")
+	}
+	files := []*protocol.RoomFile{{Name: strings.ReplaceAll(mail.Subject, " ", "-") + ".txt", Type: "text/plain", Data: []byte(text)}}
+	for _, img := range mail.Inline {
+		files = append(files, &protocol.RoomFile{Name: img.FileName, Type: img.ContentType, Data: img.Data})
+	}
+	if _, err := rooms.PostToRoom(ctx, &protocol.PostToRoomRequest{
+		Provider: provider, Room: target.Room, Body: mail.Subject, Files: files,
+	}); err != nil {
+		return errors.Wrap(err, "the report was not said in the Node Room")
+	}
+	return nil
 }
 
 // setupWeeklyReport reads Sentry's settings, registers the report and keeps its
@@ -132,27 +181,4 @@ func (s *QNTXServer) setupWeeklyReport(cfg *appcfg.Config) {
 		return
 	}
 	s.logger.Infow("Scheduled the weekly report", "job_id", job.Id, "interval_seconds", interval)
-}
-
-// sentryReader is Sentry as am.toml names it, resolved now: a token created
-// after the node started is read by the next report.
-func (s *QNTXServer) sentryReader(ctx context.Context) (sentryread.Client, error) {
-	return sentryReaderFrom(ctx, s.sentryConfig)
-}
-
-// sentryReaderFrom is a Sentry client from am.toml, or why there is none.
-func sentryReaderFrom(ctx context.Context, cfg appcfg.SentryConfig) (sentryread.Client, error) {
-	c := sentryread.Client{API: cfg.API, Organization: cfg.Organization, Project: cfg.Project}
-	if cfg.ReadTokenRef != "" {
-		token, err := secretref.Resolve(ctx, cfg.ReadTokenRef)
-		if err != nil {
-			// The reference is named, never the value it failed to fetch.
-			return c, errors.Wrapf(err, "sentry.read_token %s did not resolve", cfg.ReadTokenRef)
-		}
-		c.Token = token
-	}
-	if err := c.Configured(); err != nil {
-		return c, err
-	}
-	return c, nil
 }

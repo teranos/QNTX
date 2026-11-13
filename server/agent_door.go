@@ -35,6 +35,56 @@ type agentDoors struct {
 	byDID map[string]*agentDoor
 	// byHome is the door an agent's ground reaches the node at, by its home.
 	byHome map[string]string
+	// turns is, by agent DID, how many of its turns run now that a person
+	// started, and how many nobody did.
+	turns map[string]*turnsRunning
+}
+
+// turnsRunning counts an agent's turns running now, by who started them.
+type turnsRunning struct{ byPerson, byNoPerson int }
+
+// "I said it here. Release it."
+//
+// onAPersonsWord marks what arrives at an agent's door while a person is
+// talking to it: what the agent does in that turn, it does on their word.
+type onAPersonsWord struct{}
+
+// aPersonsTurn counts a turn of the agent with did as running until the
+// returned func is called: started by a person, or by none.
+func (s *QNTXServer) aPersonsTurn(did string, byPerson bool) func() {
+	s.doors.mu.Lock()
+	defer s.doors.mu.Unlock()
+	if s.doors.turns == nil {
+		s.doors.turns = map[string]*turnsRunning{}
+	}
+	running := s.doors.turns[did]
+	if running == nil {
+		running = &turnsRunning{}
+		s.doors.turns[did] = running
+	}
+	if byPerson {
+		running.byPerson++
+	} else {
+		running.byNoPerson++
+	}
+	return func() {
+		s.doors.mu.Lock()
+		defer s.doors.mu.Unlock()
+		if byPerson {
+			running.byPerson--
+		} else {
+			running.byNoPerson--
+		}
+	}
+}
+
+// speaksForAPerson is whether every turn of the agent with did running now is
+// one a person started: a turn nobody started running beside it speaks for no one.
+func (s *QNTXServer) speaksForAPerson(did string) bool {
+	s.doors.mu.Lock()
+	defer s.doors.mu.Unlock()
+	running := s.doors.turns[did]
+	return running != nil && running.byPerson > 0 && running.byNoPerson == 0
 }
 
 // agentDoor is one agent's door: where it answers, and the agent it admits.
@@ -103,7 +153,11 @@ func (s *QNTXServer) openDoor(agent *rootAgent, grant auth.Grant, keepIn string)
 				http.Error(w, "the node does not serve yet", http.StatusServiceUnavailable)
 				return
 			}
-			s.served.ServeHTTP(w, r.WithContext(auth.ThroughDoor(r.Context(), held)))
+			ctx := auth.ThroughDoor(r.Context(), held)
+			if s.speaksForAPerson(held.DID) {
+				ctx = context.WithValue(ctx, onAPersonsWord{}, true)
+			}
+			s.served.ServeHTTP(w, r.WithContext(ctx))
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,

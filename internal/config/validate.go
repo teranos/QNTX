@@ -139,6 +139,9 @@ func (c *Config) Validate() error {
 	if err := validateProviders("auth.provider", c.Auth.Provider); err != nil {
 		return err
 	}
+	if err := validateApns(c.Apns); err != nil {
+		return err
+	}
 	for namespace, configured := range c.Auth.Door {
 		if err := validateProviders("auth.door."+namespace+".provider", configured.Provider); err != nil {
 			return err
@@ -212,9 +215,6 @@ func (c *Config) Validate() error {
 			return errors.Newf("sentry.traces_sample_rate must be between 0 and 1, got %f", c.Sentry.TracesSampleRate)
 		}
 	}
-	if err := secretref.Validate(c.Sentry.ReadTokenRef); err != nil {
-		return errors.Wrap(err, "sentry.read_token")
-	}
 
 	// The node's own report (ADR-042): omit for weekly, 0 is never.
 	if c.Mail.Report.IntervalSeconds != nil && *c.Mail.Report.IntervalSeconds < 0 {
@@ -235,6 +235,26 @@ func validateProviders(at string, p ProviderConfig) error {
 		return err
 	}
 	return validateAppleClient(at+".apple", p.Apple)
+}
+
+// validateApns holds the node's way to a phone to all four or nothing: a key
+// with no app to reach, or an app with no key, reaches no phone and says
+// nothing of it until a notification is due. The key is named, never written:
+// am.toml is read by more than the node.
+func validateApns(a ApnsConfig) error {
+	given := 0
+	for _, field := range []string{a.BundleID, a.KeyID, a.TeamID, a.PrivateKeyRef} {
+		if field != "" {
+			given++
+		}
+	}
+	if given != 0 && given != 4 {
+		return errors.New("apns needs bundle_id, key_id, team_id and private_key together, or none of them")
+	}
+	if err := secretref.Validate(a.PrivateKeyRef); err != nil {
+		return errors.Wrap(err, "apns.private_key is invalid")
+	}
+	return nil
 }
 
 // validateGitHubApp holds the key to the App it signs for: the JWT names the

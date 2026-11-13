@@ -572,14 +572,9 @@ func (h *Handler) MintedBy(did string) (string, bool) {
 	if h == nil || h.tokens == nil || did == "" {
 		return "", false
 	}
-	held, err := h.tokens.List()
-	if err != nil {
-		return "", false
-	}
-	for _, t := range held {
-		if t.DID == did && t.MintedBy != "" {
-			return t.MintedBy, true
-		}
+	// Found by its DID, and the list not read: a DID names one token.
+	if found, known := h.tokenOf(did); known && found.MintedBy != "" {
+		return found.MintedBy, true
 	}
 	return "", false
 }

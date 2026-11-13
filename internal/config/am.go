@@ -15,6 +15,7 @@ type Config struct {
 	Fetch      FetchConfig      `mapstructure:"fetch"`
 	Mail       MailConfig       `mapstructure:"mail"`
 	Sentry     SentryConfig     `mapstructure:"sentry"`
+	Apns       ApnsConfig       `mapstructure:"apns"`
 	Node       NodeConfig       `mapstructure:"node"`
 	Nodes      NodesConfig      `mapstructure:"nodes"`
 	Agent      AgentConfig      `mapstructure:"agent"`
@@ -196,6 +197,21 @@ type PeerConfig struct {
 	ReturnAddress string   `mapstructure:"return_address"` // Where its people are sent back to, + /auth/elsewhere/back.
 }
 
+// ApnsConfig is how the node reaches a phone through Apple: the app it reaches
+// and the team's APNs auth key. The key itself is kept where secrets are kept
+// and named here, as the identity providers' keys are. See internal/secretref.
+type ApnsConfig struct {
+	BundleID string `mapstructure:"bundle_id"` // The app's bundle id, which is the topic a notification is sent to.
+	KeyID    string `mapstructure:"key_id"`    // The id Apple gave the key.
+	TeamID   string `mapstructure:"team_id"`   // The Apple Developer team's id.
+	// PrivateKeyRef names the .p8 as Apple gave it: ssm:///path or env:VAR. Empty = the node reaches no phone.
+	PrivateKeyRef string `mapstructure:"private_key"`
+	// Development is whether the app the phones run was built for development:
+	// Apple takes its tokens at another host, and refuses them at the one a
+	// TestFlight or App Store build is reached at.
+	Development bool `mapstructure:"development"`
+}
+
 // SentryConfig points the node's logs at a Sentry project.
 //
 // The console and the log file are for whoever is at the machine. This is for
@@ -218,12 +234,12 @@ type SentryConfig struct {
 	// as prose. 0 ships none. 1 ships all.
 	TracesSampleRate float64 `mapstructure:"traces_sample_rate"`
 
-	// Reading back what the node shipped, for the weekly report (ADR-042). All
-	// four or the report says which is missing and leaves Sentry out.
-	ReadTokenRef string `mapstructure:"read_token"`   // ssm:// or env: reference to a Sentry token that may read events — a literal is rejected
-	API          string `mapstructure:"api"`          // The API origin the organization lives in (e.g. "https://de.sentry.io")
+	// Reading back what the node shipped, for the weekly report (ADR-042), through the Sentry MCP server the
+	// node consumes, named sentry (mcp connect): "the node gives Agents access to the MCP of Sentry". No token:
+	// "ADR-025 is DEAD ok?" All three, or the report says which is missing and leaves Sentry out.
+	API          string `mapstructure:"api"`          // The region the organization lives in (e.g. "https://de.sentry.io")
 	Organization string `mapstructure:"organization"` // The organization's slug
-	Project      string `mapstructure:"project"`      // The project's id: the last segment of the DSN
+	Project      string `mapstructure:"project"`      // The project's slug or id
 }
 
 // LLMConfig configures LLM request queuing and rate limiting at the core routing layer.
