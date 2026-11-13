@@ -1,10 +1,11 @@
-// Package apns sends a notification to a phone through Apple: the node says
-// something to a person whose app is closed (teranos/QNTX#1409).
+// Package apns reaches a phone through Apple: the node starts, moves and ends
+// a Live Activity on it, with the app closed (teranos/QNTX#1409).
 //
-// What is sent is Apple's own shape: one HTTP/2 POST per notification to
-// /3/device/<token>, the push type alert, the topic the app's bundle id, and a
-// provider token: a JWT the key signs, ES256, that Apple takes for an hour and
-// refuses when it is renewed more often than every twenty minutes.
+// What is sent is Apple's own shape: one HTTP/2 POST to /3/device/<token>, the
+// push type liveactivity, the topic the app's bundle id and
+// .push-type.liveactivity after it, and a provider token: a JWT the key signs,
+// ES256, that Apple takes for an hour and refuses when it is renewed more
+// often than every twenty minutes.
 package apns
 
 import (
@@ -26,16 +27,13 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// Production is where Apple takes notifications for an app from TestFlight or
-// the App Store, and Development where it takes them for one built for
+// Production is where Apple takes what is said to an app from TestFlight or
+// the App Store, and Development where it takes it for one built for
 // development. A token of the one is refused at the other.
 const (
 	Production  = "https://api.push.apple.com"
 	Development = "https://api.sandbox.push.apple.com"
 )
-
-// replacesAtMost is the longest Apple takes what a notification replaces by.
-const replacesAtMost = 64
 
 // tokenLives is how long one provider token is used before another is signed:
 // under Apple's hour, over its twenty minutes.
@@ -49,22 +47,7 @@ type Key struct {
 	TeamID string
 }
 
-// Notification is one thing said to a phone.
-type Notification struct {
-	// Token is the device's, hex as the app read it.
-	Token string
-	// Title and Body are what the phone shows.
-	Title, Body string
-	// Opens is what the app is handed when the person taps it: where to go.
-	Opens map[string]string
-	// Replaces names what this is about. A later one with the same name takes
-	// the place of the earlier on the phone, and does not stand beside it.
-	Replaces string
-	// Expires is when Apple stops trying to deliver it. Zero is one try.
-	Expires time.Time
-}
-
-// Sender sends notifications for one app.
+// Sender reaches the Live Activities of one app.
 type Sender struct {
 	// BundleID is the app's.
 	BundleID string
@@ -134,58 +117,114 @@ func (s *Sender) providerToken() (string, error) {
 	return s.token, nil
 }
 
-// Refused is Apple's own answer to a notification it did not take.
+// Refused is Apple's own answer to what it did not take.
 type Refused struct {
 	Status int
 	Reason string
 	// Gone is whether the token is no longer one: the app was removed from
-	// the phone. Nothing is sent to it again.
+	// the phone, or the activity is over. Nothing is sent to it again.
 	Gone bool
 }
 
 func (r *Refused) Error() string {
-	return "Apple refused the notification: " + strconv.Itoa(r.Status) + " " + r.Reason
+	return "Apple refused what the Live Activity was told: " + strconv.Itoa(r.Status) + " " + r.Reason
 }
 
-// Send sends one notification, and answers Apple's id for it. What Apple refuses is a *Refused.
-func (s *Sender) Send(ctx context.Context, n Notification) (string, error) {
+// What a Live Activity is told: that it begins, that what it shows changed, or that it is over.
+const (
+	ActivityStarts = "start"
+	ActivityMoves  = "update"
+	ActivityEnds   = "end"
+)
+
+// Activity is one thing said to a Live Activity: what stands on the phone's
+// island and lock screen, and in the menu bar of the person's Mac, for as long
+// as it lasts. Apple's own shape for it is "Starting and updating Live
+// Activities with ActivityKit push notifications".
+type Activity struct {
+	// Token is the phone's token for starting one when it starts, and the
+	// activity's own afterwards.
+	Token string
+	// Event is ActivityStarts, ActivityMoves or ActivityEnds.
+	Event string
+	// Type names the app's ActivityAttributes type, and Attributes is what
+	// never changes while it lasts. Both are said when it starts and only then.
+	Type       string
+	Attributes any
+	// State is what it shows now, in the shape of the type's ContentState.
+	State any
+	// Title and Body are what the phone says as it begins: Apple starts none unannounced.
+	Title, Body string
+	// Stale is when what it shows is no longer so, were nothing said after this.
+	Stale time.Time
+	// Gone is when an ended one leaves the lock screen. Zero is Apple's own time, hours later.
+	Gone time.Time
+	// Expires is when Apple stops trying to hand it to a phone it cannot
+	// reach. Zero is one try: a phone that comes back later is not shown
+	// what is over by then.
+	Expires time.Time
+}
+
+// atMost is the most Apple takes as what one thing said to a Live Activity carries, in bytes.
+const atMost = 4096
+
+// Show says one thing to a Live Activity, and answers Apple's id for it. What Apple refuses is a *Refused.
+func (s *Sender) Show(ctx context.Context, a Activity) (string, error) {
 	switch {
-	case n.Token == "":
-		return "", errors.New("a notification goes to a token, and this has none")
-	case n.Title == "":
-		return "", errors.New("a notification says something, and this has no title")
-	case len(n.Replaces) > replacesAtMost:
-		return "", errors.Newf("what a notification replaces is named in %d bytes at most, and %q is %d: Apple refuses it", replacesAtMost, n.Replaces, len(n.Replaces))
+	case a.Token == "":
+		return "", errors.New("a Live Activity is reached by a token, and this has none")
+	case a.Event != ActivityStarts && a.Event != ActivityMoves && a.Event != ActivityEnds:
+		return "", errors.Newf("a Live Activity starts, moves or ends, and %q is none of them", a.Event)
+	case a.State == nil:
+		return "", errors.New("a Live Activity shows something, and this has no state: Apple decodes none from nothing")
+	case a.Event == ActivityStarts && (a.Type == "" || a.Attributes == nil || a.Title == ""):
+		return "", errors.New("a Live Activity that starts names its type, its attributes and what the phone says as it begins")
 	}
-	payload := map[string]any{"aps": map[string]any{"alert": map[string]string{"title": n.Title, "body": n.Body}, "sound": "default"}}
-	for key, value := range n.Opens {
-		if key != "aps" {
-			payload[key] = value
-		}
+	aps := map[string]any{"timestamp": s.Now().Unix(), "event": a.Event, "content-state": a.State}
+	if a.Event == ActivityStarts {
+		aps["attributes-type"], aps["attributes"] = a.Type, a.Attributes
+		aps["alert"] = map[string]string{"title": a.Title, "body": a.Body}
+		// iOS 18 hands the app the started activity's own token only when asked: it is what moves and ends it.
+		aps["input-push-token"] = 1
 	}
-	body, err := json.Marshal(payload)
+	if !a.Stale.IsZero() {
+		aps["stale-date"] = a.Stale.Unix()
+	}
+	if a.Event == ActivityEnds && !a.Gone.IsZero() {
+		aps["dismissal-date"] = a.Gone.Unix()
+	}
+	body, err := json.Marshal(map[string]any{"aps": aps})
 	if err != nil {
-		return "", errors.Wrap(err, "the notification did not marshal")
+		return "", errors.Wrap(err, "what the Live Activity is told did not marshal")
 	}
+	if len(body) > atMost {
+		return "", errors.Newf("what the Live Activity is told is %d bytes, and Apple takes %d at most", len(body), atMost)
+	}
+	expires := "0"
+	if !a.Expires.IsZero() {
+		expires = strconv.FormatInt(a.Expires.Unix(), 10)
+	}
+	return s.post(ctx, a.Token, map[string]string{
+		"apns-push-type": "liveactivity", "apns-topic": s.BundleID + ".push-type.liveactivity", "apns-expiration": expires,
+	}, body)
+}
+
+// post hands Apple one body for one token, and answers Apple's id for it. What Apple refuses is a *Refused.
+func (s *Sender) post(ctx context.Context, to string, headers map[string]string, body []byte) (string, error) {
 	token, err := s.providerToken()
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.At+"/3/device/"+n.Token, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.At+"/3/device/"+to, bytes.NewReader(body))
 	if err != nil {
-		return "", errors.Wrap(err, "the notification was not made into a request")
+		return "", errors.Wrap(err, "what is sent to Apple was not made into a request")
 	}
 	req.Header.Set("authorization", "bearer "+token)
-	req.Header.Set("apns-push-type", "alert")
-	req.Header.Set("apns-topic", s.BundleID)
 	// Now: what it says is about something that happens in minutes.
 	req.Header.Set("apns-priority", "10")
 	req.Header.Set("content-type", "application/json")
-	if n.Replaces != "" {
-		req.Header.Set("apns-collapse-id", n.Replaces)
-	}
-	if !n.Expires.IsZero() {
-		req.Header.Set("apns-expiration", strconv.FormatInt(n.Expires.Unix(), 10))
+	for name, value := range headers {
+		req.Header.Set(name, value)
 	}
 	answer, err := s.Client.Do(req)
 	if err != nil {
