@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"slices"
@@ -146,11 +148,20 @@ func (s *QNTXServer) phones() ([]string, error) {
 }
 
 // started is one Live Activity that stands on a phone: what it is of, and
-// what it showed when the node last said something to it.
+// what it showed when the node last said something to it, as shownAs marks it.
 type started struct {
-	Waits  string
-	Due    int64
-	Things int
+	Waits string
+	Shows string
+}
+
+// shownAs marks all one shows, so that what stands is said again only when it changed.
+func shownAs(shown waitsShown) string {
+	raw, err := json.Marshal(shown)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:8])
 }
 
 // activities is every started Live Activity that is not over, by its own token.
@@ -165,9 +176,8 @@ func (s *QNTXServer) activities() (map[string]started, error) {
 			continue
 		}
 		waits, _ := line.Attributes["waits"].(string)
-		due, _ := line.Attributes["due"].(float64)
-		things, _ := line.Attributes["things"].(float64)
-		live[token] = started{Waits: waits, Due: int64(due), Things: int(things)}
+		shows, _ := line.Attributes["shows"].(string)
+		live[token] = started{Waits: waits, Shows: shows}
 	}
 	return live, nil
 }
@@ -340,31 +350,49 @@ func aboutToGo(due, now time.Time) bool {
 }
 
 // showWhatWaits makes what stands on each phone what waits now: a batch that
-// goes within shownBefore is started where it does not stand, one that
-// changed is moved, and one that no longer goes then is ended saying what
-// became of it.
+// goes within shownBefore and an approval that waits on ROOT are started
+// where they do not stand, one that changed is moved, and one that no longer
+// waits is ended saying what became of it.
 func (s *QNTXServer) showWhatWaits(ctx context.Context, now time.Time) error {
-	kept, err := s.theCollection()
-	if err != nil {
-		return nil
+	failed := []string{}
+	held := map[string]*collectedFor{}
+	if kept, err := s.theCollection(); err == nil {
+		kept.mu.Lock()
+		read, err := kept.read()
+		kept.mu.Unlock()
+		if err != nil {
+			return err
+		}
+		held = read
+		for did, looked := range held {
+			if len(looked.Waiting) == 0 || !aboutToGo(looked.due(), now) {
+				continue
+			}
+			if err := s.startBatch(ctx, kept, did, now); err != nil {
+				failed = append(failed, err.Error())
+			}
+		}
 	}
-	kept.mu.Lock()
-	held, err := kept.read()
-	kept.mu.Unlock()
+	// Nothing is read of approvals where no phone would show them.
+	tokens, err := s.phones()
 	if err != nil {
 		return err
 	}
-	failed := []string{}
-	for did, looked := range held {
-		if len(looked.Waiting) == 0 || !aboutToGo(looked.due(), now) {
-			continue
+	live, err := s.activities()
+	if err != nil {
+		return err
+	}
+	if len(tokens) > 0 || len(live) > 0 {
+		open, err := s.openApprovals()
+		if err != nil {
+			return err
 		}
-		if err := s.startBatch(ctx, kept, did, now); err != nil {
+		if err := s.startApprovals(ctx, tokens, open); err != nil {
 			failed = append(failed, err.Error())
 		}
-	}
-	if err := s.moveBatches(ctx, held, now); err != nil {
-		failed = append(failed, err.Error())
+		if err := s.moveWhatStands(ctx, live, held, open, now); err != nil {
+			failed = append(failed, err.Error())
+		}
 	}
 	if len(failed) > 0 {
 		slices.Sort(failed)
@@ -461,14 +489,10 @@ func (s *QNTXServer) startBatch(ctx context.Context, kept *collection, did strin
 	return nil
 }
 
-// moveBatches says to each started Live Activity of a batch what the batch is
-// now, where that is not what it shows: more or fewer things, another time,
-// or that it is over.
-func (s *QNTXServer) moveBatches(ctx context.Context, held map[string]*collectedFor, now time.Time) error {
-	live, err := s.activities()
-	if err != nil {
-		return err
-	}
+// moveWhatStands says to each started Live Activity what it is of now, where
+// that is not what it shows, and ends one whose thing no longer waits, saying
+// what became of it.
+func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started, held map[string]*collectedFor, open []*approvalState, now time.Time) error {
 	if len(live) == 0 {
 		return nil
 	}
@@ -478,29 +502,48 @@ func (s *QNTXServer) moveBatches(ctx context.Context, held map[string]*collected
 	}
 	failed := []string{}
 	for token, stands := range live {
-		did, aBatch := strings.CutPrefix(stands.Waits, "collected/")
-		if !aBatch {
+		var waits *waitsShown
+		var stale time.Time
+		became := ""
+		if did, aBatch := strings.CutPrefix(stands.Waits, "collected/"); aBatch {
+			batch := held[did]
+			switch {
+			case batch != nil && len(batch.Waiting) > 0 && aboutToGo(batch.due(), now):
+				shown := batchShown(batch, batch.due())
+				waits, stale = &shown, batch.due()
+			case batch != nil && len(batch.Waiting) > 0:
+				became = "delayed"
+			case batch != nil && !batch.Delivered.IsZero() && now.Sub(batch.Delivered) < shownBefore+collectedLooked:
+				became = "sent"
+			default:
+				became = "canceled"
+			}
+		} else if subject, anApproval := strings.CutPrefix(stands.Waits, "approval/"); anApproval {
+			i := slices.IndexFunc(open, func(st *approvalState) bool { return st.subject == subject })
+			switch {
+			case i < 0:
+				became = "closed"
+			case open[i].said != "":
+				became = open[i].said
+			case !open[i].presented():
+				became = "moved to a new head"
+			default:
+				shown := approvalShown(open[i])
+				waits = &shown
+			}
+		} else {
 			continue
 		}
-		waits := held[did]
 		says := apns.Activity{Token: token}
 		recorded := map[string]any{"platform": "ios", "waits": stands.Waits}
-		switch {
-		case waits != nil && len(waits.Waiting) > 0 && aboutToGo(waits.due(), now):
-			due := waits.due()
-			if stands.Due == due.Unix() && stands.Things == len(waits.Waiting) {
+		if waits != nil {
+			as := shownAs(*waits)
+			if stands.Shows == as {
 				continue
 			}
-			says.Event, says.State, says.Stale = apns.ActivityMoves, batchShown(waits, due), due
-			recorded["gone"], recorded["due"], recorded["things"] = false, due.Unix(), len(waits.Waiting)
-		default:
-			became := "canceled"
-			switch {
-			case waits != nil && len(waits.Waiting) > 0:
-				became = "delayed"
-			case waits != nil && !waits.Delivered.IsZero() && now.Sub(waits.Delivered) < shownBefore+collectedLooked:
-				became = "sent"
-			}
+			says.Event, says.State, says.Stale = apns.ActivityMoves, *waits, stale
+			recorded["gone"], recorded["shows"] = false, as
+		} else {
 			says.Event, says.State, says.Gone = apns.ActivityEnds, ended(became), now.Add(leavesAfter)
 			recorded["gone"] = true
 		}
