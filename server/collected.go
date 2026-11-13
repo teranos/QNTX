@@ -80,11 +80,12 @@ type collectedFor struct {
 	// HeldUntil is a person's word that nothing is delivered before it.
 	HeldUntil time.Time `json:"held_until,omitempty"`
 	Delivered time.Time `json:"delivered,omitempty"`
-	// Announced is, for each phone told of it, the time it was due when that
-	// phone was told (phones.go): held to another time, the phone is told
-	// again before that one, and a phone that was not reached is told when it is.
-	Announced map[string]time.Time `json:"announced,omitempty"`
-	Waiting   []collectedSaid      `json:"waiting"`
+	// Shown is, for each phone it was started on as a Live Activity, the time
+	// it was due when it was started there (phones.go): held to another time,
+	// it is started again before that one, and on a phone that was not reached
+	// when it is.
+	Shown   map[string]time.Time `json:"shown,omitempty"`
+	Waiting []collectedSaid      `json:"waiting"`
 }
 
 // waitOf is how long what is collected for an agent on model waits.
@@ -566,7 +567,7 @@ func aPersonsToSay(ctx context.Context, does string) *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.NotAllowed, Says: "collected " + does + " is a person's to say, and this asks as an agent"}
 }
 
-// collectedNamed is the DID of the agent something waits for under name.
+// collectedNamed is the DID of the agent something waits for under name, or under its DID.
 func (s *QNTXServer) collectedNamed(name string) (string, *protocol.Refusal) {
 	kept, err := s.theCollection()
 	if err != nil {
@@ -577,6 +578,11 @@ func (s *QNTXServer) collectedNamed(name string) (string, *protocol.Refusal) {
 	kept.mu.Unlock()
 	if err != nil {
 		return "", &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	// By its DID first: a name is held by whoever holds it now, and what
+	// stands on a phone names the agent it was started for.
+	if _, found := held[strings.TrimSpace(name)]; found {
+		return strings.TrimSpace(name), nil
 	}
 	for did, waits := range held {
 		if strings.EqualFold(waits.Called, strings.TrimSpace(name)) {
