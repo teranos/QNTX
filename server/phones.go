@@ -79,8 +79,9 @@ type waitsPress struct {
 	Says string `json:"says"`
 	// "CANCEL SHOULD BE ONE THING"
 	// "APPROVE SHOULD BE ONE THING"
-	// Does names what the press is, among the few things a press is: send,
-	// delay, cancel, approve, refuse. The mark it is drawn as is the phone's to say,
+	// "THEY ARE ESSENTIALLY THE SAME GODDAMN THING"
+	// Does names what the press is, and a press is one of three: approve,
+	// delay, cancel. Sending what waits now is approving it. The mark it is drawn as is the phone's to say,
 	// one mark for each wherever it stands, and Says is what is read out for it.
 	Does string `json:"does"`
 	// Then is what it says once the node did it.
@@ -289,7 +290,7 @@ func batchShown(waits *collectedFor, due time.Time) waitsShown {
 		Says: says, Preview: strings.Join(lines, "\n"), Due: float64(due.Unix()),
 		Segments: []waitsSegment{},
 		Presses: []waitsPress{
-			{Says: "send now", Does: "send", Then: "sent", Path: collectedPath + "/release", Sent: to},
+			{Says: "send now", Does: "approve", Then: "sent", Path: collectedPath + "/release", Sent: to},
 			{Says: "delay", Does: "delay", Then: "delayed", Path: collectedPath + "/later", Sent: to},
 			{Says: "cancel", Does: "cancel", Then: "canceled", Path: collectedPath + "/cancel", Sent: to, Armed: true},
 		},
