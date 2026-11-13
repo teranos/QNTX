@@ -140,20 +140,20 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 	return resumePluginSchedules(db, pluginName, logger)
 }
 
-// A schedule is a plugin's by its handler: the plugin's name in front of it, as
-// PluginHandlerName writes it, which is what sends a tick to that plugin. What
-// a schedule's metadata says is whatever its maker wrote, and proves nothing.
+// 「[Sonnet 5.5, Fable 5.2] A schedule is a plugin's by its handler: the plugin's name in front of it, as」
+// 「[Sonnet 5.5, Fable 5.2] PluginHandlerName writes it, which is what sends a tick to that plugin. What」
+// 「[Sonnet 5.5, Fable 5.2] a schedule's metadata says is whatever its maker wrote, and proves nothing.」
 const ownedBy = `(substr(handler_name, 1, length(?)) = ? OR substr(handler_name, 1, length(?)) = ?)`
 
-// owned is the arguments ownedBy takes for one plugin: its name before a
-// slash, and before a dot, as older handlers were written.
+// 「[Sonnet 5.5, Fable 5.2] owned is the arguments ownedBy takes for one plugin: its name before a」
+// 「[Sonnet 5.5, Fable 5.2] slash, and before a dot, as older handlers were written.」
 func owned(pluginName string) []any {
 	return []any{pluginName + "/", pluginName + "/", pluginName + ".", pluginName + "."}
 }
 
-// movePluginSchedules moves every schedule of a plugin from one state to
-// another in one statement, so no schedule is moved and another left: all of
-// them, or none. It answers how many moved.
+// 「[Sonnet 5.5, Fable 5.2] movePluginSchedules moves every schedule of a plugin from one state to」
+// 「[Sonnet 5.5, Fable 5.2] another in one statement, so no schedule is moved and another left: all of」
+// 「[Sonnet 5.5, Fable 5.2] them, or none. It answers how many moved.」
 func movePluginSchedules(db *sql.DB, pluginName, from, to string) (int64, error) {
 	query := `UPDATE scheduled_pulse_jobs SET state = ?, updated_at = ? WHERE ` + ownedBy
 	args := append([]any{to, time.Now().UTC().Format(time.RFC3339)}, owned(pluginName)...)
@@ -172,10 +172,10 @@ func movePluginSchedules(db *sql.DB, pluginName, from, to string) (int64, error)
 	return count, errors.Wrapf(err, "the schedules of plugin %s moved to %s, and how many is not known", pluginName, to)
 }
 
-// PausePluginSchedules takes what a plugin has running out of the ticker's
-// sight, for a plugin that was switched off: active becomes inactive, the
-// state of a schedule whose plugin is off. A schedule somebody paused is
-// paused still, and switching the plugin on again does not wake it.
+// 「[Sonnet 5.5, Fable 5.2] PausePluginSchedules takes what a plugin has running out of the ticker's」
+// 「[Sonnet 5.5, Fable 5.2] sight, for a plugin that was switched off: active becomes inactive, the」
+// 「[Sonnet 5.5, Fable 5.2] state of a schedule whose plugin is off. A schedule somebody paused is」
+// 「[Sonnet 5.5, Fable 5.2] paused still, and switching the plugin on again does not wake it.」
 func PausePluginSchedules(db *sql.DB, pluginName string, logger *zap.SugaredLogger) error {
 	count, err := movePluginSchedules(db, pluginName, schedule.StateActive, schedule.StateInactive)
 	if err != nil {
@@ -185,9 +185,9 @@ func PausePluginSchedules(db *sql.DB, pluginName string, logger *zap.SugaredLogg
 	return nil
 }
 
-// resumePluginSchedules wakes what PausePluginSchedules took out, for a plugin
-// that came back, and nothing else: a schedule paused by hand since is paused,
-// not inactive, and stays so.
+// 「[Sonnet 5.5, Fable 5.2] resumePluginSchedules wakes what PausePluginSchedules took out, for a plugin」
+// 「[Sonnet 5.5, Fable 5.2] that came back, and nothing else: a schedule paused by hand since is paused,」
+// 「[Sonnet 5.5, Fable 5.2] not inactive, and stays so.」
 func resumePluginSchedules(db *sql.DB, pluginName string, logger *zap.SugaredLogger) error {
 	count, err := movePluginSchedules(db, pluginName, schedule.StateInactive, schedule.StateActive)
 	if err != nil {
@@ -199,8 +199,8 @@ func resumePluginSchedules(db *sql.DB, pluginName string, logger *zap.SugaredLog
 	return nil
 }
 
-// DeletePluginSchedules deletes every schedule of a plugin that was taken off
-// the node. A name added again starts with none.
+// 「[Sonnet 5.5, Fable 5.2] DeletePluginSchedules deletes every schedule of a plugin that was taken off」
+// 「[Sonnet 5.5, Fable 5.2] the node. A name added again starts with none.」
 func DeletePluginSchedules(db *sql.DB, pluginName string, logger *zap.SugaredLogger) error {
 	count, err := movePluginSchedules(db, pluginName, "", schedule.StateDeleted)
 	if err != nil {
