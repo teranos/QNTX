@@ -87,7 +87,7 @@ type approvalState struct {
 	// movedAt is when it last changed for whoever decides it: asked at this
 	// head, or a check on it changed.
 	movedAt time.Time
-	checks                                []approvalCheck
+	checks  []approvalCheck
 	// What stands, and who said it: the newest press about the head.
 	option, said, answeredBy string
 	// over is merged or closed: nothing more is asked of anybody.
