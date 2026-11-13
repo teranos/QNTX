@@ -258,8 +258,8 @@ impl<S: AttestationStore> Run<'_, S> {
         self.ok("put", put);
         self.boundary(reopen)?;
         // Every field an update can change, so a store that drops one is seen.
-        // `created_at` stays as it was: whether an update may rewrite it is not
-        // the trait's to say yet, and both answers then agree.
+        // `created_at` is sent changed and must come back as it was: when it was
+        // first stored is not an update's to rewrite (`AttestationStore::update`).
         let mut changed = a.clone();
         changed.subjects = vec!["ZED".to_string()];
         changed.predicates = vec!["knew".to_string()];
@@ -273,7 +273,9 @@ impl<S: AttestationStore> Run<'_, S> {
         ]);
         changed.signature = Some(vec![1, 2, 3]);
         changed.signer_did = Some("did:key:zconformance".to_string());
-        let upd = self.s()?.update(changed.clone());
+        let mut sent = changed.clone();
+        sent.created_at = a.created_at + 5_000;
+        let upd = self.s()?.update(sent);
         let upd_ok = self.ok("update", upd).is_some();
         // What is stored is what is asked about: now, and in a case that crosses
         // the boundary, after the next reopen as well. A same-session case never reopens.
@@ -431,6 +433,8 @@ mod tests {
         lax: bool,
         /// Keeps the old predicates on update, as a store that persists only some fields.
         lossy: bool,
+        /// Takes the `created_at` an update gives, as Memory, IndexedDB and Postgres did.
+        restamps: bool,
     }
 
     impl AttestationStore for Buffered {
@@ -458,10 +462,13 @@ mod tests {
                 return Err(StoreError::NotFound(a.id));
             }
             if let Some(slot) = self.buffer.get_mut(&a.id) {
-                let kept = slot.predicates.clone();
+                let (kept, created) = (slot.predicates.clone(), slot.created_at);
                 *slot = a;
                 if self.lossy {
                     slot.predicates = kept;
+                }
+                if !self.restamps {
+                    slot.created_at = created;
                 }
             }
             Ok(())
@@ -513,6 +520,15 @@ mod tests {
         let found = check(Buffered { lossy: true, ..Buffered::default() }, &mut same, "lossy", false);
         let cases: std::collections::BTreeSet<&str> = found.iter().map(|v| v.case.as_str()).collect();
         assert!(cases.contains("update/same_session"), "{found:#?}");
+    }
+
+    #[test]
+    fn a_store_that_lets_an_update_rewrite_created_at_is_reported_in_the_session() {
+        let mut same = |s: Buffered| Ok(s);
+        let found = check(Buffered { restamps: true, ..Buffered::default() }, &mut same, "restamps", false);
+        let cases: std::collections::BTreeSet<&str> = found.iter().map(|v| v.case.as_str()).collect();
+        // in the writing session and after a reopen alike, and nowhere else
+        assert_eq!(cases.into_iter().collect::<Vec<_>>(), ["update/after_reopen", "update/same_session"], "{found:#?}");
     }
 
     #[test]

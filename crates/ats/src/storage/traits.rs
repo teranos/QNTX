@@ -35,6 +35,10 @@ pub trait AttestationStore {
 
     /// Update an existing attestation.
     ///
+    /// Every field of the attestation given replaces the stored one except
+    /// `created_at`, which is when the attestation was first stored and is kept
+    /// as it was whatever the attestation given says.
+    ///
     /// Returns `StoreError::NotFound` if the attestation doesn't exist.
     fn update(&mut self, attestation: Attestation) -> StoreResult<()>;
 

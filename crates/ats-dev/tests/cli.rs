@@ -585,6 +585,25 @@ fn the_bytes_written_are_printed_to_two_decimals_not_rounded_to_whole_megabytes(
     assert!(frac.len() == 2 && whole.parse::<u64>().is_ok(), "{row}");
 }
 
+/// The `created_at` of the attestation on a line of output.
+fn created_at_of(line: &str) -> String {
+    line.split("\"created_at\":").nth(1).unwrap().split([',', '}']).next().unwrap().to_string()
+}
+
+#[test]
+fn an_update_that_names_created_at_does_not_move_it() {
+    let (_d, p) = db();
+    let put = run(&p, &["--unsigned", "put", "ALICE is author of GITHUB by BOB"], "");
+    let id = out(&put).split("\"id\":\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+    let created = created_at_of(&out(&put));
+    let patch = format!("{{\"id\":\"{id}\",\"source\":\"changed\",\"created_at\":1}}");
+    let u = run(&p, &["--unsigned", "update", &patch], "");
+    assert!(u.status.success(), "{}", err(&u));
+    assert_eq!(created_at_of(&out(&u)), created, "{}", out(&u));
+    assert!(out(&u).contains("\"source\":\"changed\""));
+    assert_eq!(created_at_of(&out(&run(&p, &["get", &id], ""))), created);
+}
+
 /// `run` for a backend: the global flags go before `--db`, and `db` is whatever
 /// that backend calls its location (a path, a url, a connection string).
 fn run_on(backend: &[&str], db: &str, args: &[&str], stdin: &str) -> Output {
@@ -697,10 +716,14 @@ fn holds_what_attestation_store_promises(backend: &[&str], db: &str, key: &str) 
     let v = r(&["verify", &id]);
     assert!(v.status.success() && out(&v).contains("\"valid\""), "{}{}", out(&v), err(&v));
 
-    // update: changed, or refused; never Ok with the old row left
-    let patch = format!("{{\"id\":\"{id}\",\"source\":\"changed\"}}");
+    // update: changed, or refused; never Ok with the old row left. A patch that
+    // names created_at does not move it: when it was first stored is kept.
+    let created = created_at_of(&out(&put));
+    let patch = format!("{{\"id\":\"{id}\",\"source\":\"changed\",\"created_at\":1}}");
     let u = r(&["update", &patch]);
-    let now_changed = out(&r(&["get", &id])).contains("\"source\":\"changed\"");
+    let after = out(&r(&["get", &id]));
+    let now_changed = after.contains("\"source\":\"changed\"");
+    assert_eq!(created_at_of(&after), created, "an update rewrote created_at: {after}");
     assert_eq!(u.status.success(), now_changed, "update exit {} but stored changed={now_changed}: {}", u.status, err(&u));
 
     // delete: removed, or refused; never Ok with the row still there

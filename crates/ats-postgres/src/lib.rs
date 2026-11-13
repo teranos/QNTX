@@ -311,12 +311,27 @@ impl AttestationStore for PostgresStore {
         attestation.writable()?;
         let attributes = attributes_json(&attestation)?;
         let sql = format!(
-            "UPDATE {} SET subjects = $2, predicates = $3, contexts = $4, actors = $5, timestamp = $6, source = $7, attributes = $8, created_at = $9, signature = $10, signer_did = $11 WHERE id = $1",
+            "UPDATE {} SET subjects = $2, predicates = $3, contexts = $4, actors = $5, timestamp = $6, source = $7, attributes = $8, signature = $9, signer_did = $10 WHERE id = $1",
             self.table
         );
+        // created_at is when it was first stored: not an update's to write, so it is not bound.
         let rows = self
             .client()?
-            .execute(&sql, &insert_params(&attestation, &attributes))
+            .execute(
+                &sql,
+                &[
+                    &attestation.id,
+                    &attestation.subjects,
+                    &attestation.predicates,
+                    &attestation.contexts,
+                    &attestation.actors,
+                    &attestation.timestamp,
+                    &attestation.source,
+                    &attributes,
+                    &attestation.signature,
+                    &attestation.signer_did,
+                ],
+            )
             .map_err(refused)?;
         // id is the primary key, so an update reaches one row or none.
         if rows == 1 {
