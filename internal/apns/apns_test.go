@@ -24,7 +24,7 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// aKey is an APNs key as Apple gives one: a P-256 key, PKCS#8, PEM.
+// 「[Opus 5.5] aKey is an APNs key as Apple gives one: a P-256 key, PKCS#8, PEM.」
 func aKey(t *testing.T) (Key, *ecdsa.PublicKey) {
 	t.Helper()
 	made, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -34,7 +34,7 @@ func aKey(t *testing.T) (Key, *ecdsa.PublicKey) {
 	return Key{P8: pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), KeyID: "KEY1234567", TeamID: "TEAM123456"}, &made.PublicKey
 }
 
-// apple stands in for Apple: it keeps what it was sent and answers as told.
+// 「[Opus 5.5] apple stands in for Apple: it keeps what it was sent and answers as told.」
 type apple struct {
 	*httptest.Server
 	asked  []*http.Request
@@ -76,8 +76,8 @@ func aBatch() Notification {
 	}
 }
 
-// A notification is sent as Apple reads one: an alert, to the app's own topic,
-// saying what it says, and carrying where a tap goes.
+// 「[Opus 5.5] A notification is sent as Apple reads one: an alert, to the app's own topic,」
+// 「[Opus 5.5] saying what it says, and carrying where a tap goes.」
 func TestANotificationIsSentAsAppleReadsOne(t *testing.T) {
 	s, at, public := aSender(t)
 	now := time.Date(2026, 11, 13, 13, 45, 0, 0, time.UTC)
@@ -102,7 +102,7 @@ func TestANotificationIsSentAsAppleReadsOne(t *testing.T) {
 	assert.Equal(t, map[string]any{"title": "3 wait for Birch", "body": "Alder: pull request one is open"}, aps["alert"])
 	assert.Equal(t, "did:key:z6Mkbirch", at.bodies[0]["collected"], "where a tap goes is not carried beside aps")
 
-	// The provider token is the key's: ES256, its id, the team, signed now.
+	// 「[Opus 5.5] The provider token is the key's: ES256, its id, the team, signed now.」
 	bearer, found := strings.CutPrefix(asked.Header.Get("authorization"), "bearer ")
 	require.True(t, found)
 	parts := strings.Split(bearer, ".")
@@ -124,7 +124,7 @@ func TestANotificationIsSentAsAppleReadsOne(t *testing.T) {
 	assert.True(t, ecdsa.Verify(public, digest[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])), "the provider token is not signed by the key")
 }
 
-// What a tap carries cannot stand in for what Apple reads as the notification itself.
+// 「[Opus 5.5] What a tap carries cannot stand in for what Apple reads as the notification itself.」
 func TestWhatATapCarriesDoesNotReplaceTheNotification(t *testing.T) {
 	s, at, _ := aSender(t)
 	sends := aBatch()
@@ -136,7 +136,7 @@ func TestWhatATapCarriesDoesNotReplaceTheNotification(t *testing.T) {
 	assert.Contains(t, aps, "alert")
 }
 
-// Apple is asked for a new hour's admission no more often than it allows.
+// 「[Opus 5.5] Apple is asked for a new hour's admission no more often than it allows.」
 func TestTheProviderTokenIsSignedOnceUntilItIsOld(t *testing.T) {
 	s, at, _ := aSender(t)
 	now := time.Date(2026, 11, 13, 13, 0, 0, 0, time.UTC)
@@ -159,7 +159,7 @@ func TestTheProviderTokenIsSignedOnceUntilItIsOld(t *testing.T) {
 	assert.NotEqual(t, first, at.asked[4].Header.Get("authorization"), "a provider token older than its life was used")
 }
 
-// What Apple refuses is said in Apple's words, and a token that is gone is said to be.
+// 「[Opus 5.5] What Apple refuses is said in Apple's words, and a token that is gone is said to be.」
 func TestWhatAppleRefusesIsSaidAsAppleSaysIt(t *testing.T) {
 	s, at, _ := aSender(t)
 
@@ -175,14 +175,14 @@ func TestWhatAppleRefusesIsSaidAsAppleSaysIt(t *testing.T) {
 	require.True(t, errors.As(err, &refused))
 	assert.True(t, refused.Gone, "a token Apple says is unregistered is not said to be gone")
 
-	// A token of Apple's other host is refused as a bad one, and that phone is still there.
+	// 「[Opus 5.5] A token of Apple's other host is refused as a bad one, and that phone is still there.」
 	at.status, at.says = http.StatusBadRequest, `{"reason":"BadDeviceToken"}`
 	_, err = s.Send(context.Background(), aBatch())
 	require.True(t, errors.As(err, &refused))
 	assert.False(t, refused.Gone, "a phone asked at the wrong host was taken for gone")
 }
 
-// What Apple would refuse for its length is not sent.
+// 「[Opus 5.5] What Apple would refuse for its length is not sent.」
 func TestWhatItReplacesIsNamedInWhatAppleTakes(t *testing.T) {
 	s, at, _ := aSender(t)
 	long := aBatch()
@@ -192,7 +192,7 @@ func TestWhatItReplacesIsNamedInWhatAppleTakes(t *testing.T) {
 	assert.Empty(t, at.asked)
 }
 
-// What is no notification is not sent, and a key that is no key makes no sender.
+// 「[Opus 5.5] What is no notification is not sent, and a key that is no key makes no sender.」
 func TestWhatIsNoNotificationIsNotSent(t *testing.T) {
 	s, at, _ := aSender(t)
 	noToken, noTitle := aBatch(), aBatch()
