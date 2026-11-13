@@ -68,7 +68,7 @@ func aSender(t *testing.T) (*Sender, *apple, *ecdsa.PublicKey) {
 	return s, at, public
 }
 
-// aBatch is what waits for an agent, as it starts on a phone.
+// 「[Fable 5.2] aBatch is what waits for an agent, as it starts on a phone.」
 func aBatch(due time.Time) Activity {
 	return Activity{
 		Token: "aa11", Event: ActivityStarts,
@@ -80,9 +80,9 @@ func aBatch(due time.Time) Activity {
 	}
 }
 
-// A Live Activity is started as Apple reads one: the push type and topic of
-// Live Activities, the type and attributes it is made of, what it shows, and
-// what the phone says as it begins.
+// 「[Fable 5.2] A Live Activity is started as Apple reads one: the push type and topic of」
+// 「[Fable 5.2] Live Activities, the type and attributes it is made of, what it shows, and」
+// 「[Fable 5.2] what the phone says as it begins.」
 func TestALiveActivityIsStartedAsAppleReadsOne(t *testing.T) {
 	s, at, public := aSender(t)
 	now := time.Date(2026, 11, 13, 13, 45, 0, 0, time.UTC)
@@ -136,8 +136,8 @@ func TestALiveActivityIsStartedAsAppleReadsOne(t *testing.T) {
 	assert.True(t, ecdsa.Verify(public, digest[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])), "the provider token is not signed by the key")
 }
 
-// One that moves or ends says what it shows now and nothing of what it is made
-// of; one that ends says when it leaves the lock screen.
+// 「[Fable 5.2] One that moves or ends says what it shows now and nothing of what it is made」
+// 「[Fable 5.2] of; one that ends says when it leaves the lock screen.」
 func TestALiveActivityMovesAndEndsByItsOwnToken(t *testing.T) {
 	s, at, _ := aSender(t)
 	now := time.Date(2026, 11, 13, 13, 50, 0, 0, time.UTC)
@@ -201,7 +201,7 @@ func TestWhatAppleRefusesIsSaidAsAppleSaysIt(t *testing.T) {
 	assert.False(t, refused.Gone, "a phone asked at the wrong host was taken for gone")
 }
 
-// What is no Live Activity is not sent, and a key that is no key makes no sender.
+// 「[Fable 5.2] What is no Live Activity is not sent, and a key that is no key makes no sender.」
 func TestWhatIsNoLiveActivityIsNotSent(t *testing.T) {
 	s, at, _ := aSender(t)
 	due := time.Now()
@@ -220,7 +220,7 @@ func TestWhatIsNoLiveActivityIsNotSent(t *testing.T) {
 	require.Error(t, err)
 }
 
-// What Apple would refuse for its size is not sent, and one that expires says when.
+// 「[Fable 5.2] What Apple would refuse for its size is not sent, and one that expires says when.」
 func TestWhatAppleWouldRefuseForItsSizeIsNotSent(t *testing.T) {
 	s, at, _ := aSender(t)
 	due := time.Date(2026, 11, 13, 14, 0, 0, 0, time.UTC)

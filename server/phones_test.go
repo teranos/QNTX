@@ -14,7 +14,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 )
 
-// told stands in for Apple: it keeps what the node said to Live Activities, and refuses what it is told to.
+// 「[Opus 5.5] told stands in for Apple: it keeps what the node said to Live Activities, and refuses what it is told to.」
 type told struct {
 	sent    []apns.Activity
 	refuses map[string]error
@@ -31,11 +31,11 @@ func (a *told) Show(_ context.Context, said apns.Activity) (string, error) {
 const (
 	aPhone       = "aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11"
 	anotherPhone = "bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22"
-	// What one started Live Activity is moved and ended by, as the app hands it over.
+	// 「[Opus 5.5] What one started Live Activity is moved and ended by, as the app hands it over.」
 	anActivity = "cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33"
 )
 
-// handsOver is the app handing the node a token, as whoever ctx admits.
+// 「[Opus 5.5] handsOver is the app handing the node a token, as whoever ctx admits.」
 func handsOver(t *testing.T, srv *QNTXServer, ctx context.Context, body string) (int, string) {
 	t.Helper()
 	asked := httptest.NewRequest(http.MethodPost, phonesPath, strings.NewReader(body)).WithContext(ctx)
@@ -54,12 +54,12 @@ func naming(phone string) string {
 	return "{\"token\":\"" + phone + "\",\"platform\":\"ios\"}"
 }
 
-// startedOf is the app handing over the own token of a Live Activity that started, of what waits for Birch.
+// 「[Opus 5.5] startedOf is the app handing over the own token of a Live Activity that started, of what waits for Birch.」
 func startedOf(activity string) string {
 	return "{\"token\":\"" + activity + "\",\"platform\":\"ios\",\"waits\":\"collected/did:key:z6Mkbirch\"}"
 }
 
-// The phone what waits stands on is named by the human, in their own session.
+// 「[Opus 5.5] The phone what waits stands on is named by the human, in their own session.」
 func TestAPhoneIsNamedByTheHumanAndByNoToken(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 
@@ -97,9 +97,9 @@ func TestAPhoneIsNamedByTheHumanAndByNoToken(t *testing.T) {
 	assert.Empty(t, phones)
 }
 
-// Fifteen minutes before what is collected is delivered it stands on the phone
-// as a Live Activity, started once: what it is of, how many wait, who said
-// what, when it goes, and ROOT's three answers as the node answers them.
+// 「[Opus 5.5] Fifteen minutes before what is collected is delivered it stands on the phone」
+// 「[Opus 5.5] as a Live Activity, started once: what it is of, how many wait, who said」
+// 「[Opus 5.5] what, when it goes, and ROOT's three answers as the node answers them.」
 func TestWhatWaitsStandsOnThePhoneFifteenMinutesBeforeItGoes(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -117,7 +117,7 @@ func TestWhatWaitsStandsOnThePhoneFifteenMinutesBeforeItGoes(t *testing.T) {
 	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-16*time.Minute)))
 	assert.Empty(t, apple.sent, "it stood on the phone more than fifteen minutes before")
 
-	// Inside the fifteen minutes: started, once, however often the node looks.
+	// 「[Opus 5.5] Inside the fifteen minutes: started, once, however often the node looks.」
 	for _, before := range []time.Duration{14 * time.Minute, 13 * time.Minute, 2 * time.Minute} {
 		require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-before)))
 	}
@@ -136,7 +136,7 @@ func TestWhatWaitsStandsOnThePhoneFifteenMinutesBeforeItGoes(t *testing.T) {
 	assert.InDelta(t, float64(due.Unix()), shown.Due, 5, "it does not count down to when it goes")
 	assert.Equal(t, int64(shown.Due), one.Stale.Unix())
 	assert.Equal(t, one.Stale, one.Expires, "a phone not reached before it goes would be shown it afterwards")
-	// By the agent's DID, which stays its own whoever holds its name later.
+	// 「[Fable 5.2] By the agent's DID, which stays its own whoever holds its name later.」
 	birch := map[string]string{"to": "did:key:z6Mkbirch"}
 	assert.Equal(t, []waitsPress{
 		{Says: "send now", Does: "approve", Then: "sent", Path: "/api/collected/release", Sent: birch},
@@ -146,8 +146,8 @@ func TestWhatWaitsStandsOnThePhoneFifteenMinutesBeforeItGoes(t *testing.T) {
 	assert.NotNil(t, shown.Segments, "the phone decodes no list from nothing")
 }
 
-// A phone Apple did not take it for has it started when the node next looks,
-// and one named after the others has it too: each phone once.
+// 「[Opus 5.5] A phone Apple did not take it for has it started when the node next looks,」
+// 「[Opus 5.5] and one named after the others has it too: each phone once.」
 func TestItIsStartedOnEachPhoneOnceWhenItIsReached(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{refuses: map[string]error{anotherPhone: &apns.Refused{Status: http.StatusServiceUnavailable, Reason: "ServiceUnavailable"}}}
@@ -160,7 +160,7 @@ func TestItIsStartedOnEachPhoneOnceWhenItIsReached(t *testing.T) {
 	sayTo(t, srv, alder, "Birch", "pull request one is open")
 	due := time.Now().Add(6 * time.Hour)
 
-	// One is reached and one is not: said, and it stands on the one reached.
+	// 「[Opus 5.5] One is reached and one is not: said, and it stands on the one reached.」
 	require.Error(t, srv.showWhatWaits(context.Background(), due.Add(-10*time.Minute)))
 	require.Len(t, apple.sent, 1)
 	assert.Equal(t, aPhone, apple.sent[0].Token)
@@ -168,7 +168,7 @@ func TestItIsStartedOnEachPhoneOnceWhenItIsReached(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, phones, 2, "a phone Apple was busy for was taken for gone")
 
-	// Apple takes it now: the one that missed it has it, and the other does not have it twice.
+	// 「[Opus 5.5] Apple takes it now: the one that missed it has it, and the other does not have it twice.」
 	apple.refuses = nil
 	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-9*time.Minute)))
 	require.Len(t, apple.sent, 2)
@@ -177,7 +177,7 @@ func TestItIsStartedOnEachPhoneOnceWhenItIsReached(t *testing.T) {
 	require.Len(t, apple.sent, 2, "it was started twice on a phone for the same time")
 }
 
-// What a person canceled is not started on a phone afterwards.
+// 「[Opus 5.5] What a person canceled is not started on a phone afterwards.」
 func TestWhatWasCanceledIsNotStartedOnAPhone(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -194,8 +194,8 @@ func TestWhatWasCanceledIsNotStartedOnAPhone(t *testing.T) {
 	assert.Empty(t, apple.sent, "what a person canceled stood on a phone")
 }
 
-// One that stands is moved when what waits changes, by its own token, and
-// ended saying what became of it when ROOT delays it: nothing is said to it after.
+// 「[Opus 5.5] One that stands is moved when what waits changes, by its own token, and」
+// 「[Opus 5.5] ended saying what became of it when ROOT delays it: nothing is said to it after.」
 func TestOneThatStandsIsMovedAndEndedByItsOwnToken(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -208,7 +208,7 @@ func TestOneThatStandsIsMovedAndEndedByItsOwnToken(t *testing.T) {
 
 	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-10*time.Minute)))
 	require.Len(t, apple.sent, 1)
-	// The app hands over the started one's own token, in ROOT's session and in no other.
+	// 「[Opus 5.5] The app hands over the started one's own token, in ROOT's session and in no other.」
 	code, said = handsOver(t, srv, alder, startedOf(anActivity))
 	assert.Equal(t, http.StatusForbidden, code, said)
 	code, said = handsOver(t, srv, inROOTsSession(), startedOf(anActivity))
@@ -217,7 +217,7 @@ func TestOneThatStandsIsMovedAndEndedByItsOwnToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{aPhone}, phones, "a Live Activity's own token was taken for one that starts them")
 
-	// Something more is said: it is moved to show both, and once.
+	// 「[Opus 5.5] Something more is said: it is moved to show both, and once.」
 	sayTo(t, srv, alder, "Birch", "pull request two is open")
 	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-9*time.Minute)))
 	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-8*time.Minute)))
@@ -229,7 +229,7 @@ func TestOneThatStandsIsMovedAndEndedByItsOwnToken(t *testing.T) {
 	assert.Equal(t, "2 wait", moved.State.(waitsShown).Says)
 	assert.Contains(t, moved.State.(waitsShown).Preview, "pull request two is open")
 
-	// ROOT delays it: it ends saying so, with nothing to press, and leaves the lock screen.
+	// 「[Opus 5.5] ROOT delays it: it ends saying so, with nothing to press, and leaves the lock screen.」
 	_, refused := askCollected(t, srv, asAPerson(), "later", map[string]string{"to": "Birch"})
 	require.Nil(t, refused, refused.GetSays())
 	at := due.Add(-7 * time.Minute)
@@ -244,7 +244,7 @@ func TestOneThatStandsIsMovedAndEndedByItsOwnToken(t *testing.T) {
 	require.Len(t, apple.sent, 3, "something was said to one that is over")
 }
 
-// One ROOT canceled ends saying so.
+// 「[Opus 5.5] One ROOT canceled ends saying so.」
 func TestOneThatWasCanceledEndsSayingSo(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -266,7 +266,7 @@ func TestOneThatWasCanceledEndsSayingSo(t *testing.T) {
 	assert.Equal(t, "canceled", last.State.(waitsShown).Says)
 }
 
-// Held to a later time, it is started again before that time, with what came in meanwhile.
+// 「[Opus 5.5] Held to a later time, it is started again before that time, with what came in meanwhile.」
 func TestWhatIsHeldLaterIsStartedAgainBeforeItsNewTime(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -296,7 +296,7 @@ func TestWhatIsHeldLaterIsStartedAgainBeforeItsNewTime(t *testing.T) {
 	assert.Contains(t, apple.sent[1].State.(waitsShown).Preview, "pull request two is open")
 }
 
-// A phone the app was removed from has nothing started on it again.
+// 「[Opus 5.5] A phone the app was removed from has nothing started on it again.」
 func TestAPhoneThatIsGoneHasNothingStartedOnItAgain(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{refuses: map[string]error{aPhone: &apns.Refused{Status: http.StatusGone, Reason: "Unregistered", Gone: true}}}
@@ -322,7 +322,7 @@ func TestWithNoPhoneNothingIsStartedAndNothingFails(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
 	sayTo(t, srv, alder, "Birch", "pull request one is open")
-	// No stand-in and no key: asked for, either would be an error.
+	// 「[Opus 5.5] No stand-in and no key: asked for, either would be an error.」
 	require.NoError(t, srv.showWhatWaits(context.Background(), time.Now().Add(6*time.Hour-10*time.Minute)))
 }
 
@@ -345,8 +345,8 @@ func TestAnAgentOnAPersonsWordNamesNoPhone(t *testing.T) {
 	assert.Empty(t, phones, "an agent named the phone what waits stands on")
 }
 
-// A token of another kind, held from before the node started Live Activities,
-// starts none: Apple would refuse it each time the node looked.
+// 「[Fable 5.2] A token of another kind, held from before the node started Live Activities,」
+// 「[Fable 5.2] starts none: Apple would refuse it each time the node looked.」
 func TestATokenOfAnotherKindStartsNothing(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -359,8 +359,8 @@ func TestATokenOfAnotherKindStartsNothing(t *testing.T) {
 	assert.Empty(t, apple.sent, "a Live Activity was started by a token that starts none")
 }
 
-// What is due and not delivered yet is left as it stands: it has not been
-// delayed, and it ends when it is sent.
+// 「[Fable 5.2] What is due and not delivered yet is left as it stands: it has not been」
+// 「[Fable 5.2] delayed, and it ends when it is sent.」
 func TestWhatIsDueAndNotDeliveredYetIsLeftAsItStands(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -380,7 +380,7 @@ func TestWhatIsDueAndNotDeliveredYetIsLeftAsItStands(t *testing.T) {
 	assert.Len(t, apple.sent, stood, "what is due and not delivered yet was ended, or said to be delayed")
 }
 
-// A press names the batch by its agent's DID, and the node answers it by that.
+// 「[Fable 5.2] A press names the batch by its agent's DID, and the node answers it by that.」
 func TestAPressNamesTheBatchByItsAgentsDID(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")

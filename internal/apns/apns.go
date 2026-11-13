@@ -1,11 +1,11 @@
-// Package apns reaches a phone through Apple: the node starts, moves and ends
-// a Live Activity on it, with the app closed (teranos/QNTX#1409).
+// 「[Fable 5.2] Package apns reaches a phone through Apple: the node starts, moves and ends」
+// 「[Fable 5.2] a Live Activity on it, with the app closed (teranos/QNTX#1409).」
 //
-// What is sent is Apple's own shape: one HTTP/2 POST to /3/device/<token>, the
-// push type liveactivity, the topic the app's bundle id and
-// .push-type.liveactivity after it, and a provider token: a JWT the key signs,
-// ES256, that Apple takes for an hour and refuses when it is renewed more
-// often than every twenty minutes.
+// 「[Fable 5.2] What is sent is Apple's own shape: one HTTP/2 POST to /3/device/<token>, the」
+// 「[Fable 5.2] push type liveactivity, the topic the app's bundle id and」
+// 「[Fable 5.2] .push-type.liveactivity after it, and a provider token: a JWT the key signs,」
+// 「[Fable 5.2] ES256, that Apple takes for an hour and refuses when it is renewed more」
+// 「[Fable 5.2] often than every twenty minutes.」
 package apns
 
 import (
@@ -27,8 +27,8 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// Production is where Apple takes what is said to an app from TestFlight or
-// the App Store, and Development where it takes it for one built for
+// 「[Fable 5.2] Production is where Apple takes what is said to an app from TestFlight or」
+// 「[Fable 5.2] the App Store, and Development where it takes it for one built for」
 // development. A token of the one is refused at the other.
 const (
 	Production  = "https://api.push.apple.com"
@@ -47,7 +47,7 @@ type Key struct {
 	TeamID string
 }
 
-// Sender reaches the Live Activities of one app.
+// 「[Fable 5.2] Sender reaches the Live Activities of one app.」
 type Sender struct {
 	// BundleID is the app's.
 	BundleID string
@@ -117,12 +117,12 @@ func (s *Sender) providerToken() (string, error) {
 	return s.token, nil
 }
 
-// Refused is Apple's own answer to what it did not take.
+// 「[Fable 5.2] Refused is Apple's own answer to what it did not take.」
 type Refused struct {
 	Status int
 	Reason string
 	// Gone is whether the token is no longer one: the app was removed from
-	// the phone, or the activity is over. Nothing is sent to it again.
+	// 「[Fable 5.2] the phone, or the activity is over. Nothing is sent to it again.」
 	Gone bool
 }
 
@@ -130,45 +130,45 @@ func (r *Refused) Error() string {
 	return "Apple refused what the Live Activity was told: " + strconv.Itoa(r.Status) + " " + r.Reason
 }
 
-// What a Live Activity is told: that it begins, that what it shows changed, or that it is over.
+// 「[Fable 5.2] What a Live Activity is told: that it begins, that what it shows changed, or that it is over.」
 const (
 	ActivityStarts = "start"
 	ActivityMoves  = "update"
 	ActivityEnds   = "end"
 )
 
-// Activity is one thing said to a Live Activity: what stands on the phone's
-// island and lock screen, and in the menu bar of the person's Mac, for as long
-// as it lasts. Apple's own shape for it is "Starting and updating Live
-// Activities with ActivityKit push notifications".
+// 「[Fable 5.2] Activity is one thing said to a Live Activity: what stands on the phone's」
+// 「[Fable 5.2] island and lock screen, and in the menu bar of the person's Mac, for as long」
+// 「[Fable 5.2] as it lasts. Apple's own shape for it is "Starting and updating Live」
+// 「[Fable 5.2] Activities with ActivityKit push notifications".」
 type Activity struct {
-	// Token is the phone's token for starting one when it starts, and the
-	// activity's own afterwards.
+	// 「[Fable 5.2] Token is the phone's token for starting one when it starts, and the」
+	// 「[Fable 5.2] activity's own afterwards.」
 	Token string
-	// Event is ActivityStarts, ActivityMoves or ActivityEnds.
+	// 「[Fable 5.2] Event is ActivityStarts, ActivityMoves or ActivityEnds.」
 	Event string
-	// Type names the app's ActivityAttributes type, and Attributes is what
-	// never changes while it lasts. Both are said when it starts and only then.
+	// 「[Fable 5.2] Type names the app's ActivityAttributes type, and Attributes is what」
+	// 「[Fable 5.2] never changes while it lasts. Both are said when it starts and only then.」
 	Type       string
 	Attributes any
-	// State is what it shows now, in the shape of the type's ContentState.
+	// 「[Fable 5.2] State is what it shows now, in the shape of the type's ContentState.」
 	State any
-	// Title and Body are what the phone says as it begins: Apple starts none unannounced.
+	// 「[Fable 5.2] Title and Body are what the phone says as it begins: Apple starts none unannounced.」
 	Title, Body string
-	// Stale is when what it shows is no longer so, were nothing said after this.
+	// 「[Fable 5.2] Stale is when what it shows is no longer so, were nothing said after this.」
 	Stale time.Time
-	// Gone is when an ended one leaves the lock screen. Zero is Apple's own time, hours later.
+	// 「[Fable 5.2] Gone is when an ended one leaves the lock screen. Zero is Apple's own time, hours later.」
 	Gone time.Time
-	// Expires is when Apple stops trying to hand it to a phone it cannot
-	// reach. Zero is one try: a phone that comes back later is not shown
-	// what is over by then.
+	// 「[Fable 5.2] Expires is when Apple stops trying to hand it to a phone it cannot」
+	// 「[Fable 5.2] reach. Zero is one try: a phone that comes back later is not shown」
+	// 「[Fable 5.2] what is over by then.」
 	Expires time.Time
 }
 
-// atMost is the most Apple takes as what one thing said to a Live Activity carries, in bytes.
+// 「[Fable 5.2] atMost is the most Apple takes as what one thing said to a Live Activity carries, in bytes.」
 const atMost = 4096
 
-// Show says one thing to a Live Activity, and answers Apple's id for it. What Apple refuses is a *Refused.
+// 「[Fable 5.2] Show says one thing to a Live Activity, and answers Apple's id for it. What Apple refuses is a *Refused.」
 func (s *Sender) Show(ctx context.Context, a Activity) (string, error) {
 	switch {
 	case a.Token == "":
@@ -184,7 +184,7 @@ func (s *Sender) Show(ctx context.Context, a Activity) (string, error) {
 	if a.Event == ActivityStarts {
 		aps["attributes-type"], aps["attributes"] = a.Type, a.Attributes
 		aps["alert"] = map[string]string{"title": a.Title, "body": a.Body}
-		// iOS 18 hands the app the started activity's own token only when asked: it is what moves and ends it.
+		// 「[Fable 5.2] iOS 18 hands the app the started activity's own token only when asked: it is what moves and ends it.」
 		aps["input-push-token"] = 1
 	}
 	if !a.Stale.IsZero() {
@@ -209,7 +209,7 @@ func (s *Sender) Show(ctx context.Context, a Activity) (string, error) {
 	}, body)
 }
 
-// post hands Apple one body for one token, and answers Apple's id for it. What Apple refuses is a *Refused.
+// 「[Fable 5.2] post hands Apple one body for one token, and answers Apple's id for it. What Apple refuses is a *Refused.」
 func (s *Sender) post(ctx context.Context, to string, headers map[string]string, body []byte) (string, error) {
 	token, err := s.providerToken()
 	if err != nil {
