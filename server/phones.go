@@ -42,7 +42,7 @@ const activitiesSubject = "ACTIVITIES"
 var shownBefore = 15 * time.Minute
 
 // waitsType names the app's one Live Activity type, as its Swift declares it
-// (QNTX-App island/ios/Sources/WaitsAttributes.swift). What the node says to
+// (QNTX-App island/shared/WaitsAttributes.swift). What the node says to
 // Apple is decoded into that type on the phone, so the two are one shape.
 const waitsType = "WaitsAttributes"
 
@@ -76,11 +76,13 @@ type waitsSegment struct {
 // asks of the node, at a path of the node's with what is sent there. The node
 // says its presses, so a new kind of thing that waits needs no new app.
 type waitsPress struct {
-	Says string            `json:"says"`
+	Says string `json:"says"`
+	// Then is what it says once the node did it.
+	Then string            `json:"then"`
 	Path string            `json:"path"`
 	Sent map[string]string `json:"sent"`
-	// Final is whether it cannot be undone.
-	Final bool `json:"final"`
+	// Armed is whether it cannot be undone, which it is drawn red for.
+	Armed bool `json:"armed"`
 }
 
 // shower starts, moves and ends a Live Activity. The node's is Apple's
@@ -281,9 +283,9 @@ func batchShown(waits *collectedFor, due time.Time) waitsShown {
 		Says: says, Preview: strings.Join(lines, "\n"), Due: float64(due.Unix()),
 		Segments: []waitsSegment{},
 		Presses: []waitsPress{
-			{Says: "send now", Path: collectedPath + "/release", Sent: to},
-			{Says: "delay", Path: collectedPath + "/later", Sent: to},
-			{Says: "cancel", Path: collectedPath + "/cancel", Sent: to, Final: true},
+			{Says: "send now", Then: "sent", Path: collectedPath + "/release", Sent: to},
+			{Says: "delay", Then: "delayed", Path: collectedPath + "/later", Sent: to},
+			{Says: "cancel", Then: "canceled", Path: collectedPath + "/cancel", Sent: to, Armed: true},
 		},
 	}
 }
