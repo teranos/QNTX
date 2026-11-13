@@ -132,12 +132,17 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	assert.NotContains(t, string(said), "TASK_STATE_COMPLETED")
 	// It is collected by the turn the message started, which SendMessage does not wait for:
 	// asked at once, the list was empty on a slow runner.
+	// Asked here, on the test's own goroutine, until it holds it: a refusal fails at once, in its own words.
 	var all *protocol.CollectedAll
-	require.Eventually(t, func() bool {
+	for until := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		var refused *protocol.Refusal
 		all, refused = askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
-		return refused == nil && len(all.GetCollected()) == 1
-	}, 5*time.Second, 10*time.Millisecond, "what Alder said to Birch was not collected")
+		require.Nil(t, refused, refused.GetSays())
+		if len(all.GetCollected()) == 1 {
+			break
+		}
+		require.True(t, time.Now().Before(until), "what Alder said to Birch was not collected")
+	}
 	assert.Equal(t, "Alder", all.GetCollected()[0].GetWaiting()[0].GetFrom(), "it is from Alder, by name")
 	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()))
 

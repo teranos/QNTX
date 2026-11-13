@@ -26,8 +26,16 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// Production is where Apple takes notifications for an app from TestFlight or the App Store.
-const Production = "https://api.push.apple.com"
+// Production is where Apple takes notifications for an app from TestFlight or
+// the App Store, and Development where it takes them for one built for
+// development. A token of the one is refused at the other.
+const (
+	Production  = "https://api.push.apple.com"
+	Development = "https://api.sandbox.push.apple.com"
+)
+
+// replacesAtMost is the longest Apple takes what a notification replaces by.
+const replacesAtMost = 64
 
 // tokenLives is how long one provider token is used before another is signed:
 // under Apple's hour, over its twenty minutes.
@@ -146,6 +154,8 @@ func (s *Sender) Send(ctx context.Context, n Notification) (string, error) {
 		return "", errors.New("a notification goes to a token, and this has none")
 	case n.Title == "":
 		return "", errors.New("a notification says something, and this has no title")
+	case len(n.Replaces) > replacesAtMost:
+		return "", errors.Newf("what a notification replaces is named in %d bytes at most, and %q is %d: Apple refuses it", replacesAtMost, n.Replaces, len(n.Replaces))
 	}
 	payload := map[string]any{"aps": map[string]any{"alert": map[string]string{"title": n.Title, "body": n.Body}, "sound": "default"}}
 	for key, value := range n.Opens {
@@ -195,6 +205,8 @@ func (s *Sender) Send(ctx context.Context, n Notification) (string, error) {
 	}
 	return "", &Refused{
 		Status: answer.StatusCode, Reason: why.Reason,
-		Gone: answer.StatusCode == http.StatusGone || why.Reason == "BadDeviceToken" || why.Reason == "Unregistered",
+		// Unregistered is the app off the phone. BadDeviceToken is not: it is
+		// also what a token of the other host is refused as, and that phone is still there.
+		Gone: answer.StatusCode == http.StatusGone || why.Reason == "Unregistered",
 	}
 }

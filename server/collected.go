@@ -78,10 +78,11 @@ type collectedFor struct {
 	// HeldUntil is a person's word that nothing is delivered before it.
 	HeldUntil time.Time `json:"held_until,omitempty"`
 	Delivered time.Time `json:"delivered,omitempty"`
-	// AnnouncedFor is the time it was due when a phone was last told of it
-	// (phones.go): held to another time, it is told again before that one.
-	AnnouncedFor time.Time       `json:"announced_for,omitempty"`
-	Waiting      []collectedSaid `json:"waiting"`
+	// Announced is, for each phone told of it, the time it was due when that
+	// phone was told (phones.go): held to another time, the phone is told
+	// again before that one, and a phone that was not reached is told when it is.
+	Announced map[string]time.Time `json:"announced,omitempty"`
+	Waiting   []collectedSaid      `json:"waiting"`
 }
 
 // waitOf is how long what is collected for an agent on model waits.
@@ -390,19 +391,12 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did, authored string,
 func (s *QNTXServer) keepDeliveringCollected() {
 	tick := time.NewTicker(collectedLooked)
 	defer tick.Stop()
-	last, lastTold := "", ""
+	last := ""
 	for {
 		select {
 		case <-s.ctx.Done():
 			return
 		case <-tick.C:
-			// A phone is told what is about to go before it goes; one that was not told changes nothing of what is delivered.
-			if told := s.announceDue(s.ctx, time.Now()); told != nil && told.Error() != lastTold {
-				lastTold = told.Error()
-				s.logger.Errorw("A phone was not told what is about to be said to an agent", "error", told)
-			} else if told == nil {
-				lastTold = ""
-			}
 			err := s.deliverDue(time.Now())
 			switch {
 			case err == nil:

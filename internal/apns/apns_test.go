@@ -174,6 +174,22 @@ func TestWhatAppleRefusesIsSaidAsAppleSaysIt(t *testing.T) {
 	_, err = s.Send(context.Background(), aBatch())
 	require.True(t, errors.As(err, &refused))
 	assert.True(t, refused.Gone, "a token Apple says is unregistered is not said to be gone")
+
+	// A token of Apple's other host is refused as a bad one, and that phone is still there.
+	at.status, at.says = http.StatusBadRequest, `{"reason":"BadDeviceToken"}`
+	_, err = s.Send(context.Background(), aBatch())
+	require.True(t, errors.As(err, &refused))
+	assert.False(t, refused.Gone, "a phone asked at the wrong host was taken for gone")
+}
+
+// What Apple would refuse for its length is not sent.
+func TestWhatItReplacesIsNamedInWhatAppleTakes(t *testing.T) {
+	s, at, _ := aSender(t)
+	long := aBatch()
+	long.Replaces = "collected-did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+	_, err := s.Send(context.Background(), long)
+	require.Error(t, err)
+	assert.Empty(t, at.asked)
 }
 
 // What is no notification is not sent, and a key that is no key makes no sender.

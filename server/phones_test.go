@@ -115,7 +115,58 @@ func TestThePhoneIsToldFifteenMinutesBeforeWhatIsCollectedGoes(t *testing.T) {
 	assert.Contains(t, one.Body, "Alder: pull request one is open")
 	assert.Contains(t, one.Body, "Hazel: the pond is drained")
 	assert.Equal(t, "did:key:z6Mkbirch", one.Opens["collected"], "a tap does not say what waits it opens on")
-	assert.Equal(t, "collected-did:key:z6Mkbirch", one.Replaces)
+	// Apple takes 64 bytes and no more, and an agent's DID alone is 56: it is named shorter, the same each time.
+	assert.Equal(t, replacesFor("did:key:z6Mkbirch"), one.Replaces)
+	assert.LessOrEqual(t, len(replacesFor("did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")), 64)
+	assert.NotEqual(t, replacesFor("did:key:z6Mkbirch"), replacesFor("did:key:z6Mkalder"))
+}
+
+// A phone Apple did not take it for is told when the node next looks, and one
+// named after the others were told is told too: each phone once.
+func TestEachPhoneIsToldOnceWhenItIsReached(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	apple := &told{refuses: map[string]error{anotherPhone: &apns.Refused{Status: http.StatusServiceUnavailable, Reason: "ServiceUnavailable"}}}
+	srv.notifies = apple
+	for _, phone := range []string{aPhone, anotherPhone} {
+		code, said := handsOver(t, srv, inROOTsSession(), naming(phone))
+		require.Equal(t, http.StatusOK, code, said)
+	}
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	due := time.Now().Add(6 * time.Hour)
+
+	// One is reached and one is not: said, and the one reached is told.
+	require.Error(t, srv.announceDue(context.Background(), due.Add(-10*time.Minute)))
+	require.Len(t, apple.sent, 1)
+	assert.Equal(t, aPhone, apple.sent[0].Token)
+	phones, err := srv.phones()
+	require.NoError(t, err)
+	assert.Len(t, phones, 2, "a phone Apple was busy for was taken for gone")
+
+	// Apple takes it now: the one that missed it is told, and the other is not told twice.
+	apple.refuses = nil
+	require.NoError(t, srv.announceDue(context.Background(), due.Add(-9*time.Minute)))
+	require.Len(t, apple.sent, 2)
+	assert.Equal(t, anotherPhone, apple.sent[1].Token)
+	require.NoError(t, srv.announceDue(context.Background(), due.Add(-8*time.Minute)))
+	require.Len(t, apple.sent, 2, "a phone was told twice of the same time")
+}
+
+// What a person canceled is not shown to a phone afterwards.
+func TestWhatWasCanceledIsNotToldToAPhone(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	apple := &told{}
+	srv.notifies = apple
+	code, said := handsOver(t, srv, inROOTsSession(), naming(aPhone))
+	require.Equal(t, http.StatusOK, code, said)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	due := time.Now().Add(6 * time.Hour)
+
+	_, refused := askCollected(t, srv, asAPerson(), "cancel", map[string]string{"to": "Birch"})
+	require.Nil(t, refused, refused.GetSays())
+	require.NoError(t, srv.announceDue(context.Background(), due.Add(-10*time.Minute)))
+	assert.Empty(t, apple.sent, "what a person canceled was shown to a phone")
 }
 
 // Held to a later time, it is told again before that time, with what came in meanwhile.

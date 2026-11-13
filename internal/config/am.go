@@ -205,6 +205,10 @@ type ApnsConfig struct {
 	KeyID    string `mapstructure:"key_id"`    // The id Apple gave the key.
 	TeamID   string `mapstructure:"team_id"`   // The Apple Developer team's id.
 	KeyFile  string `mapstructure:"key_file"`  // Where the .p8 is on the node. Empty = the node reaches no phone.
+	// Development is whether the app the phones run was built for development:
+	// Apple takes its tokens at another host, and refuses them at the one a
+	// TestFlight or App Store build is reached at.
+	Development bool `mapstructure:"development"`
 }
 
 // SentryConfig points the node's logs at a Sentry project.

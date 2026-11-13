@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -61,6 +63,10 @@ func (s *QNTXServer) theNotifier() (notifier, error) {
 	sender, err := apns.New(said.BundleID, apns.Key{P8: p8, KeyID: said.KeyID, TeamID: said.TeamID})
 	if err != nil {
 		return nil, err
+	}
+	// An app built for development is reached at Apple's other host, and nowhere else.
+	if said.Development {
+		sender.At = apns.Development
 	}
 	s.notifies = sender
 	return sender, nil
@@ -159,9 +165,43 @@ func whatWaitsSaid(waits *collectedFor, due time.Time, now time.Time) (title, bo
 	return title, strings.Join(lines, "\n")
 }
 
-// announceDue tells every phone what will be delivered within announcedBefore
-// of now, once for each time it is due: held to a later time, it is told again
-// before that one.
+// announcedWithin is how long Apple is given to take one notification.
+var announcedWithin = 5 * time.Second
+
+// replacesFor names what waits for an agent to Apple, which takes no more than
+// 64 bytes and would refuse the agent's DID whole: a later notification about
+// the same agent takes the place of the earlier on the phone.
+func replacesFor(did string) string {
+	sum := sha256.Sum256([]byte(did))
+	return "collected-" + hex.EncodeToString(sum[:12])
+}
+
+// keepAnnouncingCollected tells phones what is about to be delivered until the
+// node stops. What failed is said once for as long as it keeps failing the same way.
+func (s *QNTXServer) keepAnnouncingCollected() {
+	tick := time.NewTicker(collectedLooked)
+	defer tick.Stop()
+	last := ""
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-tick.C:
+			err := s.announceDue(s.ctx, time.Now())
+			switch {
+			case err == nil:
+				last = ""
+			case err.Error() != last:
+				last = err.Error()
+				s.logger.Errorw("A phone was not told what is about to be said to an agent", "error", err)
+			}
+		}
+	}
+}
+
+// announceDue tells each phone what will be delivered within announcedBefore
+// of now, once for each time it is due: held to a later time, a phone is told
+// again before that one, and one that was not reached is told when it is.
 func (s *QNTXServer) announceDue(ctx context.Context, now time.Time) error {
 	kept, err := s.theCollection()
 	if err != nil {
@@ -174,54 +214,96 @@ func (s *QNTXServer) announceDue(ctx context.Context, now time.Time) error {
 		return err
 	}
 	failed := []string{}
-	for did, waits := range held {
-		due := waits.due()
-		if len(waits.Waiting) == 0 || now.Before(due.Add(-announcedBefore)) || !now.Before(due) || waits.AnnouncedFor.Equal(due) {
+	for did, looked := range held {
+		due := looked.due()
+		if len(looked.Waiting) == 0 || now.Before(due.Add(-announcedBefore)) || !now.Before(due) {
 			continue
 		}
-		tokens, err := s.phones()
-		if err != nil {
-			return err
+		if err := s.announce(ctx, kept, did, now); err != nil {
+			failed = append(failed, err.Error())
 		}
-		if len(tokens) == 0 {
-			continue
-		}
-		sends, err := s.theNotifier()
-		if err != nil {
-			return err
-		}
-		title, body := whatWaitsSaid(waits, due, now)
-		told := 0
-		for _, token := range tokens {
-			_, err := sends.Send(ctx, apns.Notification{
-				Token: token, Title: title, Body: body,
-				Opens: map[string]string{"collected": did}, Replaces: "collected-" + did, Expires: due,
-			})
-			var refused *apns.Refused
-			switch {
-			case err == nil:
-				told++
-			case errors.As(err, &refused) && refused.Gone:
-				// The app is off that phone: it is told nothing again.
-				if err := s.nodeRecords().nodeRecord(s.nodeActor(), phonesSubject, token, "_", map[string]any{"platform": "ios", "gone": true}); err != nil {
-					failed = append(failed, err.Error())
-				}
-			default:
+	}
+	if len(failed) > 0 {
+		slices.Sort(failed)
+		return errors.New(strings.Join(slices.Compact(failed), "; "))
+	}
+	return nil
+}
+
+// announce tells the phones not yet told what waits for one agent. It takes
+// its turn with a delivery and with what a person changes (collection.settling):
+// what a phone is shown is what waits when it is sent, never what a person
+// canceled or changed a moment before.
+func (s *QNTXServer) announce(ctx context.Context, kept *collection, did string, now time.Time) error {
+	tokens, err := s.phones()
+	if err != nil {
+		return err
+	}
+	if len(tokens) == 0 {
+		return nil
+	}
+	kept.settling.Lock()
+	defer kept.settling.Unlock()
+	kept.mu.Lock()
+	held, err := kept.read()
+	kept.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	waits, found := held[did]
+	if !found || len(waits.Waiting) == 0 {
+		return nil
+	}
+	// Asked again now that nothing else changes it: held on meanwhile, it is not about to go.
+	due := waits.due()
+	if now.Before(due.Add(-announcedBefore)) || !now.Before(due) {
+		return nil
+	}
+	untold := slices.DeleteFunc(slices.Clone(tokens), func(token string) bool { return waits.Announced[token].Equal(due) })
+	if len(untold) == 0 {
+		return nil
+	}
+	sends, err := s.theNotifier()
+	if err != nil {
+		return err
+	}
+	title, body := whatWaitsSaid(waits, due, now)
+	told, failed := []string{}, []string{}
+	for _, token := range untold {
+		within, done := context.WithTimeout(ctx, announcedWithin)
+		_, err := sends.Send(within, apns.Notification{
+			Token: token, Title: title, Body: body,
+			Opens: map[string]string{"collected": did}, Replaces: replacesFor(did), Expires: due,
+		})
+		done()
+		var refused *apns.Refused
+		switch {
+		case err == nil:
+			told = append(told, token)
+		case errors.As(err, &refused) && refused.Gone:
+			// The app is off that phone: it is told nothing again.
+			if err := s.nodeRecords().nodeRecord(s.nodeActor(), phonesSubject, token, "_", map[string]any{"platform": "ios", "gone": true}); err != nil {
 				failed = append(failed, err.Error())
 			}
+		default:
+			failed = append(failed, err.Error())
 		}
-		if told == 0 {
-			continue
-		}
+	}
+	if len(told) > 0 {
 		if err := kept.change(func(held map[string]*collectedFor) error {
-			if now, found := held[did]; found {
-				now.AnnouncedFor = due
+			if waits, found := held[did]; found {
+				if waits.Announced == nil {
+					waits.Announced = map[string]time.Time{}
+				}
+				for _, token := range told {
+					waits.Announced[token] = due
+				}
 			}
 			return nil
 		}); err != nil {
 			return err
 		}
-		s.logger.Infow("A phone is told what is about to be said to an agent", "to", waits.Called, "things", len(waits.Waiting), "due", due.UTC().Format(time.RFC3339), "phones", told)
+		s.logger.Infow("A phone is told what is about to be said to an agent", "to", waits.Called, "things", len(waits.Waiting), "due", due.UTC().Format(time.RFC3339), "phones", len(told))
 	}
 	if len(failed) > 0 {
 		slices.Sort(failed)
