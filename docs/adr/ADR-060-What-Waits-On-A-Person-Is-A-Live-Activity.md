@@ -63,6 +63,12 @@ Status: Unpolished
 
 "ANY PENDING COLLECITON"
 
+"SO THE 6H ONE STAYS FOR 6H"
+
+"WHEN DELAY CANT WE MAKE IT BE DISMISSED UNTIL ITS TIME TO SHOW AGAIN /"
+
+"SO WE NEVER BREAK APPLES RULE YOU KNOW"
+
 ## Approval packs
 
 An approval pack is a thing of its own: a complete package of pull requests
@@ -153,10 +159,14 @@ ends is said, on what stands and in the node's log.
 
 | What waits | Started | Moved | Ended |
 |---|---|---|---|
-| A batch | when it is pending, and again each eight hours, which is as long as Apple lets one stand | when what waits changes, or a person delays it | delivered or canceled |
+| A collection | when it is pending, for its wait: from when it is said, or, delayed or held, for the wait before its new time | when what waits changes | delivered or canceled, and dismissed at once when it is delayed |
 | An approval | with the collection it is an item of | as its checks run, and when it can be decided | answered, or the pull request is over |
 
 `showWhatWaits` looks once a minute and makes what stands what waits.
+
+One stands for its own wait and no longer, six hours or three, which is under
+the eight hours Apple lets a Live Activity stand. Nothing is started again to
+stay inside Apple's time, and nothing counts it.
 
 ## What it rests on
 
