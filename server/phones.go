@@ -56,7 +56,7 @@ func (s *QNTXServer) theNotifier() (notifier, error) {
 	if said.PrivateKeyRef == "" {
 		return nil, errors.New("am.toml names no [apns] private_key, so this node reaches no phone")
 	}
-	// Named, never held in the config: resolved where the node keeps its secrets, when a phone is first told.
+	// 「[Fable 5.2] Named, never held in the config: resolved where the node keeps its secrets, when a phone is first told.」
 	within, done := context.WithTimeout(s.ctx, keyReadWithin)
 	defer done()
 	p8, err := secretref.Resolve(within, said.PrivateKeyRef)
@@ -168,7 +168,7 @@ func whatWaitsSaid(waits *collectedFor, due time.Time, now time.Time) (title, bo
 	return title, strings.Join(lines, "\n")
 }
 
-// keyReadWithin is how long where secrets are kept is given to hand over the key.
+// 「[Fable 5.2] keyReadWithin is how long where secrets are kept is given to hand over the key.」
 var keyReadWithin = 10 * time.Second
 
 // announcedWithin is how long Apple is given to take one notification.
@@ -248,8 +248,8 @@ func (s *QNTXServer) announce(ctx context.Context, kept *collection, did string,
 	if len(tokens) == 0 {
 		return nil
 	}
-	// Asked for before its turn is taken: the key is read from where secrets are kept, and what a
-	// person does with what waits never waits on that.
+	// 「[Fable 5.2] Asked for before its turn is taken: the key is read from where secrets are kept, and what a」
+	// 「[Fable 5.2] person does with what waits never waits on that.」
 	sends, err := s.theNotifier()
 	if err != nil {
 		return err
