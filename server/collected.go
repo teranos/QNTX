@@ -603,7 +603,12 @@ func (s *QNTXServer) collectedRelease(ctx context.Context, sent sigil.Sent) (any
 	if refused != nil {
 		return nil, refused
 	}
-	if err := s.deliverCollected(ctx, did, sent["says"], idsOf(sent["ids"]), time.Time{}); err != nil {
+	// ids that name nothing are no way to say everything: left out says that.
+	only := idsOf(sent["ids"])
+	if sent["ids"] != "" && len(only) != len(strings.Split(sent["ids"], ",")) {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "ids", Says: "ids names each thing said that goes, separated by commas, and this names nothing in one of its places: leave it out to release everything that waits"}
+	}
+	if err := s.deliverCollected(ctx, did, sent["says"], only, time.Time{}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return s.collectedList(ctx, sent)

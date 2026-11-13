@@ -343,3 +343,19 @@ func TestWhatIsHeldSinceItWasLookedAtStays(t *testing.T) {
 	require.NoError(t, srv.deliverCollected(srv.ctx, all.GetCollected()[0].GetDid(), "", nil, time.Now().Add(7*time.Hour)))
 	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()), "what a person passed to later was delivered by a look made before")
 }
+
+// ids that name nothing in one of their places release nothing.
+func TestIDsThatNameNothingReleaseNothing(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	for _, ids := range []string{",", "  ", "a,,b", " , "} {
+		_, refused := askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Birch", "says": "merge nothing today", "ids": ids})
+		require.NotNil(t, refused, "ids "+ids+" released something")
+		assert.Equal(t, sigil.Invalid, refused.GetWhy())
+	}
+	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	require.Len(t, all.GetCollected()[0].GetWaiting(), 1)
+	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()))
+}
