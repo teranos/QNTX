@@ -374,9 +374,9 @@ func TestWhatAGroundTookOutlivesARestart(t *testing.T) {
 	assert.Contains(t, toJSON(t, ended), "Birch received it")
 }
 
-// The Node Agent holds a name as any agent does, and the node runs its turns:
-// what is said to that name is a turn of the Node Agent, answered in the Task,
-// and waits on no ground to take it off the status row.
+// 「[Opus 5.5] The Node Agent holds a name as any agent does, and the node runs its turns:」
+// 「[Opus 5.5] what is said to that name is a turn of the Node Agent, answered in the Task,」
+// 「[Opus 5.5] and waits on no ground to take it off the status row.」
 func TestWhatIsSaidToTheNodeAgentsNameIsATurnOfTheNodeAgent(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	srv.news = statusline.NewNewsLog()
@@ -392,7 +392,7 @@ func TestWhatIsSaidToTheNodeAgentsNameIsATurnOfTheNodeAgent(t *testing.T) {
 	assert.Equal(t, "Up 3 days.", at(task, "artifacts.0.parts.0.text"))
 	assert.Empty(t, srv.news.Since(srv.nodeAgent.did, time.Now().UnixMilli()), "it was left on the row for a ground that is not there")
 
-	// The Task is the Node Agent's: found at no tenant as at its name.
+	// 「[Opus 5.5] The Task is the Node Agent's: found at no tenant as at its name.」
 	id := at(task, "id").(string)
 	code, again := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
 	require.Equal(t, http.StatusOK, code, again)
