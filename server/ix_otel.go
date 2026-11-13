@@ -206,7 +206,7 @@ func otlpDecode(encoding string, body []byte, into proto.Message) error {
 	if err := decoder.Decode(&said); err != nil {
 		return err
 	}
-	// One export is one JSON value; anything after it is no export.
+	// 「[Opus 5.5] One export is one JSON value; anything after it is no export.」
 	if _, err := decoder.Token(); err != io.EOF {
 		return errors.New("the body holds more than one JSON value")
 	}
@@ -250,9 +250,9 @@ func otlpIDs(v any, turn func(string) (string, error)) error {
 	return nil
 }
 
-// otlpExportIDs turns the hex ids of an ExportTraceServiceRequest's spans and
-// their links, where the schema has them: a field of that name the schema does
-// not know is left to be discarded, whatever it holds.
+// 「[Opus 5.5] otlpExportIDs turns the hex ids of an ExportTraceServiceRequest's spans and」
+// 「[Opus 5.5] their links, where the schema has them: a field of that name the schema does」
+// 「[Opus 5.5] not know is left to be discarded, whatever it holds.」
 func otlpExportIDs(export any) error {
 	for _, resource := range otlpList(export, "resourceSpans") {
 		for _, scope := range otlpList(resource, "scopeSpans") {
@@ -271,7 +271,7 @@ func otlpExportIDs(export any) error {
 	return nil
 }
 
-// otlpZero is whether an id is all zero bytes, which OTLP names invalid.
+// 「[Opus 5.5] otlpZero is whether an id is all zero bytes, which OTLP names invalid.」
 func otlpZero(id []byte) bool {
 	for _, b := range id {
 		if b != 0 {
@@ -281,14 +281,14 @@ func otlpZero(id []byte) bool {
 	return true
 }
 
-// otlpList is the list under key of an object, or none.
+// 「[Opus 5.5] otlpList is the list under key of an object, or none.」
 func otlpList(v any, key string) []any {
 	object, _ := v.(map[string]any)
 	list, _ := object[key].([]any)
 	return list
 }
 
-// otlpIDsOf turns the hex ids named keys of one object.
+// 「[Opus 5.5] otlpIDsOf turns the hex ids named keys of one object.」
 func otlpIDsOf(v any, keys ...string) error {
 	object, _ := v.(map[string]any)
 	for _, key := range keys {
@@ -391,7 +391,7 @@ func (s *QNTXServer) keepSpans(admitted auth.Admission, store ats.AttestationSto
 				now := time.Now()
 				at := now
 				if started := span.GetStartTimeUnixNano(); started != 0 {
-					// Unsigned nanoseconds, split so one past int64's range does not wrap.
+					// 「[Opus 5.5] Unsigned nanoseconds, split so one past int64's range does not wrap.」
 					at = time.Unix(int64(started/1e9), int64(started%1e9)).UTC()
 				}
 				err = store.CreateAttestation(&types.As{
