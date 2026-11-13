@@ -80,11 +80,12 @@ type collectedFor struct {
 	// HeldUntil is a person's word that nothing is delivered before it.
 	HeldUntil time.Time `json:"held_until,omitempty"`
 	Delivered time.Time `json:"delivered,omitempty"`
-	// Announced is, for each phone told of it, the time it was due when that
-	// phone was told (phones.go): held to another time, the phone is told
-	// again before that one, and a phone that was not reached is told when it is.
-	Announced map[string]time.Time `json:"announced,omitempty"`
-	Waiting   []collectedSaid      `json:"waiting"`
+	// Shown is, for each phone it was started on as a Live Activity, the time
+	// it was due when it was started there (phones.go): held to another time,
+	// it is started again before that one, and on a phone that was not reached
+	// when it is.
+	Shown   map[string]time.Time `json:"shown,omitempty"`
+	Waiting []collectedSaid      `json:"waiting"`
 }
 
 // waitOf is how long what is collected for an agent on model waits.
