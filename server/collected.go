@@ -18,35 +18,35 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "Agents cant wake Agents willy nilly"
-// "the messages collect"
-// "and as a human i can dial it"
-// "and as a human i can observe it"
-// "ROOM WAKE NEEDS TO FOLLOW SAME SAY LIMIT RULES"
-// "EXPERT OVERRIDE ALWAYS"
+// "「[Opus 5.5] Agents cant wake Agents willy nilly」"
+// "「[Opus 5.5] the messages collect」"
+// "「[Opus 5.5] and as a human i can dial it」"
+// "「[Opus 5.5] and as a human i can observe it」"
+// "「[Opus 5.5] ROOM WAKE NEEDS TO FOLLOW SAME SAY LIMIT RULES」"
+// "「[Opus 5.5] EXPERT OVERRIDE ALWAYS」"
 //
-// What an agent says to an agent does not go out on its own. It is collected
-// for the agent it was said to, and what is collected is delivered whole, as
-// one thing said: no sooner than the agent's wait after the oldest of it, and
-// no sooner than that after the last delivery. A person sees what waits, holds
-// it longer, or releases it. What a person says is never collected.
+// 「[Opus 5.5] What an agent says to an agent does not go out on its own. It is collected」
+// 「[Opus 5.5] for the agent it was said to, and what is collected is delivered whole, as」
+// 「[Opus 5.5] one thing said: no sooner than the agent's wait after the oldest of it, and」
+// 「[Opus 5.5] no sooner than that after the last delivery. A person sees what waits, holds」
+// 「[Opus 5.5] it longer, or releases it. What a person says is never collected.」
 
 const collectedPath = "/api/collected"
 
-// How long what is collected waits, by the model of the agent it is for. An
-// agent whose model the node does not hold waits the longer.
+// 「[Opus 5.5] How long what is collected waits, by the model of the agent it is for. An」
+// 「[Opus 5.5] agent whose model the node does not hold waits the longer.」
 var (
 	collectedForFable = 6 * time.Hour
 	collectedForOpus  = 3 * time.Hour
 )
 
-// collectedLooked is how often the node looks for what is due.
+// 「[Opus 5.5] collectedLooked is how often the node looks for what is due.」
 var collectedLooked = time.Minute
 
-// collectedFile is where what is collected is kept, beside the agents.
+// 「[Opus 5.5] collectedFile is where what is collected is kept, beside the agents.」
 const collectedFile = "collected.json"
 
-// collectedSaid is one thing an agent said to another.
+// 「[Opus 5.5] collectedSaid is one thing an agent said to another.」
 type collectedSaid struct {
 	From string    `json:"from"`
 	Says string    `json:"says"`
@@ -54,22 +54,22 @@ type collectedSaid struct {
 	Task string    `json:"task,omitempty"`
 }
 
-// collectedFor is what waits for one agent.
+// 「[Opus 5.5] collectedFor is what waits for one agent.」
 type collectedFor struct {
-	// DID is the agent; Called the name it holds or what the node calls it.
+	// 「[Opus 5.5] DID is the agent; Called the name it holds or what the node calls it.」
 	DID    string `json:"did"`
 	Called string `json:"called"`
-	// Tenant is where the node serves it over A2A: empty for the Node Agent,
-	// its name for an agent that holds one.
+	// 「[Opus 5.5] Tenant is where the node serves it over A2A: empty for the Node Agent,」
+	// 「[Opus 5.5] its name for an agent that holds one.」
 	Tenant string `json:"tenant"`
 	Model  string `json:"model,omitempty"`
-	// HeldUntil is a person's word that nothing is delivered before it.
+	// 「[Opus 5.5] HeldUntil is a person's word that nothing is delivered before it.」
 	HeldUntil time.Time       `json:"held_until,omitempty"`
 	Delivered time.Time       `json:"delivered,omitempty"`
 	Waiting   []collectedSaid `json:"waiting"`
 }
 
-// waitOf is how long what is collected for an agent on model waits.
+// 「[Opus 5.5] waitOf is how long what is collected for an agent on model waits.」
 func waitOf(model string) time.Duration {
 	if strings.Contains(strings.ToLower(model), "opus") {
 		return collectedForOpus
@@ -77,7 +77,7 @@ func waitOf(model string) time.Duration {
 	return collectedForFable
 }
 
-// due is when what waits is delivered if nobody holds or releases it.
+// 「[Opus 5.5] due is when what waits is delivered if nobody holds or releases it.」
 func (c collectedFor) due() time.Time {
 	if len(c.Waiting) == 0 {
 		return time.Time{}
@@ -93,7 +93,7 @@ func (c collectedFor) due() time.Time {
 	return due
 }
 
-// collection is everything collected on this node, kept in one file.
+// 「[Opus 5.5] collection is everything collected on this node, kept in one file.」
 type collection struct {
 	mu   sync.Mutex
 	path string
@@ -122,7 +122,7 @@ func (c *collection) write(held map[string]*collectedFor) error {
 	if err := os.MkdirAll(filepath.Dir(c.path), 0o700); err != nil {
 		return errors.Wrapf(err, "%s was not made to keep what is collected in", filepath.Dir(c.path))
 	}
-	// Written beside and moved over: a node that stops mid-write keeps the last whole one.
+	// 「[Opus 5.5] Written beside and moved over: a node that stops mid-write keeps the last whole one.」
 	beside := c.path + ".writing"
 	if err := os.WriteFile(beside, raw, 0o600); err != nil {
 		return errors.Wrapf(err, "what is collected was not written at %s", beside)
@@ -130,7 +130,7 @@ func (c *collection) write(held map[string]*collectedFor) error {
 	return errors.Wrapf(os.Rename(beside, c.path), "what is collected was not kept at %s", c.path)
 }
 
-// change reads what is collected, lets change it, and keeps it.
+// 「[Opus 5.5] change reads what is collected, lets change it, and keeps it.」
 func (c *collection) change(change func(map[string]*collectedFor) error) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -144,7 +144,7 @@ func (c *collection) change(change func(map[string]*collectedFor) error) error {
 	return c.write(held)
 }
 
-// theCollection is this node's, kept beside its agents.
+// 「[Opus 5.5] theCollection is this node's, kept beside its agents.」
 func (s *QNTXServer) theCollection() (*collection, error) {
 	s.collectedOnce.Do(func() {
 		home := ""
@@ -163,16 +163,16 @@ func (s *QNTXServer) theCollection() (*collection, error) {
 	return s.collected, nil
 }
 
-// deliversCollected marks a request as the node delivering what was
-// collected: said for the agents that said it, released by a person or due.
+// 「[Opus 5.5] deliversCollected marks a request as the node delivering what was」
+// 「[Opus 5.5] collected: said for the agents that said it, released by a person or due.」
 type deliversCollected struct{}
 
-// aPersonSpeaks is whether the one a request speaks for is a person: one the
-// gate admitted who is no agent by a DID of its own (itsOwnDID). A person's
-// session is one, and so is a client a person signed in to, which speaks for
-// them. What nobody was admitted for, a delivery of GitHub's or a room's wake,
-// is no person's. What the node delivers of what it collected is said as a
-// person's is.
+// 「[Opus 5.5] aPersonSpeaks is whether the one a request speaks for is a person: one the」
+// 「[Fable 5.2] gate admitted who is no agent by a DID of its own (itsOwnDID). A person's」
+// 「[Fable 5.2] session is one, and so is a client a person signed in to, which speaks for」
+// 「[Fable 5.2] them. What nobody was admitted for, a delivery of GitHub's or a room's wake,」
+// 「[Fable 5.2] is no person's. What the node delivers of what it collected is said as a」
+// 「[Fable 5.2] person's is.」
 func aPersonSpeaks(r *http.Request) bool {
 	if r == nil {
 		return false
@@ -182,17 +182,17 @@ func aPersonSpeaks(r *http.Request) bool {
 	}
 	admitted, gated := auth.AdmissionFrom(r.Context())
 	if !gated {
-		// A node with no gate admits nobody, and whoever speaks there is its
-		// person. A turn the node's own wake started names who wrote what
-		// woke it (wake_github.go), and that is no person.
+		// 「[Fable 5.2] A node with no gate admits nobody, and whoever speaks there is its」
+		// 「[Fable 5.2] person. A turn the node's own wake started names who wrote what」
+		// 「[Fable 5.2] woke it (wake_github.go), and that is no person.」
 		return speakerOf(r.Context()) == ""
 	}
 	_, noAgent := itsOwnDID(admitted)
 	return noAgent != nil
 }
 
-// collect keeps what an agent said to another, to be delivered with what else
-// is collected for it, and answers when that is if nobody holds or releases it.
+// 「[Opus 5.5] collect keeps what an agent said to another, to be delivered with what else」
+// 「[Opus 5.5] is collected for it, and answers when that is if nobody holds or releases it.」
 func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, error) {
 	kept, err := s.theCollection()
 	if err != nil {
@@ -205,7 +205,7 @@ func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, er
 			waits = &collectedFor{DID: to.DID}
 			held[to.DID] = waits
 		}
-		// What it is called, where it is served and what it runs on are as the node holds them now.
+		// 「[Opus 5.5] What it is called, where it is served and what it runs on are as the node holds them now.」
 		waits.Called, waits.Tenant, waits.Model = to.Called, to.Tenant, to.Model
 		waits.Waiting = append(waits.Waiting, said)
 		due = waits.due()
@@ -218,8 +218,8 @@ func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, er
 	return due, nil
 }
 
-// calledBy is the name the agent whose DID this is holds, or what was given:
-// a DID that holds none, or who a delivery of GitHub's says wrote it.
+// 「[Fable 5.2] calledBy is the name the agent whose DID this is holds, or what was given:」
+// 「[Fable 5.2] a DID that holds none, or who a delivery of GitHub's says wrote it.」
 func (s *QNTXServer) calledBy(who string) string {
 	if names, err := s.agentNames(); err == nil {
 		if at := slices.IndexFunc(names, func(kept agentName) bool { return kept.did == who && !kept.let }); at >= 0 {
@@ -232,13 +232,13 @@ func (s *QNTXServer) calledBy(who string) string {
 	return who
 }
 
-// collectedSays is why what an agent said was not said to the agent now.
+// 「[Opus 5.5] collectedSays is why what an agent said was not said to the agent now.」
 func collectedSays(called string, due time.Time) string {
 	return "collected for " + called + ", not said to it now: what agents say to an agent is delivered together, here no sooner than " +
 		due.UTC().Format(time.RFC3339) + ", or when a person releases it (collected list)"
 }
 
-// theNodeAgentsModel is the model the node holds its Node Agent to run on.
+// 「[Opus 5.5] theNodeAgentsModel is the model the node holds its Node Agent to run on.」
 func (s *QNTXServer) theNodeAgentsModel() string {
 	if s.deps == nil || s.deps.cfg == nil {
 		return ""
@@ -246,7 +246,7 @@ func (s *QNTXServer) theNodeAgentsModel() string {
 	return s.deps.cfg.Agent.Root.Claude.Model
 }
 
-// asOneThing is everything that waits for an agent, as the one thing said to it.
+// 「[Opus 5.5] asOneThing is everything that waits for an agent, as the one thing said to it.」
 func asOneThing(waiting []collectedSaid) string {
 	var said strings.Builder
 	said.WriteString("Collected for you: what agents said to you since " + waiting[0].At.UTC().Format(time.RFC3339) + ", delivered together. No person said any of it.\n")
@@ -256,8 +256,8 @@ func asOneThing(waiting []collectedSaid) string {
 	return said.String()
 }
 
-// deliverCollected says everything that waits for the agent did to it, as one
-// thing, and ends each Task it was said as. Nothing waiting is nothing done.
+// 「[Opus 5.5] deliverCollected says everything that waits for the agent did to it, as one」
+// 「[Opus 5.5] thing, and ends each Task it was said as. Nothing waiting is nothing done.」
 func (s *QNTXServer) deliverCollected(ctx context.Context, did string) error {
 	kept, err := s.theCollection()
 	if err != nil {
@@ -275,8 +275,8 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did string) error {
 	}
 	delivering := slices.Clone(waits.Waiting)
 
-	// Said over the node's own A2A, as what a person says is: the agent's
-	// turn, or its status row, as it is for anything said to it.
+	// 「[Opus 5.5] Said over the node's own A2A, as what a person says is: the agent's」
+	// 「[Opus 5.5] turn, or its status row, as it is for anything said to it.」
 	as := auth.Admitted(auth.LevelRoot)
 	said := context.WithValue(auth.WithAdmission(ctx, as), deliversCollected{}, true)
 	client, _, refused := s.ownClient(said, waits.Tenant)
@@ -301,7 +301,7 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did string) error {
 		if !found {
 			return nil
 		}
-		// What was said while this was delivered waits for the next.
+		// 「[Opus 5.5] What was said while this was delivered waits for the next.」
 		waits.Waiting = slices.DeleteFunc(waits.Waiting, func(one collectedSaid) bool {
 			return slices.ContainsFunc(delivering, func(sent collectedSaid) bool {
 				return sent.At.Equal(one.At) && sent.From == one.From && sent.Says == one.Says
@@ -325,8 +325,8 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did string) error {
 	return nil
 }
 
-// keepDeliveringCollected delivers what is due until the node stops. What
-// failed is said once for as long as it keeps failing the same way.
+// 「[Opus 5.5] keepDeliveringCollected delivers what is due until the node stops. What」
+// 「[Opus 5.5] failed is said once for as long as it keeps failing the same way.」
 func (s *QNTXServer) keepDeliveringCollected() {
 	tick := time.NewTicker(collectedLooked)
 	defer tick.Stop()
@@ -348,7 +348,7 @@ func (s *QNTXServer) keepDeliveringCollected() {
 	}
 }
 
-// deliverDue delivers what is due at now, for every agent something waits for.
+// 「[Opus 5.5] deliverDue delivers what is due at now, for every agent something waits for.」
 func (s *QNTXServer) deliverDue(now time.Time) error {
 	kept, err := s.theCollection()
 	if err != nil {
@@ -452,8 +452,8 @@ func (s *QNTXServer) collectedList(context.Context, sigil.Sent) (any, *protocol.
 	return answer, nil
 }
 
-// aPersonsToSay is nil when a person asks, and why not otherwise: what waits
-// is held and released by a person, and by no agent.
+// 「[Opus 5.5] aPersonsToSay is nil when a person asks, and why not otherwise: what waits」
+// 「[Opus 5.5] is held and released by a person, and by no agent.」
 func aPersonsToSay(ctx context.Context, does string) *protocol.Refusal {
 	if aPersonSpeaks(sigil.Caller(ctx)) {
 		return nil
@@ -461,7 +461,7 @@ func aPersonsToSay(ctx context.Context, does string) *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.NotAllowed, Says: "collected " + does + " is a person's to say, and this asks as an agent"}
 }
 
-// collectedNamed is the DID of the agent something waits for under name.
+// 「[Opus 5.5] collectedNamed is the DID of the agent something waits for under name.」
 func (s *QNTXServer) collectedNamed(name string) (string, *protocol.Refusal) {
 	kept, err := s.theCollection()
 	if err != nil {
