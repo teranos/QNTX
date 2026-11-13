@@ -41,6 +41,12 @@ Status: Unpolished
 
 "ITS DIRECTIONAL, SO WE CARE ABOUT THE RECEIVER"
 
+"IF WE KNOW SESSION A WAS INVOLVED, THATS WHY WE KNOW WHERE TO SEND"
+
+"IF SESSION A AND B ARE INVOLVED, THEY EACH GET THE PR ADDED ONTO THERI COLLECTION"
+
+"SO THEY KNOW DURING THE NEXT WAKE"
+
 ## What stands is the collection
 
 One thing stands in front of a person: the collection, by who it is for. It
@@ -50,14 +56,19 @@ A pull request that waits on the person is an item in the receiver's
 collection, beside what agents said, and is approved there. It does not stand
 on its own.
 
+Where a pull request goes is who was involved in it: the session that was is
+the receiver, and where two were, it is added to the collection of each. They
+know of it when what is collected for them is delivered, at their next wake,
+and are not woken for it.
+
 Pressing the collection brings the person to it and to where it is going:
 what is pending for an agent brings them to that agent, its chat, and the
 collection opens over it as the overlay.
 
-**Not built yet.** As built on 2026-11-14, an approval is started as a Live
-Activity of its own (`server/phones_approvals.go`), four stood at once that
-night, and pressing what stands opens nothing. Both are to be made what is
-said here.
+**Not built yet.** On 2026-11-13 an approval was started as a Live Activity
+of its own, and four stood at once. The node starts none on its own since. A
+pull request is not yet an item in a collection, and pressing what stands
+opens nothing yet.
 
 ## The story
 
@@ -111,7 +122,7 @@ ends is said, on what stands and in the node's log.
 | What waits | Started | Moved | Ended |
 |---|---|---|---|
 | A batch | fifteen minutes before it is delivered | when what waits changes | delivered, delayed or canceled |
-| An approval | when it is asked, or a check on its head changes | as its checks run, and when it can be decided | answered, or the pull request is over |
+| An approval | with the collection it is an item of | as its checks run, and when it can be decided | answered, or the pull request is over |
 
 `showWhatWaits` looks once a minute and makes what stands what waits.
 
