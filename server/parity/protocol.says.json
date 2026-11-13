@@ -139,6 +139,7 @@
   "protocol.CollectedSaid.at": "When it said it, RFC3339.",
   "protocol.CollectedSaid.edited": "Whether a person changed what it says.",
   "protocol.CollectedSaid.from": "Who said it: the name the agent holds, or its DID.",
+  "protocol.CollectedSaid.from_did": "「[Opus 5.5] The DID of who said it, which its name may change over: what a chat's」 「[Opus 5.5] outbox finds what its agent said by. Empty for what was collected before.」",
   "protocol.CollectedSaid.id": "What collected edit and cancel name it by.",
   "protocol.CollectedSaid.says": "What it said.",
   "protocol.CollectedSaid.task": "The A2A Task it was said as, when it was said as one.",
