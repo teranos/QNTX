@@ -200,7 +200,7 @@ REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' '
 REACH is '/api/agent/stop'                                                of ROOT
 
 # What agents said to an agent, collected until it is delivered together.
-REACH is '/api/collected' '/api/collected/hold' '/api/collected/release'  of ROOT
+REACH is '/api/collected' '/api/collected/hold' '/api/collected/release' '/api/collected/edit' '/api/collected/later' '/api/collected/cancel'  of ROOT
 
 # The element agent (the elements signum, ADR-054): each element is its own
 # agent and its own conversation, and ROOT SHAKE is ROOT's.

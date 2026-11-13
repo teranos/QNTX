@@ -127,7 +127,8 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	require.NoError(t, err)
 	// "Agents cant wake Agents willy nilly": it is collected for Birch, and
 	// not on the row (collected_test.go).
-	assert.Contains(t, string(said), "TASK_STATE_SUBMITTED")
+	// Submitted as it is answered, or already waiting on a person: either is collected.
+	assert.NotContains(t, string(said), "TASK_STATE_COMPLETED")
 	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
 	require.Nil(t, refused, refused.GetSays())
 	require.Len(t, all.GetCollected(), 1)

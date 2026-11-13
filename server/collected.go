@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -52,6 +54,16 @@ type collectedSaid struct {
 	Says string    `json:"says"`
 	At   time.Time `json:"at"`
 	Task string    `json:"task,omitempty"`
+	// ID is what a person names it by; Edited that a person changed what it says.
+	ID     string `json:"id,omitempty"`
+	Edited bool   `json:"edited,omitempty"`
+}
+
+// collectedID is a new name for one thing said.
+func collectedID() string {
+	raw := make([]byte, 8)
+	_, _ = rand.Read(raw)
+	return hex.EncodeToString(raw)
 }
 
 // collectedFor is what waits for one agent.
@@ -95,8 +107,12 @@ func (c collectedFor) due() time.Time {
 
 // collection is everything collected on this node, kept in one file.
 type collection struct {
-	mu   sync.Mutex
-	path string
+	mu sync.Mutex
+	// settling is held for the whole of a delivery, and for the whole of what a
+	// person changes: what a person holds, edits or cancels is never also on
+	// its way out, and what is on its way out is never changed under it.
+	settling sync.Mutex
+	path     string
 }
 
 func (c *collection) read() (map[string]*collectedFor, error) {
@@ -110,6 +126,20 @@ func (c *collection) read() (map[string]*collectedFor, error) {
 	}
 	if err := json.Unmarshal(raw, &held); err != nil {
 		return nil, errors.Wrapf(err, "what is collected at %s is not JSON", c.path)
+	}
+	// What was kept before a thing said had an id is given one, and kept with it.
+	named := false
+	for _, waits := range held {
+		for at := range waits.Waiting {
+			if waits.Waiting[at].ID == "" {
+				waits.Waiting[at].ID, named = collectedID(), true
+			}
+		}
+	}
+	if named {
+		if err := c.write(held); err != nil {
+			return nil, err
+		}
 	}
 	return held, nil
 }
@@ -207,6 +237,7 @@ func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, er
 		}
 		// What it is called, where it is served and what it runs on are as the node holds them now.
 		waits.Called, waits.Tenant, waits.Model = to.Called, to.Tenant, to.Model
+		said.ID = collectedID()
 		waits.Waiting = append(waits.Waiting, said)
 		due = waits.due()
 		return nil
@@ -249,20 +280,35 @@ func (s *QNTXServer) theNodeAgentsModel() string {
 // asOneThing is everything that waits for an agent, as the one thing said to it.
 func asOneThing(waiting []collectedSaid) string {
 	var said strings.Builder
-	said.WriteString("Collected for you: what agents said to you since " + waiting[0].At.UTC().Format(time.RFC3339) + ", delivered together. No person said any of it.\n")
+	said.WriteString("Collected for you: what agents said to you since " + waiting[0].At.UTC().Format(time.RFC3339) + ", delivered together.")
+	if slices.ContainsFunc(waiting, func(one collectedSaid) bool { return one.Edited }) {
+		said.WriteString(" A person changed what is marked so.\n")
+	} else {
+		said.WriteString(" No person said any of it.\n")
+	}
 	for _, one := range waiting {
-		said.WriteString("\n" + one.From + ", " + one.At.UTC().Format(time.RFC3339) + ":\n" + one.Says + "\n")
+		changed := ""
+		if one.Edited {
+			changed = ", changed by a person"
+		}
+		said.WriteString("\n" + one.From + ", " + one.At.UTC().Format(time.RFC3339) + changed + ":\n" + one.Says + "\n")
 	}
 	return said.String()
 }
 
 // deliverCollected says everything that waits for the agent did to it, as one
 // thing, and ends each Task it was said as. Nothing waiting is nothing done.
-func (s *QNTXServer) deliverCollected(ctx context.Context, did string) error {
+// authored, when a person gave it, is the whole of what the agent receives.
+// only, when a person named them, are the ids of what goes: what they saw, and
+// nothing that was collected since. dueAt, when it is not zero, is the moment
+// it is asked at: what is not due then, held since it was looked at, stays.
+func (s *QNTXServer) deliverCollected(ctx context.Context, did, authored string, only []string, dueAt time.Time) error {
 	kept, err := s.theCollection()
 	if err != nil {
 		return err
 	}
+	kept.settling.Lock()
+	defer kept.settling.Unlock()
 	kept.mu.Lock()
 	held, err := kept.read()
 	kept.mu.Unlock()
@@ -273,7 +319,20 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did string) error {
 	if !found || len(waits.Waiting) == 0 {
 		return nil
 	}
+	if !dueAt.IsZero() && dueAt.Before(waits.due()) {
+		return nil
+	}
 	delivering := slices.Clone(waits.Waiting)
+	if len(only) > 0 {
+		delivering = slices.DeleteFunc(delivering, func(one collectedSaid) bool { return !slices.Contains(only, one.ID) })
+		if len(delivering) == 0 {
+			return errors.Newf("nothing that waits for %s is among %s", waits.Called, strings.Join(only, ", "))
+		}
+	}
+	receives := asOneThing(delivering)
+	if strings.TrimSpace(authored) != "" {
+		receives = authored
+	}
 
 	// Said over the node's own A2A, as what a person says is: the agent's
 	// turn, or its status row, as it is for anything said to it.
@@ -284,7 +343,7 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did string) error {
 		return errors.Newf("what is collected for %s was not delivered: %s", waits.Called, refused.GetSays())
 	}
 	defer func() { _ = client.Destroy() }()
-	message := a2asdk.NewMessage(a2asdk.MessageRoleUser, a2asdk.NewTextPart(asOneThing(delivering)))
+	message := a2asdk.NewMessage(a2asdk.MessageRoleUser, a2asdk.NewTextPart(receives))
 	returns := true
 	answered, err := client.SendMessage(said, &a2asdk.SendMessageRequest{Message: message, Config: &a2asdk.SendMessageConfig{ReturnImmediately: returns}})
 	if err != nil {
@@ -303,9 +362,7 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did string) error {
 		}
 		// What was said while this was delivered waits for the next.
 		waits.Waiting = slices.DeleteFunc(waits.Waiting, func(one collectedSaid) bool {
-			return slices.ContainsFunc(delivering, func(sent collectedSaid) bool {
-				return sent.At.Equal(one.At) && sent.From == one.From && sent.Says == one.Says
-			})
+			return slices.ContainsFunc(delivering, func(sent collectedSaid) bool { return sent.ID == one.ID })
 		})
 		waits.Delivered, waits.HeldUntil = now, time.Time{}
 		return nil
@@ -365,7 +422,7 @@ func (s *QNTXServer) deliverDue(now time.Time) error {
 		if len(waits.Waiting) == 0 || now.Before(waits.due()) {
 			continue
 		}
-		if err := s.deliverCollected(s.ctx, did); err != nil {
+		if err := s.deliverCollected(s.ctx, did, "", nil, now); err != nil {
 			failed = append(failed, err.Error())
 		}
 	}
@@ -401,16 +458,46 @@ func (s *QNTXServer) collectedSignum() sigil.Signum {
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: collectedPath + "/hold"},
 				},
 				{
-					Name:   "release",
-					Does:   "Delivers what waits for an agent now, as one thing said to it. A person's to say.",
-					Takes:  []*protocol.Param{to},
+					Name: "release",
+					Does: "Delivers what waits for an agent now, as one thing said to it. A person's to say.",
+					Takes: []*protocol.Param{to,
+						{Name: "says", Says: "The whole of what the agent receives, as the person wrote it. Empty delivers what waits as the node puts it together."},
+						{Name: "ids", Says: "The things said that go, by id, separated by commas: what the person saw. Empty is everything that waits. What is not among them waits on."},
+					},
 					Answer: "protocol.CollectedAll",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: collectedPath + "/release"},
+				},
+				{
+					Name: "edit",
+					Does: "Changes what one thing that waits says: the agent receives what the person left there. A person's to say.",
+					Takes: []*protocol.Param{to,
+						{Name: "id", Required: true, Says: "The thing said, by its id, as collected list gives it."},
+						{Name: "says", Required: true, Says: "What it says from now on."},
+					},
+					Answer: "protocol.CollectedAll",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: collectedPath + "/edit"},
+				},
+				{
+					Name:   "later",
+					Does:   "Passes what waits for an agent to the next delivery: it is held one more of the agent's waits past when it was due. A person's to say.",
+					Takes:  []*protocol.Param{to},
+					Answer: "protocol.CollectedAll",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: collectedPath + "/later"},
+				},
+				{
+					Name: "cancel",
+					Does: "Cancels what waits for an agent: it is never delivered, and each Task it was said as ends canceled. A person's to say.",
+					Takes: []*protocol.Param{to,
+						{Name: "id", Says: "One thing said, by its id. Empty cancels everything that waits for the agent."},
+					},
+					Answer: "protocol.CollectedAll",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: collectedPath + "/cancel"},
 				},
 			},
 		},
 		Answers: map[string]sigil.Answer{
 			"list": s.collectedList, "hold": s.collectedHold, "release": s.collectedRelease,
+			"edit": s.collectedEdit, "later": s.collectedLater, "cancel": s.collectedCancel,
 		},
 	}
 }
@@ -444,7 +531,7 @@ func (s *QNTXServer) collectedList(context.Context, sigil.Sent) (any, *protocol.
 			Waiting: []*protocol.CollectedSaid{},
 		}
 		for _, said := range waits.Waiting {
-			one.Waiting = append(one.Waiting, &protocol.CollectedSaid{From: said.From, Says: said.Says, At: stamped(said.At), Task: said.Task})
+			one.Waiting = append(one.Waiting, &protocol.CollectedSaid{From: said.From, Says: said.Says, At: stamped(said.At), Task: said.Task, Id: said.ID, Edited: said.Edited})
 		}
 		answer.Collected = append(answer.Collected, one)
 	}
@@ -497,6 +584,8 @@ func (s *QNTXServer) collectedHold(ctx context.Context, sent sigil.Sent) (any, *
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	kept.settling.Lock()
+	defer kept.settling.Unlock()
 	if err := kept.change(func(held map[string]*collectedFor) error {
 		held[did].HeldUntil = until
 		return nil
@@ -514,8 +603,141 @@ func (s *QNTXServer) collectedRelease(ctx context.Context, sent sigil.Sent) (any
 	if refused != nil {
 		return nil, refused
 	}
-	if err := s.deliverCollected(ctx, did); err != nil {
+	// ids that name nothing are no way to say everything: left out says that.
+	only := idsOf(sent["ids"])
+	if sent["ids"] != "" && len(only) != len(strings.Split(sent["ids"], ",")) {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "ids", Says: "ids names each thing said that goes, separated by commas, and this names nothing in one of its places: leave it out to release everything that waits"}
+	}
+	if err := s.deliverCollected(ctx, did, sent["says"], only, time.Time{}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return s.collectedList(ctx, sent)
+}
+
+// "DELAY QUICKLY (GET'S COLLECTED WITH THE NEXT BATCH)"
+// What comes in before then joins what waits, and goes out with it.
+func (s *QNTXServer) collectedLater(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	if refused := aPersonsToSay(ctx, "later"); refused != nil {
+		return nil, refused
+	}
+	did, refused := s.collectedNamed(sent["to"])
+	if refused != nil {
+		return nil, refused
+	}
+	kept, err := s.theCollection()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	kept.settling.Lock()
+	defer kept.settling.Unlock()
+	if err := kept.change(func(held map[string]*collectedFor) error {
+		waits := held[did]
+		if due := waits.due(); !due.IsZero() {
+			waits.HeldUntil = due.Add(waitOf(waits.Model))
+		}
+		return nil
+	}); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	return s.collectedList(ctx, sent)
+}
+
+// "CANCELS THE MESSAGE"
+func (s *QNTXServer) collectedCancel(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	if refused := aPersonsToSay(ctx, "cancel"); refused != nil {
+		return nil, refused
+	}
+	did, refused := s.collectedNamed(sent["to"])
+	if refused != nil {
+		return nil, refused
+	}
+	kept, err := s.theCollection()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	kept.settling.Lock()
+	defer kept.settling.Unlock()
+	id := strings.TrimSpace(sent["id"])
+	if id == "" && sent["id"] != "" {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "id", Says: "id names one thing said, and this is nothing but space: leave it out to cancel everything that waits"}
+	}
+	kept.mu.Lock()
+	held, err := kept.read()
+	kept.mu.Unlock()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	called := held[did].Called
+	canceled := slices.DeleteFunc(slices.Clone(held[did].Waiting), func(one collectedSaid) bool { return id != "" && one.ID != id })
+	if id != "" && len(canceled) == 0 {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "id", Says: "nothing that waits for " + sent["to"] + " is " + id}
+	}
+	// Each Task ends canceled before the thing said is let go of: one that did
+	// not end keeps what it was said as waiting, to be canceled again.
+	lines := s.systemTasks(did)
+	for _, one := range canceled {
+		if one.Task == "" {
+			continue
+		}
+		if err := s.endTask(lines, one.Task, a2asdk.TaskStateCanceled, did, "", "", "a person canceled it before it was delivered to "+called); err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "Task " + one.Task + " did not end canceled, so what it was said as still waits: " + err.Error()}
+		}
+	}
+	if err := kept.change(func(held map[string]*collectedFor) error {
+		waits := held[did]
+		waits.Waiting = slices.DeleteFunc(waits.Waiting, func(one collectedSaid) bool {
+			return slices.ContainsFunc(canceled, func(gone collectedSaid) bool { return gone.ID == one.ID })
+		})
+		if len(waits.Waiting) == 0 {
+			waits.HeldUntil = time.Time{}
+		}
+		return nil
+	}); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	s.logger.Infow("What was collected for an agent is canceled by a person", "to", called, "things", len(canceled))
+	return s.collectedList(ctx, sent)
+}
+
+// "I AUTHOR, I CHANGE WHATEVER I WANT ABOUT WHAT AN AGENT RECEIVES"
+func (s *QNTXServer) collectedEdit(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	if refused := aPersonsToSay(ctx, "edit"); refused != nil {
+		return nil, refused
+	}
+	did, refused := s.collectedNamed(sent["to"])
+	if refused != nil {
+		return nil, refused
+	}
+	kept, err := s.theCollection()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	kept.settling.Lock()
+	defer kept.settling.Unlock()
+	found := false
+	if err := kept.change(func(held map[string]*collectedFor) error {
+		for at := range held[did].Waiting {
+			if one := &held[did].Waiting[at]; one.ID != "" && one.ID == sent["id"] {
+				one.Says, one.Edited, found = sent["says"], true, true
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	if !found {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "id", Says: "nothing that waits for " + sent["to"] + " is " + sent["id"]}
+	}
+	return s.collectedList(ctx, sent)
+}
+
+// idsOf is the ids a person named, separated by commas.
+func idsOf(said string) []string {
+	ids := []string{}
+	for _, one := range strings.Split(said, ",") {
+		if id := strings.TrimSpace(one); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
