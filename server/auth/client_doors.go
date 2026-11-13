@@ -44,8 +44,11 @@ type Client struct {
 // expired client is not a door, and is refused here rather than at the token
 // endpoint.
 //
-// The list is read whole. A client is looked up once per authorize request,
-// which is a person walking up, and the store is small.
+// It is asked on every request a client's key signs (admissionOf), so the
+// token is found by its DID and the list is not read: read whole for each, it
+// was what q spent its CPU on until it starved (2026-11-13, QNTX #1715). The
+// list is read only for a DID whose token is no client's, which the scan
+// below settles as it always did.
 func (h *Handler) clientByDID(did string) (Client, bool) {
 	if node, declared := h.nodes[did]; declared {
 		return node, true
@@ -53,10 +56,18 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 	if h.tokens == nil || did == "" {
 		return Client{}, false
 	}
-	listed, err := h.tokens.List()
-	if err != nil {
-		h.logger.Errorw("could not list tokens, so no client answers", "did", did, "error", err)
+	var listed []TokenInfo
+	if found, held := h.tokenOf(did); !held {
 		return Client{}, false
+	} else if found.Level == LevelOAuth {
+		listed = []TokenInfo{found}
+	} else {
+		all, err := h.tokens.List()
+		if err != nil {
+			h.logger.Errorw("could not list tokens, so no client answers", "did", did, "error", err)
+			return Client{}, false
+		}
+		listed = all
 	}
 	for _, t := range listed {
 		if t.DID != did || t.Level != LevelOAuth {

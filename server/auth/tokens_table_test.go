@@ -416,3 +416,54 @@ func TestTheTableIsParsedOnceUntilATokenChanges(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "default", labeled(again, "token def").Namespaces[0])
 }
+
+// A client is asked for on every request its key signs: it is found by its
+// DID, and the table is not listed for it. Listed for each, it was what q
+// spent its CPU on.
+func TestAClientIsFoundByItsDIDAndTheTableIsNotListed(t *testing.T) {
+	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
+	require.NoError(t, err)
+	_, _, err = table.Create(NewToken{
+		Label: "app", MintedBy: mastodonAccount, Level: LevelOAuth,
+		Namespaces: []string{NamespaceDefault}, ReturnAddress: appReturn, ExpiresAt: NeverEnds(),
+	})
+	require.NoError(t, err)
+	for _, hash := range []string{"abc", "def"} {
+		_, err = table.Issue(aToken(hash, "token "+hash))
+		require.NoError(t, err)
+	}
+	listed, err := table.List()
+	require.NoError(t, err)
+	var app TokenInfo
+	for _, one := range listed {
+		if one.Label == "app" {
+			app = one
+		}
+	}
+	require.NotEmpty(t, app.DID)
+	parsedSoFar := table.parses
+
+	h := handlerWithDoors(t)
+	h.tokens = table
+	for range 50 {
+		client, found := h.clientByDID(app.DID)
+		require.True(t, found, "the client its DID names was not found")
+		assert.Equal(t, "app", client.Label)
+		assert.Equal(t, appReturn, client.ReturnAddress)
+		by, known := h.MintedBy(app.DID)
+		require.True(t, known)
+		assert.Equal(t, mastodonAccount, by)
+	}
+	assert.Equal(t, parsedSoFar, table.parses, "finding a client by its DID listed the table")
+
+	// A DID no token holds names no client, and one whose token is no client's names none either.
+	_, found := h.clientByDID("did:key:z6Mknobody")
+	assert.False(t, found)
+	_, found = h.clientByDID("did:key:zabc")
+	assert.False(t, found, "a token that is no client's was taken for a client")
+
+	// A client revoked is no door.
+	require.NoError(t, table.Revoke(app.ID))
+	_, found = h.clientByDID(app.DID)
+	assert.False(t, found, "a revoked client still answers")
+}
