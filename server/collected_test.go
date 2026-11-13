@@ -276,3 +276,70 @@ func TestWhatAPersonWritesOnReleaseIsWhatTheAgentReceives(t *testing.T) {
 	assert.Contains(t, left[0].Item.Note, "merge nothing today")
 	assert.NotContains(t, left[0].Item.Note, "pull request one is open")
 }
+
+// What a person releases by id is what they saw: what was collected since waits on.
+func TestWhatAPersonDidNotSeeIsNotSwallowedByWhatTheyWrote(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	saw := all.GetCollected()[0].GetWaiting()[0].GetId()
+	sayTo(t, srv, alder, "Birch", "the build is red")
+
+	all, refused = askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Birch", "says": "merge nothing today", "ids": saw})
+	require.Nil(t, refused, refused.GetSays())
+	require.Len(t, all.GetCollected(), 1)
+	require.Len(t, all.GetCollected()[0].GetWaiting(), 1)
+	assert.Equal(t, "the build is red", all.GetCollected()[0].GetWaiting()[0].GetSays(), "what the person never saw was let go of")
+
+	_, refused = askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Birch", "ids": "no-such"})
+	require.NotNil(t, refused, "ids that name nothing delivered something")
+}
+
+// An id of nothing but space names nothing, and cancels nothing.
+func TestAnIDOfNothingButSpaceCancelsNothing(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	_, refused := askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch", "id": "  "})
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.Invalid, refused.GetWhy())
+	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	require.Len(t, all.GetCollected()[0].GetWaiting(), 1)
+}
+
+// What was kept before a thing said had an id is given one, the same on every read.
+func TestWhatWasKeptBeforeIDsIsNamed(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	kept, err := srv.theCollection()
+	require.NoError(t, err)
+	require.NoError(t, kept.change(func(held map[string]*collectedFor) error {
+		for _, waits := range held {
+			waits.Waiting[0].ID = ""
+		}
+		return nil
+	}))
+	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	first := all.GetCollected()[0].GetWaiting()[0].GetId()
+	require.NotEmpty(t, first)
+	all, refused = askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	assert.Equal(t, first, all.GetCollected()[0].GetWaiting()[0].GetId())
+}
+
+// What a person holds after the node looked is not delivered by that look.
+func TestWhatIsHeldSinceItWasLookedAtStays(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	all, refused := askCollected(t, srv, asAPerson(), "later", sigil.Sent{"to": "Birch"})
+	require.Nil(t, refused, refused.GetSays())
+	// The moment the node looked at is before what the person passed it on to.
+	require.NoError(t, srv.deliverCollected(srv.ctx, all.GetCollected()[0].GetDid(), "", nil, time.Now().Add(7*time.Hour)))
+	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()), "what a person passed to later was delivered by a look made before")
+}
