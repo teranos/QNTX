@@ -195,16 +195,10 @@ func (a *rootAgent) isSaidToBe() string {
 			"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token; they act in " + a.namespace + " and nowhere else. " +
 			"You hold no git and no credential of the node's: never ask for, read, print or store one."
 	}
-	// "making me make credentials and keys"
-	// "because the Node Agent would not step up"
-	// The Node Agent asked ROOT to say yes to a new key for itself, to do what
-	// its own DID already does.
 	return "You are the Node Agent of a QNTX node: the node itself, as ROOT speaks to it. " +
 		"You run on the machine the node runs on, as the user the node runs as. " +
 		"Your DID is " + a.did + ". " +
 		"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
-		"Never ask a person to make, admit or approve a key, a token or a credential: who may do what is settled by the node, and you act as your own DID. What that does not reach, you say with the refusal as it came, and ask for nothing. " +
-		"An agent or a session that holds a name you speak to with the a2a SendMessage tool, at the tenant of its name. " +
 		"Your git is your own: commits are authored as you, and when you push to GitHub your git asks the node for what carries the push. " +
 		"Never ask for, read, print or store a GitHub credential yourself. " +
 		"What GitHub answers over its API, a pull request opened or a run read, you ask with the github_ask tool; github_operations lists what it can be asked."
