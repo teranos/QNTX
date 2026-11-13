@@ -18,9 +18,12 @@ import (
 //
 // An approval that waits on ROOT is a Live Activity, the same shape a batch
 // is (phones.go): the pull request, its checks as segments, and ROOT's
-// answers as presses. It stands from when it is asked until ROOT answers it
-// or it is over, showing its checks as they run; its presses are there once
-// it can be decided (ADR-052).
+// answers as presses. It is started when it moves: asked, or a check on its
+// head changed, within shownBefore of now. One that has waited longer than
+// that is not put in front of ROOT anew, and a phone named today is not
+// handed every pull request that was already open. Started, it stands until
+// ROOT answers it or it is over, showing its checks as they run; its presses
+// are there once it can be decided (ADR-052).
 
 // begunSubject is what the lines about Live Activities the node started are
 // about. Each line's predicate names one phone and one thing that waits, and
@@ -86,7 +89,9 @@ func approvalShown(st *approvalState) waitsShown {
 // Activity, on each phone it was not started on for the head it is at. One
 // that stands already is moved to its new head and not started beside itself.
 func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, live map[string]started, open []*approvalState, now time.Time) error {
-	waiting := slices.DeleteFunc(slices.Clone(open), func(st *approvalState) bool { return st.said != "" })
+	waiting := slices.DeleteFunc(slices.Clone(open), func(st *approvalState) bool {
+		return st.said != "" || now.Sub(st.movedAt) >= shownBefore
+	})
 	if len(tokens) == 0 || len(waiting) == 0 {
 		return nil
 	}

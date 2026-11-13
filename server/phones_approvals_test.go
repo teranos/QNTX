@@ -23,6 +23,12 @@ func TestAnApprovalThatWaitsOnROOTStandsAsALiveActivity(t *testing.T) {
 	code, said := handsOver(t, s, inROOTsSession(), naming(aPhone))
 	require.Equal(t, http.StatusOK, code, said)
 
+	// One that was asked long before the phone was named is not put in front of ROOT now.
+	delivered(t, s, "pull_request", pullRequest("opened", 28, "0ldhead", ""))
+	require.NoError(t, s.showWhatWaits(context.Background(), time.Now().Add(16*time.Minute)))
+	assert.Empty(t, apple.sent, "an approval that had waited longer than fifteen minutes was started")
+	delivered(t, s, "pull_request", pullRequest("closed", 28, "0ldhead", ""))
+
 	// Asked: it stands, once, however often the node looks.
 	delivered(t, s, "pull_request", pullRequest("opened", 29, "abe92a9", ""))
 	require.NoError(t, s.showWhatWaits(context.Background(), time.Now()))
