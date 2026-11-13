@@ -76,9 +76,13 @@ type collectedFor struct {
 	Tenant string `json:"tenant"`
 	Model  string `json:"model,omitempty"`
 	// HeldUntil is a person's word that nothing is delivered before it.
-	HeldUntil time.Time       `json:"held_until,omitempty"`
-	Delivered time.Time       `json:"delivered,omitempty"`
-	Waiting   []collectedSaid `json:"waiting"`
+	HeldUntil time.Time `json:"held_until,omitempty"`
+	Delivered time.Time `json:"delivered,omitempty"`
+	// Announced is, for each phone told of it, the time it was due when that
+	// phone was told (phones.go): held to another time, the phone is told
+	// again before that one, and a phone that was not reached is told when it is.
+	Announced map[string]time.Time `json:"announced,omitempty"`
+	Waiting   []collectedSaid      `json:"waiting"`
 }
 
 // waitOf is how long what is collected for an agent on model waits.
@@ -210,6 +214,11 @@ func aPersonSpeaks(r *http.Request) bool {
 	if r.Context().Value(deliversCollected{}) != nil {
 		return true
 	}
+	// "I said it here. Release it."
+	// An agent in a turn a person started acts on that person's word.
+	if r.Context().Value(onAPersonsWord{}) != nil {
+		return true
+	}
 	admitted, gated := auth.AdmissionFrom(r.Context())
 	if !gated {
 		// A node with no gate admits nobody, and whoever speaks there is its
@@ -219,6 +228,13 @@ func aPersonSpeaks(r *http.Request) bool {
 	}
 	_, noAgent := itsOwnDID(admitted)
 	return noAgent != nil
+}
+
+// startedByAPerson is whether a turn asked for by r is a person talking to the
+// agent. A delivery of what was collected is the node's, whoever released it:
+// a turn it starts speaks for no one.
+func startedByAPerson(r *http.Request) bool {
+	return aPersonSpeaks(r) && r.Context().Value(deliversCollected{}) == nil
 }
 
 // collect keeps what an agent said to another, to be delivered with what else

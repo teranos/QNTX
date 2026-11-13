@@ -359,3 +359,45 @@ func TestIDsThatNameNothingReleaseNothing(t *testing.T) {
 	require.Len(t, all.GetCollected()[0].GetWaiting(), 1)
 	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()))
 }
+
+// "I said it here. Release it."
+// An agent in a turn a person started acts on that person's word; in a turn
+// nobody started, or beside one, it does not.
+func TestAnAgentInAPersonsTurnSpeaksForThem(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+
+	// What the door marks while a person's turn of Alder runs.
+	throughTheDoor := func() context.Context {
+		ctx := alder
+		if srv.speaksForAPerson("did:key:z6Mkalder") {
+			ctx = context.WithValue(ctx, onAPersonsWord{}, true)
+		}
+		return sigil.WithCaller(ctx, httptest.NewRequest(http.MethodPost, collectedPath, nil).WithContext(ctx))
+	}
+
+	_, refused := askCollected(t, srv, throughTheDoor(), "release", sigil.Sent{"to": "Birch"})
+	require.NotNil(t, refused, "an agent no person is talking to released what was collected")
+
+	ends := srv.aPersonsTurn("did:key:z6Mkalder", true)
+	wake := srv.aPersonsTurn("did:key:z6Mkalder", false)
+	_, refused = askCollected(t, srv, throughTheDoor(), "release", sigil.Sent{"to": "Birch"})
+	require.NotNil(t, refused, "a turn nobody started, running beside a person's, spoke for the person")
+	wake()
+
+	all, refused := askCollected(t, srv, throughTheDoor(), "release", sigil.Sent{"to": "Birch"})
+	require.Nil(t, refused, refused.GetSays())
+	assert.Empty(t, all.GetCollected(), "what the agent released on the person's word still waits")
+	ends()
+
+	sayTo(t, srv, alder, "Birch", "pull request two is open")
+	_, refused = askCollected(t, srv, throughTheDoor(), "release", sigil.Sent{"to": "Birch"})
+	require.NotNil(t, refused, "the agent still spoke for the person once their turn ended")
+
+	// A turn the node's delivery started speaks for no one, though a delivery counts as said by a person.
+	delivery := httptest.NewRequest(http.MethodPost, collectedPath, nil)
+	delivery = delivery.WithContext(context.WithValue(delivery.Context(), deliversCollected{}, true))
+	assert.True(t, aPersonSpeaks(delivery))
+	assert.False(t, startedByAPerson(delivery), "a delivery's turn was counted as a person's")
+}

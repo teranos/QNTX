@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
@@ -129,9 +130,19 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	// not on the row (collected_test.go).
 	// Submitted as it is answered, or already waiting on a person: either is collected.
 	assert.NotContains(t, string(said), "TASK_STATE_COMPLETED")
-	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
-	require.Nil(t, refused, refused.GetSays())
-	require.Len(t, all.GetCollected(), 1)
+	// It is collected by the turn the message started, which SendMessage does not wait for:
+	// asked at once, the list was empty on a slow runner.
+	// Asked here, on the test's own goroutine, until it holds it: a refusal fails at once, in its own words.
+	var all *protocol.CollectedAll
+	for until := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		var refused *protocol.Refusal
+		all, refused = askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+		require.Nil(t, refused, refused.GetSays())
+		if len(all.GetCollected()) == 1 {
+			break
+		}
+		require.True(t, time.Now().Before(until), "what Alder said to Birch was not collected")
+	}
 	assert.Equal(t, "Alder", all.GetCollected()[0].GetWaiting()[0].GetFrom(), "it is from Alder, by name")
 	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()))
 
