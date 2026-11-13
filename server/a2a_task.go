@@ -2,7 +2,9 @@ package server
 
 import (
 	"encoding/json"
+	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -69,6 +71,9 @@ type taskAgent struct {
 	// their streams (followLeftTurns): the Node Agent's and an element agent's,
 	// which are under the Node Agent's home.
 	followed bool
+	// named is an agent that holds a name (i name) and that the node runs no
+	// turn for: what is said to it goes to it over the status row (a2a_named.go).
+	named bool
 }
 
 // systemTasks is where the Task lines of the agent did are when they are in
@@ -100,10 +105,27 @@ func (s *QNTXServer) taskAgentAt(r *http.Request, tenant string) (taskAgent, err
 	case isElement:
 		ta, err = s.elementTaskAgent(element)
 	default:
-		ta, err = s.namespaceTaskAgent(admitted, tenant)
+		named, held, nameErr := s.agentNamedAt(tenant)
+		switch {
+		case nameErr != nil:
+			err = a2aRefusal(a2asdk.ErrInternalError, nameErr.Error())
+		// The Node Agent's own name is the Node Agent: the node runs its
+		// turns, and no ground stands by to take what is said off a row.
+		case held && s.nodeAgent != nil && named.did == s.nodeAgent.did:
+			ta, err = s.nodeTaskAgent()
+		case held:
+			ta = s.namedTaskAgent(named)
+		default:
+			ta, err = s.namespaceTaskAgent(admitted, tenant)
+		}
 	}
 	if err != nil {
 		return taskAgent{}, err
+	}
+	// Who reaches /a2a reaches an agent by its name: it has no say of its own
+	// for a line to be about.
+	if ta.named {
+		return ta, nil
 	}
 	// What the lines say of the say over A2A, before anything is written or
 	// read: the gate asks again when the turn is asked.
@@ -178,6 +200,14 @@ func (s *QNTXServer) namespaceTaskAgent(admitted auth.Admission, namespace strin
 // new contextId, it MUST be included in the response" (§3.4.1). Its first turn
 // then starts the session under that id.
 func (s *QNTXServer) contextOf(ta taskAgent, asked string) (string, error) {
+	// A named agent's session is its own, where it runs: the context its Tasks
+	// are in here is the agent, by its DID.
+	if ta.named {
+		if asked != "" && asked != ta.did {
+			return "", a2aRefusal(a2asdk.ErrInvalidParams, ta.called+" is one agent, and context "+asked+" is not it")
+		}
+		return ta.did, nil
+	}
 	// Two first messages at once are one session.
 	s.taskEnds.Lock()
 	defer s.taskEnds.Unlock()
@@ -266,6 +296,27 @@ func (s *QNTXServer) writeTask(lines taskLines, task *a2asdk.Task, by string, al
 	}), "the %s line of task %s was not written", state, task.ID)
 }
 
+// maskedValue is a JSON value with every string in it masked.
+func maskedValue(value any) any {
+	switch v := value.(type) {
+	case string:
+		return masked(v)
+	case map[string]any:
+		held := make(map[string]any, len(v))
+		for key, inner := range v {
+			held[key] = maskedValue(inner)
+		}
+		return held
+	case []any:
+		held := make([]any, len(v))
+		for i, inner := range v {
+			held[i] = maskedValue(inner)
+		}
+		return held
+	}
+	return value
+}
+
 // maskedTask is task with every text it holds masked, as the turn's own lines
 // are: what a person or the agent said can carry a secret.
 func maskedTask(task *a2asdk.Task) *a2asdk.Task {
@@ -274,8 +325,17 @@ func maskedTask(task *a2asdk.Task) *a2asdk.Task {
 		out := make(a2asdk.ContentParts, 0, len(parts))
 		for _, part := range parts {
 			p := *part
-			if text, isText := p.Content.(a2asdk.Text); isText {
-				p.Content = a2asdk.Text(masked(string(text)))
+			switch content := p.Content.(type) {
+			case a2asdk.Text:
+				p.Content = a2asdk.Text(masked(string(content)))
+			case a2asdk.Data:
+				p.Content = a2asdk.Data{Value: maskedValue(content.Value)}
+			case a2asdk.Raw:
+				// A file of text is masked as text is; an image or a PDF is
+				// kept as it was sent.
+				if kind, _, err := mime.ParseMediaType(p.MediaType); err == nil && (strings.HasPrefix(kind, "text/") || kind == "application/json") {
+					p.Content = a2asdk.Raw(masked(string(content)))
+				}
 			}
 			out = append(out, &p)
 		}
@@ -485,13 +545,36 @@ func textPart(text string) *a2asdk.Part {
 	return part
 }
 
-// textPlain is the media type the agents take and give.
+// textPlain is the media type the agents answer in.
 const textPlain = "text/plain"
+
+// turnModes are the media types a turn takes and gives (§4.4.5): text, JSON,
+// and the files Claude Code reads, a PDF and an image among them. Any other is
+// refused, as "Agents SHOULD sanitize or validate file content types and
+// reject unexpected media types" (§13.4).
+var turnModes = []string{
+	textPlain, "text/markdown", "text/csv", "application/json",
+	"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
+}
+
+// isTurnMode is whether a media type, whatever its parameters, is one a turn
+// gives.
+func isTurnMode(mediaType string) bool {
+	parsed, _, err := mime.ParseMediaType(mediaType)
+	return err == nil && slices.Contains(turnModes, parsed)
+}
+
+// sameMediaType is whether mode, whatever its parameters, names kind: a client
+// taking image/png; profile=x takes a PNG.
+func sameMediaType(mode, kind string) bool {
+	parsed, _, err := mime.ParseMediaType(mode)
+	return err == nil && strings.EqualFold(parsed, kind)
+}
 
 // endTask writes that task id ended in state, as by, unless it ended already:
 // a Task ends once, by its turn, a restart or a cancel, whichever is first.
 // answer is what it gave when it completed, why why it did not.
-func (s *QNTXServer) endTask(lines taskLines, id string, state a2asdk.TaskState, by, session, answer, why string) error {
+func (s *QNTXServer) endTask(lines taskLines, id string, state a2asdk.TaskState, by, session, answer, why string, files ...*a2asdk.Artifact) error {
 	s.taskEnds.Lock()
 	defer s.taskEnds.Unlock()
 	task, _, _, held, err := s.heldTask(lines, id)
@@ -511,7 +594,7 @@ func (s *QNTXServer) endTask(lines taskLines, id string, state a2asdk.TaskState,
 	}
 	switch state {
 	case a2asdk.TaskStateCompleted:
-		task.Artifacts = []*a2asdk.Artifact{answerArtifact(answer)}
+		task.Artifacts = append([]*a2asdk.Artifact{answerArtifact(answer)}, files...)
 	case a2asdk.TaskStateFailed:
 		task.Status.Message = failedWhy(task.ID, task.ContextID, why)
 	}
@@ -552,8 +635,20 @@ func (s *QNTXServer) settleLeftTask(agent *rootAgent, session, stream string, an
 			state, gave = a2asdk.TaskStateCompleted, masked(answer.Text)
 		}
 		did := s.agentOfLine(line)
-		if err := s.endTask(s.systemTasks(did), id, state, did, session, gave, why); err != nil {
+		// What the turn wrote for its answer before the node stopped is given
+		// with it, and the Task's files go once it is settled. Which modes
+		// the client took went with the node that stopped: the turn's own are
+		// given.
+		dir := taskFiles(agent, id)
+		var files []*a2asdk.Artifact
+		if state == a2asdk.TaskStateCompleted {
+			files = s.filesOut(filepath.Join(dir, "out"), nil)
+		}
+		if err := s.endTask(s.systemTasks(did), id, state, did, session, gave, why, files...); err != nil {
 			return err
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			s.logger.Warnw("a settled task's files were not removed", "task", id, "error", err)
 		}
 	}
 	return nil
@@ -578,6 +673,7 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 		a2asdk.TaskStateWorking:   "the node stopped while its turn ran, and no stream was left to read how it ended",
 	}
 	newest := map[string]*types.As{}
+	toAName := map[string]bool{}
 	for _, line := range lines {
 		id, found := taskIn(line)
 		if !found {
@@ -585,6 +681,10 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 		}
 		if held, seen := newest[id]; !seen || line.Timestamp.After(held.Timestamp) {
 			newest[id] = line
+		}
+		// A Task said to a name says so on its first line, and on no other.
+		if slices.Contains(line.Contexts, saidToANameContext) {
+			toAName[id] = true
 		}
 	}
 	for id, line := range newest {
@@ -596,6 +696,18 @@ func (s *QNTXServer) settleTasksNoTurnLeft(agent *rootAgent, since time.Time) er
 			continue
 		}
 		did := s.agentOfLine(line)
+		if toAName[id] {
+			// What a ground took off the row before the node stopped is in
+			// that ground's store, on its way to the session: the Task waits
+			// on for the agent to say it received it, as it did before.
+			if a2asdk.TaskState(line.Predicates[0]) == a2asdk.TaskStateWorking {
+				s.awaitReceived(did, id, line.Timestamp)
+				continue
+			}
+			// Never taken, it was on the status row, which the node that
+			// stopped held in memory: it is on no row now, and was not received.
+			said = "the node stopped while it was on the status row, and it was not received"
+		}
 		if err := s.endTask(s.systemTasks(did), id, a2asdk.TaskStateFailed, did, "", "", said); err != nil {
 			return err
 		}

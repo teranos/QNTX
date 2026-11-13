@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -267,11 +268,11 @@ func TestWhatTheNodeAgentDoesNotTakeIsRefused(t *testing.T) {
 		code       int
 		says       string
 	}{
-		{"a part that is not text",
-			`{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [{"url": "https://example.org/a.png", "mediaType": "image/png"}]}}`,
+		{"a file of a media type no skill takes",
+			`{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [{"raw": "UEsDBA==", "filename": "a.zip", "mediaType": "application/zip"}]}}`,
 			http.StatusBadRequest, "CONTENT_TYPE_NOT_SUPPORTED"},
-		{"text in another media type",
-			`{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [{"text": "{}", "mediaType": "application/json"}]}}`,
+		{"a file that says no media type",
+			`{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [{"url": "https://example.org/a"}]}}`,
 			http.StatusBadRequest, "CONTENT_TYPE_NOT_SUPPORTED"},
 		{"a context that is not its session",
 			`{"message": {"messageId": "m", "role": "ROLE_USER", "contextId": "another", "parts": [{"text": "hi"}]}}`,
@@ -302,9 +303,9 @@ func TestATaskNoIdNamesIsNotFound(t *testing.T) {
 	assert.Contains(t, string(said), "TASK_NOT_FOUND")
 }
 
-// The card says the Node Agent takes text and gives text: what a client reads
-// before it sends (§3.3.4).
-func TestTheNodeAgentsSkillTakesText(t *testing.T) {
+// The card says what the Node Agent takes and gives, turnModes: what a client
+// reads before it sends (§3.3.4).
+func TestTheNodeAgentsSkillTakesWhatATurnReads(t *testing.T) {
 	namedNode(t)
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	code, card := a2aAsked(t, srv, http.MethodGet, "/a2a/extendedAgentCard", "", tokens[auth.LevelRoot])
@@ -317,8 +318,12 @@ func TestTheNodeAgentsSkillTakesText(t *testing.T) {
 		}
 	}
 	require.NotNil(t, agent, "ROOT's card has no skill for the Node Agent")
-	assert.Equal(t, []any{"text/plain"}, at(agent, "inputModes"))
-	assert.Equal(t, []any{"text/plain"}, at(agent, "outputModes"))
+	modes := make([]any, 0, len(turnModes))
+	for _, mode := range turnModes {
+		modes = append(modes, mode)
+	}
+	assert.Equal(t, modes, at(agent, "inputModes"))
+	assert.Equal(t, modes, at(agent, "outputModes"))
 }
 
 // leftTurn is a turn the node's last process left in agent's home: its stream,
@@ -571,8 +576,11 @@ func TestWhatATurnSaysIsStreamedAsItSaysIt(t *testing.T) {
 // A turn Claude Code prints in past turnQuietMost is working, not quiet: it is
 // left to answer.
 func TestATurnThatPrintsPastItsQuietTimeIsNotStopped(t *testing.T) {
+	// A second, and a line every twentieth of it: on a runner that stalls a
+	// shell for 400ms the turn was ended as quiet, and the test failed on a
+	// pull request that touched none of this.
 	quiet := turnQuietMost
-	turnQuietMost = 400 * time.Millisecond
+	turnQuietMost = time.Second
 	t.Cleanup(func() { turnQuietMost = quiet })
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	srv.harnessBinaries.mu.Lock()
@@ -580,12 +588,12 @@ func TestATurnThatPrintsPastItsQuietTimeIsNotStopped(t *testing.T) {
 	srv.harnessBinaries.mu.Unlock()
 	prints := filepath.Join(filepath.Dir(held.path), "claude-printing")
 	require.NoError(t, os.WriteFile(prints, []byte("#!/bin/sh\n"+
-		"i=0\nwhile [ $i -lt 30 ]; do echo '{\"type\":\"system\",\"subtype\":\"status\"}'; sleep 0.05; i=$((i+1)); done\n"+
+		"i=0\nwhile [ $i -lt 70 ]; do echo '{\"type\":\"system\",\"subtype\":\"status\"}'; sleep 0.05; i=$((i+1)); done\n"+
 		"exec '"+held.path+"' \"$@\"\n"), 0o755))
 	srv.holdHarness("claude", &harnessHeld{fetched: held.fetched, path: prints})
 
 	started := time.Now()
-	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to thirty", ""), tokens[auth.LevelRoot])
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to seventy", ""), tokens[auth.LevelRoot])
 	assert.Greater(t, time.Since(started), 3*turnQuietMost, "the turn did not print past its quiet time")
 	assert.Equal(t, "TASK_STATE_COMPLETED", at(sent, "task.status.state"), sent)
 }
@@ -729,4 +737,124 @@ func TestJSONRPCIsAnsweredWhereTheCardNamesIt(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answered), w.Body.String())
 	assert.Equal(t, "2.0", answered["jsonrpc"])
 	assert.NotNil(t, answered["error"], "a task no id names is not found")
+}
+
+// A message carries a file, a URL and JSON data, and the turn reads them all:
+// the file written where the turn works, the URL and data in what it is told.
+// What the turn writes for its answer comes back as the Task's artifacts, each
+// its bytes, name and media type (§6.7), of the media types the client takes.
+func TestFilesGoInAndComeBackOut(t *testing.T) {
+	srv, tokens, ran := nodeAgentOverA2A(t, "")
+	srv.harnessBinaries.mu.Lock()
+	held := srv.harnessBinaries.held["claude"]
+	srv.harnessBinaries.mu.Unlock()
+	seen := t.TempDir()
+	writes := filepath.Join(filepath.Dir(held.path), "claude-writing")
+	require.NoError(t, os.WriteFile(writes, []byte("#!/bin/sh\n"+
+		"cp a2a/*/in/* '"+seen+"'/\n"+
+		"printf 'the harvest is in' > a2a/*/out/report.txt 2>/dev/null || for d in a2a/*/out; do printf 'the harvest is in' > $d/report.txt; done\n"+
+		"for d in a2a/*/out; do printf 'PNGBYTES' > $d/chart.png; done\n"+
+		"exec '"+held.path+"' \"$@\"\n"), 0o755))
+	srv.holdHarness("claude", &harnessHeld{fetched: held.fetched, path: writes})
+
+	sent := func(id, accepts string) map[string]any {
+		body := `{"message": {"messageId": "` + id + `", "role": "ROLE_USER", "parts": [` +
+			`{"text": "what do these say?"},` +
+			`{"raw": "` + base64.StdEncoding.EncodeToString([]byte("apples,3")) + `", "filename": "crop.csv", "mediaType": "text/csv"},` +
+			`{"url": "https://example.org/orchard.png", "mediaType": "image/png"},` +
+			`{"data": {"rows": 2}}]}`
+		if accepts != "" {
+			body += `, "configuration": {"acceptedOutputModes": [` + accepts + `]}`
+		}
+		code, answered := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", body+`}`, tokens[auth.LevelRoot])
+		require.Equal(t, http.StatusOK, code, answered)
+		require.Equal(t, "TASK_STATE_COMPLETED", at(answered, "task.status.state"), answered)
+		return answered
+	}
+
+	answered := sent("m-1", "")
+	read, err := os.ReadFile(filepath.Join(seen, "crop.csv"))
+	require.NoError(t, err, "the file sent was not where the turn works")
+	assert.Equal(t, "apples,3", string(read))
+	args, err := os.ReadFile(filepath.Join(ran, "0", "args"))
+	require.NoError(t, err)
+	assert.Contains(t, string(args), "crop.csv (crop.csv, text/csv)")
+	assert.Contains(t, string(args), "A file is at https://example.org/orchard.png (image/png).")
+	assert.Contains(t, string(args), `{"rows":2}`)
+
+	byName := map[string]any{}
+	for _, artifact := range at(answered, "task.artifacts").([]any) {
+		byName[at(artifact, "name").(string)] = artifact
+	}
+	require.Contains(t, byName, "report.txt", answered)
+	require.Contains(t, byName, "chart.png", answered)
+	assert.Equal(t, base64.StdEncoding.EncodeToString([]byte("the harvest is in")), at(byName["report.txt"], "parts.0.raw"))
+	assert.Equal(t, "report.txt", at(byName["report.txt"], "parts.0.filename"))
+	assert.Equal(t, "text/plain", at(byName["report.txt"], "parts.0.mediaType"))
+	assert.Equal(t, "image/png", at(byName["chart.png"], "parts.0.mediaType"))
+
+	// "Agents SHOULD use this to tailor their output" (acceptedOutputModes).
+	answered = sent("m-2", `"text/plain", "text/csv"`)
+	for _, artifact := range at(answered, "task.artifacts").([]any) {
+		assert.NotEqual(t, "chart.png", at(artifact, "name"), "a file the client does not take was given")
+	}
+
+	// A client that takes a PNG alone is given the PNG alone: no text.
+	answered = sent("m-3", `"image/png"`)
+	artifacts := at(answered, "task.artifacts").([]any)
+	require.Len(t, artifacts, 1, answered)
+	assert.Equal(t, "chart.png", at(artifacts[0], "name"))
+
+	// A mode with parameters takes its media type: the PNG is still given.
+	answered = sent("m-4", `"image/png; profile=x"`)
+	artifacts = at(answered, "task.artifacts").([]any)
+	require.Len(t, artifacts, 1, answered)
+	assert.Equal(t, "chart.png", at(artifacts[0], "name"))
+
+	// The files went with the Task.
+	left, err := filepath.Glob(filepath.Join(srv.nodeAgent.home, "work", "a2a", "*"))
+	require.NoError(t, err)
+	assert.Empty(t, left, "a Task's files stayed after it ended")
+}
+
+// A Task whose turn wrote a file before the node stopped is given that file
+// when the next node settles it, and its files go once it is settled.
+func TestATaskSettledFromItsStreamGivesTheFilesItsTurnWrote(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	before := time.Now().Add(-time.Minute)
+	stream := leftTurn(t, srv.nodeAgent, "s-left", claudeAnswered)
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "left", "TASK_STATE_SUBMITTED", "someone", before, map[string]any{"message": `{"messageId":"m","role":"ROLE_USER","parts":[{"text":"up?"}]}`, "context_id": ""}))
+	require.NoError(t, srv.writeTaskLine(srv.systemTasks(srv.nodeAgent.did), "left", "TASK_STATE_WORKING", srv.nodeAgent.did, before.Add(time.Second), map[string]any{"context_id": "s-left", "stream": filepath.Base(stream)}, streamContext(stream)))
+	out := filepath.Join(taskFiles(srv.nodeAgent, "left"), "out")
+	require.NoError(t, os.MkdirAll(out, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(out, "uptime.txt"), []byte("3 days"), 0o600))
+
+	readingOn(srv, time.Now())
+
+	code, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/left", "", tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, got)
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(got, "status.state"))
+	assert.Equal(t, "uptime.txt", at(got, "artifacts.1.name"), got)
+	assert.Equal(t, base64.StdEncoding.EncodeToString([]byte("3 days")), at(got, "artifacts.1.parts.0.raw"))
+	assert.NoDirExists(t, taskFiles(srv.nodeAgent, "left"), "a settled task's files stayed")
+}
+
+// A secret sent in JSON data or in a file of text is masked in what the Task
+// keeps, as one sent as text is (§14.1.1: "Sensitive information in task
+// history and artifacts MUST be protected").
+func TestASecretInDataOrATextFileIsNotKept(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123"
+	body := `{"message": {"messageId": "m", "role": "ROLE_USER", "parts": [` +
+		`{"data": {"token": "` + secret + `", "nested": ["` + secret + `"]}},` +
+		`{"raw": "` + base64.StdEncoding.EncodeToString([]byte("token="+secret)) + `", "filename": "env.txt", "mediaType": "text/plain"}]}}`
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", body, tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, sent)
+	id := at(sent, "task.id").(string)
+
+	_, held := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	kept, _ := json.Marshal(held)
+	require.Contains(t, string(kept), "env.txt", "the task kept no history to look in")
+	assert.NotContains(t, string(kept), secret)
+	assert.NotContains(t, string(kept), base64.StdEncoding.EncodeToString([]byte("token="+secret)))
 }

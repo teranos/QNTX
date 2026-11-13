@@ -53,6 +53,18 @@
       {
         name = "Checkout repository";
         uses = "actions/checkout@v5";
+        # The tags, so git describe names the build by the one it is past.
+        "with".fetch-depth = 0;
+      }
+
+      {
+        # "you need to make release be set with the tag for non dev deployments, like, q and k"
+        # docs/release.md
+        name = "Compute version tag";
+        id = "version";
+        run = ''
+          echo "tag=$(git describe --tags --match 'v*' --dirty)" >> "$GITHUB_OUTPUT"
+        '';
       }
 
       {
@@ -87,9 +99,10 @@
 
       {
         name = "Build QNTX binary";
+        env.VERSION_TAG = "\${{ steps.version.outputs.tag }}";
         run = ''
-          echo "Building QNTX for Linux ''${{ matrix.arch }}..."
-          nix build .#qntx --print-build-logs
+          echo "Building QNTX $VERSION_TAG for Linux ''${{ matrix.arch }}..."
+          nix build .#qntx --impure --print-build-logs
         '';
       }
 
@@ -98,7 +111,8 @@
         # The Rust libraries and their compiled dependencies are build-time
         # inputs of qntx, so pushing qntx alone never carried them: every node
         # building qntx compiled every crate again.
-        run = "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --print-out-paths --no-link | cachix push qntx";
+        env.VERSION_TAG = "\${{ steps.version.outputs.tag }}";
+        run = "nix build .#qntx .#ats-ffi-deps .#ats-ffi .#ats-wasm-deps .#ats-wasm --impure --print-out-paths --no-link | cachix push qntx";
       }
 
       {
@@ -108,13 +122,40 @@
           mkdir -p release/lib
           cp result/bin/qntx release/qntx
           chmod +w release/qntx
+          # The claude plugin travels with the node (ADR-059): patched as qntx is, below.
+          cp result/bin/qntx-claude-plugin release/qntx-claude-plugin
+          chmod +w release/qntx-claude-plugin
           DUCKDB_SO=$(ldd result/bin/qntx | awk '/libduckdb/ {print $3}')
           if [ -z "$DUCKDB_SO" ]; then
             echo "libduckdb not found in qntx dependencies"
             ldd result/bin/qntx
             exit 1
           fi
-          cp -L "$DUCKDB_SO" release/lib/
+          # The libduckdb nix builds needs the glibc of the nixpkgs it came from; a node
+          # runs on its distribution's. DuckDB's own build of the same version runs on both.
+          DUCKDB_VERSION=$(echo "$DUCKDB_SO" | grep -oE 'duckdb-[0-9]+\.[0-9]+\.[0-9]+' | head -1 | cut -d- -f2)
+          if [ -z "$DUCKDB_VERSION" ]; then
+            echo "no DuckDB version in $DUCKDB_SO"
+            exit 1
+          fi
+          # DuckDB's own host first: GitHub's release asset for arm64 answered 504 on every ask on 2026-11-08.
+          curl -fsSL -o libduckdb.zip "https://install.duckdb.org/v''${DUCKDB_VERSION}/libduckdb-linux-''${{ matrix.arch }}.zip" \
+            || curl -fsSL -o libduckdb.zip "https://github.com/duckdb/duckdb/releases/download/v''${DUCKDB_VERSION}/libduckdb-linux-''${{ matrix.arch }}.zip"
+          # Each archive is held to the hash DuckDB's two hosts agreed on (2026-11-11); a version pinned nowhere here is refused.
+          case "$DUCKDB_VERSION-''${{ matrix.arch }}" in
+            1.5.5-amd64) WANT=1fb8ce388157d84a25abe685a8a2520bf00c00321821968e4bb398fd766e7abb ;;
+            1.5.5-arm64) WANT=abe4f6f005ee0b448a058322f4263584b4bd1b6faf7ab4637b79eeaf978f8e9c ;;
+            *) echo "no hash pinned for libduckdb $DUCKDB_VERSION ''${{ matrix.arch }}"; exit 1 ;;
+          esac
+          echo "$WANT  libduckdb.zip" | sha256sum -c -
+          unzip -o libduckdb.zip libduckdb.so -d release/lib/
+          # Debian 13's glibc, which the node runs on, is the newest a release may need.
+          NEEDS=$(objdump -T release/lib/libduckdb.so | grep -oE 'GLIBC_2\.[0-9]+' | sort -t. -k2 -n -u | tail -1)
+          if [ "''${NEEDS#GLIBC_2.}" -gt 41 ]; then
+            echo "libduckdb $DUCKDB_VERSION needs $NEEDS, past the node's GLIBC_2.41"
+            exit 1
+          fi
+          echo "libduckdb $DUCKDB_VERSION, needing $NEEDS"
           if [ "''${{ matrix.arch }}" = "arm64" ]; then
             INTERP=/lib/ld-linux-aarch64.so.1
           else
@@ -124,9 +165,13 @@
             --set-interpreter "$INTERP" \
             --set-rpath '$ORIGIN/lib' \
             release/qntx
-          chmod +x release/qntx
+          nix run nixpkgs#patchelf -- \
+            --set-interpreter "$INTERP" \
+            --set-rpath '$ORIGIN/lib' \
+            release/qntx-claude-plugin
+          chmod +x release/qntx release/qntx-claude-plugin
           cd release
-          tar -czf qntx-''${{ steps.branch.outputs.name }}-linux-''${{ matrix.arch }}.tar.gz qntx lib/
+          tar -czf qntx-''${{ steps.branch.outputs.name }}-linux-''${{ matrix.arch }}.tar.gz qntx qntx-claude-plugin lib/
           sha256sum qntx-''${{ steps.branch.outputs.name }}-linux-''${{ matrix.arch }}.tar.gz \
             > qntx-''${{ steps.branch.outputs.name }}-linux-''${{ matrix.arch }}.tar.gz.sha256
         '';

@@ -45,6 +45,7 @@ func (s *QNTXServer) cardBase(r *http.Request) agentCard {
 		Description: appcfg.GetString("node.description"),
 		Version:     version.VersionTag,
 		URL:         a2aURL(r),
+		GRPC:        appcfg.GetString("a2a.grpc"),
 		// "Implement default output types": what the node gives is JSON,
 		// everywhere, and the Node Agent's text is its skill's own.
 		OutputModes: cardModes,
@@ -88,11 +89,11 @@ func (s *QNTXServer) nodeKey() (*nodedid.Handler, bool) {
 }
 
 // skillOf is a signum as a skill. Its id is the signum. The Node Agent is what
-// a message sent to the node reaches, and it takes text and gives text.
+// a message sent to the node reaches, and it takes and gives turnModes.
 func skillOf(signum *protocol.Signum) cardSkill {
 	skill := cardSkill{ID: signum.GetName(), Name: signum.GetName(), Description: signum.GetDescription(), Tags: signum.GetTags()}
 	if signum.GetName() == nodeAgentSignumName {
-		skill.Modes = []string{textPlain}
+		skill.Modes = turnModes
 	}
 	return skill
 }
@@ -276,6 +277,10 @@ type agentCard struct {
 	Name, Description, Version string
 	// URL is where the binding answers, and Tenant the agent behind it.
 	URL, Tenant string
+	// GRPC is where A2A over gRPC is reached, as am.toml's a2a.grpc names it
+	// (host:port): the node serves it on its own port, and whether its front
+	// door passes HTTP/2 is the deployment's to say. Empty lists none.
+	GRPC string
 	// OutputModes is the card's default output modes, which a skill's Modes
 	// override.
 	OutputModes []string
@@ -287,7 +292,7 @@ type agentCard struct {
 }
 
 // sdk is the card as a2a-go's AgentCard. It is reached over HTTP+JSON and
-// JSON-RPC, both at its URL.
+// JSON-RPC, both at its URL, and over gRPC where am.toml says where.
 func (c agentCard) sdk() *a2asdk.AgentCard {
 	bearer := a2asdk.SecurityRequirements{"bearer": {}}
 	card := &a2asdk.AgentCard{
@@ -302,6 +307,10 @@ func (c agentCard) sdk() *a2asdk.AgentCard {
 		DefaultInputModes:    cardModes,
 		DefaultOutputModes:   c.OutputModes,
 		Skills:               []a2asdk.AgentSkill{},
+	}
+	if c.GRPC != "" {
+		card.SupportedInterfaces = append(card.SupportedInterfaces,
+			&a2asdk.AgentInterface{URL: c.GRPC, ProtocolBinding: a2asdk.TransportProtocolGRPC, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant})
 	}
 	if c.Session != "" {
 		card.SecuritySchemes["session"] = a2asdk.APIKeySecurityScheme{Description: "A person's passkey session", Location: a2asdk.APIKeySecuritySchemeLocationCookie, Name: c.Session}

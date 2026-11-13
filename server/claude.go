@@ -42,6 +42,9 @@ type rootAgent struct {
 	// (agent_door.go). Empty on a node with no gate to open one at.
 	door string
 	home string
+	// instructions is the file of what the node's own repository tells its
+	// Node Agent (am.toml, [agent.root] instructions). Empty when it names none.
+	instructions string
 	// sessions is its session in each harness, by the harness's name.
 	sessions   map[string]*inHarness
 	sessionsMu sync.Mutex
@@ -201,7 +204,27 @@ func (a *rootAgent) isSaidToBe() string {
 		"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
 		"Your git is your own: commits are authored as you, and when you push to GitHub your git asks the node for what carries the push. " +
 		"Never ask for, read, print or store a GitHub credential yourself. " +
-		"What GitHub answers over its API, a pull request opened or a run read, you ask with the github_ask tool; github_operations lists what it can be asked."
+		"What GitHub answers over its API, a pull request opened or a run read, you ask with the github_ask tool; github_operations lists what it can be asked." +
+		a.instructed()
+}
+
+// "the Node Agent system prompt"
+// "should live with the Node repo"
+// "we dont know what other people want to use QNTX for"
+// "I NEED TO BE ABLE TO EDIT SYSTEM PROMPTS IN MY OBSIDIAN"
+//
+// instructed is what the node's own file tells its Node Agent, read at every
+// turn so that what was written there last is what it is told. A file that
+// cannot be read is said to the agent, to say to whoever it answers.
+func (a *rootAgent) instructed() string {
+	if a.instructions == "" {
+		return ""
+	}
+	told, err := os.ReadFile(a.instructions)
+	if err != nil {
+		return " Your instructions are the node's own, at " + a.instructions + ", and they could not be read: " + err.Error() + ". Say so first in what you answer."
+	}
+	return "\n\nWhat this node tells you, from " + a.instructions + ":\n\n" + strings.TrimSpace(string(told))
 }
 
 // claudeHarness is the Node Agent in Claude Code.
@@ -211,7 +234,10 @@ func (s *QNTXServer) claudeHarness() *harness {
 		name: "claude", called: "Claude Code", file: claudeSessionFile,
 		sayTakes: []*protocol.Param{
 			{Name: "permission_mode", OneOf: appcfg.PermissionModes, Says: "In Claude Code, the permission mode it runs this in. Not sent, it is the one am.toml gives."},
-			{Name: "model", OneOf: claudeModels, Says: "The model it answers with. Not sent, it is the one am.toml gives."},
+			// "the hardcoded list is BS": the node keeps no list of models. The name
+			// goes to Claude Code, which runs the model and refuses a name it does not know.
+			{Name: "model", Says: "The model it answers with, by Claude Code's name for it. Not sent, it is the one am.toml gives."},
+			{Name: "in", Says: "The repository of its work it is said in, as owner/repo: the turn runs in that checkout, in the same session, so it stands where that repository's rituals are switched on. Not sent, it is said in its work."},
 		},
 		// "Let's say that I don't like how it's putting Claude on a pedestal."
 		named:    func() bool { return named().Named() },
@@ -224,7 +250,7 @@ func (s *QNTXServer) claudeHarness() *harness {
 		am: func(is agentIn, agent *rootAgent, spec agentSpec) proto.Message {
 			am := &protocol.ClaudeAm{
 				Did: is.did, Model: spec.Model, Effort: spec.Effort, PermissionMode: spec.Mode,
-				PermissionModes: appcfg.PermissionModes, Models: claudeModels, Allow: spec.Allow,
+				PermissionModes: appcfg.PermissionModes, Models: []string{spec.Model}, Allow: spec.Allow,
 				Session: is.session, Answering: is.answering, ClaudeCode: is.path, NotReady: is.notReady,
 			}
 			// Asked of Claude Code itself, when the node holds one.
@@ -245,7 +271,9 @@ func spokenBy(caller *http.Request) string {
 	admitted, gated := auth.AdmissionFrom(caller.Context())
 	switch {
 	case !gated:
-		return ""
+		// A turn a verified GitHub delivery started is said by the app that
+		// wrote the comment; any other request without a login says nobody.
+		return speakerOf(caller.Context())
 	case admitted.Grant != nil:
 		return admitted.Grant.DID
 	case admitted.TokenDID != "":
@@ -271,12 +299,6 @@ func (s *QNTXServer) thereIsNoClaude() *protocol.Refusal {
 	}
 	return &protocol.Refusal{Why: sigil.NotFound, Says: "this node's am.toml names no Claude Code for the Node Agent ([agent.root.claude]), so it does not run in Claude Code"}
 }
-
-// claudeModels is every model a turn can be said to answer with.
-// After a tool result, Opus 5.5, Sonnet 5.5 and Fable 5.1 hold their text and
-// print it whole (anthropics/claude-code#96439); Sonnet 5 and Haiku 4.5 stream
-// it, so a turn watched live through tool calls is said with one of those.
-var claudeModels = []string{"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-sonnet-5", "claude-haiku-4-5"}
 
 // claudePart is Claude Code's part of one turn: run in the permission mode
 // whoever speaks names, or the one am.toml gives.
@@ -311,12 +333,21 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			if err := comet.AgentTrust(agent.home); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: agent.called + "'s work was not trusted for the rituals it starts: " + err.Error()}
 			}
+			// A grove checkout that arrived or changed since its ground was built is built into its
+			// sand apart from this turn, which is said on what it holds now.
+			reach := s.groundReach(agent.home)
+			if err := comet.SandStands(agent.home, reach); err != nil && !comet.Building(agent.home) {
+				s.logger.Named("comet").Infow("An agent's ground is built again: its sand does not stand", "home", agent.home, "reach", reach, "because", err.Error())
+				s.cometHandler().Builder.GroundAgent(s.ctx, agent.home, reach, s.keepGroundReaching(reach), s.logger.Named("comet").Infow)
+			}
 			if plan, err = secretref.Resolve(ctx, named.TokenRef); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "the Claude plan token am.toml names did not resolve: " + err.Error()}
 			}
 			// No plan token named is Claude Code on its own sign-in, which has
 			// to have happened: a turn with no credential at all is not run.
-			if plan == "" {
+			// The claude plugin's Claude Code is the plugin's to have signed in
+			// (ADR-059): the node holds no binary to ask.
+			if _, pluginRuns := s.harnessBackend(agentLineClaude); plan == "" && !pluginRuns {
 				status, err := s.claudeStatus(ctx, binary, agent.home)
 				if err != nil {
 					return false, &protocol.Refusal{Why: sigil.Failed, Says: "Claude Code did not say whether the agent is signed in: " + err.Error()}
@@ -333,7 +364,7 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 			said := claudecode.Said{
 				Binary: binary, Home: agent.home, Session: t.session, Resumes: t.resumes,
 				Says: t.says, Model: model, Effort: named.Effort, Token: plan,
-				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env,
+				System: agent.isSaidToBe(), Mode: mode, Allow: named.Allow, Env: t.env, In: sent["in"],
 				// "on a redeploy NODE agent would still be alive, which is the
 				// intended state, rather than being killed mid-turn" (#1256).
 				Apart:   s.nodeAgentApart && agent.namespace == auth.NamespaceSystem,

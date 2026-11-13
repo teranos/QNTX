@@ -85,12 +85,12 @@
               curlOptsList = [ "--user-agent" "qntx-nix" ];
             });
           }) {
-            lockFile = ./Cargo.lock;
-            # sacred-error is a git dependency (github.com/teranos/sacred-error,
-            # the rev in Cargo.toml). Change the rev, change this hash: nix hash
-            # path --sri on a `git archive` of that rev.
-            outputHashes."sacred-error-0.1.0" = "sha256-AFWB5DT1EjfHvjuODxri3Dw+vGYo/EAnTwF0xpJwSQQ=";
-          };
+          lockFile = ./Cargo.lock;
+          # sacred-error is a git dependency (github.com/teranos/sacred-error,
+          # the rev in Cargo.toml). Change the rev, change this hash: nix hash
+          # path --sri on a `git archive` of that rev.
+          outputHashes."sacred-error-0.1.0" = "sha256-AFWB5DT1EjfHvjuODxri3Dw+vGYo/EAnTwF0xpJwSQQ=";
+        };
 
         # "i doubt we need to build ats each and every time / or laye / or the go backend"
         # The Rust derivations see only what the Rust build reads. A commit to
@@ -312,7 +312,12 @@
             "-X 'github.com/teranos/QNTX/internal/version.VersionTag=${versionTag}'"
           ];
 
-          subPackages = [ "cmd/qntx" ];
+          # plugins/claude is qntx-claude-plugin (ADR-059): built with the node, so a
+          # node is handed it as it is handed qntx, and builds nothing itself.
+          subPackages = [ "cmd/qntx" "plugins/claude" ];
+          postInstall = ''
+            mv $out/bin/claude $out/bin/qntx-claude-plugin
+          '';
         };
 
         # "It should be private, owned by the node's deployment repository"
@@ -469,6 +474,14 @@
           qntx-image = QNTXImage;
           qntx-image-amd64 = mkQNTXImage "amd64";
           qntx-image-arm64 = mkQNTXImage "arm64";
+        } // pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
+          # Hermes is a separate agent runtime, not a Pyre PythonService provider.
+          # getFlake uses an immutable upstream commit; Hermes' own flake.lock
+          # supplies its uv2nix, npm and Nix dependency graph. No system Python.
+          # Keep the revision identical to server/parity/hermes_*/manifest.json.
+          hermes = (builtins.getFlake
+            "github:NousResearch/hermes-agent/bf0203a794a07aac3ff764972ab9087baa4e4f4e"
+          ).packages.${system}.minimal;
         } // pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
           # The pinned Supabase Postgres server, which make parity runs
           # ats-postgres's migrations in: postgresql_17, the server psql_17 is

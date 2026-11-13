@@ -46,8 +46,11 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// The card names JSON-RPC at /a2a itself, so it is answered there and not
 	// redirected to /a2a/, which a client that does not follow it never reads.
 	a2aServed := s.a2aHTTP()
+	s.a2aOwn = a2aServed
 	s.answer(a2aPrefix, a2aServed)
 	s.answer(a2aPrefix[:len(a2aPrefix)-1], a2aServed)
+	// A2A over gRPC (§10), on the same port: gRPC is HTTP/2 at the service's path.
+	s.answer(a2aGRPCPrefix, s.a2aGRPC)
 	// A2AService's streaming operations, spoken to a peer's agent or a card's (SSE).
 	s.answerA2AStreams()
 

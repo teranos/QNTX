@@ -1,87 +1,121 @@
-//! ats-dev's own signing identity: an ed25519 key it mints on first use and
-//! keeps in a file beside the database. The bytes signed are `ats-sign`'s, the
-//! ones Go's `ats/signing` signs and verifies; the signer is named by its
-//! `did:key`, as the node names itself. This is not the node's key and its DID
-//! is not in the node's DID document. Unix only, as QNTX is (ADR-029).
+//! ats-dev signs as the key kept in `~/.qntx/key`: the one `qntx` signs a
+//! request to a node with, a 32-byte ed25519 seed in hex that `ground code
+//! login` keeps. ats-dev never mints one. The bytes an attestation is signed
+//! over are `ats-sign`'s, the ones the node verifies (through `ats-wasm`); a
+//! request is signed as `qntx sign` signs one (QNTX `server/auth/signed.go`).
+//!
+//! "A signature proves the key, and nothing reusable leaves the node."
+//!
+//! Unix only, as QNTX is (ADR-029).
 
 use std::path::{Path, PathBuf};
 
 use ats::Attestation;
 use ats_sign::{didkey, Signable};
-use laye_me::Keypair;
 use libp2p_identity::ed25519;
 use sacred_error::Error;
 
 use crate::fail;
 
 pub struct Signer {
-    key: Keypair,
+    key: ed25519::Keypair,
     pub did: String,
 }
 
-/// Where the key lives: `--key`, else `$ATS_DEV_KEY`, else `<db>.key` when the
-/// database is a path (`beside`). A url has no file to sit beside, so it is told.
-pub fn key_path(flag: Option<&str>, beside: Option<&str>, backend: &str) -> Result<PathBuf, Box<Error>> {
-    match (flag, std::env::var("ATS_DEV_KEY"), beside) {
-        (Some(f), _, _) => Ok(PathBuf::from(f)),
-        (None, Ok(e), _) => Ok(PathBuf::from(e)),
-        (None, Err(_), Some(db)) => Ok(PathBuf::from(format!("{db}.key"))),
-        (None, Err(_), None) => Err(fail(
-            "no key file to default to",
-            format!("a {backend} database is not a file the key can sit beside: --key FILE or $ATS_DEV_KEY, or --unsigned"),
-        )),
+/// Where the key is kept: `--key`, else `$ATS_DEV_KEY`, else `~/.qntx/key`.
+pub fn key_path(flag: Option<&str>) -> Result<PathBuf, Box<Error>> {
+    if let Some(f) = flag {
+        return Ok(PathBuf::from(f));
     }
+    if let Ok(e) = std::env::var("ATS_DEV_KEY") {
+        return Ok(PathBuf::from(e));
+    }
+    // An empty HOME names no directory: `qntx` refuses it too (Go's
+    // os.UserHomeDir), rather than read a key from wherever ats-dev was started.
+    let home = std::env::var("HOME").unwrap_or_default();
+    if home.is_empty() {
+        return Err(fail("the home directory is unknown, so ~/.qntx/key is not found", "HOME is not set"));
+    }
+    Ok(PathBuf::from(home).join(".qntx").join("key"))
 }
 
 impl Signer {
-    /// The key at `path`, or a fresh one written there (0600) if there is none.
-    /// A file that exists and is not a key is an error, never replaced. Two
-    /// processes minting at once end with one key: the loser loads the winner's.
-    pub fn load_or_mint(path: &Path) -> Result<Self, Box<Error>> {
-        match read_key(path) {
-            Ok(Some(bytes)) => Self::from_file(path, &bytes),
-            Ok(None) => {
-                let k = laye_me::fresh();
-                let bytes = laye_me::to_bytes(&k).map_err(|e| fail("could not encode the key", e))?;
-                if publish_new(path, &bytes)? {
-                    return Self::from_keypair(k);
-                }
-                let bytes = read_key(path)?
-                    .ok_or_else(|| fail("the key file vanished", path.display()))?;
-                Self::from_file(path, &bytes)
-            }
-            Err(e) => Err(e),
-        }
+    /// The key at `path`. None kept there is an error: ats-dev does not mint one.
+    pub fn load(path: &Path) -> Result<Self, Box<Error>> {
+        Self::load_existing(path)?.ok_or_else(|| {
+            fail(
+                &format!("no key is kept at {} to sign with", path.display()),
+                "ground code login keeps one; or --key FILE, or --unsigned",
+            )
+        })
     }
 
-    /// The key at `path` if there is one; none is not minted.
+    /// The key at `path` if one is kept there.
     pub fn load_existing(path: &Path) -> Result<Option<Self>, Box<Error>> {
         read_key(path)?.map(|bytes| Self::from_file(path, &bytes)).transpose()
     }
 
     fn from_file(path: &Path, bytes: &[u8]) -> Result<Self, Box<Error>> {
-        let key = laye_me::load(bytes)
-            .map_err(|e| fail("the key file is not a key", format!("{}: {e}", path.display())))?;
-        Self::from_keypair(key)
+        let not_seed = || fail("the key file holds no 32-byte ed25519 seed in hex", path.display());
+        let text = std::str::from_utf8(bytes).map_err(|_e| not_seed())?.trim();
+        let seed = hex_decode(text).ok_or_else(not_seed)?;
+        if seed.len() != 32 {
+            return Err(not_seed());
+        }
+        Self::from_seed(seed)
     }
 
-    pub fn from_keypair(key: Keypair) -> Result<Self, Box<Error>> {
-        let ed = key
-            .clone()
-            .try_into_ed25519()
-            .map_err(|e| fail("the key is not ed25519", e))?;
-        let did = didkey::encode(&ed.public().to_bytes());
+    pub fn from_seed(seed: Vec<u8>) -> Result<Self, Box<Error>> {
+        let secret = ed25519::SecretKey::try_from_bytes(seed).map_err(|e| fail("the seed is not an ed25519 key", e))?;
+        let key = ed25519::Keypair::from(secret);
+        let did = didkey::encode(&key.public().to_bytes());
         Ok(Self { key, did })
     }
 
     /// The attestation, signed over `ats-sign`'s canonical bytes. The actors
-    /// are under the signature, so they must be settled before this is called.
+    /// and the timestamp are under the signature, so they must be settled
+    /// before this is called (see `ready_to_sign` in main.rs).
     pub fn sign(&self, mut a: Attestation) -> Result<Attestation, Box<Error>> {
         let bytes = canonical(&a)?;
-        a.signature = Some(self.key.sign(bytes.as_bytes()).map_err(|e| fail("could not sign", e))?);
+        a.signature = Some(self.key.sign(bytes.as_bytes()));
         a.signer_did = Some(self.did.clone());
         Ok(a)
     }
+
+    /// The `Authorization` one request to the node at `origin` goes with: a
+    /// JWT this key signs as its did:key, made out to that origin, lasting
+    /// `lasts` seconds and spent once there (`qntx sign` makes the same).
+    pub fn authorization(&self, origin: &str, lasts: i64) -> Result<String, Box<Error>> {
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let mut jti = [0u8; 16];
+        std::fs::File::open("/dev/urandom")
+            .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut jti))
+            .map_err(|e| fail("no id could be drawn for the signature", e))?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| fail("the clock is before 1970", e))?
+            .as_secs();
+        let exp = i64::try_from(now).map_err(|e| fail("the clock does not fit", e))? + lasts;
+        let header = serde_json::json!({ "alg": "EdDSA", "typ": "JWT" });
+        let claims = serde_json::json!({
+            "iss": self.did, "sub": self.did, "aud": [origin], "exp": exp,
+            "jti": jti.iter().map(|b| format!("{b:02x}")).collect::<String>(),
+        });
+        let signing_input = format!("{}.{}", b64.encode(header.to_string()), b64.encode(claims.to_string()));
+        let sig = self.key.sign(signing_input.as_bytes());
+        Ok(format!("Signed {signing_input}.{}", b64.encode(sig)))
+    }
+}
+
+fn hex_decode(s: &str) -> Option<Vec<u8>> {
+    if !s.len().is_multiple_of(2) || !s.is_ascii() {
+        return None;
+    }
+    s.as_bytes()
+        .chunks(2)
+        .map(|p| std::str::from_utf8(p).ok().and_then(|h| u8::from_str_radix(h, 16).ok()))
+        .collect()
 }
 
 /// What a signature on an attestation amounts to.
@@ -101,7 +135,7 @@ pub fn verify(a: &Attestation) -> Verdict {
                 let pk = didkey::decode(did).map_err(|e| e.to_string())?;
                 let ed = ed25519::PublicKey::try_from_bytes(&pk).map_err(|e| e.to_string())?;
                 let bytes = canonical(a).map_err(|e| e.why)?;
-                Ok(libp2p_identity::PublicKey::from(ed).verify(bytes.as_bytes(), sig))
+                Ok(ed.verify(bytes.as_bytes(), sig))
             };
             match check() {
                 Ok(true) => Verdict::Valid(did.clone()),
@@ -150,62 +184,14 @@ fn read_key(path: &Path) -> Result<Option<Vec<u8>>, Box<Error>> {
     Ok(Some(bytes))
 }
 
-/// The key, written whole to a private temporary file beside `path` and then
-/// linked into place, which fails if `path` exists: a reader never sees half a
-/// key, and nothing is replaced. `false` means someone else's key is there.
-/// The temporary name is this attempt's alone, and only a file this attempt
-/// created is removed.
-fn publish_new(path: &Path, bytes: &[u8]) -> Result<bool, Box<Error>> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let tmp = PathBuf::from(format!("{}.{}.{nanos}.tmp", path.display(), std::process::id()));
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(&tmp)
-        .map_err(|e| fail("could not create the key's temporary file", format!("{}: {e}", tmp.display())))?;
-    let wrote = f.write_all(bytes).and_then(|()| f.sync_all());
-    drop(f);
-    let linked = match wrote {
-        Ok(()) => std::fs::hard_link(&tmp, path),
-        Err(e) => Err(e),
-    };
-    let cleaned = std::fs::remove_file(&tmp);
-    match linked {
-        Ok(()) => {
-            cleaned.map_err(|e| fail("the key is written but its temporary copy is left", format!("{}: {e}", tmp.display())))?;
-            sync_dir_of(path)?;
-            Ok(true)
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
-        Err(e) => Err(fail("could not write the key file", format!("{}: {e}", path.display()))),
-    }
-}
-
-/// Make the key's directory entry durable before anything is signed with it:
-/// rows signed by a key that a power loss un-links could never be re-signed.
-fn sync_dir_of(path: &Path) -> Result<(), Box<Error>> {
-    let dir = match path.parent() {
-        Some(d) if !d.as_os_str().is_empty() => d,
-        _ => Path::new("."),
-    };
-    std::fs::File::open(dir)
-        .and_then(|d| d.sync_all())
-        .map_err(|e| fail("could not make the key durable", format!("{}: {e}", dir.display())))
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::string_slice)]
 mod tests {
     use super::*;
+    use base64::Engine;
 
     fn hex(s: &str) -> Vec<u8> {
-        (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+        hex_decode(s).unwrap()
     }
 
     /// Go's vectors: the same seed, the same attestations, the signatures
@@ -214,9 +200,7 @@ mod tests {
     fn it_signs_what_go_signed_byte_for_byte() {
         let sigs: serde_json::Value = serde_json::from_str(include_str!("../../../ats/signing/testdata/signatures.json")).unwrap();
         let cases: serde_json::Value = serde_json::from_str(include_str!("../../../ats/signing/testdata/canonical.json")).unwrap();
-        let seed = hex(sigs["seed_hex"].as_str().unwrap());
-        let secret = ed25519::SecretKey::try_from_bytes(seed).unwrap();
-        let signer = Signer::from_keypair(Keypair::from(ed25519::Keypair::from(secret))).unwrap();
+        let signer = Signer::from_seed(hex(sigs["seed_hex"].as_str().unwrap())).unwrap();
 
         let expected = sigs["signatures"].as_array().unwrap();
         assert!(!expected.is_empty());
@@ -234,11 +218,35 @@ mod tests {
 
     #[test]
     fn a_changed_field_no_longer_verifies() {
-        let signer = Signer::from_keypair(laye_me::fresh()).unwrap();
+        let signer = Signer::from_seed(vec![7; 32]).unwrap();
         let mut a = Attestation { id: "AS-1".into(), subjects: vec!["a".into()], actors: vec!["x".into()], ..Attestation::default() };
         a = signer.sign(a).unwrap();
-        assert!(matches!(verify(&a), Verdict::Valid(_)));
+        assert_eq!(verify(&a), Verdict::Valid(signer.did.clone()));
         a.subjects = vec!["b".into()];
         assert!(matches!(verify(&a), Verdict::Invalid(_)));
+    }
+
+    /// The request JWT: EdDSA, issued by and about the key's did:key, made out
+    /// to the origin, a 16-byte jti in hex, and signed by the key the DID names.
+    #[test]
+    fn a_request_is_signed_as_qntx_sign_signs_one() {
+        let signer = Signer::from_seed(vec![9; 32]).unwrap();
+        let auth = signer.authorization("https://node.example", 60).unwrap();
+        let jwt = auth.strip_prefix("Signed ").unwrap();
+        let parts: Vec<&str> = jwt.split('.').collect();
+        assert_eq!(parts.len(), 3);
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let header: serde_json::Value = serde_json::from_slice(&b64.decode(parts[0]).unwrap()).unwrap();
+        let claims: serde_json::Value = serde_json::from_slice(&b64.decode(parts[1]).unwrap()).unwrap();
+        assert_eq!(header["alg"], "EdDSA");
+        assert_eq!(claims["iss"], signer.did.as_str());
+        assert_eq!(claims["sub"], signer.did.as_str());
+        assert_eq!(claims["aud"], serde_json::json!(["https://node.example"]));
+        assert_eq!(claims["jti"].as_str().unwrap().len(), 32);
+        let pk = ed25519::PublicKey::try_from_bytes(&didkey::decode(&signer.did).unwrap()).unwrap();
+        let input = format!("{}.{}", parts[0], parts[1]);
+        assert!(pk.verify(input.as_bytes(), &b64.decode(parts[2]).unwrap()));
+        // a second is a different jti: each request is its own
+        assert_ne!(auth, signer.authorization("https://node.example", 60).unwrap());
     }
 }

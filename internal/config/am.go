@@ -43,6 +43,12 @@ type NodeAgentConfig struct {
 	// "wiring it into node and namespace config as an actual harness"
 	Agy AgyConfig `mapstructure:"agy"`
 
+	// "the Node Agent system prompt"
+	// "should live with the Node repo"
+	// Instructions is the file of what this node tells its Node Agent, in
+	// every harness. QNTX says what the Node Agent is; the node says the rest.
+	Instructions string `mapstructure:"instructions"`
+
 	// 「[Opus 5.5] Moved is Claude Code as am.toml named it before
 	// [agent.root.claude]: read as Claude when that is not named, and said
 	// where it moved (MovedKeys).」

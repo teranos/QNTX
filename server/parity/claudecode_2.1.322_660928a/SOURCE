@@ -1,8 +1,8 @@
 Claude Code
 
-manifest.json https://downloads.claude.ai/claude-code-releases/2.1.289/manifest.json (commit 736d26eef42d1e3017e07e6d5bd0970b8c3a068f, built 2026-10-03T19:38:35Z)
+manifest.json https://downloads.claude.ai/claude-code-releases/2.1.322/manifest.json (commit 660928a5946898d0c8d3488f20dd9b0b2da4ec09, built 2026-11-10T00:53:25Z)
 
-0fac4e2ae412434d3443e603154198ff8705dfd64f65d949a3004d82759274ba  manifest.json
+05d2eff648bb528c1479c719bb8eca9a759657631e285d03aaf37fe779173f1c  manifest.json
 
 Anthropic's own manifest for this version: the sha256 and the size of its
 binary on each platform. A node fetches the binary it runs from the same host

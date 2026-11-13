@@ -629,6 +629,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
 	mux.answer(deviceApprovePath, h.handleDeviceApprove)
 	mux.answer(deviceDonePath, h.handleDeviceDone)
+	// A key that was said yes to admits a session's key, signing as itself (ADR-059).
+	mux.answer(admitPath, h.handleAdmit)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
 	// A peer asks for the lines about the namespaces it serves, signing as itself.
@@ -868,6 +870,10 @@ var a2aStatus = map[int]string{http.StatusUnauthorized: "UNAUTHENTICATED", http.
 // "HTTP error responses use the google.rpc.Status JSON representation" (A2A
 // §11.6), and as every other refusal here elsewhere.
 func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, message string) {
+	if asksOverGRPC(r) {
+		h.refuseGRPC(w, status, message)
+		return
+	}
 	if strings.HasPrefix(r.URL.Path, ixOtelPrefix) {
 		h.refuseOTLP(w, r, status, message)
 		return
@@ -903,5 +909,5 @@ func isAPIRequest(r *http.Request) bool {
 			return true
 		}
 	}
-	return strings.Contains(r.Header.Get("Accept"), "application/json")
+	return asksOverGRPC(r) || strings.Contains(r.Header.Get("Accept"), "application/json")
 }

@@ -116,7 +116,7 @@ func (s *QNTXServer) sessionWindows(ctx context.Context) ([]*protocol.AnthropicW
 // exhausted, then the other when ROOT ticked it. Any other agent's turn runs as said.
 func (s *QNTXServer) spend(agent *rootAgent, said claudecode.Said, shot shaken, each func(claudecode.Message)) (claudecode.Answer, error) {
 	if agent.namespace != auth.NamespaceSystem {
-		return said.Run(s.ctx, each)
+		return s.runClaude(s.ctx, said, each)
 	}
 	kept, _, err := s.anthropicLine()
 	if err != nil {
@@ -143,7 +143,7 @@ func (s *QNTXServer) spend(agent *rootAgent, said claudecode.Said, shot shaken, 
 		if source == anthropicConsole && agent.element != "" {
 			answer, err = s.runManaged(agent, said, shot, kept, each)
 		} else {
-			answer, err = on.Run(s.ctx, each)
+			answer, err = s.runClaude(s.ctx, on, each)
 		}
 		if err != nil {
 			s.logger.Errorw("a ROOT agent's turn did not run", "on", source, "session", said.Session, "error", err)

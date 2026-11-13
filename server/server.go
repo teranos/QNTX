@@ -55,6 +55,8 @@ type QNTXServer struct {
 	nodeAgent             *rootAgent                    // The Node Agent this node runs; nil when am.toml names none (ADR-048)
 	taskEnds              sync.Mutex                    // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
 	taskStreams           sync.Map                      // Each Task whose turn this process runs, by id, to the stream the turn prints to
+	a2aGRPC               http.HandlerFunc              // The node's A2A binding over gRPC (a2a_grpc.go)
+	a2aOwn                http.HandlerFunc              // The node's own A2A binding, asked in process for an agent this node serves (a2a_named.go)
 	taskCancels           sync.Map                      // Each Task canceled in this process, by id, to who canceled it
 	noNodeAgent           error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
 	namespaceAgents       agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
