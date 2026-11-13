@@ -228,9 +228,9 @@ func TestABindingThatPanicsDoesNotLeaveItsCallerWaiting(t *testing.T) {
 	}
 }
 
-// "A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT"
-// The agent itself asking for the whole of what was said to it has received
-// it, and the Task says so. Another agent of the same person asking has not.
+// "「[Opus 5.5] A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT」"
+// 「[Fable 5.2] The agent itself asking for the whole of what was said to it has received」
+// 「[Fable 5.2] it, and the Task says so. Another agent of the same person asking has not.」
 func TestWhatTheNamedAgentItselfAsksTheWholeOfIsReceived(t *testing.T) {
 	srv, root := namedOverA2A(t)
 

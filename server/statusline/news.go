@@ -41,8 +41,8 @@ type News struct {
 	Quiet bool
 	// AtMs is when it was left, stamped by the log.
 	AtMs int64
-	// Whole is told who asked for the whole of the item, each time one does:
-	// what the item is for can know its addressee took it.
+	// 「[Fable 5.2] Whole is told who asked for the whole of the item, each time one does:」
+	// 「[Fable 5.2] what the item is for can know its addressee took it.」
 	Whole func(by auth.Admission)
 }
 
