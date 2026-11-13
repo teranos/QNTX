@@ -6,13 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/internal/apns"
+	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 )
@@ -53,14 +53,17 @@ func (s *QNTXServer) theNotifier() (notifier, error) {
 		return nil, errors.New("this node has no configuration, so no key to reach a phone with")
 	}
 	said := s.deps.cfg.Apns
-	if said.KeyFile == "" {
-		return nil, errors.New("am.toml names no [apns] key_file, so this node reaches no phone")
+	if said.PrivateKeyRef == "" {
+		return nil, errors.New("am.toml names no [apns] private_key, so this node reaches no phone")
 	}
-	p8, err := os.ReadFile(said.KeyFile)
+	// Named, never held in the config: resolved where the node keeps its secrets, when a phone is first told.
+	within, done := context.WithTimeout(s.ctx, keyReadWithin)
+	defer done()
+	p8, err := secretref.Resolve(within, said.PrivateKeyRef)
 	if err != nil {
-		return nil, errors.Wrapf(err, "the APNs key at %s was not read", said.KeyFile)
+		return nil, errors.Wrap(err, "the APNs key [apns] private_key names was not read")
 	}
-	sender, err := apns.New(said.BundleID, apns.Key{P8: p8, KeyID: said.KeyID, TeamID: said.TeamID})
+	sender, err := apns.New(said.BundleID, apns.Key{P8: []byte(p8), KeyID: said.KeyID, TeamID: said.TeamID})
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +168,9 @@ func whatWaitsSaid(waits *collectedFor, due time.Time, now time.Time) (title, bo
 	return title, strings.Join(lines, "\n")
 }
 
+// keyReadWithin is how long where secrets are kept is given to hand over the key.
+var keyReadWithin = 10 * time.Second
+
 // announcedWithin is how long Apple is given to take one notification.
 var announcedWithin = 5 * time.Second
 
@@ -242,6 +248,12 @@ func (s *QNTXServer) announce(ctx context.Context, kept *collection, did string,
 	if len(tokens) == 0 {
 		return nil
 	}
+	// Asked for before its turn is taken: the key is read from where secrets are kept, and what a
+	// person does with what waits never waits on that.
+	sends, err := s.theNotifier()
+	if err != nil {
+		return err
+	}
 	kept.settling.Lock()
 	defer kept.settling.Unlock()
 	kept.mu.Lock()
@@ -262,10 +274,6 @@ func (s *QNTXServer) announce(ctx context.Context, kept *collection, did string,
 	untold := slices.DeleteFunc(slices.Clone(tokens), func(token string) bool { return waits.Announced[token].Equal(due) })
 	if len(untold) == 0 {
 		return nil
-	}
-	sends, err := s.theNotifier()
-	if err != nil {
-		return err
 	}
 	title, body := whatWaitsSaid(waits, due, now)
 	told, failed := []string{}, []string{}
