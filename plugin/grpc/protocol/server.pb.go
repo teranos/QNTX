@@ -2477,7 +2477,8 @@ func (x *Memory) GetModified() string {
 // answers after it.
 type Memories struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Store string                 `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
+	// The store they are of.
+	Store string `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
 	// Every memory of the store, by name. Each without its text.
 	Memories      []*Memory `protobuf:"bytes,2,rep,name=memories,proto3" json:"memories,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2596,9 +2597,11 @@ func (x *MemoryStore) GetPlace() string {
 // MemoryStores is what memory stores answers.
 type MemoryStores struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The vault that backs memory, and the place in it.
-	Vault         string         `protobuf:"bytes,1,opt,name=vault,proto3" json:"vault,omitempty"`
-	Place         string         `protobuf:"bytes,2,opt,name=place,proto3" json:"place,omitempty"`
+	// The vault that backs memory, by its name.
+	Vault string `protobuf:"bytes,1,opt,name=vault,proto3" json:"vault,omitempty"`
+	// The place in that vault memory is kept at.
+	Place string `protobuf:"bytes,2,opt,name=place,proto3" json:"place,omitempty"`
+	// Every store under that place, one per folder.
 	Stores        []*MemoryStore `protobuf:"bytes,3,rep,name=stores,proto3" json:"stores,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
