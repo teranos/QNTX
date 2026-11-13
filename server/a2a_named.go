@@ -110,6 +110,20 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	if ec.StoredTask == nil && !yield(submitted, nil) {
 		return
 	}
+	// "Agents cant wake Agents willy nilly"
+	// Said by no person, it is collected for the agent (collected.go), and
+	// its Task ends when what was collected is delivered.
+	if !aPersonSpeaks(call.request) {
+		due, err := e.s.collect(
+			collectedFor{DID: ta.did, Called: ta.called, Tenant: ta.called},
+			collectedSaid{From: e.s.calledBy(spokenBy(call.request)), Says: says, At: time.Now(), Task: string(id)})
+		if err != nil {
+			yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "it was not collected for "+ta.called+", and was not said: "+err.Error())), nil)
+			return
+		}
+		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateInputRequired, failedWhy(id, ec.ContextID, collectedSays(ta.called, due))), nil)
+		return
+	}
 	if e.s.news == nil {
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "this node keeps no status row to leave it on")), nil)
 		return

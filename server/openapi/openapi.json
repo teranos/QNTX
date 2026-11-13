@@ -277,6 +277,21 @@
       ],
       "x-qntx-prefix": true
     },
+    "/api/collected": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/hold": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/release": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/crash-test": {
       "x-qntx-reach": [
         "ROOT"

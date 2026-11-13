@@ -199,6 +199,9 @@ REACH is '/api/memory/{store}/{memory}/forget'                            of ROO
 REACH is '/api/agent' '/api/agent/say' '/api/agent/session' '/api/agent/login' '/api/agent/live' of ROOT
 REACH is '/api/agent/stop'                                                of ROOT
 
+# What agents said to an agent, collected until it is delivered together.
+REACH is '/api/collected' '/api/collected/hold' '/api/collected/release'  of ROOT
+
 # The element agent (the elements signum, ADR-054): each element is its own
 # agent and its own conversation, and ROOT SHAKE is ROOT's.
 REACH is '/api/elements' '/api/elements/{element}' '/api/elements/{element}/say' '/api/elements/{element}/session' '/api/elements/{element}/sessions' '/api/elements/{element}/live' of ROOT

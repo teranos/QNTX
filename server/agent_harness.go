@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/internal/claudecode"
 
@@ -344,6 +345,18 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	caller := sigil.Caller(ctx)
 	if caller == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to " + agent.called + " is written down with who said it, and this asking carried no request"}
+	}
+	// "Agents cant wake Agents willy nilly"
+	// What is said to the Node Agent by no person is collected (collected.go):
+	// an agent's words, a room's wake, a delivery of GitHub's.
+	if agent == s.nodeAgent && agent.element == "" && !aPersonSpeaks(caller) {
+		due, err := s.collect(
+			collectedFor{DID: agent.did, Called: s.calledInMemory(agent.home), Model: spec.Model},
+			collectedSaid{From: s.calledBy(spokenBy(caller)), Says: sent["says"], At: time.Now()})
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what was said to " + agent.called + " by no person was not collected, and was not said: " + err.Error()}
+		}
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: collectedSays(s.calledInMemory(agent.home), due)}
 	}
 	screenshot, refused := s.screenshotFor(agent, sent)
 	if refused != nil {
