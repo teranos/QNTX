@@ -369,6 +369,56 @@ message Vault {
   // What still stands between this vault and its folders working: its copy
   // not being on the box at path (#1091). Empty is nothing.
   string setup = 6;
+  // The place in the vault agents' memory is kept at (ADR-055): one folder
+  // per Memory Store under it. Empty, the vault backs no memory.
+  string memory = 7;
+}
+
+// Agent Memory (ADR-055).
+//
+// "Interesting to think about an Obsidian linked directory to be how Agent Memory is backed, allowing for access into, and rewriting and referring to Memory."
+// "So Agent Memory is also in its own quotation"
+
+// Memory is one memory of a store: a note in the vault.
+message Memory {
+  // The store it is in.
+  string store = 1;
+  // Its name: the note's, without .md.
+  string name = 2;
+  // What it says, whole. Not sent where memories are listed.
+  string text = 3;
+  // When the note was last written, RFC3339.
+  string modified = 4;
+}
+
+// Memories is what memory list answers, and what a sigil that changes a store
+// answers after it.
+message Memories {
+  // The store they are of.
+  string store = 1;
+  // Every memory of the store, by name. Each without its text.
+  repeated Memory memories = 2;
+}
+
+// MemoryStore is one agent's memory, as the node holds it.
+message MemoryStore {
+  // The store's name: the name its agent holds (i name), or what the node
+  // calls an agent that holds none.
+  string name = 1;
+  // How many memories it holds.
+  int32 memories = 2;
+  // Where it is in the vault.
+  string place = 3;
+}
+
+// MemoryStores is what memory stores answers.
+message MemoryStores {
+  // The vault that backs memory, by its name.
+  string vault = 1;
+  // The place in that vault memory is kept at.
+  string place = 2;
+  // Every store under that place, one per folder.
+  repeated MemoryStore stores = 3;
 }
 
 // Vaults is what vault list answers, and what every vault sigil that changes
