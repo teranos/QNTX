@@ -44,11 +44,11 @@ type Client struct {
 // expired client is not a door, and is refused here rather than at the token
 // endpoint.
 //
-// It is asked on every request a client's key signs (admissionOf), so the
-// token is found by its DID and the list is not read: read whole for each, it
-// was what q spent its CPU on until it starved (2026-11-13, QNTX #1715). The
-// list is read only for a DID whose token is no client's, which the scan
-// below settles as it always did.
+// It is asked on every request a key signs (admissionOf), a session's own key
+// among them, which names no client. So the store is asked for the client by
+// its DID and the list is not read: read whole for each, it was what q spent
+// its CPU on until it starved (2026-11-13, QNTX #1715). A store that cannot
+// find one by its DID is listed, as before.
 func (h *Handler) clientByDID(did string) (Client, bool) {
 	if node, declared := h.nodes[did]; declared {
 		return node, true
@@ -57,9 +57,11 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 		return Client{}, false
 	}
 	var listed []TokenInfo
-	if found, held := h.tokenOf(did); !held {
-		return Client{}, false
-	} else if found.Level == LevelOAuth {
+	if indexed, finds := h.tokens.(findsClients); finds {
+		found, held := indexed.ClientByDID(did)
+		if !held {
+			return Client{}, false
+		}
 		listed = []TokenInfo{found}
 	} else {
 		all, err := h.tokens.List()
@@ -93,6 +95,12 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 		}, true
 	}
 	return Client{}, false
+}
+
+// findsClients is a TokenStore that finds the client a DID names without listing
+// every token. The operational table is one; a store that is not is listed.
+type findsClients interface {
+	ClientByDID(did string) (TokenInfo, bool)
 }
 
 // ConnectorInstructions is what a connector's MCP server tells the agent on

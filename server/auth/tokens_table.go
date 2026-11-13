@@ -36,7 +36,11 @@ type TokenTable struct {
 	mu      sync.RWMutex
 	rows    map[string]tokenRow // hash → the row, as the table holds it
 	dids    map[string]string   // did → the hash of the token it names
-	used    map[string]int64    // hash → when it was last presented, not yet in the table
+	// clients is did → the hash of the client that DID names: the oldest token
+	// at the client's level holding it, as a scan of the list finds it first.
+	// A client is asked for on every request its key signs.
+	clients map[string]string
+	used    map[string]int64 // hash → when it was last presented, not yet in the table
 	// listed is every token parsed, oldest first, kept until a row changes: the
 	// list is asked for on every request a session's key signs, and parsing
 	// every record for each was the whole of what the node spent its CPU on.
@@ -429,6 +433,10 @@ func (t *TokenTable) write(held TokenRecord) error {
 	t.listed = nil // a row changed: the list is parsed anew when next asked for
 	if held.DID != "" {
 		t.dids[held.DID] = held.Hash
+		// A client written after another that holds its DID is the younger, and the older stays the one named.
+		if _, taken := t.clients[held.DID]; !taken && held.Level == string(LevelOAuth) {
+			t.clients[held.DID] = held.Hash
+		}
 	}
 	if written := held.LastUsedAt; written != nil && t.used[held.Hash] <= *written {
 		delete(t.used, held.Hash)
@@ -457,19 +465,30 @@ func (t *TokenTable) load() (err error) {
 		return errors.Wrap(err, "the access_tokens table stopped answering")
 	}
 	dids := make(map[string]string, len(held))
+	clients := map[string]string{}
 	for hash, row := range held {
 		var named struct {
-			DID string `json:"did"`
+			DID   string `json:"did"`
+			Level string `json:"level"`
 		}
 		if err := json.Unmarshal(row.record, &named); err != nil {
 			return errors.Wrapf(err, "access token %s in the access_tokens table is not a token", row.id)
 		}
-		if named.DID != "" {
-			dids[named.DID] = hash
+		if named.DID == "" {
+			continue
+		}
+		dids[named.DID] = hash
+		if named.Level != string(LevelOAuth) {
+			continue
+		}
+		// The oldest of them, and of two as old the one whose id sorts first: the order the list is in.
+		if first, taken := clients[named.DID]; !taken || row.createdAt < held[first].createdAt ||
+			(row.createdAt == held[first].createdAt && row.id < held[first].id) {
+			clients[named.DID] = hash
 		}
 	}
 	t.mu.Lock()
-	t.rows, t.dids, t.listed = held, dids, nil
+	t.rows, t.dids, t.clients, t.listed = held, dids, clients, nil
 	t.mu.Unlock()
 	return nil
 }
@@ -481,6 +500,23 @@ func (t *TokenTable) ByDID(did string) (TokenInfo, bool) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	hash, named := t.dids[did]
+	if !named {
+		return TokenInfo{}, false
+	}
+	held, err := t.token(hash, t.rows[hash])
+	if err != nil {
+		return TokenInfo{}, false
+	}
+	return held.Info(), true
+}
+
+// ClientByDID is the client this DID names, revoked and expired ones included,
+// and whether the table holds one: what a scan of the list for the first token
+// at the client's level holding the DID finds, without the list.
+func (t *TokenTable) ClientByDID(did string) (TokenInfo, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	hash, named := t.clients[did]
 	if !named {
 		return TokenInfo{}, false
 	}
