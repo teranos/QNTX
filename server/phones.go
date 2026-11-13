@@ -393,23 +393,19 @@ func (s *QNTXServer) showWhatWaits(ctx context.Context, now time.Time) error {
 			}
 		}
 	}
-	// Nothing is read of approvals where no phone would show them.
-	tokens, err := s.phones()
-	if err != nil {
-		return err
-	}
 	live, err := s.activities()
 	if err != nil {
 		return err
 	}
-	if len(tokens) > 0 || len(live) > 0 {
+	if len(live) > 0 {
 		open, err := s.openApprovals()
 		if err != nil {
 			return err
 		}
-		if err := s.startApprovals(ctx, tokens, live, open, now); err != nil {
-			failed = append(failed, err.Error())
-		}
+		// "I SEE IT AS PART OF THE COLLECTION, APPROVABLE IN IT"
+		// An approval is not started on its own: it is an item in the collection
+		// of whoever it is going to, and stands with that (ADR-060). One that
+		// stands from before is still moved and ended below.
 		if err := s.moveWhatStands(ctx, live, held, batchesKnown, open, now); err != nil {
 			failed = append(failed, err.Error())
 		}
