@@ -91,6 +91,22 @@ func (s *QNTXServer) phones() ([]string, error) {
 	return tokens, nil
 }
 
+// theHumanThemselves is whether a request is the person's own, by their own
+// session: no token, no agent by a key of its own, and no agent acting on a
+// person's word. An agent in a turn a person started speaks for them where
+// what is collected is concerned (collected.go, onAPersonsWord); which phone
+// the node tells is not something said in a turn, and an agent names none.
+func theHumanThemselves(r *http.Request, admitted auth.Admission) bool {
+	if r.Context().Value(onAPersonsWord{}) != nil || r.Context().Value(deliversCollected{}) != nil {
+		return false
+	}
+	if aToken(admitted) {
+		return false
+	}
+	_, aPerson := itsOwnDID(admitted)
+	return aPerson != nil
+}
+
 // HandlePhone takes a phone's token, from the app, in ROOT's own session. A
 // token of the node's is refused whatever it holds, as an approval's answer
 // refuses one: which phone is told what waits is the human's to say.
@@ -104,8 +120,7 @@ func (s *QNTXServer) HandlePhone(w http.ResponseWriter, r *http.Request) {
 	case !ok:
 		writeError(w, http.StatusUnauthorized, "a phone is named by the logged-in human, and nobody is logged in")
 		return
-	case aToken(admitted) || !aPersonSpeaks(r):
-		// A token, and an agent by a key of its own (collected.go, aPersonSpeaks): neither is the human.
+	case !theHumanThemselves(r, admitted):
 		writeError(w, http.StatusForbidden, "a phone is named by the logged-in human, not by a token or an agent ("+admitted.ActsAs()+")")
 		return
 	case !admitted.IsRoot():

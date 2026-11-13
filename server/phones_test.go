@@ -227,3 +227,22 @@ func TestWithNoPhoneNothingIsToldAndNothingFails(t *testing.T) {
 	// No notifier and no key: asked for, either would be an error.
 	require.NoError(t, srv.announceDue(context.Background(), time.Now().Add(6*time.Hour-10*time.Minute)))
 }
+
+// An agent in a turn a person started speaks for them where what is collected
+// is concerned. It names no phone all the same: neither by its own key on the
+// person's word, nor as the person themselves through its door.
+func TestAnAgentOnAPersonsWordNamesNoPhone(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	for _, ctx := range []context.Context{
+		context.WithValue(alder, onAPersonsWord{}, true),
+		context.WithValue(inROOTsSession(), onAPersonsWord{}, true),
+		context.WithValue(inROOTsSession(), deliversCollected{}, true),
+	} {
+		code, said := handsOver(t, srv, ctx, naming(aPhone))
+		assert.Equal(t, http.StatusForbidden, code, said)
+	}
+	phones, err := srv.phones()
+	require.NoError(t, err)
+	assert.Empty(t, phones, "an agent named the phone the node tells")
+}
