@@ -57,6 +57,10 @@ Status: Unpolished
 
 "AND JUST AS YOU CAN APPROVE AN INDIVIDUAL PR IN A COLLECTION, YOU CAN APPROVE OR DENY AN INDIVIDUAL ITEM IN A PACK"
 
+"DONT DO THE 15 MINUTE THING ANYMORE"
+
+"ANY PENDING IS LIVE ACTIVITY"
+
 ## Approval packs
 
 An approval pack is a thing of its own: a complete package of pull requests
@@ -102,7 +106,7 @@ Things on the node wait on a person. An agent wants a pull request merged
 ([ADR-052](ADR-052-Approvals.md)). Agents have said things to another agent,
 and the batch is held (`server/collected.go`).
 
-When one of them moves, it stands in front of the person by itself: on the
+While one of them is pending, it stands in front of the person by itself: on the
 iPhone's island and lock screen, and in the menu bar of their Mac. They opened
 nothing.
 
@@ -147,7 +151,7 @@ ends is said, on what stands and in the node's log.
 
 | What waits | Started | Moved | Ended |
 |---|---|---|---|
-| A batch | fifteen minutes before it is delivered | when what waits changes | delivered, delayed or canceled |
+| A batch | when it is pending, and again each eight hours, which is as long as Apple lets one stand | when what waits changes, or a person delays it | delivered or canceled |
 | An approval | with the collection it is an item of | as its checks run, and when it can be decided | answered, or the pull request is over |
 
 `showWhatWaits` looks once a minute and makes what stands what waits.
