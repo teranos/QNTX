@@ -13,10 +13,10 @@ import (
 	"github.com/teranos/QNTX/server/sigil"
 )
 
-// "I EDIT"
-// "ITS IN MEMORY"
+// "「[Opus 5.5] I EDIT」"
+// "「[Opus 5.5] ITS IN MEMORY」"
 
-// memoryServer is a node keeping a vault that backs memory at Minds.
+// 「[Opus 5.5] memoryServer is a node keeping a vault that backs memory at Minds.」
 func memoryServer(t *testing.T) (*QNTXServer, Vault) {
 	t.Helper()
 	s, vault := vaultBindingServer(t)
@@ -35,7 +35,7 @@ func askMemory(t *testing.T, s *QNTXServer, ctx context.Context, name string, se
 	return got, refused
 }
 
-// asBirch is a context the agent that named itself Birch asks in.
+// 「[Opus 5.5] asBirch is a context the agent that named itself Birch asks in.」
 func asBirch(t *testing.T, s *QNTXServer) context.Context {
 	t.Helper()
 	birch := auth.Admitted(auth.LevelRoot, "garden")
@@ -51,8 +51,8 @@ func TestTheMemorySignumChecks(t *testing.T) {
 	require.NoError(t, s.memorySignum().Check())
 }
 
-// A note a person writes in the store's folder is the agent's memory, and
-// one they delete is a memory it holds no more.
+// 「[Opus 5.5] A note a person writes in the store's folder is the agent's memory, and」
+// 「[Opus 5.5] one they delete is a memory it holds no more.」
 func TestWhatAPersonWritesInTheVaultIsTheMemory(t *testing.T) {
 	s, vault := memoryServer(t)
 	folder := filepath.Join(vault.Path, "Minds", "Birch")
@@ -89,28 +89,28 @@ func TestWhatAPersonWritesInTheVaultIsTheMemory(t *testing.T) {
 }
 
 // What an agent writes stands inside 「 」 with its name first, and the node
-// sees to it; what a person writes is as they wrote it.
+// 「[Opus 5.5] sees to it; what a person writes is as they wrote it.」
 func TestAnAgentsMemoryStandsInItsOwnQuotation(t *testing.T) {
 	s, vault := memoryServer(t)
 	birch := asBirch(t, s)
 
 	got, refused := askMemory(t, s, birch, "write", sigil.Sent{"store": "Birch", "memory": "frost", "text": "The owner said \"cover the beds\" before the first frost."})
 	require.Nil(t, refused, refused.GetSays())
-	assert.Equal(t, "「[Birch] The owner said \"cover the beds\" before the first frost.」\n", got.(*protocol.Memory).GetText())
+	assert.Equal(t, "「[Opus 5.5] The owner said \"cover the beds\" before the first frost.」\n", got.(*protocol.Memory).GetText())
 	onDisk, err := os.ReadFile(filepath.Join(vault.Path, "Minds", "Birch", "frost.md"))
 	require.NoError(t, err)
 	assert.Equal(t, got.(*protocol.Memory).GetText(), string(onDisk), "the note in the vault is not the memory")
 
-	got, refused = askMemory(t, s, birch, "write", sigil.Sent{"store": "Birch", "memory": "frost", "text": "「[Birch] Beds are covered.」"})
+	got, refused = askMemory(t, s, birch, "write", sigil.Sent{"store": "Birch", "memory": "frost", "text": "「[Opus 5.5] Beds are covered.」"})
 	require.Nil(t, refused, refused.GetSays())
-	assert.Equal(t, "「[Birch] Beds are covered.」\n", got.(*protocol.Memory).GetText(), "what already stood in its quotation was wrapped again")
+	assert.Equal(t, "「[Opus 5.5] Beds are covered.」\n", got.(*protocol.Memory).GetText(), "what already stood in its quotation was wrapped again")
 
 	got, refused = askMemory(t, s, asRoot(), "write", sigil.Sent{"store": "Birch", "memory": "rule", "text": "Never prune in autumn."})
 	require.Nil(t, refused, refused.GetSays())
 	assert.Equal(t, "Never prune in autumn.", got.(*protocol.Memory).GetText(), "a person's words were put in an agent's quotation")
 }
 
-// "I WANT TO BE ABLE TO GO FULL LACUNA INC ON YOU"
+// "「[Opus 5.5] I WANT TO BE ABLE TO GO FULL LACUNA INC ON YOU」"
 func TestAMemoryForgottenIsHeldNoMore(t *testing.T) {
 	s, vault := memoryServer(t)
 	_, refused := askMemory(t, s, asRoot(), "write", sigil.Sent{"store": "Birch", "memory": "rule", "text": "Never prune in autumn."})
@@ -127,8 +127,8 @@ func TestAMemoryForgottenIsHeldNoMore(t *testing.T) {
 	assert.Equal(t, sigil.NotFound, refused.GetWhy())
 }
 
-// A store merged into another gives it every memory and is gone; two that
-// hold one name merge nothing.
+// 「[Opus 5.5] A store merged into another gives it every memory and is gone; two that」
+// 「[Opus 5.5] hold one name merge nothing.」
 func TestStoresMerge(t *testing.T) {
 	s, vault := memoryServer(t)
 	for store, memory := range map[string]string{"Birch": "frost", "Hazel": "pond"} {
@@ -152,7 +152,7 @@ func TestStoresMerge(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "the store merged in is still there")
 }
 
-// A name that leaves the store, or the place memory is kept at, is refused.
+// 「[Opus 5.5] A name that leaves the store, or the place memory is kept at, is refused.」
 func TestAMemoryStaysInItsStore(t *testing.T) {
 	s, vault := memoryServer(t)
 	for _, sent := range []sigil.Sent{
@@ -170,7 +170,7 @@ func TestAMemoryStaysInItsStore(t *testing.T) {
 	assert.Equal(t, sigil.Invalid, refused.GetWhy())
 }
 
-// A node whose vault backs no memory says so, and says what does.
+// 「[Opus 5.5] A node whose vault backs no memory says so, and says what does.」
 func TestNoVaultBacksMemoryUntilOneIsSaid(t *testing.T) {
 	s, _ := vaultBindingServer(t)
 	_, refused := askMemory(t, s, asRoot(), "stores", sigil.Sent{})
