@@ -165,3 +165,114 @@ func TestWhatAPersonSaysIsNeverCollected(t *testing.T) {
 	require.Nil(t, refused, refused.GetSays())
 	assert.Empty(t, all.GetCollected(), "what a person said was collected")
 }
+
+// "CANCELS THE MESSAGE"
+// "I AUTHOR, I CHANGE WHATEVER I WANT ABOUT WHAT AN AGENT RECEIVES"
+func TestAPersonAuthorsWhatAnAgentReceives(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	sayTo(t, srv, alder, "Birch", "the pond is drained")
+	sayTo(t, srv, alder, "Birch", "pull request two is open")
+
+	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	waiting := all.GetCollected()[0].GetWaiting()
+	require.Len(t, waiting, 3)
+	require.NotEmpty(t, waiting[0].GetId())
+
+	// An agent changes and cancels nothing.
+	asAlder := sigil.WithCaller(alder, httptest.NewRequest(http.MethodPost, collectedPath, nil).WithContext(alder))
+	for _, does := range []string{"edit", "later", "cancel"} {
+		_, refused = askCollected(t, srv, asAlder, does, sigil.Sent{"to": "Birch", "id": waiting[0].GetId(), "says": "mine"})
+		require.NotNil(t, refused, "an agent said collected "+does)
+		assert.Equal(t, sigil.NotAllowed, refused.GetWhy())
+	}
+
+	// A person changes one and cancels another.
+	all, refused = askCollected(t, srv, asAPerson(), "edit", sigil.Sent{"to": "Birch", "id": waiting[0].GetId(), "says": "look at pull request one first"})
+	require.Nil(t, refused, refused.GetSays())
+	assert.True(t, all.GetCollected()[0].GetWaiting()[0].GetEdited())
+	all, refused = askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch", "id": waiting[1].GetId()})
+	require.Nil(t, refused, refused.GetSays())
+	require.Len(t, all.GetCollected()[0].GetWaiting(), 2)
+	_, refused = askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch", "id": "no-such"})
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.NotFound, refused.GetWhy())
+
+	// What the agent receives is what the person left.
+	_, refused = askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Birch"})
+	require.Nil(t, refused, refused.GetSays())
+	var left []statusline.News
+	require.Eventually(t, func() bool {
+		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
+		return len(left) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.Contains(t, left[0].Item.Note, "look at pull request one first")
+	assert.Contains(t, left[0].Item.Note, "changed by a person")
+	assert.NotContains(t, left[0].Item.Note, "pull request one is open")
+	assert.NotContains(t, left[0].Item.Note, "the pond is drained")
+	assert.Contains(t, left[0].Item.Note, "pull request two is open")
+}
+
+// Everything that waits canceled is never delivered.
+func TestWhatAPersonCancelsWholeIsNeverDelivered(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	sayTo(t, srv, alder, "Birch", "pull request two is open")
+
+	all, refused := askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch"})
+	require.Nil(t, refused, refused.GetSays())
+	assert.Empty(t, all.GetCollected(), "what was canceled still waits")
+	require.NoError(t, srv.deliverDue(time.Now().Add(48*time.Hour)))
+	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()), "what a person canceled was delivered")
+}
+
+// "WHEN I DELAY, I MEANS, THE MESSAGE WILL COLLECT EVERYTHING THAT COMES IN IN THE MEANTIME AS WELL"
+func TestWhatAPersonPassesToLaterGoesOutWithWhatCameInMeanwhile(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+
+	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	was, err := time.Parse(time.RFC3339, all.GetCollected()[0].GetDue())
+	require.NoError(t, err)
+
+	all, refused = askCollected(t, srv, asAPerson(), "later", sigil.Sent{"to": "Birch"})
+	require.Nil(t, refused, refused.GetSays())
+	assert.Equal(t, was.Add(6*time.Hour).Format(time.RFC3339), all.GetCollected()[0].GetDue(), "later is one more of the agent's waits")
+
+	// Past when it was due: nothing, and what comes in joins it.
+	require.NoError(t, srv.deliverDue(was.Add(time.Minute)))
+	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()), "what was passed to later was delivered at its first time")
+	sayTo(t, srv, alder, "Birch", "pull request two is open")
+
+	require.NoError(t, srv.deliverDue(was.Add(6*time.Hour+time.Minute)))
+	var left []statusline.News
+	require.Eventually(t, func() bool {
+		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
+		return len(left) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.Contains(t, left[0].Item.Note, "pull request one is open")
+	assert.Contains(t, left[0].Item.Note, "pull request two is open")
+}
+
+// What a person writes on release is the whole of what the agent receives.
+func TestWhatAPersonWritesOnReleaseIsWhatTheAgentReceives(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+
+	all, refused := askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Birch", "says": "merge nothing today"})
+	require.Nil(t, refused, refused.GetSays())
+	assert.Empty(t, all.GetCollected())
+	var left []statusline.News
+	require.Eventually(t, func() bool {
+		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
+		return len(left) == 1
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.Contains(t, left[0].Item.Note, "merge nothing today")
+	assert.NotContains(t, left[0].Item.Note, "pull request one is open")
+}

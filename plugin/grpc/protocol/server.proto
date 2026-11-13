@@ -434,6 +434,10 @@ message CollectedSaid {
   string at = 3;
   // The A2A Task it was said as, when it was said as one.
   string task = 4;
+  // What collected edit and cancel name it by.
+  string id = 5;
+  // Whether a person changed what it says.
+  bool edited = 6;
 }
 
 // Collected is what waits for one agent.
