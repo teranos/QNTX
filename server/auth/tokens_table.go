@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -36,6 +37,11 @@ type TokenTable struct {
 	rows    map[string]tokenRow // hash → the row, as the table holds it
 	dids    map[string]string   // did → the hash of the token it names
 	used    map[string]int64    // hash → when it was last presented, not yet in the table
+	// listed is every token parsed, oldest first, kept until a row changes: the
+	// list is asked for on every request a session's key signs, and parsing
+	// every record for each was the whole of what the node spent its CPU on.
+	listed []TokenRecord
+	parses int // how often the table was parsed whole, for the test that holds it to once
 }
 
 // tokenRow is one row of access_tokens.
@@ -230,15 +236,62 @@ func (t *TokenTable) Issue(spec IssuedToken) (string, error) {
 // with. Revoked and expired ones included, so a revoked token is visibly
 // revoked rather than absent.
 func (t *TokenTable) List() ([]TokenInfo, error) {
-	held, err := t.records()
+	held, err := t.parsed()
 	if err != nil {
 		return nil, err
 	}
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	out := make([]TokenInfo, 0, len(held))
 	for _, one := range held {
-		out = append(out, one.Info())
+		// The last use Touch has kept and not yet written, as token gives it.
+		if used, kept := t.used[one.Hash]; kept && (one.LastUsedAt == nil || *one.LastUsedAt < used) {
+			one.LastUsedAt = &used
+		}
+		info := one.Info()
+		// Whoever is handed the list is handed its own: what they do to it is not in the next.
+		info.Namespaces = slices.Clone(info.Namespaces)
+		out = append(out, info)
 	}
 	return out, nil
+}
+
+// parsed is every token as its record says it, oldest first, parsed once and
+// kept until a row changes. It carries no last use Touch has kept: List adds it.
+func (t *TokenTable) parsed() ([]TokenRecord, error) {
+	t.mu.RLock()
+	held := t.listed
+	t.mu.RUnlock()
+	if held != nil {
+		return held, nil
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.listed != nil {
+		return t.listed, nil
+	}
+	hashes := make([]string, 0, len(t.rows))
+	for hash := range t.rows {
+		hashes = append(hashes, hash)
+	}
+	sort.Slice(hashes, func(i, j int) bool {
+		a, b := t.rows[hashes[i]], t.rows[hashes[j]]
+		if a.createdAt != b.createdAt {
+			return a.createdAt < b.createdAt
+		}
+		return a.id < b.id
+	})
+	listed := make([]TokenRecord, 0, len(hashes))
+	for _, hash := range hashes {
+		var one TokenRecord
+		if err := json.Unmarshal(t.rows[hash].record, &one); err != nil {
+			return nil, errors.Wrapf(err, "access token %s in the access_tokens table is not a token", t.rows[hash].id)
+		}
+		listed = append(listed, wholeToken(one))
+	}
+	t.listed = listed
+	t.parses++
+	return listed, nil
 }
 
 // Revoke marks a token revoked. Revoking twice keeps the first timestamp — the
@@ -373,6 +426,7 @@ func (t *TokenTable) write(held TokenRecord) error {
 	row := t.rows[held.Hash] // created_at is the table's, and a write leaves it
 	row.id, row.record = held.ID, body
 	t.rows[held.Hash] = row
+	t.listed = nil // a row changed: the list is parsed anew when next asked for
 	if held.DID != "" {
 		t.dids[held.DID] = held.Hash
 	}
@@ -415,7 +469,7 @@ func (t *TokenTable) load() (err error) {
 		}
 	}
 	t.mu.Lock()
-	t.rows, t.dids = held, dids
+	t.rows, t.dids, t.listed = held, dids, nil
 	t.mu.Unlock()
 	return nil
 }

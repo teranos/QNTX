@@ -361,3 +361,58 @@ func TestATokenIsFoundByItsDID(t *testing.T) {
 	require.True(t, held)
 	assert.Equal(t, "two", found.Label)
 }
+
+// q starved on this: every request signed by a session's key asked for the
+// list, and the list parsed every token's record again. 89% of the node's CPU.
+func TestTheTableIsParsedOnceUntilATokenChanges(t *testing.T) {
+	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
+	require.NoError(t, err)
+	for _, hash := range []string{"abc", "def", "ghi"} {
+		_, err = table.Issue(aToken(hash, "token "+hash))
+		require.NoError(t, err)
+	}
+
+	// The tokens were made in one second, so their order is their ids': each is found by its label.
+	labeled := func(listed []TokenInfo, label string) *TokenInfo {
+		for at := range listed {
+			if listed[at].Label == label {
+				return &listed[at]
+			}
+		}
+		require.Fail(t, "no token is labeled "+label)
+		return nil
+	}
+
+	for range 50 {
+		listed, err := table.List()
+		require.NoError(t, err)
+		require.Len(t, listed, 3)
+	}
+	assert.Equal(t, 1, table.parses, "a request parsed the table again")
+
+	// A token that changes is read anew, once.
+	listed, err := table.List()
+	require.NoError(t, err)
+	require.NoError(t, table.Revoke(labeled(listed, "token abc").ID))
+	for range 10 {
+		listed, err = table.List()
+		require.NoError(t, err)
+	}
+	assert.NotNil(t, labeled(listed, "token abc").RevokedAt, "the list did not see the token revoked")
+	assert.Equal(t, 2, table.parses)
+
+	// A use is seen without reading anything again.
+	require.NoError(t, table.Touch("def"))
+	listed, err = table.List()
+	require.NoError(t, err)
+	assert.NotNil(t, labeled(listed, "token def").LastUsedAt, "the list did not see the token used")
+	assert.Equal(t, 2, table.parses)
+
+	// What a caller does to what it was handed is not in the next list.
+	mine := labeled(listed, "token def")
+	mine.Namespaces[0] = "elsewhere"
+	mine.Label = "scribbled on"
+	again, err := table.List()
+	require.NoError(t, err)
+	assert.Equal(t, "default", labeled(again, "token def").Namespaces[0])
+}
