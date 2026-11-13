@@ -394,4 +394,10 @@ func TestAnAgentInAPersonsTurnSpeaksForThem(t *testing.T) {
 	sayTo(t, srv, alder, "Birch", "pull request two is open")
 	_, refused = askCollected(t, srv, throughTheDoor(), "release", sigil.Sent{"to": "Birch"})
 	require.NotNil(t, refused, "the agent still spoke for the person once their turn ended")
+
+	// A turn the node's delivery started speaks for no one, though a delivery counts as said by a person.
+	delivery := httptest.NewRequest(http.MethodPost, collectedPath, nil)
+	delivery = delivery.WithContext(context.WithValue(delivery.Context(), deliversCollected{}, true))
+	assert.True(t, aPersonSpeaks(delivery))
+	assert.False(t, aPersonSpeaks(delivery) && delivery.Context().Value(deliversCollected{}) == nil, "a delivery's turn was counted as a person's")
 }
