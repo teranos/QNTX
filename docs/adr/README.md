@@ -25,6 +25,7 @@ In this repository:
 
 - [[ADR-041-mail-service]]
 - [[ADR-046-a-plugin-stands-in-a-namespace]]
+
 #### What waits on a person
 
 - [[ADR-052-Approvals]]
