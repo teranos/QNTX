@@ -16,8 +16,9 @@ import (
 //
 // An approval that waits on ROOT is a Live Activity, the same shape a batch
 // is (phones.go): the pull request, its checks as segments, and ROOT's
-// answers as presses. It stands from when every check on its head is done
-// until ROOT answers it or it is over (ADR-052).
+// answers as presses. It stands from when it is asked until ROOT answers it
+// or it is over, showing its checks as they run; its presses are there once
+// it can be decided (ADR-052).
 
 // begunSubject is what the lines about Live Activities the node started are
 // about. Each line's predicate names one phone and one thing that waits, and
@@ -33,30 +34,45 @@ func begunOn(token, waits string) string {
 	return hex.EncodeToString(sum[:20])
 }
 
-// approvalShown is what a Live Activity of an approval shows while it waits
-// on ROOT: its title, each check on its head, and the yes and the no, as
-// HandleApprovalAnswer takes them.
+// approvalShown is what a Live Activity of an approval shows while it waits:
+// its title and each check on its head, and, once every check is done, the
+// yes and the no as HandleApprovalAnswer takes them. Until then it cannot be
+// decided, and it has nothing to press.
 func approvalShown(st *approvalState) waitsShown {
 	segments := []waitsSegment{}
 	for _, check := range st.checks {
 		segments = append(segments, waitsSegment{Name: check.name, State: check.state})
 	}
+	shown := waitsShown{Says: "its checks run", Preview: st.title, Segments: segments, Presses: []waitsPress{}}
+	if !st.presented() {
+		return shown
+	}
 	answers := func(option, said string) map[string]string {
 		return map[string]string{"subject": st.subject, "sha": st.sha, "option": option, "said": said}
 	}
-	return waitsShown{
-		Says: "waits on you", Preview: st.title, Segments: segments,
-		Presses: []waitsPress{
-			{Says: saysMergeWhenReady, Does: "approve", Then: saysMergeWhenReady, Path: approvalsAnswerPath, Sent: answers(optionMerge, saysMergeWhenReady)},
-			{Says: saysCancel, Does: "cancel", Then: saysCancel, Path: approvalsAnswerPath, Sent: answers(optionDontMerge, saysCancel)},
-		},
+	shown.Says = "waits on you"
+	shown.Presses = []waitsPress{
+		{Says: saysMergeWhenReady, Does: "approve", Then: saysMergeWhenReady, Path: approvalsAnswerPath, Sent: answers(optionMerge, saysMergeWhenReady)},
+		{Says: saysCancel, Does: "cancel", Then: saysCancel, Path: approvalsAnswerPath, Sent: answers(optionDontMerge, saysCancel)},
 	}
+	return shown
 }
 
-// startApprovals starts each approval that waits on ROOT as a Live Activity,
-// on each phone it was not started on for the head it is at.
-func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, open []*approvalState) error {
-	waiting := slices.DeleteFunc(slices.Clone(open), func(st *approvalState) bool { return !st.presented() || st.said != "" })
+// startApprovals starts each approval ROOT has not answered as a Live
+// Activity, on each phone it was not started on for the head it is at. One
+// that stands already is moved to its new head and not started beside itself.
+func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, live map[string]started, open []*approvalState) error {
+	waiting := slices.DeleteFunc(slices.Clone(open), func(st *approvalState) bool {
+		if st.said != "" {
+			return true
+		}
+		for _, stands := range live {
+			if stands.Waits == approvalWaits(st.subject) {
+				return true
+			}
+		}
+		return false
+	})
 	if len(tokens) == 0 || len(waiting) == 0 {
 		return nil
 	}

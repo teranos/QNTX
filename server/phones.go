@@ -387,7 +387,7 @@ func (s *QNTXServer) showWhatWaits(ctx context.Context, now time.Time) error {
 		if err != nil {
 			return err
 		}
-		if err := s.startApprovals(ctx, tokens, open); err != nil {
+		if err := s.startApprovals(ctx, tokens, live, open); err != nil {
 			failed = append(failed, err.Error())
 		}
 		if err := s.moveWhatStands(ctx, live, held, open, now); err != nil {
@@ -525,8 +525,6 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 				became = "closed"
 			case open[i].said != "":
 				became = open[i].said
-			case !open[i].presented():
-				became = "moved to a new head"
 			default:
 				shown := approvalShown(open[i])
 				waits = &shown
