@@ -373,3 +373,28 @@ func TestWhatAGroundTookOutlivesARestart(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 	assert.Contains(t, toJSON(t, ended), "Birch received it")
 }
+
+// The Node Agent holds a name as any agent does, and the node runs its turns:
+// what is said to that name is a turn of the Node Agent, answered in the Task,
+// and waits on no ground to take it off the status row.
+func TestWhatIsSaidToTheNodeAgentsNameIsATurnOfTheNodeAgent(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	srv.news = statusline.NewNewsLog()
+	lamp := auth.Admitted(auth.LevelRoot, "system")
+	lamp.Identity, lamp.ClientDID, lamp.TokenDID = rootAccount, srv.nodeAgent.did, srv.nodeAgent.did
+	_, refusal := srv.iName(auth.WithAdmission(context.Background(), lamp), sigil.Sent{"name": "Lamplighter"})
+	require.Nil(t, refusal, refusal.GetSays())
+
+	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/Lamplighter/message:send", saidToTheNode("how long has the box been up?", ""), tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, sent)
+	task := at(sent, "task")
+	assert.Equal(t, "TASK_STATE_COMPLETED", at(task, "status.state"))
+	assert.Equal(t, "Up 3 days.", at(task, "artifacts.0.parts.0.text"))
+	assert.Empty(t, srv.news.Since(srv.nodeAgent.did, time.Now().UnixMilli()), "it was left on the row for a ground that is not there")
+
+	// The Task is the Node Agent's: found at no tenant as at its name.
+	id := at(task, "id").(string)
+	code, again := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	require.Equal(t, http.StatusOK, code, again)
+	assert.Equal(t, "TASK_STATE_COMPLETED", taskStateIn(again))
+}
