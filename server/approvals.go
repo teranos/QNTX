@@ -84,8 +84,8 @@ type approvalState struct {
 	subject, repo, base, sha, title, link string
 	pull                                  int64
 	askedAt                               time.Time
-	// movedAt is when it last changed for whoever decides it: asked at this
-	// head, or a check on it changed.
+	// 「[Fable 5.2] movedAt is when it last changed for whoever decides it: asked at this」
+	// 「[Fable 5.2] head, or a check on it changed.」
 	movedAt time.Time
 	checks  []approvalCheck
 	// What stands, and who said it: the newest press about the head.
@@ -182,7 +182,7 @@ func foldApprovals(lines []*types.As) map[string]*approvalState {
 		switch predicate {
 		case watcher.ApprovalChecked:
 			check := approvalCheck{name: attrString(as.Attributes, "name"), state: attrString(as.Attributes, "state"), link: attrString(as.Attributes, "link")}
-			// It moved when a check came to another state: the same state said again moves nothing.
+			// 「[Opus 5.5] It moved when a check came to another state: the same state said again moves nothing.」
 			if i := slices.IndexFunc(st.checks, func(c approvalCheck) bool { return c.name == check.name }); i >= 0 {
 				if st.checks[i].state != check.state {
 					st.movedAt = as.Timestamp
