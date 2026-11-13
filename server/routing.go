@@ -67,8 +67,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// tool; the reach table names it of ROOT.
 	s.answer(approvalsAnswerPath, s.HandleApprovalAnswer)
 
-	// The phone that is told what waits (phones.go): the app hands the node its
-	// token in ROOT's own session. A route and no sigil, as an approval's answer is.
+	// 「[Opus 5.5] The phone that is told what waits (phones.go): the app hands the node its」
+	// 「[Opus 5.5] token in ROOT's own session. A route and no sigil, as an approval's answer is.」
 	s.answer(phonesPath, s.HandlePhone)
 
 	// A staand answers the public pixel on /s/{namespace}/{slug} (ADR-035). The
