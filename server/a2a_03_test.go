@@ -18,13 +18,13 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 )
 
-// "WHY CANT WE MAKE IT NOT MATTER"
+// "「[Fable 5.2] WHY CANT WE MAKE IT NOT MATTER」"
 //
-// The node speaks what the a2a-go it pins speaks, 0.3 and 1.0, and a caller is
-// answered in the version its request is in, whichever it names or none.
+// 「[Fable 5.2] The node speaks what the a2a-go it pins speaks, 0.3 and 1.0, and a caller is」
+// 「[Fable 5.2] answered in the version its request is in, whichever it names or none.」
 
-// A client speaking only 0.3, by a2a-go's own compat, finds the node by its
-// card and is answered over HTTP+JSON and JSON-RPC alike.
+// 「[Fable 5.2] A client speaking only 0.3, by a2a-go's own compat, finds the node by its」
+// 「[Fable 5.2] card and is answered over HTTP+JSON and JSON-RPC alike.」
 func TestAClientSpeaking03IsAnswered(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	served := httptest.NewServer(srv.served)
@@ -53,8 +53,8 @@ func TestAClientSpeaking03IsAnswered(t *testing.T) {
 	}
 }
 
-// The extended card asked over 0.3 is written in 0.3, naming where 0.3 is
-// answered, and verifies by the node's key over the bytes served.
+// 「[Fable 5.2] The extended card asked over 0.3 is written in 0.3, naming where 0.3 is」
+// 「[Fable 5.2] answered, and verifies by the node's key over the bytes served.」
 func TestTheExtendedCardIn03IsSignedAsServed(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	w := httptest.NewRecorder()
@@ -70,8 +70,8 @@ func TestTheExtendedCardIn03IsSignedAsServed(t *testing.T) {
 	assert.True(t, strings.HasSuffix(card.URL, "/a2a"), card.URL)
 }
 
-// A caller naming 0.3 is answered by 0.3's binding whatever its body holds: a
-// method 0.3 does not have is not found there, not read as 1.0's.
+// 「[Fable 5.2] A caller naming 0.3 is answered by 0.3's binding whatever its body holds: a」
+// 「[Fable 5.2] method 0.3 does not have is not found there, not read as 1.0's.」
 func TestACallerNaming03IsAnsweredIn03(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	body := `{"jsonrpc": "2.0", "id": 1, "method": "GetTask", "params": {"id": "no-such-task"}}`
@@ -91,8 +91,8 @@ func TestACallerNaming03IsAnsweredIn03(t *testing.T) {
 	assert.Equal(t, -32601, answered.Error.Code, "GetTask is 1.0's method, and 0.3 has none by that name: "+w.Body.String())
 }
 
-// A 1.0 request naming no version, which a2a-go alone reads as 0.3, is answered
-// in 1.0: the version it is in.
+// 「[Fable 5.2] A 1.0 request naming no version, which a2a-go alone reads as 0.3, is answered」
+// 「[Fable 5.2] in 1.0: the version it is in.」
 func TestA10RequestNamingNoVersionIsAnswered(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	body := saidToTheNode("how long has the box been up?", "")

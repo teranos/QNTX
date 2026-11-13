@@ -155,11 +155,11 @@ func (s *QNTXServer) HandleAgentCard(w http.ResponseWriter, r *http.Request) {
 	cardCached(a2asrv.NewAgentCardHandler(cardIn03And10{s: s, card: s.publicCard(r).sdk()})).ServeHTTP(w, r)
 }
 
-// cardIn03And10 is a card both versions read: 1.0's as a2a-go writes it, and
-// 0.3's as a2av0 writes it, merged key by key, each version's reader taking its
-// own keys and passing over the other's. a2av0's own union writes the security
-// schemes in 0.3's shape alone, which a2a-go's 1.0 reader refuses. It is signed
-// as written, since a card is verified over the bytes it is served as.
+// 「[Fable 5.2] cardIn03And10 is a card both versions read: 1.0's as a2a-go writes it, and」
+// 「[Fable 5.2] 0.3's as a2av0 writes it, merged key by key, each version's reader taking its」
+// 「[Fable 5.2] own keys and passing over the other's. a2av0's own union writes the security」
+// 「[Fable 5.2] schemes in 0.3's shape alone, which a2a-go's 1.0 reader refuses. It is signed」
+// 「[Fable 5.2] as written, since a card is verified over the bytes it is served as.」
 type cardIn03And10 struct {
 	s    *QNTXServer
 	card *a2asdk.AgentCard
@@ -210,8 +210,8 @@ func (c cardIn03And10) CardJSON(ctx context.Context) ([]byte, error) {
 	return json.Marshal(union)
 }
 
-// merged is a and b as one JSON value: objects key by key, arrays of one
-// length item by item, and a where both hold something else.
+// 「[Fable 5.2] merged is a and b as one JSON value: objects key by key, arrays of one」
+// 「[Fable 5.2] length item by item, and a where both hold something else.」
 func merged(a, b any) any {
 	switch inA := a.(type) {
 	case map[string]any:
@@ -379,9 +379,9 @@ type agentCard struct {
 }
 
 // sdk is the card as a2a-go's AgentCard. It is reached over HTTP+JSON and
-// JSON-RPC, both at its URL, in 1.0 and in 0.3, and over gRPC in 1.0 where
-// am.toml says where. 0.3 has no tenant, so its agent at a tenant is reached
-// under the tenant's path.
+// 「[Fable 5.2] JSON-RPC, both at its URL, in 1.0 and in 0.3, and over gRPC in 1.0 where」
+// 「[Fable 5.2] am.toml says where. 0.3 has no tenant, so its agent at a tenant is reached」
+// 「[Fable 5.2] under the tenant's path.」
 func (c agentCard) sdk() *a2asdk.AgentCard {
 	bearer := a2asdk.SecurityRequirements{"bearer": {}}
 	at03 := c.URL

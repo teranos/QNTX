@@ -55,8 +55,8 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 }
 
 // The card is a2a-go's AgentCard, reached over HTTP+JSON and JSON-RPC, both
-// at the binding's URL (§8.3.1), in 1.0 and in 0.3: the node's MCP is not one
-// of its interfaces.
+// 「[Fable 5.2] at the binding's URL (§8.3.1), in 1.0 and in 0.3: the node's MCP is not one」
+// 「[Fable 5.2] of its interfaces.」
 func TestTheCardIsReachedOverBothBindings(t *testing.T) {
 	srv, _ := pluginServingServer(t, "fake")
 	card := srv.a2aCard(askedAs(auth.LevelRoot)).sdk()
