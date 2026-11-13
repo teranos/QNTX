@@ -3,8 +3,12 @@ package server
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/teranos/QNTX/internal/claudecode"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
@@ -117,10 +121,18 @@ func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
 					Answer: "protocol.SessionTranscript",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: nodeAgentPath + "/session"},
 				},
+				{
+					Name:   "stop",
+					Does:   "Stops the Node Agent's turn running in the harness named, as a person stops it: what it printed until then stays in its session, and it answers no more in that turn. Answers who the Node Agent is now.",
+					Takes:  []*protocol.Param{harness},
+					Answer: "protocol.NodeAgentAm",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: nodeAgentPath + "/stop"},
+				},
 				login.sigil,
 			},
 		},
 		Answers: map[string]sigil.Answer{
+			"stop":    s.nodeAgentStop,
 			"say":     s.nodeAgentSay,
 			"am":      s.nodeAgentAm,
 			"session": s.nodeAgentSession,
@@ -164,6 +176,36 @@ func (s *QNTXServer) nodeAgentSay(ctx context.Context, sent sigil.Sent) (any, *p
 		return &protocol.NodeAgentSaid{Agy: said}, nil
 	}
 	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent answered in " + h.called + " as no Coding Agent Harness this node runs"}
+}
+
+// "i want to be able to make it stop"
+// "the sent button needs to change"
+// "into a stop button"
+// "why is an a2a message more importabt than a human message"
+//
+// nodeAgentStop interrupts the turn the Node Agent is in, in the harness
+// named, as a Task canceled over A2A interrupts its turn: by the stream the
+// turn prints to, whether the node runs it or its harness plugin does.
+func (s *QNTXServer) nodeAgentStop(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	h, refused := s.harnessNamed(sent)
+	if refused != nil {
+		return nil, refused
+	}
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
+	}
+	going := s.nodeAgent.in(h).answering.Load()
+	if going == nil {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "the Node Agent is in no turn in " + h.called + ", so there is nothing to stop"}
+	}
+	if going.stream == "" {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's turn in " + h.called + " prints to no stream yet, so it was not stopped: in Claude Code it does once it starts, and Pi, Codex and agy print to none"}
+	}
+	if err := claudecode.Interrupt(s.nodeAgent.home, filepath.Base(going.stream)); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's turn was not stopped: " + err.Error()}
+	}
+	s.logger.Infow("The Node Agent's turn was stopped", "harness", h.name, "session", going.session, "stream", going.stream, "by", actorOf(ctx))
+	return s.nodeAgentAm(ctx, sent)
 }
 
 func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -303,6 +345,18 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	caller := sigil.Caller(ctx)
 	if caller == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to " + agent.called + " is written down with who said it, and this asking carried no request"}
+	}
+	// "Agents cant wake Agents willy nilly"
+	// What is said to the Node Agent by no person is collected (collected.go):
+	// an agent's words, a room's wake, a delivery of GitHub's.
+	if agent == s.nodeAgent && agent.element == "" && !aPersonSpeaks(caller) {
+		due, err := s.collect(
+			collectedFor{DID: agent.did, Called: s.calledInMemory(agent.home), Model: spec.Model},
+			collectedSaid{From: s.calledBy(spokenBy(caller)), Says: sent["says"], At: time.Now()})
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what was said to " + agent.called + " by no person was not collected, and was not said: " + err.Error()}
+		}
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: collectedSays(s.calledInMemory(agent.home), due)}
 	}
 	screenshot, refused := s.screenshotFor(agent, sent)
 	if refused != nil {

@@ -125,15 +125,14 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	require.Nil(t, refusal, refusal.GetSays())
 	said, err := protojson.Marshal(answered.(proto.Message))
 	require.NoError(t, err)
+	// "Agents cant wake Agents willy nilly": it is collected for Birch, and
+	// not on the row (collected_test.go).
 	assert.Contains(t, string(said), "TASK_STATE_SUBMITTED")
-
-	var left []statusline.News
-	require.Eventually(t, func() bool {
-		left = srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli())
-		return len(left) == 1
-	}, 5*time.Second, 10*time.Millisecond)
-	assert.Equal(t, "Alder to Birch", left[0].Item.Name, "it is from Alder, by name")
-	assert.Equal(t, "your commit broke the build", left[0].Item.Note)
+	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	require.Len(t, all.GetCollected(), 1)
+	assert.Equal(t, "Alder", all.GetCollected()[0].GetWaiting()[0].GetFrom(), "it is from Alder, by name")
+	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()))
 
 	// A name nobody holds is no agent, said so.
 	_, refusal = signum.Answers["SendMessage"](asAlder, sigil.Sent{

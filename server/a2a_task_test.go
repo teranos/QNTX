@@ -858,3 +858,50 @@ func TestASecretInDataOrATextFileIsNotKept(t *testing.T) {
 	assert.NotContains(t, string(kept), secret)
 	assert.NotContains(t, string(kept), base64.StdEncoding.EncodeToString([]byte("token="+secret)))
 }
+
+// "i want to be able to make it stop"
+// "why is an a2a message more importabt than a human message"
+// A person stops the Node Agent's turn as a canceled Task does: agent stop
+// interrupts it, and nothing let it answer.
+func TestAPersonStopsTheNodeAgentsTurn(t *testing.T) {
+	held := filepath.Join(t.TempDir(), "held")
+	require.NoError(t, os.WriteFile(held, nil, 0o600))
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	// A stand-in that, as Claude Code does, ends on an interrupt: a shell
+	// waiting on a child of its own goes on after one only it was sent.
+	srv.harnessBinaries.mu.Lock()
+	standIn := srv.harnessBinaries.held["claude"]
+	srv.harnessBinaries.mu.Unlock()
+	stops := filepath.Join(filepath.Dir(standIn.path), "claude-stops")
+	require.NoError(t, os.WriteFile(stops, []byte("#!/bin/sh\ntrap 'exit 130' INT\nwhile [ -f '"+held+"' ]; do sleep 0.02; done\nexec '"+standIn.path+"' \"$@\"\n"), 0o755))
+	srv.holdHarness("claude", &harnessHeld{fetched: standIn.fetched, path: stops})
+
+	// Nothing is running: there is nothing to stop.
+	r := asBearer(http.MethodPost, "/api/agent/stop", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(`{"harness":"claude"}`))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+
+	// A turn that would run until its stand-in is let go.
+	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to a million", `{"returnImmediately": true}`), tokens[auth.LevelRoot])
+	id := at(sent, "task.id").(string)
+	require.Eventually(t, func() bool {
+		going := srv.nodeAgent.in(srv.claudeHarness()).answering.Load()
+		return going != nil && going.stream != ""
+	}, 10*time.Second, 20*time.Millisecond)
+
+	r = asBearer(http.MethodPost, "/api/agent/stop", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(`{"harness":"claude"}`))
+	r.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// The turn stopped while the stand-in was still held.
+	require.Eventually(t, func() bool { return srv.nodeAgent.in(srv.claudeHarness()).answering.Load() == nil }, 10*time.Second, 20*time.Millisecond)
+	assert.FileExists(t, held)
+	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
+	assert.NotEqual(t, "TASK_STATE_COMPLETED", at(got, "status.state"), "a stopped turn answered")
+}
