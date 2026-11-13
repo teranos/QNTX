@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
 	"github.com/a2aproject/a2a-go/v2/a2acrypto"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	appcfg "github.com/teranos/QNTX/internal/config"
@@ -151,10 +152,43 @@ func (s *QNTXServer) publicCard(r *http.Request) agentCard {
 // HandleAgentCard serves the public card: a2a-go's card handler, the card
 // signed with the node's own key (§8.4) by a2a-go's signed card producer.
 func (s *QNTXServer) HandleAgentCard(w http.ResponseWriter, r *http.Request) {
-	producer := a2asrv.AgentCardProducerFn(func(context.Context) (*a2asdk.AgentCard, error) {
-		return s.publicCard(r).sdk(), nil
-	})
-	cardCached(a2asrv.NewAgentCardHandler(a2asrv.NewSignedCardProducer(producer, s.cardSigners))).ServeHTTP(w, r)
+	cardCached(a2asrv.NewAgentCardHandler(cardIn03And10{s: s, card: s.publicCard(r).sdk()})).ServeHTTP(w, r)
+}
+
+// cardIn03And10 is a card both versions read: a2a-go's a2av0 writes it as
+// the union of 1.0's and 0.3's, and it is signed as written, since a card is
+// verified over the bytes it is served as.
+type cardIn03And10 struct {
+	s    *QNTXServer
+	card *a2asdk.AgentCard
+}
+
+func (c cardIn03And10) Card(ctx context.Context) (*a2asdk.AgentCard, error) {
+	return c.s.signedCard(ctx, c.card)
+}
+
+func (c cardIn03And10) CardJSON(ctx context.Context) ([]byte, error) {
+	written := func(card *a2asdk.AgentCard) ([]byte, error) {
+		return a2av0.NewStaticAgentCardProducer(card).(a2asrv.AgentCardJSONProducer).CardJSON(ctx)
+	}
+	raw, err := written(c.card)
+	if err != nil {
+		return nil, errors.Wrap(err, "the card was not written in 0.3 and 1.0")
+	}
+	signers, err := c.s.cardSigners(ctx)
+	if err != nil {
+		return nil, err
+	}
+	signed := *c.card
+	signed.Signatures = slices.Clone(c.card.Signatures)
+	for _, signer := range signers {
+		sig, err := signer.Sign(ctx, raw)
+		if err != nil {
+			return nil, errors.Wrap(err, "the card was not signed")
+		}
+		signed.Signatures = append(signed.Signatures, *sig)
+	}
+	return written(&signed)
 }
 
 // cardMaxAge is how long a client keeps the public card: short, because health
@@ -292,14 +326,22 @@ type agentCard struct {
 }
 
 // sdk is the card as a2a-go's AgentCard. It is reached over HTTP+JSON and
-// JSON-RPC, both at its URL, and over gRPC where am.toml says where.
+// JSON-RPC, both at its URL, in 1.0 and in 0.3, and over gRPC in 1.0 where
+// am.toml says where. 0.3 has no tenant, so its agent at a tenant is reached
+// under the tenant's path.
 func (c agentCard) sdk() *a2asdk.AgentCard {
 	bearer := a2asdk.SecurityRequirements{"bearer": {}}
+	at03 := c.URL
+	if c.Tenant != "" {
+		at03 += "/" + c.Tenant
+	}
 	card := &a2asdk.AgentCard{
 		Name: c.Name, Description: c.Description, Version: c.Version,
 		SupportedInterfaces: []*a2asdk.AgentInterface{
 			{URL: c.URL, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant},
 			{URL: c.URL, ProtocolBinding: a2asdk.TransportProtocolJSONRPC, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant},
+			{URL: at03, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2av0.Version},
+			{URL: at03, ProtocolBinding: a2asdk.TransportProtocolJSONRPC, ProtocolVersion: a2av0.Version},
 		},
 		Capabilities:         a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true, Extensions: c.Extensions},
 		SecuritySchemes:      a2asdk.NamedSecuritySchemes{"bearer": a2asdk.HTTPAuthSecurityScheme{Scheme: "Bearer"}},
