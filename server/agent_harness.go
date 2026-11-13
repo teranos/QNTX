@@ -183,9 +183,9 @@ func (s *QNTXServer) nodeAgentSay(ctx context.Context, sent sigil.Sent) (any, *p
 // "into a stop button"
 // "why is an a2a message more importabt than a human message"
 //
-// nodeAgentStop interrupts the turn the Node Agent is in, in the harness
-// named, as a Task canceled over A2A interrupts its turn: by the stream the
-// turn prints to, whether the node runs it or its harness plugin does.
+// 「[Opus 5.5] nodeAgentStop interrupts the turn the Node Agent is in, in the harness」
+// 「[Opus 5.5] named, as a Task canceled over A2A interrupts its turn: by the stream the」
+// 「[Opus 5.5] turn prints to, whether the node runs it or its harness plugin does.」
 func (s *QNTXServer) nodeAgentStop(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	h, refused := s.harnessNamed(sent)
 	if refused != nil {

@@ -861,14 +861,14 @@ func TestASecretInDataOrATextFileIsNotKept(t *testing.T) {
 
 // "i want to be able to make it stop"
 // "why is an a2a message more importabt than a human message"
-// A person stops the Node Agent's turn as a canceled Task does: agent stop
-// interrupts it, and nothing let it answer.
+// 「[Opus 5.5] A person stops the Node Agent's turn as a canceled Task does: agent stop」
+// 「[Opus 5.5] interrupts it, and nothing let it answer.」
 func TestAPersonStopsTheNodeAgentsTurn(t *testing.T) {
 	held := filepath.Join(t.TempDir(), "held")
 	require.NoError(t, os.WriteFile(held, nil, 0o600))
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
-	// A stand-in that, as Claude Code does, ends on an interrupt: a shell
-	// waiting on a child of its own goes on after one only it was sent.
+	// 「[Opus 5.5] A stand-in that, as Claude Code does, ends on an interrupt: a shell」
+	// 「[Opus 5.5] waiting on a child of its own goes on after one only it was sent.」
 	srv.harnessBinaries.mu.Lock()
 	standIn := srv.harnessBinaries.held["claude"]
 	srv.harnessBinaries.mu.Unlock()
@@ -876,7 +876,7 @@ func TestAPersonStopsTheNodeAgentsTurn(t *testing.T) {
 	require.NoError(t, os.WriteFile(stops, []byte("#!/bin/sh\ntrap 'exit 130' INT\nwhile [ -f '"+held+"' ]; do sleep 0.02; done\nexec '"+standIn.path+"' \"$@\"\n"), 0o755))
 	srv.holdHarness("claude", &harnessHeld{fetched: standIn.fetched, path: stops})
 
-	// Nothing is running: there is nothing to stop.
+	// 「[Opus 5.5] Nothing is running: there is nothing to stop.」
 	r := asBearer(http.MethodPost, "/api/agent/stop", tokens[auth.LevelRoot])
 	r.Body = io.NopCloser(strings.NewReader(`{"harness":"claude"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -884,7 +884,7 @@ func TestAPersonStopsTheNodeAgentsTurn(t *testing.T) {
 	srv.served.ServeHTTP(w, r)
 	assert.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 
-	// A turn that would run until its stand-in is let go.
+	// 「[Opus 5.5] A turn that would run until its stand-in is let go.」
 	_, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send", saidToTheNode("count to a million", `{"returnImmediately": true}`), tokens[auth.LevelRoot])
 	id := at(sent, "task.id").(string)
 	require.Eventually(t, func() bool {
@@ -899,7 +899,7 @@ func TestAPersonStopsTheNodeAgentsTurn(t *testing.T) {
 	srv.served.ServeHTTP(w, r)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-	// The turn stopped while the stand-in was still held.
+	// 「[Opus 5.5] The turn stopped while the stand-in was still held.」
 	require.Eventually(t, func() bool { return srv.nodeAgent.in(srv.claudeHarness()).answering.Load() == nil }, 10*time.Second, 20*time.Millisecond)
 	assert.FileExists(t, held)
 	_, got := a2aAsked(t, srv, http.MethodGet, "/a2a/tasks/"+id, "", tokens[auth.LevelRoot])
