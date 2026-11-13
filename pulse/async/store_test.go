@@ -648,8 +648,8 @@ func TestCancelQueuedBeforeDropsOnlyTheOldQueuedOfTheHandler(t *testing.T) {
 
 // "anything that isnt operational in operational db, just needs to get out of there probably"
 //
-// A handler's done and dropped jobs keep their rows and lose their payloads;
-// one still to run keeps what it is run with. Cleanup takes a dropped job too.
+// 「[Opus 5.5] A handler's done and dropped jobs keep their rows and lose their payloads;」
+// 「[Opus 5.5] one still to run keeps what it is run with. Cleanup takes a dropped job too.」
 func TestADoneJobForgetsItsPayloadAndADroppedOneIsCleanedUp(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
