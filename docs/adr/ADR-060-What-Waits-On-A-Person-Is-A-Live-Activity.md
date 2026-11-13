@@ -25,6 +25,40 @@ Status: Unpolished
 
 "CANT YOU SEE THIS CODEPATH IS CRITICAL"
 
+"HERE IS THE PR STORY"
+
+"ITS PART OF THE COLLECTON"
+
+"SO I DONT SEE IT"
+
+"I SEE IT AS PART OF THE COLLECTION, APPROVABLE IN IT"
+
+"FOR NOW THAT IS IT, AND CLICKING ON THE COLLECTION, BRING YOU TO IT, THE COLLECTION ITSELF, AND WHERE ITS GOING,"
+
+"SO A PENDING COLLECTION FOR A"
+
+"BRINGS ME TO A, AND THEN THE OVERLAY"
+
+"ITS DIRECTIONAL, SO WE CARE ABOUT THE RECEIVER"
+
+## What stands is the collection
+
+One thing stands in front of a person: the collection, by who it is for. It
+is directional, and the receiver is what it is named by.
+
+A pull request that waits on the person is an item in the receiver's
+collection, beside what agents said, and is approved there. It does not stand
+on its own.
+
+Pressing the collection brings the person to it and to where it is going:
+what is pending for an agent brings them to that agent, its chat, and the
+collection opens over it as the overlay.
+
+**Not built yet.** As built on 2026-11-14, an approval is started as a Live
+Activity of its own (`server/phones_approvals.go`), four stood at once that
+night, and pressing what stands opens nothing. Both are to be made what is
+said here.
+
 ## The story
 
 Things on the node wait on a person. An agent wants a pull request merged
