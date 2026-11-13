@@ -48,10 +48,10 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 	}
 	p := h.presented(r)
 	carriedAs := ""
-	// What this node admitted is carried, a session or a signature: what was
-	// presented here is spent here, and the peer is handed this node's word.
+	// 「[Sonnet 5.5] What this node admitted is carried, a session or a signature: what was」
+	// 「[Sonnet 5.5] presented here is spent here, and the peer is handed this node's word.」
 	//
-	// "k should be delegating auth to the node entirely to q"
+	// "「[Sonnet 5.5] k should be delegating auth to the node entirely to q」"
 	carries := p.SessionLive || p.Bearer != nil
 	if carries {
 		admitted, ok := h.admissionOf(p)
@@ -61,7 +61,7 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 		}
 		level, name, namespaces := h.levelOf(admitted.Identity), p.DisplayName, peer.Namespaces
 		if !p.SessionLive {
-			// A grant goes as far as it reaches here, and no further.
+			// 「[Sonnet 5.5] A grant goes as far as it reaches here, and no further.」
 			level, name, namespaces = Level(admitted.LevelName()), admitted.DisplayName, nil
 			for _, namespace := range peer.Namespaces {
 				if admitted.MayActIn(namespace) {

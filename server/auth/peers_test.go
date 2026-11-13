@@ -169,11 +169,11 @@ func TestThePeerAdmitsThePersonCarriedAsItsOwnUser(t *testing.T) {
 	assert.Equal(t, "US-HERE", carried(holding).UserID)
 }
 
-// A key signed in here reaches the peer as the person it speaks for, at its
-// grant's level and in the namespaces its grant reaches there: the signature
-// is spent here, and the peer is handed the primary's.
+// 「[Sonnet 5.5] A key signed in here reaches the peer as the person it speaks for, at its」
+// 「[Sonnet 5.5] grant's level and in the namespaces its grant reaches there: the signature」
+// 「[Sonnet 5.5] is spent here, and the peer is handed the primary's.」
 //
-// "k should be delegating auth to the node entirely to q"
+// "「[Sonnet 5.5] k should be delegating auth to the node entirely to q」"
 func TestASignatureAdmittedHereIsCarriedAsItsGrant(t *testing.T) {
 	primary, served, got := primaryAndPeer(t, func() string { _, did := otherNode(t); return did }())
 	_, key, err := ed25519.GenerateKey(rand.Reader)
@@ -201,7 +201,7 @@ func TestASignatureAdmittedHereIsCarriedAsItsGrant(t *testing.T) {
 	assert.Equal(t, []string{NamespaceDefault}, claims.Namespaces)
 }
 
-// A grant reaching none of the namespaces the peer serves carries none there.
+// 「[Sonnet 5.5] A grant reaching none of the namespaces the peer serves carries none there.」
 func TestAGrantCarriesNoNamespaceItDoesNotReach(t *testing.T) {
 	primary, served, got := primaryAndPeer(t, func() string { _, did := otherNode(t); return did }())
 	_, key, err := ed25519.GenerateKey(rand.Reader)
