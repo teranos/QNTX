@@ -137,9 +137,9 @@ func TestWhatWaitsStandsOnThePhoneFifteenMinutesBeforeItGoes(t *testing.T) {
 	assert.Equal(t, int64(shown.Due), one.Stale.Unix())
 	birch := map[string]string{"to": "Birch"}
 	assert.Equal(t, []waitsPress{
-		{Says: "send now", Then: "sent", Path: "/api/collected/release", Sent: birch},
-		{Says: "delay", Then: "delayed", Path: "/api/collected/later", Sent: birch},
-		{Says: "cancel", Then: "canceled", Path: "/api/collected/cancel", Sent: birch, Armed: true},
+		{Says: "send now", Does: "send", Then: "sent", Path: "/api/collected/release", Sent: birch},
+		{Says: "delay", Does: "delay", Then: "delayed", Path: "/api/collected/later", Sent: birch},
+		{Says: "cancel", Does: "cancel", Then: "canceled", Path: "/api/collected/cancel", Sent: birch, Armed: true},
 	}, shown.Presses)
 	assert.NotNil(t, shown.Segments, "the phone decodes no list from nothing")
 }
