@@ -116,6 +116,11 @@
         "ROOT"
       ]
     },
+    "/api/agent/stop": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/agents/{namespace}": {
       "x-qntx-reach": [
         "ROOT",
