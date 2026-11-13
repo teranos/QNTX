@@ -2658,19 +2658,19 @@ func (x *MemoryStores) GetStores() []*MemoryStore {
 	return nil
 }
 
-// What agents said to an agent, collected (ADR-048).
+// 「[Fable 5.2] What agents said to an agent, collected (ADR-048).」
 //
-// CollectedSaid is one thing an agent said to another, kept until it is
-// delivered with what else was collected.
+// 「[Fable 5.2] CollectedSaid is one thing an agent said to another, kept until it is」
+// 「[Fable 5.2] delivered with what else was collected.」
 type CollectedSaid struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Who said it: the name the agent holds, or its DID.
+	// 「[Fable 5.2] Who said it: the name the agent holds, or its DID.」
 	From string `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
-	// What it said.
+	// 「[Fable 5.2] What it said.」
 	Says string `protobuf:"bytes,2,opt,name=says,proto3" json:"says,omitempty"`
-	// When it said it, RFC3339.
+	// 「[Fable 5.2] When it said it, RFC3339.」
 	At string `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
-	// The A2A Task it was said as, when it was said as one.
+	// 「[Fable 5.2] The A2A Task it was said as, when it was said as one.」
 	Task          string `protobuf:"bytes,4,opt,name=task,proto3" json:"task,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2701,7 +2701,7 @@ func (x *CollectedSaid) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CollectedSaid.ProtoReflect.Descriptor instead.
+// 「[Fable 5.2] Deprecated: Use CollectedSaid.ProtoReflect.Descriptor instead.」
 func (*CollectedSaid) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{31}
 }
@@ -2734,24 +2734,24 @@ func (x *CollectedSaid) GetTask() string {
 	return ""
 }
 
-// Collected is what waits for one agent.
+// 「[Fable 5.2] Collected is what waits for one agent.」
 type Collected struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The agent it waits for: the name it holds, or what the node calls it.
+	// 「[Fable 5.2] The agent it waits for: the name it holds, or what the node calls it.」
 	To string `protobuf:"bytes,1,opt,name=to,proto3" json:"to,omitempty"`
-	// The agent's DID.
+	// 「[Fable 5.2] The agent's DID.」
 	Did string `protobuf:"bytes,2,opt,name=did,proto3" json:"did,omitempty"`
-	// The model the node holds the agent to run on. Empty when it holds none.
+	// 「[Fable 5.2] The model the node holds the agent to run on. Empty when it holds none.」
 	Model string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	// How long what is collected for it waits, as a duration: 6h0m0s.
+	// 「[Fable 5.2] How long what is collected for it waits, as a duration: 6h0m0s.」
 	Waits string `protobuf:"bytes,4,opt,name=waits,proto3" json:"waits,omitempty"`
-	// When it is delivered if nobody holds or releases it, RFC3339.
+	// 「[Fable 5.2] When it is delivered if nobody holds or releases it, RFC3339.」
 	Due string `protobuf:"bytes,5,opt,name=due,proto3" json:"due,omitempty"`
-	// Not delivered before this, as a person said, RFC3339. Empty when nobody said.
+	// 「[Fable 5.2] Not delivered before this, as a person said, RFC3339. Empty when nobody said.」
 	HeldUntil string `protobuf:"bytes,6,opt,name=held_until,json=heldUntil,proto3" json:"held_until,omitempty"`
-	// When something collected was last delivered to it, RFC3339. Empty when never.
+	// 「[Fable 5.2] When something collected was last delivered to it, RFC3339. Empty when never.」
 	Delivered string `protobuf:"bytes,7,opt,name=delivered,proto3" json:"delivered,omitempty"`
-	// Each thing that waits, oldest first.
+	// 「[Fable 5.2] Each thing that waits, oldest first.」
 	Waiting       []*CollectedSaid `protobuf:"bytes,8,rep,name=waiting,proto3" json:"waiting,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2782,7 +2782,7 @@ func (x *Collected) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Collected.ProtoReflect.Descriptor instead.
+// 「[Fable 5.2] Deprecated: Use Collected.ProtoReflect.Descriptor instead.」
 func (*Collected) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{32}
 }
@@ -2843,11 +2843,11 @@ func (x *Collected) GetWaiting() []*CollectedSaid {
 	return nil
 }
 
-// CollectedAll is what collected list answers, and what a sigil that changes
-// what waits answers after it.
+// 「[Fable 5.2] CollectedAll is what collected list answers, and what a sigil that changes」
+// 「[Fable 5.2] what waits answers after it.」
 type CollectedAll struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// One per agent something waits for, or was held for.
+	// 「[Fable 5.2] One per agent something waits for, or was held for.」
 	Collected     []*Collected `protobuf:"bytes,1,rep,name=collected,proto3" json:"collected,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2878,7 +2878,7 @@ func (x *CollectedAll) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CollectedAll.ProtoReflect.Descriptor instead.
+// 「[Fable 5.2] Deprecated: Use CollectedAll.ProtoReflect.Descriptor instead.」
 func (*CollectedAll) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{33}
 }

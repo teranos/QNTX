@@ -110,9 +110,9 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	if ec.StoredTask == nil && !yield(submitted, nil) {
 		return
 	}
-	// "Agents cant wake Agents willy nilly"
-	// Said by no person, it is collected for the agent (collected.go), and
-	// its Task ends when what was collected is delivered.
+	// "「[Opus 5.5] Agents cant wake Agents willy nilly」"
+	// 「[Fable 5.2] Said by no person, it is collected for the agent (collected.go), and」
+	// 「[Fable 5.2] its Task ends when what was collected is delivered.」
 	if !aPersonSpeaks(call.request) {
 		due, err := e.s.collect(
 			collectedFor{DID: ta.did, Called: ta.called, Tenant: ta.called},

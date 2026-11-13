@@ -125,8 +125,8 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	require.Nil(t, refusal, refusal.GetSays())
 	said, err := protojson.Marshal(answered.(proto.Message))
 	require.NoError(t, err)
-	// "Agents cant wake Agents willy nilly": it is collected for Birch, and
-	// not on the row (collected_test.go).
+	// 「[Fable 5.2] "Agents cant wake Agents willy nilly": it is collected for Birch, and」
+	// 「[Fable 5.2] not on the row (collected_test.go).」
 	assert.Contains(t, string(said), "TASK_STATE_SUBMITTED")
 	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
 	require.Nil(t, refused, refused.GetSays())

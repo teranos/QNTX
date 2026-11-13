@@ -421,45 +421,45 @@ message MemoryStores {
   repeated MemoryStore stores = 3;
 }
 
-// What agents said to an agent, collected (ADR-048).
+// 「[Fable 5.2] What agents said to an agent, collected (ADR-048).」
 //
-// CollectedSaid is one thing an agent said to another, kept until it is
-// delivered with what else was collected.
+// 「[Fable 5.2] CollectedSaid is one thing an agent said to another, kept until it is」
+// 「[Fable 5.2] delivered with what else was collected.」
 message CollectedSaid {
-  // Who said it: the name the agent holds, or its DID.
+  // 「[Fable 5.2] Who said it: the name the agent holds, or its DID.」
   string from = 1;
-  // What it said.
+  // 「[Fable 5.2] What it said.」
   string says = 2;
-  // When it said it, RFC3339.
+  // 「[Fable 5.2] When it said it, RFC3339.」
   string at = 3;
-  // The A2A Task it was said as, when it was said as one.
+  // 「[Fable 5.2] The A2A Task it was said as, when it was said as one.」
   string task = 4;
 }
 
-// Collected is what waits for one agent.
+// 「[Fable 5.2] Collected is what waits for one agent.」
 message Collected {
-  // The agent it waits for: the name it holds, or what the node calls it.
+  // 「[Fable 5.2] The agent it waits for: the name it holds, or what the node calls it.」
   string to = 1;
-  // The agent's DID.
+  // 「[Fable 5.2] The agent's DID.」
   string did = 2;
-  // The model the node holds the agent to run on. Empty when it holds none.
+  // 「[Fable 5.2] The model the node holds the agent to run on. Empty when it holds none.」
   string model = 3;
-  // How long what is collected for it waits, as a duration: 6h0m0s.
+  // 「[Fable 5.2] How long what is collected for it waits, as a duration: 6h0m0s.」
   string waits = 4;
-  // When it is delivered if nobody holds or releases it, RFC3339.
+  // 「[Fable 5.2] When it is delivered if nobody holds or releases it, RFC3339.」
   string due = 5;
-  // Not delivered before this, as a person said, RFC3339. Empty when nobody said.
+  // 「[Fable 5.2] Not delivered before this, as a person said, RFC3339. Empty when nobody said.」
   string held_until = 6;
-  // When something collected was last delivered to it, RFC3339. Empty when never.
+  // 「[Fable 5.2] When something collected was last delivered to it, RFC3339. Empty when never.」
   string delivered = 7;
-  // Each thing that waits, oldest first.
+  // 「[Fable 5.2] Each thing that waits, oldest first.」
   repeated CollectedSaid waiting = 8;
 }
 
-// CollectedAll is what collected list answers, and what a sigil that changes
-// what waits answers after it.
+// 「[Fable 5.2] CollectedAll is what collected list answers, and what a sigil that changes」
+// 「[Fable 5.2] what waits answers after it.」
 message CollectedAll {
-  // One per agent something waits for, or was held for.
+  // 「[Fable 5.2] One per agent something waits for, or was held for.」
   repeated Collected collected = 1;
 }
 

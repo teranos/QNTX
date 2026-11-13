@@ -346,9 +346,9 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	if caller == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to " + agent.called + " is written down with who said it, and this asking carried no request"}
 	}
-	// "Agents cant wake Agents willy nilly"
-	// What is said to the Node Agent by no person is collected (collected.go):
-	// an agent's words, a room's wake, a delivery of GitHub's.
+	// "「[Opus 5.5] Agents cant wake Agents willy nilly」"
+	// 「[Fable 5.2] What is said to the Node Agent by no person is collected (collected.go):」
+	// 「[Fable 5.2] an agent's words, a room's wake, a delivery of GitHub's.」
 	if agent == s.nodeAgent && agent.element == "" && !aPersonSpeaks(caller) {
 		due, err := s.collect(
 			collectedFor{DID: agent.did, Called: s.calledInMemory(agent.home), Model: spec.Model},
