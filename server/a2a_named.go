@@ -116,7 +116,7 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	if !aPersonSpeaks(call.request) {
 		due, err := e.s.collect(
 			collectedFor{DID: ta.did, Called: ta.called, Tenant: ta.called},
-			collectedSaid{From: e.s.calledBy(spokenBy(call.request)), Says: says, At: time.Now(), Task: string(id)})
+			collectedSaid{From: e.s.calledBy(spokenBy(call.request)), FromDID: spokenBy(call.request), Says: says, At: time.Now(), Task: string(id)})
 		if err != nil {
 			yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "it was not collected for "+ta.called+", and was not said: "+err.Error())), nil)
 			return
