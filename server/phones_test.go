@@ -135,7 +135,9 @@ func TestWhatWaitsStandsOnThePhoneFifteenMinutesBeforeItGoes(t *testing.T) {
 	assert.Contains(t, shown.Preview, "Hazel: the pond is drained")
 	assert.InDelta(t, float64(due.Unix()), shown.Due, 5, "it does not count down to when it goes")
 	assert.Equal(t, int64(shown.Due), one.Stale.Unix())
-	birch := map[string]string{"to": "Birch"}
+	assert.Equal(t, one.Stale, one.Expires, "a phone not reached before it goes would be shown it afterwards")
+	// By the agent's DID, which stays its own whoever holds its name later.
+	birch := map[string]string{"to": "did:key:z6Mkbirch"}
 	assert.Equal(t, []waitsPress{
 		{Says: "send now", Does: "approve", Then: "sent", Path: "/api/collected/release", Sent: birch},
 		{Says: "delay", Does: "delay", Then: "delayed", Path: "/api/collected/later", Sent: birch},
@@ -341,4 +343,52 @@ func TestAnAgentOnAPersonsWordNamesNoPhone(t *testing.T) {
 	phones, err := srv.phones()
 	require.NoError(t, err)
 	assert.Empty(t, phones, "an agent named the phone what waits stands on")
+}
+
+// A token of another kind, held from before the node started Live Activities,
+// starts none: Apple would refuse it each time the node looked.
+func TestATokenOfAnotherKindStartsNothing(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	apple := &told{}
+	srv.shows = apple
+	require.NoError(t, srv.nodeRecords().nodeRecord(rootAccount, "PHONES", aPhone, "_", map[string]any{"platform": "ios", "gone": false}))
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+
+	require.NoError(t, srv.showWhatWaits(context.Background(), time.Now().Add(6*time.Hour-10*time.Minute)))
+	assert.Empty(t, apple.sent, "a Live Activity was started by a token that starts none")
+}
+
+// What is due and not delivered yet is left as it stands: it has not been
+// delayed, and it ends when it is sent.
+func TestWhatIsDueAndNotDeliveredYetIsLeftAsItStands(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	apple := &told{}
+	srv.shows = apple
+	code, said := handsOver(t, srv, inROOTsSession(), naming(aPhone))
+	require.Equal(t, http.StatusOK, code, said)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	due := time.Now().Add(6 * time.Hour)
+	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-10*time.Minute)))
+	code, said = handsOver(t, srv, inROOTsSession(), startedOf(anActivity))
+	require.Equal(t, http.StatusOK, code, said)
+	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-9*time.Minute)))
+	stood := len(apple.sent)
+
+	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(30*time.Second)))
+	assert.Len(t, apple.sent, stood, "what is due and not delivered yet was ended, or said to be delayed")
+}
+
+// A press names the batch by its agent's DID, and the node answers it by that.
+func TestAPressNamesTheBatchByItsAgentsDID(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+
+	all, refused := askCollected(t, srv, asAPerson(), "cancel", map[string]string{"to": "did:key:z6Mkbirch"})
+	require.Nil(t, refused, refused.GetSays())
+	for _, one := range all.GetCollected() {
+		assert.Empty(t, one.GetWaiting(), "what was canceled by its agent's DID still waits")
+	}
 }

@@ -159,7 +159,14 @@ type Activity struct {
 	Stale time.Time
 	// Gone is when an ended one leaves the lock screen. Zero is Apple's own time, hours later.
 	Gone time.Time
+	// Expires is when Apple stops trying to hand it to a phone it cannot
+	// reach. Zero is one try: a phone that comes back later is not shown
+	// what is over by then.
+	Expires time.Time
 }
+
+// atMost is the most Apple takes as what one thing said to a Live Activity carries, in bytes.
+const atMost = 4096
 
 // Show says one thing to a Live Activity, and answers Apple's id for it. What Apple refuses is a *Refused.
 func (s *Sender) Show(ctx context.Context, a Activity) (string, error) {
@@ -190,7 +197,16 @@ func (s *Sender) Show(ctx context.Context, a Activity) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "what the Live Activity is told did not marshal")
 	}
-	return s.post(ctx, a.Token, map[string]string{"apns-push-type": "liveactivity", "apns-topic": s.BundleID + ".push-type.liveactivity"}, body)
+	if len(body) > atMost {
+		return "", errors.Newf("what the Live Activity is told is %d bytes, and Apple takes %d at most", len(body), atMost)
+	}
+	expires := "0"
+	if !a.Expires.IsZero() {
+		expires = strconv.FormatInt(a.Expires.Unix(), 10)
+	}
+	return s.post(ctx, a.Token, map[string]string{
+		"apns-push-type": "liveactivity", "apns-topic": s.BundleID + ".push-type.liveactivity", "apns-expiration": expires,
+	}, body)
 }
 
 // post hands Apple one body for one token, and answers Apple's id for it. What Apple refuses is a *Refused.

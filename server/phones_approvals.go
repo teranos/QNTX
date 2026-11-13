@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/internal/apns"
 	errors "github.com/teranos/sacred-error"
@@ -25,6 +27,12 @@ import (
 // says the head it was started for: an approval is started once for each head.
 const begunSubject = "WAITS-BEGUN"
 
+// segmentsAtMost is how many of an approval's checks a Live Activity shows each by its own name.
+const segmentsAtMost = 16
+
+// startedFor is how long Apple is given to reach a phone with an approval that waits.
+const startedFor = time.Hour
+
 // approvalWaits names an approval, as a Live Activity is of it.
 func approvalWaits(subject string) string { return "approval/" + subject }
 
@@ -39,9 +47,25 @@ func begunOn(token, waits string) string {
 // yes and the no as HandleApprovalAnswer takes them. Until then it cannot be
 // decided, and it has nothing to press.
 func approvalShown(st *approvalState) waitsShown {
+	// As many checks as a phone draws and Apple carries: the rest are counted in the last.
 	segments := []waitsSegment{}
-	for _, check := range st.checks {
-		segments = append(segments, waitsSegment{Name: check.name, State: check.state})
+	for at, check := range st.checks {
+		if at == segmentsAtMost-1 && len(st.checks) > segmentsAtMost {
+			rest := st.checks[at:]
+			state := checkDone
+			for _, one := range rest {
+				if one.state != checkDone {
+					state = one.state
+				}
+			}
+			segments = append(segments, waitsSegment{Name: strconv.Itoa(len(rest)) + " more", State: state})
+			break
+		}
+		name := check.name
+		if cut := []rune(name); len(cut) > 40 {
+			name = string(cut[:40]) + "…"
+		}
+		segments = append(segments, waitsSegment{Name: name, State: check.state})
 	}
 	shown := waitsShown{Says: "its checks run", Preview: st.title, Segments: segments, Presses: []waitsPress{}}
 	if !st.presented() {
@@ -61,18 +85,8 @@ func approvalShown(st *approvalState) waitsShown {
 // startApprovals starts each approval ROOT has not answered as a Live
 // Activity, on each phone it was not started on for the head it is at. One
 // that stands already is moved to its new head and not started beside itself.
-func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, live map[string]started, open []*approvalState) error {
-	waiting := slices.DeleteFunc(slices.Clone(open), func(st *approvalState) bool {
-		if st.said != "" {
-			return true
-		}
-		for _, stands := range live {
-			if stands.Waits == approvalWaits(st.subject) {
-				return true
-			}
-		}
-		return false
-	})
+func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, live map[string]started, open []*approvalState, now time.Time) error {
+	waiting := slices.DeleteFunc(slices.Clone(open), func(st *approvalState) bool { return st.said != "" })
 	if len(tokens) == 0 || len(waiting) == 0 {
 		return nil
 	}
@@ -93,6 +107,16 @@ func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, live m
 			if line, found := begun[on]; found && attrString(line.Attributes, "once") == st.sha {
 				continue
 			}
+			// It stands on this phone already, or on one the app did not name: moved there, not started again.
+			stands := false
+			for _, one := range live {
+				if one.Waits == waits && (one.Phone == token || one.Phone == "") {
+					stands = true
+				}
+			}
+			if stands {
+				continue
+			}
 			within, done := context.WithTimeout(ctx, shownWithin)
 			_, err := shows.Show(within, apns.Activity{
 				Token: token, Event: apns.ActivityStarts,
@@ -100,6 +124,7 @@ func (s *QNTXServer) startApprovals(ctx context.Context, tokens []string, live m
 				Attributes: waitsOf{Waits: waits, Kind: "approvals", Title: st.subject},
 				State:      shown,
 				Title:      st.subject + " waits on you", Body: st.title,
+				Expires: now.Add(startedFor),
 			})
 			done()
 			var refused *apns.Refused

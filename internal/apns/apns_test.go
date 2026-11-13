@@ -99,6 +99,7 @@ func TestALiveActivityIsStartedAsAppleReadsOne(t *testing.T) {
 	assert.Equal(t, "liveactivity", asked.Header.Get("apns-push-type"))
 	assert.Equal(t, "nl.example.app.push-type.liveactivity", asked.Header.Get("apns-topic"))
 	assert.Equal(t, "10", asked.Header.Get("apns-priority"))
+	assert.Equal(t, "0", asked.Header.Get("apns-expiration"), "with no time said, Apple would keep trying a phone it cannot reach")
 
 	assert.Len(t, at.bodies[0], 1, "something stands beside aps")
 	aps := at.bodies[0]["aps"].(map[string]any)
@@ -217,4 +218,21 @@ func TestWhatIsNoLiveActivityIsNotSent(t *testing.T) {
 	require.Error(t, err)
 	_, err = New("", key)
 	require.Error(t, err)
+}
+
+// What Apple would refuse for its size is not sent, and one that expires says when.
+func TestWhatAppleWouldRefuseForItsSizeIsNotSent(t *testing.T) {
+	s, at, _ := aSender(t)
+	due := time.Date(2026, 11, 13, 14, 0, 0, 0, time.UTC)
+	large := aBatch(due)
+	large.State = map[string]any{"says": strings.Repeat("a", 5000)}
+	_, err := s.Show(context.Background(), large)
+	require.Error(t, err)
+	assert.Empty(t, at.asked, "what is over what Apple takes was sent to it")
+
+	expires := aBatch(due)
+	expires.Expires = due
+	_, err = s.Show(context.Background(), expires)
+	require.NoError(t, err)
+	assert.Equal(t, "1794578400", at.asked[0].Header.Get("apns-expiration"))
 }
