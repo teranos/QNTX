@@ -191,6 +191,9 @@ func (s *QNTXServer) nameNodeAgent(home string) error {
 			return errors.Wrap(err, "the Node Agent has no door to the node")
 		}
 	}
+	if s.deps != nil && s.deps.cfg != nil {
+		agent.instructions = s.deps.cfg.Agent.Root.Instructions
+	}
 	s.nodeAgent = agent
 	s.underGround.add(home)
 	s.logger.Infow("The Node Agent is this node's", "did", agent.did, "home", home)

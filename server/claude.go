@@ -42,6 +42,9 @@ type rootAgent struct {
 	// (agent_door.go). Empty on a node with no gate to open one at.
 	door string
 	home string
+	// instructions is the file of what the node's own repository tells its
+	// Node Agent (am.toml, [agent.root] instructions). Empty when it names none.
+	instructions string
 	// sessions is its session in each harness, by the harness's name.
 	sessions   map[string]*inHarness
 	sessionsMu sync.Mutex
@@ -201,7 +204,27 @@ func (a *rootAgent) isSaidToBe() string {
 		"The node's sigils are the tools of the MCP server named " + nodeAgentMCP + ", which you reach with your own token. " +
 		"Your git is your own: commits are authored as you, and when you push to GitHub your git asks the node for what carries the push. " +
 		"Never ask for, read, print or store a GitHub credential yourself. " +
-		"What GitHub answers over its API, a pull request opened or a run read, you ask with the github_ask tool; github_operations lists what it can be asked."
+		"What GitHub answers over its API, a pull request opened or a run read, you ask with the github_ask tool; github_operations lists what it can be asked." +
+		a.instructed()
+}
+
+// "the Node Agent system prompt"
+// "should live with the Node repo"
+// "we dont know what other people want to use QNTX for"
+// "I NEED TO BE ABLE TO EDIT SYSTEM PROMPTS IN MY OBSIDIAN"
+//
+// instructed is what the node's own file tells its Node Agent, read at every
+// turn so that what was written there last is what it is told. A file that
+// cannot be read is said to the agent, to say to whoever it answers.
+func (a *rootAgent) instructed() string {
+	if a.instructions == "" {
+		return ""
+	}
+	told, err := os.ReadFile(a.instructions)
+	if err != nil {
+		return " Your instructions are the node's own, at " + a.instructions + ", and they could not be read: " + err.Error() + ". Say so first in what you answer."
+	}
+	return "\n\nWhat this node tells you, from " + a.instructions + ":\n\n" + strings.TrimSpace(string(told))
 }
 
 // claudeHarness is the Node Agent in Claude Code.
