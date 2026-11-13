@@ -211,8 +211,8 @@ func (s *QNTXServer) answerFile(root *os.Root, name string, left int) (*protocol
 
 // answerInRoom runs one Node Agent turn and posts what it answered, or why it
 // did not, into the room as that agent, with the files it wrote for the room.
-// It says whether the agent took the turn: a refusal is posted and is not one.
-// An answer that did not reach the room is an error, and no turn taken.
+// 「[Opus 5.5] It says whether the agent took the turn: a refusal is posted and is not one.」
+// 「[Opus 5.5] An answer that did not reach the room is an error, and no turn taken.」
 func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms protocol.RoomsServiceClient, room, thread, harness, waker, says string) (took bool, err error) {
 	lifetime := s.lifetime()
 	turn := "In the " + nodeRoomName + ", " + waker + " woke you (" + harness + ") with:\n\n" + says +

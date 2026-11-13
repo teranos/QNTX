@@ -38,8 +38,8 @@ type Comment struct {
 	App string
 	// PRBody is the description of the pull request the comment is on.
 	PRBody string
-	// PRByApp is whether a GitHub App opened the pull request: the node's own
-	// pull requests are opened by its App, a person's by the person.
+	// 「[Fable 5.2] PRByApp is whether a GitHub App opened the pull request: the node's own」
+	// 「[Fable 5.2] pull requests are opened by its App, a person's by the person.」
 	PRByApp bool
 }
 

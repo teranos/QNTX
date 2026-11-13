@@ -49,7 +49,7 @@ func (c Comment) OfClaude() bool {
 
 // Wakes is whether the comment is to start a turn of the agent that owns the
 // pull request: an app on the room's list wrote it, on a pull request Claude
-// Code opened through the node's App. One a person opened, the person holds.
+// 「[Fable 5.2] Code opened through the node's App. One a person opened, the person holds.」
 func (c Comment) Wakes(g Guests, room string) bool {
 	if c.Kind == "pull_request" {
 		// Ready for review wakes whoever changed it; back to a draft is said
@@ -77,16 +77,16 @@ func (c Comment) Poster() string {
 	return strings.TrimSuffix(c.Author, "[bot]")
 }
 
-// "Don't relay Qodo updated their comment edits whose set of findings is
-// unchanged"
+// 「[Fable 5.2] "Don't relay Qodo updated their comment edits whose set of findings is」
+// 「[Fable 5.2] unchanged"」
 
-// passing is what changes in a comment from one review of a pull request to
-// the next without its findings changing: the commit it reviewed and the time.
+// 「[Fable 5.2] passing is what changes in a comment from one review of a pull request to」
+// 「[Fable 5.2] the next without its findings changing: the commit it reviewed and the time.」
 var passing = regexp.MustCompile(`\b[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?`)
 
-// Findings is a sum of what the comment says, less the commit and time that
-// change with every review: two versions of a comment with the same sum found
-// the same things.
+// 「[Fable 5.2] Findings is a sum of what the comment says, less the commit and time that」
+// 「[Fable 5.2] change with every review: two versions of a comment with the same sum found」
+// 「[Fable 5.2] the same things.」
 func (c Comment) Findings() string {
 	sum := sha256.Sum256([]byte(strings.Join(strings.Fields(passing.ReplaceAllString(c.Body, "")), " ")))
 	return hex.EncodeToString(sum[:])
