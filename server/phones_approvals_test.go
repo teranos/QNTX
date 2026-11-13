@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/internal/apns"
 )
 
@@ -22,6 +24,12 @@ func TestAnApprovalThatWaitsOnROOTStandsAsALiveActivity(t *testing.T) {
 	s.shows = apple
 	code, said := handsOver(t, s, inROOTsSession(), naming(aPhone))
 	require.Equal(t, http.StatusOK, code, said)
+
+	// One that was asked long before the phone was named is not put in front of ROOT now.
+	delivered(t, s, "pull_request", pullRequest("opened", 28, "0ldhead", ""))
+	require.NoError(t, s.showWhatWaits(context.Background(), time.Now().Add(16*time.Minute)))
+	assert.Empty(t, apple.sent, "an approval that had waited longer than fifteen minutes was started")
+	delivered(t, s, "pull_request", pullRequest("closed", 28, "0ldhead", ""))
 
 	// Asked: it stands, once, however often the node looks.
 	delivered(t, s, "pull_request", pullRequest("opened", 29, "abe92a9", ""))
@@ -80,4 +88,21 @@ func TestAnApprovalThatWaitsOnROOTStandsAsALiveActivity(t *testing.T) {
 	assert.Equal(t, saysCancel, last.State.(waitsShown).Says)
 	require.NoError(t, s.showWhatWaits(context.Background(), at.Add(time.Minute)))
 	assert.Len(t, apple.sent, 4, "something was said to an approval that is over")
+}
+
+// A check said again in the state it was in moves nothing: an approval that
+// has waited is not put in front of ROOT anew by it.
+func TestACheckSaidAgainMovesNoApproval(t *testing.T) {
+	lines := func(at time.Time, predicate string, attributes map[string]any) *types.As {
+		return &types.As{Subjects: []string{"teranos/elements#29"}, Predicates: []string{predicate}, Timestamp: at, Attributes: attributes}
+	}
+	asked := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
+	done := map[string]any{"sha": "abe92a9", "name": "TypeScript", "state": checkDone}
+	folded := foldApprovals([]*types.As{
+		lines(asked, watcher.ApprovalAsked, map[string]any{"sha": "abe92a9"}),
+		lines(asked.Add(time.Minute), watcher.ApprovalChecked, map[string]any{"sha": "abe92a9", "name": "TypeScript", "state": checkRunning}),
+		lines(asked.Add(2*time.Minute), watcher.ApprovalChecked, done),
+		lines(asked.Add(5*time.Hour), watcher.ApprovalChecked, done),
+	})
+	assert.Equal(t, asked.Add(2*time.Minute), folded["teranos/elements#29"].movedAt, "a check said again in the same state moved the approval")
 }
