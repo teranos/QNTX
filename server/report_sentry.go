@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -179,25 +180,44 @@ func (m mcpSentry) Series(ctx context.Context, q sentryread.SeriesQuery) ([]sent
 		count = q.YAxis
 	}
 	buckets := int(q.Window.End.Sub(q.Window.Start) / q.Bucket)
-	// What each period back from now holds: its count, and its sum when it is an average.
+	// What each period back from now holds: its count, and its sum when it is an average. Each period is measured
+	// back from when Sentry answers it, so they are all asked at once: the further apart they are asked, the more
+	// the days they are told apart into slide.
 	counts, sums := make([]float64, buckets+1), make([]float64, buckets+1)
+	errs := make([]error, buckets+1)
+	var asked sync.WaitGroup
 	for i := 1; i <= buckets; i++ {
-		rows, err := m.Table(ctx, sentryread.TableQuery{
-			Dataset: q.Dataset,
-			Fields:  fields,
-			Query:   q.Query,
-			Window:  sentryread.Window{Start: q.Window.End.Add(-time.Duration(i) * q.Bucket), End: q.Window.End},
-		})
-		if err != nil {
-			return nil, err
+		asked.Add(1)
+		go func() {
+			defer asked.Done()
+			rows, err := m.Table(ctx, sentryread.TableQuery{
+				Dataset: q.Dataset,
+				Fields:  fields,
+				Query:   q.Query,
+				Window:  sentryread.Window{Start: q.Window.End.Add(-time.Duration(i) * q.Bucket), End: q.Window.End},
+			})
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			if len(rows) == 0 {
+				counts[i] = math.NaN()
+				return
+			}
+			counts[i] = number(rows[0][count])
+			if averaged {
+				sums[i] = number(rows[0][q.YAxis]) * counts[i]
+			}
+		}()
+	}
+	asked.Wait()
+	for i := 1; i <= buckets; i++ {
+		if errs[i] != nil {
+			return nil, errs[i]
 		}
-		if len(rows) == 0 {
+		// A period that held nothing holds what the shorter one did.
+		if math.IsNaN(counts[i]) {
 			counts[i], sums[i] = counts[i-1], sums[i-1]
-			continue
-		}
-		counts[i] = number(rows[0][count])
-		if averaged {
-			sums[i] = number(rows[0][q.YAxis]) * counts[i]
 		}
 	}
 	points := make([]sentryread.Point, 0, buckets)

@@ -84,7 +84,9 @@ func (s *QNTXServer) sendReport(ctx context.Context) (*protocol.MailReport, erro
 		return sent, err
 	}
 	s.logger.Infow("Weekly report sent", "user", root.ID, "message_id", messageID, "attestation", attestationID)
-	return sent, roomErr
+	// The mail went: a report asked for again would mail it twice. That the Node Room was not said to is the error
+	// line logged above, which next week's report counts among its error lines.
+	return sent, nil
 }
 
 // sayReportInNodeRoom says the report in the Node Room of the one plugin that holds rooms.

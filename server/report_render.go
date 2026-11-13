@@ -203,8 +203,8 @@ func sentrySections(r Report, drawn map[string]bool) []services.MailSection {
 			} else {
 				s.Rows = []services.MailRow{
 					{Label: "Mean:", Value: fmt.Sprintf("%.1f%%", mean)},
-					{Label: "Lowest hour:", Value: fmt.Sprintf("%.1f%%", lo)},
-					{Label: "Highest hour:", Value: fmt.Sprintf("%.1f%%", hi)},
+					{Label: "Lowest day:", Value: fmt.Sprintf("%.1f%%", lo)},
+					{Label: "Highest day:", Value: fmt.Sprintf("%.1f%%", hi)},
 				}
 			}
 		}
@@ -475,7 +475,7 @@ func queryLine(q queryTimes) string {
 func downtimeLine(d downtime) string {
 	s := fmt.Sprintf("last week %s, last 3 weeks %s", minutesIn(d.WeekMinutes), minutesIn(d.ThreeWeeksMinutes))
 	if !d.Since.IsZero() {
-		s += fmt.Sprintf(" (counted from %s UTC, the first day Sentry holds a sample for)", d.Since.UTC().Format("2006-01-02 15:04"))
+		s += fmt.Sprintf(" (counted from %s UTC, the first sample Sentry holds)", d.Since.UTC().Format("2006-01-02 15:04"))
 	}
 	return s
 }
@@ -487,7 +487,7 @@ func minutesIn(m int) string {
 	return fmt.Sprintf("%dh %dm", m/60, m%60)
 }
 
-// seriesStats is the hours that had samples: their mean, lowest and highest.
+// seriesStats is the buckets that had samples: their mean, lowest and highest.
 func seriesStats(points []sentryread.Point) (mean, lo, hi float64, n int) {
 	lo, hi = math.Inf(1), math.Inf(-1)
 	sum := 0.0

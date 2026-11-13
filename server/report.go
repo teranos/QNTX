@@ -588,28 +588,49 @@ func errorLinesIn(ctx context.Context, sentry sentryAsker, env string, w sentryr
 
 // "downtime over last week", "downtime over last 3 weeks"
 //
-// Minutes without a CPU sample, counted a whole day at a time back from now.
+// Minutes without a CPU sample, counted a whole day at a time back from now, the
+// day Sentry's samples begin counted from its first sample.
 func downtimeUpTo(ctx context.Context, sentry sentryAsker, env string, now time.Time) downtime {
 	end := now.UTC()
 	w := sentryread.Window{Start: end.Add(-reportThreeWeeks), End: end}
+	query := metricQuery("qntx.host.cpu", "gauge", env)
 	points, err := sentry.Series(ctx, sentryread.SeriesQuery{
 		Dataset: sentryread.DatasetMetrics,
 		YAxis:   "count(value,qntx.host.cpu,gauge,-)",
-		Query:   metricQuery("qntx.host.cpu", "gauge", env),
+		Query:   query,
 		Bucket:  reportBucket,
 		Window:  w,
 	})
 	if err != nil {
 		return downtime{Err: err.Error()}
 	}
-	return downtimeFrom(points, end, reportBucket)
+	// The first sample Sentry holds in the window: the day it falls in was not
+	// down before it.
+	rows, err := sentry.Table(ctx, sentryread.TableQuery{
+		Dataset: sentryread.DatasetMetrics,
+		Fields:  []string{"timestamp"},
+		Query:   query,
+		Sort:    "timestamp",
+		Limit:   1,
+		Window:  w,
+	})
+	if err != nil {
+		return downtime{Err: err.Error()}
+	}
+	var first time.Time
+	if len(rows) > 0 {
+		if at, err := time.Parse(time.RFC3339, text(rows[0]["timestamp"])); err == nil {
+			first = at.UTC()
+		}
+	}
+	return downtimeFrom(points, end, reportBucket, first)
 }
 
 // downtimeFrom reads a sample count per bucket. A bucket holds a sample a minute
 // when the node was up all of it. Buckets before the first sample Sentry holds
-// are not counted: no data yet is not down.
-func downtimeFrom(points []sentryread.Point, end time.Time, bucket time.Duration) downtime {
-	minutes := int(bucket / time.Minute)
+// are not counted: no data yet is not down. When first is known, the bucket it
+// falls in is counted from it.
+func downtimeFrom(points []sentryread.Point, end time.Time, bucket time.Duration, first time.Time) downtime {
 	var d downtime
 	weekStart := end.Add(-reportWeek)
 	started := false
@@ -617,12 +638,17 @@ func downtimeFrom(points []sentryread.Point, end time.Time, bucket time.Duration
 		if !p.At.Before(end) {
 			continue
 		}
+		minutes := int(bucket / time.Minute)
 		if !started {
 			if p.Value <= 0 {
 				continue
 			}
 			started = true
 			d.Since = p.At
+			if !first.IsZero() && !first.Before(p.At) && first.Before(p.At.Add(bucket)) {
+				d.Since = first
+				minutes = int(math.Round(p.At.Add(bucket).Sub(first).Minutes()))
+			}
 		}
 		missing := minutes - int(math.Round(p.Value))
 		if missing < 0 {

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
@@ -22,14 +24,17 @@ import (
 
 // askedSentry is the Sentry MCP server as the report asks it: every call kept, each answered by answer.
 type askedSentry struct {
+	mu     sync.Mutex
 	calls  []map[string]any
 	tools  []string
 	answer func(tool string, arguments map[string]any) string
 }
 
 func (a *askedSentry) call(_ context.Context, tool string, arguments map[string]any) (json.RawMessage, error) {
+	a.mu.Lock()
 	a.tools = append(a.tools, tool)
 	a.calls = append(a.calls, arguments)
+	a.mu.Unlock()
 	return json.RawMessage(a.answer(tool, arguments)), nil
 }
 
@@ -99,10 +104,17 @@ func TestASeriesIsEachPeriodLessTheOneBeforeIt(t *testing.T) {
 	}
 }
 
-// Downtime is the minutes a day held no CPU sample, from the counts the series answers.
+// Downtime is the minutes a day held no CPU sample, from the counts the series answers. The day Sentry's samples
+// begin is counted from its first sample, not from midnight back: the hours before it were not down.
 func TestDowntimeIsCountedADayAtATimeThroughTheMCP(t *testing.T) {
-	// Up all of the last 20 days but 5 minutes yesterday and 30 ten days back; nothing before.
+	// Samples begin 6 hours into the 20th day back; up since, but 5 minutes yesterday and 30 ten days back.
+	first := reportEnd.Add(-20*reportBucket + 6*time.Hour)
 	asked := &askedSentry{answer: func(_ string, arguments map[string]any) string {
+		if fields := arguments["fields"].([]string); fields[0] == "timestamp" {
+			assert.Equal(t, "timestamp", arguments["sort"])
+			assert.Equal(t, 1, arguments["limit"])
+			return fmt.Sprintf(`{"resultType":"samples","results":[{"values":{"timestamp":%q,"metric.name":"qntx.host.cpu"}}]}`, first.Format(time.RFC3339))
+		}
 		var hours int
 		_, err := fmt.Sscanf(arguments["period"].(string), "%dh", &hours)
 		require.NoError(t, err)
@@ -115,6 +127,8 @@ func TestDowntimeIsCountedADayAtATimeThroughTheMCP(t *testing.T) {
 				count -= 5
 			case 10:
 				count -= 30
+			case 20:
+				count -= 6 * 60
 			}
 		}
 		return fmt.Sprintf(`{"results":[{"values":{"count(value,qntx.host.cpu,gauge,-)":%d}}]}`, count)
@@ -122,9 +136,50 @@ func TestDowntimeIsCountedADayAtATimeThroughTheMCP(t *testing.T) {
 	d := downtimeUpTo(context.Background(), sentryAt(t, asked), "", reportEnd)
 	assert.Empty(t, d.Err)
 	assert.Equal(t, 5, d.WeekMinutes)
-	assert.Equal(t, 35, d.ThreeWeeksMinutes)
-	assert.Equal(t, reportEnd.Add(-20*reportBucket), d.Since)
-	assert.Len(t, asked.calls, 21)
+	assert.Equal(t, 35, d.ThreeWeeksMinutes, "the 6 hours before the first sample are not down")
+	assert.Equal(t, first, d.Since)
+	assert.Len(t, asked.calls, 22)
+}
+
+// Each period is measured back from when Sentry answers it, so the periods of a series are asked together, not one
+// after another: asked in turn, the days they are told apart into slide by how long each answer took.
+func TestThePeriodsOfASeriesAreAskedTogether(t *testing.T) {
+	const days = 7
+	arrived := make(chan struct{}, days)
+	all := make(chan struct{})
+	go func() {
+		for range days {
+			<-arrived
+		}
+		close(all)
+	}()
+	asked := &askedSentry{answer: func(string, map[string]any) string {
+		arrived <- struct{}{}
+		select {
+		case <-all:
+		case <-time.After(5 * time.Second):
+			t.Error("a period was answered before every period was asked")
+		}
+		return `{"results":[{"values":{"count(value,qntx.host.cpu,gauge,-)":1440}}]}`
+	}}
+	_, err := sentryAt(t, asked).Series(context.Background(), sentryread.SeriesQuery{
+		Dataset: sentryread.DatasetMetrics, YAxis: "count(value,qntx.host.cpu,gauge,-)", Query: "metric.name:qntx.host.cpu",
+		Bucket: reportBucket, Window: sentryread.Window{Start: reportEnd.Add(-days * reportBucket), End: reportEnd},
+	})
+	require.NoError(t, err)
+}
+
+// A graph of days says its lowest and highest day.
+func TestADailyGraphSaysDays(t *testing.T) {
+	s := rootKnowingServer(t)
+	mail, err := renderReport(s.gatherReport(context.Background(), reportEnd, answeringSentry{}, nil))
+	require.NoError(t, err)
+	for _, kind := range []services.MailBodyKind{services.MailHTML, services.MailText} {
+		body := nodeBody(t, mail, kind)
+		assert.NotContains(t, body, "hour:", kind)
+		assert.NotContains(t, body, "lowest hour", kind)
+	}
+	assert.Contains(t, nodeBody(t, mail, services.MailHTML), "Lowest day:")
 }
 
 // What Sentry took and dropped of the week's error events is summed per outcome and reason, as find_dropped_events

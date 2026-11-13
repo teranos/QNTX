@@ -130,7 +130,7 @@ func TestDowntimeIsTheMinutesWithoutASample(t *testing.T) {
 		points = append(points, sentryread.Point{At: at, Value: count})
 	}
 
-	d := downtimeFrom(points, end, time.Hour)
+	d := downtimeFrom(points, end, time.Hour, time.Time{})
 	assert.Empty(t, d.Err)
 	assert.Equal(t, 5, d.WeekMinutes)
 	assert.Equal(t, 35, d.ThreeWeeksMinutes)
@@ -310,11 +310,10 @@ func TestTheReportIsMailedToTheRootUser(t *testing.T) {
 	s.nodeMailer = mail
 
 	// Sentry is not set up here; the report says so and goes. No plugin holds rooms here either: the mail goes,
-	// and that the Node Room was not said to is the report's failure.
+	// and is not failed for it, or a report asked for again would mail it twice.
 	s.sentryConfig = appcfg.SentryConfig{}
 	sent, err := s.sendReport(context.Background())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no Node Room")
+	require.NoError(t, err)
 	assert.Equal(t, "root@garden.test", sent.GetTo())
 	require.Len(t, box.mails, 1)
 	assert.Equal(t, "root@garden.test", box.mails[0].To)
