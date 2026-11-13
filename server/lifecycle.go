@@ -54,7 +54,7 @@ func (s *QNTXServer) startBackgroundServices() {
 	s.wg.Go("rooms.githubWakes", s.tellDueAgents)
 	s.wg.Go("memory.inStep", s.keepMemoriesInStep)
 	s.wg.Go("collected.deliver", s.keepDeliveringCollected)
-	// On its own: a phone Apple is slow to reach holds up nothing that is delivered.
+	// 「[Opus 5.5] On its own: a phone Apple is slow to reach holds up nothing that is delivered.」
 	s.wg.Go("collected.announce", s.keepAnnouncingCollected)
 	// Pulse runs because the node runs. It is not separate enough from the node
 	// to be worth turning on and off, so there is no state to consult here and
