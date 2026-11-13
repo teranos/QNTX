@@ -1,27 +1,27 @@
-//! What every `AttestationStore` has to do, as a check a backend runs on itself.
+//! 「[Sonnet 5.5] What every `AttestationStore` has to do, as a check a backend runs on itself.」
 //!
-//! The trait's docs are the contract (`traits.rs`); this is that contract run.
-//! It exists because a backend's own tests tend to stay inside one session: put,
-//! then act, in the same process, on the same buffer. DuckDB's `delete`, `update`,
-//! `ids` and `clear` pass every such test and still do nothing to a row that a
-//! flush has moved into a Parquet file (ADR-024). So each case here runs twice
-//! where it can: acting in the session that wrote, and acting after the store
-//! has been reopened, which is a new process's view of what the first one left.
+//! 「[Sonnet 5.5] The trait's docs are the contract (`traits.rs`); this is that contract run.」
+//! 「[Sonnet 5.5] It exists because a backend's own tests tend to stay inside one session: put,」
+//! 「[Sonnet 5.5] then act, in the same process, on the same buffer. DuckDB's `delete`, `update`,」
+//! 「[Sonnet 5.5] `ids` and `clear` pass every such test and still do nothing to a row that a」
+//! 「[Sonnet 5.5] flush has moved into a Parquet file (ADR-024). So each case here runs twice」
+//! 「[Sonnet 5.5] where it can: acting in the session that wrote, and acting after the store」
+//! 「[Sonnet 5.5] has been reopened, which is a new process's view of what the first one left.」
 //!
-//! The answer is data, not a panic: [`check`] returns the [`Violation`]s, none
-//! when the store does what the trait says. A backend's test asserts the list
-//! is empty and prints it when it is not.
+//! 「[Sonnet 5.5] The answer is data, not a panic: [`check`] returns the [`Violation`]s, none」
+//! 「[Sonnet 5.5] when the store does what the trait says. A backend's test asserts the list」
+//! 「[Sonnet 5.5] is empty and prints it when it is not.」
 //!
-//! ```no_run
-//! # use ats::storage::{conformance, MemoryStore};
-//! // Memory has no durability boundary: "reopen" hands the same store back.
-//! let found = conformance::check(MemoryStore::new(), &mut |s| Ok(s), "memory", true);
-//! assert!(found.is_empty(), "{found:#?}");
-//! ```
+//! 「[Sonnet 5.5] ```no_run」
+//! 「[Sonnet 5.5] # use ats::storage::{conformance, MemoryStore};」
+//! 「[Sonnet 5.5] // Memory has no durability boundary: "reopen" hands the same store back.」
+//! 「[Sonnet 5.5] let found = conformance::check(MemoryStore::new(), &mut |s| Ok(s), "memory", true);」
+//! 「[Sonnet 5.5] assert!(found.is_empty(), "{found:#?}");」
+//! 「[Sonnet 5.5] ```」
 //!
-//! `reopen` takes the store by value so the caller can drop it first, which is
-//! what makes a buffering backend write out (`DuckdbStore`'s `Drop` flushes),
-//! and returns a store over the same data.
+//! 「[Sonnet 5.5] `reopen` takes the store by value so the caller can drop it first, which is」
+//! 「[Sonnet 5.5] what makes a buffering backend write out (`DuckdbStore`'s `Drop` flushes),」
+//! 「[Sonnet 5.5] and returns a store over the same data.」
 
 use std::collections::HashMap;
 use std::fmt;
@@ -29,12 +29,12 @@ use std::fmt;
 use crate::attestation::Attestation;
 use crate::storage::{AttestationStore, StoreError, StoreResult};
 
-/// One way a store did not do what the trait says.
+/// 「[Sonnet 5.5] One way a store did not do what the trait says.」
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Violation {
-    /// The case, and whether it acted in the writing session or after a reopen.
+    /// 「[Sonnet 5.5] The case, and whether it acted in the writing session or after a reopen.」
     pub case: String,
-    /// The call, in the order the case makes them.
+    /// 「[Sonnet 5.5] The call, in the order the case makes them.」
     pub step: &'static str,
     pub expected: String,
     pub got: String,
@@ -50,10 +50,10 @@ impl fmt::Display for Violation {
     }
 }
 
-/// The store was lost: a reopen failed, so nothing more can be asked of it.
+/// 「[Sonnet 5.5] The store was lost: a reopen failed, so nothing more can be asked of it.」
 struct Lost;
 
-/// A case, by name.
+/// 「[Sonnet 5.5] A case, by name.」
 type Case<S> = (String, Box<dyn Fn(&mut Run<'_, S>) -> Result<(), Lost>>);
 
 struct Run<'a, S> {
@@ -78,7 +78,7 @@ impl<S: AttestationStore> Run<'_, S> {
         self.store.as_mut().ok_or(Lost)
     }
 
-    /// The store, as a new process would see it.
+    /// 「[Sonnet 5.5] The store, as a new process would see it.」
     fn reopen(&mut self) -> Result<(), Lost> {
         let Some(old) = self.store.take() else {
             return Err(Lost);
@@ -95,7 +95,7 @@ impl<S: AttestationStore> Run<'_, S> {
         }
     }
 
-    /// The call's value, or the failure recorded and `None`.
+    /// 「[Sonnet 5.5] The call's value, or the failure recorded and `None`.」
     fn ok<T>(&mut self, step: &'static str, res: StoreResult<T>) -> Option<T> {
         match res {
             Ok(v) => Some(v),
@@ -128,7 +128,7 @@ impl<S: AttestationStore> Run<'_, S> {
         }
     }
 
-    /// Cross the durability boundary, if this case is the one that does.
+    /// 「[Sonnet 5.5] Cross the durability boundary, if this case is the one that does.」
     fn boundary(&mut self, reopen: bool) -> Result<(), Lost> {
         if reopen {
             self.reopen()
@@ -175,8 +175,8 @@ impl<S: AttestationStore> Run<'_, S> {
         Ok(())
     }
 
-    /// What `Attestation::writable` refuses, no store takes: not on `put`, not
-    /// on `update`, and a refused one leaves nothing and changes nothing.
+    /// 「[Sonnet 5.5] What `Attestation::writable` refuses, no store takes: not on `put`, not」
+    /// 「[Sonnet 5.5] on `update`, and a refused one leaves nothing and changes nothing.」
     fn refuses_unwritable(&mut self) -> Result<(), Lost> {
         let mut bad = self.make(0);
         bad.subjects.clear();
@@ -243,7 +243,7 @@ impl<S: AttestationStore> Run<'_, S> {
                 self.miss("ids lists every stored id", &a.id, format!("{} ids, not this one", ids.len()));
             }
         }
-        // The rows already in the store are not this case's, so it counts what it added.
+        // 「[Sonnet 5.5] The rows already in the store are not this case's, so it counts what it added.」
         if let Some(before) = before {
             if count != before + all.len() {
                 self.miss("count grows by the rows put", before + all.len(), count);
@@ -257,9 +257,9 @@ impl<S: AttestationStore> Run<'_, S> {
         let put = self.s()?.put(a.clone());
         self.ok("put", put);
         self.boundary(reopen)?;
-        // Every field an update can change, so a store that drops one is seen.
-        // `created_at` stays as it was: whether an update may rewrite it is not
-        // the trait's to say yet, and both answers then agree.
+        // 「[Sonnet 5.5] Every field an update can change, so a store that drops one is seen.」
+        // 「[Sonnet 5.5] `created_at` stays as it was: whether an update may rewrite it is not」
+        // 「[Sonnet 5.5] the trait's to say yet, and both answers then agree.」
         let mut changed = a.clone();
         changed.subjects = vec!["ZED".to_string()];
         changed.predicates = vec!["knew".to_string()];
@@ -275,8 +275,8 @@ impl<S: AttestationStore> Run<'_, S> {
         changed.signer_did = Some("did:key:zconformance".to_string());
         let upd = self.s()?.update(changed.clone());
         let upd_ok = self.ok("update", upd).is_some();
-        // What is stored is what is asked about: now, and in a case that crosses
-        // the boundary, after the next reopen as well. A same-session case never reopens.
+        // 「[Sonnet 5.5] What is stored is what is asked about: now, and in a case that crosses」
+        // 「[Sonnet 5.5] the boundary, after the next reopen as well. A same-session case never reopens.」
         for after in if reopen { vec![false, true] } else { vec![false] } {
             if after {
                 self.reopen()?;
@@ -367,12 +367,12 @@ impl<S: AttestationStore> Run<'_, S> {
     }
 }
 
-/// Run every case against `store`.
+/// 「[Sonnet 5.5] Run every case against `store`.」
 ///
-/// `tag` is in every id the cases write, so two runs against one persistent
-/// store do not collide. `destructive` adds the `clear` cases, which empty
-/// the store, rows that were not the check's own included: never against data
-/// that matters.
+/// 「[Sonnet 5.5] `tag` is in every id the cases write, so two runs against one persistent」
+/// 「[Sonnet 5.5] store do not collide. `destructive` adds the `clear` cases, which empty」
+/// 「[Sonnet 5.5] the store, rows that were not the check's own included: never against data」
+/// 「[Sonnet 5.5] that matters.」
 pub fn check<S: AttestationStore>(
     store: S,
     reopen: &mut dyn FnMut(S) -> StoreResult<S>,
@@ -380,9 +380,9 @@ pub fn check<S: AttestationStore>(
     destructive: bool,
 ) -> Vec<Violation> {
     let mut run = Run { store: Some(store), reopen, tag, found: Vec::new(), case: String::new() };
-    // The cases that act in the writing session run first. Once a reopen has
-    // moved rows into files, a later case's store holds rows it did not write,
-    // and a gap the first reopen exposed would be blamed on every case after it.
+    // 「[Sonnet 5.5] The cases that act in the writing session run first. Once a reopen has」
+    // 「[Sonnet 5.5] moved rows into files, a later case's store holds rows it did not write,」
+    // 「[Sonnet 5.5] and a gap the first reopen exposed would be blamed on every case after it.」
     let mut cases: Vec<Case<S>> =
         vec![
             ("put_get".to_string(), Box::new(|r| r.put_get())),
@@ -420,16 +420,16 @@ mod tests {
         assert!(found.is_empty(), "{found:#?}");
     }
 
-    /// A store whose delete and update reach only what the session wrote: the
-    /// shape of a buffer in front of immutable files. The check has to see it,
-    /// and only after a reopen.
+    /// 「[Sonnet 5.5] A store whose delete and update reach only what the session wrote: the」
+    /// 「[Sonnet 5.5] shape of a buffer in front of immutable files. The check has to see it,」
+    /// 「[Sonnet 5.5] and only after a reopen.」
     #[derive(Default)]
     struct Buffered {
         files: HashMap<String, Attestation>,
         buffer: HashMap<String, Attestation>,
-        /// Takes what `writable` refuses, as Postgres did.
+        /// 「[Sonnet 5.5] Takes what `writable` refuses, as Postgres did.」
         lax: bool,
-        /// Keeps the old predicates on update, as a store that persists only some fields.
+        /// 「[Sonnet 5.5] Keeps the old predicates on update, as a store that persists only some fields.」
         lossy: bool,
     }
 

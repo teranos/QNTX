@@ -167,10 +167,10 @@ in
           '';
         }
 
-        # The one Rust test that runs here: the crate's other tests run through the
-        # Makefile's test-parquet, but this is what holds DuckDB to
-        # AttestationStore's contract (ats::storage::conformance), and without a
-        # step of its own nothing in CI would run it.
+        # 「[Sonnet 5.5] The one Rust test that runs here: the crate's other tests run through the」
+        # 「[Sonnet 5.5] Makefile's test-parquet, but this is what holds DuckDB to」
+        # 「[Sonnet 5.5] AttestationStore's contract (ats::storage::conformance), and without a」
+        # 「[Sonnet 5.5] step of its own nothing in CI would run it.」
         {
           name = "Test ats-duckdb against AttestationStore's contract";
           run = "nix develop --command cargo test --package ats-duckdb --test conformance";

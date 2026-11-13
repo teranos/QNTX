@@ -41,7 +41,7 @@ chrono = { version = "0.4", default-features = false, features = ["std", "clock"
 
 
 [dev-dependencies]
-# storage::conformance, the check this backend runs on itself
+# 「[Sonnet 5.5] storage::conformance, the check this backend runs on itself」
 ats = { workspace = true, features = ["conformance"] }
 tempfile = "3.0"
 pretty_assertions = "1.4"

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-//! `SqliteStore` against `AttestationStore`'s contract, in the session that
-//! wrote and after the file has been closed and opened again.
+//! 「[Sonnet 5.5] `SqliteStore` against `AttestationStore`'s contract, in the session that」
+//! 「[Sonnet 5.5] wrote and after the file has been closed and opened again.」
 
 use ats::storage::conformance::check;
 use ats_sqlite::SqliteStore;
