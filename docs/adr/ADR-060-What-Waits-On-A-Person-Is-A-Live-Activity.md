@@ -61,6 +61,8 @@ Status: Unpolished
 
 "ANY PENDING IS LIVE ACTIVITY"
 
+"ANY PENDING COLLECITON"
+
 ## Approval packs
 
 An approval pack is a thing of its own: a complete package of pull requests
@@ -106,9 +108,9 @@ Things on the node wait on a person. An agent wants a pull request merged
 ([ADR-052](ADR-052-Approvals.md)). Agents have said things to another agent,
 and the batch is held (`server/collected.go`).
 
-While one of them is pending, it stands in front of the person by itself: on the
-iPhone's island and lock screen, and in the menu bar of their Mac. They opened
-nothing.
+While a collection is pending, it stands in front of the person by itself: on
+the iPhone's island and lock screen, and in the menu bar of their Mac. They
+opened nothing.
 
 It shows what it is, what it says now, and, where it runs out, the time left,
 counting down.
