@@ -616,6 +616,7 @@ func (s *QNTXServer) collectedHold(ctx context.Context, sent sigil.Sent) (any, *
 	}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	s.logger.Infow("What is collected for an agent is held by a person", "to", sent["to"], "until", until.UTC().Format(time.RFC3339), "from", saidFrom(ctx))
 	return s.collectedList(ctx, sent)
 }
 
@@ -633,8 +634,10 @@ func (s *QNTXServer) collectedRelease(ctx context.Context, sent sigil.Sent) (any
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "ids", Says: "ids names each thing said that goes, separated by commas, and this names nothing in one of its places: leave it out to release everything that waits"}
 	}
 	if err := s.deliverCollected(ctx, did, sent["says"], only, time.Time{}); err != nil {
+		s.logger.Errorw("What a person released was not delivered", "to", sent["to"], "from", saidFrom(ctx), "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	s.logger.Infow("What is collected for an agent is released by a person", "to", sent["to"], "ids", sent["ids"], "from", saidFrom(ctx))
 	return s.collectedList(ctx, sent)
 }
 
@@ -663,6 +666,7 @@ func (s *QNTXServer) collectedLater(ctx context.Context, sent sigil.Sent) (any, 
 	}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
+	s.logger.Infow("What is collected for an agent is delayed by a person", "to", sent["to"], "from", saidFrom(ctx))
 	return s.collectedList(ctx, sent)
 }
 
@@ -719,7 +723,7 @@ func (s *QNTXServer) collectedCancel(ctx context.Context, sent sigil.Sent) (any,
 	}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	s.logger.Infow("What was collected for an agent is canceled by a person", "to", called, "things", len(canceled))
+	s.logger.Infow("What was collected for an agent is canceled by a person", "to", called, "things", len(canceled), "from", saidFrom(ctx))
 	return s.collectedList(ctx, sent)
 }
 
@@ -753,6 +757,15 @@ func (s *QNTXServer) collectedEdit(ctx context.Context, sent sigil.Sent) (any, *
 		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "id", Says: "nothing that waits for " + sent["to"] + " is " + sent["id"]}
 	}
 	return s.collectedList(ctx, sent)
+}
+
+// saidFrom is what the person's word about what waits came from, as the
+// client named itself: the page, or what stands on their phone.
+func saidFrom(ctx context.Context) string {
+	if r := sigil.Caller(ctx); r != nil {
+		return r.UserAgent()
+	}
+	return ""
 }
 
 // idsOf is the ids a person named, separated by commas.
