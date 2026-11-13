@@ -77,8 +77,8 @@ type Host interface {
 	// StoreFor is the store of the namespace the caller of a sigil stands in,
 	// from the context the sigil's Answer was handed.
 	StoreFor(ctx context.Context) (ats.AttestationStore, error)
-	// OfStandingRow is the store of the namespace a standing row landed in,
-	// for what its built-in writes beside the row. system is refused.
+	// 「[Opus 5.5] OfStandingRow is the store of the namespace a standing row landed in,」
+	// 「[Opus 5.5] for what its built-in writes beside the row. system is refused.」
 	OfStandingRow(namespace string) (ats.AttestationStore, error)
 	// Held is a DuckDB the subsystem holds for itself, by name: its own
 	// tables, made by its migrations, in one file of the node's, held in memory
