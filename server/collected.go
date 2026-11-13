@@ -51,7 +51,7 @@ const collectedFile = "collected.json"
 // collectedSaid is one thing an agent said to another.
 type collectedSaid struct {
 	From string `json:"from"`
-	// FromDID is who said it, by the DID its name may change over.
+	// 「[Opus 5.5] FromDID is who said it, by the DID its name may change over.」
 	FromDID string    `json:"from_did,omitempty"`
 	Says    string    `json:"says"`
 	At      time.Time `json:"at"`
