@@ -182,10 +182,14 @@ func foldApprovals(lines []*types.As) map[string]*approvalState {
 		switch predicate {
 		case watcher.ApprovalChecked:
 			check := approvalCheck{name: attrString(as.Attributes, "name"), state: attrString(as.Attributes, "state"), link: attrString(as.Attributes, "link")}
-			st.movedAt = as.Timestamp
+			// It moved when a check came to another state: the same state said again moves nothing.
 			if i := slices.IndexFunc(st.checks, func(c approvalCheck) bool { return c.name == check.name }); i >= 0 {
+				if st.checks[i].state != check.state {
+					st.movedAt = as.Timestamp
+				}
 				st.checks[i] = check
 			} else {
+				st.movedAt = as.Timestamp
 				st.checks = append(st.checks, check)
 			}
 		case watcher.ApprovalAnswered:
