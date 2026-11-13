@@ -197,17 +197,17 @@ type PeerConfig struct {
 	ReturnAddress string   `mapstructure:"return_address"` // Where its people are sent back to, + /auth/elsewhere/back.
 }
 
-// ApnsConfig is how the node reaches a phone through Apple: the app it reaches
-// and the team's APNs auth key. The key itself is a file on the node, named
-// here and never written here.
+// 「[Opus 5.5] ApnsConfig is how the node reaches a phone through Apple: the app it reaches」
+// 「[Opus 5.5] and the team's APNs auth key. The key itself is a file on the node, named」
+// 「[Opus 5.5] here and never written here.」
 type ApnsConfig struct {
 	BundleID string `mapstructure:"bundle_id"` // The app's bundle id, which is the topic a notification is sent to.
 	KeyID    string `mapstructure:"key_id"`    // The id Apple gave the key.
 	TeamID   string `mapstructure:"team_id"`   // The Apple Developer team's id.
 	KeyFile  string `mapstructure:"key_file"`  // Where the .p8 is on the node. Empty = the node reaches no phone.
-	// Development is whether the app the phones run was built for development:
-	// Apple takes its tokens at another host, and refuses them at the one a
-	// TestFlight or App Store build is reached at.
+	// 「[Opus 5.5] Development is whether the app the phones run was built for development:」
+	// 「[Opus 5.5] Apple takes its tokens at another host, and refuses them at the one a」
+	// 「[Opus 5.5] TestFlight or App Store build is reached at.」
 	Development bool `mapstructure:"development"`
 }
 

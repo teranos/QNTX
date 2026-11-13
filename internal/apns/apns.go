@@ -1,10 +1,10 @@
-// Package apns sends a notification to a phone through Apple: the node says
-// something to a person whose app is closed (teranos/QNTX#1409).
+// 「[Opus 5.5] Package apns sends a notification to a phone through Apple: the node says」
+// 「[Opus 5.5] something to a person whose app is closed (teranos/QNTX#1409).」
 //
-// What is sent is Apple's own shape: one HTTP/2 POST per notification to
-// /3/device/<token>, the push type alert, the topic the app's bundle id, and a
-// provider token: a JWT the key signs, ES256, that Apple takes for an hour and
-// refuses when it is renewed more often than every twenty minutes.
+// 「[Opus 5.5] What is sent is Apple's own shape: one HTTP/2 POST per notification to」
+// 「[Opus 5.5] /3/device/<token>, the push type alert, the topic the app's bundle id, and a」
+// 「[Opus 5.5] provider token: a JWT the key signs, ES256, that Apple takes for an hour and」
+// 「[Opus 5.5] refuses when it is renewed more often than every twenty minutes.」
 package apns
 
 import (
@@ -26,49 +26,49 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// Production is where Apple takes notifications for an app from TestFlight or
-// the App Store, and Development where it takes them for one built for
-// development. A token of the one is refused at the other.
+// 「[Opus 5.5] Production is where Apple takes notifications for an app from TestFlight or」
+// 「[Opus 5.5] the App Store, and Development where it takes them for one built for」
+// 「[Opus 5.5] development. A token of the one is refused at the other.」
 const (
 	Production  = "https://api.push.apple.com"
 	Development = "https://api.sandbox.push.apple.com"
 )
 
-// replacesAtMost is the longest Apple takes what a notification replaces by.
+// 「[Opus 5.5] replacesAtMost is the longest Apple takes what a notification replaces by.」
 const replacesAtMost = 64
 
-// tokenLives is how long one provider token is used before another is signed:
-// under Apple's hour, over its twenty minutes.
+// 「[Opus 5.5] tokenLives is how long one provider token is used before another is signed:」
+// 「[Opus 5.5] under Apple's hour, over its twenty minutes.」
 const tokenLives = 40 * time.Minute
 
-// Key is the APNs auth key of an Apple Developer team: the .p8 as Apple gave
-// it, the id Apple gave the key, and the team's.
+// 「[Opus 5.5] Key is the APNs auth key of an Apple Developer team: the .p8 as Apple gave」
+// 「[Opus 5.5] it, the id Apple gave the key, and the team's.」
 type Key struct {
 	P8     []byte
 	KeyID  string
 	TeamID string
 }
 
-// Notification is one thing said to a phone.
+// 「[Opus 5.5] Notification is one thing said to a phone.」
 type Notification struct {
-	// Token is the device's, hex as the app read it.
+	// 「[Opus 5.5] Token is the device's, hex as the app read it.」
 	Token string
-	// Title and Body are what the phone shows.
+	// 「[Opus 5.5] Title and Body are what the phone shows.」
 	Title, Body string
-	// Opens is what the app is handed when the person taps it: where to go.
+	// 「[Opus 5.5] Opens is what the app is handed when the person taps it: where to go.」
 	Opens map[string]string
-	// Replaces names what this is about. A later one with the same name takes
-	// the place of the earlier on the phone, and does not stand beside it.
+	// 「[Opus 5.5] Replaces names what this is about. A later one with the same name takes」
+	// 「[Opus 5.5] the place of the earlier on the phone, and does not stand beside it.」
 	Replaces string
-	// Expires is when Apple stops trying to deliver it. Zero is one try.
+	// 「[Opus 5.5] Expires is when Apple stops trying to deliver it. Zero is one try.」
 	Expires time.Time
 }
 
-// Sender sends notifications for one app.
+// 「[Opus 5.5] Sender sends notifications for one app.」
 type Sender struct {
-	// BundleID is the app's.
+	// 「[Opus 5.5] BundleID is the app's.」
 	BundleID string
-	// At is Apple's host, Production unless a test stands in for it.
+	// 「[Opus 5.5] At is Apple's host, Production unless a test stands in for it.」
 	At     string
 	Client *http.Client
 	Now    func() time.Time
@@ -81,7 +81,7 @@ type Sender struct {
 	signedAt time.Time
 }
 
-// New is a sender for the app whose bundle id this is, signing with key.
+// 「[Opus 5.5] New is a sender for the app whose bundle id this is, signing with key.」
 func New(bundleID string, key Key) (*Sender, error) {
 	if bundleID == "" || key.KeyID == "" || key.TeamID == "" {
 		return nil, errors.New("an APNs sender needs the app's bundle id, the key's id and the team's id")
@@ -103,7 +103,7 @@ func New(bundleID string, key Key) (*Sender, error) {
 
 func b64(raw []byte) string { return base64.RawURLEncoding.EncodeToString(raw) }
 
-// providerToken is the JWT Apple admits the sender by, signed anew when the one held is old.
+// 「[Opus 5.5] providerToken is the JWT Apple admits the sender by, signed anew when the one held is old.」
 func (s *Sender) providerToken() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -125,7 +125,7 @@ func (s *Sender) providerToken() (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "APNs key %s did not sign", s.key.KeyID)
 	}
-	// JWS wants r and s side by side, each the curve's width, not ASN.1.
+	// 「[Opus 5.5] JWS wants r and s side by side, each the curve's width, not ASN.1.」
 	width := (s.signer.Curve.Params().BitSize + 7) / 8
 	joined := make([]byte, 2*width)
 	r.FillBytes(joined[:width])
@@ -134,12 +134,12 @@ func (s *Sender) providerToken() (string, error) {
 	return s.token, nil
 }
 
-// Refused is Apple's own answer to a notification it did not take.
+// 「[Opus 5.5] Refused is Apple's own answer to a notification it did not take.」
 type Refused struct {
 	Status int
 	Reason string
-	// Gone is whether the token is no longer one: the app was removed from
-	// the phone. Nothing is sent to it again.
+	// 「[Opus 5.5] Gone is whether the token is no longer one: the app was removed from」
+	// 「[Opus 5.5] the phone. Nothing is sent to it again.」
 	Gone bool
 }
 
@@ -147,7 +147,7 @@ func (r *Refused) Error() string {
 	return "Apple refused the notification: " + strconv.Itoa(r.Status) + " " + r.Reason
 }
 
-// Send sends one notification, and answers Apple's id for it. What Apple refuses is a *Refused.
+// 「[Opus 5.5] Send sends one notification, and answers Apple's id for it. What Apple refuses is a *Refused.」
 func (s *Sender) Send(ctx context.Context, n Notification) (string, error) {
 	switch {
 	case n.Token == "":
@@ -178,7 +178,7 @@ func (s *Sender) Send(ctx context.Context, n Notification) (string, error) {
 	req.Header.Set("authorization", "bearer "+token)
 	req.Header.Set("apns-push-type", "alert")
 	req.Header.Set("apns-topic", s.BundleID)
-	// Now: what it says is about something that happens in minutes.
+	// 「[Opus 5.5] Now: what it says is about something that happens in minutes.」
 	req.Header.Set("apns-priority", "10")
 	req.Header.Set("content-type", "application/json")
 	if n.Replaces != "" {
@@ -205,8 +205,8 @@ func (s *Sender) Send(ctx context.Context, n Notification) (string, error) {
 	}
 	return "", &Refused{
 		Status: answer.StatusCode, Reason: why.Reason,
-		// Unregistered is the app off the phone. BadDeviceToken is not: it is
-		// also what a token of the other host is refused as, and that phone is still there.
+		// 「[Opus 5.5] Unregistered is the app off the phone. BadDeviceToken is not: it is」
+		// 「[Opus 5.5] also what a token of the other host is refused as, and that phone is still there.」
 		Gone: answer.StatusCode == http.StatusGone || why.Reason == "Unregistered",
 	}
 }

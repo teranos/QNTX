@@ -130,9 +130,9 @@ func TestASessionSaysSomethingToANameWithA2ASendMessage(t *testing.T) {
 	// not on the row (collected_test.go).
 	// Submitted as it is answered, or already waiting on a person: either is collected.
 	assert.NotContains(t, string(said), "TASK_STATE_COMPLETED")
-	// It is collected by the turn the message started, which SendMessage does not wait for:
-	// asked at once, the list was empty on a slow runner.
-	// Asked here, on the test's own goroutine, until it holds it: a refusal fails at once, in its own words.
+	// 「[Opus 5.5] It is collected by the turn the message started, which SendMessage does not wait for:」
+	// 「[Opus 5.5] asked at once, the list was empty on a slow runner.」
+	// 「[Opus 5.5] Asked here, on the test's own goroutine, until it holds it: a refusal fails at once, in its own words.」
 	var all *protocol.CollectedAll
 	for until := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		var refused *protocol.Refusal

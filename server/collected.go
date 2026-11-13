@@ -78,9 +78,9 @@ type collectedFor struct {
 	// HeldUntil is a person's word that nothing is delivered before it.
 	HeldUntil time.Time `json:"held_until,omitempty"`
 	Delivered time.Time `json:"delivered,omitempty"`
-	// Announced is, for each phone told of it, the time it was due when that
-	// phone was told (phones.go): held to another time, the phone is told
-	// again before that one, and a phone that was not reached is told when it is.
+	// 「[Opus 5.5] Announced is, for each phone told of it, the time it was due when that」
+	// 「[Opus 5.5] phone was told (phones.go): held to another time, the phone is told」
+	// 「[Opus 5.5] again before that one, and a phone that was not reached is told when it is.」
 	Announced map[string]time.Time `json:"announced,omitempty"`
 	Waiting   []collectedSaid      `json:"waiting"`
 }

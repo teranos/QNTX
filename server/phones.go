@@ -17,34 +17,34 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "Push notifications is something I want though, especially for approvals"
-// "as you may believe, i want to see it on my phone, for the duration of 15 minutes before a collected message is sent, the preview and the buttons to send now, delay and cancel"
-// "listen, a simpler version will work for me, i just want to get the hard part out of the way"
-// "MAN, GETTING THE PUSH NOTIFICATION MIGHT BE THE ICING ON THE CAKE RIGHT."
-// "IN TERMS OF KNOWING WHAT IS GOING TO BE SAID TO WHAT BY WHAT AND WHEN"
+// "「[Opus 5.5] Push notifications is something I want though, especially for approvals」"
+// "「[Opus 5.5] as you may believe, i want to see it on my phone, for the duration of 15 minutes before a collected message is sent, the preview and the buttons to send now, delay and cancel」"
+// "「[Opus 5.5] listen, a simpler version will work for me, i just want to get the hard part out of the way」"
+// "「[Opus 5.5] MAN, GETTING THE PUSH NOTIFICATION MIGHT BE THE ICING ON THE CAKE RIGHT.」"
+// "「[Opus 5.5] IN TERMS OF KNOWING WHAT IS GOING TO BE SAID TO WHAT BY WHAT AND WHEN」"
 //
-// The node tells ROOT's phone what is about to be said to an agent, by whom,
-// before it is said: a notification, fifteen minutes before what is collected
-// is delivered. A tap opens the app on what waits, where it is sent now, held
-// or canceled (collected.go). The phone is the one whose app handed the node
-// its token, in ROOT's own session.
+// 「[Opus 5.5] The node tells ROOT's phone what is about to be said to an agent, by whom,」
+// 「[Opus 5.5] before it is said: a notification, fifteen minutes before what is collected」
+// 「[Opus 5.5] is delivered. A tap opens the app on what waits, where it is sent now, held」
+// 「[Opus 5.5] or canceled (collected.go). The phone is the one whose app handed the node」
+// 「[Opus 5.5] its token, in ROOT's own session.」
 
 const phonesPath = "/api/phones"
 
-// phonesSubject is what the lines about phones are about; each line's
-// predicate is one phone's token.
+// 「[Opus 5.5] phonesSubject is what the lines about phones are about; each line's」
+// 「[Opus 5.5] predicate is one phone's token.」
 const phonesSubject = "PHONES"
 
-// announcedBefore is how long before what is collected is delivered the phone is told.
+// 「[Opus 5.5] announcedBefore is how long before what is collected is delivered the phone is told.」
 var announcedBefore = 15 * time.Minute
 
-// notifier says something to a phone. The node's is Apple's (internal/apns);
-// a test's stands in for it.
+// 「[Opus 5.5] notifier says something to a phone. The node's is Apple's (internal/apns);」
+// 「[Opus 5.5] a test's stands in for it.」
 type notifier interface {
 	Send(ctx context.Context, n apns.Notification) (string, error)
 }
 
-// theNotifier is how this node reaches phones, and why not when it cannot.
+// 「[Opus 5.5] theNotifier is how this node reaches phones, and why not when it cannot.」
 func (s *QNTXServer) theNotifier() (notifier, error) {
 	if s.notifies != nil {
 		return s.notifies, nil
@@ -64,7 +64,7 @@ func (s *QNTXServer) theNotifier() (notifier, error) {
 	if err != nil {
 		return nil, err
 	}
-	// An app built for development is reached at Apple's other host, and nowhere else.
+	// 「[Opus 5.5] An app built for development is reached at Apple's other host, and nowhere else.」
 	if said.Development {
 		sender.At = apns.Development
 	}
@@ -72,7 +72,7 @@ func (s *QNTXServer) theNotifier() (notifier, error) {
 	return sender, nil
 }
 
-// phones is every token a phone handed the node and Apple has not said is gone.
+// 「[Opus 5.5] phones is every token a phone handed the node and Apple has not said is gone.」
 func (s *QNTXServer) phones() ([]string, error) {
 	newest, err := newestLines(s, phonesSubject, "phones")
 	if err != nil {
@@ -88,9 +88,9 @@ func (s *QNTXServer) phones() ([]string, error) {
 	return tokens, nil
 }
 
-// HandlePhone takes a phone's token, from the app, in ROOT's own session. A
-// token of the node's is refused whatever it holds, as an approval's answer
-// refuses one: which phone is told what waits is the human's to say.
+// 「[Opus 5.5] HandlePhone takes a phone's token, from the app, in ROOT's own session. A」
+// 「[Opus 5.5] token of the node's is refused whatever it holds, as an approval's answer」
+// 「[Opus 5.5] refuses one: which phone is told what waits is the human's to say.」
 func (s *QNTXServer) HandlePhone(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, phonesPath+" answers POST, and this was "+r.Method)
@@ -102,7 +102,7 @@ func (s *QNTXServer) HandlePhone(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "a phone is named by the logged-in human, and nobody is logged in")
 		return
 	case aToken(admitted) || !aPersonSpeaks(r):
-		// A token, and an agent by a key of its own (collected.go, aPersonSpeaks): neither is the human.
+		// 「[Opus 5.5] A token, and an agent by a key of its own (collected.go, aPersonSpeaks): neither is the human.」
 		writeError(w, http.StatusForbidden, "a phone is named by the logged-in human, not by a token or an agent ("+admitted.ActsAs()+")")
 		return
 	case !admitted.IsRoot():
@@ -119,7 +119,7 @@ func (s *QNTXServer) HandlePhone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token := strings.ToLower(strings.TrimSpace(sent.Token))
-	// A token is hex as the app read it off the system: anything else is no token, and would be a path at Apple.
+	// 「[Opus 5.5] A token is hex as the app read it off the system: anything else is no token, and would be a path at Apple.」
 	if len(token) < 32 || len(token) > 256 || strings.Trim(token, "0123456789abcdef") != "" {
 		writeError(w, http.StatusBadRequest, "token is a phone's push token, in hex, and this is not one")
 		return
@@ -140,7 +140,7 @@ func (s *QNTXServer) HandlePhone(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"phones": len(held)})
 }
 
-// whatWaitsSaid is the notification for what waits: how many, for whom, and who said what.
+// 「[Opus 5.5] whatWaitsSaid is the notification for what waits: how many, for whom, and who said what.」
 func whatWaitsSaid(waits *collectedFor, due time.Time, now time.Time) (title, body string) {
 	n := len(waits.Waiting)
 	verb := "wait"
@@ -149,7 +149,7 @@ func whatWaitsSaid(waits *collectedFor, due time.Time, now time.Time) (title, bo
 	}
 	in := due.Sub(now).Round(time.Minute)
 	title = strconv.Itoa(n) + " " + verb + " for " + waits.Called + ", sent in " + strconv.Itoa(int(in.Minutes())) + " min"
-	// A phone shows a few lines: each thing said, cut where it runs long.
+	// 「[Opus 5.5] A phone shows a few lines: each thing said, cut where it runs long.」
 	lines := []string{}
 	for _, one := range waits.Waiting {
 		says := strings.Join(strings.Fields(one.Says), " ")
@@ -165,19 +165,19 @@ func whatWaitsSaid(waits *collectedFor, due time.Time, now time.Time) (title, bo
 	return title, strings.Join(lines, "\n")
 }
 
-// announcedWithin is how long Apple is given to take one notification.
+// 「[Opus 5.5] announcedWithin is how long Apple is given to take one notification.」
 var announcedWithin = 5 * time.Second
 
-// replacesFor names what waits for an agent to Apple, which takes no more than
-// 64 bytes and would refuse the agent's DID whole: a later notification about
-// the same agent takes the place of the earlier on the phone.
+// 「[Opus 5.5] replacesFor names what waits for an agent to Apple, which takes no more than」
+// 「[Opus 5.5] 64 bytes and would refuse the agent's DID whole: a later notification about」
+// 「[Opus 5.5] the same agent takes the place of the earlier on the phone.」
 func replacesFor(did string) string {
 	sum := sha256.Sum256([]byte(did))
 	return "collected-" + hex.EncodeToString(sum[:12])
 }
 
-// keepAnnouncingCollected tells phones what is about to be delivered until the
-// node stops. What failed is said once for as long as it keeps failing the same way.
+// 「[Opus 5.5] keepAnnouncingCollected tells phones what is about to be delivered until the」
+// 「[Opus 5.5] node stops. What failed is said once for as long as it keeps failing the same way.」
 func (s *QNTXServer) keepAnnouncingCollected() {
 	tick := time.NewTicker(collectedLooked)
 	defer tick.Stop()
@@ -199,9 +199,9 @@ func (s *QNTXServer) keepAnnouncingCollected() {
 	}
 }
 
-// announceDue tells each phone what will be delivered within announcedBefore
-// of now, once for each time it is due: held to a later time, a phone is told
-// again before that one, and one that was not reached is told when it is.
+// 「[Opus 5.5] announceDue tells each phone what will be delivered within announcedBefore」
+// 「[Opus 5.5] of now, once for each time it is due: held to a later time, a phone is told」
+// 「[Opus 5.5] again before that one, and one that was not reached is told when it is.」
 func (s *QNTXServer) announceDue(ctx context.Context, now time.Time) error {
 	kept, err := s.theCollection()
 	if err != nil {
@@ -230,10 +230,10 @@ func (s *QNTXServer) announceDue(ctx context.Context, now time.Time) error {
 	return nil
 }
 
-// announce tells the phones not yet told what waits for one agent. It takes
-// its turn with a delivery and with what a person changes (collection.settling):
-// what a phone is shown is what waits when it is sent, never what a person
-// canceled or changed a moment before.
+// 「[Opus 5.5] announce tells the phones not yet told what waits for one agent. It takes」
+// 「[Opus 5.5] its turn with a delivery and with what a person changes (collection.settling):」
+// 「[Opus 5.5] what a phone is shown is what waits when it is sent, never what a person」
+// 「[Opus 5.5] canceled or changed a moment before.」
 func (s *QNTXServer) announce(ctx context.Context, kept *collection, did string, now time.Time) error {
 	tokens, err := s.phones()
 	if err != nil {
@@ -254,7 +254,7 @@ func (s *QNTXServer) announce(ctx context.Context, kept *collection, did string,
 	if !found || len(waits.Waiting) == 0 {
 		return nil
 	}
-	// Asked again now that nothing else changes it: held on meanwhile, it is not about to go.
+	// 「[Opus 5.5] Asked again now that nothing else changes it: held on meanwhile, it is not about to go.」
 	due := waits.due()
 	if now.Before(due.Add(-announcedBefore)) || !now.Before(due) {
 		return nil
@@ -281,7 +281,7 @@ func (s *QNTXServer) announce(ctx context.Context, kept *collection, did string,
 		case err == nil:
 			told = append(told, token)
 		case errors.As(err, &refused) && refused.Gone:
-			// The app is off that phone: it is told nothing again.
+			// 「[Opus 5.5] The app is off that phone: it is told nothing again.」
 			if err := s.nodeRecords().nodeRecord(s.nodeActor(), phonesSubject, token, "_", map[string]any{"platform": "ios", "gone": true}); err != nil {
 				failed = append(failed, err.Error())
 			}
