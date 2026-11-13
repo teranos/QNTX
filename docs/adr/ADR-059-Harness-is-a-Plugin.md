@@ -41,7 +41,7 @@ What holds there holds here:
 - "The node reaches no machine" ([[ADR-050-comet]]), so a session is spoken to where it looks: "Say an Agent session is still a session as you know, but it communicates with the room, or rather it has access to it", "Say you can wake a specific Agent so it will check the room", "Say all your Node Agents are all in the Node Room" ([[ADR-057-Agent-Rooms]]).
 - "In a QNTX Cluster, only one Node is ever responsible for Rooms Services cluster-wide" ([[ADR-057-Agent-Rooms]]): the sessions of every machine's harness meet there.
 
-## How a session on a machine is told
+## 「[Fable 5.2] How a session on a machine is told」
 
 "SESSION A ON MY LAPTOP HAS A NAME"
 "THAT NAME IS NOT TAKEN"
@@ -58,15 +58,15 @@ What holds there holds here:
 
 "Messages from QNTX can end up in ground and we need no new path"
 
-QNTX writes a message into ground's db, and ground hands it to the session:
+「[Fable 5.2] QNTX writes a message into ground's db, and ground hands it to the session:」
 
-1. The node leaves the message on the status row as news, for the person, naming the session it is for (`server/statusline/news.go`). It stays there two minutes (`NewsHold`). CI verdicts are left this way today (`server/ci_pulse.go`).
-2. ug polls the status row and writes each item it has not seen into ground's db: one `immediate:news` row in the context `session:<id>`, or `project:<repo>` when the node names no session (`newsPass` in ground `ug/tmux.d`, and `ug/sql.d`). It does so while `ug tmux` draws (ground `UNDERGROUND.md`, Limitation).
-3. sky reads what is addressed to its session or its project and wakes the session with it. A `delivered:<id>` row per session makes it once (ground `source/sky.d`, `source/immediate.d`).
+1. 「[Fable 5.2] The node leaves the message on the status row as news, for the person, naming the session it is for (`server/statusline/news.go`). It stays there two minutes (`NewsHold`). CI verdicts are left this way today (`server/ci_pulse.go`).」
+2. 「[Fable 5.2] ug polls the status row and writes each item it has not seen into ground's db: one `immediate:news` row in the context `session:<id>`, or `project:<repo>` when the node names no session (`newsPass` in ground `ug/tmux.d`, and `ug/sql.d`). It does so while `ug tmux` draws (ground `UNDERGROUND.md`, Limitation).」
+3. 「[Fable 5.2] sky reads what is addressed to its session or its project and wakes the session with it. A `delivered:<id>` row per session makes it once (ground `source/sky.d`, `source/immediate.d`).」
 
-The node knows which session to name because every row a ground hook writes goes to the node as well, in a `session:<id>` context (ground `source/stream.d`). `am ground` answers the sessions started and left (`server/am_ground.go`).
+「[Fable 5.2] The node knows which session to name because every row a ground hook writes goes to the node as well, in a `session:<id>` context (ground `source/stream.d`). `am ground` answers the sessions started and left (`server/am_ground.go`).」
 
-A deferred message is the same row with an `after` gate (ground `CLAUDE.md`).
+「[Fable 5.2] A deferred message is the same row with an `after` gate (ground `CLAUDE.md`).」
 
 ## A session's key and its name
 
@@ -76,7 +76,7 @@ A deferred message is the same row with an `after` gate (ground `CLAUDE.md`).
 "As Peer Node"
 "The condition is no handwritten A2A, use spec faithfully, be opportunistic, make sure discovery is implemented in a way that we can move forwards and make it ship to sentry, so next time I come back when I have it deployed and then I can ask you"
 
-Agents talk to each other through A2A: first two nodes, then their Node Agents as peers (`a2a Peers`, `server/a2a_peer_client.go`), on a2a-go's server and client and nothing hand-written (`server/a2a_route.go`, `server/a2a_client.go`). A session is the next agent in that line.
+「[Fable 5.2] Agents talk to each other through A2A: first two nodes, then their Node Agents as peers (`a2a Peers`, `server/a2a_peer_client.go`), on a2a-go's server and client and nothing hand-written (`server/a2a_route.go`, `server/a2a_client.go`). A session is the next agent in that line.」
 
 "The true way forwards is A2A"
 "if every session is its own addresable A2A via QNTX so Alder would be addressable"
@@ -96,31 +96,31 @@ Agents talk to each other through A2A: first two nodes, then their Node Agents a
 "I HAVE A DESKTOP CALLED K"
 "ON K I EXPECT EACH SESSION TO ALSO HAVE ITS OWN KEY AND NAME"
 "I EXPECT K SESSIONS TO BE ABLE TO TALK TO SESSIONS ON MY LAPTOP IF CONNECTIVITY ALLOWS FOR IT"
-"I WANT A SESSION TO BE ABLE TO GIVE ITSELF AN AVAILABLE NAME, AMONGST ALL PARTICIPANTS IN THE CLUSTER"
+"「[Opus 5.5] I WANT A SESSION TO BE ABLE TO GIVE ITSELF AN AVAILABLE NAME, AMONGST ALL PARTICIPANTS IN THE CLUSTER」"
 "SO, ONE ALDER"
 "ONE SLATE"
 "ONE OTEL"
 
-Where it is built:
+「[Fable 5.2] Where it is built:」
 
-- **The key.** Ground makes it at SessionStart and keeps it in `~/.qntx/sessions/<session id>/key` (ground `source/naming.d`, branch `session-names`).
-- **The admission.** `POST /auth/admit` with the session's DID and what it is called, signed by `~/.qntx/key` (`server/auth/admit.go`, #1656).
-- **The name.** `i name`, signed by the session's own key. Ground asks for what Claude Code calls the session, and keeps the name the node gave beside the key, so the session asks for the same one again. `ground name <Name>` takes another.
-"the name"
-"needs to stick"
-"why would ground ask for a rename, its the same session"
-- **What a name is** (`server/i_name.go`, #1668).
-"a name is an Uppercase character followed by normal lowercase characters"
-"and a name can be two names after each other as well"
-"or three"
-"i want to ban numbers in names"
-"so no special chars in names as well"
-"a Name needs to be able to be phonetically spoken"
-"Names need to be compatible with STT/TTS"
-- **A name a revoked token held** goes to the agent asking for it (#1668).
-"the token can be GONE"
+- 「[Fable 5.2] **The key.** Ground makes it at SessionStart and keeps it in `~/.qntx/sessions/<session id>/key` (ground `source/naming.d`, branch `session-names`).」
+- 「[Fable 5.2] **The admission.** `POST /auth/admit` with the session's DID and what it is called, signed by `~/.qntx/key` (`server/auth/admit.go`, #1656).」
+- 「[Fable 5.2] **The name.** `i name`, signed by the session's own key. Ground asks for what Claude Code calls the session, and keeps the name the node gave beside the key, so the session asks for the same one again. `ground name <Name>` takes another.」
+"「[Opus 5.5] the name」"
+"「[Opus 5.5] needs to stick」"
+"「[Opus 5.5] why would ground ask for a rename, its the same session」"
+- 「[Fable 5.2] **What a name is** (`server/i_name.go`, #1668).」
+"「[Opus 5.5] a name is an Uppercase character followed by normal lowercase characters」"
+"「[Opus 5.5] and a name can be two names after each other as well」"
+"「[Opus 5.5] or three」"
+"「[Opus 5.5] i want to ban numbers in names」"
+"「[Opus 5.5] so no special chars in names as well」"
+"「[Opus 5.5] a Name needs to be able to be phonetically spoken」"
+"「[Opus 5.5] Names need to be compatible with STT/TTS」"
+- 「[Fable 5.2] **A name a revoked token held** goes to the agent asking for it (#1668).」
+"「[Opus 5.5] the token can be GONE」"
 "i want false Alder to take a different name for example"
-- Ground holds a session's id, key, DID and name together, in that one directory.
+- 「[Fable 5.2] Ground holds a session's id, key, DID and name together, in that one directory.」
 
 ## What the repository already answers
 

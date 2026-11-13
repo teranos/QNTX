@@ -26,9 +26,9 @@ type News struct {
 	// ID is the attestation's own, so the laptop writes it once whatever the
 	// poll count. The row carries it and a click asks by it.
 	ID string
-	// For is who the item is addressed to, as NewsKey names a caller: the
-	// person a token or a key speaks for, and the DID only for a caller that
-	// is nobody's. It is what the poll is found by when it asks.
+	// 「[Fable 5.2] For is who the item is addressed to, as NewsKey names a caller: the」
+	// 「[Fable 5.2] person a token or a key speaks for, and the DID only for a caller that」
+	// 「[Fable 5.2] is nobody's. It is what the poll is found by when it asks.」
 	For  string
 	Item StatusItem
 	// Detail is the whole of it, answered on a click.
