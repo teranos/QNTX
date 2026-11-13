@@ -27,8 +27,8 @@ import (
 // "A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT, AND WE DONT INVENT HERE, WE TAKE THE A2A CONVENTIONS, WE TAKE THE SDK SERIOUSLY"
 //
 // A name an agent holds (i name) is a tenant: SendMessage at it is a Task of
-// that agent. The node runs no turn for it, unless it is the Node Agent's own
-// name (isTheNodeAgentsName). What was said is left on the
+// 「[Opus 5.5] that agent. The node runs no turn for it, unless it is the Node Agent's own」
+// 「[Opus 5.5] name (isTheNodeAgentsName). What was said is left on the」
 // status row as news for the agent, where ug sees it and writes it into
 // ground's store (ADR-059). The Task is the delivery. Nothing tells the node
 // yet that the agent received it: ground writes a row for a session or a
@@ -81,9 +81,9 @@ func (s *QNTXServer) holdsAName(tenant string) bool {
 	return err == nil && held
 }
 
-// isTheNodeAgentsName is whether the agent served at tenant by its name is the
-// Node Agent itself: the node runs its turns, and what is said to its name is
-// one, as what is said at no tenant is.
+// 「[Opus 5.5] isTheNodeAgentsName is whether the agent served at tenant by its name is the」
+// 「[Opus 5.5] Node Agent itself: the node runs its turns, and what is said to its name is」
+// 「[Opus 5.5] one, as what is said at no tenant is.」
 func (s *QNTXServer) isTheNodeAgentsName(tenant string) bool {
 	named, held, err := s.agentNamedAt(tenant)
 	return err == nil && held && s.nodeAgent != nil && named.did == s.nodeAgent.did
