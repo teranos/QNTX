@@ -282,7 +282,22 @@
         "ROOT"
       ]
     },
+    "/api/collected/cancel": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/edit": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/collected/hold": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/later": {
       "x-qntx-reach": [
         "ROOT"
       ]

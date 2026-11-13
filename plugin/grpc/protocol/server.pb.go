@@ -2671,7 +2671,11 @@ type CollectedSaid struct {
 	// When it said it, RFC3339.
 	At string `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
 	// The A2A Task it was said as, when it was said as one.
-	Task          string `protobuf:"bytes,4,opt,name=task,proto3" json:"task,omitempty"`
+	Task string `protobuf:"bytes,4,opt,name=task,proto3" json:"task,omitempty"`
+	// What collected edit and cancel name it by.
+	Id string `protobuf:"bytes,5,opt,name=id,proto3" json:"id,omitempty"`
+	// Whether a person changed what it says.
+	Edited        bool `protobuf:"varint,6,opt,name=edited,proto3" json:"edited,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2732,6 +2736,20 @@ func (x *CollectedSaid) GetTask() string {
 		return x.Task
 	}
 	return ""
+}
+
+func (x *CollectedSaid) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CollectedSaid) GetEdited() bool {
+	if x != nil {
+		return x.Edited
+	}
+	return false
 }
 
 // Collected is what waits for one agent.
@@ -4370,12 +4388,14 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\fMemoryStores\x12\x14\n" +
 	"\x05vault\x18\x01 \x01(\tR\x05vault\x12\x14\n" +
 	"\x05place\x18\x02 \x01(\tR\x05place\x12-\n" +
-	"\x06stores\x18\x03 \x03(\v2\x15.protocol.MemoryStoreR\x06stores\"[\n" +
+	"\x06stores\x18\x03 \x03(\v2\x15.protocol.MemoryStoreR\x06stores\"\x83\x01\n" +
 	"\rCollectedSaid\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x12\n" +
 	"\x04says\x18\x02 \x01(\tR\x04says\x12\x0e\n" +
 	"\x02at\x18\x03 \x01(\tR\x02at\x12\x12\n" +
-	"\x04task\x18\x04 \x01(\tR\x04task\"\xdb\x01\n" +
+	"\x04task\x18\x04 \x01(\tR\x04task\x12\x0e\n" +
+	"\x02id\x18\x05 \x01(\tR\x02id\x12\x16\n" +
+	"\x06edited\x18\x06 \x01(\bR\x06edited\"\xdb\x01\n" +
 	"\tCollected\x12\x0e\n" +
 	"\x02to\x18\x01 \x01(\tR\x02to\x12\x10\n" +
 	"\x03did\x18\x02 \x01(\tR\x03did\x12\x14\n" +
