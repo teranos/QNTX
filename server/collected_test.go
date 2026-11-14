@@ -25,7 +25,14 @@ import (
 func TestWhatIsCollectedWaitsByTheAgentsModel(t *testing.T) {
 	assert.Equal(t, 6*time.Hour, waitOf("claude-fable-5-2"))
 	assert.Equal(t, 3*time.Hour, waitOf("claude-opus-5-5"))
-	assert.Equal(t, 6*time.Hour, waitOf(""))
+	// "Sonnet should be like 30 min"
+	assert.Equal(t, 30*time.Minute, waitOf("claude-sonnet-5-5"))
+	// "Fable needs to be explicit"
+	// A model the node does not name waits the longest of the waits it names,
+	// not Fable's because Fable's is the one left over.
+	assert.Equal(t, collectedForLongest(), waitOf(""))
+	assert.Equal(t, collectedForLongest(), waitOf("claude-haiku-5-5"))
+	assert.Equal(t, 6*time.Hour, collectedForLongest())
 
 	at := time.Date(2026, 11, 13, 10, 0, 0, 0, time.UTC)
 	opus := collectedFor{Model: "claude-opus-5-5", Waiting: []collectedSaid{{At: at}, {At: at.Add(time.Hour)}}}

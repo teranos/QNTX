@@ -36,11 +36,19 @@ import (
 const collectedPath = "/api/collected"
 
 // How long what is collected waits, by the model of the agent it is for. An
-// agent whose model the node does not hold waits the longer.
+// agent whose model the node does not hold waits the longest of these.
+// "Sonnet should be like 30 min"
+// "Fable needs to be explicit"
 var (
-	collectedForFable = 6 * time.Hour
-	collectedForOpus  = 3 * time.Hour
+	collectedForFable  = 6 * time.Hour
+	collectedForOpus   = 3 * time.Hour
+	collectedForSonnet = 30 * time.Minute
 )
+
+// collectedForLongest is the longest wait a model is named with.
+func collectedForLongest() time.Duration {
+	return max(collectedForFable, collectedForOpus, collectedForSonnet)
+}
 
 // collectedLooked is how often the node looks for what is due.
 var collectedLooked = time.Minute
@@ -106,10 +114,15 @@ func (c collectedFor) startedFor(phone string) time.Time {
 
 // waitOf is how long what is collected for an agent on model waits.
 func waitOf(model string) time.Duration {
-	if strings.Contains(strings.ToLower(model), "opus") {
+	switch m := strings.ToLower(model); {
+	case strings.Contains(m, "fable"):
+		return collectedForFable
+	case strings.Contains(m, "opus"):
 		return collectedForOpus
+	case strings.Contains(m, "sonnet"):
+		return collectedForSonnet
 	}
-	return collectedForFable
+	return collectedForLongest()
 }
 
 // due is when what waits is delivered if nobody holds or releases it.
