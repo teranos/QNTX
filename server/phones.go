@@ -323,13 +323,20 @@ func batchShown(waits *collectedFor, due time.Time) waitsShown {
 	}
 	// By its DID: a name is held by whoever holds it when the press is pressed.
 	to := map[string]string{"to": waits.DID}
+	// "a press never asks what the person did not see": send now and cancel
+	// name each thing said they were drawn with. What came in since waits on.
+	ids := make([]string, 0, n)
+	for _, one := range waits.Waiting {
+		ids = append(ids, one.ID)
+	}
+	seen := map[string]string{"to": waits.DID, "ids": strings.Join(ids, ",")}
 	return waitsShown{
 		Says: says, Preview: strings.Join(lines, "\n"), Due: float64(due.Unix()),
 		Segments: []waitsSegment{},
 		Presses: []waitsPress{
-			{Says: "send now", Does: "approve", Then: "sent", Path: collectedPath + "/release", Sent: to},
+			{Says: "send now", Does: "approve", Then: "sent", Path: collectedPath + "/release", Sent: seen},
 			{Says: "delay", Does: "delay", Then: "delayed", Path: collectedPath + "/later", Sent: to},
-			{Says: "cancel", Does: "cancel", Then: "canceled", Path: collectedPath + "/cancel", Sent: to, Armed: true},
+			{Says: "cancel", Does: "cancel", Then: "canceled", Path: collectedPath + "/cancel", Sent: seen, Armed: true},
 		},
 	}
 }

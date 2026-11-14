@@ -410,3 +410,24 @@ func TestAnAgentInAPersonsTurnSpeaksForThem(t *testing.T) {
 	assert.True(t, aPersonSpeaks(delivery))
 	assert.False(t, startedByAPerson(delivery), "a delivery's turn was counted as a person's")
 }
+
+// "a press never asks what the person did not see"
+// A cancel names what the person saw; what came in since waits on.
+func TestACancelTakesOnlyWhatWasSeen(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	seen := all.GetCollected()[0].GetWaiting()[0].GetId()
+
+	sayTo(t, srv, alder, "Birch", "pull request two is open")
+	all, refused = askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch", "ids": seen})
+	require.Nil(t, refused, refused.GetSays())
+	require.Len(t, all.GetCollected(), 1)
+	require.Len(t, all.GetCollected()[0].GetWaiting(), 1)
+	assert.Equal(t, "pull request two is open", all.GetCollected()[0].GetWaiting()[0].GetSays(), "what came in after it was seen was canceled")
+
+	_, refused = askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch", "id": seen, "ids": seen})
+	require.NotNil(t, refused, "id and ids were both taken")
+}

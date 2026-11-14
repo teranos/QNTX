@@ -537,6 +537,7 @@ func (s *QNTXServer) collectedSignum() sigil.Signum {
 					Does: "Cancels what waits for an agent: it is never delivered, and each Task it was said as ends canceled. A person's to say.",
 					Takes: []*protocol.Param{to,
 						{Name: "id", Says: "One thing said, by its id. Empty cancels everything that waits for the agent."},
+						{Name: "ids", Says: "The things said that are canceled, by id, separated by commas: what the person saw. What is not among them waits on."},
 					},
 					Answer: "protocol.CollectedAll",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: collectedPath + "/cancel"},
@@ -733,6 +734,16 @@ func (s *QNTXServer) collectedCancel(ctx context.Context, sent sigil.Sent) (any,
 	if id == "" && sent["id"] != "" {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "id", Says: "id names one thing said, and this is nothing but space: leave it out to cancel everything that waits"}
 	}
+	only := idsOf(sent["ids"])
+	if sent["ids"] != "" && len(only) != len(strings.Split(sent["ids"], ",")) {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "ids", Says: "ids names each thing said that is canceled, separated by commas, and this names nothing in one of its places"}
+	}
+	if id != "" && len(only) > 0 {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "ids", Says: "id names one thing said and ids several: say one of them"}
+	}
+	if id != "" {
+		only = []string{id}
+	}
 	kept.mu.Lock()
 	held, err := kept.read()
 	kept.mu.Unlock()
@@ -740,9 +751,9 @@ func (s *QNTXServer) collectedCancel(ctx context.Context, sent sigil.Sent) (any,
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	called := held[did].Called
-	canceled := slices.DeleteFunc(slices.Clone(held[did].Waiting), func(one collectedSaid) bool { return id != "" && one.ID != id })
-	if id != "" && len(canceled) == 0 {
-		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "id", Says: "nothing that waits for " + sent["to"] + " is " + id}
+	canceled := slices.DeleteFunc(slices.Clone(held[did].Waiting), func(one collectedSaid) bool { return len(only) > 0 && !slices.Contains(only, one.ID) })
+	if len(only) > 0 && len(canceled) == 0 {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Param: "id", Says: "nothing that waits for " + sent["to"] + " is " + strings.Join(only, ", ")}
 	}
 	// Each Task ends canceled before the thing said is let go of: one that did
 	// not end keeps what it was said as waiting, to be canceled again.
