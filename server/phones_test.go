@@ -135,10 +135,19 @@ func TestWhatIsPendingStandsOnThePhone(t *testing.T) {
 	assert.Equal(t, one.Stale, one.Expires, "a phone not reached before it goes would be shown it afterwards")
 	// By the agent's DID, which stays its own whoever holds its name later.
 	birch := map[string]string{"to": "did:key:z6Mkbirch"}
+	// "a press never asks what the person did not see": send now and cancel name what they were drawn with.
+	kept, err := srv.theCollection()
+	require.NoError(t, err)
+	kept.mu.Lock()
+	held, err := kept.read()
+	kept.mu.Unlock()
+	require.NoError(t, err)
+	require.Len(t, held["did:key:z6Mkbirch"].Waiting, 2)
+	seen := map[string]string{"to": "did:key:z6Mkbirch", "drawn": drawnOf(held["did:key:z6Mkbirch"].Waiting)}
 	assert.Equal(t, []waitsPress{
-		{Says: "send now", Does: "approve", Then: "sent", Path: "/api/collected/release", Sent: birch},
+		{Says: "send now", Does: "approve", Then: "sent", Path: "/api/collected/release", Sent: seen},
 		{Says: "delay", Does: "delay", Then: "delayed", Path: "/api/collected/later", Sent: birch},
-		{Says: "cancel", Does: "cancel", Then: "canceled", Path: "/api/collected/cancel", Sent: birch, Armed: true},
+		{Says: "cancel", Does: "cancel", Then: "canceled", Path: "/api/collected/cancel", Sent: seen, Armed: true},
 	}, shown.Presses)
 	assert.NotNil(t, shown.Segments, "the phone decodes no list from nothing")
 }

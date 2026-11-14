@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -523,6 +524,7 @@ func (s *QNTXServer) collectedSignum() sigil.Signum {
 					Takes: []*protocol.Param{to,
 						{Name: "says", Says: "The whole of what the agent receives, as the person wrote it. Empty delivers what waits as the node puts it together."},
 						{Name: "ids", Says: "The things said that go, by id, separated by commas: what the person saw. Empty is everything that waits. What is not among them waits on."},
+						{Name: "drawn", Says: "What the person saw, as a press was drawn with it: what waits now is said to have changed, and nothing is done, unless it is still that."},
 					},
 					Answer: "protocol.CollectedAll",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: collectedPath + "/release"},
@@ -549,6 +551,7 @@ func (s *QNTXServer) collectedSignum() sigil.Signum {
 					Does: "Cancels what waits for an agent: it is never delivered, and each Task it was said as ends canceled. A person's to say.",
 					Takes: []*protocol.Param{to,
 						{Name: "id", Says: "One thing said, by its id. Empty cancels everything that waits for the agent."},
+						{Name: "drawn", Says: "What the person saw, as a press was drawn with it: what waits now is said to have changed, and nothing is done, unless it is still that."},
 					},
 					Answer: "protocol.CollectedAll",
 					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: collectedPath + "/cancel"},
@@ -606,6 +609,48 @@ func aPersonsToSay(ctx context.Context, does string) *protocol.Refusal {
 		return nil
 	}
 	return &protocol.Refusal{Why: sigil.NotAllowed, Says: "collected " + does + " is a person's to say, and this asks as an agent"}
+}
+
+// "a press never asks what the person did not see"
+//
+// drawnOf is what a person saw of what waits, as a press is drawn with it:
+// each thing said, by its id and its words. Something come in, gone or
+// edited since is something else.
+func drawnOf(waiting []collectedSaid) string {
+	sum := sha256.New()
+	for _, one := range waiting {
+		sum.Write([]byte(one.ID + "\x00" + one.Says + "\x00"))
+	}
+	return hex.EncodeToString(sum.Sum(nil))[:16]
+}
+
+// changedSince is the refusal of a press drawn with something other than what waits now.
+func changedSince(to string) *protocol.Refusal {
+	return &protocol.Refusal{Why: sigil.NotAllowed, Param: "drawn", Says: "what waits for " + to + " changed since it was drawn: press again"}
+}
+
+// stillAsDrawn is the ids of what waits for did, when that is still what was
+// drawn, and a refusal when it is not.
+func (s *QNTXServer) stillAsDrawn(did, to, drawn string) ([]string, *protocol.Refusal) {
+	kept, err := s.theCollection()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	kept.mu.Lock()
+	held, err := kept.read()
+	kept.mu.Unlock()
+	if err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	waits := held[did]
+	if waits == nil || len(waits.Waiting) == 0 || drawnOf(waits.Waiting) != drawn {
+		return nil, changedSince(to)
+	}
+	ids := make([]string, 0, len(waits.Waiting))
+	for _, one := range waits.Waiting {
+		ids = append(ids, one.ID)
+	}
+	return ids, nil
 }
 
 // collectedNamed is the DID of the agent something waits for under name, or under its DID.
@@ -674,6 +719,17 @@ func (s *QNTXServer) collectedRelease(ctx context.Context, sent sigil.Sent) (any
 	only := idsOf(sent["ids"])
 	if sent["ids"] != "" && len(only) != len(strings.Split(sent["ids"], ",")) {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "ids", Says: "ids names each thing said that goes, separated by commas, and this names nothing in one of its places: leave it out to release everything that waits"}
+	}
+	if sent["drawn"] != "" {
+		as, refused := s.stillAsDrawn(did, sent["to"], sent["drawn"])
+		if refused != nil {
+			return nil, refused
+		}
+		// What goes is what was drawn, or what of it the person named: what
+		// comes in from here on waits on.
+		if len(only) == 0 {
+			only = as
+		}
 	}
 	went, err := s.deliverCollected(ctx, did, sent["says"], only, time.Time{})
 	if err != nil {
@@ -750,6 +806,9 @@ func (s *QNTXServer) collectedCancel(ctx context.Context, sent sigil.Sent) (any,
 	kept.mu.Unlock()
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
+	if sent["drawn"] != "" && drawnOf(held[did].Waiting) != sent["drawn"] {
+		return nil, changedSince(sent["to"])
 	}
 	called := held[did].Called
 	canceled := slices.DeleteFunc(slices.Clone(held[did].Waiting), func(one collectedSaid) bool { return id != "" && one.ID != id })
