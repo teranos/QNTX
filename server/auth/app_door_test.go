@@ -98,10 +98,10 @@ func TestANamedDoorPicksItsOwnClient(t *testing.T) {
 	assert.Contains(t, recorded.Header().Get("Location"), "gardens-own-client")
 }
 
-// theAppTakesBack is the ticket the app takes from the URL its sheet came back
-// on, by the app's own rule (QNTX-Web ts/app-door.ts, ticketIn): the URL up to
-// its query is exactly the door, and the query holds the ceremony. Empty where
-// the app throws the URL away.
+// 「[Opus 5.5] theAppTakesBack is the ticket the app takes from the URL its sheet came back」
+// 「[Opus 5.5] on, by the app's own rule (QNTX-Web ts/app-door.ts, ticketIn): the URL up to」
+// 「[Opus 5.5] its query is exactly the door, and the query holds the ceremony. Empty where」
+// 「[Opus 5.5] the app throws the URL away.」
 func theAppTakesBack(door, cameBack string) string {
 	cut := strings.Index(cameBack, "?")
 	if cut < 0 || cameBack[:cut] != door {
@@ -116,11 +116,11 @@ func theAppTakesBack(door, cameBack string) string {
 
 // "i cant login"
 //
-// The app's sign-in, the whole way: it starts at the node naming its door and
-// its page, GitHub answers, the sheet is sent back, the app takes the ticket
-// back by its own rule, and the ticket collects the binding. With the page the
-// app names, "/", the sheet came back to qntx://door/ and the app threw it
-// away: every sign-in by a provider in the app ended there.
+// 「[Opus 5.5] The app's sign-in, the whole way: it starts at the node naming its door and」
+// 「[Opus 5.5] its page, GitHub answers, the sheet is sent back, the app takes the ticket」
+// 「[Opus 5.5] back by its own rule, and the ticket collects the binding. With the page the」
+// 「[Opus 5.5] app names, "/", the sheet came back to qntx://door/ and the app threw it」
+// 「[Opus 5.5] away: every sign-in by a provider in the app ended there.」
 func TestTheAppSignsInByAProviderTheWholeWay(t *testing.T) {
 	standInGitHub(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -135,7 +135,7 @@ func TestTheAppSignsInByAProviderTheWholeWay(t *testing.T) {
 		h.SetGitHubClient("the-nodes-client", "the-nodes-secret")
 		h.nodeKey = testNodeKey(t)
 
-		// The app starts it, naming its door and the page it is on.
+		// 「[Opus 5.5] The app starts it, naming its door and the page it is on.」
 		started := httptest.NewRecorder()
 		h.handleBindingGo(started, httptest.NewRequest(http.MethodGet, "/auth/binding/go?provider=github&door=garden%3A%2F%2Fdoor&page="+
 			urlEncode(page)+"&peer_pubkey_hex="+testPeerPubkeyHex, nil))
@@ -150,19 +150,19 @@ func TestTheAppSignsInByAProviderTheWholeWay(t *testing.T) {
 		}
 		require.NotNil(t, cookie, page)
 
-		// GitHub sends the sheet back to the node, which holds the cookie it set.
+		// 「[Opus 5.5] GitHub sends the sheet back to the node, which holds the cookie it set.」
 		back := httptest.NewRequest(http.MethodGet, callbackPath+"?state="+url.QueryEscape(toGitHub.Query().Get("state"))+"&code=the-code", nil)
 		back.AddCookie(cookie)
 		returned := httptest.NewRecorder()
 		h.handleBindingCallback(returned, back)
 		require.Equal(t, http.StatusFound, returned.Code, returned.Body.String())
 
-		// The app takes the ticket back from where the sheet landed.
+		// 「[Opus 5.5] The app takes the ticket back from where the sheet landed.」
 		cameBack := returned.Header().Get("Location")
 		ticket := theAppTakesBack("garden://door", cameBack)
 		require.NotEmpty(t, ticket, "the app throws away %s (page %s)", cameBack, page)
 
-		// And the ticket collects the binding, from the app's page, with no cookie.
+		// 「[Opus 5.5] And the ticket collects the binding, from the app's page, with no cookie.」
 		collected := httptest.NewRecorder()
 		h.handleBindingResult(collected, httptest.NewRequest(http.MethodGet, "/auth/binding/result?ceremony="+url.QueryEscape(ticket), nil))
 		require.Equal(t, http.StatusOK, collected.Code, collected.Body.String())
