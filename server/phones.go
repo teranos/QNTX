@@ -49,7 +49,9 @@ const phonesSubject = "ACTIVITY-STARTS"
 // ends it.
 const activitiesSubject = "ACTIVITIES"
 
-// sentWithin is how long after what waited was delivered one that stood for it ends saying it was sent.
+// sentWithin is how long after what waited was delivered one that stood for
+// it ends saying it was sent, where the node does not hold the time it was
+// started for.
 var sentWithin = 15 * time.Minute
 
 // waitsType names the app's one Live Activity type, as its Swift declares it
@@ -384,11 +386,12 @@ func (c collectedFor) stands(now time.Time) bool {
 }
 
 // standsOn is whether a Live Activity of waits stands on the phone a token
-// starts them on, as far as the app said: one whose phone the app did not
-// name stands on every phone.
-func standsOn(live map[string]started, waits, phone string) bool {
+// starts them on, as far as the app said. One whose phone the app did not
+// name stands where the node started one, begunThere, and on no phone it
+// never started on: a phone named later is not kept from what waits by it.
+func standsOn(live map[string]started, waits, phone string, begunThere bool) bool {
 	for _, one := range live {
-		if one.Waits == waits && (one.Phone == phone || one.Phone == "") {
+		if one.Waits == waits && (one.Phone == phone || (one.Phone == "" && begunThere)) {
 			return true
 		}
 	}
@@ -404,9 +407,13 @@ func (s *QNTXServer) showWhatWaits(ctx context.Context, now time.Time) error {
 	// Whether what is collected was read: where it was not, nothing is known
 	// of a batch, and one that stands is left as it is.
 	batchesKnown := false
+	// What stands is read to start nothing where it stands already. Not read,
+	// that is said, and what waits is started all the same: once for each time
+	// it is due, as the collection itself keeps.
 	live, err := s.activities()
 	if err != nil {
-		return err
+		failed = append(failed, err.Error())
+		live = nil
 	}
 	if kept, err := s.theCollection(); err == nil {
 		kept.mu.Lock()
@@ -482,7 +489,8 @@ func (s *QNTXServer) startBatch(ctx context.Context, kept *collection, live map[
 	}
 	// Started once for each time it is due, and not where it stands already as the app said.
 	without := slices.DeleteFunc(slices.Clone(tokens), func(token string) bool {
-		return waits.Shown[token].Equal(due) || standsOn(live, batchWaits(did), token)
+		_, begunThere := waits.Shown[token]
+		return waits.Shown[token].Equal(due) || standsOn(live, batchWaits(did), token, begunThere)
 	})
 	if len(without) == 0 {
 		return nil
@@ -558,17 +566,34 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 				continue
 			}
 			batch := held[did]
+			// The time it was due when this one was started: one stands for one
+			// time, so that none stands longer than its wait.
+			var startedFor time.Time
+			if batch != nil {
+				startedFor = batch.startedFor(stands.Phone)
+			}
 			switch {
-			case batch != nil && batch.stands(now):
+			case batch != nil && batch.stands(now) && (startedFor.IsZero() || startedFor.Equal(batch.due())):
 				shown := batchShown(batch, batch.due())
 				waits, stale = &shown, batch.due()
+			case batch != nil && !startedFor.IsZero() && !startedFor.Equal(batch.due()) && batch.Delivered.After(startedFor.Add(-waitOf(batch.Model))):
+				// Delivered since this one began to stand, and what waits now came
+				// after: what this one stood for was sent, and says so.
+				became = "sent"
+			case batch != nil && batch.stands(now):
+				// Held to another time, and standing still by that one: this one
+				// is dismissed, and another is started for the new time.
+				became = "delayed"
 			case batch != nil && len(batch.Waiting) > 0 && !pending(batch.due(), now):
 				// Due, and not delivered yet: it is left as it stands, and ends when it is sent.
 				continue
 			case batch != nil && len(batch.Waiting) > 0:
 				// Delayed past its wait: dismissed, and started again for the wait before its new time.
 				became = "delayed"
-			case batch != nil && !batch.Delivered.IsZero() && now.Sub(batch.Delivered) < sentWithin:
+			case batch != nil && !batch.Delivered.IsZero() && !startedFor.IsZero() && batch.Delivered.After(startedFor.Add(-waitOf(batch.Model))):
+				// Delivered since this one began to stand: it was sent, however long ago the node looked last.
+				became = "sent"
+			case batch != nil && !batch.Delivered.IsZero() && startedFor.IsZero() && now.Sub(batch.Delivered) < sentWithin+collectedLooked:
 				became = "sent"
 			default:
 				became = "canceled"

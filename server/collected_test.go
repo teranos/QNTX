@@ -341,7 +341,8 @@ func TestWhatIsHeldSinceItWasLookedAtStays(t *testing.T) {
 	all, refused := askCollected(t, srv, asAPerson(), "later", sigil.Sent{"to": "Birch"})
 	require.Nil(t, refused, refused.GetSays())
 	// The moment the node looked at is before what the person passed it on to.
-	require.NoError(t, srv.deliverCollected(srv.ctx, all.GetCollected()[0].GetDid(), "", nil, time.Now().Add(7*time.Hour)))
+	_, undelivered := srv.deliverCollected(srv.ctx, all.GetCollected()[0].GetDid(), "", nil, time.Now().Add(7*time.Hour))
+	require.NoError(t, undelivered)
 	assert.Empty(t, srv.news.Since("did:key:z6Mkbirch", time.Now().UnixMilli()), "what a person passed to later was delivered by a look made before")
 }
 
