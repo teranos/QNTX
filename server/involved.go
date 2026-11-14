@@ -14,24 +14,24 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "IF WE KNOW SESSION A WAS INVOLVED, THATS WHY WE KNOW WHERE TO SEND"
-// "IF SESSION A AND B ARE INVOLVED, THEY EACH GET THE PR ADDED ONTO THERI COLLECTION"
-// "SO THEY KNOW DURING THE NEXT WAKE"
-// "NO, ANY ONE THAT WAKES. PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION"
+// "「[Opus 5.5] IF WE KNOW SESSION A WAS INVOLVED, THATS WHY WE KNOW WHERE TO SEND」"
+// "「[Opus 5.5] IF SESSION A AND B ARE INVOLVED, THEY EACH GET THE PR ADDED ONTO THERI COLLECTION」"
+// "「[Opus 5.5] SO THEY KNOW DURING THE NEXT WAKE」"
+// "「[Opus 5.5] NO, ANY ONE THAT WAKES. PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION」"
 //
-// A session is involved in a pull request when it asked GitHub about it
-// through the node (github ask): the node writes that down. When the pull
-// request is merged or closed, that is collected for each session that was
-// involved, as something that wakes nobody: they know at their next wake.
+// 「[Opus 5.5] A session is involved in a pull request when it asked GitHub about it」
+// 「[Opus 5.5] through the node (github ask): the node writes that down. When the pull」
+// 「[Opus 5.5] request is merged or closed, that is collected for each session that was」
+// 「[Opus 5.5] involved, as something that wakes nobody: they know at their next wake.」
 
-// involvedIn is what the lines about who was involved in one pull request are
-// about, the pull request by its name after it: owner/repo#n. Each line's
-// predicate is one agent's DID.
+// 「[Opus 5.5] involvedIn is what the lines about who was involved in one pull request are」
+// 「[Opus 5.5] about, the pull request by its name after it: owner/repo#n. Each line's」
+// 「[Opus 5.5] predicate is one agent's DID.」
 const involvedIn = "INVOLVED IN "
 
-// pullAskedAbout is the pull request an asking of GitHub is about, by its
-// name, owner/repo#n: what was asked names it, or, for one that was opened by
-// the asking, what GitHub answered does.
+// 「[Opus 5.5] pullAskedAbout is the pull request an asking of GitHub is about, by its」
+// 「[Opus 5.5] name, owner/repo#n: what was asked names it, or, for one that was opened by」
+// 「[Opus 5.5] the asking, what GitHub answered does.」
 func pullAskedAbout(request []byte, answered map[string]any) (string, bool) {
 	var asked map[string]any
 	if err := json.Unmarshal(request, &asked); err != nil {
@@ -42,8 +42,8 @@ func pullAskedAbout(request []byte, answered map[string]any) (string, bool) {
 	if owner == "" || repo == "" {
 		return "", false
 	}
-	// GitHubService reads what is asked as protobuf's JSON: a field by GitHub's
-	// name or by its other spelling, and a number as one or in a string.
+	// 「[Fable 5.2, Opus 5.5] GitHubService reads what is asked as protobuf's JSON: a field by GitHub's」
+	// 「[Fable 5.2, Opus 5.5] name or by its other spelling, and a number as one or in a string.」
 	number := numberSaid(asked["pull_number"])
 	for _, spelled := range []string{"pullNumber", "issue_number", "issueNumber"} {
 		if number == 0 {
@@ -51,13 +51,13 @@ func pullAskedAbout(request []byte, answered map[string]any) (string, bool) {
 		}
 	}
 	if number == 0 {
-		// Opened by this asking: GitHub answers its number, and that it is a pull request by its head.
+		// 「[Opus 5.5] Opened by this asking: GitHub answers its number, and that it is a pull request by its head.」
 		if _, opened := answered["head"]; opened {
 			number = numberSaid(answered["number"])
 		}
 	}
 	if number == 0 {
-		// A review comment read or changed: GitHub answers the pull request it is on, as .../pulls/<n>.
+		// 「[Fable 5.2, Opus 5.5] A review comment read or changed: GitHub answers the pull request it is on, as .../pulls/<n>.」
 		for _, spelled := range []string{"pull_request_url", "pullRequestUrl"} {
 			if url, said := answered[spelled].(string); said && number == 0 {
 				if at := strings.LastIndex(url, "/pulls/"); at >= 0 {
@@ -72,8 +72,8 @@ func pullAskedAbout(request []byte, answered map[string]any) (string, bool) {
 	return owner + "/" + repo + "#" + strconv.FormatInt(number, 10), true
 }
 
-// numberSaid is a number as JSON holds it, or as protobuf's JSON writes one of
-// 64 bits: in a string. What is neither is none.
+// 「[Fable 5.2, Opus 5.5] numberSaid is a number as JSON holds it, or as protobuf's JSON writes one of」
+// 「[Fable 5.2, Opus 5.5] 64 bits: in a string. What is neither is none.」
 func numberSaid(said any) int64 {
 	switch is := said.(type) {
 	case float64:
@@ -86,8 +86,8 @@ func numberSaid(said any) int64 {
 	return 0
 }
 
-// theAgentAsking is the DID of the agent that asks in ctx, by a key of its
-// own, and empty where a person asks or nobody the node admitted.
+// 「[Opus 5.5] theAgentAsking is the DID of the agent that asks in ctx, by a key of its」
+// 「[Opus 5.5] own, and empty where a person asks or nobody the node admitted.」
 func theAgentAsking(ctx context.Context) string {
 	caller := sigil.Caller(ctx)
 	if caller == nil {
@@ -104,22 +104,22 @@ func theAgentAsking(ctx context.Context) string {
 	return did
 }
 
-// involvedKey is what the lines about one pull request are kept under. GitHub
-// names a repository in any case, and what was asked may name it in another
-// than GitHub does when it says the pull request is over: it is kept in one.
+// 「[Fable 5.2, Opus 5.5] involvedKey is what the lines about one pull request are kept under. GitHub」
+// 「[Fable 5.2, Opus 5.5] names a repository in any case, and what was asked may name it in another」
+// 「[Fable 5.2, Opus 5.5] than GitHub does when it says the pull request is over: it is kept in one.」
 func involvedKey(kind, pull string) string {
 	return kind + strings.ToLower(pull)
 }
 
-// wasInvolved writes down that the agent asking in ctx asked GitHub about a
-// pull request, and answers what was not written down: an agent that is not
-// written down is told nothing when the pull request is over.
+// 「[Opus 5.5] wasInvolved writes down that the agent asking in ctx asked GitHub about a」
+// 「[Fable 5.2, Opus 5.5] pull request, and answers what was not written down: an agent that is not」
+// 「[Fable 5.2, Opus 5.5] written down is told nothing when the pull request is over.」
 func (g *gitHub) wasInvolved(ctx context.Context, operation, pull string) error {
 	did := theAgentAsking(ctx)
 	if did == "" {
 		return nil
 	}
-	// Written down once: an agent that asks about it a hundred times is one line.
+	// 「[Fable 5.2, Opus 5.5] Written down once: an agent that asks about it a hundred times is one line.」
 	if known, err := newestLines(g.host.nodeRecords().s, involvedKey(involvedIn, pull), "who was involved in a pull request"); err == nil {
 		if _, already := known[did]; already {
 			return nil
@@ -133,10 +133,10 @@ func (g *gitHub) wasInvolved(ctx context.Context, operation, pull string) error 
 	return nil
 }
 
-// collectedForDID is whose collection an agent's DID names: the Node Agent's,
-// or that of the session that holds a name by it. No name held, there is
-// nowhere the node delivers to. Names that were not read are an error, and
-// not a session without one.
+// 「[Opus 5.5] collectedForDID is whose collection an agent's DID names: the Node Agent's,」
+// 「[Opus 5.5] or that of the session that holds a name by it. No name held, there is」
+// 「[Fable 5.2, Opus 5.5] nowhere the node delivers to. Names that were not read are an error, and」
+// 「[Fable 5.2, Opus 5.5] not a session without one.」
 func (s *QNTXServer) collectedForDID(did string) (collectedFor, bool, error) {
 	if s.nodeAgent != nil && s.nodeAgent.did == did {
 		return collectedFor{DID: did, Called: s.calledInMemory(s.nodeAgent.home), Model: s.theNodeAgentsModel()}, true, nil
@@ -151,21 +151,21 @@ func (s *QNTXServer) collectedForDID(did string) (collectedFor, bool, error) {
 	return collectedFor{}, false, nil
 }
 
-// toldOver is what the lines about who was told a pull request is over are
-// about, the pull request after it. Each line's predicate is one agent's DID,
-// and it says which closing it was told of.
+// 「[Fable 5.2, Opus 5.5] toldOver is what the lines about who was told a pull request is over are」
+// 「[Fable 5.2, Opus 5.5] about, the pull request after it. Each line's predicate is one agent's DID,」
+// 「[Fable 5.2, Opus 5.5] and it says which closing it was told of.」
 const toldOver = "TOLD OVER "
 
-// tellingOver is held for the whole of one telling: GitHub delivering the same
-// closing twice tells each session once.
+// 「[Fable 5.2, Opus 5.5] tellingOver is held for the whole of one telling: GitHub delivering the same」
+// 「[Fable 5.2, Opus 5.5] closing twice tells each session once.」
 var tellingOver sync.Mutex
 
-// pullIsOver collects, for each session that was involved in a pull request,
-// that it was merged or closed. It wakes nobody. closedAt is GitHub's time of
-// this closing, which names it: a session is told of one closing once, however
-// often GitHub delivers it, and one that was not told is told when GitHub
-// delivers it again. A pull request opened again and closed again is another
-// closing.
+// 「[Opus 5.5] pullIsOver collects, for each session that was involved in a pull request,」
+// 「[Fable 5.2, Opus 5.5] that it was merged or closed. It wakes nobody. closedAt is GitHub's time of」
+// 「[Fable 5.2, Opus 5.5] this closing, which names it: a session is told of one closing once, however」
+// 「[Fable 5.2, Opus 5.5] often GitHub delivers it, and one that was not told is told when GitHub」
+// 「[Fable 5.2, Opus 5.5] delivers it again. A pull request opened again and closed again is another」
+// 「[Fable 5.2, Opus 5.5] closing.」
 func (s *QNTXServer) pullIsOver(subject, title, link, closedAt string, merged bool) error {
 	tellingOver.Lock()
 	defer tellingOver.Unlock()
@@ -202,7 +202,7 @@ func (s *QNTXServer) pullIsOver(subject, title, link, closedAt string, merged bo
 			continue
 		}
 		if err := s.nodeRecords().nodeRecord(s.nodeActor(), involvedKey(toldOver, subject), did, "_", map[string]any{"closed_at": closedAt, "merged": merged}); err != nil {
-			// Collected and not written down: delivered again, GitHub's closing is collected twice for this one.
+			// 「[Fable 5.2, Opus 5.5] Collected and not written down: delivered again, GitHub's closing is collected twice for this one.」
 			s.logger.Errorw("That a session was told a pull request is over was not written down", "pull", subject, "agent", did, "error", err)
 		}
 	}
