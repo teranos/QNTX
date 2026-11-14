@@ -44,11 +44,11 @@ type Client struct {
 // expired client is not a door, and is refused here rather than at the token
 // endpoint.
 //
-// It is asked on every request a key signs (admissionOf), a session's own key
-// among them, which names no client. So the store is asked for the client by
-// its DID and the list is not read: read whole for each, it was what q spent
-// its CPU on until it starved (2026-11-13, QNTX #1715). A store that cannot
-// find one by its DID is listed, as before.
+// 「[Fable 5.2] It is asked on every request a key signs (admissionOf), a session's own key」
+// 「[Fable 5.2] among them, which names no client. So the store is asked for the client by」
+// 「[Fable 5.2] its DID and the list is not read: read whole for each, it was what q spent」
+// 「[Fable 5.2] its CPU on until it starved (2026-11-13, QNTX #1715). A store that cannot」
+// 「[Fable 5.2] find one by its DID is listed, as before.」
 func (h *Handler) clientByDID(did string) (Client, bool) {
 	if node, declared := h.nodes[did]; declared {
 		return node, true
@@ -97,8 +97,8 @@ func (h *Handler) clientByDID(did string) (Client, bool) {
 	return Client{}, false
 }
 
-// findsClients is a TokenStore that finds the client a DID names without listing
-// every token. The operational table is one; a store that is not is listed.
+// 「[Fable 5.2] findsClients is a TokenStore that finds the client a DID names without listing」
+// 「[Fable 5.2] every token. The operational table is one; a store that is not is listed.」
 type findsClients interface {
 	ClientByDID(did string) (TokenInfo, bool)
 }
