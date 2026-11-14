@@ -26,7 +26,7 @@ func githubAskSigils() []*protocol.Sigil {
 			},
 			Gives: []*protocol.Field{
 				{Name: "answer", Says: "What GitHub answered, as the operation gives it."},
-				{Name: "untold", Says: "Only when the node did not write down that the asker is involved in the pull request asked about: why, and that it is told nothing when the pull request is merged or closed."},
+				{Name: "untold", Says: "Empty, or, when the node did not write down that the asker is involved in the pull request asked about: why, and that it is told nothing when the pull request is merged or closed."},
 			},
 			Http: &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/ask"},
 		},
@@ -90,12 +90,12 @@ func (g *gitHub) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol
 			untold = g.wasInvolved(ctx, operation, opened)
 		}
 	}
-	gives := map[string]any{"answer": answered}
+	// GitHub did what was asked, and that stands: what the node did not keep is said beside it.
+	notKept := ""
 	if untold != nil {
-		// GitHub did what was asked, and that stands: what the node did not keep is said beside it.
-		gives["untold"] = untold.Error()
+		notKept = untold.Error()
 	}
-	return gives, nil
+	return map[string]any{"answer": answered, "untold": notKept}, nil
 }
 
 func (g *gitHub) githubOperations(context.Context, sigil.Sent) (any, *protocol.Refusal) {
