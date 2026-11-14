@@ -634,13 +634,18 @@ func (s *QNTXServer) collectedRelease(ctx context.Context, sent sigil.Sent) (any
 	if sent["ids"] != "" && len(only) != len(strings.Split(sent["ids"], ",")) {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "ids", Says: "ids names each thing said that goes, separated by commas, and this names nothing in one of its places: leave it out to release everything that waits"}
 	}
+	waited := s.waitingFor(did)
 	if err := s.deliverCollected(ctx, did, sent["says"], only, time.Time{}); err != nil {
 		by, client := decidedBy(ctx)
 		s.logger.Errorw("What a person released was not delivered", "to", did, "by", by, "client_named_itself", client, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	by, client := decidedBy(ctx)
-	s.logger.Infow("What is collected for an agent is released by a person", "to", did, "things_named", len(only), "authored", sent["says"] != "", "by", by, "client_named_itself", client)
+	// Said only when something went: a release of what holds nothing delivers nothing.
+	if waited > 0 {
+		by, client := decidedBy(ctx)
+		s.logger.Infow("What is collected for an agent is released by a person", "to", did, "things_waited", waited, "things_named", len(only),
+			"authored", strings.TrimSpace(sent["says"]) != "", "by", by, "client_named_itself", client)
+	}
 	return s.collectedList(ctx, sent)
 }
 
@@ -671,8 +676,11 @@ func (s *QNTXServer) collectedLater(ctx context.Context, sent sigil.Sent) (any, 
 	}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	by, client := decidedBy(ctx)
-	s.logger.Infow("What is collected for an agent is delayed by a person", "to", did, "until", stamped(until), "by", by, "client_named_itself", client)
+	// Said only when it was delayed: what holds nothing that is due has no time to move.
+	if !until.IsZero() {
+		by, client := decidedBy(ctx)
+		s.logger.Infow("What is collected for an agent is delayed by a person", "to", did, "until", stamped(until), "by", by, "client_named_itself", client)
+	}
 	return s.collectedList(ctx, sent)
 }
 
@@ -766,6 +774,21 @@ func (s *QNTXServer) collectedEdit(ctx context.Context, sent sigil.Sent) (any, *
 	return s.collectedList(ctx, sent)
 }
 
+// waitingFor is how many things wait for the agent whose DID this is.
+func (s *QNTXServer) waitingFor(did string) int {
+	kept, err := s.theCollection()
+	if err != nil {
+		return 0
+	}
+	kept.mu.Lock()
+	held, err := kept.read()
+	kept.mu.Unlock()
+	if err != nil || held[did] == nil {
+		return 0
+	}
+	return len(held[did].Waiting)
+}
+
 // namedItself is how a client named itself, as fit for a log: the page, or
 // what stands on a phone. It is the client's own word and proves nothing, so
 // it is written as that and never as who decided; cut where it runs long, and
@@ -793,8 +816,12 @@ func decidedBy(ctx context.Context) (by, client string) {
 	if r == nil {
 		return "", ""
 	}
+	// Who the node admitted: the route they act as, and for ROOT, who acts as no route, who they are.
 	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
 		by = admitted.ActsAs()
+		if by == "" {
+			by = admitted.Identity
+		}
 	}
 	return by, namedItself(r)
 }
