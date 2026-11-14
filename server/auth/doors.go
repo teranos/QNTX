@@ -281,9 +281,9 @@ func (h *Handler) returnableTo(r *http.Request) string {
 // onPage is the page on a door's origin a ceremony returns to: the path it
 // began on, where the invitee's invitation is held.
 func onPage(origin, page string) string {
-	// A page is a path on a site. A door that is an app's scheme, qntx://door,
-	// has no pages: the app takes back exactly the door it named, and
-	// qntx://door/ or anything after it is not that door.
+	// 「[Opus 5.5] A page is a path on a site. A door that is an app's scheme, qntx://door,」
+	// 「[Opus 5.5] has no pages: the app takes back exactly the door it named, and」
+	// 「[Opus 5.5] qntx://door/ or anything after it is not that door.」
 	if origin == "" || page == "" || !(strings.HasPrefix(origin, "https://") || strings.HasPrefix(origin, "http://")) {
 		return origin
 	}
