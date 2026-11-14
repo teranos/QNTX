@@ -144,9 +144,11 @@ func (s *QNTXServer) pullRequestEvent(e gitHubPullRequestEvent) ([]string, error
 			return nil, err
 		}
 		// Over: collected for each session that was involved in it, waking nobody (involved.go).
+		// What the sessions are told failing is said, and does not fail the rest
+		// of what this delivery is: its approval closed above, and its other readers.
 		if e.Action == "closed" {
 			if err := s.pullIsOver(subject, e.PullRequest.Title, e.PullRequest.HTMLURL, e.PullRequest.ClosedAt, e.PullRequest.Merged); err != nil {
-				return nil, err
+				s.logger.Errorw("A pull request closed and the sessions involved in it were not told", "pull", subject, "error", err)
 			}
 		}
 	case "assigned", "unassigned", "labeled", "unlabeled", "edited", "locked", "unlocked",

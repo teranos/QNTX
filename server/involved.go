@@ -56,6 +56,16 @@ func pullAskedAbout(request []byte, answered map[string]any) (string, bool) {
 			number = numberSaid(answered["number"])
 		}
 	}
+	if number == 0 {
+		// A review comment read or changed: GitHub answers the pull request it is on, as .../pulls/<n>.
+		for _, spelled := range []string{"pull_request_url", "pullRequestUrl"} {
+			if url, said := answered[spelled].(string); said && number == 0 {
+				if at := strings.LastIndex(url, "/pulls/"); at >= 0 {
+					number = numberSaid(url[at+len("/pulls/"):])
+				}
+			}
+		}
+	}
 	if number <= 0 {
 		return "", false
 	}

@@ -37,6 +37,9 @@ func TestThePullRequestAnAskingIsAbout(t *testing.T) {
 	assert.Equal(t, "teranos/QNTX#1734", about(`{"owner":"teranos","repo":"QNTX","pullNumber":"1734"}`, nil))
 	assert.Equal(t, "teranos/QNTX#1740", about(`{"owner":"teranos","repo":"QNTX","title":"t","head":"a","base":"main"}`,
 		map[string]any{"number": "1740", "head": map[string]any{"ref": "a"}}))
+	// A review comment read or changed: the pull request GitHub answers it is on.
+	assert.Equal(t, "teranos/QNTX#1741", about(`{"owner":"teranos","repo":"QNTX","comment_id":"77"}`,
+		map[string]any{"pull_request_url": "https://api.github.com/repos/teranos/QNTX/pulls/1741"}))
 	// An issue that was opened is no pull request, and a branch that was read is about none.
 	assert.Empty(t, about(`{"owner":"teranos","repo":"QNTX","title":"t"}`, map[string]any{"number": float64(9)}))
 	assert.Empty(t, about(`{"owner":"teranos","repo":"QNTX","branch":"main"}`, nil))
