@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"iter"
 	"net/http"
 	"regexp"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/a2aproject/a2a-go/v2/errordetails"
 	"github.com/google/uuid"
@@ -70,6 +72,10 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	atNoTenant := a2asrv.NewRESTHandler(handler, alive)
 	atTenant := a2asrv.NewTenantRESTHandler("/{*}", handler, alive)
 	jsonRPC := a2asrv.NewJSONRPCHandler(handler, alive)
+	// The node speaks what the a2a-go it pins speaks: 1.0, and 0.3 by its
+	// a2acompat, on the one handler, gate and Tasks.
+	rest03 := a2av0.NewRESTHandler(tenantIn03{handler, s}, alive)
+	jsonRPC03 := a2av0.NewJSONRPCHandler(tenantIn03{handler, s}, alive)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// One id per request, answered to the client, so what it reports names what the node wrote down.
 		id := uuid.NewString()
@@ -83,9 +89,22 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		if r.Body != nil {
 			r.Body = &a2aBodyRead{ReadCloser: http.MaxBytesReader(w, r.Body, nodeBodyMost), exchange: exchange}
 		}
+		spoken, tenant, path, overJSONRPC := spokenIn(r)
+		// Which version a caller names, or names none, does not matter: the
+		// version its request is in is the one it is answered in.
+		r.Header.Set(a2asdk.SvcParamVersion, string(spoken))
+		if spoken == a2av0.Version {
+			r.URL.Path = path
+			r = r.WithContext(context.WithValue(r.Context(), tenantIn03Key{}, tenant))
+		}
 		exchange.request = r
-		answered := &a2aAnswered{ResponseWriter: w, keepsAll: r.Method == http.MethodPost && r.URL.Path == "/"}
+		answered := &a2aAnswered{ResponseWriter: w, keepsAll: overJSONRPC}
 		switch _, _, named := tenantOf(r.Method, r.URL.Path); {
+		case spoken == a2av0.Version && overJSONRPC:
+			exchange.jsonRPC = true
+			jsonRPC03.ServeHTTP(answered, r)
+		case spoken == a2av0.Version:
+			rest03.ServeHTTP(answered, r)
 		case r.Method == http.MethodPost && r.URL.Path == "/":
 			exchange.jsonRPC = true
 			jsonRPC.ServeHTTP(answered, r)
@@ -117,6 +136,202 @@ func tenantOf(method, path string) (string, string, bool) {
 		return "", path, false
 	}
 	return first, strings.TrimPrefix(path, "/"+first), true
+}
+
+// spokenIn is the A2A version r is in, by its shape: 0.3's HTTP+JSON is under
+// /v1, and its JSON-RPC methods are named with a slash (message/send), 1.0's
+// are neither. A caller naming 1.0 is held to it. 0.3 carries no tenant, so
+// its agent at a tenant is reached under the tenant's path: tenant is that
+// path's first segment, and path what 0.3's binding reads after it.
+func spokenIn(r *http.Request) (spoken a2asdk.ProtocolVersion, tenant, path string, overJSONRPC bool) {
+	named := r.Header.Get(a2asdk.SvcParamVersion)
+	if named == "" {
+		named = r.URL.Query().Get(a2asdk.SvcParamVersion)
+	}
+	in10, in03 := strings.HasPrefix(named, "1."), strings.HasPrefix(named, "0.")
+	trimmed := strings.TrimPrefix(r.URL.Path, "/")
+	first, after, _ := strings.Cut(trimmed, "/")
+	if r.Method == http.MethodPost && !strings.Contains(trimmed, "/") && !a2aRoute(r.Method, r.URL.Path) {
+		// A caller naming 0.3 is answered in 0.3, whatever its body holds.
+		if in03 || (!in10 && jsonRPCMethodIn03(r)) {
+			return a2av0.Version, first, "/", true
+		}
+		return a2asdk.Version, "", r.URL.Path, trimmed == ""
+	}
+	if !in10 {
+		switch {
+		case strings.HasPrefix(after, a2av0.RESTPathPrefix[1:]+"/"):
+			return a2av0.Version, first, "/" + after, false
+		case first == a2av0.RESTPathPrefix[1:] && after != "":
+			return a2av0.Version, "", r.URL.Path, false
+		}
+	}
+	return a2asdk.Version, "", r.URL.Path, false
+}
+
+// jsonRPCMethodIn03 is whether r's JSON-RPC method is one of 0.3's. The body
+// is read, and put back for the binding to read again.
+func jsonRPCMethodIn03(r *http.Request) bool {
+	if r.Body == nil {
+		return false
+	}
+	body, err := io.ReadAll(r.Body)
+	again := []io.Reader{bytes.NewReader(body)}
+	if err != nil {
+		again = append(again, readFails{err})
+	}
+	r.Body = bodyAgain{Reader: io.MultiReader(again...), Closer: r.Body}
+	var said struct {
+		Method string `json:"method"`
+	}
+	return json.Unmarshal(body, &said) == nil && strings.Contains(said.Method, "/")
+}
+
+// bodyAgain is a body read once, read again from what was read.
+type bodyAgain struct {
+	io.Reader
+	io.Closer
+}
+
+// readFails is how reading a body failed, said again to the binding.
+type readFails struct{ err error }
+
+func (f readFails) Read([]byte) (int, error) { return 0, f.err }
+
+// tenantIn03Key holds the tenant a 0.3 request's path names.
+type tenantIn03Key struct{}
+
+// tenantIn03 is the handler 0.3 is answered by: the one 1.0 is, each request
+// given the tenant its path named, which 0.3's requests have no field for.
+type tenantIn03 struct {
+	a2asrv.RequestHandler
+	s *QNTXServer
+}
+
+func tenantFrom03(ctx context.Context, tenant *string) {
+	if named, _ := ctx.Value(tenantIn03Key{}).(string); named != "" && *tenant == "" {
+		*tenant = named
+	}
+}
+
+func (h tenantIn03) GetTask(ctx context.Context, req *a2asdk.GetTaskRequest) (*a2asdk.Task, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.GetTask(ctx, req)
+}
+
+func (h tenantIn03) ListTasks(ctx context.Context, req *a2asdk.ListTasksRequest) (*a2asdk.ListTasksResponse, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.ListTasks(ctx, req)
+}
+
+func (h tenantIn03) CancelTask(ctx context.Context, req *a2asdk.CancelTaskRequest) (*a2asdk.Task, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.CancelTask(ctx, req)
+}
+
+func (h tenantIn03) SendMessage(ctx context.Context, req *a2asdk.SendMessageRequest) (a2asdk.SendMessageResult, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.SendMessage(ctx, req)
+}
+
+func (h tenantIn03) SubscribeToTask(ctx context.Context, req *a2asdk.SubscribeToTaskRequest) iter.Seq2[a2asdk.Event, error] {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.SubscribeToTask(ctx, req)
+}
+
+func (h tenantIn03) SendStreamingMessage(ctx context.Context, req *a2asdk.SendMessageRequest) iter.Seq2[a2asdk.Event, error] {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.SendStreamingMessage(ctx, req)
+}
+
+func (h tenantIn03) GetTaskPushConfig(ctx context.Context, req *a2asdk.GetTaskPushConfigRequest) (*a2asdk.PushConfig, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.GetTaskPushConfig(ctx, req)
+}
+
+func (h tenantIn03) ListTaskPushConfigs(ctx context.Context, req *a2asdk.ListTaskPushConfigRequest) (*a2asdk.ListTaskPushConfigResponse, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.ListTaskPushConfigs(ctx, req)
+}
+
+func (h tenantIn03) CreateTaskPushConfig(ctx context.Context, req *a2asdk.PushConfig) (*a2asdk.PushConfig, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.CreateTaskPushConfig(ctx, req)
+}
+
+func (h tenantIn03) DeleteTaskPushConfig(ctx context.Context, req *a2asdk.DeleteTaskPushConfigRequest) error {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.DeleteTaskPushConfig(ctx, req)
+}
+
+// GetExtendedAgentCard is the card 0.3's bindings write as a2av0's
+// FromV1AgentCard, which reads its url and protocolVersion off the first
+// interface: 0.3's come first, and the card is signed over the bytes written.
+// A peer's card is the peer's, and is handed over as the peer signed it.
+func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExtendedAgentCardRequest) (*a2asdk.AgentCard, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	card, err := h.RequestHandler.GetExtendedAgentCard(ctx, req)
+	if err != nil || card == nil {
+		return card, err
+	}
+	if req != nil && req.Tenant != "" && slices.ContainsFunc(h.s.peers(), serving(req.Tenant)) {
+		return card, nil
+	}
+	in03 := *card
+	in03.Signatures = nil
+	in03.SupportedInterfaces = slices.Clone(card.SupportedInterfaces)
+	slices.SortStableFunc(in03.SupportedInterfaces, func(a, b *a2asdk.AgentInterface) int {
+		return cmpBool(b.ProtocolVersion == a2av0.Version, a.ProtocolVersion == a2av0.Version)
+	})
+	raw, err := json.Marshal(a2av0.FromV1AgentCard(&in03))
+	if err != nil {
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not written in 0.3: "+err.Error())
+	}
+	signers, err := h.s.cardSigners(ctx)
+	if err != nil {
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not signed: "+err.Error())
+	}
+	for _, signer := range signers {
+		sig, err := signer.Sign(ctx, raw)
+		if err != nil {
+			return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not signed: "+err.Error())
+		}
+		in03.Signatures = append(in03.Signatures, *sig)
+	}
+	return &in03, nil
+}
+
+// cmpBool orders false before true.
+func cmpBool(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return 1
+	}
+	return -1
 }
 
 // a2aRoutes is each operation's method and route (§11.3).
