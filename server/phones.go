@@ -18,9 +18,7 @@ import (
 )
 
 // "the magic island"
-// "as you may believe, i want to see it on my phone, for the duration of 15 minutes before a collected message is sent, the preview and the buttons to send now, delay and cancel"
 // "THE BATCH IS A LIVE ACTIVITY"
-// "DONT DO THE 15 MINUTE THING ANYMORE"
 // "ANY PENDING IS LIVE ACTIVITY"
 // "ANY PENDING COLLECITON"
 // "SO THE 6H ONE STAYS FOR 6H"
@@ -92,7 +90,6 @@ type waitsPress struct {
 	Says string `json:"says"`
 	// "CANCEL SHOULD BE ONE THING"
 	// "APPROVE SHOULD BE ONE THING"
-	// "THEY ARE ESSENTIALLY THE SAME GODDAMN THING"
 	// Does names what the press is, and a press is one of three: approve,
 	// delay, cancel. Sending what waits now is approving it. The mark it is drawn as is the phone's to say,
 	// one mark for each wherever it stands, and Says is what is read out for it.
@@ -323,13 +320,16 @@ func batchShown(waits *collectedFor, due time.Time) waitsShown {
 	}
 	// By its DID: a name is held by whoever holds it when the press is pressed.
 	to := map[string]string{"to": waits.DID}
+	// "a press never asks what the person did not see": send now and cancel
+	// carry what they were drawn with, and do nothing once that changed.
+	seen := map[string]string{"to": waits.DID, "drawn": drawnOf(waits.Waiting)}
 	return waitsShown{
 		Says: says, Preview: strings.Join(lines, "\n"), Due: float64(due.Unix()),
 		Segments: []waitsSegment{},
 		Presses: []waitsPress{
-			{Says: "send now", Does: "approve", Then: "sent", Path: collectedPath + "/release", Sent: to},
+			{Says: "send now", Does: "approve", Then: "sent", Path: collectedPath + "/release", Sent: seen},
 			{Says: "delay", Does: "delay", Then: "delayed", Path: collectedPath + "/later", Sent: to},
-			{Says: "cancel", Does: "cancel", Then: "canceled", Path: collectedPath + "/cancel", Sent: to, Armed: true},
+			{Says: "cancel", Does: "cancel", Then: "canceled", Path: collectedPath + "/cancel", Sent: seen, Armed: true},
 		},
 	}
 }
@@ -584,6 +584,9 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 				// Held to another time, and standing still by that one: this one
 				// is dismissed, and another is started for the new time.
 				became = "delayed"
+			case batch != nil && len(batch.Waiting) > 0 && batch.due().IsZero():
+				// What is left wakes nobody: what this one stood for was canceled.
+				became = "canceled"
 			case batch != nil && len(batch.Waiting) > 0 && !pending(batch.due(), now):
 				// Due, and not delivered yet: it is left as it stands, and ends when it is sent.
 				continue
