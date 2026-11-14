@@ -412,22 +412,41 @@ func TestAnAgentInAPersonsTurnSpeaksForThem(t *testing.T) {
 }
 
 // "a press never asks what the person did not see"
-// A cancel names what the person saw; what came in since waits on.
-func TestACancelTakesOnlyWhatWasSeen(t *testing.T) {
+// A press carries what it was drawn with: what still is that goes; what
+// changed since, by something come in or edited, is refused, and nothing is done.
+func TestAPressDoesNothingOnceWhatItWasDrawnWithChanged(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
 	sayTo(t, srv, alder, "Birch", "pull request one is open")
-	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
-	require.Nil(t, refused, refused.GetSays())
-	seen := all.GetCollected()[0].GetWaiting()[0].GetId()
+	drawn := func() string {
+		kept, err := srv.theCollection()
+		require.NoError(t, err)
+		kept.mu.Lock()
+		held, err := kept.read()
+		kept.mu.Unlock()
+		require.NoError(t, err)
+		return drawnOf(held["did:key:z6Mkbirch"].Waiting)
+	}
+	first := drawn()
 
 	sayTo(t, srv, alder, "Birch", "pull request two is open")
-	all, refused = askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch", "ids": seen})
-	require.Nil(t, refused, refused.GetSays())
-	require.Len(t, all.GetCollected(), 1)
-	require.Len(t, all.GetCollected()[0].GetWaiting(), 1)
-	assert.Equal(t, "pull request two is open", all.GetCollected()[0].GetWaiting()[0].GetSays(), "what came in after it was seen was canceled")
+	for _, press := range []string{"release", "cancel"} {
+		_, refused := askCollected(t, srv, asAPerson(), press, sigil.Sent{"to": "Birch", "drawn": first})
+		require.NotNil(t, refused, "%s took what came in after it was drawn", press)
+		assert.Contains(t, refused.GetSays(), "changed since it was drawn")
+	}
 
-	_, refused = askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch", "id": seen, "ids": seen})
-	require.NotNil(t, refused, "id and ids were both taken")
+	// Edited: the same ids, other words, and so something else.
+	both := drawn()
+	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	_, refused = askCollected(t, srv, asAPerson(), "edit", sigil.Sent{"to": "Birch", "id": all.GetCollected()[0].GetWaiting()[0].GetId(), "says": "pull request one is merged"})
+	require.Nil(t, refused, refused.GetSays())
+	_, refused = askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch", "drawn": both})
+	require.NotNil(t, refused, "a cancel drawn before an edit took the edited words")
+
+	// Still as drawn: all of it goes.
+	all, refused = askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Birch", "drawn": drawn()})
+	require.Nil(t, refused, refused.GetSays())
+	assert.Empty(t, all.GetCollected(), "what was drawn still waits")
 }

@@ -142,12 +142,8 @@ func TestWhatIsPendingStandsOnThePhone(t *testing.T) {
 	held, err := kept.read()
 	kept.mu.Unlock()
 	require.NoError(t, err)
-	ids := []string{}
-	for _, one := range held["did:key:z6Mkbirch"].Waiting {
-		ids = append(ids, one.ID)
-	}
-	require.Len(t, ids, 2)
-	seen := map[string]string{"to": "did:key:z6Mkbirch", "ids": strings.Join(ids, ",")}
+	require.Len(t, held["did:key:z6Mkbirch"].Waiting, 2)
+	seen := map[string]string{"to": "did:key:z6Mkbirch", "drawn": drawnOf(held["did:key:z6Mkbirch"].Waiting)}
 	assert.Equal(t, []waitsPress{
 		{Says: "send now", Does: "approve", Then: "sent", Path: "/api/collected/release", Sent: seen},
 		{Says: "delay", Does: "delay", Then: "delayed", Path: "/api/collected/later", Sent: birch},
