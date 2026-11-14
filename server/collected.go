@@ -59,6 +59,10 @@ type collectedSaid struct {
 	// ID is what a person names it by; Edited that a person changed what it says.
 	ID     string `json:"id,omitempty"`
 	Edited bool   `json:"edited,omitempty"`
+	// "PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION"
+	// Quiet is that it wakes nobody: it is delivered with what does, and
+	// alone it makes nothing due.
+	Quiet bool `json:"quiet,omitempty"`
 }
 
 // collectedID is a new name for one thing said.
@@ -96,13 +100,16 @@ func waitOf(model string) time.Duration {
 	return collectedForFable
 }
 
-// due is when what waits is delivered if nobody holds or releases it.
+// due is when what waits is delivered if nobody holds or releases it: the
+// agent's wait after the first thing that wakes it. What only holds what
+// wakes nobody is due at no time, and goes when something that wakes does.
 func (c collectedFor) due() time.Time {
-	if len(c.Waiting) == 0 {
+	first := slices.IndexFunc(c.Waiting, func(one collectedSaid) bool { return !one.Quiet })
+	if first < 0 {
 		return time.Time{}
 	}
 	wait := waitOf(c.Model)
-	due := c.Waiting[0].At.Add(wait)
+	due := c.Waiting[first].At.Add(wait)
 	if after := c.Delivered.Add(wait); !c.Delivered.IsZero() && after.After(due) {
 		due = after
 	}
@@ -264,7 +271,7 @@ func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, er
 	if err != nil {
 		return time.Time{}, err
 	}
-	s.logger.Infow("What an agent said to an agent is collected", "to", to.Called, "from", said.From, "task", said.Task, "due", due.UTC().Format(time.RFC3339))
+	s.logger.Infow("What an agent said to an agent is collected", "to", to.Called, "from", said.From, "task", said.Task, "wakes", !said.Quiet, "due", stamped(due))
 	return due, nil
 }
 
@@ -438,7 +445,8 @@ func (s *QNTXServer) deliverDue(now time.Time) error {
 	}
 	failed := []string{}
 	for did, waits := range held {
-		if len(waits.Waiting) == 0 || now.Before(waits.due()) {
+		// What is due at no time holds nothing that wakes, and is not delivered for itself.
+		if due := waits.due(); due.IsZero() || now.Before(due) {
 			continue
 		}
 		if err := s.deliverCollected(s.ctx, did, "", nil, now); err != nil {

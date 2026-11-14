@@ -74,6 +74,8 @@ func (g *gitHub) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol
 	}
 	delete(answered, "success")
 	delete(answered, "error")
+	// An agent that asked about a pull request was involved in it (involved.go).
+	g.wasInvolved(ctx, operation, []byte(sent["request"]), answered)
 	return map[string]any{"answer": answered}, nil
 }
 

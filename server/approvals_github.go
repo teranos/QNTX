@@ -141,6 +141,12 @@ func (s *QNTXServer) pullRequestEvent(e gitHubPullRequestEvent) ([]string, error
 		if err := s.approvalLine(s.nodeActor(), subject, watcher.ApprovalClosed, e.Repository.FullName, attrs); err != nil {
 			return nil, err
 		}
+		// Over: collected for each session that was involved in it, waking nobody (involved.go).
+		if e.Action == "closed" {
+			if err := s.pullIsOver(subject, e.PullRequest.Title, e.PullRequest.HTMLURL, e.PullRequest.Merged); err != nil {
+				return nil, err
+			}
+		}
 	case "assigned", "unassigned", "labeled", "unlabeled", "edited", "locked", "unlocked",
 		"review_requested", "review_request_removed", "milestoned", "demilestoned",
 		"auto_merge_enabled", "auto_merge_disabled", "enqueued", "dequeued", "typed", "untyped":
