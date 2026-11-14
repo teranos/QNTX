@@ -26,6 +26,7 @@ func githubAskSigils() []*protocol.Sigil {
 			},
 			Gives: []*protocol.Field{
 				{Name: "answer", Says: "What GitHub answered, as the operation gives it."},
+				{Name: "untold", Says: "Empty, or, when the node did not write down that the asker is involved in the pull request asked about: why, and that it is told nothing when the pull request is merged or closed."},
 			},
 			Http: &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/ask"},
 		},
@@ -44,6 +45,15 @@ func (g *gitHub) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol
 	// what tells a call that was answered from one that was not (6SION).
 	mcpAskedOf(ctx).says("operation", operation)
 	// TODO(forge): ask and operations expose GitHubService by operation name. They are GitHub's and should say so (sigil names), or each forge lists its own operations.
+	// An agent that asks about a pull request is involved in it (involved.go),
+	// and is written down before GitHub is asked: an asking that merges it is
+	// answered after GitHub said it is over, and one GitHub refused was about
+	// it all the same.
+	var untold error
+	pull, named := pullAskedAbout([]byte(sent["request"]), nil)
+	if named {
+		untold = g.wasInvolved(ctx, operation, pull)
+	}
 	raw, err := g.gitHubService().Ask(services.AsInstallation(ctx), operation, []byte(sent["request"]))
 	var noSuch services.NoSuchOperation
 	var notTaken services.NotWhatItTakes
@@ -74,7 +84,18 @@ func (g *gitHub) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol
 	}
 	delete(answered, "success")
 	delete(answered, "error")
-	return map[string]any{"answer": answered}, nil
+	// One the asking opened is named by what GitHub answered.
+	if !named {
+		if opened, isOne := pullAskedAbout([]byte(sent["request"]), answered); isOne {
+			untold = g.wasInvolved(ctx, operation, opened)
+		}
+	}
+	// GitHub did what was asked, and that stands: what the node did not keep is said beside it.
+	notKept := ""
+	if untold != nil {
+		notKept = untold.Error()
+	}
+	return map[string]any{"answer": answered, "untold": notKept}, nil
 }
 
 func (g *gitHub) githubOperations(context.Context, sigil.Sent) (any, *protocol.Refusal) {
