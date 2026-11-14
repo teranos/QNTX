@@ -434,3 +434,31 @@ func TestOneThatIsHeldToAnotherTimeIsStartedAnewForIt(t *testing.T) {
 	assert.Equal(t, apns.ActivityStarts, again.Event)
 	assert.InDelta(t, float64(goes.Unix()), again.State.(waitsShown).Due, 5)
 }
+
+// A phone named while a collection is pending has it started there, also when
+// one stands elsewhere whose phone the app did not name.
+func TestAPhoneNamedLaterHasWhatIsPendingStartedOnIt(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	apple := &told{}
+	srv.shows = apple
+	code, said := handsOver(t, srv, inROOTsSession(), naming(aPhone))
+	require.Equal(t, http.StatusOK, code, said)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	due := time.Now().Add(6 * time.Hour)
+	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-time.Hour)))
+	require.Len(t, apple.sent, 1)
+	code, said = handsOver(t, srv, inROOTsSession(), startedOf(anActivity))
+	require.Equal(t, http.StatusOK, code, said)
+
+	code, said = handsOver(t, srv, inROOTsSession(), naming(anotherPhone))
+	require.Equal(t, http.StatusOK, code, said)
+	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-50*time.Minute)))
+	starts := []string{}
+	for _, one := range apple.sent {
+		if one.Event == apns.ActivityStarts {
+			starts = append(starts, one.Token)
+		}
+	}
+	assert.Equal(t, []string{aPhone, anotherPhone}, starts, "a phone named later was kept from what waits, or the first was started on again")
+}

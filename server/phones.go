@@ -386,11 +386,12 @@ func (c collectedFor) stands(now time.Time) bool {
 }
 
 // standsOn is whether a Live Activity of waits stands on the phone a token
-// starts them on, as far as the app said: one whose phone the app did not
-// name stands on every phone.
-func standsOn(live map[string]started, waits, phone string) bool {
+// starts them on, as far as the app said. One whose phone the app did not
+// name stands where the node started one, begunThere, and on no phone it
+// never started on: a phone named later is not kept from what waits by it.
+func standsOn(live map[string]started, waits, phone string, begunThere bool) bool {
 	for _, one := range live {
-		if one.Waits == waits && (one.Phone == phone || one.Phone == "") {
+		if one.Waits == waits && (one.Phone == phone || (one.Phone == "" && begunThere)) {
 			return true
 		}
 	}
@@ -488,7 +489,8 @@ func (s *QNTXServer) startBatch(ctx context.Context, kept *collection, live map[
 	}
 	// Started once for each time it is due, and not where it stands already as the app said.
 	without := slices.DeleteFunc(slices.Clone(tokens), func(token string) bool {
-		return waits.Shown[token].Equal(due) || standsOn(live, batchWaits(did), token)
+		_, begunThere := waits.Shown[token]
+		return waits.Shown[token].Equal(due) || standsOn(live, batchWaits(did), token, begunThere)
 	})
 	if len(without) == 0 {
 		return nil
@@ -574,6 +576,10 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 			case batch != nil && batch.stands(now) && (startedFor.IsZero() || startedFor.Equal(batch.due())):
 				shown := batchShown(batch, batch.due())
 				waits, stale = &shown, batch.due()
+			case batch != nil && !startedFor.IsZero() && !startedFor.Equal(batch.due()) && batch.Delivered.After(startedFor.Add(-waitOf(batch.Model))):
+				// Delivered since this one began to stand, and what waits now came
+				// after: what this one stood for was sent, and says so.
+				became = "sent"
 			case batch != nil && batch.stands(now):
 				// Held to another time, and standing still by that one: this one
 				// is dismissed, and another is started for the new time.
