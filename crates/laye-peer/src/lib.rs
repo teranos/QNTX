@@ -62,14 +62,16 @@ pub fn key_at(path: &Path) -> Result<Keypair, Box<Error>> {
                     e.to_string(),
                 )
             })?;
-            write_owner_only(path, &bytes).map_err(|e| {
-                error(
+            match keep_once(path, &bytes) {
+                Ok(()) => Ok(keypair),
+                // Another start kept its key first, whole: that key is this peer.
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => key_at(path),
+                Err(e) => Err(error(
                     "key-unwritable",
                     "the peer's new key was not kept",
                     format!("{}: {e}", path.display()),
-                )
-            })?;
-            Ok(keypair)
+                )),
+            }
         }
         Err(e) => Err(error(
             "key-unreadable",
@@ -77,6 +79,26 @@ pub fn key_at(path: &Path) -> Result<Keypair, Box<Error>> {
             format!("{}: {e}", path.display()),
         )),
     }
+}
+
+/// The key is written whole and synced beside `path`, then linked in. A link
+/// never replaces a file, so `path` holds either nothing or a whole key, and
+/// a second start finds `AlreadyExists` rather than overwriting the first.
+fn keep_once(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let mut beside = path.as_os_str().to_owned();
+    beside.push(format!(
+        ".{}-{}.new",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let beside = std::path::PathBuf::from(beside);
+
+    let written = write_owner_only(&beside, bytes).and_then(|()| std::fs::hard_link(&beside, path));
+    let removed = std::fs::remove_file(&beside);
+    written?;
+    removed
 }
 
 #[cfg(unix)]
@@ -88,12 +110,19 @@ fn write_owner_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         .create_new(true)
         .mode(0o600)
         .open(path)?;
-    f.write_all(bytes)
+    f.write_all(bytes)?;
+    f.sync_all()
 }
 
 #[cfg(not(unix))]
 fn write_owner_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    std::fs::write(path, bytes)
+    use std::io::Write;
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)?;
+    f.write_all(bytes)?;
+    f.sync_all()
 }
 
 /// A failure at laye-peer's boundary, in sacred-error's shape.
@@ -143,6 +172,37 @@ mod tests {
         assert_eq!(made.public(), read.public());
 
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Two starts at once on an empty path end as one peer: whoever kept a
+    /// key first, the other reads it.
+    #[test]
+    fn two_starts_at_once_are_one_peer() {
+        for round in 0..20 {
+            let dir =
+                std::env::temp_dir().join(format!("laye-peer-race-{}-{round}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("key");
+
+            let a = {
+                let path = path.clone();
+                std::thread::spawn(move || key_at(&path))
+            };
+            let b = {
+                let path = path.clone();
+                std::thread::spawn(move || key_at(&path))
+            };
+            let a = a.join().unwrap().unwrap();
+            let b = b.join().unwrap().unwrap();
+            assert_eq!(a.public(), b.public(), "round {round}");
+            assert_eq!(key_at(&path).unwrap().public(), a.public());
+
+            // Nothing written beside the key is left behind.
+            let left: Vec<_> = std::fs::read_dir(&dir).unwrap().collect();
+            assert_eq!(left.len(), 1, "round {round}");
+
+            std::fs::remove_dir_all(&dir).unwrap();
+        }
     }
 
     #[test]

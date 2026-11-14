@@ -56,6 +56,11 @@ pub enum NetEvent {
     Listening {
         addr: String,
     },
+    /// This peer was asked to listen and holds no listener: nobody can
+    /// connect to it.
+    Unreachable {
+        reason: String,
+    },
     SubscriptionChange {
         topic: Topic,
         peer: PeerId,
@@ -213,6 +218,9 @@ mod tests {
         });
         round_trip(NetEvent::Listening {
             addr: "/ip4/127.0.0.1/tcp/4001/ws".into(),
+        });
+        round_trip(NetEvent::Unreachable {
+            reason: "listen on /ip4/127.0.0.1/tcp/4001/ws: io::AddrInUse".into(),
         });
         round_trip(NetEvent::SubscriptionChange {
             topic: Topic("t".into()),

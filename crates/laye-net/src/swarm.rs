@@ -5,11 +5,13 @@ use crate::{NetError, NetEvent};
 use futures::channel::mpsc;
 use futures::{StreamExt, select_biased};
 use laye_protocol::{PeerId, Topic};
+use libp2p::core::transport::ListenerId;
 use libp2p::core::transport::Transport as _;
 use libp2p::core::upgrade;
 use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
 use libp2p::{Swarm, SwarmBuilder, gossipsub, identify, ping};
 use libp2p_connection_limits as connection_limits;
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -20,6 +22,11 @@ pub(crate) struct LayeBehaviour {
     pub(crate) ping: ping::Behaviour,
     pub(crate) connection_limits: connection_limits::Behaviour,
 }
+
+/// How many peers a listening peer holds at once, and how many it lets
+/// handshake at once.
+const MAX_INCOMING: u32 = 256;
+const MAX_PENDING_INCOMING: u32 = 64;
 
 pub(crate) enum Cmd {
     Publish { topic: Topic, bytes: Vec<u8> },
@@ -55,9 +62,14 @@ pub(crate) fn build_swarm(
     // "relaye is dead. Make laye-net able to accept connections"
     //
     // A client keeps one connection out and takes none in. A peer that
-    // listens is what others connect to, so it takes them.
+    // listens is what others connect to, so it takes them, up to a number
+    // that a stream of fresh keypairs cannot get past.
     let conn_limits = if listening {
-        connection_limits::ConnectionLimits::default().with_max_established_per_peer(Some(1))
+        connection_limits::ConnectionLimits::default()
+            .with_max_established_per_peer(Some(1))
+            .with_max_established_incoming(Some(MAX_INCOMING))
+            .with_max_pending_incoming(Some(MAX_PENDING_INCOMING))
+            .with_max_established(Some(MAX_INCOMING))
     } else {
         connection_limits::ConnectionLimits::default()
             .with_max_established_outgoing(Some(1))
@@ -146,6 +158,10 @@ pub(crate) async fn drive_swarm(
     listen_addrs: Vec<String>,
     initial_topics: Vec<Topic>,
 ) {
+    // The listeners still open. A peer that was asked to listen and holds
+    // none is one nobody can reach, and says so once.
+    let mut live: HashSet<ListenerId> = HashSet::new();
+    let mut why_none = Vec::new();
     for addr_str in &listen_addrs {
         let listened = addr_str
             .parse::<libp2p::Multiaddr>()
@@ -153,12 +169,25 @@ pub(crate) async fn drive_swarm(
             .and_then(|addr| {
                 swarm
                     .listen_on(addr)
-                    .map(|_| ())
                     .map_err(|e| format!("listen on {addr_str}: {}", decode_error_chain(&e)))
             });
-        if let Err(reason) = listened {
-            push_event(&events, NetEvent::Error(NetError::NotListening { reason }));
+        match listened {
+            Ok(id) => {
+                live.insert(id);
+            }
+            Err(reason) => {
+                why_none.push(reason.clone());
+                push_event(&events, NetEvent::Error(NetError::NotListening { reason }));
+            }
         }
+    }
+    if !listen_addrs.is_empty() && live.is_empty() {
+        push_event(
+            &events,
+            NetEvent::Unreachable {
+                reason: why_none.join("; "),
+            },
+        );
     }
 
     for topic in initial_topics {
@@ -227,7 +256,24 @@ pub(crate) async fn drive_swarm(
                 }
             }
             event = swarm.select_next_some() => {
-                handle_swarm_event(event, &events);
+                match event {
+                    SwarmEvent::ListenerClosed { listener_id, addresses, reason } => {
+                        let reason = match reason {
+                            Ok(()) => format!("listener on {addresses:?} closed"),
+                            Err(e) => format!("listener on {addresses:?} closed: {}", decode_error_chain(&e)),
+                        };
+                        push_event(&events, NetEvent::Error(NetError::NotListening { reason: reason.clone() }));
+                        if live.remove(&listener_id) && live.is_empty() {
+                            push_event(&events, NetEvent::Unreachable { reason });
+                        }
+                    }
+                    SwarmEvent::ListenerError { error, .. } => {
+                        push_event(&events, NetEvent::Error(NetError::NotListening {
+                            reason: decode_error_chain(&error),
+                        }));
+                    }
+                    other => handle_swarm_event(other, &events),
+                }
             }
         }
     }

@@ -102,11 +102,18 @@ async fn main() {
                     e.to_string(),
                 )),
             }
-            if let NetEvent::Listening { addr } = &event {
-                println!(
+            match &event {
+                NetEvent::Listening { addr } => println!(
                     "{}",
                     serde_json::json!({ "dial": format!("{addr}/p2p/{}", net.identity().0) })
-                );
+                ),
+                // A peer nobody can connect to is no peer: it stops, and says why.
+                NetEvent::Unreachable { reason } => fail(&laye_peer::error(
+                    "listen",
+                    "the peer listens on nothing, so nobody can connect to it",
+                    reason.clone(),
+                )),
+                _ => {}
             }
         }
         tokio::time::sleep(Duration::from_millis(200)).await;

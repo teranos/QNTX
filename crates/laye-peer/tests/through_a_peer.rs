@@ -49,6 +49,55 @@ fn client(dial: &str, topic: &Topic) -> (Net, laye_me::Keypair) {
     (net, keypair)
 }
 
+/// A second peer asked to listen where the first already does holds no
+/// listener, and says it is unreachable rather than running as if it were.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_peer_that_cannot_listen_says_it_is_unreachable() {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let (first, drive) = laye_peer::listening(
+        laye_me::fresh(),
+        vec!["/ip4/127.0.0.1/tcp/0/ws".into()],
+        Vec::new(),
+    )
+    .unwrap();
+    tokio::spawn(drive);
+    let taken = loop {
+        assert!(Instant::now() < deadline, "the first peer never listened");
+        let found = first.poll_events().into_iter().find_map(|e| match e {
+            NetEvent::Listening { addr } => Some(addr),
+            _ => None,
+        });
+        if let Some(addr) = found {
+            break addr;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    };
+
+    let (second, drive) =
+        laye_peer::listening(laye_me::fresh(), vec![taken.clone()], Vec::new()).unwrap();
+    tokio::spawn(drive);
+    loop {
+        assert!(
+            Instant::now() < deadline,
+            "the second peer never said it is unreachable"
+        );
+        let events = second.poll_events();
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, NetEvent::Listening { .. })),
+            "the second peer listens on {taken}, which the first holds"
+        );
+        if events
+            .iter()
+            .any(|e| matches!(e, NetEvent::Unreachable { .. }))
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn one_message_goes_from_one_peer_to_another_through_a_third() {
     let topic = Topic("laye/through-a-peer".into());
