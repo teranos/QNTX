@@ -321,7 +321,7 @@ func batchShown(waits *collectedFor, due time.Time) waitsShown {
 	// By its DID: a name is held by whoever holds it when the press is pressed.
 	to := map[string]string{"to": waits.DID}
 	// "a press never asks what the person did not see": send now and cancel
-	// carry what they were drawn with, and do nothing once that changed.
+	// 「[Opus 5.5] carry what they were drawn with, and do nothing once that changed.」
 	seen := map[string]string{"to": waits.DID, "drawn": drawnOf(waits.Waiting)}
 	return waitsShown{
 		Says: says, Preview: strings.Join(lines, "\n"), Due: float64(due.Unix()),
