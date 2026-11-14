@@ -18,9 +18,7 @@ import (
 )
 
 // "the magic island"
-// "as you may believe, i want to see it on my phone, for the duration of 15 minutes before a collected message is sent, the preview and the buttons to send now, delay and cancel"
 // "THE BATCH IS A LIVE ACTIVITY"
-// "DONT DO THE 15 MINUTE THING ANYMORE"
 // "ANY PENDING IS LIVE ACTIVITY"
 // "ANY PENDING COLLECITON"
 // "SO THE 6H ONE STAYS FOR 6H"
@@ -92,7 +90,6 @@ type waitsPress struct {
 	Says string `json:"says"`
 	// "CANCEL SHOULD BE ONE THING"
 	// "APPROVE SHOULD BE ONE THING"
-	// "THEY ARE ESSENTIALLY THE SAME GODDAMN THING"
 	// Does names what the press is, and a press is one of three: approve,
 	// delay, cancel. Sending what waits now is approving it. The mark it is drawn as is the phone's to say,
 	// one mark for each wherever it stands, and Says is what is read out for it.
