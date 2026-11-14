@@ -296,6 +296,7 @@ async fn init_inner(config_json: String) -> Result<(), SacredError> {
 
     let (net, drive) = laye_net::new(NetConfig {
         bootstrap_addrs: config.bootstrap_addrs,
+        listen_addrs: Vec::new(),
         keypair,
         topics: Vec::new(),
         identify_protocol: config.identify_protocol,

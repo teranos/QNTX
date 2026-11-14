@@ -30,6 +30,7 @@ pub(crate) enum Cmd {
 pub(crate) fn build_swarm(
     keypair: libp2p::identity::Keypair,
     identify_protocol: String,
+    listening: bool,
 ) -> Result<Swarm<LayeBehaviour>, NetError> {
     let gossipsub_config = gossipsub::ConfigBuilder::default()
         .heartbeat_interval(Duration::from_secs(1))
@@ -51,14 +52,19 @@ pub(crate) fn build_swarm(
 
     let ping_b = ping::Behaviour::new(ping::Config::new().with_interval(Duration::from_secs(5)));
 
-    // Default client posture: single relay, no inbound. Mirrors rave's
-    // verified setup; if a consumer needs server-shaped limits a config
-    // field surfaces later.
-    let conn_limits = connection_limits::ConnectionLimits::default()
-        .with_max_established_outgoing(Some(1))
-        .with_max_established_incoming(Some(0))
-        .with_max_established_per_peer(Some(1))
-        .with_max_pending_outgoing(Some(2));
+    // "relaye is dead. Make laye-net able to accept connections"
+    //
+    // A client keeps one connection out and takes none in. A peer that
+    // listens is what others connect to, so it takes them.
+    let conn_limits = if listening {
+        connection_limits::ConnectionLimits::default().with_max_established_per_peer(Some(1))
+    } else {
+        connection_limits::ConnectionLimits::default()
+            .with_max_established_outgoing(Some(1))
+            .with_max_established_incoming(Some(0))
+            .with_max_established_per_peer(Some(1))
+            .with_max_pending_outgoing(Some(2))
+    };
     let connection_limits_b = connection_limits::Behaviour::new(conn_limits);
 
     let behaviour = LayeBehaviour {
@@ -137,8 +143,24 @@ pub(crate) async fn drive_swarm(
     mut cmd_rx: mpsc::UnboundedReceiver<Cmd>,
     events: Arc<Mutex<Vec<NetEvent>>>,
     bootstrap_addrs: Vec<String>,
+    listen_addrs: Vec<String>,
     initial_topics: Vec<Topic>,
 ) {
+    for addr_str in &listen_addrs {
+        let listened = addr_str
+            .parse::<libp2p::Multiaddr>()
+            .map_err(|e| format!("parse multiaddr {addr_str}: {e}"))
+            .and_then(|addr| {
+                swarm
+                    .listen_on(addr)
+                    .map(|_| ())
+                    .map_err(|e| format!("listen on {addr_str}: {}", decode_error_chain(&e)))
+            });
+        if let Err(reason) = listened {
+            push_event(&events, NetEvent::Error(NetError::NotListening { reason }));
+        }
+    }
+
     for topic in initial_topics {
         let t = gossipsub::IdentTopic::new(&topic.0);
         if let Err(e) = swarm.behaviour_mut().gossipsub.subscribe(&t) {
@@ -217,6 +239,14 @@ fn push_event(events: &Arc<Mutex<Vec<NetEvent>>>, event: NetEvent) {
 
 fn handle_swarm_event(event: SwarmEvent<LayeBehaviourEvent>, events: &Arc<Mutex<Vec<NetEvent>>>) {
     match event {
+        SwarmEvent::NewListenAddr { address, .. } => {
+            push_event(
+                events,
+                NetEvent::Listening {
+                    addr: address.to_string(),
+                },
+            );
+        }
         SwarmEvent::ConnectionEstablished { peer_id, .. } => {
             push_event(
                 events,
@@ -273,11 +303,13 @@ fn handle_swarm_event(event: SwarmEvent<LayeBehaviourEvent>, events: &Arc<Mutex<
                 .as_ref()
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| propagation_source.to_string());
+            let from_did = message.source.as_ref().and_then(did_of);
             push_event(
                 events,
                 NetEvent::Message {
                     topic: Topic(message.topic.to_string()),
                     from: PeerId(from),
+                    from_did,
                     bytes: message.data,
                     at_ms: now_ms(),
                 },
@@ -313,6 +345,18 @@ fn handle_swarm_event(event: SwarmEvent<LayeBehaviourEvent>, events: &Arc<Mutex<
         // expected and uninteresting at the transport layer.
         _ => {}
     }
+}
+
+/// The did:key a peer id names. An ed25519 peer id carries its public key
+/// inline (an identity multihash), so the key is read out of it, not looked up.
+pub(crate) fn did_of(peer: &libp2p::PeerId) -> Option<String> {
+    let multihash = libp2p::multihash::Multihash::<64>::from_bytes(&peer.to_bytes()).ok()?;
+    if multihash.code() != 0 {
+        return None;
+    }
+    let public = libp2p::identity::PublicKey::try_decode_protobuf(multihash.digest()).ok()?;
+    let ed25519 = public.try_into_ed25519().ok()?;
+    Some(laye_me::didkey::encode(&ed25519.to_bytes()))
 }
 
 /// Walks the error chain via `std::error::Error::source()`, extracting
