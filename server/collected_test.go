@@ -412,8 +412,8 @@ func TestAnAgentInAPersonsTurnSpeaksForThem(t *testing.T) {
 }
 
 // "a press never asks what the person did not see"
-// A press carries what it was drawn with: what still is that goes; what
-// changed since, by something come in or edited, is refused, and nothing is done.
+// 「[Opus 5.5] A press carries what it was drawn with: what still is that goes; what」
+// 「[Opus 5.5] changed since, by something come in or edited, is refused, and nothing is done.」
 func TestAPressDoesNothingOnceWhatItWasDrawnWithChanged(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
@@ -436,7 +436,7 @@ func TestAPressDoesNothingOnceWhatItWasDrawnWithChanged(t *testing.T) {
 		assert.Contains(t, refused.GetSays(), "changed since it was drawn")
 	}
 
-	// Edited: the same ids, other words, and so something else.
+	// 「[Opus 5.5] Edited: the same ids, other words, and so something else.」
 	both := drawn()
 	all, refused := askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
 	require.Nil(t, refused, refused.GetSays())
@@ -445,12 +445,12 @@ func TestAPressDoesNothingOnceWhatItWasDrawnWithChanged(t *testing.T) {
 	_, refused = askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch", "drawn": both})
 	require.NotNil(t, refused, "a cancel drawn before an edit took the edited words")
 
-	// Still as drawn: all of it goes.
+	// 「[Opus 5.5] Still as drawn: all of it goes.」
 	all, refused = askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Birch", "drawn": drawn()})
 	require.Nil(t, refused, refused.GetSays())
 	assert.Empty(t, all.GetCollected(), "what was drawn still waits")
 
-	// Named and drawn: what was named goes, and the rest of what was drawn waits on.
+	// 「[Opus 5.5] Named and drawn: what was named goes, and the rest of what was drawn waits on.」
 	sayTo(t, srv, alder, "Birch", "pull request three is open")
 	sayTo(t, srv, alder, "Birch", "pull request four is open")
 	all, refused = askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
