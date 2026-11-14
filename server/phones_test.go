@@ -98,9 +98,9 @@ func TestAPhoneIsNamedByTheHumanAndByNoToken(t *testing.T) {
 }
 
 // "ANY PENDING IS LIVE ACTIVITY"
-// What is collected stands on the phone as a Live Activity for as long as it
-// is pending, started once: what it is of, how many wait, who said what, when
-// it goes, and ROOT's three answers as the node answers them.
+// 「[Fable 5.2] What is collected stands on the phone as a Live Activity for as long as it」
+// 「[Fable 5.2] is pending, started once: what it is of, how many wait, who said what, when」
+// 「[Fable 5.2] it goes, and ROOT's three answers as the node answers them.」
 func TestWhatIsPendingStandsOnThePhone(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -114,7 +114,7 @@ func TestWhatIsPendingStandsOnThePhone(t *testing.T) {
 	sayTo(t, srv, hazel, "Birch", "the pond is drained")
 	due := time.Now().Add(6 * time.Hour)
 
-	// From when it is pending, hours before it goes: started, once, however often the node looks.
+	// 「[Fable 5.2] From when it is pending, hours before it goes: started, once, however often the node looks.」
 	for _, before := range []time.Duration{5*time.Hour + 59*time.Minute, 3 * time.Hour, 14 * time.Minute, 2 * time.Minute} {
 		require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-before)))
 	}
@@ -145,8 +145,8 @@ func TestWhatIsPendingStandsOnThePhone(t *testing.T) {
 
 // "SO THE 6H ONE STAYS FOR 6H"
 // "SO WE NEVER BREAK APPLES RULE YOU KNOW"
-// One stands for its wait and no longer: what a person holds for longer
-// stands for the wait before it goes, and not before.
+// 「[Fable 5.2] One stands for its wait and no longer: what a person holds for longer」
+// 「[Fable 5.2] stands for the wait before it goes, and not before.」
 func TestWhatIsHeldLongerStandsForTheWaitBeforeItGoes(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -217,9 +217,9 @@ func TestWhatWasCanceledIsNotStartedOnAPhone(t *testing.T) {
 }
 
 // "WHEN DELAY CANT WE MAKE IT BE DISMISSED UNTIL ITS TIME TO SHOW AGAIN /"
-// One that stands is moved when what waits changes, by its own token. Delayed,
-// it is dismissed at once, and stands again for the wait before its new time,
-// with what came in meanwhile.
+// 「[Fable 5.2] One that stands is moved when what waits changes, by its own token. Delayed,」
+// 「[Fable 5.2] it is dismissed at once, and stands again for the wait before its new time,」
+// 「[Fable 5.2] with what came in meanwhile.」
 func TestOneThatStandsIsMovedAndADelayDismissesIt(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -253,7 +253,7 @@ func TestOneThatStandsIsMovedAndADelayDismissesIt(t *testing.T) {
 	assert.Equal(t, "2 wait", moved.State.(waitsShown).Says)
 	assert.Contains(t, moved.State.(waitsShown).Preview, "pull request two is open")
 
-	// ROOT delays it: it is dismissed at once, saying so, and nothing is said to it after.
+	// 「[Fable 5.2] ROOT delays it: it is dismissed at once, saying so, and nothing is said to it after.」
 	all, refused := askCollected(t, srv, asAPerson(), "later", map[string]string{"to": "Birch"})
 	require.Nil(t, refused, refused.GetSays())
 	later, err := time.Parse(time.RFC3339, all.GetCollected()[0].GetDue())
@@ -269,7 +269,7 @@ func TestOneThatStandsIsMovedAndADelayDismissesIt(t *testing.T) {
 	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-6*time.Minute)))
 	require.Len(t, apple.sent, 3, "something was said to one that was dismissed, or it was started before its time")
 
-	// The wait before its new time: it stands again, with what came in meanwhile.
+	// 「[Fable 5.2] The wait before its new time: it stands again, with what came in meanwhile.」
 	require.NoError(t, srv.showWhatWaits(context.Background(), later.Add(-5*time.Hour)))
 	require.Len(t, apple.sent, 4, "what was delayed did not stand again before its new time")
 	again := apple.sent[3]
@@ -399,9 +399,9 @@ func TestAPressNamesTheBatchByItsAgentsDID(t *testing.T) {
 }
 
 // "SO WE NEVER BREAK APPLES RULE YOU KNOW"
-// One stands for one time. Held to another while it stands, and standing
-// still by the new one, it is dismissed and another is started for that
-// time: none stands longer than its wait.
+// 「[Fable 5.2] One stands for one time. Held to another while it stands, and standing」
+// 「[Fable 5.2] still by the new one, it is dismissed and another is started for that」
+// 「[Fable 5.2] time: none stands longer than its wait.」
 func TestOneThatIsHeldToAnotherTimeIsStartedAnewForIt(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -416,7 +416,7 @@ func TestOneThatIsHeldToAnotherTimeIsStartedAnewForIt(t *testing.T) {
 	code, said = handsOver(t, srv, inROOTsSession(), startedOf(anActivity))
 	require.Equal(t, http.StatusOK, code, said)
 
-	// Held an hour longer: by the new time it stands still, for that is within its wait.
+	// 「[Fable 5.2] Held an hour longer: by the new time it stands still, for that is within its wait.」
 	goes := due.Add(time.Hour)
 	_, refused := askCollected(t, srv, asAPerson(), "hold", map[string]string{"to": "Birch", "until": goes.Format(time.RFC3339)})
 	require.Nil(t, refused, refused.GetSays())
@@ -427,7 +427,7 @@ func TestOneThatIsHeldToAnotherTimeIsStartedAnewForIt(t *testing.T) {
 	assert.Equal(t, apns.ActivityEnds, last.Event, "the one that stood for the old time was left standing for the new")
 	assert.Equal(t, at.Unix(), last.Gone.Unix())
 
-	// The node looks again: another is started, for the new time.
+	// 「[Fable 5.2] The node looks again: another is started, for the new time.」
 	require.NoError(t, srv.showWhatWaits(context.Background(), at.Add(time.Minute)))
 	again := apple.sent[len(apple.sent)-1]
 	assert.Equal(t, aPhone, again.Token)
@@ -435,8 +435,8 @@ func TestOneThatIsHeldToAnotherTimeIsStartedAnewForIt(t *testing.T) {
 	assert.InDelta(t, float64(goes.Unix()), again.State.(waitsShown).Due, 5)
 }
 
-// A phone named while a collection is pending has it started there, also when
-// one stands elsewhere whose phone the app did not name.
+// 「[Fable 5.2] A phone named while a collection is pending has it started there, also when」
+// 「[Fable 5.2] one stands elsewhere whose phone the app did not name.」
 func TestAPhoneNamedLaterHasWhatIsPendingStartedOnIt(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
