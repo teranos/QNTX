@@ -69,6 +69,8 @@ Status: Unpolished
 
 "SO WE NEVER BREAK APPLES RULE YOU KNOW"
 
+"NO, ANY ONE THAT WAKES. PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION"
+
 ## Approval packs
 
 An approval pack is a thing of its own: a complete package of pull requests
@@ -106,7 +108,9 @@ collection opens over it as the overlay.
 **Not built yet.** On 2026-11-13 an approval was started as a Live Activity
 of its own, and four stood at once. The node starts none on its own since. A
 pull request is not yet an item in a collection, and pressing what stands
-opens nothing yet.
+opens nothing yet. Everything the node collects today is delivered at its
+time and wakes its receiver, so every collection it holds is one that wakes:
+nothing in it is yet an item that does not.
 
 ## The story
 
@@ -114,9 +118,13 @@ Things on the node wait on a person. An agent wants a pull request merged
 ([ADR-052](ADR-052-Approvals.md)). Agents have said things to another agent,
 and the batch is held (`server/collected.go`).
 
-While a collection is pending, it stands in front of the person by itself: on
-the iPhone's island and lock screen, and in the menu bar of their Mac. They
-opened nothing.
+While a collection that wakes its receiver is pending, it stands in front of
+the person by itself: on the iPhone's island and lock screen, and in the menu
+bar of their Mac. They opened nothing.
+
+What stands is a collection that wakes. A pull request merge update wakes
+nobody by itself: it is collected onto a collection that wakes, and goes with
+it. What does not wake makes nothing stand.
 
 It shows what it is, what it says now, and, where it runs out, the time left,
 counting down.
