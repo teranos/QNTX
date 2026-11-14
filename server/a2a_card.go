@@ -45,7 +45,7 @@ func (s *QNTXServer) cardBase(r *http.Request) agentCard {
 		Name:        appcfg.GetString("node.name"),
 		Description: appcfg.GetString("node.description"),
 		Version:     version.VersionTag,
-		URL:         a2aURL(r),
+		Node:        nodeURL(r),
 		GRPC:        appcfg.GetString("a2a.grpc"),
 		// "Implement default output types": what the node gives is JSON,
 		// everywhere, and the Node Agent's text is its skill's own.
@@ -338,11 +338,6 @@ func nodeURL(r *http.Request) string {
 	return scheme + "://" + r.Host
 }
 
-// a2aURL is where the caller of r reached the binding.
-func a2aURL(r *http.Request) string {
-	return nodeURL(r) + a2aPrefix[:len(a2aPrefix)-1]
-}
-
 // cardSkill is one signum as A2A sees it: "On the Agent Card a signum is
 // described as an AgentSkill" (ADR-039).
 type cardSkill struct {
@@ -362,8 +357,9 @@ var cardModes = []string{"application/json"}
 // agentCard is what the node can say of itself to one caller.
 type agentCard struct {
 	Name, Description, Version string
-	// URL is where the binding answers, and Tenant the agent behind it.
-	URL, Tenant string
+	// Node is the node as the caller reached it, beneath which each version
+	// is mounted (a2aSpoken), and Tenant the agent behind it.
+	Node, Tenant string
 	// GRPC is where A2A over gRPC is reached, as am.toml's a2a.grpc names it
 	// (host:port): the node serves it on its own port, and whether its front
 	// door passes HTTP/2 is the deployment's to say. Empty lists none.
@@ -378,40 +374,19 @@ type agentCard struct {
 	Session string
 }
 
-// sdk is the card as a2a-go's AgentCard. It is reached over HTTP+JSON and
-// JSON-RPC, both at its URL, in 1.0 and in 0.3, and over gRPC in 1.0 where
-// am.toml says where. 0.3 has no tenant, so its agent at a tenant is reached
-// under the tenant's path.
+// sdk is the card as a2a-go's AgentCard, reached at each version and binding
+// a2aSpoken holds (interfacesOf).
 func (c agentCard) sdk() *a2asdk.AgentCard {
 	bearer := a2asdk.SecurityRequirements{"bearer": {}}
-	at03 := c.URL
-	if c.Tenant != "" {
-		at03 += "/" + c.Tenant
-	}
 	card := &a2asdk.AgentCard{
 		Name: c.Name, Description: c.Description, Version: c.Version,
-		SupportedInterfaces: []*a2asdk.AgentInterface{
-			{URL: c.URL, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant},
-			{URL: c.URL, ProtocolBinding: a2asdk.TransportProtocolJSONRPC, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant},
-			{URL: at03, ProtocolBinding: a2asdk.TransportProtocolHTTPJSON, ProtocolVersion: a2av0.Version},
-			{URL: at03, ProtocolBinding: a2asdk.TransportProtocolJSONRPC, ProtocolVersion: a2av0.Version},
-		},
+		SupportedInterfaces:  interfacesOf(c.Node, c.GRPC, c.Tenant),
 		Capabilities:         a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true, Extensions: c.Extensions},
 		SecuritySchemes:      a2asdk.NamedSecuritySchemes{"bearer": a2asdk.HTTPAuthSecurityScheme{Scheme: "Bearer"}},
 		SecurityRequirements: a2asdk.SecurityRequirementsOptions{bearer},
 		DefaultInputModes:    cardModes,
 		DefaultOutputModes:   c.OutputModes,
 		Skills:               []a2asdk.AgentSkill{},
-	}
-	if c.GRPC != "" {
-		card.SupportedInterfaces = append(card.SupportedInterfaces,
-			&a2asdk.AgentInterface{URL: c.GRPC, ProtocolBinding: a2asdk.TransportProtocolGRPC, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant})
-		// 0.3's gRPC names no tenant, and its path is its service's: it reaches
-		// the node, and no agent at a tenant.
-		if c.Tenant == "" {
-			card.SupportedInterfaces = append(card.SupportedInterfaces,
-				&a2asdk.AgentInterface{URL: c.GRPC, ProtocolBinding: a2asdk.TransportProtocolGRPC, ProtocolVersion: a2av0.Version})
-		}
 	}
 	if c.Session != "" {
 		card.SecuritySchemes["session"] = a2asdk.APIKeySecurityScheme{Description: "A person's passkey session", Location: a2asdk.APIKeySecuritySchemeLocationCookie, Name: c.Session}

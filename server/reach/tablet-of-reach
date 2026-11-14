@@ -241,6 +241,9 @@ REACH is '/api/phones'                                                    of ROO
 # /tasks/{id}:cancel is no pattern the mux reads. "A2A is ROOT's alone for the
 # foreseeable future" (ADR-039); a2a:<signum> lines say who reaches a skill.
 REACH is '/a2a' '/a2a/'                                                   of ROOT
+# A2A 0.3, a2a-go's a2acompat, at a base of its own: where a request arrives is
+# the version it is in (a2aSpoken).
+REACH is '/a2a/0.3' '/a2a/0.3/'                                           of ROOT
 # A2A over gRPC (§10): every method of A2AService, at the path gRPC names it by.
 REACH is '/lf.a2a.v1.A2AService/'                                         of ROOT
 # 0.3's A2AService over gRPC, a2a-go's a2agrpc/v0, at the path 0.3 names it by.

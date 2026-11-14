@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/parity"
+	"github.com/teranos/QNTX/server/reach"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -25,8 +26,9 @@ import (
 
 // "WHY CANT WE MAKE IT NOT MATTER"
 //
-// The node speaks what the a2a-go it pins speaks, 0.3 and 1.0, and a caller is
-// answered in the version its request is in, whichever it names or none.
+// The node speaks what the a2a-go it pins speaks, 0.3 and 1.0, each where
+// a2aSpoken mounts it, and a caller is answered in the version of where it
+// arrived, whichever it names or none.
 
 // A client speaking only 0.3, by a2a-go's own compat, finds the node by its
 // card and is answered over HTTP+JSON and JSON-RPC alike.
@@ -63,7 +65,7 @@ func TestAClientSpeaking03IsAnswered(t *testing.T) {
 func TestTheExtendedCardIn03IsSignedAsServed(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	w := httptest.NewRecorder()
-	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/a2a/v1/card", tokens[auth.LevelRoot]))
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/a2a/0.3/v1/card", tokens[auth.LevelRoot]))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.NoError(t, verifiedBy(context.Background(), w.Body.Bytes(), srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), w.Body.String())
 	var card struct {
@@ -72,28 +74,32 @@ func TestTheExtendedCardIn03IsSignedAsServed(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &card))
 	assert.Equal(t, "0.3", card.ProtocolVersion)
-	assert.True(t, strings.HasSuffix(card.URL, "/a2a"), card.URL)
+	assert.True(t, strings.HasSuffix(card.URL, "/a2a/0.3"), card.URL)
 }
 
-// A caller naming 0.3 is answered by 0.3's binding whatever its body holds: a
-// method 0.3 does not have is not found there, not read as 1.0's.
-func TestACallerNaming03IsAnsweredIn03(t *testing.T) {
+// Where a request arrives is the version it is answered in, whichever version
+// it names: GetTask is 1.0's method, which 0.3's JSON-RPC has none of.
+func TestThePathDecidesTheVersionItsCallerNamesOrNot(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
-	body := `{"jsonrpc": "2.0", "id": 1, "method": "GetTask", "params": {"id": "no-such-task"}}`
-	r := asBearer(http.MethodPost, "/a2a", tokens[auth.LevelRoot])
-	r.Body = io.NopCloser(strings.NewReader(body))
-	r.ContentLength = int64(len(body))
-	r.Header.Set("Content-Type", "application/json")
-	r.Header.Set("A2A-Version", "0.3")
-	w := httptest.NewRecorder()
-	srv.served.ServeHTTP(w, r)
-	var answered struct {
-		Error struct {
-			Code int `json:"code"`
-		} `json:"error"`
+	asked := func(path, named string) int {
+		body := `{"jsonrpc": "2.0", "id": 1, "method": "GetTask", "params": {"id": "no-such-task"}}`
+		r := asBearer(http.MethodPost, path, tokens[auth.LevelRoot])
+		r.Body = io.NopCloser(strings.NewReader(body))
+		r.ContentLength = int64(len(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("A2A-Version", named)
+		w := httptest.NewRecorder()
+		srv.served.ServeHTTP(w, r)
+		var answered struct {
+			Error struct {
+				Code int `json:"code"`
+			} `json:"error"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answered), w.Body.String())
+		return answered.Error.Code
 	}
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answered), w.Body.String())
-	assert.Equal(t, -32601, answered.Error.Code, "GetTask is 1.0's method, and 0.3 has none by that name: "+w.Body.String())
+	assert.Equal(t, -32601, asked("/a2a/0.3", "1.0"), "0.3 at its base has no GetTask, whatever the caller names")
+	assert.NotEqual(t, -32601, asked("/a2a", "0.3"), "1.0 at its base has GetTask, whatever the caller names")
 }
 
 // A client speaking only 0.3 over gRPC, by a2a-go's a2agrpc/v0, is answered at
@@ -124,9 +130,10 @@ func TestAClientSpeaking03IsAnsweredOverGRPC(t *testing.T) {
 }
 
 // The node serves what the a2a-go it pins serves: every binding the SDK ships a
-// server for, in the version that server speaks, is on the node's card, and
-// nothing else is. A pin bringing a version or a binding the node does not
-// serve fails here.
+// server for, in the version that server speaks, is a binding of a2aSpoken, and
+// nothing else is; and a card says the node is reached at each of them. A pin
+// bringing a version or a binding the node does not serve fails here, and the
+// row that serves it is the whole change.
 func TestTheNodeServesWhatThePinnedSDKServes(t *testing.T) {
 	served, err := parity.A2AServes()
 	require.NoError(t, err)
@@ -134,12 +141,29 @@ func TestTheNodeServesWhatThePinnedSDKServes(t *testing.T) {
 	for _, binding := range served {
 		sdk = append(sdk, binding.Version+" "+binding.Binding)
 	}
-	card := agentCard{URL: "https://node.example/a2a", GRPC: "node.example:443"}.sdk()
-	var node []string
-	for _, held := range card.SupportedInterfaces {
-		node = append(node, string(held.ProtocolVersion)+" "+string(held.ProtocolBinding))
+	var spoken []string
+	for _, v := range a2aSpoken {
+		for _, binding := range v.bindings() {
+			spoken = append(spoken, string(v.version)+" "+string(binding))
+		}
 	}
-	assert.ElementsMatch(t, sdk, node, "a2a.serves.json is what the pinned a2a-go serves (make says), and the card what the node serves")
+	assert.ElementsMatch(t, sdk, spoken, "a2a.serves.json is what the pinned a2a-go serves (make says), and a2aSpoken what the node serves")
+
+	var carded []string
+	for _, held := range interfacesOf("https://node.example", "node.example:443", "") {
+		carded = append(carded, string(held.ProtocolVersion)+" "+string(held.ProtocolBinding))
+	}
+	assert.ElementsMatch(t, spoken, carded, "the node's card says it is reached at every binding it serves")
+}
+
+// Every path a version is mounted at is one the tablet of REACH names.
+func TestEveryVersionIsMountedWhereReachNamesIt(t *testing.T) {
+	named := reach.Paths()
+	for _, v := range a2aSpoken {
+		for _, path := range []string{v.base, v.base + "/", v.grpcService} {
+			assert.Contains(t, named, path, string(v.version)+" is mounted at "+path+", which no REACH line names")
+		}
+	}
 }
 
 // A 1.0 request naming no version, which a2a-go alone reads as 0.3, is answered

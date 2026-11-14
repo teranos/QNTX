@@ -4,12 +4,8 @@ import (
 	"context"
 	"net/http"
 	"strconv"
-	"strings"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
-	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
-	a2agrpcv0 "github.com/a2aproject/a2a-go/v2/a2agrpc/v0"
-	"github.com/a2aproject/a2a-go/v2/a2agrpc/v1"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/google/uuid"
 	"github.com/teranos/QNTX/internal/logger"
@@ -25,28 +21,21 @@ import (
 // from, so the three answer alike (§5). It is served on the node's own port,
 // at the path gRPC names the service by, through the gate as every route is.
 
-// a2aGRPCPrefix is where gRPC asks for A2AService: /<package>.<service>/<method>.
-const a2aGRPCPrefix = "/lf.a2a.v1.A2AService/"
-
-// a2aGRPCPrefix03 is where gRPC asks for 0.3's A2AService, a2a-go's a2agrpc/v0.
-const a2aGRPCPrefix03 = "/a2a.v1.A2AService/"
-
-// a2aOverGRPC is the gRPC binding of handler: 1.0's, and 0.3's at its own
-// service path. The path is the version, so the version a caller names, or
-// names none, does not matter.
+// a2aOverGRPC is the gRPC binding of handler: each version a2aSpoken holds,
+// at its own service path. The path is the version, so the version a caller
+// names, or names none, does not matter.
 func (s *QNTXServer) a2aOverGRPC(handler a2asrv.RequestHandler) http.HandlerFunc {
 	served := grpc.NewServer(grpc.MaxRecvMsgSize(nodeBodyMost))
-	a2agrpc.NewHandler(handler).RegisterWith(served)
-	a2agrpcv0.NewHandler(handler).RegisterWith(served)
+	for _, v := range a2aSpoken {
+		v.grpc(v.answeredBy(handler, s), served)
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		spoken := a2asdk.Version
-		if strings.HasPrefix(r.URL.Path, a2aGRPCPrefix03) {
-			spoken = a2av0.Version
+		if v, spoken := spokenOverGRPC(r.URL.Path); spoken {
+			r.Header.Set(a2asdk.SvcParamVersion, string(v.version))
 		}
-		r.Header.Set(a2asdk.SvcParamVersion, string(spoken))
 		id := uuid.NewString()
 		w.Header().Set("X-Request-Id", id)
-		exchange := &a2aExchange{grpc: true}
+		exchange := &a2aExchange{grpc: true, path: r.URL.Path}
 		r = r.WithContext(context.WithValue(logger.WithRequestID(r.Context(), id), a2aExchangeKey{}, exchange))
 		if r.Body != nil {
 			r.Body = &a2aBodyRead{ReadCloser: r.Body, exchange: exchange}
