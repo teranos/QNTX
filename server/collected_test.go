@@ -449,4 +449,16 @@ func TestAPressDoesNothingOnceWhatItWasDrawnWithChanged(t *testing.T) {
 	all, refused = askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Birch", "drawn": drawn()})
 	require.Nil(t, refused, refused.GetSays())
 	assert.Empty(t, all.GetCollected(), "what was drawn still waits")
+
+	// Named and drawn: what was named goes, and the rest of what was drawn waits on.
+	sayTo(t, srv, alder, "Birch", "pull request three is open")
+	sayTo(t, srv, alder, "Birch", "pull request four is open")
+	all, refused = askCollected(t, srv, asAPerson(), "list", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	three := all.GetCollected()[0].GetWaiting()[0].GetId()
+	all, refused = askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Birch", "ids": three, "drawn": drawn()})
+	require.Nil(t, refused, refused.GetSays())
+	require.Len(t, all.GetCollected(), 1)
+	require.Len(t, all.GetCollected()[0].GetWaiting(), 1)
+	assert.Equal(t, "pull request four is open", all.GetCollected()[0].GetWaiting()[0].GetSays(), "what was not named went with what was")
 }

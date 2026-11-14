@@ -713,8 +713,11 @@ func (s *QNTXServer) collectedRelease(ctx context.Context, sent sigil.Sent) (any
 		if refused != nil {
 			return nil, refused
 		}
-		// What goes is what was drawn: what comes in from here on waits on.
-		only = as
+		// What goes is what was drawn, or what of it the person named: what
+		// comes in from here on waits on.
+		if len(only) == 0 {
+			only = as
+		}
 	}
 	went, err := s.deliverCollected(ctx, did, sent["says"], only, time.Time{})
 	if err != nil {
