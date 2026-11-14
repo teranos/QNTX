@@ -220,10 +220,9 @@ func (h tenantIn03) DeleteTaskPushConfig(ctx context.Context, req *a2asdk.Delete
 	return h.RequestHandler.DeleteTaskPushConfig(ctx, req)
 }
 
-// GetExtendedAgentCard is the card 0.3's bindings write as a2av0's
-// FromV1AgentCard, which reads its url and protocolVersion off the first
-// interface: 0.3's come first, and the card is signed over the bytes written.
-// A peer's card is the peer's, and is handed over as the peer signed it.
+// GetExtendedAgentCard is the card 0.3's bindings write in 0.3, as a2av0's
+// card producer writes it, signed over the bytes written. A peer's card is the
+// peer's, and is handed over as the peer signed it.
 func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExtendedAgentCardRequest) (*a2asdk.AgentCard, error) {
 	if req != nil {
 		tenantFrom03(ctx, &req.Tenant)
@@ -237,11 +236,7 @@ func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExt
 	}
 	in03 := *card
 	in03.Signatures = nil
-	in03.SupportedInterfaces = slices.Clone(card.SupportedInterfaces)
-	slices.SortStableFunc(in03.SupportedInterfaces, func(a, b *a2asdk.AgentInterface) int {
-		return cmpBool(b.ProtocolVersion == a2av0.Version, a.ProtocolVersion == a2av0.Version)
-	})
-	raw, err := json.Marshal(a2av0.FromV1AgentCard(&in03))
+	raw, err := a2av0.NewStaticAgentCardProducer(&in03).(a2asrv.AgentCardJSONProducer).CardJSON(ctx)
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not written in 0.3: "+err.Error())
 	}
@@ -257,17 +252,6 @@ func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExt
 		in03.Signatures = append(in03.Signatures, *sig)
 	}
 	return &in03, nil
-}
-
-// cmpBool orders false before true.
-func cmpBool(a, b bool) int {
-	switch {
-	case a == b:
-		return 0
-	case a:
-		return 1
-	}
-	return -1
 }
 
 // a2aRoutes is each operation's method and route (§11.3).
