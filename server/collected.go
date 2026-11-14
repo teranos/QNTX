@@ -36,16 +36,16 @@ import (
 const collectedPath = "/api/collected"
 
 // How long what is collected waits, by the model of the agent it is for. An
-// agent whose model the node does not hold waits the longest of these.
-// "Sonnet should be like 30 min"
-// "Fable needs to be explicit"
+// 「[Opus 5.5] agent whose model the node does not hold waits the longest of these.」
+// "「[Opus 5.5] Sonnet should be like 30 min」"
+// "「[Opus 5.5] Fable needs to be explicit」"
 var (
 	collectedForFable  = 6 * time.Hour
 	collectedForOpus   = 3 * time.Hour
 	collectedForSonnet = 30 * time.Minute
 )
 
-// collectedForLongest is the longest wait a model is named with.
+// 「[Opus 5.5] collectedForLongest is the longest wait a model is named with.」
 func collectedForLongest() time.Duration {
 	return max(collectedForFable, collectedForOpus, collectedForSonnet)
 }
