@@ -6,13 +6,13 @@ import (
 
 // "AND SO IS THE APPROCAL"
 // "ITS KIND OF THE SAME THING"
-// "I SEE IT AS PART OF THE COLLECTION, APPROVABLE IN IT"
+// "「[Opus 5.5] I SEE IT AS PART OF THE COLLECTION, APPROVABLE IN IT」"
 //
-// An approval is shown in the shape a batch is (phones.go): the pull request,
-// its checks as segments, and ROOT's answers as presses. It is not started on
-// its own: it is an item in the collection of whoever it is going to, and
-// stands with that (ADR-060). What is here is what one that stands shows, and
-// is what moves and ends the ones started before that was said.
+// 「[Fable 5.2] An approval is shown in the shape a batch is (phones.go): the pull request,」
+// 「[Fable 5.2] its checks as segments, and ROOT's answers as presses. It is not started on」
+// 「[Fable 5.2] its own: it is an item in the collection of whoever it is going to, and」
+// 「[Fable 5.2] stands with that (ADR-060). What is here is what one that stands shows, and」
+// 「[Fable 5.2] is what moves and ends the ones started before that was said.」
 
 // segmentsAtMost is how many of an approval's checks a Live Activity shows each by its own name.
 const segmentsAtMost = 16
