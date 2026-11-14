@@ -88,9 +88,9 @@ type collectedFor struct {
 	Waiting []collectedSaid      `json:"waiting"`
 }
 
-// startedFor is the time what waits was due when it was started on the phone
-// a token starts Live Activities on, and, where the phone is not known, the
-// latest it was started for on any.
+// 「[Fable 5.2] startedFor is the time what waits was due when it was started on the phone」
+// 「[Fable 5.2] a token starts Live Activities on, and, where the phone is not known, the」
+// 「[Fable 5.2] latest it was started for on any.」
 func (c collectedFor) startedFor(phone string) time.Time {
 	if at, known := c.Shown[phone]; known {
 		return at
@@ -656,8 +656,8 @@ func (s *QNTXServer) collectedRelease(ctx context.Context, sent sigil.Sent) (any
 		s.logger.Errorw("What a person released was not delivered", "to", did, "by", by, "client_named_itself", client, "error", err)
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	// Said only when something went, and by how many this release delivered:
-	// a release of what holds nothing delivers nothing.
+	// 「[Fable 5.2] Said only when something went, and by how many this release delivered:」
+	// 「[Fable 5.2] a release of what holds nothing delivers nothing.」
 	if went > 0 {
 		by, client := decidedBy(ctx)
 		s.logger.Infow("What is collected for an agent is released by a person", "to", did, "things", went, "things_named", len(only),
@@ -693,7 +693,7 @@ func (s *QNTXServer) collectedLater(ctx context.Context, sent sigil.Sent) (any, 
 	}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	// Said only when it was delayed: what holds nothing that is due has no time to move.
+	// 「[Fable 5.2] Said only when it was delayed: what holds nothing that is due has no time to move.」
 	if !until.IsZero() {
 		by, client := decidedBy(ctx)
 		s.logger.Infow("What is collected for an agent is delayed by a person", "to", did, "until", stamped(until), "by", by, "client_named_itself", client)
@@ -791,10 +791,10 @@ func (s *QNTXServer) collectedEdit(ctx context.Context, sent sigil.Sent) (any, *
 	return s.collectedList(ctx, sent)
 }
 
-// namedItself is how a client named itself, as fit for a log: the page, or
-// what stands on a phone. It is the client's own word and proves nothing, so
-// it is written as that and never as who decided; cut where it runs long, and
-// with nothing in it that would start a line of its own.
+// 「[Fable 5.2] namedItself is how a client named itself, as fit for a log: the page, or」
+// 「[Fable 5.2] what stands on a phone. It is the client's own word and proves nothing, so」
+// 「[Fable 5.2] it is written as that and never as who decided; cut where it runs long, and」
+// 「[Fable 5.2] with nothing in it that would start a line of its own.」
 func namedItself(r *http.Request) string {
 	if r == nil {
 		return ""
@@ -811,14 +811,14 @@ func namedItself(r *http.Request) string {
 	return said
 }
 
-// decidedBy is who decided something about what waits, as the node admitted
-// them, and how the client they decided from named itself.
+// 「[Fable 5.2] decidedBy is who decided something about what waits, as the node admitted」
+// 「[Fable 5.2] them, and how the client they decided from named itself.」
 func decidedBy(ctx context.Context) (by, client string) {
 	r := sigil.Caller(ctx)
 	if r == nil {
 		return "", ""
 	}
-	// Who the node admitted: the route they act as, and for ROOT, who acts as no route, who they are.
+	// 「[Fable 5.2] Who the node admitted: the route they act as, and for ROOT, who acts as no route, who they are.」
 	if admitted, ok := auth.AdmissionFrom(r.Context()); ok {
 		by = admitted.ActsAs()
 		if by == "" {
