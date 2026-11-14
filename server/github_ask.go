@@ -45,10 +45,10 @@ func (g *gitHub) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol
 	// what tells a call that was answered from one that was not (6SION).
 	mcpAskedOf(ctx).says("operation", operation)
 	// TODO(forge): ask and operations expose GitHubService by operation name. They are GitHub's and should say so (sigil names), or each forge lists its own operations.
-	// An agent that asks about a pull request is involved in it (involved.go),
-	// and is written down before GitHub is asked: an asking that merges it is
-	// answered after GitHub said it is over, and one GitHub refused was about
-	// it all the same.
+	// 「[Fable 5.2, Opus 5.5] An agent that asks about a pull request is involved in it (involved.go),」
+	// 「[Fable 5.2, Opus 5.5] and is written down before GitHub is asked: an asking that merges it is」
+	// 「[Fable 5.2, Opus 5.5] answered after GitHub said it is over, and one GitHub refused was about」
+	// 「[Fable 5.2, Opus 5.5] it all the same.」
 	var untold error
 	pull, named := pullAskedAbout([]byte(sent["request"]), nil)
 	if named {
@@ -84,13 +84,13 @@ func (g *gitHub) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol
 	}
 	delete(answered, "success")
 	delete(answered, "error")
-	// One the asking opened is named by what GitHub answered.
+	// 「[Fable 5.2, Opus 5.5] One the asking opened is named by what GitHub answered.」
 	if !named {
 		if opened, isOne := pullAskedAbout([]byte(sent["request"]), answered); isOne {
 			untold = g.wasInvolved(ctx, operation, opened)
 		}
 	}
-	// GitHub did what was asked, and that stands: what the node did not keep is said beside it.
+	// 「[Fable 5.2, Opus 5.5] GitHub did what was asked, and that stands: what the node did not keep is said beside it.」
 	notKept := ""
 	if untold != nil {
 		notKept = untold.Error()

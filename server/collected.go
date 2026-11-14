@@ -68,9 +68,9 @@ type collectedSaid struct {
 	// ID is what a person names it by; Edited that a person changed what it says.
 	ID     string `json:"id,omitempty"`
 	Edited bool   `json:"edited,omitempty"`
-	// "PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION"
-	// Quiet is that it wakes nobody: it is delivered with what does, and
-	// alone it makes nothing due.
+	// "「[Opus 5.5] PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION」"
+	// 「[Fable 5.2, Opus 5.5] Quiet is that it wakes nobody: it is delivered with what does, and」
+	// 「[Fable 5.2, Opus 5.5] alone it makes nothing due.」
 	Quiet bool `json:"quiet,omitempty"`
 }
 
@@ -130,9 +130,9 @@ func waitOf(model string) time.Duration {
 	return collectedForLongest()
 }
 
-// due is when what waits is delivered if nobody holds or releases it: the
-// agent's wait after the first thing that wakes it. What only holds what
-// wakes nobody is due at no time, and goes when something that wakes does.
+// 「[Fable 5.2, Opus 5.5] due is when what waits is delivered if nobody holds or releases it: the」
+// 「[Fable 5.2, Opus 5.5] agent's wait after the first thing that wakes it. What only holds what」
+// 「[Fable 5.2, Opus 5.5] wakes nobody is due at no time, and goes when something that wakes does.」
 func (c collectedFor) due() time.Time {
 	first := slices.IndexFunc(c.Waiting, func(one collectedSaid) bool { return !one.Quiet })
 	if first < 0 {
@@ -376,8 +376,8 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did, authored string,
 		return 0, nil
 	}
 	if !dueAt.IsZero() {
-		// Asked because it was due: what a person took out of it since may have
-		// left only what wakes nobody, which is due at no time and stays.
+		// 「[Fable 5.2, Opus 5.5] Asked because it was due: what a person took out of it since may have」
+		// 「[Fable 5.2, Opus 5.5] left only what wakes nobody, which is due at no time and stays.」
 		if due := waits.due(); due.IsZero() || dueAt.Before(due) {
 			return 0, nil
 		}
@@ -479,7 +479,7 @@ func (s *QNTXServer) deliverDue(now time.Time) error {
 	}
 	failed := []string{}
 	for did, waits := range held {
-		// What is due at no time holds nothing that wakes, and is not delivered for itself.
+		// 「[Fable 5.2, Opus 5.5] What is due at no time holds nothing that wakes, and is not delivered for itself.」
 		if due := waits.due(); due.IsZero() || now.Before(due) {
 			continue
 		}
