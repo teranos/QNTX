@@ -42,7 +42,7 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 	}
 	// "make am the card, not a skill on it"
 	assert.NotContains(t, names(root), amSignumName, "am is the card, not a skill on it")
-	assert.Equal(t, "https://node.example/a2a", root.URL)
+	assert.Equal(t, "https://node.example", root.Node)
 	mcpAt, _ := root.Extensions[0].Params["mcp"].(map[string]any)
 	assert.Equal(t, "https://node.example/mcp", mcpAt["url"], "the node extension says where the MCP answers")
 	assert.Equal(t, mcpProtocolVersion, mcpAt["protocolVersion"])
@@ -55,8 +55,8 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 }
 
 // The card is a2a-go's AgentCard, reached over HTTP+JSON and JSON-RPC, both
-// at the binding's URL (§8.3.1), in 1.0 and in 0.3: the node's MCP is not one
-// of its interfaces.
+// at each version's base (§8.3.1), 1.0's and then 0.3's: the node's MCP is not
+// one of its interfaces.
 func TestTheCardIsReachedOverBothBindings(t *testing.T) {
 	srv, _ := pluginServingServer(t, "fake")
 	card := srv.a2aCard(askedAs(auth.LevelRoot)).sdk()
@@ -67,8 +67,9 @@ func TestTheCardIsReachedOverBothBindings(t *testing.T) {
 		assert.Equal(t, version, card.SupportedInterfaces[2*i].ProtocolVersion)
 		assert.Equal(t, version, card.SupportedInterfaces[2*i+1].ProtocolVersion)
 	}
-	for _, held := range card.SupportedInterfaces {
-		assert.Equal(t, "https://node.example/a2a", held.URL)
+	for i, at := range []string{"https://node.example/a2a", "https://node.example/a2a/0.3"} {
+		assert.Equal(t, at, card.SupportedInterfaces[2*i].URL)
+		assert.Equal(t, at, card.SupportedInterfaces[2*i+1].URL)
 	}
 }
 

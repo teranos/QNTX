@@ -100,9 +100,14 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 		return
 	}
 
+	// The path a request arrived at, before its version's base was taken off.
+	path := r.URL.Path
+	if exchange, held := a2aExchangeFrom(r.Context()); held && exchange.path != "" {
+		path = exchange.path
+	}
 	said := map[string]string{
 		"a2a.method":    bounded(r.Method, 16),
-		"a2a.path":      bounded(a2aPrefix[:len(a2aPrefix)-1]+r.URL.Path, saidPathMost),
+		"a2a.path":      bounded(path, saidPathMost),
 		"a2a.operation": refusal.Operation,
 		"a2a.binding":   binding,
 		"a2a.version":   bounded(version, saidVersionMost),

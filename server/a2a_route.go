@@ -54,8 +54,9 @@ var turnQuietMost = 4 * time.Minute
 // a2aContentType is the media type A2A's HTTP+JSON binding speaks in.
 const a2aContentType = "application/a2a+json"
 
-// a2aHTTP is the binding: a2a-go's HTTP+JSON and JSON-RPC, made once, the
-// JSON-RPC one at the binding's root.
+// a2aHTTP is the node's A2A over HTTP: each version a2aSpoken holds, at its
+// base, a2a-go's HTTP+JSON and JSON-RPC made once, JSON-RPC at the base itself.
+// gRPC is made beside them, of the same handler (a2a_grpc.go).
 func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	handler := a2asrv.NewHandler(turnExecutor{s},
 		a2asrv.WithTaskStore(tasksOnLines{s}),
@@ -69,50 +70,59 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	// A turn can be quiet for minutes: a stream is kept alive through the
 	// gateways in front of the node, which drop idle connections.
 	alive := a2asrv.WithTransportKeepAlive(streamKeptAlive)
-	atNoTenant := a2asrv.NewRESTHandler(handler, alive)
-	atTenant := a2asrv.NewTenantRESTHandler("/{*}", handler, alive)
-	jsonRPC := a2asrv.NewJSONRPCHandler(handler, alive)
-	// The node speaks what the a2a-go it pins speaks: 1.0, and 0.3 by its
-	// a2acompat, on the one handler, gate and Tasks.
-	rest03 := a2av0.NewRESTHandler(tenantIn03{handler, s}, alive)
-	jsonRPC03 := a2av0.NewJSONRPCHandler(tenantIn03{handler, s}, alive)
+	type made struct{ rest, restAtTenant, jsonRPC http.Handler }
+	served := map[a2asdk.ProtocolVersion]made{}
+	for _, v := range a2aSpoken {
+		answered := v.answeredBy(handler, s)
+		m := made{rest: v.rest(answered, alive), jsonRPC: v.jsonRPC(answered, alive)}
+		if v.restAtTenant != nil {
+			m.restAtTenant = v.restAtTenant(answered, alive)
+		}
+		served[v.version] = m
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
+		v, path, spoken := spokenAt(r.URL.Path)
+		if !spoken {
+			http.NotFound(w, r)
+			return
+		}
 		// One id per request, answered to the client, so what it reports names what the node wrote down.
 		id := uuid.NewString()
 		w.Header().Set("X-Request-Id", id)
-		exchange := &a2aExchange{}
+		exchange := &a2aExchange{path: r.URL.Path}
 		r = r.WithContext(context.WithValue(logger.WithRequestID(r.Context(), id), a2aExchangeKey{}, exchange))
 		at := *r.URL
 		r.URL = &at
-		r.URL.Path = "/" + strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, a2aPrefix[:len(a2aPrefix)-1]), "/")
-		r.URL.RawPath = ""
+		r.URL.Path, r.URL.RawPath = path, ""
+		// Where a request arrives is the version it is in: the version a
+		// caller names, or names none, does not matter.
+		r.Header.Set(a2asdk.SvcParamVersion, string(v.version))
 		if r.Body != nil {
 			r.Body = &a2aBodyRead{ReadCloser: http.MaxBytesReader(w, r.Body, nodeBodyMost), exchange: exchange}
 		}
-		spoken, tenant, path, overJSONRPC := spokenIn(r)
-		// Which version a caller names, or names none, does not matter: the
-		// version its request is in is the one it is answered in.
-		r.Header.Set(a2asdk.SvcParamVersion, string(spoken))
-		if spoken == a2av0.Version {
-			r.URL.Path = path
+		m := served[v.version]
+		tenant, rest, named := v.tenantAt(r.Method, r.URL.Path)
+		var answeredBy http.Handler
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/":
+			exchange.jsonRPC, answeredBy = true, m.jsonRPC
+		case named && v.tenantField:
+			answeredBy = m.restAtTenant
+		case named:
+			// A version whose requests carry no tenant is given the one its path names.
 			r = r.WithContext(context.WithValue(r.Context(), tenantIn03Key{}, tenant))
+			r.URL.Path = rest
+			if exchange.jsonRPC = r.Method == http.MethodPost && rest == "/"; exchange.jsonRPC {
+				answeredBy = m.jsonRPC
+			} else {
+				answeredBy = m.rest
+			}
+		default:
+			answeredBy = m.rest
 		}
 		exchange.request = r
-		answered := &a2aAnswered{ResponseWriter: w, keepsAll: overJSONRPC}
-		switch _, _, named := tenantOf(r.Method, r.URL.Path); {
-		case spoken == a2av0.Version && overJSONRPC:
-			exchange.jsonRPC = true
-			jsonRPC03.ServeHTTP(answered, r)
-		case spoken == a2av0.Version:
-			rest03.ServeHTTP(answered, r)
-		case r.Method == http.MethodPost && r.URL.Path == "/":
-			exchange.jsonRPC = true
-			jsonRPC.ServeHTTP(answered, r)
-		case named:
-			atTenant.ServeHTTP(answered, r)
-		default:
-			atNoTenant.ServeHTTP(answered, r)
-		}
+		answered := &a2aAnswered{ResponseWriter: w, keepsAll: exchange.jsonRPC}
+		answeredBy.ServeHTTP(answered, r)
 		if answered.status >= http.StatusBadRequest {
 			s.a2aRefused(r, refusalOf(exchange, answered))
 		} else if exchange.jsonRPC {
@@ -123,80 +133,6 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		}
 	}
 }
-
-// tenantOf is the tenant a request's path names, and the operation's path
-// after it. A path that is an operation without a tenant names none; any
-// other's first segment is a tenant, a namespace named tasks among them.
-func tenantOf(method, path string) (string, string, bool) {
-	if a2aRoute(method, path) {
-		return "", path, false
-	}
-	first, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
-	if first == "" {
-		return "", path, false
-	}
-	return first, strings.TrimPrefix(path, "/"+first), true
-}
-
-// spokenIn is the A2A version r is in, by its shape: 0.3's HTTP+JSON is under
-// /v1, and its JSON-RPC methods are named with a slash (message/send), 1.0's
-// are neither. A caller naming 1.0 is held to it. 0.3 carries no tenant, so
-// its agent at a tenant is reached under the tenant's path: tenant is that
-// path's first segment, and path what 0.3's binding reads after it.
-func spokenIn(r *http.Request) (spoken a2asdk.ProtocolVersion, tenant, path string, overJSONRPC bool) {
-	named := r.Header.Get(a2asdk.SvcParamVersion)
-	if named == "" {
-		named = r.URL.Query().Get(a2asdk.SvcParamVersion)
-	}
-	in10, in03 := strings.HasPrefix(named, "1."), strings.HasPrefix(named, "0.")
-	trimmed := strings.TrimPrefix(r.URL.Path, "/")
-	first, after, _ := strings.Cut(trimmed, "/")
-	if r.Method == http.MethodPost && !strings.Contains(trimmed, "/") && !a2aRoute(r.Method, r.URL.Path) {
-		// A caller naming 0.3 is answered in 0.3, whatever its body holds.
-		if in03 || (!in10 && jsonRPCMethodIn03(r)) {
-			return a2av0.Version, first, "/", true
-		}
-		return a2asdk.Version, "", r.URL.Path, trimmed == ""
-	}
-	if !in10 {
-		switch {
-		case strings.HasPrefix(after, a2av0.RESTPathPrefix[1:]+"/"):
-			return a2av0.Version, first, "/" + after, false
-		case first == a2av0.RESTPathPrefix[1:] && after != "":
-			return a2av0.Version, "", r.URL.Path, false
-		}
-	}
-	return a2asdk.Version, "", r.URL.Path, false
-}
-
-// jsonRPCMethodIn03 is whether r's JSON-RPC method is one of 0.3's. The body
-// is read, and put back for the binding to read again.
-func jsonRPCMethodIn03(r *http.Request) bool {
-	if r.Body == nil {
-		return false
-	}
-	body, err := io.ReadAll(r.Body)
-	again := []io.Reader{bytes.NewReader(body)}
-	if err != nil {
-		again = append(again, readFails{err})
-	}
-	r.Body = bodyAgain{Reader: io.MultiReader(again...), Closer: r.Body}
-	var said struct {
-		Method string `json:"method"`
-	}
-	return json.Unmarshal(body, &said) == nil && strings.Contains(said.Method, "/")
-}
-
-// bodyAgain is a body read once, read again from what was read.
-type bodyAgain struct {
-	io.Reader
-	io.Closer
-}
-
-// readFails is how reading a body failed, said again to the binding.
-type readFails struct{ err error }
-
-func (f readFails) Read([]byte) (int, error) { return 0, f.err }
 
 // tenantIn03Key holds the tenant a 0.3 request's path names.
 type tenantIn03Key struct{}
@@ -284,10 +220,9 @@ func (h tenantIn03) DeleteTaskPushConfig(ctx context.Context, req *a2asdk.Delete
 	return h.RequestHandler.DeleteTaskPushConfig(ctx, req)
 }
 
-// GetExtendedAgentCard is the card 0.3's bindings write as a2av0's
-// FromV1AgentCard, which reads its url and protocolVersion off the first
-// interface: 0.3's come first, and the card is signed over the bytes written.
-// A peer's card is the peer's, and is handed over as the peer signed it.
+// GetExtendedAgentCard is the card 0.3's bindings write in 0.3, as a2av0's
+// card producer writes it, signed over the bytes written. A peer's card is the
+// peer's, and is handed over as the peer signed it.
 func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExtendedAgentCardRequest) (*a2asdk.AgentCard, error) {
 	if req != nil {
 		tenantFrom03(ctx, &req.Tenant)
@@ -301,11 +236,7 @@ func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExt
 	}
 	in03 := *card
 	in03.Signatures = nil
-	in03.SupportedInterfaces = slices.Clone(card.SupportedInterfaces)
-	slices.SortStableFunc(in03.SupportedInterfaces, func(a, b *a2asdk.AgentInterface) int {
-		return cmpBool(b.ProtocolVersion == a2av0.Version, a.ProtocolVersion == a2av0.Version)
-	})
-	raw, err := json.Marshal(a2av0.FromV1AgentCard(&in03))
+	raw, err := a2av0.NewStaticAgentCardProducer(&in03).(a2asrv.AgentCardJSONProducer).CardJSON(ctx)
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not written in 0.3: "+err.Error())
 	}
@@ -321,17 +252,6 @@ func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExt
 		in03.Signatures = append(in03.Signatures, *sig)
 	}
 	return &in03, nil
-}
-
-// cmpBool orders false before true.
-func cmpBool(a, b bool) int {
-	switch {
-	case a == b:
-		return 0
-	case a:
-		return 1
-	}
-	return -1
 }
 
 // a2aRoutes is each operation's method and route (§11.3).
@@ -361,7 +281,9 @@ func a2aRoute(method, path string) bool {
 // a2aExchange is what the node knows of one A2A request as the SDK answers
 // it: the request, the operation it is, and whether it came over JSON-RPC.
 type a2aExchange struct {
-	request   *http.Request
+	request *http.Request
+	// path is where the request arrived, before its version's base was taken off.
+	path      string
 	operation string
 	jsonRPC   bool
 	grpc      bool

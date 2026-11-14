@@ -50,7 +50,7 @@ func aPeer(t *testing.T, answer func(p *standInPeer, w http.ResponseWriter, orig
 // orchardsCard is orchard's agent card as the peer serves it.
 func orchardsCard(origin string) *a2asdk.AgentCard {
 	return agentCard{Name: "the agent of orchard, claude-sonnet-5-5", Description: "The namespace agent.", Version: "1.0.0",
-		URL: origin + "/a2a", Tenant: "orchard", OutputModes: cardModes,
+		Node: origin, Tenant: "orchard", OutputModes: cardModes,
 		Skills: []cardSkill{{ID: "say", Name: "say", Description: "Says something to it.", Tags: []string{"agent"}}},
 	}.sdk()
 }
