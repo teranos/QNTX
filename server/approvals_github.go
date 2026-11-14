@@ -24,7 +24,9 @@ type gitHubPullRequestEvent struct {
 		HTMLURL string `json:"html_url"`
 		Draft   bool   `json:"draft"`
 		Merged  bool   `json:"merged"`
-		Head    struct {
+		// ClosedAt is GitHub's time of the closing, which names one closing among several.
+		ClosedAt string `json:"closed_at"`
+		Head     struct {
 			Sha string `json:"sha"`
 			Ref string `json:"ref"`
 		} `json:"head"`
@@ -143,7 +145,7 @@ func (s *QNTXServer) pullRequestEvent(e gitHubPullRequestEvent) ([]string, error
 		}
 		// Over: collected for each session that was involved in it, waking nobody (involved.go).
 		if e.Action == "closed" {
-			if err := s.pullIsOver(subject, e.PullRequest.Title, e.PullRequest.HTMLURL, e.PullRequest.Merged); err != nil {
+			if err := s.pullIsOver(subject, e.PullRequest.Title, e.PullRequest.HTMLURL, e.PullRequest.ClosedAt, e.PullRequest.Merged); err != nil {
 				return nil, err
 			}
 		}

@@ -361,8 +361,12 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did, authored string,
 	if !found || len(waits.Waiting) == 0 {
 		return 0, nil
 	}
-	if !dueAt.IsZero() && dueAt.Before(waits.due()) {
-		return 0, nil
+	if !dueAt.IsZero() {
+		// Asked because it was due: what a person took out of it since may have
+		// left only what wakes nobody, which is due at no time and stays.
+		if due := waits.due(); due.IsZero() || dueAt.Before(due) {
+			return 0, nil
+		}
 	}
 	delivering := slices.Clone(waits.Waiting)
 	if len(only) > 0 {

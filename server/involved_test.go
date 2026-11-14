@@ -48,11 +48,17 @@ func TestAMergeIsCollectedForEachSessionThatWasInvolved(t *testing.T) {
 	asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
 	asAnAgent(t, srv, "Hazel", "did:key:z6Mkhazel")
 	pull := "teranos/elements#29"
-	for _, did := range []string{"did:key:z6Mkalder", "did:key:z6Mkhazel", "did:key:z6Mknameless"} {
-		require.NoError(t, srv.nodeRecords().nodeRecord(did, involvedIn+pull, did, "_", map[string]any{"operation": "CreateAPullRequest"}))
+	// One asked about it by another case than GitHub names it in.
+	for did, asked := range map[string]string{"did:key:z6Mkalder": pull, "did:key:z6Mkhazel": "Teranos/Elements#29", "did:key:z6Mknameless": pull} {
+		require.NoError(t, srv.nodeRecords().nodeRecord(did, involvedKey(involvedIn, asked), did, "_", map[string]any{"operation": "CreateAPullRequest"}))
 	}
 
-	require.NoError(t, srv.pullIsOver(pull, "A panel on a phone reads at a phone's size", "https://github.com/teranos/elements/pull/29", true))
+	over := func(closedAt string) {
+		require.NoError(t, srv.pullIsOver(pull, "A panel on a phone reads at a phone's size", "https://github.com/teranos/elements/pull/29", closedAt, true))
+	}
+	over("2026-11-14T01:00:00Z")
+	// GitHub delivers the same closing again: nobody is told twice.
+	over("2026-11-14T01:00:00Z")
 
 	for _, did := range []string{"did:key:z6Mkalder", "did:key:z6Mkhazel"} {
 		waits := whatWaitsFor(t, srv, did)
@@ -64,6 +70,24 @@ func TestAMergeIsCollectedForEachSessionThatWasInvolved(t *testing.T) {
 		assert.True(t, waits.due().IsZero())
 	}
 	assert.Nil(t, whatWaitsFor(t, srv, "did:key:z6Mknameless"), "something was collected for a session that holds no name")
+
+	// Opened again and closed again is another closing, and is told.
+	over("2026-11-14T02:00:00Z")
+	assert.Len(t, whatWaitsFor(t, srv, "did:key:z6Mkalder").Waiting, 2)
+}
+
+// What was due when it was looked at, and holds only what wakes nobody when
+// it is delivered, a person having canceled what woke, stays.
+func TestWhatIsLeftWakingNobodyIsNotDeliveredAsDue(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	birch := collectedFor{DID: "did:key:z6Mkbirch", Called: "Birch", Tenant: "Birch"}
+	_, err := srv.collect(birch, collectedSaid{From: "GitHub", Says: "teranos/elements#29 was merged", At: time.Now().Add(-7 * time.Hour), Quiet: true})
+	require.NoError(t, err)
+
+	sent, err := srv.deliverCollected(context.Background(), birch.DID, "", nil, time.Now())
+	require.NoError(t, err)
+	assert.Zero(t, sent, "what wakes nobody was delivered as due")
+	assert.Len(t, whatWaitsFor(t, srv, birch.DID).Waiting, 1)
 }
 
 // "NO, ANY ONE THAT WAKES. PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION"
