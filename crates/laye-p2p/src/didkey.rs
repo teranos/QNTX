@@ -9,7 +9,7 @@ pub fn keypair_from_seed(seed: &[u8]) -> Option<libp2p_identity::ed25519::Keypai
 
 /// The did:key this public key is named by — the one encoding, which the node
 /// decodes a signer with.
-pub use ats_sign::didkey::encode;
+pub use laye_me::didkey::encode;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

@@ -84,6 +84,22 @@ pub fn ax_filter(query: &str, now_ms: f64, limit: u32) -> String {
     }
 }
 
+/// The bytes an attestation's signature is over (crates/ats-sign), from proto
+/// JSON as the browser holds it. QNTX makes them; laye-p2p's `sign` signs them
+/// without knowing what an attestation is.
+///
+/// Returns: `{"canonical":"..."}`, or `{"error":"description"}`
+#[wasm_bindgen]
+pub fn canonical_attestation(attestation_json: &str) -> String {
+    let error = |msg: &str| serde_json::json!({ "error": msg }).to_string();
+    match ats_sign::Signable::from_proto_json(attestation_json)
+        .and_then(|signable| signable.canonical_json())
+    {
+        Ok(canonical) => serde_json::json!({ "canonical": canonical }).to_string(),
+        Err(e) => error(&e.to_string()),
+    }
+}
+
 // ============================================================================
 // Storage operations
 // ============================================================================

@@ -486,7 +486,8 @@ dependencies = [
 name = "ats-sign"
 version = "0.2.44"
 dependencies = [
- "bs58",
+ "laye-me",
+ "libp2p-identity",
  "serde",
  "serde_json",
  "thiserror 2.0.19",
@@ -2586,6 +2587,7 @@ dependencies = [
 name = "laye-me"
 version = "0.0.0"
 dependencies = [
+ "bs58",
  "libp2p-identity",
  "serde",
  "serde_json",
@@ -2614,7 +2616,6 @@ dependencies = [
 name = "laye-p2p"
 version = "0.0.0"
 dependencies = [
- "ats-sign",
  "bs58",
  "futures",
  "js-sys",

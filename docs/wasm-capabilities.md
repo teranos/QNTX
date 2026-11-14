@@ -21,7 +21,7 @@ The Rust is in `crates/`: `ats` (parsing, filters, resolution, watchers), `ats-i
 | Query resolution: aliases, cartesian expansion, grouping, classification, conflicts | `ats::ax::execute_with_aliases` | no | cgo `storage_query_resolved`, `read_conn_query_resolved`; a parquet node reads its SQLite landing file |
 | Watcher matching | `ats::watcher::match_watchers` | no | wazero `match_watchers`, and nothing else: a build without `qntxwasm` matches no watcher |
 | Identity (ASUID) | `ats-id` | `generateASUID`, used by ts-element | wazero `generate_asuid`, `generate_compact_asuid`, `generate_random_id` |
-| Attestation signing | `ats-sign` | laye-p2p `sign_attestation`, used by ts-element | wazero `canonical_attestation`; `ats/signing/testdata` holds the vectors both are tested against |
+| Attestation signing | `ats-sign` | `canonical_attestation`, whose bytes laye-p2p `sign` signs | wazero `canonical_attestation`; `ats/signing/testdata` holds the vectors both are tested against |
 | Cosine similarity | `ats::similarity` | `cosineSimilarity`, wrapped in `local-semantic-search.ts`, which nothing imports | not called: `server/embeddings/clustering.go` has its own `cosineSimilarityF32` |
 
 ## Exported and not called

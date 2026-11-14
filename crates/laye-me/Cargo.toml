@@ -8,9 +8,16 @@ license = "MIT"
 [lints]
 workspace = true
 
+[features]
+default = ["rand"]
+# Minting a fresh key. did:key and verifying need none of it, and without it
+# nothing pulls getrandom into a wasm32-unknown-unknown build.
+rand = ["libp2p-identity/rand"]
+
 [dependencies]
-libp2p-identity = { version = "=0.2.14", features = ["ed25519", "peerid", "rand"] }
+libp2p-identity = { version = "=0.2.14", features = ["ed25519", "peerid"] }
 thiserror = { workspace = true }
+bs58 = "=0.5.1"
 serde = { version = "=1.0.228", features = ["derive"] }
 
 [dev-dependencies]

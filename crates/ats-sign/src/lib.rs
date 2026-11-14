@@ -17,10 +17,13 @@
 //! `ats/signing/testdata` holds the vectors both sides are tested against.
 //!
 //! No key lives here. The signer holds its own: the node in Go, the browser in
-//! laye-p2p.
+//! laye-p2p. laye signs the bytes made here and does not know what an
+//! attestation is.
 
 pub mod canonical;
-pub mod didkey;
+
+/// did:key is identity, which is laye's.
+pub use laye_me::didkey;
 
 pub use canonical::{CanonicalError, Signable};
 pub use didkey::DidKeyError;

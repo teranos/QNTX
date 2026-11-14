@@ -8,6 +8,8 @@
         clippy::string_slice
     )
 )]
+pub mod didkey;
+
 pub use libp2p_identity::Keypair;
 use libp2p_identity::{DecodingError, PublicKey};
 use serde::{Deserialize, Serialize};
@@ -146,6 +148,7 @@ mod hex_bytes_vec {
     }
 }
 
+#[cfg(feature = "rand")]
 pub fn fresh() -> Keypair {
     Keypair::generate_ed25519()
 }
@@ -160,6 +163,7 @@ pub fn to_bytes(keypair: &Keypair) -> Result<Vec<u8>, MeError> {
         .map_err(|e| MeError::Encode(format!("{e}")))
 }
 
+#[cfg(feature = "rand")]
 pub fn load_or_fresh(bytes: Option<&[u8]>) -> Result<Keypair, MeError> {
     match bytes {
         Some(b) => load(b),
@@ -167,7 +171,7 @@ pub fn load_or_fresh(bytes: Option<&[u8]>) -> Result<Keypair, MeError> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rand"))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;

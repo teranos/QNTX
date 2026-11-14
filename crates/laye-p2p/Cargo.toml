@@ -15,7 +15,6 @@ workspace = true
 laye-net = { path = "../laye-net" }
 laye-me = { path = "../laye-me" }
 sacred-error.workspace = true
-ats-sign = { path = "../ats-sign" }
 libp2p-identity = { version = "=0.2.14", features = ["ed25519", "peerid"] }
 bs58 = "=0.5.1"
 thiserror = { workspace = true }
