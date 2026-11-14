@@ -613,9 +613,9 @@ func aPersonsToSay(ctx context.Context, does string) *protocol.Refusal {
 
 // "a press never asks what the person did not see"
 //
-// drawnOf is what a person saw of what waits, as a press is drawn with it:
-// each thing said, by its id and its words. Something come in, gone or
-// edited since is something else.
+// 「[Opus 5.5] drawnOf is what a person saw of what waits, as a press is drawn with it:」
+// 「[Opus 5.5] each thing said, by its id and its words. Something come in, gone or」
+// 「[Opus 5.5] edited since is something else.」
 func drawnOf(waiting []collectedSaid) string {
 	sum := sha256.New()
 	for _, one := range waiting {
@@ -624,13 +624,13 @@ func drawnOf(waiting []collectedSaid) string {
 	return hex.EncodeToString(sum.Sum(nil))[:16]
 }
 
-// changedSince is the refusal of a press drawn with something other than what waits now.
+// 「[Opus 5.5] changedSince is the refusal of a press drawn with something other than what waits now.」
 func changedSince(to string) *protocol.Refusal {
 	return &protocol.Refusal{Why: sigil.NotAllowed, Param: "drawn", Says: "what waits for " + to + " changed since it was drawn: press again"}
 }
 
-// stillAsDrawn is the ids of what waits for did, when that is still what was
-// drawn, and a refusal when it is not.
+// 「[Opus 5.5] stillAsDrawn is the ids of what waits for did, when that is still what was」
+// 「[Opus 5.5] drawn, and a refusal when it is not.」
 func (s *QNTXServer) stillAsDrawn(did, to, drawn string) ([]string, *protocol.Refusal) {
 	kept, err := s.theCollection()
 	if err != nil {
@@ -725,8 +725,8 @@ func (s *QNTXServer) collectedRelease(ctx context.Context, sent sigil.Sent) (any
 		if refused != nil {
 			return nil, refused
 		}
-		// What goes is what was drawn, or what of it the person named: what
-		// comes in from here on waits on.
+		// 「[Opus 5.5] What goes is what was drawn, or what of it the person named: what」
+		// 「[Opus 5.5] comes in from here on waits on.」
 		if len(only) == 0 {
 			only = as
 		}
