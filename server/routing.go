@@ -51,6 +51,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer(a2aPrefix[:len(a2aPrefix)-1], a2aServed)
 	// A2A over gRPC (§10), on the same port: gRPC is HTTP/2 at the service's path.
 	s.answer(a2aGRPCPrefix, s.a2aGRPC)
+	s.answer(a2aGRPCPrefix03, s.a2aGRPC)
 	// A2AService's streaming operations, spoken to a peer's agent or a card's (SSE).
 	s.answerA2AStreams()
 

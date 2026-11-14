@@ -93,4 +93,21 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("%d messages, fields and methods of a2a-go say something of themselves, written to %s\n", len(a2a), parity.A2ASaysFile)
+
+	// What a2a-go ships a server for, and in which version: what the node serves.
+	served, err := parity.A2AGoServes(os.DirFS(strings.TrimSpace(string(module))))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "says: %v\n", err)
+		os.Exit(1)
+	}
+	body, err = parity.WriteA2AServes(served)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "says: %v\n", err)
+		os.Exit(1)
+	}
+	if err := os.WriteFile(parity.A2AServesFile, body, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "says: %v\n", errors.Wrapf(err, "failed to write %s", parity.A2AServesFile))
+		os.Exit(1)
+	}
+	fmt.Printf("%d bindings a2a-go ships a server for, written to %s\n", len(served), parity.A2AServesFile)
 }

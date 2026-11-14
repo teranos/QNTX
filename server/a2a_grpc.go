@@ -4,7 +4,11 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
+	a2agrpcv0 "github.com/a2aproject/a2a-go/v2/a2agrpc/v0"
 	"github.com/a2aproject/a2a-go/v2/a2agrpc/v1"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/google/uuid"
@@ -24,11 +28,22 @@ import (
 // a2aGRPCPrefix is where gRPC asks for A2AService: /<package>.<service>/<method>.
 const a2aGRPCPrefix = "/lf.a2a.v1.A2AService/"
 
-// a2aOverGRPC is the gRPC binding of handler.
+// a2aGRPCPrefix03 is where gRPC asks for 0.3's A2AService, a2a-go's a2agrpc/v0.
+const a2aGRPCPrefix03 = "/a2a.v1.A2AService/"
+
+// a2aOverGRPC is the gRPC binding of handler: 1.0's, and 0.3's at its own
+// service path. The path is the version, so the version a caller names, or
+// names none, does not matter.
 func (s *QNTXServer) a2aOverGRPC(handler a2asrv.RequestHandler) http.HandlerFunc {
 	served := grpc.NewServer(grpc.MaxRecvMsgSize(nodeBodyMost))
 	a2agrpc.NewHandler(handler).RegisterWith(served)
+	a2agrpcv0.NewHandler(handler).RegisterWith(served)
 	return func(w http.ResponseWriter, r *http.Request) {
+		spoken := a2asdk.Version
+		if strings.HasPrefix(r.URL.Path, a2aGRPCPrefix03) {
+			spoken = a2av0.Version
+		}
+		r.Header.Set(a2asdk.SvcParamVersion, string(spoken))
 		id := uuid.NewString()
 		w.Header().Set("X-Request-Id", id)
 		exchange := &a2aExchange{grpc: true}

@@ -13,9 +13,14 @@ import (
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
 	"github.com/a2aproject/a2a-go/v2/a2aclient/agentcard"
 	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
+	a2agrpcv0 "github.com/a2aproject/a2a-go/v2/a2agrpc/v0"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/parity"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // "WHY CANT WE MAKE IT NOT MATTER"
@@ -89,6 +94,52 @@ func TestACallerNaming03IsAnsweredIn03(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answered), w.Body.String())
 	assert.Equal(t, -32601, answered.Error.Code, "GetTask is 1.0's method, and 0.3 has none by that name: "+w.Body.String())
+}
+
+// A client speaking only 0.3 over gRPC, by a2a-go's a2agrpc/v0, is answered at
+// 0.3's service path, naming no version.
+func TestAClientSpeaking03IsAnsweredOverGRPC(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	node := httptest.NewUnstartedServer(srv.served)
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	protocols.SetUnencryptedHTTP2(true)
+	node.Config.Protocols = protocols
+	node.Start()
+	t.Cleanup(node.Close)
+	ctx := context.Background()
+	bearer := grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		return invoker(metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+tokens[auth.LevelRoot]), method, req, reply, cc, opts...)
+	})
+	client, err := a2aclient.NewFromEndpoints(ctx,
+		[]*a2asdk.AgentInterface{{URL: strings.TrimPrefix(node.URL, "http://"), ProtocolBinding: a2asdk.TransportProtocolGRPC, ProtocolVersion: a2av0.Version}},
+		a2aclient.WithDefaultsDisabled(),
+		a2aclient.WithCompatTransport(a2av0.Version, a2asdk.TransportProtocolGRPC, a2agrpcv0.NewGRPCTransportFactory(grpc.WithTransportCredentials(insecure.NewCredentials()), bearer)))
+	require.NoError(t, err)
+	answered, err := client.SendMessage(ctx, &a2asdk.SendMessageRequest{Message: a2asdk.NewMessage(a2asdk.MessageRoleUser, a2asdk.NewTextPart("how long has the box been up?"))})
+	require.NoError(t, err)
+	task, isTask := answered.(*a2asdk.Task)
+	require.True(t, isTask, "%T", answered)
+	assert.Equal(t, a2asdk.TaskStateCompleted, task.Status.State)
+}
+
+// The node serves what the a2a-go it pins serves: every binding the SDK ships a
+// server for, in the version that server speaks, is on the node's card, and
+// nothing else is. A pin bringing a version or a binding the node does not
+// serve fails here.
+func TestTheNodeServesWhatThePinnedSDKServes(t *testing.T) {
+	served, err := parity.A2AServes()
+	require.NoError(t, err)
+	var sdk []string
+	for _, binding := range served {
+		sdk = append(sdk, binding.Version+" "+binding.Binding)
+	}
+	card := agentCard{URL: "https://node.example/a2a", GRPC: "node.example:443"}.sdk()
+	var node []string
+	for _, held := range card.SupportedInterfaces {
+		node = append(node, string(held.ProtocolVersion)+" "+string(held.ProtocolBinding))
+	}
+	assert.ElementsMatch(t, sdk, node, "a2a.serves.json is what the pinned a2a-go serves (make says), and the card what the node serves")
 }
 
 // A 1.0 request naming no version, which a2a-go alone reads as 0.3, is answered

@@ -406,6 +406,12 @@ func (c agentCard) sdk() *a2asdk.AgentCard {
 	if c.GRPC != "" {
 		card.SupportedInterfaces = append(card.SupportedInterfaces,
 			&a2asdk.AgentInterface{URL: c.GRPC, ProtocolBinding: a2asdk.TransportProtocolGRPC, ProtocolVersion: a2asdk.Version, Tenant: c.Tenant})
+		// 0.3's gRPC names no tenant, and its path is its service's: it reaches
+		// the node, and no agent at a tenant.
+		if c.Tenant == "" {
+			card.SupportedInterfaces = append(card.SupportedInterfaces,
+				&a2asdk.AgentInterface{URL: c.GRPC, ProtocolBinding: a2asdk.TransportProtocolGRPC, ProtocolVersion: a2av0.Version})
+		}
 	}
 	if c.Session != "" {
 		card.SecuritySchemes["session"] = a2asdk.APIKeySecurityScheme{Description: "A person's passkey session", Location: a2asdk.APIKeySecuritySchemeLocationCookie, Name: c.Session}
