@@ -49,44 +49,32 @@ fn client(dial: &str, topic: &Topic) -> (Net, laye_me::Keypair) {
     (net, keypair)
 }
 
-/// A second peer asked to listen where the first already does holds no
+/// A peer asked to listen on an address this host does not hold has no
 /// listener, and says it is unreachable rather than running as if it were.
+///
+/// Not a port another peer holds: libp2p-tcp binds every listener with
+/// SO_REUSEPORT (libp2p-tcp 0.44.1 src/lib.rs:281, 217-218), so on Linux a
+/// second bind to a held port succeeds. 192.0.2.1 is TEST-NET-1 (RFC 5737),
+/// which no host holds, so binding it fails everywhere.
 #[tokio::test(flavor = "multi_thread")]
 async fn a_peer_that_cannot_listen_says_it_is_unreachable() {
     let deadline = Instant::now() + Duration::from_secs(10);
-    let (first, drive) = laye_peer::listening(
-        laye_me::fresh(),
-        vec!["/ip4/127.0.0.1/tcp/0/ws".into()],
-        Vec::new(),
-    )
-    .unwrap();
-    tokio::spawn(drive);
-    let taken = loop {
-        assert!(Instant::now() < deadline, "the first peer never listened");
-        let found = first.poll_events().into_iter().find_map(|e| match e {
-            NetEvent::Listening { addr } => Some(addr),
-            _ => None,
-        });
-        if let Some(addr) = found {
-            break addr;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    };
+    let nowhere = "/ip4/192.0.2.1/tcp/0/ws";
 
-    let (second, drive) =
-        laye_peer::listening(laye_me::fresh(), vec![taken.clone()], Vec::new()).unwrap();
+    let (peer, drive) =
+        laye_peer::listening(laye_me::fresh(), vec![nowhere.into()], Vec::new()).unwrap();
     tokio::spawn(drive);
     loop {
         assert!(
             Instant::now() < deadline,
-            "the second peer never said it is unreachable"
+            "the peer never said it is unreachable"
         );
-        let events = second.poll_events();
+        let events = peer.poll_events();
         assert!(
             !events
                 .iter()
                 .any(|e| matches!(e, NetEvent::Listening { .. })),
-            "the second peer listens on {taken}, which the first holds"
+            "the peer listens on {nowhere}, which this host does not hold"
         );
         if events
             .iter()
