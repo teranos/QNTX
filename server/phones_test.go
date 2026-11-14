@@ -397,3 +397,40 @@ func TestAPressNamesTheBatchByItsAgentsDID(t *testing.T) {
 		assert.Empty(t, one.GetWaiting(), "what was canceled by its agent's DID still waits")
 	}
 }
+
+// "SO WE NEVER BREAK APPLES RULE YOU KNOW"
+// One stands for one time. Held to another while it stands, and standing
+// still by the new one, it is dismissed and another is started for that
+// time: none stands longer than its wait.
+func TestOneThatIsHeldToAnotherTimeIsStartedAnewForIt(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	apple := &told{}
+	srv.shows = apple
+	code, said := handsOver(t, srv, inROOTsSession(), naming(aPhone))
+	require.Equal(t, http.StatusOK, code, said)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	due := time.Now().Add(6 * time.Hour)
+	require.NoError(t, srv.showWhatWaits(context.Background(), due.Add(-time.Hour)))
+	require.Len(t, apple.sent, 1)
+	code, said = handsOver(t, srv, inROOTsSession(), startedOf(anActivity))
+	require.Equal(t, http.StatusOK, code, said)
+
+	// Held an hour longer: by the new time it stands still, for that is within its wait.
+	goes := due.Add(time.Hour)
+	_, refused := askCollected(t, srv, asAPerson(), "hold", map[string]string{"to": "Birch", "until": goes.Format(time.RFC3339)})
+	require.Nil(t, refused, refused.GetSays())
+	at := due.Add(-50 * time.Minute)
+	require.NoError(t, srv.showWhatWaits(context.Background(), at))
+	last := apple.sent[len(apple.sent)-1]
+	assert.Equal(t, anActivity, last.Token)
+	assert.Equal(t, apns.ActivityEnds, last.Event, "the one that stood for the old time was left standing for the new")
+	assert.Equal(t, at.Unix(), last.Gone.Unix())
+
+	// The node looks again: another is started, for the new time.
+	require.NoError(t, srv.showWhatWaits(context.Background(), at.Add(time.Minute)))
+	again := apple.sent[len(apple.sent)-1]
+	assert.Equal(t, aPhone, again.Token)
+	assert.Equal(t, apns.ActivityStarts, again.Event)
+	assert.InDelta(t, float64(goes.Unix()), again.State.(waitsShown).Due, 5)
+}
