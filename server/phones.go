@@ -584,6 +584,9 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 				// Held to another time, and standing still by that one: this one
 				// is dismissed, and another is started for the new time.
 				became = "delayed"
+			case batch != nil && len(batch.Waiting) > 0 && batch.due().IsZero():
+				// What is left wakes nobody: what this one stood for was canceled.
+				became = "canceled"
 			case batch != nil && len(batch.Waiting) > 0 && !pending(batch.due(), now):
 				// Due, and not delivered yet: it is left as it stands, and ends when it is sent.
 				continue
