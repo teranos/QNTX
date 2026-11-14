@@ -33,31 +33,47 @@ const involvedIn = "INVOLVED IN "
 // name, owner/repo#n: what was asked names it, or, for one that was opened by
 // the asking, what GitHub answered does.
 func pullAskedAbout(request []byte, answered map[string]any) (string, bool) {
-	var asked struct {
-		Owner       string `json:"owner"`
-		Repo        string `json:"repo"`
-		PullNumber  int64  `json:"pull_number"`
-		IssueNumber int64  `json:"issue_number"`
-	}
-	if err := json.Unmarshal(request, &asked); err != nil || asked.Owner == "" || asked.Repo == "" {
+	var asked map[string]any
+	if err := json.Unmarshal(request, &asked); err != nil {
 		return "", false
 	}
-	number := asked.PullNumber
-	if number == 0 {
-		number = asked.IssueNumber
+	owner, _ := asked["owner"].(string)
+	repo, _ := asked["repo"].(string)
+	if owner == "" || repo == "" {
+		return "", false
+	}
+	// GitHubService reads what is asked as protobuf's JSON: a field by GitHub's
+	// name or by its other spelling, and a number as one or in a string.
+	number := numberSaid(asked["pull_number"])
+	for _, spelled := range []string{"pullNumber", "issue_number", "issueNumber"} {
+		if number == 0 {
+			number = numberSaid(asked[spelled])
+		}
 	}
 	if number == 0 {
 		// Opened by this asking: GitHub answers its number, and that it is a pull request by its head.
 		if _, opened := answered["head"]; opened {
-			if said, isOne := answered["number"].(float64); isOne {
-				number = int64(said)
-			}
+			number = numberSaid(answered["number"])
 		}
 	}
 	if number <= 0 {
 		return "", false
 	}
-	return asked.Owner + "/" + asked.Repo + "#" + strconv.FormatInt(number, 10), true
+	return owner + "/" + repo + "#" + strconv.FormatInt(number, 10), true
+}
+
+// numberSaid is a number as JSON holds it, or as protobuf's JSON writes one of
+// 64 bits: in a string. What is neither is none.
+func numberSaid(said any) int64 {
+	switch is := said.(type) {
+	case float64:
+		return int64(is)
+	case string:
+		if number, err := strconv.ParseInt(is, 10, 64); err == nil {
+			return number
+		}
+	}
+	return 0
 }
 
 // theAgentAsking is the DID of the agent that asks in ctx, by a key of its
@@ -92,6 +108,12 @@ func (g *gitHub) wasInvolved(ctx context.Context, operation, pull string) error 
 	did := theAgentAsking(ctx)
 	if did == "" {
 		return nil
+	}
+	// Written down once: an agent that asks about it a hundred times is one line.
+	if known, err := newestLines(g.host.nodeRecords().s, involvedKey(involvedIn, pull), "who was involved in a pull request"); err == nil {
+		if _, already := known[did]; already {
+			return nil
+		}
 	}
 	if err := g.host.nodeRecords().nodeRecord(did, involvedKey(involvedIn, pull), did, "_", map[string]any{"operation": operation}); err != nil {
 		g.host.log().Errorw("That an agent was involved in a pull request was not written down: it is told nothing when it is merged",
