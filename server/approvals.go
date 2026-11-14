@@ -353,9 +353,9 @@ func (s *QNTXServer) HandleApprovalAnswer(w http.ResponseWriter, r *http.Request
 		return
 	}
 	st.option, st.said, st.answeredBy = sent.Option, sent.Said, admitted.Identity
-	// "CANT YOU SEE THIS CODEPATH IS CRITICAL"
-	// A press decides what is merged: who pressed, what, and from what it was
-	// pressed stand in the node's log beside the line it wrote.
+	// "「[Opus 5.5] CANT YOU SEE THIS CODEPATH IS CRITICAL」"
+	// 「[Fable 5.2] A press decides what is merged: who pressed, what, and from what it was」
+	// 「[Fable 5.2] pressed stand in the node's log beside the line it wrote.」
 	s.logger.Infow("An approval is answered by the human", "approval", st.subject, "sha", st.sha,
 		"option", sent.Option, "said", sent.Said, "by", admitted.Identity, "client_named_itself", namedItself(r), "merges_now", mergeNow)
 
