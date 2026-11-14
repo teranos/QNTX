@@ -27,12 +27,12 @@ import (
 // "WHEN DELAY CANT WE MAKE IT BE DISMISSED UNTIL ITS TIME TO SHOW AGAIN /"
 // "SO WE NEVER BREAK APPLES RULE YOU KNOW"
 //
-// A pending collection is a Live Activity: it stands on ROOT's iPhone's
-// island and lock screen, and in their Mac's menu bar, for its wait, with
-// what it is, what it says, the time left and its presses. Delayed, it is
-// dismissed, and stands again for the wait before its new time. So one never
-// stands longer than its wait, which is under the eight hours Apple lets one
-// stand. The node
+// 「[Fable 5.2] A pending collection is a Live Activity: it stands on ROOT's iPhone's」
+// 「[Fable 5.2] island and lock screen, and in their Mac's menu bar, for its wait, with」
+// 「[Fable 5.2] what it is, what it says, the time left and its presses. Delayed, it is」
+// 「[Fable 5.2] dismissed, and stands again for the wait before its new time. So one never」
+// 「[Fable 5.2] stands longer than its wait, which is under the eight hours Apple lets one」
+// 「[Fable 5.2] stand. The node」
 // starts it through Apple with the app closed, moves it when what waits
 // changes, and ends it when nothing waits. A press on it is ROOT's own, in the
 // session the app is in (collected.go answers it).
@@ -49,9 +49,9 @@ const phonesSubject = "ACTIVITY-STARTS"
 // ends it.
 const activitiesSubject = "ACTIVITIES"
 
-// sentWithin is how long after what waited was delivered one that stood for
-// it ends saying it was sent, where the node does not hold the time it was
-// started for.
+// 「[Fable 5.2] sentWithin is how long after what waited was delivered one that stood for」
+// 「[Fable 5.2] it ends saying it was sent, where the node does not hold the time it was」
+// 「[Fable 5.2] started for.」
 var sentWithin = 15 * time.Minute
 
 // waitsType names the app's one Live Activity type, as its Swift declares it
@@ -371,24 +371,24 @@ func (s *QNTXServer) keepShowingWhatWaits() {
 	}
 }
 
-// pending is whether what is due at due has still to go.
+// 「[Fable 5.2] pending is whether what is due at due has still to go.」
 func pending(due, now time.Time) bool {
 	return !due.IsZero() && now.Before(due)
 }
 
-// stands is whether a collection stands in front of ROOT now: pending, and
-// within its own wait of when it goes. What was just said waits that long, so
-// it stands from then; what was delayed or held stands again for the wait
-// before its new time.
+// 「[Fable 5.2] stands is whether a collection stands in front of ROOT now: pending, and」
+// 「[Fable 5.2] within its own wait of when it goes. What was just said waits that long, so」
+// 「[Fable 5.2] it stands from then; what was delayed or held stands again for the wait」
+// 「[Fable 5.2] before its new time.」
 func (c collectedFor) stands(now time.Time) bool {
 	due := c.due()
 	return len(c.Waiting) > 0 && pending(due, now) && !now.Before(due.Add(-waitOf(c.Model)))
 }
 
-// standsOn is whether a Live Activity of waits stands on the phone a token
-// starts them on, as far as the app said. One whose phone the app did not
-// name stands where the node started one, begunThere, and on no phone it
-// never started on: a phone named later is not kept from what waits by it.
+// 「[Fable 5.2] standsOn is whether a Live Activity of waits stands on the phone a token」
+// 「[Fable 5.2] starts them on, as far as the app said. One whose phone the app did not」
+// 「[Fable 5.2] name stands where the node started one, begunThere, and on no phone it」
+// 「[Fable 5.2] never started on: a phone named later is not kept from what waits by it.」
 func standsOn(live map[string]started, waits, phone string, begunThere bool) bool {
 	for _, one := range live {
 		if one.Waits == waits && (one.Phone == phone || (one.Phone == "" && begunThere)) {
@@ -398,18 +398,18 @@ func standsOn(live map[string]started, waits, phone string, begunThere bool) boo
 	return false
 }
 
-// showWhatWaits makes what stands on each phone what waits now: whatever is
-// pending is started where it does not stand, one that changed is moved, and
-// one that no longer waits is ended saying what became of it.
+// 「[Fable 5.2] showWhatWaits makes what stands on each phone what waits now: whatever is」
+// 「[Fable 5.2] pending is started where it does not stand, one that changed is moved, and」
+// 「[Fable 5.2] one that no longer waits is ended saying what became of it.」
 func (s *QNTXServer) showWhatWaits(ctx context.Context, now time.Time) error {
 	failed := []string{}
 	held := map[string]*collectedFor{}
 	// Whether what is collected was read: where it was not, nothing is known
 	// of a batch, and one that stands is left as it is.
 	batchesKnown := false
-	// What stands is read to start nothing where it stands already. Not read,
-	// that is said, and what waits is started all the same: once for each time
-	// it is due, as the collection itself keeps.
+	// 「[Fable 5.2] What stands is read to start nothing where it stands already. Not read,」
+	// 「[Fable 5.2] that is said, and what waits is started all the same: once for each time」
+	// 「[Fable 5.2] it is due, as the collection itself keeps.」
 	live, err := s.activities()
 	if err != nil {
 		failed = append(failed, err.Error())
@@ -437,10 +437,10 @@ func (s *QNTXServer) showWhatWaits(ctx context.Context, now time.Time) error {
 		if err != nil {
 			return err
 		}
-		// "I SEE IT AS PART OF THE COLLECTION, APPROVABLE IN IT"
-		// An approval is not started on its own: it is an item in the collection
-		// of whoever it is going to, and stands with that (ADR-060). One that
-		// stands from before is still moved and ended below.
+		// "「[Opus 5.5] I SEE IT AS PART OF THE COLLECTION, APPROVABLE IN IT」"
+		// 「[Fable 5.2] An approval is not started on its own: it is an item in the collection」
+		// 「[Fable 5.2] of whoever it is going to, and stands with that (ADR-060). One that」
+		// 「[Fable 5.2] stands from before is still moved and ended below.」
 		if err := s.moveWhatStands(ctx, live, held, batchesKnown, open, now); err != nil {
 			failed = append(failed, err.Error())
 		}
@@ -482,12 +482,12 @@ func (s *QNTXServer) startBatch(ctx context.Context, kept *collection, live map[
 	if !found || len(waits.Waiting) == 0 {
 		return nil
 	}
-	// Asked again now that nothing else changes it: delivered or delayed meanwhile, it does not stand.
+	// 「[Fable 5.2] Asked again now that nothing else changes it: delivered or delayed meanwhile, it does not stand.」
 	due := waits.due()
 	if !waits.stands(now) {
 		return nil
 	}
-	// Started once for each time it is due, and not where it stands already as the app said.
+	// 「[Fable 5.2] Started once for each time it is due, and not where it stands already as the app said.」
 	without := slices.DeleteFunc(slices.Clone(tokens), func(token string) bool {
 		_, begunThere := waits.Shown[token]
 		return waits.Shown[token].Equal(due) || standsOn(live, batchWaits(did), token, begunThere)
@@ -566,8 +566,8 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 				continue
 			}
 			batch := held[did]
-			// The time it was due when this one was started: one stands for one
-			// time, so that none stands longer than its wait.
+			// 「[Fable 5.2] The time it was due when this one was started: one stands for one」
+			// 「[Fable 5.2] time, so that none stands longer than its wait.」
 			var startedFor time.Time
 			if batch != nil {
 				startedFor = batch.startedFor(stands.Phone)
@@ -577,21 +577,21 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 				shown := batchShown(batch, batch.due())
 				waits, stale = &shown, batch.due()
 			case batch != nil && !startedFor.IsZero() && !startedFor.Equal(batch.due()) && batch.Delivered.After(startedFor.Add(-waitOf(batch.Model))):
-				// Delivered since this one began to stand, and what waits now came
-				// after: what this one stood for was sent, and says so.
+				// 「[Fable 5.2] Delivered since this one began to stand, and what waits now came」
+				// 「[Fable 5.2] after: what this one stood for was sent, and says so.」
 				became = "sent"
 			case batch != nil && batch.stands(now):
-				// Held to another time, and standing still by that one: this one
-				// is dismissed, and another is started for the new time.
+				// 「[Fable 5.2] Held to another time, and standing still by that one: this one」
+				// 「[Fable 5.2] is dismissed, and another is started for the new time.」
 				became = "delayed"
 			case batch != nil && len(batch.Waiting) > 0 && !pending(batch.due(), now):
 				// Due, and not delivered yet: it is left as it stands, and ends when it is sent.
 				continue
 			case batch != nil && len(batch.Waiting) > 0:
-				// Delayed past its wait: dismissed, and started again for the wait before its new time.
+				// 「[Fable 5.2] Delayed past its wait: dismissed, and started again for the wait before its new time.」
 				became = "delayed"
 			case batch != nil && !batch.Delivered.IsZero() && !startedFor.IsZero() && batch.Delivered.After(startedFor.Add(-waitOf(batch.Model))):
-				// Delivered since this one began to stand: it was sent, however long ago the node looked last.
+				// 「[Fable 5.2] Delivered since this one began to stand: it was sent, however long ago the node looked last.」
 				became = "sent"
 			case batch != nil && !batch.Delivered.IsZero() && startedFor.IsZero() && now.Sub(batch.Delivered) < sentWithin+collectedLooked:
 				became = "sent"
@@ -624,7 +624,7 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 		} else {
 			says.Event, says.State, says.Gone = apns.ActivityEnds, ended(became), now.Add(leavesAfter)
 			if became == "delayed" {
-				// Dismissed at once: it is not over, it stands again later.
+				// 「[Fable 5.2] Dismissed at once: it is not over, it stands again later.」
 				says.Gone = now
 			}
 			recorded["gone"] = true

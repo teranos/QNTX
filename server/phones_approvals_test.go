@@ -13,9 +13,9 @@ import (
 	"github.com/teranos/QNTX/internal/apns"
 )
 
-// "I SEE IT AS PART OF THE COLLECTION, APPROVABLE IN IT"
-// An approval is not started as a Live Activity of its own, asked or
-// decidable: it is an item in the collection of whoever it is going to.
+// "「[Opus 5.5] I SEE IT AS PART OF THE COLLECTION, APPROVABLE IN IT」"
+// 「[Opus 5.5] An approval is not started as a Live Activity of its own, asked or」
+// 「[Opus 5.5] decidable: it is an item in the collection of whoever it is going to.」
 func TestAnApprovalIsNotStartedOnItsOwn(t *testing.T) {
 	s, _ := approvingServer(t)
 	apple := &told{}
@@ -30,9 +30,9 @@ func TestAnApprovalIsNotStartedOnItsOwn(t *testing.T) {
 	assert.Empty(t, apple.sent, "an approval was started on its own")
 }
 
-// One that stands from before is moved as its checks run, has the yes and the
-// no once it can be decided, as the node's own answer takes them, and ends
-// saying what ROOT answered.
+// 「[Opus 5.5] One that stands from before is moved as its checks run, has the yes and the」
+// 「[Opus 5.5] no once it can be decided, as the node's own answer takes them, and ends」
+// 「[Opus 5.5] saying what ROOT answered.」
 func TestAnApprovalThatStandsIsMovedAndEnded(t *testing.T) {
 	s, _ := approvingServer(t)
 	apple := &told{}
@@ -41,7 +41,7 @@ func TestAnApprovalThatStandsIsMovedAndEnded(t *testing.T) {
 	code, said := handsOver(t, s, inROOTsSession(), "{\"token\":\""+anActivity+"\",\"platform\":\"ios\",\"waits\":\"approval/teranos/elements#29\"}")
 	require.Equal(t, http.StatusOK, code, said)
 
-	// A check runs: it shows it, and has nothing to press, for it cannot be decided yet.
+	// 「[Opus 5.5] A check runs: it shows it, and has nothing to press, for it cannot be decided yet.」
 	delivered(t, s, "check_run", checkRun("TypeScript", "abe92a9", "in_progress", ""))
 	require.NoError(t, s.showWhatWaits(context.Background(), time.Now()))
 	require.Len(t, apple.sent, 1)
@@ -67,11 +67,11 @@ func TestAnApprovalThatStandsIsMovedAndEnded(t *testing.T) {
 	assert.Equal(t, approvalsAnswerPath, yes.Path)
 	assert.Equal(t, map[string]string{"subject": "teranos/elements#29", "sha": "abe92a9", "option": optionMerge, "said": saysMergeWhenReady}, yes.Sent)
 
-	// ROOT presses the no: what the press sends is what the node's answer takes.
+	// 「[Opus 5.5] ROOT presses the no: what the press sends is what the node's answer takes.」
 	status, answered := press(s, inROOTsSession(), no.Sent["subject"], no.Sent["sha"], no.Sent["option"], no.Sent["said"])
 	require.Equal(t, http.StatusOK, status, answered)
 
-	// Answered: it ends saying what ROOT said, and nothing is said to it again.
+	// 「[Opus 5.5] Answered: it ends saying what ROOT said, and nothing is said to it again.」
 	at := time.Now()
 	require.NoError(t, s.showWhatWaits(context.Background(), at))
 	require.Len(t, apple.sent, 3)
@@ -83,7 +83,7 @@ func TestAnApprovalThatStandsIsMovedAndEnded(t *testing.T) {
 	assert.Len(t, apple.sent, 3, "something was said to an approval that is over")
 }
 
-// A check said again in the state it was in moves nothing.
+// 「[Opus 5.5] A check said again in the state it was in moves nothing.」
 func TestACheckSaidAgainMovesNoApproval(t *testing.T) {
 	lines := func(at time.Time, predicate string, attributes map[string]any) *types.As {
 		return &types.As{Subjects: []string{"teranos/elements#29"}, Predicates: []string{predicate}, Timestamp: at, Attributes: attributes}
