@@ -154,6 +154,11 @@ func (s *QNTXServer) spend(agent *rootAgent, said claudecode.Said, shot shaken, 
 			return answer, err
 		}
 		s.logger.Infow("what ROOT's agents spend was exhausted", "source", source, "said", answer.Text, "session", said.Session)
+		// The next source's answer takes this one's place: what was not tidied
+		// after this one is said now, or it is never said.
+		if answer.NotLetGo != nil {
+			s.logger.Errorw("A turn ran, and what the node handed it was not tidied after it", "on", source, "session", said.Session, "error", answer.NotLetGo)
+		}
 	}
 	return answer, nil
 }

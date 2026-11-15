@@ -145,3 +145,28 @@ func TestWhatCouldNotBeDeliveredEndsWhenItsWaitIsOver(t *testing.T) {
 	assert.Equal(t, apns.ActivityEnds, last.Event)
 	assert.Equal(t, "not delivered", last.State.(waitsShown).Says)
 }
+
+// What could not be delivered and was then canceled whole says canceled.
+func TestWhatCouldNotBeDeliveredAndWasCanceledSaysCanceled(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	apple := &told{}
+	srv.shows = apple
+	code, said := handsOver(t, srv, inROOTsSession(), naming(aPhone))
+	require.Equal(t, http.StatusOK, code, said)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	kept, err := srv.theCollection()
+	require.NoError(t, err)
+	_, _, err = srv.failedToDeliver(kept, "did:key:z6Mkbirch", assert.AnError, time.Now())
+	require.NoError(t, err)
+	code, said = handsOver(t, srv, inROOTsSession(), startedOf(anActivity))
+	require.Equal(t, http.StatusOK, code, said)
+
+	_, refused := askCollected(t, srv, asAPerson(), "cancel", sigil.Sent{"to": "Birch"})
+	require.Nil(t, refused, refused.GetSays())
+	require.NoError(t, srv.showWhatWaits(context.Background(), time.Now()))
+	require.NotEmpty(t, apple.sent)
+	last := apple.sent[len(apple.sent)-1]
+	assert.Equal(t, apns.ActivityEnds, last.Event)
+	assert.Equal(t, "canceled", last.State.(waitsShown).Says)
+}
