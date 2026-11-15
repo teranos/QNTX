@@ -101,3 +101,11 @@ func TestLayeIsNamedByADIDKey(t *testing.T) {
 	assert.Error(t, h.SetLaye("https://laye.example"))
 	assert.NoError(t, h.SetLaye(""), "no laye in front is a node standing on its own")
 }
+
+// "BUT LAYE DOES NOT REALLY OWN USER, THE QNTX WAY"
+func TestANodeLoggingInAtLayeHoldsItsOwnRoles(t *testing.T) {
+	h, _, _, _, _ := behindLaye(t)
+	require.NoError(t, h.SetPrimary("https://laye.example"))
+	_, fromThePrimary := h.LinesFromThePrimary()
+	assert.False(t, fromThePrimary, "a node with laye in front read who holds which role from laye")
+}
