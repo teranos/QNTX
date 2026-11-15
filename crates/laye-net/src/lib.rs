@@ -26,6 +26,8 @@ pub enum NetError {
     SubscribeFailed { topic: Topic, reason: String },
     #[error("not connected: {reason}")]
     NotConnected { reason: String },
+    #[error("not listening: {reason}")]
+    NotListening { reason: String },
     #[error("invalid topic {}: {reason}", topic.0)]
     InvalidTopic { topic: Topic, reason: String },
     #[error("provider internal: {reason}")]
@@ -45,8 +47,19 @@ pub enum NetEvent {
     Message {
         topic: Topic,
         from: PeerId,
+        /// The did:key of the key that signed it, when it was signed by one.
+        from_did: Option<String>,
         bytes: Vec<u8>,
         at_ms: u64,
+    },
+    /// An address this peer takes connections on.
+    Listening {
+        addr: String,
+    },
+    /// This peer was asked to listen and holds no listener: nobody can
+    /// connect to it.
+    Unreachable {
+        reason: String,
     },
     SubscriptionChange {
         topic: Topic,
@@ -58,6 +71,9 @@ pub enum NetEvent {
 
 pub struct NetConfig {
     pub bootstrap_addrs: Vec<String>,
+    /// Where others connect to this peer. None named is a client: one
+    /// connection out, none in.
+    pub listen_addrs: Vec<String>,
     pub keypair: Keypair,
     pub topics: Vec<Topic>,
     pub identify_protocol: String,
@@ -81,7 +97,8 @@ pub fn new(config: NetConfig) -> Result<(Net, NetDrive), NetError> {
     let self_peer_id = PeerId(peer_id.to_string());
     let self_keypair = config.keypair.clone();
 
-    let swarm = swarm::build_swarm(config.keypair, config.identify_protocol)?;
+    let listening = !config.listen_addrs.is_empty();
+    let swarm = swarm::build_swarm(config.keypair, config.identify_protocol, listening)?;
     let (cmd_tx, cmd_rx) = mpsc::unbounded::<swarm::Cmd>();
     let events: Arc<Mutex<Vec<NetEvent>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -90,6 +107,7 @@ pub fn new(config: NetConfig) -> Result<(Net, NetDrive), NetError> {
         cmd_rx,
         events.clone(),
         config.bootstrap_addrs,
+        config.listen_addrs,
         config.topics,
     ));
 
@@ -194,8 +212,15 @@ mod tests {
         round_trip(NetEvent::Message {
             topic: Topic("t".into()),
             from: PeerId("p".into()),
+            from_did: Some("did:key:z6Mk".into()),
             bytes: vec![1, 2, 3],
             at_ms: 1_700_000_000_000,
+        });
+        round_trip(NetEvent::Listening {
+            addr: "/ip4/127.0.0.1/tcp/4001/ws".into(),
+        });
+        round_trip(NetEvent::Unreachable {
+            reason: "listen on /ip4/127.0.0.1/tcp/4001/ws: io::AddrInUse".into(),
         });
         round_trip(NetEvent::SubscriptionChange {
             topic: Topic("t".into()),
@@ -214,6 +239,7 @@ mod tests {
         let expected = PeerId(libp2p::PeerId::from(keypair.public()).to_string());
         let (net, _drive) = new(NetConfig {
             bootstrap_addrs: vec![],
+            listen_addrs: vec![],
             keypair,
             topics: vec![],
             identify_protocol: "/laye/1.0.0".into(),

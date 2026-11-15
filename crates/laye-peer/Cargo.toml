@@ -1,0 +1,16 @@
+[package]
+name = "laye-peer"
+version = "0.0.0"
+edition = "2024"
+description = "A laye peer others connect to, without a browser."
+license = "MIT"
+
+[lints]
+workspace = true
+
+[dependencies]
+laye-net = { path = "../laye-net" }
+laye-me = { path = "../laye-me" }
+sacred-error.workspace = true
+serde_json = "=1.0.143"
+tokio = { version = "=1.53.1", features = ["rt-multi-thread", "macros", "time"] }

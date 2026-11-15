@@ -2632,6 +2632,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "laye-peer"
+version = "0.0.0"
+dependencies = [
+ "laye-me",
+ "laye-net",
+ "sacred-error",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "laye-protocol"
 version = "0.0.0"
 dependencies = [

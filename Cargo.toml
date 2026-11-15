@@ -13,6 +13,7 @@ members = [
     "crates/laye-me",
     "crates/laye-net",
     "crates/laye-p2p",
+    "crates/laye-peer",
     "crates/laye-protocol",
     "crates/qntx-ffi-common",
     "crates/qntx-grpc",
