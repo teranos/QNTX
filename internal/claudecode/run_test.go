@@ -26,6 +26,7 @@ func standIn(t *testing.T, stream string, exit int, stderr string) (binary, ran 
 		"for arg in \"$@\"; do printf '%s\\n' \"$arg\"; done > '" + ran + "/args'\n" +
 		"env > '" + ran + "/env'\n" +
 		"pwd > '" + ran + "/cwd'\n" +
+		"cat > '" + ran + "/stdin'\n" +
 		"cat '" + canned + "'\n"
 	if stderr != "" {
 		script += "printf '%s\\n' '" + stderr + "' >&2\n"
@@ -79,8 +80,15 @@ func TestSaidStartsASessionAndAnswers(t *testing.T) {
 	}
 
 	args := linesOf(t, filepath.Join(ran, "args"))
+	// What is said goes on stdin, and is no argument: one argument over
+	// 131,072 bytes is refused on Linux.
+	if !slices.Contains(args, "-p") || slices.Contains(args, "what does uname -s print?") {
+		t.Errorf("it was not run in print mode with what was said on stdin: %v", args)
+	}
+	if stdin := linesOf(t, filepath.Join(ran, "stdin")); !slices.Equal(stdin, []string{"what does uname -s print?"}) {
+		t.Errorf("what was said reached it on stdin as %q", stdin)
+	}
 	for _, pair := range [][2]string{
-		{"-p", "what does uname -s print?"},
 		{"--session-id", "s-1"},
 		{"--model", "claude-opus-5-5"},
 		{"--effort", "low"},

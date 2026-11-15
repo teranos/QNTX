@@ -340,6 +340,12 @@ func (s *QNTXServer) harnessSay(ctx context.Context, h *harness, sent sigil.Sent
 	return s.sayTo(ctx, h, agent, h.spec(), sent)
 }
 
+// collectsFor is whether what caller says to agent is collected for it rather
+// than said: the Node Agent, spoken to by no person.
+func (s *QNTXServer) collectsFor(agent *rootAgent, caller *http.Request) bool {
+	return agent != nil && agent == s.nodeAgent && agent.element == "" && !aPersonSpeaks(caller)
+}
+
 // sayTo says something to one agent in h, running as spec says.
 func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, spec agentSpec, sent sigil.Sent) (any, *protocol.Refusal) {
 	caller := sigil.Caller(ctx)
@@ -349,10 +355,10 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	// "Agents cant wake Agents willy nilly"
 	// What is said to the Node Agent by no person is collected (collected.go):
 	// an agent's words, a room's wake, a delivery of GitHub's.
-	if agent == s.nodeAgent && agent.element == "" && !aPersonSpeaks(caller) {
+	if s.collectsFor(agent, caller) {
 		due, err := s.collect(
 			collectedFor{DID: agent.did, Called: s.calledInMemory(agent.home), Model: spec.Model},
-			collectedSaid{From: s.calledBy(spokenBy(caller)), FromDID: spokenBy(caller), Says: sent["says"], At: time.Now()})
+			collectedSaid{From: s.calledBy(spokenBy(caller)), FromDID: spokenBy(caller), Says: sent["says"], At: time.Now(), Room: roomOf(caller)})
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what was said to " + agent.called + " by no person was not collected, and was not said: " + err.Error()}
 		}

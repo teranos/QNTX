@@ -3,6 +3,7 @@ package claudecode
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
@@ -184,7 +185,10 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 
 	// Partial messages are the stream_event lines: the words as the model says
 	// them, for whoever tails the stream while the turn runs (Tail).
-	args := []string{"-p", s.Says, "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+	// What is said goes on stdin, not as an argument: Linux refuses one argument
+	// over 131,072 bytes (MAX_ARG_STRLEN), and a turn that holds a room's
+	// digest, or a delivery of what was collected, is larger than that.
+	args := []string{"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
 		"--model", s.Model, "--effort", s.Effort, "--permission-mode", s.Mode}
 	if len(s.Allow) > 0 {
 		args = append(args, "--allowedTools", strings.Join(s.Allow, ","))
@@ -247,17 +251,36 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 			env = append(env, bus...)
 		}
 	}
+	// What is said is written whole to a file of the turn's before it starts,
+	// and the file is its stdin: copied in by a goroutine of the node's, a turn
+	// apart that outlives the node would read only what was copied before it
+	// stopped. Unlinked once the turn holds it.
+	told, err := os.CreateTemp(turns, "said-*")
+	if err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.Wrap(err, "the file what is said is handed over in was not made"), handedOver())
+	}
+	letGo := func() error {
+		closed := told.Close()
+		return errors.WithSecondaryError(errors.Wrapf(os.Remove(told.Name()), "%s was not removed", told.Name()), closed)
+	}
+	if _, err := told.WriteString(s.Says); err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "what is said was not written to %s", told.Name()), letGo()), handedOver())
+	}
+	if _, err := told.Seek(0, io.SeekStart); err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "%s was not read from its start", told.Name()), letGo()), handedOver())
+	}
 	cmd := exec.Command(binary, argv...)
-	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = at, env, out, said
+	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr, cmd.Stdin = at, env, out, said, told
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: s.Apart}
 	if err := cmd.Start(); err != nil {
-		return Answer{}, errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), handedOver())
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), letGo()), handedOver())
 	}
-	if err := handedOver(); err != nil {
-		return Answer{}, err
-	}
+	// Started, the turn is followed to its end whatever else fails: a failure
+	// of what was handed over is returned with what it answered, and never
+	// leaves a process nobody follows or waits for.
+	notLetGo := errors.WithSecondaryError(handedOver(), letGo())
 	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(cmd.Process.Pid)), 0o600); err != nil {
-		return Answer{}, errors.Wrapf(err, "the pid of %s was not kept", stream)
+		notLetGo = errors.WithSecondaryError(errors.Wrapf(err, "the pid of %s was not kept", stream), notLetGo)
 	}
 	s.Started(stream)
 	var exited atomic.Bool
@@ -267,6 +290,9 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		exited.Store(true)
 	})
 	answer, err := follow(ctx, stream, func() bool { return !exited.Load() }, each)
+	if notLetGo != nil {
+		err = errors.WithSecondaryError(notLetGo, err)
+	}
 	// A process of the node's own, not apart, stops when the node does, the
 	// way a person stops it, so the session is left as written. One that
 	// already printed its result has answered, and its answer is returned.

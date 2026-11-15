@@ -61,7 +61,7 @@ func TestWhatIsSaidToClaudeCodeIsRunByTheClaudePlugin(t *testing.T) {
 
 	args := ranWith(t, pluginRan, "0", "args")
 	assert.Equal(t, answer.GetSession(), after(args, "--session-id"))
-	assert.Equal(t, "how long has the box been up?", after(args, "-p"))
+	assert.Equal(t, []string{"how long has the box been up?"}, ranWith(t, pluginRan, "0", "stdin"))
 	ranHere, err := os.ReadDir(nodeRan)
 	require.NoError(t, err)
 	assert.Empty(t, ranHere, "the node ran its own Claude Code while the plugin runs it")

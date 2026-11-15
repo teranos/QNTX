@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -72,6 +73,87 @@ type collectedSaid struct {
 	// Quiet is that it wakes nobody: it is delivered with what does, and
 	// alone it makes nothing due.
 	Quiet bool `json:"quiet,omitempty"`
+	// Room is the room it was told of, as provider/room, when a room's wake
+	// said it. A room keeps all that was said in it: what waits of it is its
+	// newest wake alone, and none older than the agent's wait (roomItemsGo).
+	Room string `json:"room,omitempty"`
+}
+
+// fromRoom marks a request as a room's wake, by the room it is of.
+type fromRoom struct{}
+
+// withRoom is ctx as a wake of room, provider/room.
+func withRoom(ctx context.Context, room string) context.Context {
+	return context.WithValue(ctx, fromRoom{}, room)
+}
+
+// roomOf is the room a request is a wake of, and empty for anything else.
+func roomOf(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	room, _ := r.Context().Value(fromRoom{}).(string)
+	return room
+}
+
+// "things like coming from rooms, they may degrade over time, as in, it doesnt make sense to keep old room collection items in the waking collection at all"
+//
+// roomItemsGo lets go of what waits of a room that is older than the agent's
+// wait, as of now: the room holds it, and it is read there. What is left is
+// answered.
+func (c *collectedFor) roomItemsGo(now time.Time) []collectedSaid {
+	gone := []collectedSaid{}
+	c.Waiting = slices.DeleteFunc(c.Waiting, func(one collectedSaid) bool {
+		old := one.Room != "" && now.Sub(one.At) > waitOf(c.Model)
+		if old {
+			gone = append(gone, one)
+		}
+		return old
+	})
+	return gone
+}
+
+// replacesFromRoom lets go of what waits of the room said is of, and answers
+// said, saying since when the room holds what was said before it: a room's
+// newest wake stands for the room.
+func (c *collectedFor) replacesFromRoom(said collectedSaid) collectedSaid {
+	if said.Room == "" {
+		return said
+	}
+	var since time.Time
+	c.Waiting = slices.DeleteFunc(c.Waiting, func(one collectedSaid) bool {
+		earlier := one.Room == said.Room
+		if earlier && (since.IsZero() || one.At.Before(since)) {
+			since = one.At
+		}
+		return earlier
+	})
+	if !since.IsZero() {
+		said.Says = "(Said in " + said.Room + " before this, since " + since.UTC().Format(time.RFC3339) +
+			", is in the room, and not here: read it there.)\n\n" + said.Says
+	}
+	return said
+}
+
+// collectedMostBytes is the most one delivery says. A delivery is one A2A
+// Task, whose first line holds all of it, and a line of more than 1,000,000
+// bytes of JSON is refused (crates/ats-duckdb/src/ffi.rs, MAX_JSON_LENGTH);
+// what JSON escapes and the line wraps it in is kept under that.
+const collectedMostBytes = 800_000
+
+// storedSize is how many bytes text takes in a Task's line: written into the
+// Task as JSON, and that JSON written as an attribute's value, so each quote
+// or backslash grows twice.
+func storedSize(text string) int {
+	once, err := json.Marshal(text)
+	if err != nil {
+		return len(text)
+	}
+	twice, err := json.Marshal(string(once))
+	if err != nil {
+		return len(once)
+	}
+	return len(twice)
 }
 
 // collectedID is a new name for one thing said.
@@ -93,6 +175,13 @@ type collectedFor struct {
 	// HeldUntil is a person's word that nothing is delivered before it.
 	HeldUntil time.Time `json:"held_until,omitempty"`
 	Delivered time.Time `json:"delivered,omitempty"`
+	// "The failure is also quiet by construction."
+	// Failing is since when delivering what waits has failed, Tries how many
+	// times in a row, and Failure why the last one did: kept with what waits,
+	// so it is seen wherever what waits is, and cleared when it is delivered.
+	Failing time.Time `json:"failing,omitempty"`
+	Tries   int       `json:"tries,omitempty"`
+	Failure string    `json:"failure,omitempty"`
 	// Shown is, for each phone it was started on as a Live Activity, the time
 	// it was due when it was started there (phones.go): held to another time,
 	// it is started again before that one, and on a phone that was not reached
@@ -294,6 +383,16 @@ func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, er
 		// What it is called, where it is served and what it runs on are as the node holds them now.
 		waits.Called, waits.Tenant, waits.Model = to.Called, to.Tenant, to.Model
 		said.ID = collectedID()
+		// What waits of a room is its newest wake, and none older than the wait.
+		waits.roomItemsGo(said.At)
+		said = waits.replacesFromRoom(said)
+		// What could never be delivered is not collected: the delivery is one
+		// Task, and its first line holds the whole of it (collectedMostBytes),
+		// measured as it is stored.
+		if whole := storedSize(asOneThing(append(slices.Clone(waits.Waiting), said))); whole > collectedMostBytes {
+			return errors.Newf("what is collected for %s would be %d bytes with this, and one delivery holds %d: it was not collected, and %s is told nothing of it",
+				to.Called, whole, collectedMostBytes, to.Called)
+		}
 		waits.Waiting = append(waits.Waiting, said)
 		due = waits.due()
 		return nil
@@ -425,6 +524,7 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did, authored string,
 			return slices.ContainsFunc(delivering, func(sent collectedSaid) bool { return sent.ID == one.ID })
 		})
 		waits.Delivered, waits.HeldUntil = now, time.Time{}
+		waits.Failing, waits.Tries, waits.Failure = time.Time{}, 0, ""
 		return nil
 	}); err != nil {
 		return 0, err
@@ -442,27 +542,44 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did, authored string,
 	return len(delivering), nil
 }
 
-// keepDeliveringCollected delivers what is due until the node stops. What
-// failed is said once for as long as it keeps failing the same way.
+// keepDeliveringCollected delivers what is due until the node stops. Every
+// try that failed is said, each time: a failure said once, and then not while
+// it kept failing the same way, read as a queue that was well while it was
+// stuck (Lamplighter's, every minute for nine hours, 2026-11-14).
 func (s *QNTXServer) keepDeliveringCollected() {
 	tick := time.NewTicker(collectedLooked)
 	defer tick.Stop()
-	last := ""
 	for {
 		select {
 		case <-s.ctx.Done():
 			return
 		case <-tick.C:
-			err := s.deliverDue(time.Now())
-			switch {
-			case err == nil:
-				last = ""
-			case err.Error() != last:
-				last = err.Error()
+			if err := s.deliverDue(time.Now()); err != nil {
 				s.logger.Errorw("What is collected and due was not delivered", "error", err)
 			}
 		}
 	}
+}
+
+// failedToDeliver keeps with what waits for did that delivering it failed:
+// since when, how many times in a row, and why the last time. It answers the
+// tries and since.
+func (s *QNTXServer) failedToDeliver(kept *collection, did string, failure error, now time.Time) (int, time.Time, error) {
+	tries, since := 0, time.Time{}
+	err := kept.change(func(held map[string]*collectedFor) error {
+		waits, found := held[did]
+		if !found {
+			return nil
+		}
+		if waits.Failing.IsZero() {
+			waits.Failing = now
+		}
+		waits.Tries++
+		waits.Failure = failure.Error()
+		tries, since = waits.Tries, waits.Failing
+		return nil
+	})
+	return tries, since, err
 }
 
 // deliverDue delivers what is due at now, for every agent something waits for.
@@ -478,13 +595,38 @@ func (s *QNTXServer) deliverDue(now time.Time) error {
 		return err
 	}
 	failed := []string{}
+	// What waits of a room and is older than the wait is let go of, each look.
+	let := map[string]int{}
+	if err := kept.change(func(held map[string]*collectedFor) error {
+		for did, waits := range held {
+			if gone := waits.roomItemsGo(now); len(gone) > 0 {
+				let[did] = len(gone)
+			}
+		}
+		return nil
+	}); err != nil {
+		failed = append(failed, err.Error())
+	}
+	for did, n := range let {
+		s.logger.Infow("What waited of a room is let go of: it is older than the wait, and the room holds it", "to", held[did].Called, "things", n)
+	}
+	kept.mu.Lock()
+	held, err = kept.read()
+	kept.mu.Unlock()
+	if err != nil {
+		return err
+	}
 	for did, waits := range held {
 		// What is due at no time holds nothing that wakes, and is not delivered for itself.
 		if due := waits.due(); due.IsZero() || now.Before(due) {
 			continue
 		}
 		if _, err := s.deliverCollected(s.ctx, did, "", nil, now); err != nil {
-			failed = append(failed, err.Error())
+			tries, since, notKept := s.failedToDeliver(kept, did, err, now)
+			if notKept != nil {
+				failed = append(failed, notKept.Error())
+			}
+			failed = append(failed, fmt.Sprintf("%s, try %d since %s: %s", waits.Called, tries, stamped(since), err.Error()))
 		}
 	}
 	if len(failed) > 0 {
@@ -591,7 +733,8 @@ func (s *QNTXServer) collectedList(context.Context, sigil.Sent) (any, *protocol.
 		one := &protocol.Collected{
 			To: waits.Called, Did: waits.DID, Model: waits.Model, Waits: waitOf(waits.Model).String(),
 			Due: stamped(waits.due()), HeldUntil: stamped(waits.HeldUntil), Delivered: stamped(waits.Delivered),
-			Waiting: []*protocol.CollectedSaid{},
+			Waiting:      []*protocol.CollectedSaid{},
+			FailingSince: stamped(waits.Failing), Tries: int32(waits.Tries), Failure: waits.Failure,
 		}
 		for _, said := range waits.Waiting {
 			one.Waiting = append(one.Waiting, &protocol.CollectedSaid{From: said.From, Says: said.Says, At: stamped(said.At), Task: said.Task, Id: said.ID, Edited: said.Edited, FromDid: said.FromDID})
