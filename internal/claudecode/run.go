@@ -184,7 +184,10 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 
 	// Partial messages are the stream_event lines: the words as the model says
 	// them, for whoever tails the stream while the turn runs (Tail).
-	args := []string{"-p", s.Says, "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+	// What is said goes on stdin, not as an argument: Linux refuses one argument
+	// over 131,072 bytes (MAX_ARG_STRLEN), and a turn that holds a room's
+	// digest, or a delivery of what was collected, is larger than that.
+	args := []string{"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
 		"--model", s.Model, "--effort", s.Effort, "--permission-mode", s.Mode}
 	if len(s.Allow) > 0 {
 		args = append(args, "--allowedTools", strings.Join(s.Allow, ","))
@@ -249,6 +252,7 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	}
 	cmd := exec.Command(binary, argv...)
 	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = at, env, out, said
+	cmd.Stdin = strings.NewReader(s.Says)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: s.Apart}
 	if err := cmd.Start(); err != nil {
 		return Answer{}, errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), handedOver())

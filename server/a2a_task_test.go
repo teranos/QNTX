@@ -130,7 +130,7 @@ func TestAMessageToTheNodeIsATaskOfTheNodeAgent(t *testing.T) {
 	assert.Equal(t, id, at(task, "history.0.taskId"))
 
 	args := ranWith(t, ran, "0", "args")
-	assert.Equal(t, "how long has the box been up?", after(args, "-p"))
+	assert.Equal(t, []string{"how long has the box been up?"}, ranWith(t, ran, "0", "stdin"))
 	assert.Equal(t, after(args, "--session-id"), at(task, "contextId"), "the context is the Node Agent's one session")
 
 	// And it is the Task GetTask answers, by its id (§3.1.3).
