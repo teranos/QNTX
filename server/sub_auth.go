@@ -433,17 +433,18 @@ func (s *QNTXServer) keepPrimaryLines(held *auth.PrimaryLines) {
 	})
 }
 
-// keepPrimaryRoots asks the primary for the roots every auth.RootsEvery,
-// until the node stops. A primary that does not answer is said, and the roots
-// last heard stand.
+// keepPrimaryRoots asks the primary for the roots once before anything that
+// speaks for ROOT starts (the Node Agent takes the first of them as it is
+// named), then every auth.RootsEvery until the node stops. A primary that
+// does not answer is said, and the roots last heard stand.
 func (s *QNTXServer) keepPrimaryRoots(h *auth.Handler) {
 	ask := func() {
 		if err := h.RefreshPrimaryRoots(time.Now()); err != nil {
 			s.logger.Errorw("The primary did not say who the roots are; the ones last heard stand", "error", err)
 		}
 	}
+	ask()
 	s.wg.Go("auth.primaryRoots", func() {
-		ask()
 		ticker := time.NewTicker(auth.RootsEvery)
 		defer ticker.Stop()
 		for {
