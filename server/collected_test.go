@@ -516,3 +516,56 @@ func TestWhatGrowsWhenStoredIsMeasuredAsStored(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, whatWaitsFor(t, srv, birch.DID), "what could never be stored was collected")
 }
+
+// "things like coming from rooms, they may degrade over time, as in, it doesnt make sense to keep old room collection items in the waking collection at all"
+//
+// A room keeps all that was said in it: what waits of it is its newest wake,
+// saying since when the room holds what was said before it.
+func TestARoomsNewestWakeStandsForTheRoom(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	birch := collectedFor{DID: "did:key:z6Mkbirch", Called: "Birch", Tenant: "Birch"}
+	first := time.Now().Add(-time.Hour)
+	_, err := srv.collect(birch, collectedSaid{From: "GitHub", Says: "the first review", At: first, Room: "github/node-room"})
+	require.NoError(t, err)
+	_, err = srv.collect(birch, collectedSaid{From: "Alder", Says: "pull request one is open", At: first.Add(time.Minute)})
+	require.NoError(t, err)
+	_, err = srv.collect(birch, collectedSaid{From: "GitHub", Says: "the second review", At: time.Now(), Room: "github/node-room"})
+	require.NoError(t, err)
+
+	waits := whatWaitsFor(t, srv, birch.DID)
+	require.Len(t, waits.Waiting, 2, "an older wake of the room still waits beside its newest")
+	assert.Equal(t, "pull request one is open", waits.Waiting[0].Says, "what an agent said is not the room's to replace")
+	assert.Contains(t, waits.Waiting[1].Says, "the second review")
+	assert.Contains(t, waits.Waiting[1].Says, "since "+first.UTC().Format(time.RFC3339))
+	assert.NotContains(t, waits.Waiting[1].Says, "the first review")
+}
+
+// What waits of a room and is older than the agent's wait is let go of: the
+// room holds it.
+func TestWhatWaitsOfARoomPastTheWaitIsLetGo(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	birch := collectedFor{DID: "did:key:z6Mkbirch", Called: "Birch", Tenant: "Birch"}
+	now := time.Now()
+	_, err := srv.collect(birch, collectedSaid{From: "GitHub", Says: "a review", At: now, Room: "github/node-room", Quiet: true})
+	require.NoError(t, err)
+	_, err = srv.collect(birch, collectedSaid{From: "GitHub", Says: "merged", At: now, Quiet: true})
+	require.NoError(t, err)
+
+	// Past the wait: the room's is let go of, and what is not a room's stays.
+	require.NoError(t, srv.deliverDue(now.Add(waitOf("")+time.Minute)))
+	waits := whatWaitsFor(t, srv, birch.DID)
+	require.Len(t, waits.Waiting, 1)
+	assert.Equal(t, "merged", waits.Waiting[0].Says)
+}
+
+// A room's wake is collected as the room's.
+func TestARoomsWakeIsCollectedAsTheRooms(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	woken := httptest.NewRequest(http.MethodPost, "/github/comments", nil).WithContext(withSpeaker(context.Background(), "teranos"))
+	_, err := s.answerInRoom(woken, "github", &commentsRoom{t: t}, "room-1", "", "claude", "GitHub", "what was said")
+	require.NoError(t, err)
+	waits := whatWaitsFor(t, s, s.nodeAgent.did)
+	require.NotNil(t, waits)
+	require.Len(t, waits.Waiting, 1)
+	assert.Equal(t, "github/room-1", waits.Waiting[0].Room)
+}
