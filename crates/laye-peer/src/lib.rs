@@ -46,13 +46,7 @@ pub fn did_of(keypair: &Keypair) -> Option<String> {
 /// key is made once and read every start after.
 pub fn key_at(path: &Path) -> Result<Keypair, Box<Error>> {
     match std::fs::read(path) {
-        Ok(bytes) => laye_me::load(&bytes).map_err(|e| {
-            error(
-                "key-unreadable",
-                "the peer's key does not read",
-                format!("{}: {e}", path.display()),
-            )
-        }),
+        Ok(bytes) => decode(path, &bytes),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             let keypair = laye_me::fresh();
             let bytes = laye_me::to_bytes(&keypair).map_err(|e| {
@@ -64,8 +58,22 @@ pub fn key_at(path: &Path) -> Result<Keypair, Box<Error>> {
             })?;
             match keep_once(path, &bytes) {
                 Ok(()) => Ok(keypair),
-                // Another start kept its key first, whole: that key is this peer.
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => key_at(path),
+                // Another start kept its key first: that key is this peer. It
+                // is read once, and what does not read is said to: a path
+                // that is there to link to and not there to read (a dangling
+                // symlink) is never retried. This start returns that key, so
+                // it makes the key's entry durable too.
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    sync_dir_of(path).map_err(|e| {
+                        error(
+                            "key-unwritable",
+                            "the directory holding the peer's key was not synced",
+                            format!("{}: {e}", path.display()),
+                        )
+                    })?;
+                    let bytes = std::fs::read(path).map_err(|e| unreadable(path, &e))?;
+                    decode(path, &bytes)
+                }
                 Err(e) => Err(error(
                     "key-unwritable",
                     "the peer's new key was not kept",
@@ -73,12 +81,37 @@ pub fn key_at(path: &Path) -> Result<Keypair, Box<Error>> {
                 )),
             }
         }
-        Err(e) => Err(error(
-            "key-unreadable",
-            "the peer's key could not be read",
-            format!("{}: {e}", path.display()),
-        )),
+        Err(e) => Err(unreadable(path, &e)),
     }
+}
+
+fn decode(path: &Path, bytes: &[u8]) -> Result<Keypair, Box<Error>> {
+    laye_me::load(bytes).map_err(|e| {
+        error(
+            "key-unreadable",
+            "the peer's key does not read",
+            format!("{}: {e}", path.display()),
+        )
+    })
+}
+
+fn unreadable(path: &Path, e: &std::io::Error) -> Box<Error> {
+    error(
+        "key-unreadable",
+        "the peer's key could not be read",
+        format!("{}: {e}", path.display()),
+    )
+}
+
+/// A file's sync makes its bytes durable, not its name: the directory that
+/// holds the name is synced too, or after a crash the key can be gone and the
+/// next start is a different peer.
+fn sync_dir_of(path: &Path) -> std::io::Result<()> {
+    let dir = match path.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p,
+        _ => Path::new("."),
+    };
+    std::fs::File::open(dir)?.sync_all()
 }
 
 /// The key is written whole and synced beside `path`, then linked in. A link
@@ -98,7 +131,8 @@ fn keep_once(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let written = write_owner_only(&beside, bytes).and_then(|()| std::fs::hard_link(&beside, path));
     let removed = std::fs::remove_file(&beside);
     written?;
-    removed
+    removed?;
+    sync_dir_of(path)
 }
 
 #[cfg(unix)]
@@ -114,15 +148,18 @@ fn write_owner_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     f.sync_all()
 }
 
+/// Off unix a new file takes its directory's access list, which can let other
+/// local users read the key. No key is made where only its owner reading it
+/// cannot be set.
 #[cfg(not(unix))]
-fn write_owner_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::io::Write;
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)?;
-    f.write_all(bytes)?;
-    f.sync_all()
+fn write_owner_only(path: &Path, _bytes: &[u8]) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        format!(
+            "{}: laye-peer makes a key only where it can make it readable by its owner alone (unix)",
+            path.display()
+        ),
+    ))
 }
 
 /// A failure at laye-peer's boundary, in sacred-error's shape.
@@ -203,6 +240,26 @@ mod tests {
 
             std::fs::remove_dir_all(&dir).unwrap();
         }
+    }
+
+    /// A key path that is a dangling symlink reads as missing and links as
+    /// taken. It is said to once, not retried until the stack runs out.
+    #[cfg(unix)]
+    #[test]
+    fn a_dangling_key_path_is_said_to_once() {
+        let dir = std::env::temp_dir().join(format!("laye-peer-dangling-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("key");
+        std::os::unix::fs::symlink(dir.join("nothing-here"), &path).unwrap();
+
+        let e = key_at(&path).err().unwrap();
+        assert_eq!(e.context.region.as_deref(), Some("key-unreadable"));
+
+        // Nothing written beside the key is left behind.
+        let left: Vec<_> = std::fs::read_dir(&dir).unwrap().collect();
+        assert_eq!(left.len(), 1);
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
