@@ -275,11 +275,12 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	if err := cmd.Start(); err != nil {
 		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), letGo()), handedOver())
 	}
-	if err := errors.WithSecondaryError(handedOver(), letGo()); err != nil {
-		return Answer{}, err
-	}
+	// Started, the turn is followed to its end whatever else fails: a failure
+	// of what was handed over is returned with what it answered, and never
+	// leaves a process nobody follows or waits for.
+	notLetGo := errors.WithSecondaryError(handedOver(), letGo())
 	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(cmd.Process.Pid)), 0o600); err != nil {
-		return Answer{}, errors.Wrapf(err, "the pid of %s was not kept", stream)
+		notLetGo = errors.WithSecondaryError(errors.Wrapf(err, "the pid of %s was not kept", stream), notLetGo)
 	}
 	s.Started(stream)
 	var exited atomic.Bool
@@ -289,6 +290,9 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		exited.Store(true)
 	})
 	answer, err := follow(ctx, stream, func() bool { return !exited.Load() }, each)
+	if notLetGo != nil {
+		err = errors.WithSecondaryError(notLetGo, err)
+	}
 	// A process of the node's own, not apart, stops when the node does, the
 	// way a person stops it, so the session is left as written. One that
 	// already printed its result has answered, and its answer is returned.
