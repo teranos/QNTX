@@ -195,6 +195,7 @@ pub fn error(region: &str, title: &str, why: impl Into<String>) -> Box<Error> {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
     #[test]
     fn the_key_kept_is_the_key_read_back() {
         let dir = std::env::temp_dir().join(format!("laye-peer-key-{}", std::process::id()));
@@ -213,6 +214,7 @@ mod tests {
 
     /// Two starts at once on an empty path end as one peer: whoever kept a
     /// key first, the other reads it.
+    #[cfg(unix)]
     #[test]
     fn two_starts_at_once_are_one_peer() {
         for round in 0..20 {
@@ -258,6 +260,21 @@ mod tests {
         // Nothing written beside the key is left behind.
         let left: Vec<_> = std::fs::read_dir(&dir).unwrap().collect();
         assert_eq!(left.len(), 1);
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Off unix no key is made, and nothing is left where it would have been.
+    #[cfg(not(unix))]
+    #[test]
+    fn a_key_is_not_made_where_it_cannot_be_owner_only() {
+        let dir = std::env::temp_dir().join(format!("laye-peer-nonunix-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("key");
+
+        let e = key_at(&path).err().unwrap();
+        assert_eq!(e.context.region.as_deref(), Some("key-unwritable"));
+        assert!(!path.exists());
 
         std::fs::remove_dir_all(&dir).unwrap();
     }
