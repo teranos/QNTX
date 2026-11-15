@@ -338,6 +338,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := authHandler.SetPrimary(s.deps.cfg.Nodes.Primary); err != nil {
 		return err
 	}
+	// The laye in front of this node.
+	if err := authHandler.SetLaye(s.deps.cfg.Laye.DID); err != nil {
+		return err
+	}
 	// On the primary, its peers.
 	for _, peer := range s.deps.cfg.Nodes.Peers {
 		if err := authHandler.DeclarePeer(peer.Name, peer.DID, peer.Namespaces, peer.Origin, peer.ReturnAddress); err != nil {

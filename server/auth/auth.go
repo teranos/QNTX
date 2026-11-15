@@ -110,7 +110,10 @@ type Handler struct {
 	issuers []string
 	// The did:key each issuer says it signs as, asked once (signed.go).
 	issuerDIDs sync.Map
-	issued     issuedAnswers
+	// laye.did: the laye in front of this node, whose signature carries a
+	// session on the grant this node holds for it (laye.go).
+	laye   string
+	issued issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
 	logsInElsewhere bool
