@@ -2780,7 +2780,14 @@ type Collected struct {
 	// When something collected was last delivered to it, RFC3339. Empty when never.
 	Delivered string `protobuf:"bytes,7,opt,name=delivered,proto3" json:"delivered,omitempty"`
 	// Each thing that waits, oldest first.
-	Waiting       []*CollectedSaid `protobuf:"bytes,8,rep,name=waiting,proto3" json:"waiting,omitempty"`
+	Waiting []*CollectedSaid `protobuf:"bytes,8,rep,name=waiting,proto3" json:"waiting,omitempty"`
+	// Since when delivering it has failed, RFC3339. Empty when it has not, or
+	// was delivered since.
+	FailingSince string `protobuf:"bytes,9,opt,name=failing_since,json=failingSince,proto3" json:"failing_since,omitempty"`
+	// How many times in a row the node tried to deliver it and could not.
+	Tries int32 `protobuf:"varint,10,opt,name=tries,proto3" json:"tries,omitempty"`
+	// Why the last try failed, as the node was told.
+	Failure       string `protobuf:"bytes,11,opt,name=failure,proto3" json:"failure,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2869,6 +2876,27 @@ func (x *Collected) GetWaiting() []*CollectedSaid {
 		return x.Waiting
 	}
 	return nil
+}
+
+func (x *Collected) GetFailingSince() string {
+	if x != nil {
+		return x.FailingSince
+	}
+	return ""
+}
+
+func (x *Collected) GetTries() int32 {
+	if x != nil {
+		return x.Tries
+	}
+	return 0
+}
+
+func (x *Collected) GetFailure() string {
+	if x != nil {
+		return x.Failure
+	}
+	return ""
 }
 
 // CollectedAll is what collected list answers, and what a sigil that changes
@@ -4406,7 +4434,7 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x04task\x18\x04 \x01(\tR\x04task\x12\x0e\n" +
 	"\x02id\x18\x05 \x01(\tR\x02id\x12\x16\n" +
 	"\x06edited\x18\x06 \x01(\bR\x06edited\x12\x19\n" +
-	"\bfrom_did\x18\a \x01(\tR\afromDid\"\xdb\x01\n" +
+	"\bfrom_did\x18\a \x01(\tR\afromDid\"\xb0\x02\n" +
 	"\tCollected\x12\x0e\n" +
 	"\x02to\x18\x01 \x01(\tR\x02to\x12\x10\n" +
 	"\x03did\x18\x02 \x01(\tR\x03did\x12\x14\n" +
@@ -4416,7 +4444,11 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\n" +
 	"held_until\x18\x06 \x01(\tR\theldUntil\x12\x1c\n" +
 	"\tdelivered\x18\a \x01(\tR\tdelivered\x121\n" +
-	"\awaiting\x18\b \x03(\v2\x17.protocol.CollectedSaidR\awaiting\"A\n" +
+	"\awaiting\x18\b \x03(\v2\x17.protocol.CollectedSaidR\awaiting\x12#\n" +
+	"\rfailing_since\x18\t \x01(\tR\ffailingSince\x12\x14\n" +
+	"\x05tries\x18\n" +
+	" \x01(\x05R\x05tries\x12\x18\n" +
+	"\afailure\x18\v \x01(\tR\afailure\"A\n" +
 	"\fCollectedAll\x121\n" +
 	"\tcollected\x18\x01 \x03(\v2\x13.protocol.CollectedR\tcollected\"1\n" +
 	"\x06Vaults\x12'\n" +

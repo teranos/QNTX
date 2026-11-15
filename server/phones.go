@@ -296,6 +296,9 @@ func batchWaits(did string) string { return "collected/" + did }
 // batchShown is what a Live Activity of what waits for an agent shows while
 // it waits: how many, who said what, when it goes, and ROOT's three answers.
 func batchShown(waits *collectedFor, due time.Time) waitsShown {
+	if waits.failing() {
+		return batchFailing(waits)
+	}
 	n := len(waits.Waiting)
 	says := strconv.Itoa(n) + " wait"
 	if n == 1 {
@@ -334,6 +337,29 @@ func batchShown(waits *collectedFor, due time.Time) waitsShown {
 	}
 }
 
+// batchFailing is what a Live Activity of what waits shows once the node
+// could not deliver it: that, why, and how many times, until when it stands,
+// and ROOT's two answers: send it again, or cancel it.
+func batchFailing(waits *collectedFor) waitsShown {
+	why := strings.Join(strings.Fields(waits.Failure), " ")
+	if cut := []rune(why); len(cut) > 160 {
+		why = string(cut[:160]) + "…"
+	}
+	seen := map[string]string{"to": waits.DID, "drawn": drawnOf(waits.Waiting)}
+	return waitsShown{
+		Says:    "not delivered, " + strconv.Itoa(waits.Tries) + " tries",
+		Preview: why,
+		Due:     float64(waits.standsUntil().Unix()),
+		Segments: []waitsSegment{
+			{Name: strconv.Itoa(len(waits.Waiting)) + " waiting", State: "failed"},
+		},
+		Presses: []waitsPress{
+			{Says: "send again", Does: "approve", Then: "sent", Path: collectedPath + "/release", Sent: seen},
+			{Says: "cancel", Does: "cancel", Then: "canceled", Path: collectedPath + "/cancel", Sent: seen, Armed: true},
+		},
+	}
+}
+
 // ended is what one shows as it ends: what became of it, and nothing to press.
 func ended(says string) waitsShown {
 	return waitsShown{Says: says, Segments: []waitsSegment{}, Presses: []waitsPress{}}
@@ -349,22 +375,16 @@ var shownWithin = 5 * time.Second
 var leavesAfter = time.Minute
 
 // keepShowingWhatWaits keeps what waits on ROOT in front of them until the
-// node stops. What failed is said once for as long as it keeps failing the same way.
+// node stops. Every time it is not shown is said, each time.
 func (s *QNTXServer) keepShowingWhatWaits() {
 	tick := time.NewTicker(collectedLooked)
 	defer tick.Stop()
-	last := ""
 	for {
 		select {
 		case <-s.ctx.Done():
 			return
 		case <-tick.C:
-			err := s.showWhatWaits(s.ctx, time.Now())
-			switch {
-			case err == nil:
-				last = ""
-			case err.Error() != last:
-				last = err.Error()
+			if err := s.showWhatWaits(s.ctx, time.Now()); err != nil {
 				s.logger.Errorw("What waits on ROOT was not shown on their phone as it stands", "error", err)
 			}
 		}
@@ -380,9 +400,39 @@ func pending(due, now time.Time) bool {
 // within its own wait of when it goes. What was just said waits that long, so
 // it stands from then; what was delayed or held stands again for the wait
 // before its new time.
+//
+// One the node failed to deliver waits on ROOT now, and stands for one wait
+// from when it began to fail: never longer, as no Live Activity stands past
+// Apple's eight hours.
 func (c collectedFor) stands(now time.Time) bool {
+	if len(c.Waiting) == 0 {
+		return false
+	}
+	if c.failing() {
+		return now.Before(c.Failing.Add(waitOf(c.Model)))
+	}
 	due := c.due()
-	return len(c.Waiting) > 0 && pending(due, now) && !now.Before(due.Add(-waitOf(c.Model)))
+	return pending(due, now) && !now.Before(due.Add(-waitOf(c.Model)))
+}
+
+// failing is whether the node tried to deliver what waits and could not.
+func (c collectedFor) failing() bool { return !c.Failing.IsZero() }
+
+// standsFor is the time one Live Activity of it stands for: when it is due,
+// or, failing, when it began to fail. One stands for one time.
+func (c collectedFor) standsFor() time.Time {
+	if c.failing() {
+		return c.Failing
+	}
+	return c.due()
+}
+
+// standsUntil is when one that stands for standsFor is over.
+func (c collectedFor) standsUntil() time.Time {
+	if c.failing() {
+		return c.Failing.Add(waitOf(c.Model))
+	}
+	return c.due()
 }
 
 // standsOn is whether a Live Activity of waits stands on the phone a token
@@ -483,11 +533,11 @@ func (s *QNTXServer) startBatch(ctx context.Context, kept *collection, live map[
 		return nil
 	}
 	// Asked again now that nothing else changes it: delivered or delayed meanwhile, it does not stand.
-	due := waits.due()
+	due, until := waits.standsFor(), waits.standsUntil()
 	if !waits.stands(now) {
 		return nil
 	}
-	// Started once for each time it is due, and not where it stands already as the app said.
+	// Started once for each time it stands for, and not where it stands already as the app said.
 	without := slices.DeleteFunc(slices.Clone(tokens), func(token string) bool {
 		_, begunThere := waits.Shown[token]
 		return waits.Shown[token].Equal(due) || standsOn(live, batchWaits(did), token, begunThere)
@@ -506,7 +556,7 @@ func (s *QNTXServer) startBatch(ctx context.Context, kept *collection, live map[
 			State:      shown,
 			Title:      shown.Says + " for " + waits.Called, Body: shown.Preview,
 			// A phone that is not reached before it goes is not shown it afterwards.
-			Stale: due, Expires: due,
+			Stale: until, Expires: until,
 		})
 		done()
 		var refused *apns.Refused
@@ -536,7 +586,7 @@ func (s *QNTXServer) startBatch(ctx context.Context, kept *collection, live map[
 		}); err != nil {
 			return err
 		}
-		s.logger.Infow("What waits for an agent stands on ROOT's phone as a Live Activity", "to", waits.Called, "things", len(waits.Waiting), "due", due.UTC().Format(time.RFC3339), "phones", len(begun))
+		s.logger.Infow("What waits for an agent stands on ROOT's phone as a Live Activity", "to", waits.Called, "things", len(waits.Waiting), "until", until.UTC().Format(time.RFC3339), "failing", waits.failing(), "phones", len(begun))
 	}
 	if len(failed) > 0 {
 		slices.Sort(failed)
@@ -573,9 +623,13 @@ func (s *QNTXServer) moveWhatStands(ctx context.Context, live map[string]started
 				startedFor = batch.startedFor(stands.Phone)
 			}
 			switch {
-			case batch != nil && batch.stands(now) && (startedFor.IsZero() || startedFor.Equal(batch.due())):
+			case batch != nil && batch.stands(now) && (startedFor.IsZero() || startedFor.Equal(batch.standsFor())):
 				shown := batchShown(batch, batch.due())
-				waits, stale = &shown, batch.due()
+				waits, stale = &shown, batch.standsUntil()
+			case batch != nil && batch.failing() && batch.stands(now):
+				// It stood for when it was due, and the node could not deliver it:
+				// this one ends saying so, and another stands for the failure.
+				became = "not delivered"
 			case batch != nil && !startedFor.IsZero() && !startedFor.Equal(batch.due()) && batch.Delivered.After(startedFor.Add(-waitOf(batch.Model))):
 				// Delivered since this one began to stand, and what waits now came
 				// after: what this one stood for was sent, and says so.
