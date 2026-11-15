@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -461,4 +462,57 @@ func TestAPressDoesNothingOnceWhatItWasDrawnWithChanged(t *testing.T) {
 	require.Len(t, all.GetCollected(), 1)
 	require.Len(t, all.GetCollected()[0].GetWaiting(), 1)
 	assert.Equal(t, "pull request four is open", all.GetCollected()[0].GetWaiting()[0].GetSays(), "what was not named went with what was")
+}
+
+// "this is killing us"
+// A room's wake of the Node Agent, said by no person, is collected for the
+// agent's next delivery, and that is the agent told: the wake is taken, so
+// what it was told is not collected again at the next wake, and the room is
+// told nothing.
+func TestAWakeThatIsCollectedIsTakenAndTheRoomIsToldNothing(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	room := &commentsRoom{t: t}
+	woken := httptest.NewRequest(http.MethodPost, "/github/comments", nil).WithContext(withSpeaker(context.Background(), "teranos"))
+
+	took, err := s.answerInRoom(woken, "github", room, "room-1", "", "claude", "GitHub", "What was said in the room since you were last told")
+	require.NoError(t, err)
+	assert.True(t, took, "a wake that was collected was read as a turn not taken, and is collected again at the next")
+	assert.Empty(t, room.said, "the room was told the agent did not answer, which the next wake collects too")
+
+	waits := whatWaitsFor(t, s, s.nodeAgent.did)
+	require.NotNil(t, waits, "the wake was not collected")
+	require.Len(t, waits.Waiting, 1)
+	assert.Contains(t, waits.Waiting[0].Says, "What was said in the room since you were last told")
+}
+
+// What could never be delivered is not collected: one delivery is one Task,
+// and a line of it over the store's limit is refused at every try.
+func TestWhatCouldNeverBeDeliveredIsNotCollected(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	birch := collectedFor{DID: "did:key:z6Mkbirch", Called: "Birch", Tenant: "Birch"}
+	half := strings.Repeat("a room's digest ", collectedMostBytes/2/16)
+
+	_, err := srv.collect(birch, collectedSaid{From: "GitHub", Says: half, At: time.Now()})
+	require.NoError(t, err)
+	_, err = srv.collect(birch, collectedSaid{From: "GitHub", Says: half + half, At: time.Now()})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "it was not collected")
+
+	waits := whatWaitsFor(t, srv, birch.DID)
+	require.Len(t, waits.Waiting, 1, "what could never be delivered was collected")
+}
+
+// What is stored is the text JSON-escaped, and that escaped again: text that
+// grows when escaped is measured as it is stored, not as it was said.
+func TestWhatGrowsWhenStoredIsMeasuredAsStored(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	birch := collectedFor{DID: "did:key:z6Mkbirch", Called: "Birch", Tenant: "Birch"}
+	// Under the limit as said, four times it as stored.
+	backslashes := strings.Repeat(`\`, collectedMostBytes/3)
+	require.Less(t, len(backslashes), collectedMostBytes)
+	require.Greater(t, storedSize(backslashes), collectedMostBytes)
+
+	_, err := srv.collect(birch, collectedSaid{From: "GitHub", Says: backslashes, At: time.Now()})
+	require.Error(t, err)
+	assert.Nil(t, whatWaitsFor(t, srv, birch.DID), "what could never be stored was collected")
 }

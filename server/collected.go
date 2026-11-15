@@ -74,6 +74,27 @@ type collectedSaid struct {
 	Quiet bool `json:"quiet,omitempty"`
 }
 
+// collectedMostBytes is the most one delivery says. A delivery is one A2A
+// Task, whose first line holds all of it, and a line of more than 1,000,000
+// bytes of JSON is refused (crates/ats-duckdb/src/ffi.rs, MAX_JSON_LENGTH);
+// what JSON escapes and the line wraps it in is kept under that.
+const collectedMostBytes = 800_000
+
+// storedSize is how many bytes text takes in a Task's line: written into the
+// Task as JSON, and that JSON written as an attribute's value, so each quote
+// or backslash grows twice.
+func storedSize(text string) int {
+	once, err := json.Marshal(text)
+	if err != nil {
+		return len(text)
+	}
+	twice, err := json.Marshal(string(once))
+	if err != nil {
+		return len(once)
+	}
+	return len(twice)
+}
+
 // collectedID is a new name for one thing said.
 func collectedID() string {
 	raw := make([]byte, 8)
@@ -294,6 +315,13 @@ func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, er
 		// What it is called, where it is served and what it runs on are as the node holds them now.
 		waits.Called, waits.Tenant, waits.Model = to.Called, to.Tenant, to.Model
 		said.ID = collectedID()
+		// What could never be delivered is not collected: the delivery is one
+		// Task, and its first line holds the whole of it (collectedMostBytes),
+		// measured as it is stored.
+		if whole := storedSize(asOneThing(append(slices.Clone(waits.Waiting), said))); whole > collectedMostBytes {
+			return errors.Newf("what is collected for %s would be %d bytes with this, and one delivery holds %d: it was not collected, and %s is told nothing of it",
+				to.Called, whole, collectedMostBytes, to.Called)
+		}
 		waits.Waiting = append(waits.Waiting, said)
 		due = waits.due()
 		return nil

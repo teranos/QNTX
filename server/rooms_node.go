@@ -223,11 +223,25 @@ func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms p
 		turn += " A file you write into " + dir + " is posted with it."
 	}
 	said, refused := s.nodeAgentSay(sigil.WithCaller(lifetime, caller), sigil.Sent{"harness": harness, "says": turn})
+	// "this is killing us"
+	// What no person says to the Node Agent is collected for its next delivery
+	// (agent_harness.go, sayTo), and that is the agent told: the wake is
+	// taken, and the room is told nothing. Read as a turn not taken, the same
+	// backlog was collected again at every wake, and the room was told the
+	// agent did not answer, which the next wake collected too.
+	if refused != nil && refused.GetWhy() == sigil.NotAllowed && s.collectsFor(s.nodeAgent, caller) {
+		s.logger.Infow("A woken Node Agent's turn is collected for its next delivery", "harness", harness, "room", room, "waker", waker)
+		return true, nil
+	}
 	body := ""
 	if refused != nil {
-		// What refused stays in the node's log; the room is told only that it did.
 		s.logger.Warnw("A woken Node Agent did not answer", "harness", harness, "room", room, "refused", refused.GetSays())
 		body = harness + " was woken and did not answer"
+		// What failed on the node's side is said where it was woken, with why:
+		// said only in the node's log, the room read one more turn not taken.
+		if refused.GetWhy() == sigil.Failed {
+			body = harness + " was woken and could not be told: " + refused.GetSays()
+		}
 	} else if answered, ok := said.(*protocol.NodeAgentSaid); ok {
 		body = strings.TrimSpace(saidText(answered))
 	}

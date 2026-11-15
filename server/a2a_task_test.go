@@ -130,7 +130,7 @@ func TestAMessageToTheNodeIsATaskOfTheNodeAgent(t *testing.T) {
 	assert.Equal(t, id, at(task, "history.0.taskId"))
 
 	args := ranWith(t, ran, "0", "args")
-	assert.Equal(t, "how long has the box been up?", after(args, "-p"))
+	assert.Equal(t, "how long has the box been up?", ranWith(t, ran, "0", "stdin")[0])
 	assert.Equal(t, after(args, "--session-id"), at(task, "contextId"), "the context is the Node Agent's one session")
 
 	// And it is the Task GetTask answers, by its id (§3.1.3).
@@ -776,11 +776,11 @@ func TestFilesGoInAndComeBackOut(t *testing.T) {
 	read, err := os.ReadFile(filepath.Join(seen, "crop.csv"))
 	require.NoError(t, err, "the file sent was not where the turn works")
 	assert.Equal(t, "apples,3", string(read))
-	args, err := os.ReadFile(filepath.Join(ran, "0", "args"))
+	stdin, err := os.ReadFile(filepath.Join(ran, "0", "stdin"))
 	require.NoError(t, err)
-	assert.Contains(t, string(args), "crop.csv (crop.csv, text/csv)")
-	assert.Contains(t, string(args), "A file is at https://example.org/orchard.png (image/png).")
-	assert.Contains(t, string(args), `{"rows":2}`)
+	assert.Contains(t, string(stdin), "crop.csv (crop.csv, text/csv)")
+	assert.Contains(t, string(stdin), "A file is at https://example.org/orchard.png (image/png).")
+	assert.Contains(t, string(stdin), `{"rows":2}`)
 
 	byName := map[string]any{}
 	for _, artifact := range at(answered, "task.artifacts").([]any) {
