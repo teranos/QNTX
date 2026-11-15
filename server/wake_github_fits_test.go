@@ -103,7 +103,8 @@ func TestARoomIsReadBackToTheMark(t *testing.T) {
 	require.Len(t, read, 250, "what was said between the mark and the newest page was not read")
 	assert.Equal(t, "m-000", read[0].GetId())
 	assert.Equal(t, "m-249", read[249].GetId())
-	assert.Equal(t, 3, room.reads)
+	// Three pages, and after each page that left older out, its oldest time read whole.
+	assert.Equal(t, 5, room.reads)
 }
 
 // More said at one time than a page holds is read whole, and the read goes
