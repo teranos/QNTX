@@ -105,3 +105,23 @@ func TestARoomIsReadBackToTheMark(t *testing.T) {
 	assert.Equal(t, "m-249", read[249].GetId())
 	assert.Equal(t, 3, room.reads)
 }
+
+// More said at one time than a page holds is read whole, and the read goes
+// on before it: a page cut through that time would be read again and again.
+func TestARoomIsReadPastATimeMoreWasSaidAtThanAPageHolds(t *testing.T) {
+	room := &pagedRoom{}
+	start := time.Date(2026, 11, 14, 20, 0, 0, 0, time.UTC)
+	at := func(d time.Duration) string { return start.Add(d).Format("2006-01-02T15:04:05.000000Z") }
+	room.said = append(room.said, &protocol.RoomMessage{Id: "before", SenderName: "qodo", Body: "said", At: at(0)})
+	for i := 0; i < 150; i++ {
+		room.said = append(room.said, &protocol.RoomMessage{Id: fmt.Sprintf("same-%03d", i), SenderName: "qodo", Body: "said", At: at(time.Second)})
+	}
+	room.said = append(room.said, &protocol.RoomMessage{Id: "after", SenderName: "qodo", Body: "said", At: at(2 * time.Second)})
+
+	read, short, err := readToTheMark(context.Background(), room, "github", "room-1", at(0))
+	require.NoError(t, err)
+	assert.False(t, short, "the read stopped at a time more was said at than a page holds")
+	require.Len(t, read, 152)
+	assert.Equal(t, "before", read[0].GetId())
+	assert.Equal(t, "after", read[151].GetId())
+}

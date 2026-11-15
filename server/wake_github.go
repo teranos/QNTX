@@ -257,16 +257,39 @@ func readToTheMark(ctx context.Context, rooms protocol.RoomsServiceClient, provi
 		if !read.GetTruncated() {
 			return all, false, nil
 		}
-		// A page that brought nothing new reads no further back.
-		if len(fresh) == 0 {
+		if len(read.GetMessages()) == 0 {
 			return all, true, nil
 		}
-		if before, err = roomcomments.ReadFrom(read.GetMessages()[0].GetAt()); err != nil {
+		// The page's oldest time is read whole before reading on from before
+		// it: a time a page cut through, with more said at it than a page
+		// holds, would otherwise be read again and again and never past.
+		oldest := read.GetMessages()[0].GetAt()
+		after, err := roomcomments.ReadFrom(oldest)
+		if err != nil {
 			return nil, false, err
 		}
+		group, err := rooms.ReadRoom(ctx, &protocol.ReadRoomRequest{Provider: provider, Room: room, Since: oldest, Before: after, Limit: roomGroupMost})
+		if err != nil {
+			return nil, false, errors.Wrap(err, "the Node Room was not read")
+		}
+		var fromGroup []*protocol.RoomMessage
+		for _, m := range group.GetMessages() {
+			if !seen[m.GetId()] {
+				seen[m.GetId()] = true
+				fromGroup = append(fromGroup, m)
+			}
+		}
+		all = append(fromGroup, all...)
+		if group.GetTruncated() {
+			return all, true, nil
+		}
+		before = oldest
 	}
 	return all, true, nil
 }
+
+// roomGroupMost is the most read of one time in a room at once.
+const roomGroupMost = 1000
 
 // roomDigestMostBytes is the most one wake tells of a room. Sixteen wakes of
 // 142,092 to 165,714 characters each stood for Lamplighter on 2026-11-15: one
