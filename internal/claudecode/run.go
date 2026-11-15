@@ -145,7 +145,11 @@ func (m Message) Blocks() []Block {
 
 // Answer is how a run ended, as Claude Code's own result says it.
 type Answer struct {
-	Text string
+	// NotLetGo is what the node did not tidy after a turn that ran: what it
+	// was handed, its pid. Kept with the answer, never in place of it, and
+	// said by whoever reads it.
+	NotLetGo error
+	Text     string
 	// IsError is Claude Code reporting that the turn failed, in Text's words,
 	// and Subtype which way.
 	IsError bool
@@ -290,15 +294,21 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		exited.Store(true)
 	})
 	answer, err := follow(ctx, stream, func() bool { return !exited.Load() }, each)
-	if notLetGo != nil {
-		err = errors.WithSecondaryError(notLetGo, err)
-	}
 	// A process of the node's own, not apart, stops when the node does, the
 	// way a person stops it, so the session is left as written. One that
 	// already printed its result has answered, and its answer is returned.
+	// What was not let go of is kept with the answer, never in its place: a
+	// turn that answered has answered, whatever else failed around it.
+	answer.NotLetGo = notLetGo
 	if ctxErr := ctx.Err(); ctxErr != nil && err != nil && !s.Apart {
 		signalled := cmd.Process.Signal(os.Interrupt)
-		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(err, signalled), <-waited)
+		stopped := errors.WithSecondaryError(errors.WithSecondaryError(err, signalled), <-waited)
+		// One that printed its result before the node stopped has answered.
+		if answer.Subtype != "" {
+			answer.NotLetGo = errors.WithSecondaryError(stopped, notLetGo)
+			return answer, nil
+		}
+		return Answer{NotLetGo: notLetGo}, stopped
 	}
 	return answer, err
 }

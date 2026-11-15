@@ -381,6 +381,9 @@ func (s *QNTXServer) claudePart(named agentSpec, sent sigil.Sent, agent *rootAge
 				}
 			}
 			answer, err := s.spend(agent, said, t.shot, func(m claudecode.Message) { t.write(t.writes.rowsOf(m, t.now())) })
+			if answer.NotLetGo != nil {
+				s.logger.Errorw("A turn ran, and what the node handed it was not tidied after it", "session", t.session, "error", answer.NotLetGo)
+			}
 			if err != nil {
 				// The node stopping leaves the turn to the node that comes
 				// next, which reads it on from its stream to how it ends.
