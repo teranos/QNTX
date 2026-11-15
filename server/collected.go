@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -497,16 +496,23 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did, authored string,
 	// turn, or its status row, as it is for anything said to it.
 	as := auth.Admitted(auth.LevelRoot)
 	said := context.WithValue(auth.WithAdmission(ctx, as), deliversCollected{}, true)
+	// Every way delivering what waits fails is kept with it, whoever asked
+	// for it: the node when it was due, or a person releasing it.
+	notDelivered := func(failure error) (int, error) {
+		tries, since, notKept := s.failedToDeliver(kept, did, failure, time.Now())
+		failed := errors.Wrapf(failure, "%s, try %d since %s", waits.Called, tries, stamped(since))
+		return 0, errors.WithSecondaryError(failed, notKept)
+	}
 	client, _, refused := s.ownClient(said, waits.Tenant)
 	if refused != nil {
-		return 0, errors.Newf("what is collected for %s was not delivered: %s", waits.Called, refused.GetSays())
+		return notDelivered(errors.Newf("what is collected for %s was not delivered: %s", waits.Called, refused.GetSays()))
 	}
 	defer func() { _ = client.Destroy() }()
 	message := a2asdk.NewMessage(a2asdk.MessageRoleUser, a2asdk.NewTextPart(receives))
 	returns := true
 	answered, err := client.SendMessage(said, &a2asdk.SendMessageRequest{Message: message, Config: &a2asdk.SendMessageConfig{ReturnImmediately: returns}})
 	if err != nil {
-		return 0, errors.Wrapf(err, "what is collected for %s was not delivered", waits.Called)
+		return notDelivered(errors.Wrapf(err, "what is collected for %s was not delivered", waits.Called))
 	}
 	carried := ""
 	if info := answered.TaskInfo(); info.TaskID != "" {
@@ -621,12 +627,9 @@ func (s *QNTXServer) deliverDue(now time.Time) error {
 		if due := waits.due(); due.IsZero() || now.Before(due) {
 			continue
 		}
+		// What failed is kept with what waits where it was tried (deliverCollected).
 		if _, err := s.deliverCollected(s.ctx, did, "", nil, now); err != nil {
-			tries, since, notKept := s.failedToDeliver(kept, did, err, now)
-			if notKept != nil {
-				failed = append(failed, notKept.Error())
-			}
-			failed = append(failed, fmt.Sprintf("%s, try %d since %s: %s", waits.Called, tries, stamped(since), err.Error()))
+			failed = append(failed, err.Error())
 		}
 	}
 	if len(failed) > 0 {

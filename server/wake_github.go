@@ -228,6 +228,46 @@ func (s *QNTXServer) tellWhenQuiet(w roomcomments.Wake) {
 	})
 }
 
+// roomPagesMost is how many pages a wake reads back towards its mark.
+const roomPagesMost = 20
+
+// readToTheMark is what was said in a room at or after from, oldest first. A
+// read answers the newest of what it holds, and says when older was left
+// out ("Older than this was not answered"): what is read is read back, a page
+// before the oldest so far, until nothing older is left. Before is not
+// inclusive, so each page reaches a millisecond past the oldest so far, and
+// what is read twice is known by its id. short is whether it stopped before
+// reaching from.
+func readToTheMark(ctx context.Context, rooms protocol.RoomsServiceClient, provider, room, from string) (all []*protocol.RoomMessage, short bool, err error) {
+	seen := map[string]bool{}
+	before := ""
+	for page := 0; page < roomPagesMost; page++ {
+		read, err := rooms.ReadRoom(ctx, &protocol.ReadRoomRequest{Provider: provider, Room: room, Since: from, Before: before, Limit: 100})
+		if err != nil {
+			return nil, false, errors.Wrap(err, "the Node Room was not read")
+		}
+		var fresh []*protocol.RoomMessage
+		for _, m := range read.GetMessages() {
+			if !seen[m.GetId()] {
+				seen[m.GetId()] = true
+				fresh = append(fresh, m)
+			}
+		}
+		all = append(fresh, all...)
+		if !read.GetTruncated() {
+			return all, false, nil
+		}
+		// A page that brought nothing new reads no further back.
+		if len(fresh) == 0 {
+			return all, true, nil
+		}
+		if before, err = roomcomments.ReadFrom(read.GetMessages()[0].GetAt()); err != nil {
+			return nil, false, err
+		}
+	}
+	return all, true, nil
+}
+
 // roomDigestMostBytes is the most one wake tells of a room. Sixteen wakes of
 // 142,092 to 165,714 characters each stood for Lamplighter on 2026-11-15: one
 // wake is one thing said, and each is kept well under what one delivery holds
@@ -239,11 +279,15 @@ const roomDigestMostBytes = 100_000
 // and the time of the last message it got to, which is where the mark is kept.
 // more is whether something was left for the next wake: what is said after it
 // is told then, and none of it is told twice or lost.
+//
+// Messages said at one time are never split: the mark is a time, and the next
+// read begins after it, so one left behind at the mark's own time would never
+// be told.
 func whatFits(messages []*protocol.RoomMessage, agent string, truncated bool) (said []roomcomments.Said, last string, more bool) {
 	for _, m := range messages {
 		heard := roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()}
 		if !roomcomments.Unheard(heard, agent) {
-			if len(said) > 0 && len(roomcomments.Digest(append(slices.Clone(said), heard), truncated)) > roomDigestMostBytes {
+			if len(said) > 0 && heard.At != last && len(roomcomments.Digest(append(slices.Clone(said), heard), truncated)) > roomDigestMostBytes {
 				return said, last, true
 			}
 			said = append(said, heard)
@@ -286,22 +330,24 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 			return false, err
 		}
 	}
-	read, err := rooms.ReadRoom(ctx, &protocol.ReadRoomRequest{Provider: target.Provider, Room: target.Room, Since: from, Limit: 100})
+	read, short, err := readToTheMark(ctx, rooms, target.Provider, target.Room, from)
 	if err != nil {
-		return false, errors.Wrap(err, "the Node Room was not read")
+		return false, err
 	}
-	said, last, more := whatFits(read.GetMessages(), agent, read.GetTruncated())
+	said, last, more := whatFits(read, agent, short)
+	// Read back as far as a wake reads, and not to the mark: more waits.
+	more = more || short
 	if len(said) == 0 {
 		if last == "" {
-			return false, nil
+			return more, nil
 		}
-		return false, told.Keep(ctx, target.Room, agent, last)
+		return more, told.Keep(ctx, target.Room, agent, last)
 	}
 	request, err := http.NewRequestWithContext(withSpeaker(lifetime, speaker), http.MethodPost, "/github/comments", nil)
 	if err != nil {
 		return false, errors.Wrap(err, "the asking did not build")
 	}
-	digest := roomcomments.Digest(said, read.GetTruncated())
+	digest := roomcomments.Digest(said, short)
 	if more {
 		digest += "\n(More was said after this. It is told with the next wake.)\n"
 	}

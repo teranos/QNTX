@@ -101,3 +101,47 @@ func TestADeliveryThatWorkedClearsTheTriesThatDidNot(t *testing.T) {
 	assert.True(t, waits.Failing.IsZero())
 	assert.Empty(t, waits.Failure)
 }
+
+// A delivery a person asked for that fails is kept with what waits, the same
+// as one the node tried when it was due: send again says how many times.
+func TestAReleaseThatFailedIsKeptWithWhatWaits(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	ghost := collectedFor{DID: "did:key:z6Mkghost", Called: "Ghost", Tenant: "Ghost"}
+	_, err := srv.collect(ghost, collectedSaid{From: "Alder", Says: "the build is red", At: time.Now()})
+	require.NoError(t, err)
+
+	_, refused := askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Ghost"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "Ghost, try 1 since")
+	_, refused = askCollected(t, srv, asAPerson(), "release", sigil.Sent{"to": "Ghost"})
+	require.NotNil(t, refused)
+	assert.Contains(t, refused.GetSays(), "Ghost, try 2 since")
+	assert.Equal(t, 2, whatWaitsFor(t, srv, ghost.DID).Tries)
+}
+
+// One that stood for what could not be delivered ends when its one wait is
+// over, saying so: it stands no longer than its wait.
+func TestWhatCouldNotBeDeliveredEndsWhenItsWaitIsOver(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	apple := &told{}
+	srv.shows = apple
+	code, said := handsOver(t, srv, inROOTsSession(), naming(aPhone))
+	require.Equal(t, http.StatusOK, code, said)
+	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
+	sayTo(t, srv, alder, "Birch", "pull request one is open")
+	kept, err := srv.theCollection()
+	require.NoError(t, err)
+	began := time.Now().Add(-7 * time.Hour)
+	_, _, err = srv.failedToDeliver(kept, "did:key:z6Mkbirch", assert.AnError, began)
+	require.NoError(t, err)
+	// It stands on the phone, as the app said.
+	code, said = handsOver(t, srv, inROOTsSession(), startedOf(anActivity))
+	require.Equal(t, http.StatusOK, code, said)
+
+	require.NoError(t, srv.showWhatWaits(context.Background(), time.Now()))
+	require.NotEmpty(t, apple.sent)
+	last := apple.sent[len(apple.sent)-1]
+	assert.Equal(t, anActivity, last.Token)
+	assert.Equal(t, apns.ActivityEnds, last.Event)
+	assert.Equal(t, "not delivered", last.State.(waitsShown).Says)
+}
