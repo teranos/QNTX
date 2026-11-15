@@ -18,6 +18,7 @@ type Config struct {
 	Apns       ApnsConfig       `mapstructure:"apns"`
 	Node       NodeConfig       `mapstructure:"node"`
 	Nodes      NodesConfig      `mapstructure:"nodes"`
+	Laye       LayeConfig       `mapstructure:"laye"`
 	Agent      AgentConfig      `mapstructure:"agent"`
 
 	// said is the keys something said, recorded as the config is read.
@@ -184,6 +185,14 @@ type NodesConfig struct {
 	// While it is down this node keeps going, and nobody new logs in.
 	Primary string       `mapstructure:"primary"`
 	Peers   []PeerConfig `mapstructure:"peers"` // On the primary: its peers, one line each.
+}
+
+// "LAYE IN FRONT OF QNTX"
+
+// LayeConfig is the laye in front of this node, apart from it: its settings
+// are laye's own. Empty is no laye in front.
+type LayeConfig struct {
+	DID string `mapstructure:"did"` // laye's did:key, which carries a session to this node.
 }
 
 // PeerConfig is one peer of the primary.

@@ -338,6 +338,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := authHandler.SetPrimary(s.deps.cfg.Nodes.Primary); err != nil {
 		return err
 	}
+	// The laye in front of this node.
+	if err := authHandler.SetLaye(s.deps.cfg.Laye.DID); err != nil {
+		return err
+	}
 	// On the primary, its peers.
 	for _, peer := range s.deps.cfg.Nodes.Peers {
 		if err := authHandler.DeclarePeer(peer.Name, peer.DID, peer.Namespaces, peer.Origin, peer.ReturnAddress); err != nil {
@@ -371,6 +375,8 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		authHandler.SetRoleReader(held)
 		s.keepPrimaryLines(held)
 	}
+	// A node whose primary is laye goes by the roots laye says.
+	s.keepPrimaryRoots(authHandler)
 	// A peer's ci.watch asks GitHub through this node, with this node's token;
 	// this node, when it is a peer, asks through its own primary.
 	authHandler.SetGitHubForPeers(githubForPeers, githubLocationForPeers)
@@ -415,6 +421,31 @@ func (s *QNTXServer) keepPrimaryLines(held *auth.PrimaryLines) {
 	s.wg.Go("auth.primaryLines", func() {
 		ask()
 		ticker := time.NewTicker(auth.LinesEvery)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-ticker.C:
+				ask()
+			}
+		}
+	})
+}
+
+// keepPrimaryRoots asks the primary for the roots once before anything that
+// speaks for ROOT starts (the Node Agent takes the first of them as it is
+// named), then every auth.RootsEvery until the node stops. A primary that
+// does not answer is said, and the roots last heard stand.
+func (s *QNTXServer) keepPrimaryRoots(h *auth.Handler) {
+	ask := func() {
+		if err := h.RefreshPrimaryRoots(time.Now()); err != nil {
+			s.logger.Errorw("The primary did not say who the roots are; the ones last heard stand", "error", err)
+		}
+	}
+	ask()
+	s.wg.Go("auth.primaryRoots", func() {
+		ticker := time.NewTicker(auth.RootsEvery)
 		defer ticker.Stop()
 		for {
 			select {
