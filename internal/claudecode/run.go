@@ -290,17 +290,19 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 		exited.Store(true)
 	})
 	answer, err := follow(ctx, stream, func() bool { return !exited.Load() }, each)
-	if notLetGo != nil {
-		err = errors.WithSecondaryError(notLetGo, err)
-	}
 	// A process of the node's own, not apart, stops when the node does, the
 	// way a person stops it, so the session is left as written. One that
 	// already printed its result has answered, and its answer is returned.
 	if ctxErr := ctx.Err(); ctxErr != nil && err != nil && !s.Apart {
 		signalled := cmd.Process.Signal(os.Interrupt)
-		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(err, signalled), <-waited)
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.WithSecondaryError(err, signalled), <-waited), notLetGo)
 	}
-	return answer, err
+	// The turn's own failure is the one said, and what was not let go of is
+	// beside it; with none, what was not let go of is.
+	if err != nil {
+		return answer, errors.WithSecondaryError(err, notLetGo)
+	}
+	return answer, notLetGo
 }
 
 // place is where the turn runs: its work, or the checkout of the repository In names there.
