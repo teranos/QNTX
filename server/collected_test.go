@@ -501,3 +501,18 @@ func TestWhatCouldNeverBeDeliveredIsNotCollected(t *testing.T) {
 	waits := whatWaitsFor(t, srv, birch.DID)
 	require.Len(t, waits.Waiting, 1, "what could never be delivered was collected")
 }
+
+// What is stored is the text JSON-escaped, and that escaped again: text that
+// grows when escaped is measured as it is stored, not as it was said.
+func TestWhatGrowsWhenStoredIsMeasuredAsStored(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	birch := collectedFor{DID: "did:key:z6Mkbirch", Called: "Birch", Tenant: "Birch"}
+	// Under the limit as said, four times it as stored.
+	backslashes := strings.Repeat(`\`, collectedMostBytes/3)
+	require.Less(t, len(backslashes), collectedMostBytes)
+	require.Greater(t, storedSize(backslashes), collectedMostBytes)
+
+	_, err := srv.collect(birch, collectedSaid{From: "GitHub", Says: backslashes, At: time.Now()})
+	require.Error(t, err)
+	assert.Nil(t, whatWaitsFor(t, srv, birch.DID), "what could never be stored was collected")
+}

@@ -3,6 +3,7 @@ package claudecode
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
@@ -250,14 +251,31 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 			env = append(env, bus...)
 		}
 	}
+	// What is said is written whole to a file of the turn's before it starts,
+	// and the file is its stdin: copied in by a goroutine of the node's, a turn
+	// apart that outlives the node would read only what was copied before it
+	// stopped. Unlinked once the turn holds it.
+	told, err := os.CreateTemp(turns, "said-*")
+	if err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.Wrap(err, "the file what is said is handed over in was not made"), handedOver())
+	}
+	letGo := func() error {
+		closed := told.Close()
+		return errors.WithSecondaryError(errors.Wrapf(os.Remove(told.Name()), "%s was not removed", told.Name()), closed)
+	}
+	if _, err := told.WriteString(s.Says); err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "what is said was not written to %s", told.Name()), letGo()), handedOver())
+	}
+	if _, err := told.Seek(0, io.SeekStart); err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "%s was not read from its start", told.Name()), letGo()), handedOver())
+	}
 	cmd := exec.Command(binary, argv...)
-	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = at, env, out, said
-	cmd.Stdin = strings.NewReader(s.Says)
+	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr, cmd.Stdin = at, env, out, said, told
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: s.Apart}
 	if err := cmd.Start(); err != nil {
-		return Answer{}, errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), handedOver())
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), letGo()), handedOver())
 	}
-	if err := handedOver(); err != nil {
+	if err := errors.WithSecondaryError(handedOver(), letGo()); err != nil {
 		return Answer{}, err
 	}
 	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(cmd.Process.Pid)), 0o600); err != nil {

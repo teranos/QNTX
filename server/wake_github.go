@@ -8,6 +8,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -212,6 +213,31 @@ func (s *QNTXServer) tellWhenQuiet(w roomcomments.Wake) {
 	})
 }
 
+// roomDigestMostBytes is the most one wake tells of a room. Sixteen wakes of
+// 142,092 to 165,714 characters each stood for Lamplighter on 2026-11-15: one
+// wake is one thing said, and each is kept well under what one delivery holds
+// (collectedMostBytes).
+const roomDigestMostBytes = 100_000
+
+// whatFits is what one wake tells of what was read of a room: what agent did
+// not say itself, oldest first, for as long as it fits in roomDigestMostBytes,
+// and the time of the last message it got to, which is where the mark is kept.
+// more is whether something was left for the next wake: what is said after it
+// is told then, and none of it is told twice or lost.
+func whatFits(messages []*protocol.RoomMessage, agent string, truncated bool) (said []roomcomments.Said, last string, more bool) {
+	for _, m := range messages {
+		heard := roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()}
+		if !roomcomments.Unheard(heard, agent) {
+			if len(said) > 0 && len(roomcomments.Digest(append(slices.Clone(said), heard), truncated)) > roomDigestMostBytes {
+				return said, last, true
+			}
+			said = append(said, heard)
+		}
+		last = heard.At
+	}
+	return said, last, false
+}
+
 // tellAgentTheRoom runs a turn of the Node Agent told everything said in the
 // room since it was last told, and posts its answer into the room as it. What
 // it was told is kept once it took the turn, not before: a turn it refused
@@ -248,15 +274,7 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 	if err != nil {
 		return errors.Wrap(err, "the Node Room was not read")
 	}
-	var said []roomcomments.Said
-	var last string
-	for _, m := range read.GetMessages() {
-		heard := roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()}
-		last = heard.At
-		if !roomcomments.Unheard(heard, agent) {
-			said = append(said, heard)
-		}
-	}
+	said, last, more := whatFits(read.GetMessages(), agent, read.GetTruncated())
 	if len(said) == 0 {
 		if last == "" {
 			return nil
@@ -267,7 +285,11 @@ func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker
 	if err != nil {
 		return errors.Wrap(err, "the asking did not build")
 	}
-	took, err := s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", roomcomments.Digest(said, read.GetTruncated()))
+	digest := roomcomments.Digest(said, read.GetTruncated())
+	if more {
+		digest += "\n(More was said after this. It is told with the next wake.)\n"
+	}
+	took, err := s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", digest)
 	if err != nil {
 		// Its answer did not reach the room: nothing is kept, so it is told the same again.
 		return err

@@ -235,9 +235,13 @@ func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms p
 	}
 	body := ""
 	if refused != nil {
-		// What refused stays in the node's log; the room is told only that it did.
 		s.logger.Warnw("A woken Node Agent did not answer", "harness", harness, "room", room, "refused", refused.GetSays())
 		body = harness + " was woken and did not answer"
+		// What failed on the node's side is said where it was woken, with why:
+		// said only in the node's log, the room read one more turn not taken.
+		if refused.GetWhy() == sigil.Failed {
+			body = harness + " was woken and could not be told: " + refused.GetSays()
+		}
 	} else if answered, ok := said.(*protocol.NodeAgentSaid); ok {
 		body = strings.TrimSpace(saidText(answered))
 	}

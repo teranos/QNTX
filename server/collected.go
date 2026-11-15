@@ -80,6 +80,21 @@ type collectedSaid struct {
 // what JSON escapes and the line wraps it in is kept under that.
 const collectedMostBytes = 800_000
 
+// storedSize is how many bytes text takes in a Task's line: written into the
+// Task as JSON, and that JSON written as an attribute's value, so each quote
+// or backslash grows twice.
+func storedSize(text string) int {
+	once, err := json.Marshal(text)
+	if err != nil {
+		return len(text)
+	}
+	twice, err := json.Marshal(string(once))
+	if err != nil {
+		return len(once)
+	}
+	return len(twice)
+}
+
 // collectedID is a new name for one thing said.
 func collectedID() string {
 	raw := make([]byte, 8)
@@ -301,8 +316,9 @@ func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, er
 		waits.Called, waits.Tenant, waits.Model = to.Called, to.Tenant, to.Model
 		said.ID = collectedID()
 		// What could never be delivered is not collected: the delivery is one
-		// Task, and its first line holds the whole of it (collectedMostBytes).
-		if whole := len(asOneThing(append(slices.Clone(waits.Waiting), said))); whole > collectedMostBytes {
+		// Task, and its first line holds the whole of it (collectedMostBytes),
+		// measured as it is stored.
+		if whole := storedSize(asOneThing(append(slices.Clone(waits.Waiting), said))); whole > collectedMostBytes {
 			return errors.Newf("what is collected for %s would be %d bytes with this, and one delivery holds %d: it was not collected, and %s is told nothing of it",
 				to.Called, whole, collectedMostBytes, to.Called)
 		}
