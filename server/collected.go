@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -114,6 +115,13 @@ type collectedFor struct {
 	// HeldUntil is a person's word that nothing is delivered before it.
 	HeldUntil time.Time `json:"held_until,omitempty"`
 	Delivered time.Time `json:"delivered,omitempty"`
+	// "The failure is also quiet by construction."
+	// Failing is since when delivering what waits has failed, Tries how many
+	// times in a row, and Failure why the last one did: kept with what waits,
+	// so it is seen wherever what waits is, and cleared when it is delivered.
+	Failing time.Time `json:"failing,omitempty"`
+	Tries   int       `json:"tries,omitempty"`
+	Failure string    `json:"failure,omitempty"`
 	// Shown is, for each phone it was started on as a Live Activity, the time
 	// it was due when it was started there (phones.go): held to another time,
 	// it is started again before that one, and on a phone that was not reached
@@ -453,6 +461,7 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did, authored string,
 			return slices.ContainsFunc(delivering, func(sent collectedSaid) bool { return sent.ID == one.ID })
 		})
 		waits.Delivered, waits.HeldUntil = now, time.Time{}
+		waits.Failing, waits.Tries, waits.Failure = time.Time{}, 0, ""
 		return nil
 	}); err != nil {
 		return 0, err
@@ -470,27 +479,44 @@ func (s *QNTXServer) deliverCollected(ctx context.Context, did, authored string,
 	return len(delivering), nil
 }
 
-// keepDeliveringCollected delivers what is due until the node stops. What
-// failed is said once for as long as it keeps failing the same way.
+// keepDeliveringCollected delivers what is due until the node stops. Every
+// try that failed is said, each time: a failure said once, and then not while
+// it kept failing the same way, read as a queue that was well while it was
+// stuck (Lamplighter's, every minute for nine hours, 2026-11-14).
 func (s *QNTXServer) keepDeliveringCollected() {
 	tick := time.NewTicker(collectedLooked)
 	defer tick.Stop()
-	last := ""
 	for {
 		select {
 		case <-s.ctx.Done():
 			return
 		case <-tick.C:
-			err := s.deliverDue(time.Now())
-			switch {
-			case err == nil:
-				last = ""
-			case err.Error() != last:
-				last = err.Error()
+			if err := s.deliverDue(time.Now()); err != nil {
 				s.logger.Errorw("What is collected and due was not delivered", "error", err)
 			}
 		}
 	}
+}
+
+// failedToDeliver keeps with what waits for did that delivering it failed:
+// since when, how many times in a row, and why the last time. It answers the
+// tries and since.
+func (s *QNTXServer) failedToDeliver(kept *collection, did string, failure error, now time.Time) (int, time.Time, error) {
+	tries, since := 0, time.Time{}
+	err := kept.change(func(held map[string]*collectedFor) error {
+		waits, found := held[did]
+		if !found {
+			return nil
+		}
+		if waits.Failing.IsZero() {
+			waits.Failing = now
+		}
+		waits.Tries++
+		waits.Failure = failure.Error()
+		tries, since = waits.Tries, waits.Failing
+		return nil
+	})
+	return tries, since, err
 }
 
 // deliverDue delivers what is due at now, for every agent something waits for.
@@ -512,7 +538,11 @@ func (s *QNTXServer) deliverDue(now time.Time) error {
 			continue
 		}
 		if _, err := s.deliverCollected(s.ctx, did, "", nil, now); err != nil {
-			failed = append(failed, err.Error())
+			tries, since, notKept := s.failedToDeliver(kept, did, err, now)
+			if notKept != nil {
+				failed = append(failed, notKept.Error())
+			}
+			failed = append(failed, fmt.Sprintf("%s, try %d since %s: %s", waits.Called, tries, stamped(since), err.Error()))
 		}
 	}
 	if len(failed) > 0 {
@@ -619,7 +649,8 @@ func (s *QNTXServer) collectedList(context.Context, sigil.Sent) (any, *protocol.
 		one := &protocol.Collected{
 			To: waits.Called, Did: waits.DID, Model: waits.Model, Waits: waitOf(waits.Model).String(),
 			Due: stamped(waits.due()), HeldUntil: stamped(waits.HeldUntil), Delivered: stamped(waits.Delivered),
-			Waiting: []*protocol.CollectedSaid{},
+			Waiting:      []*protocol.CollectedSaid{},
+			FailingSince: stamped(waits.Failing), Tries: int32(waits.Tries), Failure: waits.Failure,
 		}
 		for _, said := range waits.Waiting {
 			one.Waiting = append(one.Waiting, &protocol.CollectedSaid{From: said.From, Says: said.Says, At: stamped(said.At), Task: said.Task, Id: said.ID, Edited: said.Edited, FromDid: said.FromDID})
