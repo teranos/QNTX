@@ -182,19 +182,42 @@ func escape(s string) string {
 	return strings.NewReplacer("\\", "\\\\", "[", "\\[", "]", "\\]", "*", "\\*", "_", "\\_", "`", "\\`").Replace(s)
 }
 
+// pullHeading is the line a pull request's message in the room begins with,
+// as Message writes it: its repository and number, linked.
+const pullHeading = "### [%s #%d](https://github.com/%s/pull/%d)"
+
+// PullOf is the pull request a message in the room is of, read from the line
+// Message begins it with, and whether it is one. Message and PullOf are one
+// format: the tests beside them hold each to the other.
+func PullOf(body string) (repo string, number int64, of bool) {
+	first, _, _ := strings.Cut(body, "\n")
+	var linkedRepo string
+	var linkedNumber int64
+	if n, err := fmt.Sscanf(first, "### [%s #%d](https://github.com/%s", &repo, &number, &linkedRepo); err != nil || n != 3 {
+		return "", 0, false
+	}
+	if !strings.HasPrefix(linkedRepo, repo+"/pull/") {
+		return "", 0, false
+	}
+	if _, err := fmt.Sscanf(strings.TrimPrefix(linkedRepo, repo+"/pull/"), "%d)", &linkedNumber); err != nil || linkedNumber != number {
+		return "", 0, false
+	}
+	return repo, number, number > 0
+}
+
 func (c Comment) Message() string {
 	if c.Kind == "pull_request" {
 		what := "marked the pull request ready for review"
 		if c.Action == "converted_to_draft" {
 			what = "converted the pull request to a draft"
 		}
-		return fmt.Sprintf("### [%s #%d](https://github.com/%s/pull/%d)\n\n**%s** %s · %s\n\n[View pull request](%s)", c.Repo, c.Number, c.Repo, c.Number, escape(c.Author), what, c.At, c.URL)
+		return fmt.Sprintf(pullHeading+"\n\n**%s** %s · %s\n\n[View pull request](%s)", c.Repo, c.Number, c.Repo, c.Number, escape(c.Author), what, c.At, c.URL)
 	}
 	action := "commented"
 	if c.Action == "edited" {
 		action = "updated their comment"
 	}
-	header := fmt.Sprintf("### [%s #%d](https://github.com/%s/pull/%d)\n\n**%s** %s · %s\n\n", c.Repo, c.Number, c.Repo, c.Number, escape(c.Author), action, c.At)
+	header := fmt.Sprintf(pullHeading+"\n\n**%s** %s · %s\n\n", c.Repo, c.Number, c.Repo, c.Number, escape(c.Author), action, c.At)
 	if c.Path != "" {
 		header += fmt.Sprintf("%s · line %d\n\n", escape(c.Path), c.Line)
 	}

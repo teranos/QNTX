@@ -222,6 +222,8 @@ func (s *QNTXServer) answerInRoom(caller *http.Request, provider string, rooms p
 		defer os.RemoveAll(dir)
 		turn += " A file you write into " + dir + " is posted with it."
 	}
+	// A wake of this room, so what is collected of it is known to be the room's.
+	caller = caller.WithContext(withRoom(caller.Context(), provider+"/"+room))
 	said, refused := s.nodeAgentSay(sigil.WithCaller(lifetime, caller), sigil.Sent{"harness": harness, "says": turn})
 	// "this is killing us"
 	// What no person says to the Node Agent is collected for its next delivery

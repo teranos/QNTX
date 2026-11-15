@@ -73,6 +73,66 @@ type collectedSaid struct {
 	// Quiet is that it wakes nobody: it is delivered with what does, and
 	// alone it makes nothing due.
 	Quiet bool `json:"quiet,omitempty"`
+	// Room is the room it was told of, as provider/room, when a room's wake
+	// said it. A room keeps all that was said in it: what waits of it is its
+	// newest wake alone, and none older than the agent's wait (roomItemsGo).
+	Room string `json:"room,omitempty"`
+}
+
+// fromRoom marks a request as a room's wake, by the room it is of.
+type fromRoom struct{}
+
+// withRoom is ctx as a wake of room, provider/room.
+func withRoom(ctx context.Context, room string) context.Context {
+	return context.WithValue(ctx, fromRoom{}, room)
+}
+
+// roomOf is the room a request is a wake of, and empty for anything else.
+func roomOf(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	room, _ := r.Context().Value(fromRoom{}).(string)
+	return room
+}
+
+// "things like coming from rooms, they may degrade over time, as in, it doesnt make sense to keep old room collection items in the waking collection at all"
+//
+// roomItemsGo lets go of what waits of a room that is older than the agent's
+// wait, as of now: the room holds it, and it is read there. What is left is
+// answered.
+func (c *collectedFor) roomItemsGo(now time.Time) []collectedSaid {
+	gone := []collectedSaid{}
+	c.Waiting = slices.DeleteFunc(c.Waiting, func(one collectedSaid) bool {
+		old := one.Room != "" && now.Sub(one.At) > waitOf(c.Model)
+		if old {
+			gone = append(gone, one)
+		}
+		return old
+	})
+	return gone
+}
+
+// replacesFromRoom lets go of what waits of the room said is of, and answers
+// said, saying since when the room holds what was said before it: a room's
+// newest wake stands for the room.
+func (c *collectedFor) replacesFromRoom(said collectedSaid) collectedSaid {
+	if said.Room == "" {
+		return said
+	}
+	var since time.Time
+	c.Waiting = slices.DeleteFunc(c.Waiting, func(one collectedSaid) bool {
+		earlier := one.Room == said.Room
+		if earlier && (since.IsZero() || one.At.Before(since)) {
+			since = one.At
+		}
+		return earlier
+	})
+	if !since.IsZero() {
+		said.Says = "(Said in " + said.Room + " before this, since " + since.UTC().Format(time.RFC3339) +
+			", is in the room, and not here: read it there.)\n\n" + said.Says
+	}
+	return said
 }
 
 // collectedMostBytes is the most one delivery says. A delivery is one A2A
@@ -323,6 +383,9 @@ func (s *QNTXServer) collect(to collectedFor, said collectedSaid) (time.Time, er
 		// What it is called, where it is served and what it runs on are as the node holds them now.
 		waits.Called, waits.Tenant, waits.Model = to.Called, to.Tenant, to.Model
 		said.ID = collectedID()
+		// What waits of a room is its newest wake, and none older than the wait.
+		waits.roomItemsGo(said.At)
+		said = waits.replacesFromRoom(said)
 		// What could never be delivered is not collected: the delivery is one
 		// Task, and its first line holds the whole of it (collectedMostBytes),
 		// measured as it is stored.
@@ -532,6 +595,27 @@ func (s *QNTXServer) deliverDue(now time.Time) error {
 		return err
 	}
 	failed := []string{}
+	// What waits of a room and is older than the wait is let go of, each look.
+	let := map[string]int{}
+	if err := kept.change(func(held map[string]*collectedFor) error {
+		for did, waits := range held {
+			if gone := waits.roomItemsGo(now); len(gone) > 0 {
+				let[did] = len(gone)
+			}
+		}
+		return nil
+	}); err != nil {
+		failed = append(failed, err.Error())
+	}
+	for did, n := range let {
+		s.logger.Infow("What waited of a room is let go of: it is older than the wait, and the room holds it", "to", held[did].Called, "things", n)
+	}
+	kept.mu.Lock()
+	held, err = kept.read()
+	kept.mu.Unlock()
+	if err != nil {
+		return err
+	}
 	for did, waits := range held {
 		// What is due at no time holds nothing that wakes, and is not delivered for itself.
 		if due := waits.due(); due.IsZero() || now.Before(due) {

@@ -358,7 +358,7 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	if s.collectsFor(agent, caller) {
 		due, err := s.collect(
 			collectedFor{DID: agent.did, Called: s.calledInMemory(agent.home), Model: spec.Model},
-			collectedSaid{From: s.calledBy(spokenBy(caller)), FromDID: spokenBy(caller), Says: sent["says"], At: time.Now()})
+			collectedSaid{From: s.calledBy(spokenBy(caller)), FromDID: spokenBy(caller), Says: sent["says"], At: time.Now(), Room: roomOf(caller)})
 		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what was said to " + agent.called + " by no person was not collected, and was not said: " + err.Error()}
 		}

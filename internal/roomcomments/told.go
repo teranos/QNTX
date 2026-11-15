@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -82,15 +83,59 @@ func Unheard(s Said, agent string) bool {
 // comment that only quotes it is still heard.
 var trustFlag = regexp.MustCompile(`^⚠️\s*_Switch Trust flagged this message \([^)\n]*\)\._$`)
 
-// Digest is what a turn is told of what the room said: each message by who
-// said it, oldest first.
+// "also, multiple comments are like one item per pr, and each pr is its own thing, but it can be said in digest form"
+// "like, links to things already condenses"
+// "so we dont even need to show full urls"
+//
+// Digest is what a turn is told of what the room said: each pull request
+// once, in short form, by its repository and number, who said something on
+// it and when last; GitHub holds what they said, and the agent reads it
+// there. What else was said in the room is told as it was said, by who said
+// it, oldest first.
 func Digest(said []Said, truncated bool) string {
 	var out strings.Builder
 	out.WriteString("What was said in the room since you were last told:\n")
 	if truncated {
 		out.WriteString("(Older than this was not read.)\n")
 	}
+	type pull struct {
+		repo   string
+		number int64
+		by     []string
+		times  int
+		last   string
+	}
+	var pulls []*pull
+	var rest []Said
 	for _, s := range said {
+		repo, number, of := PullOf(strings.TrimSpace(s.Body))
+		if !of {
+			rest = append(rest, s)
+			continue
+		}
+		at := slices.IndexFunc(pulls, func(p *pull) bool { return p.repo == repo && p.number == number })
+		if at < 0 {
+			pulls = append(pulls, &pull{repo: repo, number: number})
+			at = len(pulls) - 1
+		}
+		p := pulls[at]
+		p.times++
+		p.last = s.At
+		if !slices.Contains(p.by, s.Sender) {
+			p.by = append(p.by, s.Sender)
+		}
+	}
+	if len(pulls) > 0 {
+		out.WriteString("\n")
+	}
+	for _, p := range pulls {
+		said := "1 message"
+		if p.times > 1 {
+			said = fmt.Sprintf("%d messages", p.times)
+		}
+		fmt.Fprintf(&out, "- %s #%d: %s, by %s, the last at %s\n", p.repo, p.number, said, strings.Join(p.by, " and "), p.last)
+	}
+	for _, s := range rest {
 		fmt.Fprintf(&out, "\n[%s] %s:\n%s\n", s.At, s.Sender, strings.TrimSpace(s.Body))
 	}
 	return out.String()
