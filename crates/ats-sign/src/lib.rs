@@ -17,7 +17,8 @@
 //! `ats/signing/testdata` holds the vectors both sides are tested against.
 //!
 //! No key lives here. The signer holds its own: the node in Go, the browser in
-//! laye-p2p.
+//! laye's laye-p2p (Ground-Institute/laye), over the bytes ats-wasm's
+//! `canonical_attestation` hands it.
 
 pub mod canonical;
 pub mod didkey;

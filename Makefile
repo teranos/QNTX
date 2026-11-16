@@ -1,4 +1,4 @@
-.PHONY: cli web-css test test-suite test-parquet test-postgres test-coverage test-verbose clean server dev install proto rust-sqlite ats laye wasm-tarballs parity says openapi quickdev publish-crates libacp
+.PHONY: cli web-css test test-suite test-parquet test-postgres test-coverage test-verbose clean server dev install proto rust-sqlite ats wasm-tarballs parity says openapi quickdev publish-crates libacp
 
 # The frontend is teranos/QNTX-Web. web/ here is the CSS QNTX itself reads (web/README.md).
 QNTX_WEB ?= ../QNTX-Web
@@ -141,7 +141,7 @@ test-verbose: ## Run Go tests with verbose output and coverage
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
 
 clean: ## Clean build artifacts
-	@rm -rf crates/ats-wasm/pkg crates/laye-p2p/pkg tmp/wasm
+	@rm -rf crates/ats-wasm/pkg tmp/wasm
 
 install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom/path)
 	@echo "Installing qntx to $(PREFIX)/bin..."
@@ -194,23 +194,12 @@ ats: ## Build ats as WASM module (for wazero integration + browser)
 	@cd crates/ats-wasm && wasm-pack build --target web --features browser
 	@ls -lh crates/ats-wasm/pkg/*.wasm 2>/dev/null | awk '{print "  ✓ " $$9 " " $$5}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 
-# Built from crates/laye-p2p, not fetched. The hash-pinning this replaces
-# existed only because the artifact came from a deploy we did not build.
-laye: ## Build laye-p2p as browser WASM into crates/laye-p2p/pkg/
-	@echo "Building laye-p2p browser WASM..."
-	@if ! command -v wasm-pack >/dev/null 2>&1; then \
-		echo "  ⚠️  wasm-pack not found. Install with: cargo install wasm-pack"; \
-		exit 1; \
-	fi
-	@cd crates/laye-p2p && wasm-pack build --target web
-	@ls -lh crates/laye-p2p/pkg/laye_p2p_bg.wasm | awk '{print "  ✓ laye_p2p_bg.wasm " $$5}'
-
-# QNTX-Web depends on these two by the release they are attached to:
+# QNTX-Web depends on this by the release it is attached to; laye-p2p is
+# laye's, released by Ground-Institute/laye:
 # "QNTX-Web needs to be easy to be developed on, so need to be a way to develop on it without needing to build ATS or Laye"
-wasm-tarballs: ats laye ## Pack the browser WASM as the two tarballs a release attaches, into tmp/wasm/
+wasm-tarballs: ats ## Pack the browser WASM as the tarball a release attaches, into tmp/wasm/
 	@mkdir -p tmp/wasm
 	@cd crates/ats-wasm/pkg && bun pm pack --quiet --destination $(CURDIR)/tmp/wasm
-	@cd crates/laye-p2p/pkg && bun pm pack --quiet --destination $(CURDIR)/tmp/wasm
 	@ls -lh tmp/wasm/*.tgz
 
 
