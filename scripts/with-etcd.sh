@@ -30,9 +30,9 @@ free_port() {
 }
 
 # 「[Opus 5.5] free_port lets each port go before etcd binds it, so something else can
-# take one in between (CodeRabbit on #1765). An etcd that lost a port is started
-# again on fresh ones, up to five times; one that died otherwise is said, with its
-# log, at once.」
+# 「[Opus 5.5] take one in between (CodeRabbit on #1765). An etcd that lost a port is started」
+# 「[Opus 5.5] again on fresh ones, up to five times; one that died otherwise is said, with its」
+# 「[Opus 5.5] log, at once.」」
 started=""
 for attempt in 1 2 3 4 5; do
     client="http://127.0.0.1:$(free_port)"
