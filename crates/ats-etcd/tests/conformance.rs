@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! 「[Opus 5.5] `EtcdStore` against `AttestationStore`'s contract, in the client
-//! that wrote and after it has been dropped and opened again. Under
-//! scripts/with-etcd.sh, like store.rs: unset fails rather than skips.」
+//! 「[Opus 5.5] that wrote and after it has been dropped and opened again. Under」
+//! 「[Opus 5.5] scripts/with-etcd.sh, like store.rs: unset fails rather than skips.」」
 
 use ats::storage::conformance::check;
 use ats::storage::StoreError;
