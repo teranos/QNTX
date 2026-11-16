@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! 「[Opus 5.5] The store against the etcd QNTX_ETCD_ENDPOINT names, which
-//! scripts/with-etcd.sh starts and names. Unset fails rather than skips: a
-//! test that passes without an etcd says nothing.」
+//! 「[Opus 5.5] scripts/with-etcd.sh starts and names. Unset fails rather than skips: a」
+//! 「[Opus 5.5] test that passes without an etcd says nothing.」」
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
