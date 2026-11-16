@@ -194,8 +194,8 @@ ats: ## Build ats as WASM module (for wazero integration + browser)
 	@cd crates/ats-wasm && wasm-pack build --target web --features browser
 	@ls -lh crates/ats-wasm/pkg/*.wasm 2>/dev/null | awk '{print "  ✓ " $$9 " " $$5}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 
-# QNTX-Web depends on this by the release it is attached to; laye-p2p is
-# laye's, released by Ground-Institute/laye:
+# 「[Opus 5.5] QNTX-Web depends on this by the release it is attached to; laye-p2p is」
+# 「[Opus 5.5] laye's, released by Ground-Institute/laye:」
 # "QNTX-Web needs to be easy to be developed on, so need to be a way to develop on it without needing to build ATS or Laye"
 wasm-tarballs: ats ## Pack the browser WASM as the tarball a release attaches, into tmp/wasm/
 	@mkdir -p tmp/wasm
