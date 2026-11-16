@@ -17,7 +17,7 @@ etcd-client = "0.21.1"
 tokio.workspace = true
 
 [dev-dependencies]
-# storage::conformance, the check this backend runs on itself
+# 「[Opus 5.5] storage::conformance, the check this backend runs on itself」
 ats = { workspace = true, features = ["conformance"] }
 
 [lib]
