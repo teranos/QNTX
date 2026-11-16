@@ -331,13 +331,19 @@ impl SqliteStore {
 /// write that cannot keep a date says so, it does not keep today's.
 fn instant(id: &str, field: &str, ms: i64) -> StoreResult<String> {
     try_timestamp_to_sql(ms).ok_or_else(|| {
-        StoreError::InvalidData(format!("{id}: {field} {ms} ms is outside the dates a store holds"))
+        StoreError::InvalidData(format!(
+            "{id}: {field} {ms} ms is outside the dates a store holds"
+        ))
     })
 }
 
 /// The rows the indexed lookups read (`attestation_{actors,contexts,subjects,predicates}`),
 /// one per value of the attestation.
-fn write_junctions(conn: &Connection, attestation: &Attestation, created_at_sql: &str) -> StoreResult<()> {
+fn write_junctions(
+    conn: &Connection,
+    attestation: &Attestation,
+    created_at_sql: &str,
+) -> StoreResult<()> {
     crate::flight_recorder::record_fmt("put:junction_actors", &attestation.id);
     for actor in &attestation.actors {
         conn.execute(
@@ -510,34 +516,45 @@ impl AttestationStore for SqliteStore {
         // no longer has, and miss it under the ones it has now.
         let created_at_sql: String = self
             .conn
-            .query_row("SELECT created_at FROM attestations WHERE id = ?", [&attestation.id], |r| r.get(0))
+            .query_row(
+                "SELECT created_at FROM attestations WHERE id = ?",
+                [&attestation.id],
+                |r| r.get(0),
+            )
             .map_err(SqliteError::from)?;
         let tx = self.conn.transaction().map_err(SqliteError::from)?;
 
-        tx
-            .execute(
-                "UPDATE attestations
+        tx.execute(
+            "UPDATE attestations
              SET subjects = ?, predicates = ?, contexts = ?, actors = ?,
                  timestamp = ?, source = ?, attributes = ?, signature = ?, signer_did = ?
              WHERE id = ?",
-                rusqlite::params![
-                    subjects_json,
-                    predicates_json,
-                    contexts_json,
-                    actors_json,
-                    timestamp_sql,
-                    attestation.source,
-                    attributes_json,
-                    attestation.signature,
-                    attestation.signer_did,
-                    attestation.id,
-                ],
+            rusqlite::params![
+                subjects_json,
+                predicates_json,
+                contexts_json,
+                actors_json,
+                timestamp_sql,
+                attestation.source,
+                attributes_json,
+                attestation.signature,
+                attestation.signer_did,
+                attestation.id,
+            ],
+        )
+        .map_err(SqliteError::from)?;
+
+        for table in [
+            "attestation_actors",
+            "attestation_contexts",
+            "attestation_subjects",
+            "attestation_predicates",
+        ] {
+            tx.execute(
+                &format!("DELETE FROM {table} WHERE attestation_id = ?"),
+                [&attestation.id],
             )
             .map_err(SqliteError::from)?;
-
-        for table in ["attestation_actors", "attestation_contexts", "attestation_subjects", "attestation_predicates"] {
-            tx.execute(&format!("DELETE FROM {table} WHERE attestation_id = ?"), [&attestation.id])
-                .map_err(SqliteError::from)?;
         }
         write_junctions(&tx, &attestation, &created_at_sql)?;
         tx.commit().map_err(SqliteError::from)?;
@@ -580,10 +597,30 @@ fn placeholders(n: usize) -> String {
 pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
     // Each table with the index that finds one attestation's names.
     let names: [(&str, &str, &str, &Vec<String>); 4] = [
-        ("attestation_subjects", "subject", "idx_junc_subject_id", &filter.subjects),
-        ("attestation_predicates", "predicate", "idx_junc_predicate_id", &filter.predicates),
-        ("attestation_contexts", "context", "idx_junc_context_id", &filter.contexts),
-        ("attestation_actors", "actor", "idx_junc_actor_id", &filter.actors),
+        (
+            "attestation_subjects",
+            "subject",
+            "idx_junc_subject_id",
+            &filter.subjects,
+        ),
+        (
+            "attestation_predicates",
+            "predicate",
+            "idx_junc_predicate_id",
+            &filter.predicates,
+        ),
+        (
+            "attestation_contexts",
+            "context",
+            "idx_junc_context_id",
+            &filter.contexts,
+        ),
+        (
+            "attestation_actors",
+            "actor",
+            "idx_junc_actor_id",
+            &filter.actors,
+        ),
     ];
 
     // A window walks its own rows. Newest first, a window with less than a

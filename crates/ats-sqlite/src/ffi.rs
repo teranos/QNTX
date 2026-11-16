@@ -574,9 +574,8 @@ pub extern "C" fn read_conn_count(rc: *const ReadConn) -> CountResultC {
         let rc = unsafe { &*rc };
         match rc
             .conn
-            .query_row(crate::store::COUNT_SQL, [], |row| {
-                row.get::<_, usize>(0)
-            }) {
+            .query_row(crate::store::COUNT_SQL, [], |row| row.get::<_, usize>(0))
+        {
             Ok(count) => CountResultC::ok(count),
             Err(e) => CountResultC::error(&format!("{}", e)),
         }

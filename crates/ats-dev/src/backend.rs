@@ -7,8 +7,8 @@
 //! (`crates/ats/src/storage/traits.rs`); a command that needs either says so
 //! and stops rather than answering from something else.
 
-use ats::{Attestation, AttestationStore};
 use ats::storage::StoreResult;
+use ats::{Attestation, AttestationStore};
 use ats_sqlite::SqliteStore;
 use sacred_error::Error;
 
