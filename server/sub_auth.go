@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
@@ -414,9 +415,11 @@ func (authSubsystem) Init(s *QNTXServer) error {
 func (s *QNTXServer) keepPrimaryLines(held *auth.PrimaryLines) {
 	ask := func() {
 		if err := held.Refresh(time.Now()); err != nil {
+			measure.Count(measure.LinesHeard, 1, measure.String(measure.AttrOutcome, "unanswered"))
 			s.logger.Errorw("The primary did not say what the lines are; the ones last heard stand", "error", err)
 			return
 		}
+		measure.Count(measure.LinesHeard, 1, measure.String(measure.AttrOutcome, "heard"))
 	}
 	s.wg.Go("auth.primaryLines", func() {
 		ask()
