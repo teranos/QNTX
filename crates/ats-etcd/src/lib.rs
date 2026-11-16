@@ -1,6 +1,6 @@
 //! 「[Opus 5.5] etcd window onto QNTX attestations. A namespace is a key prefix,
-//! `/attestations/<namespace>/`, and each attestation is one key under it,
-//! held by a lease of SPAN.」
+//! 「[Opus 5.5] `/attestations/<namespace>/`, and each attestation is one key under it,」
+//! 「[Opus 5.5] held by a lease of SPAN.」」
 
 // "「[Opus 5.5] which would be around 3 days」"
 
@@ -23,8 +23,8 @@ type StoreResult<T> = std::result::Result<T, StoreError>;
 pub const SPAN: Duration = Duration::from_secs(72 * 60 * 60);
 
 /// 「[Opus 5.5] The key prefix a namespace's attestations live under. A namespace
-/// is held to lowercase letters, digits, `-` and `_`, as in ats-postgres, so no
-/// namespace's prefix is the start of another's.」
+/// 「[Opus 5.5] is held to lowercase letters, digits, `-` and `_`, as in ats-postgres, so no」
+/// 「[Opus 5.5] namespace's prefix is the start of another's.」」
 pub fn prefix(namespace: &str) -> Result<String> {
     let fits = !namespace.is_empty()
         && namespace
@@ -39,7 +39,7 @@ pub fn prefix(namespace: &str) -> Result<String> {
 }
 
 /// 「[Opus 5.5] One namespace's window in etcd. The client is async; the store
-/// drives it on a runtime of its own, so the trait stays synchronous.」
+/// 「[Opus 5.5] drives it on a runtime of its own, so the trait stays synchronous.」」
 pub struct EtcdStore {
     runtime: Runtime,
     client: Client,
@@ -84,7 +84,7 @@ impl EtcdStore {
     }
 
     /// 「[Opus 5.5] The lease an attestation's key was put under, as granted. None when
-    /// the window does not hold it.」
+    /// 「[Opus 5.5] the window does not hold it.」」
     pub fn granted(&self, id: &str) -> StoreResult<Option<Duration>> {
         let mut client = self.client.clone();
         let key = self.key(id);
