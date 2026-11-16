@@ -1,0 +1,28 @@
+[package]
+name = "ats-etcd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "etcd window onto QNTX attestations"
+
+[lints]
+workspace = true
+
+[dependencies]
+ats.workspace = true
+sacred-error.workspace = true
+serde_json.workspace = true
+etcd-client = "0.21.1"
+tokio.workspace = true
+
+[dev-dependencies]
+# storage::conformance, the check this backend runs on itself
+ats = { workspace = true, features = ["conformance"] }
+
+[lib]
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[features]
+default = []
+ffi = []

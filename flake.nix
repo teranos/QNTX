@@ -469,6 +469,9 @@
 
           # Default: CLI binary for easy installation
           default = qntx;
+
+          # 「[Opus 5.5] The etcd ats-etcd is tested against, server/parity/etcd_<version>_<rev>.」
+          etcd = pkgs.etcd;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
 
           qntx-image = QNTXImage;

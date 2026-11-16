@@ -4,6 +4,7 @@ members = [
     "crates/ats",
     "crates/ats-dev",
     "crates/ats-duckdb",
+    "crates/ats-etcd",
     "crates/ats-postgres",
     "crates/ats-id",
     "crates/ats-indexeddb",

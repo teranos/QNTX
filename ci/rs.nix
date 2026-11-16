@@ -51,6 +51,7 @@ in
         "crates/ats-sqlite/Cargo.toml"
         "crates/ats-duckdb/Cargo.toml"
         "crates/ats-postgres/Cargo.toml"
+        "crates/ats-etcd/Cargo.toml"
         "crates/ats-wasm/Cargo.toml"
         "ats/storage/duckdbcgo/**"
         "cmd/qntx/commands/database_parquet.go"
@@ -63,6 +64,7 @@ in
         "internal/db/postgres/migrations/**"
         "cmd/parity/**"
         "scripts/with-postgres.sh"
+        "scripts/with-etcd.sh"
         "flake.lock"
         ".github/workflows/rs.yml"
       ];
@@ -108,9 +110,10 @@ in
         # here now. ats-duckdb tests need libduckdb and run via the Makefile's
         # parquet path; ats-postgres tests need a Postgres and run in the job
         # that has the pinned one; qntx-reduce is PyO3 and builds only via Nix.
+        # 「[Opus 5.5] ats-etcd tests need an etcd and run in the job that has the pinned one.」
         {
           name = "Test Rust libraries";
-          run = "cargo test --workspace --exclude ats-duckdb --exclude ats-postgres --exclude qntx-reduce-plugin";
+          run = "cargo test --workspace --exclude ats-duckdb --exclude ats-postgres --exclude ats-etcd --exclude qntx-reduce-plugin";
         }
 
         {
@@ -237,6 +240,35 @@ in
           run = ''
             scripts/with-postgres.sh result-postgres/bin nix develop --command bash -c 'export LD_LIBRARY_PATH="$PWD/target/release:''${LD_LIBRARY_PATH:-}" && go test -tags rustduckdb,rustpostgres -v -timeout 5m ./ats/storage/postgrescgo/... ./cmd/qntx/commands/ ./cmd/parity/'
           '';
+        }
+      ];
+    };
+
+    # 「[Opus 5.5] etcd backend. Every test here runs against a member of its own
+    # that scripts/with-etcd.sh starts from the pinned etcd,
+    # server/parity/etcd_<version>_<rev>.」
+    ats-etcd = {
+      name = "etcd Backend";
+      runs-on = "ubuntu-latest";
+
+      steps = [
+        checkout
+
+        installNix
+
+        cachix
+
+        {
+          name = "Build the pinned etcd via Nix";
+          run = ''
+            nix build .#etcd --print-build-logs --out-link result-etcd
+            result-etcd/bin/etcd --version
+          '';
+        }
+
+        {
+          name = "Test ats-etcd";
+          run = "scripts/with-etcd.sh result-etcd/bin nix develop --command cargo test --package ats-etcd";
         }
       ];
     };
