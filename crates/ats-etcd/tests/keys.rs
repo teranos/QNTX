@@ -69,6 +69,39 @@ fn what_did_not_change_is_not_put_again() {
     assert_eq!(keys.revision_of("a").unwrap(), first);
 }
 
+/// 「[Opus 5.5] What a prefix holds is read a key at a time: six values of 900 KB are
+/// 「[Opus 5.5] past the 4 MiB one gRPC answer may carry, and set and held still work,」
+/// 「[Opus 5.5] the delete among them (CodeRabbit on #1768).」」
+#[test]
+fn what_is_held_is_read_past_one_answers_limit() {
+    let mut keys = EtcdKeys::open(&endpoint(), &prefix()).unwrap();
+    let big = "x".repeat(900_000);
+    let six: Vec<(String, String)> = (0..6)
+        .map(|i| (format!("did:key:{i}"), format!("{i}{big}")))
+        .collect();
+    let whole: BTreeMap<String, Vec<u8>> = six
+        .iter()
+        .map(|(k, v)| (k.clone(), v.as_bytes().to_vec()))
+        .collect();
+    keys.set(&whole).unwrap();
+    assert_eq!(keys.held().unwrap().len(), 6);
+    keys.set(&BTreeMap::new()).unwrap();
+    assert!(keys.held().unwrap().is_empty());
+}
+
+/// 「[Opus 5.5] Names are read a page at a time, and every page is read.」
+#[test]
+fn every_page_of_names_is_read() {
+    let mut keys = EtcdKeys::open(&endpoint(), &prefix()).unwrap();
+    let many: BTreeMap<String, Vec<u8>> = (0..2500)
+        .map(|i| (format!("did:key:{i:05}"), b"{}".to_vec()))
+        .collect();
+    keys.set(&many).unwrap();
+    assert_eq!(keys.names().unwrap().len(), 2500);
+    keys.set(&BTreeMap::new()).unwrap();
+    assert!(keys.names().unwrap().is_empty());
+}
+
 #[test]
 fn prefixes_do_not_see_each_other() {
     let mut a = EtcdKeys::open(&endpoint(), &prefix()).unwrap();

@@ -14,6 +14,9 @@ use crate::error::{EtcdError, Result};
 /// 「[Opus 5.5] How long open waits for etcd to answer, as the window does.」
 const OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
+/// 「[Opus 5.5] How many names one page of names holds: names alone, far under 4 MiB.」
+const NAMES_PAGE: i64 = 1000;
+
 /// 「[Opus 5.5] A prefix starts and ends at `/`, so no prefix is the start of another
 /// 「[Opus 5.5] key's name that is not under it.」」
 fn fits(prefix: &str) -> bool {
@@ -58,26 +61,67 @@ impl EtcdKeys {
         })
     }
 
-    /// 「[Opus 5.5] What the prefix holds, each key by its name under the prefix.」
-    pub fn held(&self) -> Result<BTreeMap<String, Vec<u8>>> {
+    /// 「[Opus 5.5] The names under the prefix, read without their values and a page at
+    /// 「[Opus 5.5] a time: one answer holding every value passed gRPC's 4 MiB, and then」
+    /// 「[Opus 5.5] nothing under the prefix could be set or deleted (CodeRabbit on #1768).」」
+    pub fn names(&self) -> Result<Vec<String>> {
         let mut client = self.client.clone();
         let prefix = self.prefix.clone();
+        let mut end = prefix.clone().into_bytes();
+        if let Some(last) = end.last_mut() {
+            *last += 1;
+        }
         self.runtime.block_on(async {
-            let got = client
-                .get(prefix.clone(), Some(GetOptions::new().with_prefix()))
-                .await?;
-            let mut held = BTreeMap::new();
-            for kv in got.kvs() {
-                let Some(name) = kv.key().strip_prefix(prefix.as_bytes()) else {
-                    continue;
-                };
-                held.insert(
-                    String::from_utf8_lossy(name).into_owned(),
-                    kv.value().to_vec(),
-                );
+            let mut names = Vec::new();
+            let mut from = prefix.clone().into_bytes();
+            loop {
+                let got = client
+                    .get(
+                        from.clone(),
+                        Some(
+                            GetOptions::new()
+                                .with_range(end.clone())
+                                .with_keys_only()
+                                .with_limit(NAMES_PAGE),
+                        ),
+                    )
+                    .await?;
+                for kv in got.kvs() {
+                    if let Some(name) = kv.key().strip_prefix(prefix.as_bytes()) {
+                        names.push(String::from_utf8_lossy(name).into_owned());
+                    }
+                }
+                let Some(last) = got.kvs().last() else { break };
+                if !got.more() {
+                    break;
+                }
+                from = last.key().to_vec();
+                from.push(0);
             }
-            Ok(held)
+            Ok(names)
         })
+    }
+
+    /// 「[Opus 5.5] One name's value; None when the prefix does not hold it.」
+    pub fn value(&self, name: &str) -> Result<Option<Vec<u8>>> {
+        let mut client = self.client.clone();
+        let key = format!("{}{name}", self.prefix);
+        self.runtime.block_on(async {
+            let got = client.get(key, None).await?;
+            Ok(got.kvs().first().map(|kv| kv.value().to_vec()))
+        })
+    }
+
+    /// 「[Opus 5.5] What the prefix holds, each key by its name under the prefix, read a
+    /// 「[Opus 5.5] value at a time.」」
+    pub fn held(&self) -> Result<BTreeMap<String, Vec<u8>>> {
+        let mut held = BTreeMap::new();
+        for name in self.names()? {
+            if let Some(value) = self.value(&name)? {
+                held.insert(name, value);
+            }
+        }
+        Ok(held)
     }
 
     /// 「[Opus 5.5] The revision a key was last put at; None when the prefix does not hold it.」
@@ -96,24 +140,22 @@ impl EtcdKeys {
     /// 「[Opus 5.5] request: etcd refuses a request over its --max-request-bytes, and a key's」
     /// 「[Opus 5.5] value alone is held under that by its writer.」」
     pub fn set(&mut self, whole: &BTreeMap<String, Vec<u8>>) -> Result<()> {
-        let held = self.held()?;
+        let names = self.names()?;
         let mut client = self.client.clone();
         let prefix = self.prefix.clone();
-        self.runtime.block_on(async {
-            for (name, value) in whole {
-                if held.get(name) == Some(value) {
-                    continue;
-                }
-                client
-                    .put(format!("{prefix}{name}"), value.clone(), None)
-                    .await?;
+        for (name, value) in whole {
+            if names.contains(name) && self.value(name)?.as_ref() == Some(value) {
+                continue;
             }
-            for name in held.keys() {
-                if !whole.contains_key(name) {
-                    client.delete(format!("{prefix}{name}"), None).await?;
-                }
+            self.runtime
+                .block_on(client.put(format!("{prefix}{name}"), value.clone(), None))?;
+        }
+        for name in &names {
+            if !whole.contains_key(name) {
+                self.runtime
+                    .block_on(client.delete(format!("{prefix}{name}"), None))?;
             }
-            Ok(())
-        })
+        }
+        Ok(())
     }
 }

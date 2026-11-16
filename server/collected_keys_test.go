@@ -62,6 +62,20 @@ func TestWhatIsCollectedIsKeptAtAKeyForEachAgent(t *testing.T) {
 	assert.Empty(t, keys.now(), "a key stands for an agent nothing waits for")
 }
 
+// 「[Opus 5.5] Each node keeps its keys under its own DID: a node sets the whole of
+// 「[Opus 5.5] its prefix, and two nodes on one etcd under one prefix deleted each」
+// 「[Opus 5.5] other's agents (CodeRabbit on #1768). A node with no DID has no prefix.」」
+func TestEachNodeKeepsWhatIsCollectedUnderItsOwnDID(t *testing.T) {
+	at, err := collectedKeysPrefix("did:key:z6Mkl")
+	require.NoError(t, err)
+	assert.Equal(t, "/collected/did:key:z6Mkl/", at)
+	other, err := collectedKeysPrefix("did:key:z6Mkq")
+	require.NoError(t, err)
+	assert.NotEqual(t, at, other)
+	_, err = collectedKeysPrefix("")
+	assert.Error(t, err, "a node with no DID was given a prefix")
+}
+
 // 「[Opus 5.5] etcd not taking it is said where failing handlers are, and what an
 // 「[Opus 5.5] agent said is collected all the same: the file holds it.」」
 func TestKeysEtcdDoesNotTakeAreSaid(t *testing.T) {
