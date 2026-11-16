@@ -275,7 +275,7 @@ in
         {
           name = "Test the Go side";
           run = ''
-            scripts/with-etcd.sh result-etcd/bin nix develop --command bash -c 'make rust-etcd && export LD_LIBRARY_PATH="$PWD/target/release:''${LD_LIBRARY_PATH:-}" && go test -tags rustetcd -v -timeout 5m ./ats/storage/etcdcgo/...'
+            scripts/with-etcd.sh result-etcd/bin nix develop --command bash -c 'make rust-sqlite rust-etcd && export LD_LIBRARY_PATH="$PWD/target/release:''${LD_LIBRARY_PATH:-}" && go test -tags rustetcd -v -timeout 5m ./ats/storage/etcdcgo/...'
           '';
         }
       ];
