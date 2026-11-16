@@ -175,18 +175,18 @@ const (
 	// a call at the gate; this is the call at its end.
 	MCPToolTook = "qntx.mcp.tool.took"
 
-	// LinesServed is one per time the primary answered a peer asking for its
-	// lines, sliced by the peer and by how it ended: served, or refused. A peer
-	// asks every auth.LinesEvery, so a peer that stopped asking is this number
-	// going flat, which no log line says.
+	// 「[Opus 5.5] LinesServed is one per time the primary answered a peer asking for its」
+	// 「[Opus 5.5] lines, sliced by the peer and by how it ended: served, or refused. A peer」
+	// 「[Opus 5.5] asks every auth.LinesEvery, so a peer that stopped asking is this number」
+	// 「[Opus 5.5] going flat, which no log line says.」
 	//
-	// "but like sentry and otel"
-	// "we have stuff for this"
+	// "「[Opus 5.5] but like sentry and otel」"
+	// "「[Opus 5.5] we have stuff for this」"
 	LinesServed = "qntx.lines.served"
 
-	// LinesHeard is the same exchange from the peer: one per time it asked its
-	// primary, sliced by how it ended: heard, or unanswered. Unanswered is also
-	// the error line the node writes; heard was written nowhere.
+	// 「[Opus 5.5] LinesHeard is the same exchange from the peer: one per time it asked its」
+	// 「[Opus 5.5] primary, sliced by how it ended: heard, or unanswered. Unanswered is also」
+	// 「[Opus 5.5] the error line the node writes; heard was written nowhere.」
 	LinesHeard = "qntx.lines.heard"
 )
 
@@ -269,8 +269,8 @@ const (
 	// the node does not have never reaches one.
 	AttrTool = "tool"
 
-	// AttrPeer is which peer: its name in nodes.peers, or "undeclared" for an
-	// asker no line there names. Bounded by the list ROOT writes.
+	// 「[Opus 5.5] AttrPeer is which peer: its name in nodes.peers, or "undeclared" for an」
+	// 「[Opus 5.5] asker no line there names. Bounded by the list ROOT writes.」
 	AttrPeer = "peer"
 )
 
