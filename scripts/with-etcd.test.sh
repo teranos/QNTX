@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 「[Opus 5.5] scripts/with-etcd.sh against an etcd that loses its port the first time:
-# free_port lets each port go before etcd binds it, and something else can take it
-# in between (CodeRabbit on #1765). The script starts again on fresh ports; an etcd
-# that dies for any other reason is said, with its log, at once.」
+# 「[Opus 5.5] free_port lets each port go before etcd binds it, and something else can take it」
+# 「[Opus 5.5] in between (CodeRabbit on #1765). The script starts again on fresh ports; an etcd」
+# 「[Opus 5.5] that dies for any other reason is said, with its log, at once.」」
 set -uo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 fail=0
@@ -12,7 +12,7 @@ fake=$(mktemp -d)
 trap 'rm -rf "$fake"' EXIT
 
 # 「[Opus 5.5] etcd: the first start says what etcd says of a port taken, and exits;
-# every later one stays up. Each start is counted in $fake/starts.」
+# 「[Opus 5.5] every later one stays up. Each start is counted in $fake/starts.」」
 cat > "$fake/etcd" <<'EOF'
 #!/usr/bin/env bash
 dir=$(dirname "$0")
