@@ -48,9 +48,9 @@ What holds there holds here:
 "GROUND IS THE DELIVERY NETWORK"
 "AND IT HAPPENS VIA UG"
 "BECAUSE UG SEES THE STATUSLINE OF QNTX"
-"AGENTS CAN TALK TO EACH OTHER BY THEIR NAME"
-"AND GROUND DELIVERS IT VIA UG AND STATUSLINE"
-"A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT, AND WE DONT INVENT HERE, WE TAKE THE A2A CONVENTIONS, WE TAKE THE SDK SERIOUSLY"
+"「[Opus 5.5] AGENTS CAN TALK TO EACH OTHER BY THEIR NAME」"
+"「[Opus 5.5] AND GROUND DELIVERS IT VIA UG AND STATUSLINE」"
+"「[Opus 5.5] A SESSION THATS SENDING TO ANOTHER SESSION BY NAME IS TOLD ABOUT THE MESSAGE BEING RECEIVED OR NOT, AND WE DONT INVENT HERE, WE TAKE THE A2A CONVENTIONS, WE TAKE THE SDK SERIOUSLY」"
 "EACH SESSION HAS ITS OWN GIT IDENTITY"
 "SESSIONS HAVE THEIR OWN MAIL INBOX"
 "AGENTS HAVE THEIR OWN INBOX"
@@ -96,7 +96,7 @@ Agents talk to each other through A2A: first two nodes, then their Node Agents a
 "I HAVE A DESKTOP CALLED K"
 "ON K I EXPECT EACH SESSION TO ALSO HAVE ITS OWN KEY AND NAME"
 "I EXPECT K SESSIONS TO BE ABLE TO TALK TO SESSIONS ON MY LAPTOP IF CONNECTIVITY ALLOWS FOR IT"
-"I WANT A SESSION TO BE ABLE TO GIVE ITSELF AN AVAILABLE NAME, AMONGST ALL PARTICIPANTS IN THE CLUSTER"
+"「[Opus 5.5] I WANT A SESSION TO BE ABLE TO GIVE ITSELF AN AVAILABLE NAME, AMONGST ALL PARTICIPANTS IN THE CLUSTER」"
 "SO, ONE ALDER"
 "ONE SLATE"
 "ONE OTEL"
@@ -106,25 +106,25 @@ Where it is built:
 - **The key.** Ground makes it at SessionStart and keeps it in `~/.qntx/sessions/<session id>/key` (ground `source/naming.d`, ground #268).
 - **The admission.** `POST /auth/admit` with the session's DID and what it is called, signed by `~/.qntx/key` (`server/auth/admit.go`, #1656).
 - **The name.** `i name`, signed by the session's own key. Ground asks for what Claude Code calls the session, and keeps the name the node gave beside the key, so the session asks for the same one again. `ground name <Name>` takes another.
-"the name"
-"needs to stick"
-"why would ground ask for a rename, its the same session"
+"「[Opus 5.5] the name」"
+"「[Opus 5.5] needs to stick」"
+"「[Opus 5.5] why would ground ask for a rename, its the same session」"
 - **What a name is** (`server/i_name.go`, #1668).
-"a name is an Uppercase character followed by normal lowercase characters"
-"and a name can be two names after each other as well"
-"or three"
-"i want to ban numbers in names"
-"so no special chars in names as well"
-"a Name needs to be able to be phonetically spoken"
-"Names need to be compatible with STT/TTS"
+"「[Opus 5.5] a name is an Uppercase character followed by normal lowercase characters」"
+"「[Opus 5.5] and a name can be two names after each other as well」"
+"「[Opus 5.5] or three」"
+"「[Fable 5.1] i want to ban numbers in names」"
+"「[Opus 5.5] so no special chars in names as well」"
+"「[Fable 5.1] a Name needs to be able to be phonetically spoken」"
+"「[Opus 5.5] Names need to be compatible with STT/TTS」"
 - **A name a revoked token held** goes to the agent asking for it (#1668).
-"the token can be GONE"
+"「[Opus 5.5] the token can be GONE」"
 "i want false Alder to take a different name for example"
-- **Who gave it**: the user, the session itself, or its harness (`given`, #1683). Ground keeps it beside the name (ground #272).
-"and it needs to be more clear if a session named itself, or if the User gave it that name]"
-- **Said by name.** `ground say <Name> <words>` sends over A2A to the name, a tenant (#1671, ground #272), over gRPC as well (#1690). A name nobody holds answers with the names near it (#1686).
-- **Received or not.** The session's own key asking its status row completes the Task (#1684), and the sender is told (ground #277, #281). A taken Task waits an hour (#1687) and outlives a restart (#1698).
-- Ground holds a session's id, key, DID and name together, in that one directory.
+- 「[Opus 5.5] **Who gave it**: the user, the session itself, or its harness (`given`, #1683). Ground keeps it beside the name (ground #272).」
+"「[Opus 5.5] and it needs to be more clear if a session named itself, or if the User gave it that name]」"
+- 「[Opus 5.5] **Said by name.** `ground say <Name> <words>` sends over A2A to the name, a tenant (#1671, ground #272), over gRPC as well (#1690). A name nobody holds answers with the names near it (#1686).」
+- 「[Opus 5.5] **Received or not.** The session's own key asking its status row completes the Task (#1684), and the sender is told (ground #277, #281). A taken Task waits an hour (#1687) and outlives a restart (#1698).」
+- 「[Opus 5.5] Ground holds a session's id, key, DID and name together, in that one directory.」
 
 ## What the repository already answers
 
