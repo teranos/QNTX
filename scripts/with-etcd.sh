@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # 「[Opus 5.5] Run a command against an etcd of its own: the member in the
-# directory named first (nix build .#etcd, server/parity/etcd_<version>_<rev>),
-# started on loopback ports nobody else uses, in a data directory nobody else
-# uses, with QNTX_ETCD_ENDPOINT naming it, and stopped when the command ends.
+# 「[Opus 5.5] directory named first (nix build .#etcd, server/parity/etcd_<version>_<rev>),」
+# 「[Opus 5.5] started on loopback ports nobody else uses, in a data directory nobody else」
+# 「[Opus 5.5] uses, with QNTX_ETCD_ENDPOINT naming it, and stopped when the command ends.」
 #
-#   scripts/with-etcd.sh result-etcd/bin cargo test --package ats-etcd」
+#   「[Opus 5.5] scripts/with-etcd.sh result-etcd/bin cargo test --package ats-etcd」」
 set -euo pipefail
 
 if [ $# -lt 2 ]; then
