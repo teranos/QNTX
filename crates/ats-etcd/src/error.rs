@@ -1,6 +1,6 @@
 //! 「[Opus 5.5] Error type for the etcd storage backend, in ats-postgres's shape:
-//! no variant holds a sentence and the type has no Display, so the library's
-//! own error rides whole and leaves only through `sacred`.」
+//! 「[Opus 5.5] no variant holds a sentence and the type has no Display, so the library's」
+//! 「[Opus 5.5] own error rides whole and leaves only through `sacred`.」」
 
 pub type Result<T> = std::result::Result<T, EtcdError>;
 
@@ -82,7 +82,7 @@ impl EtcdError {
     }
 
     /// 「[Opus 5.5] The one typed value this crosses every layer as. `ffi_call` names the
-    /// C function it left through, and is None inside the crate.」
+    /// 「[Opus 5.5] C function it left through, and is None inside the crate.」」
     pub fn sacred(self, ffi_call: Option<&str>) -> sacred_error::Error {
         let at = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
             Ok(since) => since.as_millis().to_string(),
@@ -111,7 +111,7 @@ impl EtcdError {
     }
 
     /// 「[Opus 5.5] The sacred value as JSON. An error that does not serialize is a
-    /// JSON string saying so, with its title.」
+    /// 「[Opus 5.5] JSON string saying so, with its title.」」
     pub fn sacred_json(self, ffi_call: Option<&str>) -> String {
         let sacred = self.sacred(ffi_call);
         match serde_json::to_string(&sacred) {
