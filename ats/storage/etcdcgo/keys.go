@@ -11,6 +11,7 @@ import "C"
 import (
 	"encoding/json"
 	"sync"
+	"unicode/utf8"
 	"unsafe"
 
 	errors "github.com/teranos/sacred-error"
@@ -59,6 +60,13 @@ func (k *Keys) Close() {
 func (k *Keys) Set(whole map[string][]byte) error {
 	asText := make(map[string]string, len(whole))
 	for name, value := range whole {
+		// 「[Opus 5.5] JSON carries UTF-8 alone: anything else would arrive changed and be said as set.」
+		if !utf8.ValidString(name) {
+			return errors.Newf("a name under %s is not UTF-8 (%q), and etcd is handed it as JSON", k.prefix, name)
+		}
+		if !utf8.Valid(value) {
+			return errors.Newf("what %s%s holds is not UTF-8, and etcd is handed it as JSON", k.prefix, name)
+		}
 		asText[name] = string(value)
 	}
 	body, err := json.Marshal(asText)

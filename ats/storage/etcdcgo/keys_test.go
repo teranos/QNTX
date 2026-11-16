@@ -46,6 +46,21 @@ func TestKeysHoldWhatIsSet(t *testing.T) {
 	}
 }
 
+// 「[Opus 5.5] What crosses to Rust as JSON is UTF-8: a name or a value that is not
+// 「[Opus 5.5] would arrive changed and be said as set, so it is refused (CodeRabbit on #1768).」」
+func TestKeysRefuseWhatIsNotUTF8(t *testing.T) {
+	keys := openKeys(t)
+	if err := keys.Set(map[string][]byte{"a": {0xff}}); err == nil {
+		t.Fatal("a value that is not UTF-8 was said as set")
+	}
+	if err := keys.Set(map[string][]byte{string([]byte{0xff}): []byte("{}")}); err == nil {
+		t.Fatal("a name that is not UTF-8 was said as set")
+	}
+	if held, err := keys.Held(); err != nil || len(held) != 0 {
+		t.Fatalf("held %q (%v) after two refused sets, want nothing", held, err)
+	}
+}
+
 func TestKeysAtAPrefixThatIsNotOneAreRefused(t *testing.T) {
 	if _, err := OpenKeys(endpoint(t), "collected"); err == nil {
 		t.Fatal("OpenKeys took a prefix that does not start and end at /")

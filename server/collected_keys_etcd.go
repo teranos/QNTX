@@ -10,10 +10,6 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// 「[Opus 5.5] collectedKeysAt is where what is collected is kept in etcd, a key
-// 「[Sonnet 5.5] for each agent.」」
-const collectedKeysAt = "/collected/"
-
 // 「[Opus 5.5] collectedKeysOfNode is the etcd am.toml names, as the keys what is
 // 「[Opus 5.5] collected is kept at; nil when it names none.」」
 func (s *QNTXServer) collectedKeysOfNode() collectedKeeper {
@@ -22,7 +18,14 @@ func (s *QNTXServer) collectedKeysOfNode() collectedKeeper {
 		// 「[Opus 5.5] am.toml that does not read refuses the node elsewhere first (the etcd window).」
 		return nil
 	}
-	return &etcdCollectedKeys{endpoint: cfg.Etcd.Endpoint}
+	keeper := &etcdCollectedKeys{endpoint: cfg.Etcd.Endpoint}
+	did := ""
+	if s.nodeDID != nil {
+		did = s.nodeDID.DID
+	}
+	// 「[Opus 5.5] With no prefix, every set says why: the keeper stands, refusing.」
+	keeper.prefix, keeper.noPrefix = collectedKeysPrefix(did)
+	return keeper
 }
 
 // 「[Opus 5.5] etcdCollectedKeys opens etcd when first set, and again after any
@@ -30,14 +33,19 @@ func (s *QNTXServer) collectedKeysOfNode() collectedKeeper {
 type etcdCollectedKeys struct {
 	mu       sync.Mutex
 	endpoint string
+	prefix   string
+	noPrefix error
 	keys     *etcdcgo.Keys
 }
 
 func (e *etcdCollectedKeys) Set(whole map[string][]byte) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.noPrefix != nil {
+		return e.noPrefix
+	}
 	if e.keys == nil {
-		keys, err := etcdcgo.OpenKeys(e.endpoint, collectedKeysAt)
+		keys, err := etcdcgo.OpenKeys(e.endpoint, e.prefix)
 		if err != nil {
 			return errors.Wrapf(err, "what is collected was not kept in etcd at %s", e.endpoint)
 		}

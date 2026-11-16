@@ -261,6 +261,16 @@ type collectedKeeper interface {
 	Set(whole map[string][]byte) error
 }
 
+// 「[Opus 5.5] collectedKeysPrefix is where a node keeps its keys: under its own DID, so
+// 「[Opus 5.5] the whole a node sets is its own, and nodes on one etcd keep apart. A」
+// 「[Opus 5.5] reader watching /collected/ has every node's.」」
+func collectedKeysPrefix(nodeDID string) (string, error) {
+	if nodeDID == "" {
+		return "", errors.New("this node holds no DID, so what it collects has no prefix in etcd")
+	}
+	return "/collected/" + nodeDID + "/", nil
+}
+
 // 「[Opus 5.5] keep sets the keys to what is held. What they do not take is said;
 // 「[Opus 5.5] the file holds it all the same.」」
 func (c *collection) keep(held map[string]*collectedFor) {
