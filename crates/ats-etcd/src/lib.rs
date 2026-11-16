@@ -75,7 +75,7 @@ impl EtcdStore {
             .build()
             .map_err(EtcdError::Runtime)?;
         // 「[Opus 5.5] connect does not dial: the channel is made when first asked.
-        // status is asked here, so an etcd nobody answers for is refused at open.」
+        // 「[Opus 5.5] status is asked here, so an etcd nobody answers for is refused at open.」」
         let options = ConnectOptions::new()
             .with_connect_timeout(OPEN_TIMEOUT)
             .with_timeout(OPEN_TIMEOUT);
