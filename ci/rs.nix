@@ -245,8 +245,8 @@ in
     };
 
     # 「[Opus 5.5] etcd backend. Every test here runs against a member of its own
-    # that scripts/with-etcd.sh starts from the pinned etcd,
-    # server/parity/etcd_<version>_<rev>.」
+    # 「[Opus 5.5] that scripts/with-etcd.sh starts from the pinned etcd,」
+    # 「[Opus 5.5] server/parity/etcd_<version>_<rev>.」」
     ats-etcd = {
       name = "etcd Backend";
       runs-on = "ubuntu-latest";
