@@ -289,12 +289,12 @@ pub fn id_normalize_for_lookup(input: &str) -> String {
 }
 
 // ============================================================================
-// Signing
+// 「[Opus 5.5] Signing」
 // ============================================================================
 
-/// The bytes an attestation's signature is over (crates/ats-sign), from the
-/// proto JSON the browser holds. The browser's key is laye's and signs them:
-/// QNTX says what is signed, laye signs it.
+/// 「[Opus 5.5] The bytes an attestation's signature is over (crates/ats-sign), from the」
+/// 「[Opus 5.5] proto JSON the browser holds. The browser's key is laye's and signs them:」
+/// 「[Opus 5.5] QNTX says what is signed, laye signs it.」
 #[wasm_bindgen]
 pub fn canonical_attestation(attestation_json: &str) -> Result<Vec<u8>, JsValue> {
     ats_sign::Signable::from_proto_json(attestation_json)
