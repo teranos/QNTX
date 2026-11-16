@@ -14,7 +14,7 @@ import (
 
 // 「[Opus 5.5] Span is how long an attestation stays in the window.」
 //
-// "which would be around 3 days"
+// "「[Opus 5.5] which would be around 3 days」"
 const Span = 72 * time.Hour
 
 // 「[Opus 5.5] writeTimeout bounds one attestation's grant and put.」
@@ -22,7 +22,7 @@ const writeTimeout = 5 * time.Second
 
 // 「[Opus 5.5] Window puts the attestations one namespace creates into etcd.」
 //
-// "isnt the right framing to think of etcd another place where attestations can go? while QNTX holds it durably?"
+// "「[Opus 5.5] isnt the right framing to think of etcd another place where attestations can go? while QNTX holds it durably?」"
 type Window struct {
 	client    *clientv3.Client
 	namespace string
