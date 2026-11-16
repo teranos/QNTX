@@ -1,8 +1,8 @@
 //! 「[Opus 5.5] C-compatible FFI for the etcd window: what the node needs to put
-//! each attestation it creates into it. Same result types and ownership rules
-//! as ats-postgres's ffi.rs: the store is allocated on the Rust heap and freed
-//! with `etcd_storage_free`; strings in result structs belong to the caller and
-//! are freed with the matching `*_result_free`.」
+//! 「[Opus 5.5] each attestation it creates into it. Same result types and ownership rules」
+//! 「[Opus 5.5] as ats-postgres's ffi.rs: the store is allocated on the Rust heap and freed」
+//! 「[Opus 5.5] with `etcd_storage_free`; strings in result structs belong to the caller and」
+//! 「[Opus 5.5] are freed with the matching `*_result_free`.」」
 
 use std::os::raw::c_char;
 use std::ptr;
@@ -52,7 +52,7 @@ impl FfiResult for OpenResultC {
 }
 
 /// 「[Opus 5.5] What an error is when it leaves through the FFI: the sacred
-/// shape, as the bytes of its JSON, naming the call it left through.」
+/// 「[Opus 5.5] shape, as the bytes of its JSON, naming the call it left through.」」
 trait Crosses {
     fn crosses(self, call: &str) -> String;
 }
@@ -70,7 +70,7 @@ impl Crosses for serde_json::Error {
 }
 
 /// 「[Opus 5.5] A `Backend` already carries the sacred shape as its string; the
-/// trait's own variants are built into one.」
+/// 「[Opus 5.5] trait's own variants are built into one.」」
 impl Crosses for StoreError {
     fn crosses(self, call: &str) -> String {
         if let StoreError::Backend(json) = &self {
@@ -83,7 +83,7 @@ impl Crosses for StoreError {
 }
 
 /// 「[Opus 5.5] A C string argument as a `&str`, or the typed refusal naming
-/// which argument of which call was not one.」
+/// 「[Opus 5.5] which argument of which call was not one.」」
 unsafe fn argument<'a>(
     call: &'static str,
     name: &'static str,
@@ -97,7 +97,7 @@ unsafe fn argument<'a>(
 }
 
 /// 「[Opus 5.5] Connect to the etcd at `endpoint`, for one namespace. The
-/// result is freed with `etcd_open_result_free`, which leaves the store.」
+/// 「[Opus 5.5] result is freed with `etcd_open_result_free`, which leaves the store.」」
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn etcd_storage_new(
@@ -133,7 +133,7 @@ pub extern "C" fn etcd_storage_free(store: *mut EtcdStore) {
 }
 
 /// 「[Opus 5.5] Put one attestation, as the node's JSON for the proto, into the
-/// window under a lease of SPAN.」
+/// 「[Opus 5.5] window under a lease of SPAN.」」
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn etcd_storage_put(
