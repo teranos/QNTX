@@ -34,6 +34,22 @@ backup_interval_seconds = 3600
 # [storage.parquet]
 # location = "s3://bucket/prefix"
 
+# ── etcd ────────────────────────────────────────────────────────
+# "isnt the right framing to think of etcd another place where attestations can go? while QNTX holds it durably?"
+#
+# "our gap is kv"
+#
+# 「[Opus 5.5] Another place what the node holds goes, for a reader to watch
+# rather than ask the node. Each attestation a namespace creates is put at
+# /attestations/<namespace>/<id> under a 72-hour lease, and what is collected
+# for each agent at /collected/<DID>, as collected list says it, deleted once
+# nothing waits. A node whose etcd does not answer does not start, and a build
+# without the rustetcd tag refuses one that names an etcd. Left out, nothing
+# goes to etcd.」
+#
+# [etcd]
+# endpoint = "http://127.0.0.1:2379"
+
 # ── Postgres records ────────────────────────────────────────────
 # A namespace given Postgres names its connection string in its own
 # ns.toml, by reference. The string says whether it is TLS:
