@@ -13,8 +13,8 @@ import (
 )
 
 // 「[Opus 5.5] endpoint is the etcd QNTX_ETCD_ENDPOINT names, which
-// scripts/with-etcd.sh starts. Unset is a failure: a test that passes without
-// an etcd says nothing.」
+// 「[Opus 5.5] scripts/with-etcd.sh starts. Unset is a failure: a test that passes without」
+// 「[Opus 5.5] an etcd says nothing.」」
 func endpoint(t *testing.T) string {
 	t.Helper()
 	e := os.Getenv("QNTX_ETCD_ENDPOINT")
@@ -51,7 +51,7 @@ func attestation(id string) *types.As {
 }
 
 // 「[Opus 5.5] The window takes an attestation once: the second put of the same
-// id is refused as already held, which says the first one landed.」
+// 「[Opus 5.5] id is refused as already held, which says the first one landed.」」
 func TestTheWindowHoldsWhatItWasHanded(t *testing.T) {
 	store := open(t)
 	var failed []error
