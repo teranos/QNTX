@@ -9,8 +9,8 @@ import (
 )
 
 // 「[Opus 5.5] etcdWindowSubsystem in a build without ats-etcd: a node whose
-// am.toml names an etcd is refused, rather than run without the window it was
-// told to keep.」
+// 「[Opus 5.5] am.toml names an etcd is refused, rather than run without the window it was」
+// 「[Opus 5.5] told to keep.」」
 type etcdWindowSubsystem struct{}
 
 func (etcdWindowSubsystem) Name() string { return "etcd-window" }
