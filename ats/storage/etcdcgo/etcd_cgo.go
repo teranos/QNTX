@@ -1,11 +1,11 @@
 //go:build cgo && rustetcd
 
 // 「[Opus 5.5] Package etcdcgo puts the attestations a namespace creates into the
-// etcd window, through the Rust ats-etcd crate. Peer of postgrescgo.
+// 「[Opus 5.5] etcd window, through the Rust ats-etcd crate. Peer of postgrescgo.」
 //
-// Build requirements:
-//   - cargo build --release -p ats-etcd --features ffi --lib
-//   - CGO enabled, and the `rustetcd` build tag」
+// 「[Opus 5.5] Build requirements:」
+//   「[Opus 5.5] - cargo build --release -p ats-etcd --features ffi --lib」
+//   「[Opus 5.5] - CGO enabled, and the `rustetcd` build tag」」
 package etcdcgo
 
 /*
@@ -29,7 +29,7 @@ import (
 )
 
 // 「[Opus 5.5] Store is one namespace's window in etcd, held by Rust. One
-// client, so one mutex serializes every call.」
+// 「[Opus 5.5] client, so one mutex serializes every call.」」
 type Store struct {
 	ptr       unsafe.Pointer // *C.EtcdStore
 	namespace string
@@ -68,7 +68,7 @@ func (s *Store) Close() {
 }
 
 // 「[Opus 5.5] ffiAttestation is the attestation as the Rust side reads it:
-// times in milliseconds, as postgrescgo hands them.」
+// 「[Opus 5.5] times in milliseconds, as postgrescgo hands them.」」
 type ffiAttestation struct {
 	ID         string         `json:"id,omitempty"`
 	Subjects   []string       `json:"subjects,omitempty"`
@@ -118,7 +118,7 @@ func (s *Store) Put(as *types.As) error {
 }
 
 // 「[Opus 5.5] Window is the observer: each attestation its namespace creates
-// is put into etcd, and each one etcd does not take is handed to failed.」
+// 「[Opus 5.5] is put into etcd, and each one etcd does not take is handed to failed.」」
 type Window struct {
 	store  *Store
 	failed func(error)
