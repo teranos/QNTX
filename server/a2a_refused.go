@@ -47,6 +47,7 @@ const (
 type a2aRefusalSaid struct {
 	Operation       string
 	JSONRPC         bool
+	GRPC            bool
 	Status          int
 	Reason, Message string
 }
@@ -80,6 +81,9 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 	binding := "http+json"
 	if refusal.JSONRPC {
 		binding = "jsonrpc"
+	}
+	if refusal.GRPC {
+		binding = "grpc"
 	}
 	version := r.Header.Get("A2A-Version")
 	if version == "" {

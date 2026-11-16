@@ -116,6 +116,11 @@
         "ROOT"
       ]
     },
+    "/api/agent/stop": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/agents/{namespace}": {
       "x-qntx-reach": [
         "ROOT",
@@ -271,6 +276,36 @@
         "USER"
       ],
       "x-qntx-prefix": true
+    },
+    "/api/collected": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/cancel": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/edit": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/hold": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/later": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/release": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
     },
     "/api/crash-test": {
       "x-qntx-reach": [
@@ -462,6 +497,36 @@
         "ROOT"
       ]
     },
+    "/api/memory": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/keep": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}/merge": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}/{memory}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}/{memory}/forget": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/namespaces": {
       "x-qntx-reach": [
         "ROOT",
@@ -508,6 +573,11 @@
       ]
     },
     "/api/parity/storage": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/phones": {
       "x-qntx-reach": [
         "ROOT"
       ]
@@ -1061,6 +1131,12 @@
         "SUPER",
         "TOKEN",
         "ATTESTOR"
+      ],
+      "x-qntx-prefix": true
+    },
+    "/lf.a2a.v1.A2AService/": {
+      "x-qntx-reach": [
+        "ROOT"
       ],
       "x-qntx-prefix": true
     },

@@ -589,6 +589,25 @@ func googleOutcomeMail(subject, text string) services.NodeMail {
 	}
 }
 
+// 「[Opus 5.5] googleConnectCostsMail is a halt only Connect costs ends, with
+// Connect costs in it: one press, where ROOT reads it.」
+// Connect costs not read, the halt is said without it, and still not as one a
+// budget frees up.
+func googleConnectCostsMail(subject, why, connect string) services.NodeMail {
+	text, page := why+".\n\n", "<p>"+html.EscapeString(why)+".</p>"
+	if connect != "" {
+		text += "Connect costs:\n" + connect + "\n\n"
+		page += "<p><a href=\"" + html.EscapeString(connect) + "\">Connect costs</a></p>"
+	}
+	text += "The node stays connected, and nothing else halts for it.\n"
+	page += "<p>The node stays connected, and nothing else halts for it.</p>"
+	return services.NodeMail{
+		Name:    "google-cloud",
+		Subject: subject,
+		Bodies:  []services.MailBody{services.TextBody(text), services.HTMLBody(page)},
+	}
+}
+
 // tellGoogleOutcome mails ROOT how connecting ended, and says so when it cannot.
 func (s *QNTXServer) tellGoogleOutcome(m services.NodeMail) {
 	if s.googleOutcome != nil {

@@ -122,6 +122,9 @@
           mkdir -p release/lib
           cp result/bin/qntx release/qntx
           chmod +w release/qntx
+          # The claude plugin travels with the node (ADR-059): patched as qntx is, below.
+          cp result/bin/qntx-claude-plugin release/qntx-claude-plugin
+          chmod +w release/qntx-claude-plugin
           DUCKDB_SO=$(ldd result/bin/qntx | awk '/libduckdb/ {print $3}')
           if [ -z "$DUCKDB_SO" ]; then
             echo "libduckdb not found in qntx dependencies"
@@ -162,9 +165,13 @@
             --set-interpreter "$INTERP" \
             --set-rpath '$ORIGIN/lib' \
             release/qntx
-          chmod +x release/qntx
+          nix run nixpkgs#patchelf -- \
+            --set-interpreter "$INTERP" \
+            --set-rpath '$ORIGIN/lib' \
+            release/qntx-claude-plugin
+          chmod +x release/qntx release/qntx-claude-plugin
           cd release
-          tar -czf qntx-''${{ steps.branch.outputs.name }}-linux-''${{ matrix.arch }}.tar.gz qntx lib/
+          tar -czf qntx-''${{ steps.branch.outputs.name }}-linux-''${{ matrix.arch }}.tar.gz qntx qntx-claude-plugin lib/
           sha256sum qntx-''${{ steps.branch.outputs.name }}-linux-''${{ matrix.arch }}.tar.gz \
             > qntx-''${{ steps.branch.outputs.name }}-linux-''${{ matrix.arch }}.tar.gz.sha256
         '';

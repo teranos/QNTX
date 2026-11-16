@@ -64,11 +64,12 @@ var storeWriters = map[string]string{
 	"nodeRecord": "the node's GitHub settings (ADR-043), what the node knows of itself. " +
 		"Reached from the github sigils, which the reach table gives to ROOT",
 
-	"keepAgentName": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
+	"keepNameLine": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
 		"a name is one agent's on the whole node, and an agent acting in one namespace does not see system. " +
 		"Reached from i name, which the reach table gives to ROOT, SUPER and TOKEN, after itsOwnDID says the " +
 		"caller is a token asking as itself and iName says no other DID holds the name; the line's subject and " +
-		"actor are that DID and its predicate is agent:named, whatever was sent",
+		"actor are that DID and its predicate is agent:named, whatever was sent; and, before it, the line a revoked " +
+		"token's name is let go of in, agent:unnamed, about the DID that held the name by the agent asking for it",
 
 	"sessionStoreOf": "where an agent's session lands (ADR-048): the Node Agent's in system, which is " +
 		"the node's own record whoever spoke to it, reached from the claude and pi sigils, which the " +
@@ -211,6 +212,9 @@ var nodeReaders = map[string]string{
 	"sub_nodedid.go:Init":                         "the node's own identity, the row keyed self",
 	"sub_plugins.go:Init":                         "the plugin service registry, and plugins are the node's",
 	"sub_ticker.go:openPulseReadDB":               "a second connection to the same file, so a read does not wait on a write",
+	"wake_github.go:dueWakes":                     "the wakes waiting for a quiet room, kept in the node's own file so a restart does not lose them",
+	"wake_github.go:tellDueAgents":                "the sweep that tells each agent whose room has gone quiet, from the node's own file",
+	"wake_github.go:tellAgentTheRoom":             "what an agent was last told in a room, kept in the node's own file beside the comments waiting to be said into it",
 }
 
 // A namespace is made of what Made says, and what is left on the node is the

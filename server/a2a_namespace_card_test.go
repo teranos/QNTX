@@ -54,8 +54,9 @@ func TestANamespaceAgentIsDescribedAtItsTenant(t *testing.T) {
 		var card struct {
 			Name       string `json:"name"`
 			Interfaces []struct {
-				URL    string `json:"url"`
-				Tenant string `json:"tenant"`
+				URL     string `json:"url"`
+				Tenant  string `json:"tenant"`
+				Version string `json:"protocolVersion"`
 			} `json:"supportedInterfaces"`
 			Skills []struct {
 				ID string `json:"id"`
@@ -63,8 +64,14 @@ func TestANamespaceAgentIsDescribedAtItsTenant(t *testing.T) {
 		}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &card))
 		assert.Equal(t, "the agent of garden, claude-sonnet-5-5", card.Name, path)
-		require.Len(t, card.Interfaces, 2, path)
+		require.Len(t, card.Interfaces, 4, path)
 		for _, held := range card.Interfaces {
+			if held.Version == "0.3" {
+				// 0.3 has no tenant: its agent at garden is reached under garden's path.
+				assert.Empty(t, held.Tenant, path)
+				assert.True(t, strings.HasSuffix(held.URL, "/a2a/garden"), path)
+				continue
+			}
 			assert.Equal(t, "garden", held.Tenant, path+": clients MUST set the tenant the interface declares")
 			assert.True(t, strings.HasSuffix(held.URL, "/a2a"), path)
 		}

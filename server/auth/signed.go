@@ -75,7 +75,13 @@ func (h *Handler) signedGrant(signed string, now time.Time) (Grant, error) {
 	// Whose signature this is is asked before its id is kept: a key nobody
 	// granted anything fills nothing here.
 	var held TokenInfo
-	if carried {
+	byLaye := h.carriedByLaye(claims.Issuer, claims.Subject)
+	if byLaye {
+		var live bool
+		if held, live = h.askingToken(claims.Subject); !live {
+			return Grant{}, errors.Newf("laye carried %s, and this node holds no live grant for it", claims.Subject)
+		}
+	} else if carried {
 		if !h.signsForItsPeople(claims.Issuer) {
 			return Grant{}, errors.Newf("%s signed for %q, and it is not this node's primary", claims.Issuer, claims.Subject)
 		}
@@ -88,7 +94,7 @@ func (h *Handler) signedGrant(signed string, now time.Time) (Grant, error) {
 	if prior, fresh := h.assertions.spend(claims.ID, claims.ExpiresAt.Time, now); !fresh {
 		return Grant{}, errors.Newf("the signature %s was already presented, and is kept until %v", claims.ID, prior)
 	}
-	if carried {
+	if carried && !byLaye {
 		return h.carriedGrant(claims)
 	}
 	return grantOfInfo(held), nil

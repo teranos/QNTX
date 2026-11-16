@@ -50,6 +50,22 @@ Who may log in, the provider ceremony, and what a passkey carries:
 
 - [ADR-030](docs/adr/ADR-030-identity-providers.md).
 
+## Ground
+
+A session on a person's machine is ground's ([teranos/ground](https://github.com/teranos/ground), public). QNTX writes into ground's db: the node leaves news on the status row, ug writes it into ground's store, and sky hands it to the session.
+
+- Here: `server/statusline/news.go`, `server/am_ground.go`.
+- In ground: `ug/tmux.d` (`newsPass`), `source/immediate.d`, `source/sky.d`, `source/stream.d`.
+- [ADR-059](docs/adr/ADR-059-Harness-is-a-Plugin.md), "How a session on a machine is told".
+
+## What waits on a person
+
+A person is told what waits on them by a Live Activity the node starts, on their phone and their Mac, with its answers on it. A batch of what agents said, an approval, and what waits next are one shape.
+
+- [ADR-060](docs/adr/ADR-060-What-Waits-On-A-Person-Is-A-Live-Activity.md): the story, a press, and what it rests on.
+- Here: `server/phones.go`, `server/phones_approvals.go`, `internal/apns`.
+- In the app: QNTX-App `island/`.
+
 ## Connectors
 
 QNTX is able to interface with a variety of other systems in many different ways.

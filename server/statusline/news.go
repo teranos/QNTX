@@ -26,8 +26,9 @@ type News struct {
 	// ID is the attestation's own, so the laptop writes it once whatever the
 	// poll count. The row carries it and a click asks by it.
 	ID string
-	// For is who the item is addressed to: the token's DID that attested the
-	// event, which is what the poll presents when it asks.
+	// For is who the item is addressed to, as NewsKey names a caller: the
+	// person a token or a key speaks for, and the DID only for a caller that
+	// is nobody's. It is what the poll is found by when it asks.
 	For  string
 	Item StatusItem
 	// Detail is the whole of it, answered on a click.
@@ -40,6 +41,9 @@ type News struct {
 	Quiet bool
 	// AtMs is when it was left, stamped by the log.
 	AtMs int64
+	// Whole is told who asked for the whole of the item, each time one does:
+	// what the item is for can know its addressee took it.
+	Whole func(by auth.Admission)
 }
 
 // NewsLog holds recent news in memory. A restart empties it, which is correct:
@@ -173,6 +177,9 @@ func (h *StatusLineHandler) newsDetail(a auth.Admission, id string) (map[string]
 	n, ok := h.News().ByID(NewsKey(a), id)
 	if !ok {
 		return nil, false
+	}
+	if n.Whole != nil {
+		n.Whole(a)
 	}
 	detail := map[string]any{
 		"id":      n.ID,

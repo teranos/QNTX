@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -54,13 +55,18 @@ func TestTheCardShowsWhatTheCallerReaches(t *testing.T) {
 }
 
 // The card is a2a-go's AgentCard, reached over HTTP+JSON and JSON-RPC, both
-// at the binding's URL (§8.3.1): the node's MCP is not one of its interfaces.
+// at the binding's URL (§8.3.1), in 1.0 and in 0.3: the node's MCP is not one
+// of its interfaces.
 func TestTheCardIsReachedOverBothBindings(t *testing.T) {
 	srv, _ := pluginServingServer(t, "fake")
 	card := srv.a2aCard(askedAs(auth.LevelRoot)).sdk()
-	require.Len(t, card.SupportedInterfaces, 2)
-	assert.Equal(t, a2asdk.TransportProtocolHTTPJSON, card.SupportedInterfaces[0].ProtocolBinding)
-	assert.Equal(t, a2asdk.TransportProtocolJSONRPC, card.SupportedInterfaces[1].ProtocolBinding)
+	require.Len(t, card.SupportedInterfaces, 4)
+	for i, version := range []a2asdk.ProtocolVersion{a2asdk.Version, a2av0.Version} {
+		assert.Equal(t, a2asdk.TransportProtocolHTTPJSON, card.SupportedInterfaces[2*i].ProtocolBinding)
+		assert.Equal(t, a2asdk.TransportProtocolJSONRPC, card.SupportedInterfaces[2*i+1].ProtocolBinding)
+		assert.Equal(t, version, card.SupportedInterfaces[2*i].ProtocolVersion)
+		assert.Equal(t, version, card.SupportedInterfaces[2*i+1].ProtocolVersion)
+	}
 	for _, held := range card.SupportedInterfaces {
 		assert.Equal(t, "https://node.example/a2a", held.URL)
 	}

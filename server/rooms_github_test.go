@@ -90,7 +90,8 @@ func TestSignedPRCommentIsSaidIntoTheNodeRoom(t *testing.T) {
 	said := r.said[0]
 	assert.Equal(t, "switchai-py", said.Provider)
 	assert.Equal(t, "node", said.Room)
-	assert.Nil(t, said.By)
+	require.NotNil(t, said.By)
+	assert.Equal(t, "qodo-code-review", said.By.Name, "said by who wrote it, not by the node")
 	assert.Contains(t, said.Body, "teranos/QNTX-Web #100")
 	assert.Contains(t, said.Body, "qodo-code-review\\[bot\\]")
 	assert.Contains(t, said.Body, "Qodo review\n\nKeep the original recording.")

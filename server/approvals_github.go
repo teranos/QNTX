@@ -24,7 +24,9 @@ type gitHubPullRequestEvent struct {
 		HTMLURL string `json:"html_url"`
 		Draft   bool   `json:"draft"`
 		Merged  bool   `json:"merged"`
-		Head    struct {
+		// ClosedAt is GitHub's time of the closing, which names one closing among several.
+		ClosedAt string `json:"closed_at"`
+		Head     struct {
 			Sha string `json:"sha"`
 			Ref string `json:"ref"`
 		} `json:"head"`
@@ -140,6 +142,14 @@ func (s *QNTXServer) pullRequestEvent(e gitHubPullRequestEvent) ([]string, error
 		attrs["merged"] = e.PullRequest.Merged
 		if err := s.approvalLine(s.nodeActor(), subject, watcher.ApprovalClosed, e.Repository.FullName, attrs); err != nil {
 			return nil, err
+		}
+		// Over: collected for each session that was involved in it, waking nobody (involved.go).
+		// What the sessions are told failing is said, and does not fail the rest
+		// of what this delivery is: its approval closed above, and its other readers.
+		if e.Action == "closed" {
+			if err := s.pullIsOver(subject, e.PullRequest.Title, e.PullRequest.HTMLURL, e.PullRequest.ClosedAt, e.PullRequest.Merged); err != nil {
+				s.logger.Errorw("A pull request closed and the sessions involved in it were not told", "pull", subject, "error", err)
+			}
 		}
 	case "assigned", "unassigned", "labeled", "unlabeled", "edited", "locked", "unlocked",
 		"review_requested", "review_request_removed", "milestoned", "demilestoned",

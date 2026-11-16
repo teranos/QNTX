@@ -46,8 +46,11 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// The card names JSON-RPC at /a2a itself, so it is answered there and not
 	// redirected to /a2a/, which a client that does not follow it never reads.
 	a2aServed := s.a2aHTTP()
+	s.a2aOwn = a2aServed
 	s.answer(a2aPrefix, a2aServed)
 	s.answer(a2aPrefix[:len(a2aPrefix)-1], a2aServed)
+	// A2A over gRPC (§10), on the same port: gRPC is HTTP/2 at the service's path.
+	s.answer(a2aGRPCPrefix, s.a2aGRPC)
 	// A2AService's streaming operations, spoken to a peer's agent or a card's (SSE).
 	s.answerA2AStreams()
 
@@ -63,6 +66,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// The human's answer to an approval (ADR-052): a route, no sigil and no
 	// tool; the reach table names it of ROOT.
 	s.answer(approvalsAnswerPath, s.HandleApprovalAnswer)
+
+	// The phone that is told what waits (phones.go): the app hands the node its
+	// token in ROOT's own session. A route and no sigil, as an approval's answer is.
+	s.answer(phonesPath, s.HandlePhone)
 
 	// A staand answers the public pixel on /s/{namespace}/{slug} (ADR-035). The
 	// handler reads the market and the slug off the path.
@@ -136,7 +143,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	s.answer("/api/prompt/", s.HandlePrompt)                                           // Prompt operations (preview/execute/list/save/get/versions)
 	s.answer("/api/plugins/{name}/logs", s.HandlePluginLogs)                           // Plugin log stream (SSE)
 	s.answer("/api/agent/live", s.HandleNodeAgentLive)                                 // The Node Agent's turn as it prints it (SSE)
-	s.answer("/api/elements/{element}/live", s.HandleElementLive)                     // An element agent's turn as it prints it (SSE)
+	s.answer("/api/elements/{element}/live", s.HandleElementLive)                      // An element agent's turn as it prints it (SSE)
 	s.answer("/api/plugins/{name}/config", s.HandlePluginConfig)                       // Plugin configuration (GET/PUT)
 	s.answer("/am/statusline", s.statusLine)                                           // What a status line draws (GET)
 	s.answer("/api/types/", s.HandleTypes)                                             // Get specific type (GET /api/types/{typename})

@@ -28,13 +28,24 @@ type Comment struct {
 	Body   string
 	At     string
 	Action string
-	Path   string
-	Line   int64
+	// Kind is the event it came in: issue_comment, pull_request_review_comment
+	// or pull_request_review.
+	Kind string
+	Path string
+	Line int64
+	// App is the slug of the GitHub App the comment was written through, empty
+	// for a person. GitHub sets it; a person cannot.
+	App string
+	// PRBody is the description of the pull request the comment is on.
+	PRBody string
+	// PRByApp is whether a GitHub App opened the pull request: the node's own
+	// pull requests are opened by its App, a person's by the person.
+	PRByApp bool
 }
 
 // "For example given the Qodo comments we see on many of our PR’s"
 func Parse(event string, body []byte) (*Comment, error) {
-	if event != "issue_comment" && event != "pull_request_review_comment" && event != "pull_request_review" {
+	if event != "issue_comment" && event != "pull_request_review_comment" && event != "pull_request_review" && event != "pull_request" {
 		return nil, nil
 	}
 	type words struct {
@@ -48,6 +59,12 @@ func Parse(event string, body []byte) (*Comment, error) {
 		User      struct {
 			Login string `json:"login"`
 		} `json:"user"`
+		App struct {
+			Slug string `json:"slug"`
+		} `json:"performed_via_github_app"`
+	}
+	type opener struct {
+		Type string `json:"type"`
 	}
 	var sent struct {
 		Action     string `json:"action"`
@@ -56,11 +73,20 @@ func Parse(event string, body []byte) (*Comment, error) {
 		} `json:"repository"`
 		Issue struct {
 			Number int64           `json:"number"`
+			Body   string          `json:"body"`
 			PR     json.RawMessage `json:"pull_request"`
+			User   opener          `json:"user"`
 		} `json:"issue"`
 		PR struct {
-			Number int64 `json:"number"`
+			ID      int64  `json:"id"`
+			Number  int64  `json:"number"`
+			Body    string `json:"body"`
+			Updated string `json:"updated_at"`
+			User    opener `json:"user"`
 		} `json:"pull_request"`
+		Sender struct {
+			Login string `json:"login"`
+		} `json:"sender"`
 		Comment words `json:"comment"`
 		Review  words `json:"review"`
 	}
@@ -76,12 +102,15 @@ func Parse(event string, body []byte) (*Comment, error) {
 	if repo == "" {
 		return nil, nil
 	}
-	w, number, fragment := sent.Comment, sent.PR.Number, "discussion_r"
+	if event == "pull_request" {
+		return draftChange(repo, sent.Action, sent.PR.Number, sent.PR.ID, sent.PR.Updated, sent.PR.Body, sent.Sender.Login)
+	}
+	w, number, fragment, prBody, opened := sent.Comment, sent.PR.Number, "discussion_r", sent.PR.Body, sent.PR.User
 	if event == "issue_comment" {
 		if len(sent.Issue.PR) == 0 || string(sent.Issue.PR) == "null" {
 			return nil, nil
 		}
-		number, fragment = sent.Issue.Number, "issuecomment-"
+		number, fragment, prBody, opened = sent.Issue.Number, "issuecomment-", sent.Issue.Body, sent.Issue.User
 	}
 	if event == "pull_request_review" {
 		if sent.Action != "submitted" && sent.Action != "edited" {
@@ -110,7 +139,7 @@ func Parse(event string, body []byte) (*Comment, error) {
 	if _, err := time.Parse(time.RFC3339Nano, at); err != nil {
 		return nil, errors.Wrap(err, "the PR comment's time did not read")
 	}
-	c := &Comment{Repo: repo, Number: number, ID: w.ID, Author: w.User.Login, Body: w.Body, At: at, Action: sent.Action, Path: w.Path, Line: w.Line}
+	c := &Comment{Repo: repo, Number: number, ID: w.ID, Author: w.User.Login, Body: w.Body, At: at, Kind: event, Action: sent.Action, Path: w.Path, Line: w.Line, App: w.App.Slug, PRBody: prBody, PRByApp: opened.Type == "Bot"}
 	c.URL = fmt.Sprintf("https://github.com/%s/pull/%d#%s%d", repo, number, fragment, w.ID)
 	// A redelivery has the same key; an edit is a new version, including a
 	// later edit restoring earlier words. Delivery IDs need not be retained.
@@ -123,16 +152,72 @@ func Parse(event string, body []byte) (*Comment, error) {
 	return c, nil
 }
 
+// "Draft->Ready change that should wake. but, Ready->Draft needs not wake, but
+// should still enter the room."
+//
+// draftChange is a pull request going from a draft to ready for review, or
+// back. It has no words of its own: the room is told who changed it.
+func draftChange(repo, action string, number, id int64, at, prBody, who string) (*Comment, error) {
+	if action != "ready_for_review" && action != "converted_to_draft" {
+		return nil, nil
+	}
+	if id <= 0 || number <= 0 || who == "" {
+		return nil, errors.New("the pull request needs its ID, number and who changed it")
+	}
+	if _, err := time.Parse(time.RFC3339Nano, at); err != nil {
+		return nil, errors.Wrap(err, "the pull request's time did not read")
+	}
+	c := &Comment{Repo: repo, Number: number, ID: id, Author: who, At: at, Kind: "pull_request", Action: action, PRBody: prBody}
+	c.URL = fmt.Sprintf("https://github.com/%s/pull/%d", repo, number)
+	key, err := json.Marshal([]string{"pull_request", c.URL, at, action})
+	if err != nil {
+		return nil, errors.Wrap(err, "the pull request change's identity did not encode")
+	}
+	digest := sha256.Sum256(key)
+	c.Key = hex.EncodeToString(digest[:])
+	return c, nil
+}
+
 func escape(s string) string {
 	return strings.NewReplacer("\\", "\\\\", "[", "\\[", "]", "\\]", "*", "\\*", "_", "\\_", "`", "\\`").Replace(s)
 }
 
+// pullHeading is the line a pull request's message in the room begins with,
+// as Message writes it: its repository and number, linked.
+const pullHeading = "### [%s #%d](https://github.com/%s/pull/%d)"
+
+// PullOf is the pull request a message in the room is of, read from the line
+// Message begins it with, and whether it is one. Message and PullOf are one
+// format: the tests beside them hold each to the other.
+func PullOf(body string) (repo string, number int64, of bool) {
+	first, _, _ := strings.Cut(body, "\n")
+	var linkedRepo string
+	var linkedNumber int64
+	if n, err := fmt.Sscanf(first, "### [%s #%d](https://github.com/%s", &repo, &number, &linkedRepo); err != nil || n != 3 {
+		return "", 0, false
+	}
+	if !strings.HasPrefix(linkedRepo, repo+"/pull/") {
+		return "", 0, false
+	}
+	if _, err := fmt.Sscanf(strings.TrimPrefix(linkedRepo, repo+"/pull/"), "%d)", &linkedNumber); err != nil || linkedNumber != number {
+		return "", 0, false
+	}
+	return repo, number, number > 0
+}
+
 func (c Comment) Message() string {
+	if c.Kind == "pull_request" {
+		what := "marked the pull request ready for review"
+		if c.Action == "converted_to_draft" {
+			what = "converted the pull request to a draft"
+		}
+		return fmt.Sprintf(pullHeading+"\n\n**%s** %s · %s\n\n[View pull request](%s)", c.Repo, c.Number, c.Repo, c.Number, escape(c.Author), what, c.At, c.URL)
+	}
 	action := "commented"
 	if c.Action == "edited" {
 		action = "updated their comment"
 	}
-	header := fmt.Sprintf("### [%s #%d](https://github.com/%s/pull/%d)\n\n**%s** %s · %s\n\n", c.Repo, c.Number, c.Repo, c.Number, escape(c.Author), action, c.At)
+	header := fmt.Sprintf(pullHeading+"\n\n**%s** %s · %s\n\n", c.Repo, c.Number, c.Repo, c.Number, escape(c.Author), action, c.At)
 	if c.Path != "" {
 		header += fmt.Sprintf("%s · line %d\n\n", escape(c.Path), c.Line)
 	}

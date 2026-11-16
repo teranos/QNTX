@@ -286,7 +286,7 @@ in
       strategy.matrix.include = [
         {
           arch = "arm64";
-          runner = "macos-14";
+          runner = "macos-latest";
         }
       ];
 

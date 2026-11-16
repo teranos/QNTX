@@ -412,12 +412,13 @@ dependencies = [
  "ats-postgres",
  "ats-sign",
  "ats-sqlite",
- "laye-me",
+ "base64 0.22.1",
  "libp2p-identity",
  "qntx-ats",
  "sacred-error",
  "serde_json",
  "tempfile",
+ "ureq",
 ]
 
 [[package]]

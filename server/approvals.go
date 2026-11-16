@@ -84,7 +84,10 @@ type approvalState struct {
 	subject, repo, base, sha, title, link string
 	pull                                  int64
 	askedAt                               time.Time
-	checks                                []approvalCheck
+	// movedAt is when it last changed for whoever decides it: asked at this
+	// head, or a check on it changed.
+	movedAt time.Time
+	checks  []approvalCheck
 	// What stands, and who said it: the newest press about the head.
 	option, said, answeredBy string
 	// over is merged or closed: nothing more is asked of anybody.
@@ -168,7 +171,7 @@ func foldApprovals(lines []*types.As) map[string]*approvalState {
 			states[subject] = &approvalState{
 				subject: subject, repo: attrString(as.Attributes, "repo"), pull: attrInt(as.Attributes, "pull"),
 				sha: sha, base: attrString(as.Attributes, "base"), title: attrString(as.Attributes, "title"),
-				link: attrString(as.Attributes, "link"), askedAt: as.Timestamp,
+				link: attrString(as.Attributes, "link"), askedAt: as.Timestamp, movedAt: as.Timestamp,
 			}
 			continue
 		}
@@ -179,9 +182,14 @@ func foldApprovals(lines []*types.As) map[string]*approvalState {
 		switch predicate {
 		case watcher.ApprovalChecked:
 			check := approvalCheck{name: attrString(as.Attributes, "name"), state: attrString(as.Attributes, "state"), link: attrString(as.Attributes, "link")}
+			// It moved when a check came to another state: the same state said again moves nothing.
 			if i := slices.IndexFunc(st.checks, func(c approvalCheck) bool { return c.name == check.name }); i >= 0 {
+				if st.checks[i].state != check.state {
+					st.movedAt = as.Timestamp
+				}
 				st.checks[i] = check
 			} else {
+				st.movedAt = as.Timestamp
 				st.checks = append(st.checks, check)
 			}
 		case watcher.ApprovalAnswered:
@@ -345,6 +353,11 @@ func (s *QNTXServer) HandleApprovalAnswer(w http.ResponseWriter, r *http.Request
 		return
 	}
 	st.option, st.said, st.answeredBy = sent.Option, sent.Said, admitted.Identity
+	// "CANT YOU SEE THIS CODEPATH IS CRITICAL"
+	// A press decides what is merged: who pressed, what, and from what it was
+	// pressed stand in the node's log beside the line it wrote.
+	s.logger.Infow("An approval is answered by the human", "approval", st.subject, "sha", st.sha,
+		"option", sent.Option, "said", sent.Said, "by", admitted.Identity, "client_named_itself", namedItself(r), "merges_now", mergeNow)
 
 	answered := &protocol.ApprovalAnswered{Subject: st.subject, Sha: st.sha, Option: st.option, Said: st.said, Did: didNothing}
 	if st.waits() {
@@ -353,9 +366,13 @@ func (s *QNTXServer) HandleApprovalAnswer(w http.ResponseWriter, r *http.Request
 	if mergeNow {
 		mergeSha, err := s.mergeApproval(r.Context(), st)
 		if err != nil {
+			s.logger.Errorw("An approval the human answered was not merged", "approval", st.subject, "sha", st.sha,
+				"by", admitted.Identity, "client_named_itself", namedItself(r), "error", err)
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
+		s.logger.Infow("An approval is merged on the human's answer", "approval", st.subject, "sha", st.sha,
+			"merge_sha", mergeSha, "by", admitted.Identity, "client_named_itself", namedItself(r))
 		answered.Did, answered.MergeSha = didMerged, mergeSha
 	}
 	respond(w, s.logger, http.StatusOK, answered)

@@ -99,9 +99,13 @@ type PrimaryLines struct {
 }
 
 // LinesFromThePrimary is the reader a peer reads its lines through, or false
-// on a node with no primary, whose own store holds its lines.
+// on a node with no primary, whose own store holds its lines. A node with laye
+// in front holds its own lines too, whoever it logs in at: laye owns identity,
+// and who holds which role is the node's.
+//
+// "BUT LAYE DOES NOT REALLY OWN USER, THE QNTX WAY"
 func (h *Handler) LinesFromThePrimary() (*PrimaryLines, bool) {
-	if !h.logsInElsewhere {
+	if !h.logsInElsewhere || h.laye != "" {
 		return nil, false
 	}
 	return &PrimaryLines{h: h}, true
