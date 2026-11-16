@@ -4,7 +4,7 @@ What runs in the shared Rust core, and how each runtime reaches it.
 
 The Rust is in `crates/`: `ats` (parsing, filters, resolution, watchers), `ats-id`, `ats-sign`, and the stores `ats-sqlite`, `ats-duckdb` and `ats-indexeddb`. It reaches a runtime by one of three bridges:
 
-- **Browser:** wasm-bindgen exports in `crates/ats-wasm/src/browser.rs`, wrapped by `web/ts/ats-wasm.ts`. Signing: ats-wasm says the bytes (`canonical_attestation`), and laye's laye-p2p, released by [Ground-Institute/laye](https://github.com/Ground-Institute/laye), signs them.
+- 「[Opus 5.5] **Browser:** wasm-bindgen exports in `crates/ats-wasm/src/browser.rs`, wrapped by `web/ts/ats-wasm.ts`. Signing: ats-wasm says the bytes (`canonical_attestation`), and laye's laye-p2p, released by [Ground-Institute/laye](https://github.com/Ground-Institute/laye), signs them.」
 - **Go, pure functions:** wazero, `crates/ats-wasm/src/lib.rs` loaded by `ats/wasm/engine.go`, behind the `qntxwasm` build tag.
 - **Go, the stores:** cgo into `libats_sqlite` (`ats/storage/sqlitecgo`) and `libats_duckdb` (`ats/storage/duckdbcgo`).
 
