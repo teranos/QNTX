@@ -11,7 +11,7 @@ import (
 )
 
 // 「[Opus 5.5] collectedKeysAt is where what is collected is kept in etcd, a key
-// 「[Opus 5.5] for each agent.」」
+// 「[Sonnet 5.5] for each agent.」」
 const collectedKeysAt = "/collected/"
 
 // 「[Opus 5.5] collectedKeysOfNode is the etcd am.toml names, as the keys what is
