@@ -91,8 +91,8 @@ func TestCanonicalJSONWritesTheVectors(t *testing.T) {
 }
 
 // TestSignaturesMatchTheVectors pins the signature a fixed key makes over each
-// vector: a browser's signature, made by laye's key over the bytes ats-wasm's
-// canonical_attestation hands it, is the node's for the same bytes.
+// 「[Opus 5.5] vector: a browser's signature, made by laye's key over the bytes ats-wasm's」
+// 「[Opus 5.5] canonical_attestation hands it, is the node's for the same bytes.」
 func TestSignaturesMatchTheVectors(t *testing.T) {
 	raw, err := os.ReadFile("testdata/signatures.json")
 	if err != nil {
