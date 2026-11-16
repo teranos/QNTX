@@ -65,6 +65,7 @@ in
         "cmd/parity/**"
         "scripts/with-postgres.sh"
         "scripts/with-etcd.sh"
+        "scripts/with-etcd.test.sh"
         "ats/storage/etcdcgo/**"
         "flake.lock"
         ".github/workflows/rs.yml"
@@ -265,6 +266,11 @@ in
             nix build .#etcd --print-build-logs --out-link result-etcd
             result-etcd/bin/etcd --version
           '';
+        }
+
+        {
+          name = "Test scripts/with-etcd.sh";
+          run = "scripts/with-etcd.test.sh";
         }
 
         {
