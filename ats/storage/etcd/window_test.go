@@ -14,7 +14,7 @@ import (
 	"go.etcd.io/etcd/server/v3/embed"
 )
 
-// freeURL is an http URL on loopback no one is listening on yet.
+// 「[Opus 5.5] freeURL is an http URL on loopback no one is listening on yet.」
 func freeURL(t *testing.T) url.URL {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -26,7 +26,7 @@ func freeURL(t *testing.T) url.URL {
 	return url.URL{Scheme: "http", Host: addr}
 }
 
-// member runs a single etcd member in this process for the length of a test.
+// 「[Opus 5.5] member runs a single etcd member in this process for the length of a test.」
 func member(t *testing.T) *clientv3.Client {
 	t.Helper()
 	cfg := embed.NewConfig()
