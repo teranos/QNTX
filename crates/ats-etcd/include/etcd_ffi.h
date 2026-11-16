@@ -1,12 +1,12 @@
 /**
  * 「[Opus 5.5] ats-etcd FFI - C interface for the etcd window onto attestations.
  *
- * Peer of ats-postgres's postgres_ffi.h, with the same result-type shape.
+ * 「[Opus 5.5] Peer of ats-postgres's postgres_ffi.h, with the same result-type shape.」
  *
- * Memory Management:
- * - Store pointers are freed with etcd_storage_free()
- * - Every result struct is freed with its *_result_free()
- * - A result that says success=false carries its reason in error_msg」
+ * 「[Opus 5.5] Memory Management:」
+ * 「[Opus 5.5] - Store pointers are freed with etcd_storage_free()」
+ * 「[Opus 5.5] - Every result struct is freed with its *_result_free()」
+ * 「[Opus 5.5] - A result that says success=false carries its reason in error_msg」」
  */
 
 #ifndef QNTX_ETCD_FFI_H
