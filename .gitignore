@@ -26,7 +26,6 @@ target
 tmp/
 *.log
 crates/ats-wasm/pkg/
-crates/laye-p2p/pkg/
 
 # Binaries (NEVER commit these!)
 *.exe
