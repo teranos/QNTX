@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/QNTX/server/statusline"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -245,6 +246,43 @@ type collection struct {
 	// its way out, and what is on its way out is never changed under it.
 	settling sync.Mutex
 	path     string
+	// 「[Opus 5.5] keys, when the node names an etcd, is where each write is kept
+	// 「[Opus 5.5] again, a key for each agent; failed says what it did not take.」」
+	keys   collectedKeeper
+	failed func(error)
+}
+
+// "「[Opus 5.5] our gap is kv」"
+
+// 「[Opus 5.5] collectedKeeper keeps what is collected a key for each agent, by its
+// 「[Opus 5.5] DID, the value what collected list says of it: a reader watches the keys」
+// 「[Opus 5.5] and has what the node has, without asking it. Set is the whole of it.」」
+type collectedKeeper interface {
+	Set(whole map[string][]byte) error
+}
+
+// 「[Opus 5.5] keep sets the keys to what is held. What they do not take is said;
+// 「[Opus 5.5] the file holds it all the same.」」
+func (c *collection) keep(held map[string]*collectedFor) {
+	if c.keys == nil {
+		return
+	}
+	whole := map[string][]byte{}
+	for did, waits := range held {
+		one := collectedOf(waits)
+		if one == nil {
+			continue
+		}
+		body, err := answerJSON(one)
+		if err != nil {
+			c.failed(errors.Wrapf(err, "what is collected for %s did not marshal for its key", waits.Called))
+			return
+		}
+		whole[did] = body
+	}
+	if err := c.keys.Set(whole); err != nil {
+		c.failed(err)
+	}
 }
 
 func (c *collection) read() (map[string]*collectedFor, error) {
@@ -289,7 +327,11 @@ func (c *collection) write(held map[string]*collectedFor) error {
 	if err := os.WriteFile(beside, raw, 0o600); err != nil {
 		return errors.Wrapf(err, "what is collected was not written at %s", beside)
 	}
-	return errors.Wrapf(os.Rename(beside, c.path), "what is collected was not kept at %s", c.path)
+	if err := os.Rename(beside, c.path); err != nil {
+		return errors.Wrapf(err, "what is collected was not kept at %s", c.path)
+	}
+	c.keep(held)
+	return nil
 }
 
 // change reads what is collected, lets change it, and keeps it.
@@ -315,8 +357,27 @@ func (s *QNTXServer) theCollection() (*collection, error) {
 		} else if at, err := nodeAgentHome(); err == nil {
 			home = at
 		}
-		if home != "" {
-			s.collected = &collection{path: filepath.Join(filepath.Dir(home), collectedFile)}
+		if home == "" {
+			return
+		}
+		keys := s.collectedKeys
+		if keys == nil {
+			keys = s.collectedKeysOfNode()
+		}
+		s.collected = &collection{path: filepath.Join(filepath.Dir(home), collectedFile), keys: keys,
+			failed: func(err error) {
+				s.logger.Errorw("etcd did not take what is collected", "error", err)
+				s.noteHandlerFailure(statusline.HandlerFailure{Handler: "etcd-collected", Error: err.Error()})
+			}}
+		// 「[Opus 5.5] The keys start as the file is, not at the first change.」
+		if keys != nil {
+			func() {
+				s.collected.mu.Lock()
+				defer s.collected.mu.Unlock()
+				if held, err := s.collected.read(); err == nil {
+					s.collected.keep(held)
+				}
+			}()
 		}
 	})
 	if s.collected == nil {
@@ -730,22 +791,30 @@ func (s *QNTXServer) collectedList(context.Context, sigil.Sent) (any, *protocol.
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	for _, waits := range held {
-		if len(waits.Waiting) == 0 && waits.HeldUntil.IsZero() {
-			continue
+		if one := collectedOf(waits); one != nil {
+			answer.Collected = append(answer.Collected, one)
 		}
-		one := &protocol.Collected{
-			To: waits.Called, Did: waits.DID, Model: waits.Model, Waits: waitOf(waits.Model).String(),
-			Due: stamped(waits.due()), HeldUntil: stamped(waits.HeldUntil), Delivered: stamped(waits.Delivered),
-			Waiting:      []*protocol.CollectedSaid{},
-			FailingSince: stamped(waits.Failing), Tries: int32(waits.Tries), Failure: waits.Failure,
-		}
-		for _, said := range waits.Waiting {
-			one.Waiting = append(one.Waiting, &protocol.CollectedSaid{From: said.From, Says: said.Says, At: stamped(said.At), Task: said.Task, Id: said.ID, Edited: said.Edited, FromDid: said.FromDID})
-		}
-		answer.Collected = append(answer.Collected, one)
 	}
 	slices.SortFunc(answer.Collected, func(a, b *protocol.Collected) int { return strings.Compare(a.GetTo(), b.GetTo()) })
 	return answer, nil
+}
+
+// 「[Opus 5.5] collectedOf is what collected list says of what waits for one agent,
+// 「[Opus 5.5] and nil when nothing waits for it and nothing is held.」」
+func collectedOf(waits *collectedFor) *protocol.Collected {
+	if len(waits.Waiting) == 0 && waits.HeldUntil.IsZero() {
+		return nil
+	}
+	one := &protocol.Collected{
+		To: waits.Called, Did: waits.DID, Model: waits.Model, Waits: waitOf(waits.Model).String(),
+		Due: stamped(waits.due()), HeldUntil: stamped(waits.HeldUntil), Delivered: stamped(waits.Delivered),
+		Waiting:      []*protocol.CollectedSaid{},
+		FailingSince: stamped(waits.Failing), Tries: int32(waits.Tries), Failure: waits.Failure,
+	}
+	for _, said := range waits.Waiting {
+		one.Waiting = append(one.Waiting, &protocol.CollectedSaid{From: said.From, Says: said.Says, At: stamped(said.At), Task: said.Task, Id: said.ID, Edited: said.Edited, FromDid: said.FromDID})
+	}
+	return one
 }
 
 // aPersonsToSay is nil when a person asks, and why not otherwise: what waits

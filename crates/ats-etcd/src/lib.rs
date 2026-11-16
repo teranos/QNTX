@@ -7,6 +7,7 @@
 // "「[Opus 5.5] isnt the right framing to think of etcd another place where attestations can go? while QNTX holds it durably?」"
 
 pub mod error;
+pub mod keys;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;
@@ -21,6 +22,7 @@ use etcd_client::{
 use tokio::runtime::Runtime;
 
 pub use crate::error::{EtcdError, Result};
+pub use crate::keys::EtcdKeys;
 
 type StoreResult<T> = std::result::Result<T, StoreError>;
 
