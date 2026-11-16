@@ -26,10 +26,10 @@ type Config struct {
 	said map[string]bool
 }
 
-// "isnt the right framing to think of etcd another place where attestations can go? while QNTX holds it durably?"
+// "「[Opus 5.5] isnt the right framing to think of etcd another place where attestations can go? while QNTX holds it durably?」"
 
 // 「[Opus 5.5] EtcdConfig names the etcd the node puts each attestation it
-// creates into, for the window ats-etcd keeps. Empty endpoint: no window.」
+// 「[Opus 5.5] creates into, for the window ats-etcd keeps. Empty endpoint: no window.」」
 type EtcdConfig struct {
 	Endpoint string `mapstructure:"endpoint"`
 }
