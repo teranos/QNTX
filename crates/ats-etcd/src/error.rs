@@ -20,6 +20,14 @@ pub enum EtcdError {
     BadNamespace {
         value: String,
     },
+    /// 「[Opus 5.5] An argument handed over the FFI was not a string.」
+    BadArgument {
+        call: &'static str,
+        argument: &'static str,
+        source: qntx_ffi_common::CStrError,
+    },
+    /// 「[Opus 5.5] The store trait's own error, crossing the FFI.」
+    Store(ats::storage::StoreError),
 }
 
 impl From<etcd_client::Error> for EtcdError {
@@ -45,6 +53,16 @@ impl EtcdError {
             EtcdError::Runtime(_) => "runtime",
             EtcdError::Connect { .. } => "connect",
             EtcdError::BadNamespace { .. } => "bad-namespace",
+            EtcdError::BadArgument { .. } => "bad-argument",
+            EtcdError::Store(e) => match e {
+                ats::storage::StoreError::AlreadyExists(_) => "already-exists",
+                ats::storage::StoreError::NotFound(_) => "not-found",
+                ats::storage::StoreError::Unwritable(_) => qntx_ffi_common::store::UNWRITABLE,
+                ats::storage::StoreError::InvalidData(_) => "invalid-data",
+                ats::storage::StoreError::Backend(_) => "backend",
+                ats::storage::StoreError::Query(_) => "query",
+                ats::storage::StoreError::Serialization(_) => "serialization",
+            },
         }
     }
 
@@ -59,6 +77,10 @@ impl EtcdError {
             EtcdError::BadNamespace { value } => {
                 format!("namespace {value:?} cannot name a key prefix")
             }
+            EtcdError::BadArgument { call, argument, .. } => {
+                format!("{call} was handed {argument} that is not a string")
+            }
+            EtcdError::Store(e) => e.to_string(),
         }
     }
 
@@ -68,7 +90,8 @@ impl EtcdError {
             EtcdError::Etcd(e) | EtcdError::Connect { source: e, .. } => e.to_string(),
             EtcdError::Serde(e) => e.to_string(),
             EtcdError::Runtime(e) => e.to_string(),
-            EtcdError::BadNamespace { .. } => String::new(),
+            EtcdError::BadArgument { source, .. } => source.to_string(),
+            EtcdError::BadNamespace { .. } | EtcdError::Store(_) => String::new(),
         }
     }
 
@@ -77,6 +100,8 @@ impl EtcdError {
             EtcdError::Etcd(_) | EtcdError::Connect { .. } => Some("etcd-client"),
             EtcdError::Serde(_) => Some("serde_json"),
             EtcdError::Runtime(_) => Some("tokio"),
+            EtcdError::BadArgument { .. } => Some("qntx-ffi-common"),
+            EtcdError::Store(_) => Some("ats"),
             EtcdError::BadNamespace { .. } => None,
         }
     }

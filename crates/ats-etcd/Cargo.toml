@@ -10,6 +10,8 @@ description = "etcd window onto QNTX attestations"
 workspace = true
 
 [dependencies]
+qntx-proto.workspace = true
+qntx-ffi-common = { path = "../qntx-ffi-common" }
 ats.workspace = true
 sacred-error.workspace = true
 serde_json.workspace = true

@@ -328,6 +328,8 @@ version = "0.2.44"
 dependencies = [
  "etcd-client",
  "qntx-ats",
+ "qntx-ffi-common",
+ "qntx-proto",
  "sacred-error",
  "serde_json",
  "tokio",

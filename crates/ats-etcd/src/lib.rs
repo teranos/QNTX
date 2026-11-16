@@ -8,6 +8,9 @@
 
 pub mod error;
 
+#[cfg(feature = "ffi")]
+pub mod ffi;
+
 use std::time::Duration;
 
 use ats::attestation::Attestation;
