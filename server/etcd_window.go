@@ -12,9 +12,9 @@ import (
 )
 
 // 「[Opus 5.5] etcdWindowSubsystem is the step a namespace runs when it starts:
-// when am.toml names an etcd, each attestation the namespace creates from then
-// on is put into it. A write etcd does not take is said where failing handlers
-// are, and in the log.」
+// 「[Opus 5.5] when am.toml names an etcd, each attestation the namespace creates from then」
+// 「[Opus 5.5] on is put into it. A write etcd does not take is said where failing handlers」
+// 「[Opus 5.5] are, and in the log.」」
 type etcdWindowSubsystem struct{}
 
 func (etcdWindowSubsystem) Name() string { return "etcd-window" }
