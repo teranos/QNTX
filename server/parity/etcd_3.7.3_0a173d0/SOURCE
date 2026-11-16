@@ -1,0 +1,9 @@
+etcd
+
+https://github.com/etcd-io/etcd/tree/0a173d0410a96d01091b484daae81365bbcde57e (the commit tag v3.7.3 names)
+
+h1:UrXcetgkuSEocaBlQlulQRJlXLEnUAHuBRbHh0lue1Q=  go.etcd.io/etcd/client/v3 v3.7.3
+h1:KcTZ/aEZrOiQe0/kdr7iYYcvyfbEoOwDOacHkz8xwZc=  go.etcd.io/etcd/server/v3 v3.7.3
+
+Those hashes are the ones go.sum holds. ats/storage/etcd writes through
+client/v3, and its test runs a member from server/v3.
