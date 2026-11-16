@@ -15,7 +15,9 @@ use std::time::Duration;
 
 use ats::attestation::Attestation;
 use ats::storage::{AttestationStore, StoreError};
-use etcd_client::{Client, Compare, CompareOp, DeleteOptions, GetOptions, PutOptions, Txn, TxnOp};
+use etcd_client::{
+    Client, Compare, CompareOp, ConnectOptions, DeleteOptions, GetOptions, PutOptions, Txn, TxnOp,
+};
 use tokio::runtime::Runtime;
 
 pub use crate::error::{EtcdError, Result};
@@ -24,6 +26,9 @@ type StoreResult<T> = std::result::Result<T, StoreError>;
 
 /// 「[Opus 5.5] How long an attestation stays in the window.」
 pub const SPAN: Duration = Duration::from_secs(72 * 60 * 60);
+
+/// 「[Opus 5.5] How long open waits for etcd to answer.」
+const OPEN_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// 「[Opus 5.5] The key prefix a namespace's attestations live under. A namespace
 /// 「[Opus 5.5] is held to lowercase letters, digits, `-` and `_`, as in ats-postgres, so no」
@@ -69,8 +74,17 @@ impl EtcdStore {
             .enable_all()
             .build()
             .map_err(EtcdError::Runtime)?;
+        // 「[Opus 5.5] connect does not dial: the channel is made when first asked.
+        // status is asked here, so an etcd nobody answers for is refused at open.」
+        let options = ConnectOptions::new()
+            .with_connect_timeout(OPEN_TIMEOUT)
+            .with_timeout(OPEN_TIMEOUT);
         let client = runtime
-            .block_on(Client::connect([endpoint], None))
+            .block_on(async {
+                let mut client = Client::connect([endpoint], Some(options)).await?;
+                client.status().await?;
+                Ok::<Client, etcd_client::Error>(client)
+            })
             .map_err(|source| EtcdError::Connect {
                 endpoint: endpoint.to_string(),
                 source,

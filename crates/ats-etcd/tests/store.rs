@@ -72,3 +72,9 @@ fn namespaces_do_not_see_each_other() {
     assert_eq!(b.get("AS-1").unwrap(), None);
     assert_eq!(b.count().unwrap(), 0);
 }
+
+/// 「[Opus 5.5] An etcd nobody answers for is refused at open, not on the first write.」
+#[test]
+fn an_endpoint_nobody_answers_is_refused_at_open() {
+    assert!(EtcdStore::open("http://127.0.0.1:1", &namespace()).is_err());
+}
