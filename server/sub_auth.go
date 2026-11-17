@@ -353,7 +353,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := authHandler.SetGrants(declaredGrants(s.deps.cfg), declaredWords(s.deps.cfg)); err != nil {
 		return err
 	}
-	// And the namespaces they act in, which am.toml names as well.
+	// 「[Opus 5.5] And the namespaces they act in, which am.toml names as well.」
 	if err := s.serveDeclaredNamespaces(s.deps.cfg); err != nil {
 		return err
 	}
