@@ -31,7 +31,7 @@ func declaringNode(t *testing.T) (h *Handler, store *memTokenStore, key ed25519.
 	h.SetIdentities([]string{mastodonAccount}, nil)
 	h.configuredOrigin = signedNodeOrigin
 	key, did = guest(t)
-	require.NoError(t, h.SetGrants([]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}}}))
+	require.NoError(t, h.SetGrants([]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}}}, nil))
 	return h, store, key, did
 }
 
@@ -57,7 +57,7 @@ func TestAKeyAmTomlListsIsAdmittedOnItsSignature(t *testing.T) {
 func TestALineStruckFromAmTomlEndsItsGrant(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	otherKey, otherDID := guest(t)
-	require.NoError(t, h.SetGrants([]DeclaredGrant{{Label: "guest2", DID: otherDID, Namespaces: []string{"fleetingmem"}}}))
+	require.NoError(t, h.SetGrants([]DeclaredGrant{{Label: "guest2", DID: otherDID, Namespaces: []string{"fleetingmem"}}}, nil))
 
 	_, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
 	assert.False(t, ok, "a key struck from auth.grants was admitted")
@@ -100,7 +100,7 @@ func TestAnAuthGrantsListThatDoesNotHoldLeavesTheGrantsBefore(t *testing.T) {
 		"a minted token's label": {{Label: "laptop", DID: did, Namespaces: []string{"fleetingmem"}}},
 		"a minted token's key":   {{Label: "guest1", DID: otherDID, Namespaces: []string{"fleetingmem"}}},
 	} {
-		assert.Error(t, h.SetGrants(listed), name)
+		assert.Error(t, h.SetGrants(listed, nil), name)
 		_, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
 		assert.True(t, ok, name+": the grant held before did not stand")
 	}
@@ -129,5 +129,80 @@ func TestAGuestIsRefusedOnceRootIsStruckOut(t *testing.T) {
 func TestAuthGrantsWithNoRootIsRefused(t *testing.T) {
 	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: newMemTokenStore(), logger: testLogger()}
 	_, did := guest(t)
-	assert.Error(t, h.SetGrants([]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}}}))
+	assert.Error(t, h.SetGrants([]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}}}, nil))
+}
+
+// A guest with no role writes nothing: ATTESTOR holding [] may not write, as
+// f42d answered every row guest1's ground sent before auth.words.
+func TestAGuestHoldingNoRoleMayNotWrite(t *testing.T) {
+	h, _, key, did := declaringNode(t)
+	admitted, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
+	require.True(t, ok)
+	assert.Empty(t, admitted.Roles())
+	assert.False(t, admitted.MayWrite("SessionStart"))
+}
+
+// The roles a grant names and the words auth.words lists are ROOT's lines: a
+// guest holding GROUND in fleetingmem writes every predicate there, and acts in
+// nothing else for it.
+func TestTheRolesAmTomlSaysLetAGuestWrite(t *testing.T) {
+	h, _, key, did := declaringNode(t)
+	require.NoError(t, h.SetGrants(
+		[]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}, Roles: []string{"ground"}}},
+		[]DeclaredWords{{Write: []string{"*"}, Of: []string{"GROUND"}}}))
+
+	admitted, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
+	require.True(t, ok)
+	assert.Equal(t, []string{"GROUND"}, admitted.Roles())
+	assert.True(t, admitted.MayWrite("SessionStart"))
+	assert.True(t, admitted.MayWrite("UserPromptSubmit"))
+	assert.False(t, admitted.MayActIn("default"))
+	assert.Equal(t, []string{"GROUND"}, h.RolesOfToken("guest1", "FleetingMem"), "a namespace is the same whatever its case")
+	assert.Empty(t, h.RolesOfToken("guest1", "default"))
+}
+
+// A role struck from am.toml is gone on the next read, as a grant is.
+func TestARoleStruckFromAmTomlIsGone(t *testing.T) {
+	h, _, key, did := declaringNode(t)
+	words := []DeclaredWords{{Write: []string{"*"}, Of: []string{"GROUND"}}}
+	require.NoError(t, h.SetGrants(
+		[]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}, Roles: []string{"GROUND"}}}, words))
+	require.NoError(t, h.SetGrants(
+		[]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}}}, words))
+
+	admitted, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
+	require.True(t, ok)
+	assert.Empty(t, admitted.Roles())
+	assert.False(t, admitted.MayWrite("SessionStart"))
+}
+
+// An auth.words list that does not hold is refused whole, naming why, and the
+// lines held before stand.
+func TestAnAuthWordsListThatDoesNotHoldLeavesTheLinesBefore(t *testing.T) {
+	h, _, key, did := declaringNode(t)
+	grants := []DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}, Roles: []string{"GROUND"}}}
+	require.NoError(t, h.SetGrants(grants, []DeclaredWords{{Write: []string{"*"}, Of: []string{"GROUND"}}}))
+
+	for name, words := range map[string][]DeclaredWords{
+		"of no role":         {{Write: []string{"*"}}},
+		"no word":            {{Of: []string{"GROUND"}}},
+		"a blank word":       {{Write: []string{" "}, Of: []string{"GROUND"}}},
+		"a word twice":       {{Write: []string{"*", "*"}, Of: []string{"GROUND"}}},
+		"a role twice":       {{Write: []string{"*"}, Of: []string{"GROUND", "ground"}}},
+		"a role of two":      {{Write: []string{"*"}, Of: []string{"TWO WORDS"}}},
+		"all reading none":   {{Write: []string{"*"}, Of: []string{"GROUND"}, All: true}},
+		"a revoke as a word": {{Write: []string{PredicateWordsRevoked, "*"}, Of: []string{"GROUND"}}},
+	} {
+		assert.Error(t, h.SetGrants(grants, words), name)
+		admitted, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
+		require.True(t, ok, name)
+		assert.True(t, admitted.MayWrite("SessionStart"), name+": the lines held before did not stand")
+	}
+	assert.Error(t, h.SetGrants([]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}, Roles: []string{" "}}}, nil), "a blank role")
+}
+
+// auth.words with nobody in auth.root_identities is refused: nobody said it.
+func TestAuthWordsWithNoRootIsRefused(t *testing.T) {
+	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: newMemTokenStore(), logger: testLogger()}
+	assert.Error(t, h.SetGrants(nil, []DeclaredWords{{Write: []string{"*"}, Of: []string{"GROUND"}}}))
 }

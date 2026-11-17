@@ -170,9 +170,29 @@ func (h *Handler) wordOutranks(line, standing WordLine) bool {
 	return line.At.After(standing.At)
 }
 
-// wordLines is every word line, read the first time they are asked for and
-// kept until a write drops them with the role lines.
+// wordLines is every word line: the store's, and those am.toml says.
 func (h *Handler) wordLines() []WordLine {
+	return joinedLines(h.storedWordLines(), h.declaredWordsHeld())
+}
+
+// roleLines is the namespace's grant lines: the store's, and those am.toml says.
+func (h *Handler) roleLines(namespace string) []RoleLine {
+	return joinedLines(h.storedRoleLines(namespace), h.declaredRoleLines(namespace))
+}
+
+// joinedLines is the store's lines and am.toml's in a slice of their own, so
+// what is held for the store is never written through.
+func joinedLines[L any](stored, declared []L) []L {
+	if len(declared) == 0 {
+		return stored
+	}
+	joined := make([]L, 0, len(stored)+len(declared))
+	return append(append(joined, stored...), declared...)
+}
+
+// storedWordLines is every word line in the store, read the first time they
+// are asked for and kept until a write drops them with the role lines.
+func (h *Handler) storedWordLines() []WordLine {
 	if h.roles == nil {
 		return nil
 	}
@@ -219,8 +239,9 @@ func (h *Handler) ForgetRoles() {
 	h.held.words = nil
 }
 
-// roleLines is the namespace's lines, read the first time they are asked for.
-func (h *Handler) roleLines(namespace string) []RoleLine {
+// storedRoleLines is the namespace's lines in the store, read the first time
+// they are asked for.
+func (h *Handler) storedRoleLines(namespace string) []RoleLine {
 	if h.roles == nil {
 		return nil
 	}

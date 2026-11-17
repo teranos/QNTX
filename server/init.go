@@ -273,10 +273,10 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		}
 		// 「[Opus 5.5] And so auth.grants: a line struck ends that key's grant now, and a」
 		// 「[Opus 5.5] list that does not hold leaves the grants held before.」
-		if err := server.authHandler.SetGrants(declaredGrants(newCfg)); err != nil {
+		if err := server.authHandler.SetGrants(declaredGrants(newCfg), declaredWords(newCfg)); err != nil {
 			serverLogger.Errorw("auth.grants not reloaded, the grants held before stand", "error", err)
 		} else {
-			serverLogger.Infow("auth.grants reloaded", "grants", len(newCfg.Auth.Grants))
+			serverLogger.Infow("auth.grants reloaded", "grants", len(newCfg.Auth.Grants), "words", len(newCfg.Auth.Words))
 		}
 		return nil
 	})

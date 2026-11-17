@@ -35,3 +35,24 @@ enabled = true
 	require.NoError(t, err)
 	assert.Empty(t, cfg.Auth.Grants)
 }
+
+// 「[Opus 5.5] A grant's roles and auth.words read as ROOT's lines would be read out loud:」
+// 「[Opus 5.5] guest1 is GROUND of fleetingmem, and WRITE is * of GROUND.」
+func TestAuthGrantRolesAndWordsReadAsWritten(t *testing.T) {
+	cfg, err := LoadFromFile(writeConfig(t, `
+[auth]
+grants = [
+  { label = "guest1", did = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK", namespaces = ["fleetingmem"], roles = ["GROUND"] },
+]
+words = [
+  { write = ["*"], of = ["GROUND"] },
+  { read = ["visit:done"], of = ["COORDINATOR"], all = true },
+]
+`))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"GROUND"}, cfg.Auth.Grants[0].Roles)
+	assert.Equal(t, []WordsConfig{
+		{Write: []string{"*"}, Of: []string{"GROUND"}},
+		{Read: []string{"visit:done"}, Of: []string{"COORDINATOR"}, All: true},
+	}, cfg.Auth.Words)
+}
