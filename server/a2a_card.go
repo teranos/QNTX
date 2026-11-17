@@ -174,9 +174,9 @@ func (c cardIn03And10) CardJSON(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "the card was not written in 1.0")
 	}
-	// A client that speaks 0.3 alone reads where to go from url and
-	// preferredTransport, which a2av0 takes from the first interface: 0.3's
-	// stand first in what it is given, or 0.3 would be sent to 1.0.
+	// 「[Opus 5.5] A client that speaks 0.3 alone reads where to go from url and」
+	// 「[Opus 5.5] preferredTransport, which a2av0 takes from the first interface: 0.3's」
+	// 「[Opus 5.5] stand first in what it is given, or 0.3 would be sent to 1.0.」
 	for03 := *c.card
 	for03.SupportedInterfaces = slices.Clone(c.card.SupportedInterfaces)
 	slices.SortStableFunc(for03.SupportedInterfaces, func(a, b *a2asdk.AgentInterface) int {
@@ -218,7 +218,7 @@ func (c cardIn03And10) CardJSON(ctx context.Context) ([]byte, error) {
 	return json.Marshal(union)
 }
 
-// boolOrder is true as 1 and false as 0, to sort what is true first by.
+// 「[Opus 5.5] boolOrder is true as 1 and false as 0, to sort what is true first by.」
 func boolOrder(b bool) int {
 	if b {
 		return 1
@@ -373,8 +373,8 @@ var cardModes = []string{"application/json"}
 // agentCard is what the node can say of itself to one caller.
 type agentCard struct {
 	Name, Description, Version string
-	// Node is the node as the caller reached it, beneath which each version
-	// is mounted (a2aSpoken), and Tenant the agent behind it.
+	// 「[Opus 5.5] Node is the node as the caller reached it, beneath which each version」
+	// 「[Opus 5.5] is mounted (a2aSpoken), and Tenant the agent behind it.」
 	Node, Tenant string
 	// GRPC is where A2A over gRPC is reached, as am.toml's a2a.grpc names it
 	// (host:port): the node serves it on its own port, and whether its front
@@ -390,8 +390,8 @@ type agentCard struct {
 	Session string
 }
 
-// sdk is the card as a2a-go's AgentCard, reached at each version and binding
-// a2aSpoken holds (interfacesOf).
+// 「[Opus 5.5] sdk is the card as a2a-go's AgentCard, reached at each version and binding」
+// 「[Opus 5.5] a2aSpoken holds (interfacesOf).」
 func (c agentCard) sdk() *a2asdk.AgentCard {
 	bearer := a2asdk.SecurityRequirements{"bearer": {}}
 	card := &a2asdk.AgentCard{
