@@ -357,7 +357,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := s.serveDeclaredNamespaces(s.deps.cfg); err != nil {
 		return err
 	}
-	// And what the roles reach, which am.toml may say too (auth.reach).
+	// 「[Opus 5.5] And what the roles reach, which am.toml may say too (auth.reach).」
 	declared, err := declaredReach(s.deps.cfg)
 	if err != nil {
 		return err
