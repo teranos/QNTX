@@ -304,9 +304,9 @@ type AuthConfig struct {
 	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the slug of the namespace behind each — the name lowercased, because a TOML key arrives lowercase and a namespace keeps the name it was created with. A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
 }
 
-// GrantConfig is one key auth.grants admits, as nodes.peers names a peer: its
-// did:key and the namespaces it acts in. It is a live grant while its line
-// stands, and striking the line ends it.
+// 「[Opus 5.5] GrantConfig is one key auth.grants admits, as nodes.peers names a peer: its」
+// 「[Opus 5.5] did:key and the namespaces it acts in. It is a live grant while its line」
+// 「[Opus 5.5] stands, and striking the line ends it.」
 type GrantConfig struct {
 	Label      string   `mapstructure:"label"`      // What it is called here: the label roles are granted to.
 	DID        string   `mapstructure:"did"`        // Its did:key, which it signs as.

@@ -9,8 +9,8 @@ import (
 
 // "a QNTX change that declares grants in am.toml"
 
-// auth.grants reads as the recommendation wrote it: a label, a did:key and
-// the namespaces it acts in, one table each.
+// 「[Opus 5.5] auth.grants reads as the recommendation wrote it: a label, a did:key and」
+// 「[Opus 5.5] the namespaces it acts in, one table each.」
 func TestAuthGrantsReadAsWritten(t *testing.T) {
 	cfg, err := LoadFromFile(writeConfig(t, `
 [auth]
@@ -26,7 +26,7 @@ grants = [
 	}, cfg.Auth.Grants)
 }
 
-// An am.toml that lists no grants holds none.
+// 「[Opus 5.5] An am.toml that lists no grants holds none.」
 func TestNoAuthGrantsIsNone(t *testing.T) {
 	cfg, err := LoadFromFile(writeConfig(t, `
 [auth]

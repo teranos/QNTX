@@ -11,34 +11,40 @@ import (
 
 // "We need this:"
 // "a QNTX change that declares grants in am.toml"
-// "The node would hold these as live grants while they're listed."
+// "「[Opus 5.5] The node would hold these as live grants while they're listed.」"
 // "Their rows land in fleetingmem, signed by their own key."
 
-// declaredID is the id a grant am.toml lists goes by: no record holds it, so
-// nothing can revoke it but striking its line.
+// 「[Opus 5.5] declaredID is the id a grant am.toml lists goes by: no record holds it, so」
+// 「[Opus 5.5] nothing can revoke it but striking its line.」
 func declaredID(label string) string {
 	return "am.toml:" + label
 }
 
-// DeclaredGrant is one grant auth.grants lists: a key, what it is called
-// here, and the namespaces it acts in.
+// 「[Opus 5.5] DeclaredGrant is one grant auth.grants lists: a key, what it is called」
+// 「[Opus 5.5] here, and the namespaces it acts in.」
 type DeclaredGrant struct {
 	Label      string
 	DID        string
 	Namespaces []string
 }
 
-// SetGrants holds the grants auth.grants lists in place of those it listed
-// before: each a live grant for its key while its line stands. A list that
-// does not hold leaves the grants held before as they were.
+// 「[Opus 5.5] SetGrants holds the grants auth.grants lists in place of those it listed」
+// 「[Opus 5.5] before: each a live grant for its key while its line stands. A list that」
+// 「[Opus 5.5] does not hold leaves the grants held before as they were.」
 //
-// A grant is ATTESTOR in its namespaces, as a key that signs for its person
-// is, and speaks for that key: what it writes is signed by the key itself,
-// and what it may write is what the lines of roles its label holds say.
+// 「[Opus 5.5] A grant is ATTESTOR in its namespaces, as a key that signs for its person」
+// 「[Opus 5.5] is. What it writes is signed by the key itself, and what it may write is」
+// 「[Opus 5.5] what the lines of roles its label holds say. It speaks for whoever am.toml」
+// 「[Opus 5.5] is ROOT's, as the Node Agent does: a token speaks for whoever minted it,」
+// 「[Opus 5.5] and striking them out of am.toml reaches it too.」
 func (h *Handler) SetGrants(listed []DeclaredGrant) error {
 	minted, err := h.mintedLabelsAndDIDs()
 	if err != nil {
 		return err
+	}
+	roots := h.identities.roots()
+	if len(listed) > 0 && len(roots) == 0 {
+		return errors.New("auth.root_identities names nobody, so there is nobody for auth.grants to speak for")
 	}
 	held := make(map[string]TokenInfo, len(listed))
 	labels := map[string]bool{}
@@ -66,7 +72,7 @@ func (h *Handler) SetGrants(listed []DeclaredGrant) error {
 		if minted[did] {
 			return errors.Newf("auth.grants names %s for %s, and a token minted here already holds that key", did, label)
 		}
-		// A grant acting in no namespace would admit its key to nothing.
+		// 「[Opus 5.5] A grant acting in no namespace would admit its key to nothing.」
 		declared, err := named.ItemsOf("auth.grants, for the namespaces "+label+" acts in,", grant.Namespaces)
 		if err != nil {
 			return err
@@ -83,20 +89,26 @@ func (h *Handler) SetGrants(listed []DeclaredGrant) error {
 			acts = append(acts, namespace)
 		}
 		labels[label] = true
+		grant, err := h.agentGrant(Grant{DID: did, Label: label, MintedBy: roots[0], Level: LevelAttestor, Namespaces: acts})
+		if err != nil {
+			return err
+		}
 		held[did] = TokenInfo{
-			ID:         declaredID(label),
-			Label:      label,
-			DID:        did,
-			MintedBy:   did,
-			Level:      LevelAttestor,
-			Namespaces: acts,
+			ID:                  declaredID(label),
+			Label:               grant.Label,
+			DID:                 grant.DID,
+			MintedBy:            grant.MintedBy,
+			MintedByUser:        grant.MintedByUser,
+			MintedByDisplayName: grant.MintedByDisplayName,
+			Level:               grant.Level,
+			Namespaces:          grant.Namespaces,
 		}
 	}
 	h.declared.Store(&held)
 	return nil
 }
 
-// declaredGrant is the grant auth.grants lists for did, and whether it lists one.
+// 「[Opus 5.5] declaredGrant is the grant auth.grants lists for did, and whether it lists one.」
 func (h *Handler) declaredGrant(did string) (TokenInfo, bool) {
 	held := h.declared.Load()
 	if held == nil {
@@ -106,7 +118,7 @@ func (h *Handler) declaredGrant(did string) (TokenInfo, bool) {
 	return grant, listed
 }
 
-// declaresLabel is whether auth.grants lists a grant called label.
+// 「[Opus 5.5] declaresLabel is whether auth.grants lists a grant called label.」
 func (h *Handler) declaresLabel(label string) bool {
 	held := h.declared.Load()
 	if held == nil {
@@ -120,9 +132,9 @@ func (h *Handler) declaresLabel(label string) bool {
 	return false
 }
 
-// mintedLabelsAndDIDs is every label and key a token minted here holds,
-// revoked ones among them: revocation is a switch, and a switched-off token
-// comes back.
+// 「[Opus 5.5] mintedLabelsAndDIDs is every label and key a token minted here holds,」
+// 「[Opus 5.5] revoked ones among them: revocation is a switch, and a switched-off token」
+// 「[Fable 5.1] comes back.」
 func (h *Handler) mintedLabelsAndDIDs() (map[string]bool, error) {
 	minted := map[string]bool{}
 	if h.tokens == nil {
