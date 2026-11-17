@@ -353,6 +353,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := authHandler.SetGrants(declaredGrants(s.deps.cfg), declaredWords(s.deps.cfg)); err != nil {
 		return err
 	}
+	// And the namespaces they act in, which am.toml names as well.
+	if err := s.serveDeclaredNamespaces(s.deps.cfg); err != nil {
+		return err
+	}
 	// The status row asks them for theirs, as the person asking (statusline/peers.go).
 	s.askPeers = authHandler.AskPeers
 	// Every other door am.toml names. The node's own relying party is
