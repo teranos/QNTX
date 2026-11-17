@@ -95,7 +95,7 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		r.URL = &at
 		r.URL.Path, r.URL.RawPath = path, ""
 		// 「[Opus 5.5] Where a request arrives is the version it is in: the version a」
-		// 「[Opus 5.5] caller names, or names none, does not matter.」
+		// 「[Fable 5.2] caller names, or names none, does not matter.」
 		r.Header.Set(a2asdk.SvcParamVersion, string(v.version))
 		if r.Body != nil {
 			r.Body = &a2aBodyRead{ReadCloser: http.MaxBytesReader(w, r.Body, nodeBodyMost), exchange: exchange}
@@ -222,7 +222,7 @@ func (h tenantIn03) DeleteTaskPushConfig(ctx context.Context, req *a2asdk.Delete
 
 // 「[Opus 5.5] GetExtendedAgentCard is the card 0.3's bindings write in 0.3, as a2av0's」
 // 「[Opus 5.5] card producer writes it, signed over the bytes written. A peer's card is the」
-// 「[Opus 5.5] peer's, and is handed over as the peer signed it.」
+// 「[Fable 5.2] peer's, and is handed over as the peer signed it.」
 func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExtendedAgentCardRequest) (*a2asdk.AgentCard, error) {
 	if req != nil {
 		tenantFrom03(ctx, &req.Tenant)
