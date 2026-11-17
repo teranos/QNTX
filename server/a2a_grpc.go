@@ -23,7 +23,7 @@ import (
 
 // 「[Opus 5.5] a2aOverGRPC is the gRPC binding of handler: each version a2aSpoken holds,」
 // 「[Opus 5.5] at its own service path. The path is the version, so the version a caller」
-// 「[Opus 5.5] names, or names none, does not matter.」
+// 「[Fable 5.2] names, or names none, does not matter.」
 func (s *QNTXServer) a2aOverGRPC(handler a2asrv.RequestHandler) http.HandlerFunc {
 	served := grpc.NewServer(grpc.MaxRecvMsgSize(nodeBodyMost))
 	for _, v := range a2aSpoken {
