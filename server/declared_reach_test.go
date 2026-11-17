@@ -14,8 +14,8 @@ func reachingConfig(lines ...appcfg.ReachConfig) *appcfg.Config {
 	return cfg
 }
 
-// auth.reach is read as the store's REACH lines are: paths, and the roles
-// that reach them, by am.toml.
+// 「[Opus 5.5] auth.reach is read as the store's REACH lines are: paths, and the roles」
+// 「[Opus 5.5] that reach them, by am.toml.」
 func TestAuthReachIsReadAsReachLines(t *testing.T) {
 	lines, err := declaredReach(reachingConfig(
 		appcfg.ReachConfig{Paths: []string{"/a2a/"}, To: []string{"ground"}},
@@ -32,8 +32,8 @@ func TestAuthReachIsReadAsReachLines(t *testing.T) {
 	assert.Empty(t, none, "saying none opens nothing")
 }
 
-// A line that would not be served from the store is refused here, and the
-// whole list with it: no path, no role, ROOT, or a level.
+// 「[Opus 5.5] A line that would not be served from the store is refused here, and the」
+// 「[Opus 5.5] whole list with it: no path, no role, ROOT, or a level.」
 func TestAuthReachRefusesWhatTheStoreWouldNotServe(t *testing.T) {
 	for name, line := range map[string]appcfg.ReachConfig{
 		"no path": {To: []string{"GROUND"}},
