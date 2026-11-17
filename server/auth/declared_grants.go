@@ -3,7 +3,9 @@ package auth
 import (
 	"crypto/ed25519"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/internal/named"
 	errors "github.com/teranos/sacred-error"
@@ -26,6 +28,106 @@ type DeclaredGrant struct {
 	Label      string
 	DID        string
 	Namespaces []string
+	// Roles its label holds in each namespace it acts in, as ROOT's grant line.
+	Roles []string
+}
+
+// DeclaredWords is one WRITE or READ line auth.words lists: the words the
+// roles may write or read, ROOT's as a word line in the store is.
+type DeclaredWords struct {
+	Write []string
+	Read  []string
+	Of    []string
+	All   bool
+}
+
+// declaredLines is what auth.grants and auth.words say about roles, as the
+// lines the store would hold had ROOT written them: by namespace, lowercased,
+// and the word lines. Read beside the store's, and outranked by nothing but a
+// later line of ROOT's.
+type declaredLines struct {
+	byNamespace map[string][]RoleLine
+	words       []WordLine
+}
+
+// roleOf is a role as a line names it: one upper-case word.
+func roleOf(written string) (string, bool) {
+	role := strings.ToUpper(strings.TrimSpace(written))
+	if role == "" || strings.ContainsAny(role, " \t\n") {
+		return "", false
+	}
+	return role, true
+}
+
+// rolesOf is the roles a line names, each once.
+func rolesOf(field string, written []string) ([]string, error) {
+	roles := make([]string, 0, len(written))
+	for _, w := range written {
+		role, ok := roleOf(w)
+		if !ok {
+			return nil, errors.Newf("%s names %q, which is no role", field, w)
+		}
+		if slices.Contains(roles, role) {
+			return nil, errors.Newf("%s names the role %s twice", field, role)
+		}
+		roles = append(roles, role)
+	}
+	return roles, nil
+}
+
+// wordsOf is the words a line names, each once and each a word.
+func wordsOf(field string, written []string) ([]string, error) {
+	words := make([]string, 0, len(written))
+	for _, w := range written {
+		word := strings.TrimSpace(w)
+		if word == "" || strings.ContainsAny(word, " \t\n") {
+			return nil, errors.Newf("%s names %q, which is no word", field, w)
+		}
+		if word == PredicateWordsRevoked {
+			return nil, errors.Newf("%s names %s, which takes words away, and am.toml takes away by striking the line", field, word)
+		}
+		if slices.Contains(words, word) {
+			return nil, errors.Newf("%s names %s twice", field, word)
+		}
+		words = append(words, word)
+	}
+	return words, nil
+}
+
+// declaredWordLines is auth.words as the word lines ROOT would have written.
+func declaredWordLines(listed []DeclaredWords, root string, at time.Time) ([]WordLine, error) {
+	var lines []WordLine
+	for i, said := range listed {
+		field := "auth.words line " + strconv.Itoa(i+1)
+		roles, err := rolesOf(field+", for the roles it is of,", said.Of)
+		if err != nil {
+			return nil, err
+		}
+		if len(roles) == 0 {
+			return nil, errors.Newf("%s is of no role", field)
+		}
+		write, err := wordsOf(field+", for what it writes,", said.Write)
+		if err != nil {
+			return nil, err
+		}
+		read, err := wordsOf(field+", for what it reads,", said.Read)
+		if err != nil {
+			return nil, err
+		}
+		if len(write) == 0 && len(read) == 0 {
+			return nil, errors.Newf("%s names no word to write or read", field)
+		}
+		if said.All && len(read) == 0 {
+			return nil, errors.Newf("%s says all, which widens a READ line, and reads nothing", field)
+		}
+		if len(write) > 0 {
+			lines = append(lines, WordLine{Write: true, Words: write, Roles: roles, Actor: root, At: at})
+		}
+		if len(read) > 0 {
+			lines = append(lines, WordLine{Words: read, Roles: roles, All: said.All, Actor: root, At: at})
+		}
+	}
+	return lines, nil
 }
 
 // 「[Opus 5.5] SetGrants holds the grants auth.grants lists in place of those it listed」
@@ -37,7 +139,12 @@ type DeclaredGrant struct {
 // 「[Opus 5.5] what the lines of roles its label holds say. It speaks for whoever am.toml」
 // 「[Opus 5.5] is ROOT's, as the Node Agent does: a token speaks for whoever minted it,」
 // 「[Opus 5.5] and striking them out of am.toml reaches it too.」
-func (h *Handler) SetGrants(listed []DeclaredGrant) error {
+//
+// The roles a grant names and the lines auth.words lists are held beside them,
+// as lines by that same ROOT, said when am.toml was read: the store's lines are
+// read with them, and a line ROOT writes in the store later outranks them as
+// any later line of ROOT's does (ADR-034).
+func (h *Handler) SetGrants(listed []DeclaredGrant, words []DeclaredWords) error {
 	minted, err := h.mintedLabelsAndDIDs()
 	if err != nil {
 		return err
@@ -45,6 +152,18 @@ func (h *Handler) SetGrants(listed []DeclaredGrant) error {
 	roots := h.identities.roots()
 	if len(listed) > 0 && len(roots) == 0 {
 		return errors.New("auth.root_identities names nobody, so there is nobody for auth.grants to speak for")
+	}
+	if len(words) > 0 && len(roots) == 0 {
+		return errors.New("auth.root_identities names nobody, so there is nobody for auth.words to be said by")
+	}
+	saidAt := time.Now()
+	var root string
+	if len(roots) > 0 {
+		root = roots[0]
+	}
+	lines := declaredLines{byNamespace: map[string][]RoleLine{}}
+	if lines.words, err = declaredWordLines(words, root, saidAt); err != nil {
+		return err
 	}
 	held := make(map[string]TokenInfo, len(listed))
 	labels := map[string]bool{}
@@ -88,6 +207,17 @@ func (h *Handler) SetGrants(listed []DeclaredGrant) error {
 			}
 			acts = append(acts, namespace)
 		}
+		roles, err := rolesOf("auth.grants, for the roles "+label+" holds,", grant.Roles)
+		if err != nil {
+			return err
+		}
+		if len(roles) > 0 {
+			for _, namespace := range acts {
+				ns := strings.ToLower(namespace)
+				lines.byNamespace[ns] = append(lines.byNamespace[ns],
+					RoleLine{Routes: []string{label}, Roles: roles, Granted: true, Actor: root, At: saidAt})
+			}
+		}
 		labels[label] = true
 		grant, err := h.agentGrant(Grant{DID: did, Label: label, MintedBy: roots[0], Level: LevelAttestor, Namespaces: acts})
 		if err != nil {
@@ -105,7 +235,26 @@ func (h *Handler) SetGrants(listed []DeclaredGrant) error {
 		}
 	}
 	h.declared.Store(&held)
+	h.declaredRoles.Store(&lines)
 	return nil
+}
+
+// declaredRoleLines is the grant lines am.toml says in namespace.
+func (h *Handler) declaredRoleLines(namespace string) []RoleLine {
+	lines := h.declaredRoles.Load()
+	if lines == nil {
+		return nil
+	}
+	return lines.byNamespace[strings.ToLower(namespace)]
+}
+
+// declaredWordsHeld is the word lines am.toml says.
+func (h *Handler) declaredWordsHeld() []WordLine {
+	lines := h.declaredRoles.Load()
+	if lines == nil {
+		return nil
+	}
+	return lines.words
 }
 
 // 「[Opus 5.5] declaredGrant is the grant auth.grants lists for did, and whether it lists one.」
