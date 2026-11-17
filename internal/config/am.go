@@ -312,13 +312,13 @@ type GrantConfig struct {
 	Label      string   `mapstructure:"label"`      // What it is called here: the label roles are granted to.
 	DID        string   `mapstructure:"did"`        // Its did:key, which it signs as.
 	Namespaces []string `mapstructure:"namespaces"` // Where it acts.
-	// Roles its label holds in each of those namespaces, said by ROOT the way
-	// a grant line in the store is (ADR-034): guest1 is GROUND of fleetingmem.
+	// 「[Opus 5.5] Roles its label holds in each of those namespaces, said by ROOT the way」
+	// 「[Opus 5.5] a grant line in the store is (ADR-034): guest1 is GROUND of fleetingmem.」
 	Roles []string `mapstructure:"roles"`
 }
 
-// WordsConfig is one WRITE or READ line ROOT says in am.toml, read out loud
-// as the store's are: WRITE is * of GROUND. It stands while listed.
+// 「[Opus 5.5] WordsConfig is one WRITE or READ line ROOT says in am.toml, read out loud」
+// 「[Opus 5.5] as the store's are: WRITE is * of GROUND. It stands while listed.」
 type WordsConfig struct {
 	Write []string `mapstructure:"write"` // The words the roles may write: a predicate, a prefix ending in a colon, or *.
 	Read  []string `mapstructure:"read"`  // The words the roles may read.
