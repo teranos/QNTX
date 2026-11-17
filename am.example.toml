@@ -34,13 +34,13 @@ backup_interval_seconds = 3600
 # [storage.parquet]
 # location = "s3://bucket/prefix"
 #
-# Namespaces this node serves because ROOT says so here. Each one the node
-# does not hold is created at start, owned by the first of
-# auth.root_identities, and given the storage named: parquet or sqlite. One
-# the node holds is left as it stands; nothing here ends a namespace.
-# namespaces = [
-#   { name = "fleetingmem", record = "parquet" },
-# ]
+# 「[Opus 5.5] Namespaces this node serves because ROOT says so here. Each one the node」
+# 「[Opus 5.5] does not hold is created at start, owned by the first of」
+# 「[Opus 5.5] auth.root_identities, and given the storage named: parquet or sqlite. One」
+# 「[Opus 5.5] the node holds is left as it stands; nothing here ends a namespace.」
+# 「[Opus 5.5] namespaces = [」
+#   「[Opus 5.5] { name = "fleetingmem", record = "parquet" },」
+# 「[Opus 5.5] ]」
 
 # ── Postgres records ────────────────────────────────────────────
 # A namespace given Postgres names its connection string in its own
