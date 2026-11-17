@@ -35,9 +35,9 @@ func TestATenantNamedAfterAnOperationIsATenant(t *testing.T) {
 	}
 }
 
-// Where a request arrives is the version it is in: 0.3 beneath /a2a/0.3, its
-// operations under /v1 and its tenant the segment before them, and 1.0
-// everywhere else beneath /a2a.
+// 「[Fable 5.2] Where a request arrives is the version it is in: 0.3 beneath /a2a/0.3, its」
+// 「[Fable 5.2] operations under /v1 and its tenant the segment before them, and 1.0」
+// 「[Fable 5.2] everywhere else beneath /a2a.」
 func TestThePathIsTheVersion(t *testing.T) {
 	for _, asked := range []struct {
 		method, path, version, tenant, rest string
