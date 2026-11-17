@@ -54,9 +54,9 @@ var turnQuietMost = 4 * time.Minute
 // a2aContentType is the media type A2A's HTTP+JSON binding speaks in.
 const a2aContentType = "application/a2a+json"
 
-// a2aHTTP is the node's A2A over HTTP: each version a2aSpoken holds, at its
-// base, a2a-go's HTTP+JSON and JSON-RPC made once, JSON-RPC at the base itself.
-// gRPC is made beside them, of the same handler (a2a_grpc.go).
+// 「[Opus 5.5] a2aHTTP is the node's A2A over HTTP: each version a2aSpoken holds, at its」
+// 「[Opus 5.5] base, a2a-go's HTTP+JSON and JSON-RPC made once, JSON-RPC at the base itself.」
+// 「[Opus 5.5] gRPC is made beside them, of the same handler (a2a_grpc.go).」
 func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	handler := a2asrv.NewHandler(turnExecutor{s},
 		a2asrv.WithTaskStore(tasksOnLines{s}),
@@ -94,8 +94,8 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		at := *r.URL
 		r.URL = &at
 		r.URL.Path, r.URL.RawPath = path, ""
-		// Where a request arrives is the version it is in: the version a
-		// caller names, or names none, does not matter.
+		// 「[Opus 5.5] Where a request arrives is the version it is in: the version a」
+		// 「[Opus 5.5] caller names, or names none, does not matter.」
 		r.Header.Set(a2asdk.SvcParamVersion, string(v.version))
 		if r.Body != nil {
 			r.Body = &a2aBodyRead{ReadCloser: http.MaxBytesReader(w, r.Body, nodeBodyMost), exchange: exchange}
@@ -109,7 +109,7 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		case named && v.tenantField:
 			answeredBy = m.restAtTenant
 		case named:
-			// A version whose requests carry no tenant is given the one its path names.
+			// 「[Opus 5.5] A version whose requests carry no tenant is given the one its path names.」
 			r = r.WithContext(context.WithValue(r.Context(), tenantIn03Key{}, tenant))
 			r.URL.Path = rest
 			if exchange.jsonRPC = r.Method == http.MethodPost && rest == "/"; exchange.jsonRPC {
@@ -220,9 +220,9 @@ func (h tenantIn03) DeleteTaskPushConfig(ctx context.Context, req *a2asdk.Delete
 	return h.RequestHandler.DeleteTaskPushConfig(ctx, req)
 }
 
-// GetExtendedAgentCard is the card 0.3's bindings write in 0.3, as a2av0's
-// card producer writes it, signed over the bytes written. A peer's card is the
-// peer's, and is handed over as the peer signed it.
+// 「[Opus 5.5] GetExtendedAgentCard is the card 0.3's bindings write in 0.3, as a2av0's」
+// 「[Opus 5.5] card producer writes it, signed over the bytes written. A peer's card is the」
+// 「[Opus 5.5] peer's, and is handed over as the peer signed it.」
 func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExtendedAgentCardRequest) (*a2asdk.AgentCard, error) {
 	if req != nil {
 		tenantFrom03(ctx, &req.Tenant)
@@ -282,7 +282,7 @@ func a2aRoute(method, path string) bool {
 // it: the request, the operation it is, and whether it came over JSON-RPC.
 type a2aExchange struct {
 	request *http.Request
-	// path is where the request arrived, before its version's base was taken off.
+	// 「[Opus 5.5] path is where the request arrived, before its version's base was taken off.」
 	path      string
 	operation string
 	jsonRPC   bool
