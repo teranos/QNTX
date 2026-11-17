@@ -21,9 +21,9 @@ import (
 // from, so the three answer alike (§5). It is served on the node's own port,
 // at the path gRPC names the service by, through the gate as every route is.
 
-// a2aOverGRPC is the gRPC binding of handler: each version a2aSpoken holds,
-// at its own service path. The path is the version, so the version a caller
-// names, or names none, does not matter.
+// 「[Opus 5.5] a2aOverGRPC is the gRPC binding of handler: each version a2aSpoken holds,」
+// 「[Opus 5.5] at its own service path. The path is the version, so the version a caller」
+// 「[Opus 5.5] names, or names none, does not matter.」
 func (s *QNTXServer) a2aOverGRPC(handler a2asrv.RequestHandler) http.HandlerFunc {
 	served := grpc.NewServer(grpc.MaxRecvMsgSize(nodeBodyMost))
 	for _, v := range a2aSpoken {
