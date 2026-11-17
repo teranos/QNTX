@@ -281,6 +281,16 @@ enabled = false
 #   「[Opus 5.5] { read = ["visit:done"], of = ["COORDINATOR"], all = true },」
 # 「[Opus 5.5] ]」
 
+# Which roles reach a path, as REACH lines ROOT wrote in the store would say
+# (ADR-039), for a node nobody signs in to as ROOT. Read out loud, the first
+# line below is: REACH is '/a2a/' of GROUND. A line ROOT writes in the store
+# about the same path and role outranks one listed here, and striking a line
+# here takes it away. Roles only: a level opens nothing here.
+# reach = [
+#   { paths = ["/a2a/"], to = ["GROUND"] },
+#   { paths = ["/am/statusline/{name}"], to = ["GROUND"] },
+# ]
+
 # ── Front doors (ADR-032) ───────────────────────────────────────
 #
 # A front door is a domain serving a UI against this node, and the namespace
