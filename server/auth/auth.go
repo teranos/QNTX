@@ -126,8 +126,8 @@ type Handler struct {
 	// 「[Opus 5.5] auth.grants: a live grant for each key it lists, by did:key, re-read」
 	// 「[Opus 5.5] when am.toml changes.」
 	declared atomic.Pointer[map[string]TokenInfo]
-	// auth.grants' roles and auth.words: the lines ROOT says in am.toml, read
-	// beside the store's, re-read with the grants.
+	// 「[Opus 5.5] auth.grants' roles and auth.words: the lines ROOT says in am.toml, read」
+	// 「[Opus 5.5] beside the store's, re-read with the grants.」
 	declaredRoles atomic.Pointer[declaredLines]
 	tokens        TokenStore // bearer token path; may be nil during init
 	attestor      Attestor   // records admissions; nil until the store is up
