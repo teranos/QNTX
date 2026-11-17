@@ -268,7 +268,7 @@ enabled = false
 # 「[Opus 5.5] signing as itself and speaking for the first of root_identities. Striking a」
 # 「[Opus 5.5] line ends its grant. The roles a line names are held by its label in each of」
 # 「[Opus 5.5] those namespaces, as a grant line ROOT wrote in the store would be (ADR-034).」
-# 「[Opus 5.5] grants = [」
+# 「[Fable 5.2] grants = [」
 #   「[Opus 5.5] { label = "guest1", did = "did:key:z6MkExampleExampleExampleExampleExampleExample", namespaces = ["fleetingmem"], roles = ["GROUND"] },」
 # 「[Opus 5.5] ]」
 

@@ -505,7 +505,7 @@ func declaredGrants(cfg *appcfg.Config) []auth.DeclaredGrant {
 	return declared
 }
 
-// declaredWords is auth.words, as the auth handler holds it.
+// 「[Opus 5.5] declaredWords is auth.words, as the auth handler holds it.」
 func declaredWords(cfg *appcfg.Config) []auth.DeclaredWords {
 	declared := make([]auth.DeclaredWords, 0, len(cfg.Auth.Words))
 	for _, line := range cfg.Auth.Words {
