@@ -94,7 +94,7 @@ func main() {
 	}
 	fmt.Printf("%d messages, fields and methods of a2a-go say something of themselves, written to %s\n", len(a2a), parity.A2ASaysFile)
 
-	// What a2a-go ships a server for, and in which version: what the node serves.
+	// 「[Fable 5.2] What a2a-go ships a server for, and in which version: what the node serves.」
 	served, err := parity.A2AGoServes(os.DirFS(strings.TrimSpace(string(module))))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "says: %v\n", err)
