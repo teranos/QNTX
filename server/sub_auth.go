@@ -365,6 +365,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := s.setDeclaredReach(declared); err != nil {
 		return err
 	}
+	// And how long what the agents say to each other waits here (collected.wait).
+	if err := dialCollected(s.deps.cfg); err != nil {
+		return err
+	}
 	// The status row asks them for theirs, as the person asking (statusline/peers.go).
 	s.askPeers = authHandler.AskPeers
 	// Every other door am.toml names. The node's own relying party is
