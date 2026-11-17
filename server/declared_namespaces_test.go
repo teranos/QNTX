@@ -10,8 +10,8 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
-// amTomlNamespaces is a namespace store that keeps what it was told, so a second
-// start reads what the first one made.
+// 「[Opus 5.5] amTomlNamespaces is a namespace store that keeps what it was told, so a second」
+// 「[Opus 5.5] start reads what the first one made.」
 type amTomlNamespaces struct {
 	held    []storage.Namespace
 	created int
@@ -47,8 +47,8 @@ func declaringConfig(namespaces ...appcfg.NamespaceConfig) *appcfg.Config {
 	return cfg
 }
 
-// A namespace am.toml names and the node does not hold is created, owned by
-// ROOT, and given its storage: what f42d's guests write in lands in parquet.
+// 「[Opus 5.5] A namespace am.toml names and the node does not hold is created, owned by」
+// 「[Opus 5.5] ROOT, and given its storage: what f42d's guests write in lands in parquet.」
 func TestANamespaceAmTomlNamesIsCreatedWithItsRecord(t *testing.T) {
 	known := &amTomlNamespaces{held: []storage.Namespace{{Name: "default"}}}
 	s := namespaceServer(t, known)
@@ -62,7 +62,7 @@ func TestANamespaceAmTomlNamesIsCreatedWithItsRecord(t *testing.T) {
 	assert.Equal(t, storage.RecordParquet, made.Definition.Record.Kind)
 }
 
-// The next start finds it held and makes nothing again.
+// 「[Opus 5.5] The next start finds it held and makes nothing again.」
 func TestANamespaceAmTomlNamesIsMadeOnce(t *testing.T) {
 	known := &amTomlNamespaces{}
 	s := namespaceServer(t, known)
@@ -73,8 +73,8 @@ func TestANamespaceAmTomlNamesIsMadeOnce(t *testing.T) {
 	assert.Equal(t, 1, known.given)
 }
 
-// One the node holds with no storage yet is given what am.toml names; one
-// that has storage keeps it, since storage is given once.
+// 「[Opus 5.5] One the node holds with no storage yet is given what am.toml names; one」
+// 「[Opus 5.5] that has storage keeps it, since storage is given once.」
 func TestANamespaceHeldIsGivenStorageOnlyFromNone(t *testing.T) {
 	known := &amTomlNamespaces{held: []storage.Namespace{
 		{Name: "FleetingMem", Definition: &storage.NamespaceDefinition{Record: storage.NamespaceRecord{Kind: storage.RecordNone}}},
@@ -90,7 +90,7 @@ func TestANamespaceHeldIsGivenStorageOnlyFromNone(t *testing.T) {
 	assert.Equal(t, storage.RecordSQLite, known.held[1].Definition.Record.Kind)
 }
 
-// A list that does not hold is refused whole, and nothing is made.
+// 「[Opus 5.5] A list that does not hold is refused whole, and nothing is made.」
 func TestANamespacesListThatDoesNotHoldMakesNothing(t *testing.T) {
 	for name, cfg := range map[string]*appcfg.Config{
 		"no name":     declaringConfig(appcfg.NamespaceConfig{Record: "parquet"}),
@@ -108,7 +108,7 @@ func TestANamespacesListThatDoesNotHoldMakesNothing(t *testing.T) {
 	}
 }
 
-// A node that keeps no namespaces says so when am.toml names some.
+// 「[Opus 5.5] A node that keeps no namespaces says so when am.toml names some.」
 func TestNamespacesOnANodeThatKeepsNoneIsRefused(t *testing.T) {
 	s := namespaceServer(t, nil)
 	assert.Error(t, s.serveDeclaredNamespaces(declaringConfig(appcfg.NamespaceConfig{Name: "fleetingmem", Record: "parquet"})))
