@@ -79,7 +79,7 @@
 
 「[Opus 5.5] A pack places things into collections. A collection holds what goes to its」
 「[Opus 5.5] receiver: pull requests, things to say to sessions, handovers, requests for」
-「[Opus 5.5] review.」
+「[agent] review.」
 
 「[Opus 5.5] The person decides on the whole or on one item, in a pack and in a」
 「[Opus 5.5] collection.」
