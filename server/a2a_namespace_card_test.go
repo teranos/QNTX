@@ -67,7 +67,7 @@ func TestANamespaceAgentIsDescribedAtItsTenant(t *testing.T) {
 		require.Len(t, card.Interfaces, 4, path)
 		for _, held := range card.Interfaces {
 			if held.Version == "0.3" {
-				// 0.3 has no tenant: its agent at garden is reached under garden's path, beneath 0.3's base.
+				// 「[Opus 5.5] 0.3 has no tenant: its agent at garden is reached under garden's path, beneath 0.3's base.」
 				assert.Empty(t, held.Tenant, path)
 				assert.True(t, strings.HasSuffix(held.URL, "/a2a/0.3/garden"), path)
 				continue
