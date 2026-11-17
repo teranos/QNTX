@@ -20,12 +20,20 @@ type Config struct {
 	Nodes      NodesConfig      `mapstructure:"nodes"`
 	Laye       LayeConfig       `mapstructure:"laye"`
 	Agent      AgentConfig      `mapstructure:"agent"`
+	Collected  CollectedConfig  `mapstructure:"collected"`
 
 	// said is the keys something said, recorded as the config is read.
 	said map[string]bool
 }
 
 // AgentConfig is the agents this node runs (ADR-048).
+// "and as a human i can dial it"
+// CollectedConfig dials how long what an agent says to another waits on this
+// node before it is delivered.
+type CollectedConfig struct {
+	Wait string `mapstructure:"wait"` // A Go duration, for every model alike: "0s" delivers at the next look. Empty = each model's own wait (Sonnet 30m, Opus 3h, Fable 6h).
+}
+
 type AgentConfig struct {
 	Root NodeAgentConfig `mapstructure:"root"`
 }

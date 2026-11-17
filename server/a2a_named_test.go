@@ -100,9 +100,9 @@ func TestANameNobodyHoldsIsNoAgent(t *testing.T) {
 	assert.Contains(t, toJSON(t, answered), "no agent is served at tenant Rowan")
 }
 
-// A name is no namespace: who reaches /a2a reaches an agent by its name
-// wherever they act, as f42d's guests act in fleetingmem and speak to each
-// other by name. A namespace they do not act in is still not theirs.
+// 「[Opus 5.5] A name is no namespace: who reaches /a2a reaches an agent by its name」
+// 「[Opus 5.5] wherever they act, as f42d's guests act in fleetingmem and speak to each」
+// 「[Opus 5.5] other by name. A namespace they do not act in is still not theirs.」
 func TestANameIsServedToWhoeverReachesA2AWhereverTheyAct(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	guest := auth.Admitted(auth.LevelAttestor, "fleetingmem")
