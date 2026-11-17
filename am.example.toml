@@ -38,7 +38,7 @@ backup_interval_seconds = 3600
 # 「[Opus 5.5] does not hold is created at start, owned by the first of」
 # 「[Opus 5.5] auth.root_identities, and given the storage named: parquet or sqlite. One」
 # 「[Opus 5.5] the node holds is left as it stands; nothing here ends a namespace.」
-# 「[Opus 5.5] namespaces = [」
+# 「[Fable 5.2] namespaces = [」
 #   「[Opus 5.5] { name = "fleetingmem", record = "parquet" },」
 # 「[Opus 5.5] ]」
 
