@@ -17,6 +17,10 @@ const OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 /// 「[Opus 5.5] How many names one page of names holds: names alone, far under 4 MiB.」
 const NAMES_PAGE: i64 = 1000;
 
+/// 「[Opus 5.5] gRPC's OUT_OF_RANGE, what an answer past the decoding limit is said as.
+/// etcd-client's tonic is not the workspace's, so the code is named by its number.」
+const GRPC_OUT_OF_RANGE: i32 = 11;
+
 /// 「[Opus 5.5] A prefix starts and ends at `/`, so no prefix is the start of another
 /// 「[Opus 5.5] key's name that is not under it.」」
 fn fits(prefix: &str) -> bool {
@@ -74,18 +78,31 @@ impl EtcdKeys {
         self.runtime.block_on(async {
             let mut names = Vec::new();
             let mut from = prefix.clone().into_bytes();
+            // 「[Opus 5.5] A page is a count, and names can be long: an answer past what
+            // gRPC decodes is asked again with half the page, down to one name, which
+            // always fits under etcd's own request limit (CodeRabbit on #1768).」
+            let mut page = NAMES_PAGE;
             loop {
-                let got = client
+                let asked = client
                     .get(
                         from.clone(),
                         Some(
                             GetOptions::new()
                                 .with_range(end.clone())
                                 .with_keys_only()
-                                .with_limit(NAMES_PAGE),
+                                .with_limit(page),
                         ),
                     )
-                    .await?;
+                    .await;
+                let got = match asked {
+                    Err(etcd_client::Error::GRpcStatus(status))
+                        if status.code() as i32 == GRPC_OUT_OF_RANGE && page > 1 =>
+                    {
+                        page /= 2;
+                        continue;
+                    }
+                    other => other?,
+                };
                 for kv in got.kvs() {
                     if let Some(name) = kv.key().strip_prefix(prefix.as_bytes()) {
                         names.push(String::from_utf8_lossy(name).into_owned());

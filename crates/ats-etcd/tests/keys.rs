@@ -102,6 +102,22 @@ fn every_page_of_names_is_read() {
     assert!(keys.names().unwrap().is_empty());
 }
 
+/// 「[Opus 5.5] A page is a count of names, and names can be long: 1,100 names of
+/// 「[Opus 5.5] 4,200 bytes pass 4 MiB in one page, and are still read, and deleted」
+/// 「[Opus 5.5] (CodeRabbit on #1768).」」
+#[test]
+fn long_names_are_read_past_one_answers_limit() {
+    let mut keys = EtcdKeys::open(&endpoint(), &prefix()).unwrap();
+    let long = "n".repeat(4200);
+    let many: BTreeMap<String, Vec<u8>> = (0..1100)
+        .map(|i| (format!("{i:05}{long}"), b"{}".to_vec()))
+        .collect();
+    keys.set(&many).unwrap();
+    assert_eq!(keys.names().unwrap().len(), 1100);
+    keys.set(&BTreeMap::new()).unwrap();
+    assert!(keys.names().unwrap().is_empty());
+}
+
 #[test]
 fn prefixes_do_not_see_each_other() {
     let mut a = EtcdKeys::open(&endpoint(), &prefix()).unwrap();
