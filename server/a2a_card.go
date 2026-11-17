@@ -174,7 +174,15 @@ func (c cardIn03And10) CardJSON(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "the card was not written in 1.0")
 	}
-	in03, err := a2av0.NewStaticAgentCardProducer(c.card).(a2asrv.AgentCardJSONProducer).CardJSON(ctx)
+	// A client that speaks 0.3 alone reads where to go from url and
+	// preferredTransport, which a2av0 takes from the first interface: 0.3's
+	// stand first in what it is given, or 0.3 would be sent to 1.0.
+	for03 := *c.card
+	for03.SupportedInterfaces = slices.Clone(c.card.SupportedInterfaces)
+	slices.SortStableFunc(for03.SupportedInterfaces, func(a, b *a2asdk.AgentInterface) int {
+		return boolOrder(b.ProtocolVersion == a2av0.Version) - boolOrder(a.ProtocolVersion == a2av0.Version)
+	})
+	in03, err := a2av0.NewStaticAgentCardProducer(&for03).(a2asrv.AgentCardJSONProducer).CardJSON(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "the card was not written in 0.3")
 	}
@@ -208,6 +216,14 @@ func (c cardIn03And10) CardJSON(ctx context.Context) ([]byte, error) {
 	}
 	union["signatures"] = sigs
 	return json.Marshal(union)
+}
+
+// boolOrder is true as 1 and false as 0, to sort what is true first by.
+func boolOrder(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // merged is a and b as one JSON value: objects key by key, arrays of one

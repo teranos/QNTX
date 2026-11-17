@@ -61,11 +61,19 @@ func WriteA2AServes(served []A2AServed) ([]byte, error) {
 // The constructors and the method a2a-go's server bindings are made and
 // registered by, each the binding it serves.
 var servedBy = map[string]string{
-	"NewRESTHandler":    "HTTP+JSON",
-	"NewJSONRPCHandler": "JSONRPC",
+	"NewRESTHandler":       "HTTP+JSON",
+	"NewTenantRESTHandler": "HTTP+JSON",
+	"NewJSONRPCHandler":    "JSONRPC",
 	// A gRPC binding registers its service with a grpc.Server.
 	"RegisterWith": "GRPC",
 }
+
+// notABinding is each New…Handler constructor of a2a-go that serves no
+// binding: a card, the request handler every binding is given, and a gRPC
+// handler, which a binding registers by RegisterWith. Any other New…Handler
+// is a binding parity does not know yet, and parity says so rather than pass
+// over it (Qodo on #1745: "New SDK bindings can escape parity").
+var notABinding = []string{"NewAgentCardHandler", "NewStaticAgentCardHandler", "NewHandler"}
 
 // a2aGoPackage is what one package of a2a-go says of itself: the Version it
 // declares, the a2a-go packages it imports, and the bindings it serves.
@@ -73,6 +81,8 @@ type a2aGoPackage struct {
 	version  string
 	imports  []string
 	bindings []string
+	// unknown is each New…Handler it declares that is neither a binding parity knows nor notABinding.
+	unknown []string
 }
 
 // A2AGoServes is every binding the a2a-go module in module ships a server
@@ -131,6 +141,11 @@ func A2AGoServes(module fs.FS) ([]A2AServed, error) {
 	if sdk == nil || sdk.version == "" {
 		return nil, errors.New("a2a-go's a2a package declares no Version")
 	}
+	for dir, held := range packages {
+		if len(held.unknown) > 0 {
+			return nil, errors.Newf("a2a-go's %s declares %s, which parity knows neither as a binding nor as no binding: name it in servedBy or notABinding", dir, strings.Join(held.unknown, ", "))
+		}
+	}
 	var served []A2AServed
 	for dir, held := range packages {
 		if len(held.bindings) == 0 {
@@ -187,6 +202,10 @@ func readA2AGoFile(file *ast.File, modulePath string, held *a2aGoPackage) {
 				}
 			}
 		case *ast.FuncDecl:
+			name := declared.Name.Name
+			if _, known := servedBy[name]; !known && declared.Recv == nil && strings.HasPrefix(name, "New") && strings.HasSuffix(name, "Handler") && !slices.Contains(notABinding, name) {
+				held.unknown = append(held.unknown, name)
+			}
 			binding, serves := servedBy[declared.Name.Name]
 			// A constructor is a function, and RegisterWith a method.
 			if !serves || (declared.Recv == nil) == (declared.Name.Name == "RegisterWith") {

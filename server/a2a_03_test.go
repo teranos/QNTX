@@ -60,6 +60,22 @@ func TestAClientSpeaking03IsAnswered(t *testing.T) {
 	}
 }
 
+// "Clients that only speak 0.3 get sent to the 1.0 endpoint" (Qodo on #1745):
+// the public card's 0.3 keys name where 0.3 is answered.
+func TestThePublicCardSendsA03ClientTo03(t *testing.T) {
+	srv, _, _ := nodeAgentOverA2A(t, "")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/.well-known/agent-card.json", nil))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var card struct {
+		URL                string `json:"url"`
+		PreferredTransport string `json:"preferredTransport"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &card))
+	assert.True(t, strings.HasSuffix(card.URL, "/a2a/0.3"), card.URL)
+	assert.NotEmpty(t, card.PreferredTransport)
+}
+
 // The extended card asked over 0.3 is written in 0.3, naming where 0.3 is
 // answered, and verifies by the node's key over the bytes served.
 func TestTheExtendedCardIn03IsSignedAsServed(t *testing.T) {
