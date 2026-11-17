@@ -9,9 +9,9 @@ import (
 	appcfg "github.com/teranos/QNTX/internal/config"
 )
 
-// "and as a human i can dial it"
-// collected.wait is every model's wait, and under a minute the node looks
-// more often; saying nothing leaves each model's own.
+// "「[Opus 5.5] and as a human i can dial it」"
+// 「[Opus 5.5] collected.wait is every model's wait, and under a minute the node looks」
+// 「[Opus 5.5] more often; saying nothing leaves each model's own.」
 func TestCollectedWaitIsDialledInAmToml(t *testing.T) {
 	fable, opus, sonnet, looked := collectedForFable, collectedForOpus, collectedForSonnet, collectedLooked
 	t.Cleanup(func() {
