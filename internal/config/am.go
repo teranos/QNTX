@@ -302,6 +302,7 @@ type AuthConfig struct {
 	Provider           ProviderConfig        `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
 	Grants             []GrantConfig         `mapstructure:"grants"`               // Keys admitted while listed, each in the namespaces it names. Empty = none.
 	Words              []WordsConfig         `mapstructure:"words"`                // WRITE and READ lines ROOT says here rather than in the store (ADR-034): what a role may say, while listed. Empty = none.
+	Reach              []ReachConfig         `mapstructure:"reach"`                // REACH lines ROOT says here rather than in the store (ADR-039): which roles reach a path, while listed. A line ROOT writes in the store about the same path and role outranks it. Empty = none.
 	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the slug of the namespace behind each — the name lowercased, because a TOML key arrives lowercase and a namespace keeps the name it was created with. A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
 }
 
@@ -324,6 +325,13 @@ type WordsConfig struct {
 	Read  []string `mapstructure:"read"`  // The words the roles may read.
 	Of    []string `mapstructure:"of"`    // The roles the line is about.
 	All   bool     `mapstructure:"all"`   // By all on the READ line: everyone's rows, not only the reader's own.
+}
+
+// ReachConfig is one REACH line ROOT says in am.toml, read as the store's are:
+// REACH is '/a2a/' of GROUND. It stands while listed.
+type ReachConfig struct {
+	Paths []string `mapstructure:"paths"` // What the line is about: paths, as the tablet and the store's lines name them.
+	To    []string `mapstructure:"to"`    // The roles that reach them.
 }
 
 // DoorConfig is one front door: a domain people arrive at, and the namespace

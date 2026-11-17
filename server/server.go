@@ -148,6 +148,9 @@ type QNTXServer struct {
 	// built from the lines in its table.
 	answering map[string]reach.Answering
 	served    *reach.Served
+	// declaredReach is auth.reach: the REACH lines am.toml says, served
+	// beside the store's (declared_reach.go). Held under opening.
+	declaredReach []reach.Line
 	// sigilPaths is the paths answering holds because a sigil is bound there,
 	// so the ones no sigil is bound to any more can be taken out.
 	sigilPaths map[string]bool

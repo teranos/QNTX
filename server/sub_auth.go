@@ -357,6 +357,14 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := s.serveDeclaredNamespaces(s.deps.cfg); err != nil {
 		return err
 	}
+	// And what the roles reach, which am.toml may say too (auth.reach).
+	declared, err := declaredReach(s.deps.cfg)
+	if err != nil {
+		return err
+	}
+	if err := s.setDeclaredReach(declared); err != nil {
+		return err
+	}
 	// The status row asks them for theirs, as the person asking (statusline/peers.go).
 	s.askPeers = authHandler.AskPeers
 	// Every other door am.toml names. The node's own relying party is
