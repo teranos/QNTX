@@ -24,6 +24,20 @@ pub use crate::error::{EtcdError, Result};
 
 type StoreResult<T> = std::result::Result<T, StoreError>;
 
+/// 「[Opus 5.5] The attestation as the node hands it over the FFI: its JSON for the
+/// proto, with the attributes read from that JSON as they are. Through the proto's
+/// number an integer past 2^53 was rounded, and kept so with no error
+/// (CodeRabbit on #1765).」
+pub fn attestation_of_node_json(json: &str) -> Result<Attestation> {
+    let proto: qntx_proto::Attestation = serde_json::from_str(json)?;
+    let mut attestation = qntx_proto::proto_convert::from_proto(proto);
+    let raw: serde_json::Value = serde_json::from_str(json)?;
+    if let Some(serde_json::Value::Object(attributes)) = raw.get("attributes") {
+        attestation.attributes = attributes.clone().into_iter().collect();
+    }
+    Ok(attestation)
+}
+
 /// 「[Opus 5.5] How long an attestation stays in the window.」
 pub const SPAN: Duration = Duration::from_secs(72 * 60 * 60);
 

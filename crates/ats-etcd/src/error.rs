@@ -26,6 +26,18 @@ pub enum EtcdError {
         argument: &'static str,
         source: qntx_ffi_common::CStrError,
     },
+    /// 「[Opus 5.5] A pointer handed over the FFI was null.」
+    NullPointer {
+        call: &'static str,
+        argument: &'static str,
+    },
+    /// 「[Opus 5.5] An argument handed over the FFI was longer than the call takes.」
+    TooLong {
+        call: &'static str,
+        argument: &'static str,
+        length: usize,
+        most: usize,
+    },
     /// 「[Opus 5.5] The store trait's own error, crossing the FFI.」
     Store(ats::storage::StoreError),
 }
@@ -54,6 +66,8 @@ impl EtcdError {
             EtcdError::Connect { .. } => "connect",
             EtcdError::BadNamespace { .. } => "bad-namespace",
             EtcdError::BadArgument { .. } => "bad-argument",
+            EtcdError::NullPointer { .. } => "null-pointer",
+            EtcdError::TooLong { .. } => "too-long",
             EtcdError::Store(e) => match e {
                 ats::storage::StoreError::AlreadyExists(_) => "already-exists",
                 ats::storage::StoreError::NotFound(_) => "not-found",
@@ -77,6 +91,17 @@ impl EtcdError {
             EtcdError::BadNamespace { value } => {
                 format!("namespace {value:?} cannot name a key prefix")
             }
+            EtcdError::NullPointer { call, argument } => {
+                format!("{call} was handed a null {argument}")
+            }
+            EtcdError::TooLong {
+                call,
+                argument,
+                length,
+                most,
+            } => {
+                format!("{call} was handed {argument} of {length} bytes, past the {most} it takes")
+            }
             EtcdError::BadArgument { call, argument, .. } => {
                 format!("{call} was handed {argument} that is not a string")
             }
@@ -91,7 +116,10 @@ impl EtcdError {
             EtcdError::Serde(e) => e.to_string(),
             EtcdError::Runtime(e) => e.to_string(),
             EtcdError::BadArgument { source, .. } => source.to_string(),
-            EtcdError::BadNamespace { .. } | EtcdError::Store(_) => String::new(),
+            EtcdError::BadNamespace { .. }
+            | EtcdError::NullPointer { .. }
+            | EtcdError::TooLong { .. }
+            | EtcdError::Store(_) => String::new(),
         }
     }
 
@@ -102,7 +130,9 @@ impl EtcdError {
             EtcdError::Runtime(_) => Some("tokio"),
             EtcdError::BadArgument { .. } => Some("qntx-ffi-common"),
             EtcdError::Store(_) => Some("ats"),
-            EtcdError::BadNamespace { .. } => None,
+            EtcdError::BadNamespace { .. }
+            | EtcdError::NullPointer { .. }
+            | EtcdError::TooLong { .. } => None,
         }
     }
 

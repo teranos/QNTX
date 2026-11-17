@@ -32,16 +32,22 @@ func (etcdWindowSubsystem) Start(u *namespaces.Universe) error {
 	if endpoint == "" {
 		return nil
 	}
-	store, err := etcdcgo.Open(endpoint, u.Name())
+	namespace := u.Name()
+	store, err := etcdcgo.Open(endpoint, windowNamespace(namespace))
 	if err != nil {
 		return err
 	}
 	logger := s.logger.Named("etcd-window")
-	namespace := u.Name()
-	storage.RegisterObserver(namespace, etcdcgo.NewWindow(store, func(err error) {
+	window := etcdcgo.NewWindow(store, func(err error) {
 		logger.Errorw("etcd did not take an attestation", "namespace", namespace, "endpoint", endpoint, "error", err)
 		s.noteHandlerFailure(statusline.HandlerFailure{Handler: "etcd-window", Error: err.Error()})
-	}))
+	})
+	// 「[Opus 5.5] Started again, the namespace's window before stops hearing it and closes.」
+	if before := s.etcdWindows.keep(namespace, window); before != nil {
+		storage.UnregisterObserver(namespace, before)
+		before.Close()
+	}
+	storage.RegisterObserver(namespace, window)
 	logger.Infow("The etcd window holds what this namespace creates", "namespace", namespace, "endpoint", endpoint)
 	return nil
 }

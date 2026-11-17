@@ -53,15 +53,26 @@ func attestation(id string) *types.As {
 // 「[Opus 5.5] The window takes an attestation once: the second put of the same
 // 「[Opus 5.5] id is refused as already held, which says the first one landed.」」
 func TestTheWindowHoldsWhatItWasHanded(t *testing.T) {
-	store := open(t)
+	ns := fmt.Sprintf("go%d_%d", os.Getpid(), time.Now().UnixNano())
+	store, err := Open(endpoint(t), ns)
+	if err != nil {
+		t.Fatalf("Open in %s: %v", ns, err)
+	}
 	var failed []error
 	w := NewWindow(store, func(err error) { failed = append(failed, err) })
 
 	w.OnAttestationCreated(attestation("AS-window"))
+	// 「[Opus 5.5] One worker puts: Close waits for what it holds, and closes the store.」
+	w.Close()
 	if len(failed) > 0 {
 		t.Fatalf("the window refused a new attestation: %v", failed)
 	}
-	err := store.Put(attestation("AS-window"))
+	again, err := Open(endpoint(t), ns)
+	if err != nil {
+		t.Fatalf("Open in %s again: %v", ns, err)
+	}
+	t.Cleanup(again.Close)
+	err = again.Put(attestation("AS-window"))
 	if !ats.AlreadyExists(err) {
 		t.Fatalf("a second put of AS-window: want already-exists, got %v", err)
 	}
@@ -76,6 +87,7 @@ func TestAWriteTheWindowDoesNotTakeIsSaid(t *testing.T) {
 	empty := attestation("AS-empty")
 	empty.Subjects = nil
 	w.OnAttestationCreated(empty)
+	w.Close()
 	if len(failed) != 1 {
 		t.Fatalf("want the refused write said once, said %d times", len(failed))
 	}
