@@ -100,6 +100,27 @@ func TestANameNobodyHoldsIsNoAgent(t *testing.T) {
 	assert.Contains(t, toJSON(t, answered), "no agent is served at tenant Rowan")
 }
 
+// A name is no namespace: who reaches /a2a reaches an agent by its name
+// wherever they act, as f42d's guests act in fleetingmem and speak to each
+// other by name. A namespace they do not act in is still not theirs.
+func TestANameIsServedToWhoeverReachesA2AWhereverTheyAct(t *testing.T) {
+	srv, _ := namedOverA2A(t)
+	guest := auth.Admitted(auth.LevelAttestor, "fleetingmem")
+	r := httptest.NewRequest(http.MethodPost, "/a2a/Birch/message:send", nil).WithContext(auth.WithAdmission(context.Background(), guest))
+
+	served, err := srv.a2aServed(r, "Birch")
+	require.NoError(t, err)
+	assert.True(t, served, "a name was served only to who acts in a namespace by that name")
+
+	served, err = srv.a2aServed(r, "Rowan")
+	require.NoError(t, err)
+	assert.False(t, served, "a name nobody holds was served")
+
+	served, err = srv.a2aServed(r, auth.NamespaceDefault)
+	require.NoError(t, err)
+	assert.False(t, served, "a namespace the caller does not act in was served")
+}
+
 // toJSON is v as its JSON, to look for words in.
 func toJSON(t *testing.T, v any) string {
 	t.Helper()

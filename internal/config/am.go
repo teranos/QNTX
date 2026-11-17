@@ -327,8 +327,8 @@ type WordsConfig struct {
 	All   bool     `mapstructure:"all"`   // By all on the READ line: everyone's rows, not only the reader's own.
 }
 
-// ReachConfig is one REACH line ROOT says in am.toml, read as the store's are:
-// REACH is '/a2a/' of GROUND. It stands while listed.
+// 「[Opus 5.5] ReachConfig is one REACH line ROOT says in am.toml, read as the store's are:」
+// 「[Opus 5.5] REACH is '/a2a/' of GROUND. It stands while listed.」
 type ReachConfig struct {
 	Paths []string `mapstructure:"paths"` // What the line is about: paths, as the tablet and the store's lines name them.
 	To    []string `mapstructure:"to"`    // The roles that reach them.
