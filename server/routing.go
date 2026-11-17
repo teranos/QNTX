@@ -42,10 +42,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// The A2A agent card, where an agent that has never seen the node looks.
 	s.answer(agentCardPath, s.HandleAgentCard)
 
-	// A2A, each version a2aSpoken holds at its base and over gRPC at its
-	// service's path (§10), on the same port: gRPC is HTTP/2 at that path. The
-	// card names JSON-RPC at a base itself, so it is answered there and not
-	// redirected to base/, which a client that does not follow it never reads.
+	// 「[Opus 5.5] A2A, each version a2aSpoken holds at its base and over gRPC at its」
+	// 「[Opus 5.5] service's path (§10), on the same port: gRPC is HTTP/2 at that path. The」
+	// 「[Opus 5.5] card names JSON-RPC at a base itself, so it is answered there and not」
+	// 「[Opus 5.5] redirected to base/, which a client that does not follow it never reads.」
 	a2aServed := s.a2aHTTP()
 	s.a2aOwn = a2aServed
 	for _, v := range a2aSpoken {
