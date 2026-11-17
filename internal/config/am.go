@@ -411,13 +411,13 @@ type SqliteConfig struct {
 // default chain resolves them.
 type ParquetConfig struct {
 	Location string `mapstructure:"location"`
-	// Namespaces this node serves because ROOT says so here: each one it does
-	// not hold is created at start, owned by the first of auth.root_identities,
-	// and given the storage named. One it holds is left as it stands.
+	// 「[Opus 5.5] Namespaces this node serves because ROOT says so here: each one it does」
+	// 「[Opus 5.5] not hold is created at start, owned by the first of auth.root_identities,」
+	// 「[Opus 5.5] and given the storage named. One it holds is left as it stands.」
 	Namespaces []NamespaceConfig `mapstructure:"namespaces"`
 }
 
-// NamespaceConfig is one namespace storage.parquet.namespaces names.
+// 「[Opus 5.5] NamespaceConfig is one namespace storage.parquet.namespaces names.」
 type NamespaceConfig struct {
 	Name   string `mapstructure:"name"`   // As it is created.
 	Record string `mapstructure:"record"` // Its storage: parquet or sqlite.
