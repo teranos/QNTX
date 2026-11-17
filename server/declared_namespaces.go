@@ -12,18 +12,18 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// A fresh node has nobody signed in as ROOT to create a namespace with, and
-// its guests' grants (auth.grants) act in one. So am.toml, which is ROOT's
-// word, names the namespaces the node serves, the way it names the grants.
+// 「[Opus 5.5] A fresh node has nobody signed in as ROOT to create a namespace with, and」
+// 「[Opus 5.5] its guests' grants (auth.grants) act in one. So am.toml, which is ROOT's」
+// 「[Opus 5.5] word, names the namespaces the node serves, the way it names the grants.」
 
-// declaredNamespace is one namespace storage.parquet.namespaces names, read.
+// 「[Opus 5.5] declaredNamespace is one namespace storage.parquet.namespaces names, read.」
 type declaredNamespace struct {
 	name   string
 	record storage.RecordKind
 }
 
-// declaredNamespacesOf reads storage.parquet.namespaces, refusing the whole
-// list when any line does not hold.
+// 「[Opus 5.5] declaredNamespacesOf reads storage.parquet.namespaces, refusing the whole」
+// 「[Opus 5.5] list when any line does not hold.」
 func declaredNamespacesOf(cfg *appcfg.Config) ([]declaredNamespace, error) {
 	listed := cfg.Storage.Parquet.Namespaces
 	declared := make([]declaredNamespace, 0, len(listed))
@@ -47,11 +47,11 @@ func declaredNamespacesOf(cfg *appcfg.Config) ([]declaredNamespace, error) {
 	return declared, nil
 }
 
-// serveDeclaredNamespaces creates each namespace am.toml names that the node
-// does not hold, owned by the first of auth.root_identities and given its
-// storage, as POST /api/namespaces and /store would. One the node holds is left
-// as it stands: switched off stays off, and storage is given once, so one that
-// has some keeps it. Nothing here ends a namespace.
+// 「[Opus 5.5] serveDeclaredNamespaces creates each namespace am.toml names that the node」
+// 「[Opus 5.5] does not hold, owned by the first of auth.root_identities and given its」
+// 「[Opus 5.5] storage, as POST /api/namespaces and /store would. One the node holds is left」
+// 「[Opus 5.5] as it stands: switched off stays off, and storage is given once, so one that」
+// 「[Opus 5.5] has some keeps it. Nothing here ends a namespace.」
 func (s *QNTXServer) serveDeclaredNamespaces(cfg *appcfg.Config) error {
 	declared, err := declaredNamespacesOf(cfg)
 	if err != nil || len(declared) == 0 {
@@ -72,8 +72,8 @@ func (s *QNTXServer) serveDeclaredNamespaces(cfg *appcfg.Config) error {
 	}
 	for _, want := range declared {
 		i := slices.IndexFunc(held, func(n storage.Namespace) bool { return slug.Of(n.Name) == slug.Of(want.name) })
-		// A namespace keeps the name it was created with, so one held is asked
-		// after by that name and not as am.toml happens to write it.
+		// 「[Opus 5.5] A namespace keeps the name it was created with, so one held is asked」
+		// 「[Opus 5.5] after by that name and not as am.toml happens to write it.」
 		name := want.name
 		if i >= 0 {
 			name = held[i].Name
