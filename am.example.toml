@@ -256,6 +256,23 @@ enabled = false
 # Unset, it is this machine's loopback origin; it is never read off a request.
 # public_origin = "https://api.qntx.example.com"
 
+# Keys admitted while listed, each ATTESTOR in the namespaces its line names,
+# signing as itself and speaking for the first of root_identities. Striking a
+# line ends its grant. The roles a line names are held by its label in each of
+# those namespaces, as a grant line ROOT wrote in the store would be (ADR-034).
+# grants = [
+#   { label = "guest1", did = "did:key:z6MkExampleExampleExampleExampleExampleExample", namespaces = ["fleetingmem"], roles = ["GROUND"] },
+# ]
+
+# What a role may write and read, as WRITE and READ lines ROOT wrote in the
+# store would say (ADR-034). Read out loud, the line below is: WRITE is * of
+# GROUND. A line ROOT writes in the store later outranks one listed here, and
+# striking a line here takes it away.
+# words = [
+#   { write = ["*"], of = ["GROUND"] },
+#   { read = ["visit:done"], of = ["COORDINATOR"], all = true },
+# ]
+
 # ── Front doors (ADR-032) ───────────────────────────────────────
 #
 # A front door is a domain serving a UI against this node, and the namespace
