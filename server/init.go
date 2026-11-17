@@ -278,7 +278,7 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		} else {
 			serverLogger.Infow("auth.grants reloaded", "grants", len(newCfg.Auth.Grants), "words", len(newCfg.Auth.Words))
 		}
-		// A namespace am.toml names since the node started is created now.
+		// 「[Opus 5.5] A namespace am.toml names since the node started is created now.」
 		if err := server.serveDeclaredNamespaces(newCfg); err != nil {
 			serverLogger.Errorw("storage.parquet.namespaces not served", "error", err)
 		}
