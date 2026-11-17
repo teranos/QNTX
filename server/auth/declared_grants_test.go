@@ -36,14 +36,14 @@ func declaringNode(t *testing.T) (h *Handler, store *memTokenStore, key ed25519.
 }
 
 // A key auth.grants lists is admitted on its signature: ATTESTOR in the
-// namespaces its line names, and acting as itself, so what it writes is
-// signed by its own key.
+// namespaces its line names, acting as itself, so what it writes is signed by
+// its own key, and speaking for whoever am.toml is ROOT's.
 func TestAKeyAmTomlListsIsAdmittedOnItsSignature(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	admitted, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
 	require.True(t, ok, "a signature by a key auth.grants lists was not admitted")
 	assert.Equal(t, did, admitted.ActsAs())
-	assert.Equal(t, did, admitted.Identity)
+	assert.Equal(t, mastodonAccount, admitted.Identity)
 	assert.Equal(t, string(LevelAttestor), admitted.LevelName())
 	assert.Equal(t, []string{"fleetingmem"}, admitted.Namespaces)
 	assert.True(t, admitted.MayActIn("fleetingmem"))
@@ -113,4 +113,21 @@ func TestALabelAmTomlListsIsMintedUnderByNobody(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mint(h, rec, mintRequest(`{"expires_at":"never","label":"guest1","level":"ATTESTOR","namespaces":["fleetingmem"]}`, ""))
 	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+}
+
+// A guest speaks for whoever am.toml is ROOT's: struck out, its guests are
+// refused with it.
+func TestAGuestIsRefusedOnceRootIsStruckOut(t *testing.T) {
+	h, _, key, did := declaringNode(t)
+	h.SetIdentities(nil, nil)
+	_, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
+	assert.False(t, ok, "a guest was admitted with nobody left in auth.root_identities")
+}
+
+// A list of grants with nobody in auth.root_identities is refused: there is
+// nobody for them to speak for.
+func TestAuthGrantsWithNoRootIsRefused(t *testing.T) {
+	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: newMemTokenStore(), logger: testLogger()}
+	_, did := guest(t)
+	assert.Error(t, h.SetGrants([]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}}}))
 }

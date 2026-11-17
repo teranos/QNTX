@@ -33,12 +33,18 @@ type DeclaredGrant struct {
 // does not hold leaves the grants held before as they were.
 //
 // A grant is ATTESTOR in its namespaces, as a key that signs for its person
-// is, and speaks for that key: what it writes is signed by the key itself,
-// and what it may write is what the lines of roles its label holds say.
+// is. What it writes is signed by the key itself, and what it may write is
+// what the lines of roles its label holds say. It speaks for whoever am.toml
+// is ROOT's, as the Node Agent does: a token speaks for whoever minted it,
+// and striking them out of am.toml reaches it too.
 func (h *Handler) SetGrants(listed []DeclaredGrant) error {
 	minted, err := h.mintedLabelsAndDIDs()
 	if err != nil {
 		return err
+	}
+	roots := h.identities.roots()
+	if len(listed) > 0 && len(roots) == 0 {
+		return errors.New("auth.root_identities names nobody, so there is nobody for auth.grants to speak for")
 	}
 	held := make(map[string]TokenInfo, len(listed))
 	labels := map[string]bool{}
@@ -83,13 +89,19 @@ func (h *Handler) SetGrants(listed []DeclaredGrant) error {
 			acts = append(acts, namespace)
 		}
 		labels[label] = true
+		grant, err := h.agentGrant(Grant{DID: did, Label: label, MintedBy: roots[0], Level: LevelAttestor, Namespaces: acts})
+		if err != nil {
+			return err
+		}
 		held[did] = TokenInfo{
-			ID:         declaredID(label),
-			Label:      label,
-			DID:        did,
-			MintedBy:   did,
-			Level:      LevelAttestor,
-			Namespaces: acts,
+			ID:                  declaredID(label),
+			Label:               grant.Label,
+			DID:                 grant.DID,
+			MintedBy:            grant.MintedBy,
+			MintedByUser:        grant.MintedByUser,
+			MintedByDisplayName: grant.MintedByDisplayName,
+			Level:               grant.Level,
+			Namespaces:          grant.Namespaces,
 		}
 	}
 	h.declared.Store(&held)
