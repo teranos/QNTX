@@ -14,7 +14,7 @@ Unix-like hosts only — see [ADR-029](adr/ADR-029-Windows.md).
   ```
   For deployments that want the tip of a branch (e.g. a staging host tracking `main`) without waiting for a tag.
 - macOS CLI tarballs on tagged releases: `qntx-{version}-darwin-arm64.tar.gz`, built on a `macos-14` runner. QNTX-App consumes these.
-- The browser WASM, `ats-wasm-<version>.tgz` and `laye-p2p-<version>.tgz`, which [QNTX-Web](https://github.com/teranos/QNTX-Web) depends on by this tag. The web bundle itself is built by QNTX-Web's `deploy-web.yml`, called by whoever is deploying it.
+- 「[Opus 5.5] The browser WASM, `ats-wasm-<version>.tgz`, which [QNTX-Web](https://github.com/teranos/QNTX-Web) depends on by this tag. laye-p2p is laye's: [Ground-Institute/laye](https://github.com/Ground-Institute/laye) releases it. The web bundle itself is built by QNTX-Web's `deploy-web.yml`, called by whoever is deploying it.」
 
 Branch and tag tarballs have the same shape. Linux only, because Linux is what gets deployed.
 

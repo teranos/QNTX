@@ -138,7 +138,7 @@ in
         }
 
         {
-          name = "Pack ats-wasm and laye-p2p";
+          name = "Pack ats-wasm";
           run = "make wasm-tarballs";
         }
 

@@ -51,8 +51,14 @@ fn duckdb_does_what_the_trait_says_except_where_adr_024_leaves_it_open() {
     );
     let seen: BTreeSet<(&str, &str)> = found.iter().map(|v| (v.case.as_str(), v.step)).collect();
     let known: BTreeSet<(&str, &str)> = KNOWN.into_iter().collect();
-    let new: Vec<_> = found.iter().filter(|v| !known.contains(&(v.case.as_str(), v.step))).collect();
+    let new: Vec<_> = found
+        .iter()
+        .filter(|v| !known.contains(&(v.case.as_str(), v.step)))
+        .collect();
     let fixed: Vec<_> = known.difference(&seen).collect();
     assert!(new.is_empty(), "violations not in KNOWN: {new:#?}");
-    assert!(fixed.is_empty(), "no longer happen, remove from KNOWN: {fixed:#?}");
+    assert!(
+        fixed.is_empty(),
+        "no longer happen, remove from KNOWN: {fixed:#?}"
+    );
 }

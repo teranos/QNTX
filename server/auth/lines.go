@@ -72,7 +72,7 @@ func (h *Handler) handleLines(w http.ResponseWriter, r *http.Request) {
 	h.countLines(asked.GetID(), "served")
 }
 
-// countLines counts one answer to an asker by the name nodes.peers gives it.
+// 「[Opus 5.5] countLines counts one answer to an asker by the name nodes.peers gives it.」
 func (h *Handler) countLines(did, outcome string) {
 	peer := "undeclared"
 	if node, declared := h.nodes[did]; declared {
