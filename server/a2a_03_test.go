@@ -26,9 +26,9 @@ import (
 
 // "WHY CANT WE MAKE IT NOT MATTER"
 //
-// The node speaks what the a2a-go it pins speaks, 0.3 and 1.0, each where
-// a2aSpoken mounts it, and a caller is answered in the version of where it
-// arrived, whichever it names or none.
+// 「[Opus 5.5] The node speaks what the a2a-go it pins speaks, 0.3 and 1.0, each where」
+// 「[Opus 5.5] a2aSpoken mounts it, and a caller is answered in the version of where it」
+// 「[Opus 5.5] arrived, whichever it names or none.」
 
 // A client speaking only 0.3, by a2a-go's own compat, finds the node by its
 // card and is answered over HTTP+JSON and JSON-RPC alike.
@@ -61,7 +61,7 @@ func TestAClientSpeaking03IsAnswered(t *testing.T) {
 }
 
 // "Clients that only speak 0.3 get sent to the 1.0 endpoint" (Qodo on #1745):
-// the public card's 0.3 keys name where 0.3 is answered.
+// 「[Opus 5.5] the public card's 0.3 keys name where 0.3 is answered.」
 func TestThePublicCardSendsA03ClientTo03(t *testing.T) {
 	srv, _, _ := nodeAgentOverA2A(t, "")
 	w := httptest.NewRecorder()
@@ -93,8 +93,8 @@ func TestTheExtendedCardIn03IsSignedAsServed(t *testing.T) {
 	assert.True(t, strings.HasSuffix(card.URL, "/a2a/0.3"), card.URL)
 }
 
-// Where a request arrives is the version it is answered in, whichever version
-// it names: GetTask is 1.0's method, which 0.3's JSON-RPC has none of.
+// 「[Opus 5.5] Where a request arrives is the version it is answered in, whichever version」
+// 「[Opus 5.5] it names: GetTask is 1.0's method, which 0.3's JSON-RPC has none of.」
 func TestThePathDecidesTheVersionItsCallerNamesOrNot(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	asked := func(path, named string) int {
@@ -118,8 +118,8 @@ func TestThePathDecidesTheVersionItsCallerNamesOrNot(t *testing.T) {
 	assert.NotEqual(t, -32601, asked("/a2a", "0.3"), "1.0 at its base has GetTask, whatever the caller names")
 }
 
-// A client speaking only 0.3 over gRPC, by a2a-go's a2agrpc/v0, is answered at
-// 0.3's service path, naming no version.
+// 「[Fable 5.2] A client speaking only 0.3 over gRPC, by a2a-go's a2agrpc/v0, is answered at」
+// 「[Fable 5.2] 0.3's service path, naming no version.」
 func TestAClientSpeaking03IsAnsweredOverGRPC(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	node := httptest.NewUnstartedServer(srv.served)
@@ -145,11 +145,11 @@ func TestAClientSpeaking03IsAnsweredOverGRPC(t *testing.T) {
 	assert.Equal(t, a2asdk.TaskStateCompleted, task.Status.State)
 }
 
-// The node serves what the a2a-go it pins serves: every binding the SDK ships a
-// server for, in the version that server speaks, is a binding of a2aSpoken, and
-// nothing else is; and a card says the node is reached at each of them. A pin
-// bringing a version or a binding the node does not serve fails here, and the
-// row that serves it is the whole change.
+// 「[Fable 5.2] The node serves what the a2a-go it pins serves: every binding the SDK ships a」
+// 「[Opus 5.5] server for, in the version that server speaks, is a binding of a2aSpoken, and」
+// 「[Opus 5.5] nothing else is; and a card says the node is reached at each of them. A pin」
+// 「[Opus 5.5] bringing a version or a binding the node does not serve fails here, and the」
+// 「[Opus 5.5] row that serves it is the whole change.」
 func TestTheNodeServesWhatThePinnedSDKServes(t *testing.T) {
 	served, err := parity.A2AServes()
 	require.NoError(t, err)
@@ -172,7 +172,7 @@ func TestTheNodeServesWhatThePinnedSDKServes(t *testing.T) {
 	assert.ElementsMatch(t, spoken, carded, "the node's card says it is reached at every binding it serves")
 }
 
-// Every path a version is mounted at is one the tablet of REACH names.
+// 「[Opus 5.5] Every path a version is mounted at is one the tablet of REACH names.」
 func TestEveryVersionIsMountedWhereReachNamesIt(t *testing.T) {
 	named := reach.Paths()
 	for _, v := range a2aSpoken {
