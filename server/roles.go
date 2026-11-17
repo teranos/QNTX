@@ -83,6 +83,8 @@ func (s *QNTXServer) runtime() reach.Runtime {
 	if s.authHandler != nil {
 		runtime.IsRoot = s.authHandler.IsRoot
 	}
+	// What am.toml says (auth.reach), beside whatever the store holds.
+	runtime.Lines = append(runtime.Lines, s.declaredReach...)
 	// A backend that keeps no system store keeps no lines: the tablet serves
 	// alone, and that is not an error to say.
 	if !s.held.KeepsSystem() {

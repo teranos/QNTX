@@ -278,9 +278,18 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		} else {
 			serverLogger.Infow("auth.grants reloaded", "grants", len(newCfg.Auth.Grants), "words", len(newCfg.Auth.Words))
 		}
-		// A namespace am.toml names since the node started is created now.
+		// 「[Opus 5.5] A namespace am.toml names since the node started is created now.」
 		if err := server.serveDeclaredNamespaces(newCfg); err != nil {
 			serverLogger.Errorw("storage.parquet.namespaces not served", "error", err)
+		}
+		// And auth.reach: a line struck takes its reach away now, and a list
+		// that does not read leaves what was served before.
+		if declared, err := declaredReach(newCfg); err != nil {
+			serverLogger.Errorw("auth.reach not reloaded, the reach served before stands", "error", err)
+		} else if err := server.setDeclaredReach(declared); err != nil {
+			serverLogger.Errorw("auth.reach reloaded and not served, what the node served before stands", "error", err)
+		} else {
+			serverLogger.Infow("auth.reach reloaded", "lines", len(declared))
 		}
 		return nil
 	})

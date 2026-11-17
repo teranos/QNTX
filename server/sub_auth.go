@@ -353,8 +353,16 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := authHandler.SetGrants(declaredGrants(s.deps.cfg), declaredWords(s.deps.cfg)); err != nil {
 		return err
 	}
-	// And the namespaces they act in, which am.toml names as well.
+	// 「[Opus 5.5] And the namespaces they act in, which am.toml names as well.」
 	if err := s.serveDeclaredNamespaces(s.deps.cfg); err != nil {
+		return err
+	}
+	// And what the roles reach, which am.toml may say too (auth.reach).
+	declared, err := declaredReach(s.deps.cfg)
+	if err != nil {
+		return err
+	}
+	if err := s.setDeclaredReach(declared); err != nil {
 		return err
 	}
 	// The status row asks them for theirs, as the person asking (statusline/peers.go).
@@ -505,7 +513,7 @@ func declaredGrants(cfg *appcfg.Config) []auth.DeclaredGrant {
 	return declared
 }
 
-// declaredWords is auth.words, as the auth handler holds it.
+// 「[Opus 5.5] declaredWords is auth.words, as the auth handler holds it.」
 func declaredWords(cfg *appcfg.Config) []auth.DeclaredWords {
 	declared := make([]auth.DeclaredWords, 0, len(cfg.Auth.Words))
 	for _, line := range cfg.Auth.Words {
