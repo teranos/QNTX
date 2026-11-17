@@ -134,7 +134,7 @@ func (h *Handler) declaresLabel(label string) bool {
 
 // 「[Opus 5.5] mintedLabelsAndDIDs is every label and key a token minted here holds,」
 // 「[Opus 5.5] revoked ones among them: revocation is a switch, and a switched-off token」
-// 「[Opus 5.5] comes back.」
+// 「[Fable 5.1] comes back.」
 func (h *Handler) mintedLabelsAndDIDs() (map[string]bool, error) {
 	minted := map[string]bool{}
 	if h.tokens == nil {
