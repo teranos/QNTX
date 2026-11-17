@@ -349,7 +349,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			return err
 		}
 	}
-	// The keys am.toml admits while it lists them.
+	// 「[Opus 5.5] The keys am.toml admits while it lists them.」
 	if err := authHandler.SetGrants(declaredGrants(s.deps.cfg)); err != nil {
 		return err
 	}
@@ -492,7 +492,7 @@ func (s *QNTXServer) keepLastUsed(table *auth.TokenTable) {
 	})
 }
 
-// declaredGrants is auth.grants, as the auth handler holds it.
+// 「[Opus 5.5] declaredGrants is auth.grants, as the auth handler holds it.」
 func declaredGrants(cfg *appcfg.Config) []auth.DeclaredGrant {
 	declared := make([]auth.DeclaredGrant, 0, len(cfg.Auth.Grants))
 	for _, grant := range cfg.Auth.Grants {
