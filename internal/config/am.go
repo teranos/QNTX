@@ -300,7 +300,17 @@ type AuthConfig struct {
 	BindingSigners     []string              `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
 	PublicOrigin       string                `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Left out, this machine's loopback origin; it is never read off a request.
 	Provider           ProviderConfig        `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
+	Grants             []GrantConfig         `mapstructure:"grants"`               // Keys admitted while listed, each in the namespaces it names. Empty = none.
 	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the slug of the namespace behind each — the name lowercased, because a TOML key arrives lowercase and a namespace keeps the name it was created with. A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
+}
+
+// GrantConfig is one key auth.grants admits, as nodes.peers names a peer: its
+// did:key and the namespaces it acts in. It is a live grant while its line
+// stands, and striking the line ends it.
+type GrantConfig struct {
+	Label      string   `mapstructure:"label"`      // What it is called here: the label roles are granted to.
+	DID        string   `mapstructure:"did"`        // Its did:key, which it signs as.
+	Namespaces []string `mapstructure:"namespaces"` // Where it acts.
 }
 
 // DoorConfig is one front door: a domain people arrive at, and the namespace
