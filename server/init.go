@@ -271,8 +271,8 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		if err := setDoors(server.authHandler, newCfg, serverLogger); err != nil {
 			serverLogger.Errorw("Front doors not reloaded, the ones already open are unchanged", "error", err)
 		}
-		// And so auth.grants: a line struck ends that key's grant now, and a
-		// list that does not hold leaves the grants held before.
+		// 「[Opus 5.5] And so auth.grants: a line struck ends that key's grant now, and a」
+		// 「[Opus 5.5] list that does not hold leaves the grants held before.」
 		if err := server.authHandler.SetGrants(declaredGrants(newCfg)); err != nil {
 			serverLogger.Errorw("auth.grants not reloaded, the grants held before stand", "error", err)
 		} else {
