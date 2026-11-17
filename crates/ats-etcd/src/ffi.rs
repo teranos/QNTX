@@ -10,7 +10,6 @@ use std::ptr;
 
 use ats::storage::{AttestationStore, StoreError};
 use qntx_ffi_common::{cstr_to_str, free_boxed, free_cstring, FfiResult};
-use qntx_proto::proto_convert;
 
 use crate::error::EtcdError;
 use crate::{EtcdKeys, EtcdStore};
@@ -74,9 +73,12 @@ impl Crosses for serde_json::Error {
 /// 「[Opus 5.5] trait's own variants are built into one.」」
 impl Crosses for StoreError {
     fn crosses(self, call: &str) -> String {
+        // 「[Opus 5.5] A Backend error was made inside the crate with no call; it names
+        // the one it leaves through here (CodeRabbit on #1765).」
         if let StoreError::Backend(json) = &self {
-            if serde_json::from_str::<sacred_error::Error>(json).is_ok() {
-                return json.clone();
+            if let Ok(mut sacred) = serde_json::from_str::<sacred_error::Error>(json) {
+                sacred.ffi_call = Some(call.to_string());
+                return serde_json::to_string(&sacred).unwrap_or_else(|_| json.clone());
             }
         }
         EtcdError::Store(self).sacred_json(Some(call))
@@ -144,21 +146,35 @@ pub extern "C" fn etcd_storage_put(
     qntx_ffi_common::guarded_result("etcd_storage_put", || {
         const CALL: &str = "etcd_storage_put";
         if store.is_null() {
-            return StorageResultC::error("null store pointer");
+            return StorageResultC::error(
+                EtcdError::NullPointer {
+                    call: CALL,
+                    argument: "store",
+                }
+                .crosses(CALL),
+            );
         }
         let json = match unsafe { argument(CALL, "attestation_json", attestation_json) } {
             Ok(s) => s,
             Err(e) => return StorageResultC::error(e.crosses(CALL)),
         };
         if json.len() > MAX_JSON_LENGTH {
-            return StorageResultC::error("attestation JSON exceeds maximum length");
+            return StorageResultC::error(
+                EtcdError::TooLong {
+                    call: CALL,
+                    argument: "attestation_json",
+                    length: json.len(),
+                    most: MAX_JSON_LENGTH,
+                }
+                .crosses(CALL),
+            );
         }
-        let proto: qntx_proto::Attestation = match serde_json::from_str(json) {
+        let attestation = match crate::attestation_of_node_json(json) {
             Ok(a) => a,
             Err(e) => return StorageResultC::error(e.crosses(CALL)),
         };
         let store = unsafe { &mut *store };
-        match store.put(proto_convert::from_proto(proto)) {
+        match store.put(attestation) {
             Ok(()) => StorageResultC {
                 success: true,
                 error_msg: ptr::null_mut(),
@@ -248,7 +264,13 @@ pub extern "C" fn etcd_keys_set(keys: *mut EtcdKeys, whole_json: *const c_char) 
     qntx_ffi_common::guarded_result("etcd_keys_set", || {
         const CALL: &str = "etcd_keys_set";
         if keys.is_null() {
-            return StorageResultC::error("null keys pointer");
+            return StorageResultC::error(
+                EtcdError::NullPointer {
+                    call: CALL,
+                    argument: "keys",
+                }
+                .crosses(CALL),
+            );
         }
         let json = match unsafe { argument(CALL, "whole_json", whole_json) } {
             Ok(s) => s,
@@ -280,7 +302,13 @@ pub extern "C" fn etcd_keys_held(keys: *mut EtcdKeys) -> HeldResultC {
     qntx_ffi_common::guarded_result("etcd_keys_held", || {
         const CALL: &str = "etcd_keys_held";
         if keys.is_null() {
-            return HeldResultC::error("null keys pointer");
+            return HeldResultC::error(
+                EtcdError::NullPointer {
+                    call: CALL,
+                    argument: "keys",
+                }
+                .crosses(CALL),
+            );
         }
         let keys = unsafe { &*keys };
         let held = match keys.held() {
@@ -342,3 +370,75 @@ pub extern "C" fn etcd_storage_result_free(result: StorageResultC) {
 }
 
 qntx_ffi_common::define_version_fn!(etcd_storage_version);
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+mod tests {
+    use super::*;
+    use std::ffi::CStr;
+
+    fn sacred_of(msg: *mut c_char) -> sacred_error::Error {
+        let text = unsafe { CStr::from_ptr(msg) }.to_str().unwrap();
+        serde_json::from_str(text).unwrap_or_else(|e| panic!("{text:?} is not a sacred error: {e}"))
+    }
+
+    /// 「[Opus 5.5] An error etcd gave names the call it left through: Backend carried it
+    /// serialized with no call, and it crossed so (CodeRabbit on #1765).」
+    #[test]
+    fn a_backend_error_names_the_call_it_left_through() {
+        let backend = StoreError::Backend(
+            EtcdError::BadNamespace {
+                value: "Clean".to_string(),
+            }
+            .sacred_json(None),
+        );
+        let crossed: sacred_error::Error =
+            serde_json::from_str(&backend.crosses("etcd_storage_put")).unwrap();
+        assert_eq!(crossed.ffi_call.as_deref(), Some("etcd_storage_put"));
+    }
+
+    /// 「[Opus 5.5] A null store is a sacred error naming its call, not a sentence
+    /// (CodeRabbit on #1765).」
+    #[test]
+    fn a_null_store_is_said_as_a_sacred_error() {
+        let result = etcd_storage_put(ptr::null_mut(), c"{}".as_ptr());
+        assert!(!result.success);
+        let said = sacred_of(result.error_msg);
+        assert_eq!(said.ffi_call.as_deref(), Some("etcd_storage_put"));
+        etcd_storage_result_free(result);
+    }
+
+    /// 「[Opus 5.5] Null keys are a sacred error naming their call, as a null store is.」
+    #[test]
+    fn null_keys_are_said_as_a_sacred_error() {
+        let set = etcd_keys_set(ptr::null_mut(), c"{}".as_ptr());
+        assert!(!set.success);
+        assert_eq!(
+            sacred_of(set.error_msg).ffi_call.as_deref(),
+            Some("etcd_keys_set")
+        );
+        etcd_storage_result_free(set);
+        let held = etcd_keys_held(ptr::null_mut());
+        assert!(!held.success);
+        assert_eq!(
+            sacred_of(held.error_msg).ffi_call.as_deref(),
+            Some("etcd_keys_held")
+        );
+        etcd_held_result_free(held);
+    }
+
+    /// 「[Opus 5.5] JSON past its length is a sacred error naming its call, not a sentence
+    /// (CodeRabbit on #1765). Run under scripts/with-etcd.sh: the store is a real one.」
+    #[test]
+    fn json_past_its_length_is_said_as_a_sacred_error() {
+        let endpoint = std::env::var("QNTX_ETCD_ENDPOINT")
+            .expect("QNTX_ETCD_ENDPOINT names no etcd; run under scripts/with-etcd.sh");
+        let mut store = EtcdStore::open(&endpoint, "ffi_length").unwrap();
+        let long = std::ffi::CString::new("x".repeat(MAX_JSON_LENGTH + 1)).unwrap();
+        let result = etcd_storage_put(&mut store, long.as_ptr());
+        assert!(!result.success);
+        let said = sacred_of(result.error_msg);
+        assert_eq!(said.ffi_call.as_deref(), Some("etcd_storage_put"));
+        etcd_storage_result_free(result);
+    }
+}

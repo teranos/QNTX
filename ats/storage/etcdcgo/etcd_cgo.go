@@ -4,8 +4,9 @@
 // 「[Opus 5.5] etcd window, through the Rust ats-etcd crate. Peer of postgrescgo.」
 //
 // 「[Opus 5.5] Build requirements:」
-//   「[Opus 5.5] - cargo build --release -p ats-etcd --features ffi --lib」
-//   「[Opus 5.5] - CGO enabled, and the `rustetcd` build tag」」
+//
+//	「[Opus 5.5] - cargo build --release -p ats-etcd --features ffi --lib」
+//	「[Opus 5.5] - CGO enabled, and the `rustetcd` build tag」」
 package etcdcgo
 
 /*
@@ -119,19 +120,71 @@ func (s *Store) Put(as *types.As) error {
 
 // 「[Opus 5.5] Window is the observer: each attestation its namespace creates
 // 「[Opus 5.5] is put into etcd, and each one etcd does not take is handed to failed.」」
+//
+// 「[Opus 5.5] One worker puts, in the order created. What waits for it is a queue of
+// WindowQueue: each attestation was a goroutine held on the store's lock while
+// etcd did not answer, as many as were written (CodeRabbit on #1765). Past the
+// queue an attestation is handed to failed at once, and QNTX still holds it.」
 type Window struct {
-	store  *Store
-	failed func(error)
+	store   putter
+	failed  func(error)
+	queue   chan *types.As
+	stopped chan struct{}
+	once    sync.Once
 }
+
+// 「[Opus 5.5] putter is what the window puts into: the Store, or what a test holds.」
+type putter interface {
+	Put(as *types.As) error
+	Close()
+}
+
+// 「[Opus 5.5] WindowQueue is how many attestations wait for etcd before the next is
+// handed to failed: about a second of a node writing hard.」
+const WindowQueue = 1024
 
 var _ storage.AttestationObserver = (*Window)(nil)
 
 func NewWindow(store *Store, failed func(error)) *Window {
-	return &Window{store: store, failed: failed}
+	return NewWindowOver(store, WindowQueue, failed)
+}
+
+// 「[Opus 5.5] NewWindowOver is a window over any putter, with a queue of queue.」
+func NewWindowOver(store putter, queue int, failed func(error)) *Window {
+	w := &Window{store: store, failed: failed, queue: make(chan *types.As, queue), stopped: make(chan struct{})}
+	go w.work()
+	return w
+}
+
+func (w *Window) work() {
+	defer close(w.stopped)
+	for as := range w.queue {
+		if err := w.store.Put(as); err != nil {
+			w.failed(err)
+		}
+	}
 }
 
 func (w *Window) OnAttestationCreated(as *types.As) {
-	if err := w.store.Put(as); err != nil {
-		w.failed(err)
+	defer func() {
+		// 「[Opus 5.5] A window closed while its namespace still wrote: said, not a panic.」
+		if recover() != nil {
+			w.failed(errors.Newf("the etcd window is closed: %s is not put", as.ID))
+		}
+	}()
+	select {
+	case w.queue <- as:
+	default:
+		w.failed(errors.Newf("%d attestations wait for etcd already: %s is not put into the window", cap(w.queue), as.ID))
 	}
+}
+
+// 「[Opus 5.5] Close puts what waits, stops the worker and closes the store. Safe to
+// call more than once.」
+func (w *Window) Close() {
+	w.once.Do(func() {
+		close(w.queue)
+		<-w.stopped
+		w.store.Close()
+	})
 }
