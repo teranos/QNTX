@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// "The node would hold these as live grants while they're listed."
+// "「[Opus 5.5] The node would hold these as live grants while they're listed.」"
 // "Their rows land in fleetingmem, signed by their own key."
 
-// guest is a key that never left its holder, and its did:key.
+// 「[Opus 5.5] guest is a key that never left its holder, and its did:key.」
 func guest(t *testing.T) (ed25519.PrivateKey, string) {
 	t.Helper()
 	_, key, err := ed25519.GenerateKey(rand.Reader)
@@ -23,7 +23,7 @@ func guest(t *testing.T) (ed25519.PrivateKey, string) {
 	return key, EncodeDIDKey(key.Public().(ed25519.PublicKey))
 }
 
-// declaringNode is a node whose am.toml lists guest1 acting in fleetingmem.
+// 「[Opus 5.5] declaringNode is a node whose am.toml lists guest1 acting in fleetingmem.」
 func declaringNode(t *testing.T) (h *Handler, store *memTokenStore, key ed25519.PrivateKey, did string) {
 	t.Helper()
 	store = newMemTokenStore()
@@ -35,9 +35,9 @@ func declaringNode(t *testing.T) (h *Handler, store *memTokenStore, key ed25519.
 	return h, store, key, did
 }
 
-// A key auth.grants lists is admitted on its signature: ATTESTOR in the
-// namespaces its line names, acting as itself, so what it writes is signed by
-// its own key, and speaking for whoever am.toml is ROOT's.
+// 「[Opus 5.5] A key auth.grants lists is admitted on its signature: ATTESTOR in the」
+// 「[Opus 5.5] namespaces its line names, acting as itself, so what it writes is signed by」
+// 「[Opus 5.5] its own key, and speaking for whoever am.toml is ROOT's.」
 func TestAKeyAmTomlListsIsAdmittedOnItsSignature(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	admitted, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
@@ -52,8 +52,8 @@ func TestAKeyAmTomlListsIsAdmittedOnItsSignature(t *testing.T) {
 	assert.Equal(t, "guest1", admitted.Grant.Label)
 }
 
-// A line struck from auth.grants ends that key's grant: the next signature
-// is refused, and the keys still listed are admitted as before.
+// 「[Opus 5.5] A line struck from auth.grants ends that key's grant: the next signature」
+// 「[Opus 5.5] is refused, and the keys still listed are admitted as before.」
 func TestALineStruckFromAmTomlEndsItsGrant(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	otherKey, otherDID := guest(t)
@@ -65,8 +65,8 @@ func TestALineStruckFromAmTomlEndsItsGrant(t *testing.T) {
 	assert.True(t, ok, "a key still listed was refused")
 }
 
-// A grant held for a signature names nothing a bearer can present: what a
-// listed key is admitted on is its signature, and nothing reusable.
+// 「[Opus 5.5] A grant held for a signature names nothing a bearer can present: what a」
+// 「[Opus 5.5] listed key is admitted on is its signature, and nothing reusable.」
 func TestAKeyAmTomlListsIsAdmittedOnlyOnASignature(t *testing.T) {
 	h, _, _, did := declaringNode(t)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -75,8 +75,8 @@ func TestAKeyAmTomlListsIsAdmittedOnlyOnASignature(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// A list that does not hold is refused whole, naming why, and the grants
-// held before stand.
+// 「[Opus 5.5] A list that does not hold is refused whole, naming why, and the grants」
+// 「[Opus 5.5] held before stand.」
 func TestAnAuthGrantsListThatDoesNotHoldLeavesTheGrantsBefore(t *testing.T) {
 	h, store, key, did := declaringNode(t)
 	_, otherDID := guest(t)
@@ -106,8 +106,8 @@ func TestAnAuthGrantsListThatDoesNotHoldLeavesTheGrantsBefore(t *testing.T) {
 	}
 }
 
-// A label auth.grants lists is no label a token can be minted under: the
-// roles a label holds are granted to it, and two holders would share them.
+// 「[Opus 5.5] A label auth.grants lists is no label a token can be minted under: the」
+// 「[Opus 5.5] roles a label holds are granted to it, and two holders would share them.」
 func TestALabelAmTomlListsIsMintedUnderByNobody(t *testing.T) {
 	h, _, _, _ := declaringNode(t)
 	rec := httptest.NewRecorder()
@@ -115,8 +115,8 @@ func TestALabelAmTomlListsIsMintedUnderByNobody(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
 }
 
-// A guest speaks for whoever am.toml is ROOT's: struck out, its guests are
-// refused with it.
+// 「[Opus 5.5] A guest speaks for whoever am.toml is ROOT's: struck out, its guests are」
+// 「[Opus 5.5] refused with it.」
 func TestAGuestIsRefusedOnceRootIsStruckOut(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	h.SetIdentities(nil, nil)
@@ -124,8 +124,8 @@ func TestAGuestIsRefusedOnceRootIsStruckOut(t *testing.T) {
 	assert.False(t, ok, "a guest was admitted with nobody left in auth.root_identities")
 }
 
-// A list of grants with nobody in auth.root_identities is refused: there is
-// nobody for them to speak for.
+// 「[Opus 5.5] A list of grants with nobody in auth.root_identities is refused: there is」
+// 「[Opus 5.5] nobody for them to speak for.」
 func TestAuthGrantsWithNoRootIsRefused(t *testing.T) {
 	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: newMemTokenStore(), logger: testLogger()}
 	_, did := guest(t)
