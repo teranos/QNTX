@@ -349,6 +349,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 			return err
 		}
 	}
+	// The keys am.toml admits while it lists them.
+	if err := authHandler.SetGrants(declaredGrants(s.deps.cfg)); err != nil {
+		return err
+	}
 	// The status row asks them for theirs, as the person asking (statusline/peers.go).
 	s.askPeers = authHandler.AskPeers
 	// Every other door am.toml names. The node's own relying party is
@@ -486,4 +490,13 @@ func (s *QNTXServer) keepLastUsed(table *auth.TokenTable) {
 			}
 		}
 	})
+}
+
+// declaredGrants is auth.grants, as the auth handler holds it.
+func declaredGrants(cfg *appcfg.Config) []auth.DeclaredGrant {
+	declared := make([]auth.DeclaredGrant, 0, len(cfg.Auth.Grants))
+	for _, grant := range cfg.Auth.Grants {
+		declared = append(declared, auth.DeclaredGrant{Label: grant.Label, DID: grant.DID, Namespaces: grant.Namespaces})
+	}
+	return declared
 }
