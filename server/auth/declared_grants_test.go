@@ -116,7 +116,7 @@ func TestALabelAmTomlListsIsMintedUnderByNobody(t *testing.T) {
 }
 
 // 「[Opus 5.5] A guest speaks for whoever am.toml is ROOT's: struck out, its guests are」
-// 「[Opus 5.5] refused with it.」
+// 「[Fable 5.2] refused with it.」
 func TestAGuestIsRefusedOnceRootIsStruckOut(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	h.SetIdentities(nil, nil)
