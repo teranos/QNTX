@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// a2a.serves.json is what the a2a-go go.mod pins ships a server for: an SDK
-// that serves something else is make says to run.
+// 「[Fable 5.2] a2a.serves.json is what the a2a-go go.mod pins ships a server for: an SDK」
+// 「[Fable 5.2] that serves something else is make says to run.」
 func TestA2AServesIsWhatTheSDKServes(t *testing.T) {
 	module, err := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "github.com/a2aproject/a2a-go/v2").Output()
 	require.NoError(t, err)
