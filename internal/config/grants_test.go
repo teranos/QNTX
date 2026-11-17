@@ -36,8 +36,8 @@ enabled = true
 	assert.Empty(t, cfg.Auth.Grants)
 }
 
-// A grant's roles and auth.words read as ROOT's lines would be read out loud:
-// guest1 is GROUND of fleetingmem, and WRITE is * of GROUND.
+// 「[Opus 5.5] A grant's roles and auth.words read as ROOT's lines would be read out loud:」
+// 「[Opus 5.5] guest1 is GROUND of fleetingmem, and WRITE is * of GROUND.」
 func TestAuthGrantRolesAndWordsReadAsWritten(t *testing.T) {
 	cfg, err := LoadFromFile(writeConfig(t, `
 [auth]
