@@ -28,12 +28,12 @@ type DeclaredGrant struct {
 	Label      string
 	DID        string
 	Namespaces []string
-	// Roles its label holds in each namespace it acts in, as ROOT's grant line.
+	// 「[Opus 5.5] Roles its label holds in each namespace it acts in, as ROOT's grant line.」
 	Roles []string
 }
 
-// DeclaredWords is one WRITE or READ line auth.words lists: the words the
-// roles may write or read, ROOT's as a word line in the store is.
+// 「[Opus 5.5] DeclaredWords is one WRITE or READ line auth.words lists: the words the」
+// 「[Opus 5.5] roles may write or read, ROOT's as a word line in the store is.」
 type DeclaredWords struct {
 	Write []string
 	Read  []string
@@ -41,16 +41,16 @@ type DeclaredWords struct {
 	All   bool
 }
 
-// declaredLines is what auth.grants and auth.words say about roles, as the
-// lines the store would hold had ROOT written them: by namespace, lowercased,
-// and the word lines. Read beside the store's, and outranked by nothing but a
-// later line of ROOT's.
+// 「[Opus 5.5] declaredLines is what auth.grants and auth.words say about roles, as the」
+// 「[Opus 5.5] lines the store would hold had ROOT written them: by namespace, lowercased,」
+// 「[Opus 5.5] and the word lines. Read beside the store's, and outranked by nothing but a」
+// 「[Opus 5.5] later line of ROOT's.」
 type declaredLines struct {
 	byNamespace map[string][]RoleLine
 	words       []WordLine
 }
 
-// roleOf is a role as a line names it: one upper-case word.
+// 「[Opus 5.5] roleOf is a role as a line names it: one upper-case word.」
 func roleOf(written string) (string, bool) {
 	role := strings.ToUpper(strings.TrimSpace(written))
 	if role == "" || strings.ContainsAny(role, " \t\n") {
@@ -59,7 +59,7 @@ func roleOf(written string) (string, bool) {
 	return role, true
 }
 
-// rolesOf is the roles a line names, each once.
+// 「[Opus 5.5] rolesOf is the roles a line names, each once.」
 func rolesOf(field string, written []string) ([]string, error) {
 	roles := make([]string, 0, len(written))
 	for _, w := range written {
@@ -75,7 +75,7 @@ func rolesOf(field string, written []string) ([]string, error) {
 	return roles, nil
 }
 
-// wordsOf is the words a line names, each once and each a word.
+// 「[Opus 5.5] wordsOf is the words a line names, each once and each a word.」
 func wordsOf(field string, written []string) ([]string, error) {
 	words := make([]string, 0, len(written))
 	for _, w := range written {
@@ -94,7 +94,7 @@ func wordsOf(field string, written []string) ([]string, error) {
 	return words, nil
 }
 
-// declaredWordLines is auth.words as the word lines ROOT would have written.
+// 「[Opus 5.5] declaredWordLines is auth.words as the word lines ROOT would have written.」
 func declaredWordLines(listed []DeclaredWords, root string, at time.Time) ([]WordLine, error) {
 	var lines []WordLine
 	for i, said := range listed {
@@ -140,10 +140,10 @@ func declaredWordLines(listed []DeclaredWords, root string, at time.Time) ([]Wor
 // 「[Opus 5.5] is ROOT's, as the Node Agent does: a token speaks for whoever minted it,」
 // 「[Opus 5.5] and striking them out of am.toml reaches it too.」
 //
-// The roles a grant names and the lines auth.words lists are held beside them,
-// as lines by that same ROOT, said when am.toml was read: the store's lines are
-// read with them, and a line ROOT writes in the store later outranks them as
-// any later line of ROOT's does (ADR-034).
+// 「[Opus 5.5] The roles a grant names and the lines auth.words lists are held beside them,」
+// 「[Opus 5.5] as lines by that same ROOT, said when am.toml was read: the store's lines are」
+// 「[Opus 5.5] read with them, and a line ROOT writes in the store later outranks them as」
+// 「[Opus 5.5] any later line of ROOT's does (ADR-034).」
 func (h *Handler) SetGrants(listed []DeclaredGrant, words []DeclaredWords) error {
 	minted, err := h.mintedLabelsAndDIDs()
 	if err != nil {
@@ -239,7 +239,7 @@ func (h *Handler) SetGrants(listed []DeclaredGrant, words []DeclaredWords) error
 	return nil
 }
 
-// declaredRoleLines is the grant lines am.toml says in namespace.
+// 「[Opus 5.5] declaredRoleLines is the grant lines am.toml says in namespace.」
 func (h *Handler) declaredRoleLines(namespace string) []RoleLine {
 	lines := h.declaredRoles.Load()
 	if lines == nil {
@@ -248,7 +248,7 @@ func (h *Handler) declaredRoleLines(namespace string) []RoleLine {
 	return lines.byNamespace[strings.ToLower(namespace)]
 }
 
-// declaredWordsHeld is the word lines am.toml says.
+// 「[Opus 5.5] declaredWordsHeld is the word lines am.toml says.」
 func (h *Handler) declaredWordsHeld() []WordLine {
 	lines := h.declaredRoles.Load()
 	if lines == nil {
