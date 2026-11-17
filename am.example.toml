@@ -281,15 +281,15 @@ enabled = false
 #   「[Opus 5.5] { read = ["visit:done"], of = ["COORDINATOR"], all = true },」
 # 「[Opus 5.5] ]」
 
-# Which roles reach a path, as REACH lines ROOT wrote in the store would say
-# (ADR-039), for a node nobody signs in to as ROOT. Read out loud, the first
-# line below is: REACH is '/a2a/' of GROUND. A line ROOT writes in the store
-# about the same path and role outranks one listed here, and striking a line
-# here takes it away. Roles only: a level opens nothing here.
-# reach = [
-#   { paths = ["/a2a/"], to = ["GROUND"] },
-#   { paths = ["/am/statusline/{name}"], to = ["GROUND"] },
-# ]
+# 「[Opus 5.5] Which roles reach a path, as REACH lines ROOT wrote in the store would say」
+# 「[Opus 5.5] (ADR-039), for a node nobody signs in to as ROOT. Read out loud, the first」
+# 「[Opus 5.5] line below is: REACH is '/a2a/' of GROUND. A line ROOT writes in the store」
+# 「[Opus 5.5] about the same path and role outranks one listed here, and striking a line」
+# 「[Opus 5.5] here takes it away. Roles only: a level opens nothing here.」
+# 「[Opus 5.5] reach = [」
+#   「[Opus 5.5] { paths = ["/a2a/"], to = ["GROUND"] },」
+#   「[Opus 5.5] { paths = ["/am/statusline/{name}"], to = ["GROUND"] },」
+# 「[Opus 5.5] ]」
 
 # ── Front doors (ADR-032) ───────────────────────────────────────
 #
