@@ -365,7 +365,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := s.setDeclaredReach(declared); err != nil {
 		return err
 	}
-	// And how long what the agents say to each other waits here (collected.wait).
+	// 「[Opus 5.5] And how long what the agents say to each other waits here (collected.wait).」
 	if err := dialCollected(s.deps.cfg); err != nil {
 		return err
 	}
