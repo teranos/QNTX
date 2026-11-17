@@ -132,8 +132,8 @@ func TestAuthGrantsWithNoRootIsRefused(t *testing.T) {
 	assert.Error(t, h.SetGrants([]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}}}, nil))
 }
 
-// A guest with no role writes nothing: ATTESTOR holding [] may not write, as
-// f42d answered every row guest1's ground sent before auth.words.
+// 「[Opus 5.5] A guest with no role writes nothing: ATTESTOR holding [] may not write, as」
+// 「[Opus 5.5] f42d answered every row guest1's ground sent before auth.words.」
 func TestAGuestHoldingNoRoleMayNotWrite(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	admitted, ok := presentedSigned(h, signature(t, key, did, signedNodeOrigin, time.Minute))
@@ -142,9 +142,9 @@ func TestAGuestHoldingNoRoleMayNotWrite(t *testing.T) {
 	assert.False(t, admitted.MayWrite("SessionStart"))
 }
 
-// The roles a grant names and the words auth.words lists are ROOT's lines: a
-// guest holding GROUND in fleetingmem writes every predicate there, and acts in
-// nothing else for it.
+// 「[Opus 5.5] The roles a grant names and the words auth.words lists are ROOT's lines: a」
+// 「[Opus 5.5] guest holding GROUND in fleetingmem writes every predicate there, and acts in」
+// 「[Opus 5.5] nothing else for it.」
 func TestTheRolesAmTomlSaysLetAGuestWrite(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	require.NoError(t, h.SetGrants(
@@ -161,7 +161,7 @@ func TestTheRolesAmTomlSaysLetAGuestWrite(t *testing.T) {
 	assert.Empty(t, h.RolesOfToken("guest1", "default"))
 }
 
-// A role struck from am.toml is gone on the next read, as a grant is.
+// 「[Opus 5.5] A role struck from am.toml is gone on the next read, as a grant is.」
 func TestARoleStruckFromAmTomlIsGone(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	words := []DeclaredWords{{Write: []string{"*"}, Of: []string{"GROUND"}}}
@@ -176,8 +176,8 @@ func TestARoleStruckFromAmTomlIsGone(t *testing.T) {
 	assert.False(t, admitted.MayWrite("SessionStart"))
 }
 
-// An auth.words list that does not hold is refused whole, naming why, and the
-// lines held before stand.
+// 「[Opus 5.5] An auth.words list that does not hold is refused whole, naming why, and the」
+// 「[Opus 5.5] lines held before stand.」
 func TestAnAuthWordsListThatDoesNotHoldLeavesTheLinesBefore(t *testing.T) {
 	h, _, key, did := declaringNode(t)
 	grants := []DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}, Roles: []string{"GROUND"}}}
@@ -201,7 +201,7 @@ func TestAnAuthWordsListThatDoesNotHoldLeavesTheLinesBefore(t *testing.T) {
 	assert.Error(t, h.SetGrants([]DeclaredGrant{{Label: "guest1", DID: did, Namespaces: []string{"fleetingmem"}, Roles: []string{" "}}}, nil), "a blank role")
 }
 
-// auth.words with nobody in auth.root_identities is refused: nobody said it.
+// 「[Opus 5.5] auth.words with nobody in auth.root_identities is refused: nobody said it.」
 func TestAuthWordsWithNoRootIsRefused(t *testing.T) {
 	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: newMemTokenStore(), logger: testLogger()}
 	assert.Error(t, h.SetGrants(nil, []DeclaredWords{{Write: []string{"*"}, Of: []string{"GROUND"}}}))
