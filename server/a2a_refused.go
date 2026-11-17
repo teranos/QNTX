@@ -100,7 +100,7 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 		return
 	}
 
-	// The path a request arrived at, before its version's base was taken off.
+	// 「[Opus 5.5] The path a request arrived at, before its version's base was taken off.」
 	path := r.URL.Path
 	if exchange, held := a2aExchangeFrom(r.Context()); held && exchange.path != "" {
 		path = exchange.path
