@@ -24,9 +24,9 @@ In this repository:
 
 
 - [[ADR-041-mail-service]]
-- 「[Opus 5.5] [[ADR-046-a-plugin-stands-in-a-namespace]]」
+- [[ADR-046-a-plugin-stands-in-a-namespace]]
 
-#### 「[Opus 5.5] What waits on a person」
+#### What waits on a person
 
 - [[ADR-052-Approvals]]
 - [[ADR-060-What-Waits-On-A-Person-Is-A-Live-Activity]]
