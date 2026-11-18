@@ -6,7 +6,7 @@
 
 ## 1. Context
 
-QNTX has agents that can produce media assets, humans who speak into Rooms, screenshots captured by ROOT SHAKE, recordings, generated assets, and external media acquired through Asset Services.
+QNTX has agents that can produce **media assets**, humans who speak into Rooms, screenshots captured by [[31-root-shakes-an-element-agent-at-anthropic.feature]], recordings, generated assets, and external media acquired through Asset Services.
 
 These are currently treated primarily as attachments, files, or incidental outputs of an interaction.
 
