@@ -8,8 +8,6 @@
 
 QNTX has agents that can produce **media assets**, humans who speak into Rooms, screenshots captured by [[31-root-shakes-an-element-agent-at-anthropic.feature|ROOT SHAKE]], recordings, generated assets, and external media acquired through Asset Services.
 
-These are currently treated primarily as attachments, files, or incidental outputs of an interaction.
-
 An attachment belongs to a message. An asset does not have to.
 
 The same image may be referenced by several Rooms, quoted in documentation, indexed, and subsequently used to generate another image.
