@@ -93,7 +93,7 @@ The Room receives a message containing both the submitted text and the reference
 Machine transcription, human corrections, and original audio remain distinguishable.
 
 
-## 6. Quotes and Imagery
+## 5. Quotes and Imagery
 
 An asset may relate to a quote, or a precise span of a quote.
 
@@ -115,7 +115,7 @@ A machine-generated transcript is an attributed interpretation. A source recordi
 
 This distinction applies equally to agents and humans.
 
-## 7. ROOT SHAKE
+## 6. ROOT SHAKE
 
 ROOT SHAKE can emit an asset when a screenshot is taken.
 
