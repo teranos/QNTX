@@ -105,9 +105,9 @@ A quote may refer to:
 - An image or region within an image.
 - Another quoted or derived media representation.    
 
-These relationships are typed.
-
-**Depicts**, **contains**, **spoken-in**, **derived-from**, **generated-by**, and **references** are not interchangeable.
+- **Depicts**, 
+- **contains**, 
+- **spoken-in**, **derived-from**, **generated-by**, and **references** 
 
 No semantic similarity result is sufficient to establish that somebody said something.
 
