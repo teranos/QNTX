@@ -105,15 +105,15 @@ A quote may refer to:
 - An image or region within an image.
 - Another quoted or derived media representation.    
 
-- **Depicts**, 
-- **contains**, 
-- **spoken-in**, **derived-from**, **generated-by**, and **references** 
+- **Depicts**
+- **contains**
+- **spoken-in**
+- **derived-from**
+- **generated-by**
+- **references** 
 
-No semantic similarity result is sufficient to establish that somebody said something.
-
-A machine-generated transcript is an attributed interpretation. A source recording is evidence of the utterance.
-
-This distinction applies equally to agents and humans.
+A machine-generated transcript is an attributed interpretation. 
+A source recording is evidence of the utterance.
 
 ## 6. ROOT SHAKE
 
