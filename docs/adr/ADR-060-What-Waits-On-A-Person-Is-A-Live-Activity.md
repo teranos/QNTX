@@ -107,6 +107,26 @@ What stands is a collection that wakes. An item that wakes nobody is due at
 no time, is not delivered for itself, and makes nothing stand. It is delivered
 with what does wake. A pull request merge update is such an item.
 
+## What fails stands too
+
+"The failure is also quiet by construction."
+
+A collection the node could not deliver waits on the person: it stands as
+`not delivered, N tries`, with why, send again and cancel, for one wait from
+when it began to fail. Every try is said in the node's log, and kept with the
+collection (`failing_since`, `tries`, `failure`).
+
+## What a room keeps
+
+"things like coming from rooms, they may degrade over time, as in, it doesnt make sense to keep old room collection items in the waking collection at all"
+
+"also, multiple comments are like one item per pr, and each pr is its own thing, but it can be said in digest form"
+
+A room holds all that was said in it. What a collection holds of a room is its
+newest wake alone, and none older than the receiver's wait. A wake tells each
+pull request once, in short form: `owner/repo #N`, how many messages, by whom,
+when the last was. A wake that is collected is the receiver told.
+
 ## One shape
 
 One Live Activity type draws everything that waits: `WaitsAttributes`
@@ -127,16 +147,24 @@ Each of these was missing once, and nothing stood on the phone.
 | A key Apple takes for Production | `[apns]` in am.toml, the key at the path it names. The key is made at Apple with Environment set to Sandbox & Production. | Both of Apple's hosts asked with the key and a token that is none: a host that takes the key refuses only the token. |
 | The island's own App ID and profile | QNTX-App `.github/workflows/island-apple.yml` asks Apple and makes what is missing. | The build installs the profile and names it in the export. |
 | The press compiled into the app by Xcode | QNTX-App `island/app` and `island/shared` are sources of the app target. A Tauri plugin's Swift is built outside Xcode, and the system finds no press in it. | `Metadata.appintents` in the archived app, in the build. |
-| The session the app is in | The page holds it and presents it on each request (QNTX-Web `ts/client/session.ts`, `server/auth/presented.go`). The app reads it from the page and keeps it in the Keychain. | The node's log. |
+| The session the app is in | The page holds it and presents it on each request (QNTX-Web `ts/client/session.ts`, `server/auth/presented.go`). The app reads it from the page and keeps it in the Keychain, and puts it back into a page that lost it while the node still admits it. laye, in front of the node, hands it on as it came (Ground-Institute/laye#6). | Sentry's qntx-island project. |
 
-## What the phone does is in the node's log
+## What the phone does is seen
 
-The app says each step it takes to the node. The lines are in the node's
-journal, by a client that names itself `QNTX-waits/<build>`:
+Every failure of the island is a SacredError (teranos/sacred-error), sent to
+Sentry's qntx-island project from `island/shared/Island.swift`, with the
+steps before it as breadcrumbs. A token hand-over that has not ended a
+minute after it began is sent naming the step it is at.
+
+The app also says its steps to the node, by a client that names itself
+`QNTX-waits/<build>`:
 
 ```
 journalctl -u qntx | grep QNTX-waits
 ```
+
+The node's access log writes only what it refused (`server/accesslog.go`).
+A request it answered is no line there, and no line is no proof of anything.
 
 The node writes down what a person decides: who, what, and the client it came
 from.
@@ -152,6 +180,8 @@ These are decided. A session builds on them and does not reopen them.
 - A pull request never stands on its own.
 - What wakes nobody makes nothing stand.
 - No Live Activity is restarted to outlast Apple's eight hours.
+- Nothing that fails is quiet: what could not be delivered stands in front of the person.
+- A room holds what was said in it; a collection holds its newest wake.
 - The node says what is shown. The app adds no kinds of its own.
 - A change to this is proven on a phone before it is called done, and the docs follow the proof.
 
@@ -172,10 +202,9 @@ a delay; the node logs each decision with who made it.
 ## What is not built
 
 - A pull request as an item in a collection, approved there.
-- A merge collected for the sessions involved (teranos/QNTX#1741, in review).
 - Pressing the collection to open the receiver's chat with the overlay.
 - Approval packs.
-- A proof in the iPhone Simulator in CI, so a change is shown working without a phone.
+- A proof in the iPhone Simulator in CI, so a change is shown working without a phone. A push does not start a Live Activity in CI's Simulator (QNTX-App#31): the test starts it in the app, with what the node would send, and everything after runs for real.
 
 ## Open defect
 
