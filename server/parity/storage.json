@@ -286,6 +286,7 @@
     "rebuilt": false,
     "sites": [
       "ats/storage/embedding_cluster_membership.go",
+      "ats/storage/embedding_index.go",
       "ats/storage/embedding_store.go",
       "ats/storage/embedding_sweep.go",
       "server/embeddings/handlers.go"
@@ -434,14 +435,6 @@
     "sites": [
       "server/auth/users_table.go"
     ]
-  },
-  {
-    "name": "vec_embeddings",
-    "sqlite": true,
-    "duckdb": false,
-    "postgres": false,
-    "rebuilt": false,
-    "sites": []
   },
   {
     "name": "watcher_execution_queue",
