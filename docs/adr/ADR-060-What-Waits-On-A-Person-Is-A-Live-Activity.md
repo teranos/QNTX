@@ -84,7 +84,6 @@ collection.
 "SO THE 6H CADENCE STAYS FOR 6H"
 
 "WHEN DELAY CANT WE MAKE IT BE DISMISSED UNTIL ITS TIME TO SHOW AGAIN "
-
 "SO WE NEVER BREAK APPLES RULE YOU KNOW"
 
 A collection stands for its wait: six hours, or three for an agent on Opus
@@ -98,7 +97,7 @@ wait, and the wait is under the eight hours Apple allows.
 
 ## What wakes
 
-"NO, ANY ONE THAT WAKES. PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION"
+"NO, ANY ONE THAT WAKES. PR MERGE UPDATES DON'T WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION"
 
 What stands is a collection that wakes. An item that wakes nobody is due at
 no time, is not delivered for itself, and makes nothing stand. It is delivered
