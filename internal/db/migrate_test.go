@@ -1,9 +1,11 @@
 package db
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -181,4 +183,38 @@ func TestRunsAreFoundByStatusThroughOneIndex(t *testing.T) {
 	require.NoError(t, rows.Err())
 	assert.True(t, held["idx_pulse_executions_status_completed"])
 	assert.False(t, held["idx_pulse_executions_status"], "the status index the composite begins with is still kept")
+}
+
+//go:embed sqlite/migrations.sum
+var migrationsSum string
+
+// A migration is what was done to every database that ran it: one that ran is
+// never edited or taken away, and a mistake in it is answered by a new one.
+// migrations.sum holds each as it was added; a new migration adds its line.
+func TestAMigrationIsAddedOntoAndNeverChanged(t *testing.T) {
+	recorded := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(migrationsSum), "\n") {
+		sum, name, found := strings.Cut(line, "  ")
+		require.True(t, found, "migrations.sum holds a line that is no sum and name: %q", line)
+		recorded[name] = sum
+	}
+
+	entries, err := migrations.ReadDir("sqlite/migrations")
+	require.NoError(t, err)
+	carried := map[string]bool{}
+	for _, entry := range entries {
+		name := entry.Name()
+		carried[name] = true
+		body, err := migrations.ReadFile("sqlite/migrations/" + name)
+		require.NoError(t, err)
+		sum, held := recorded[name]
+		if !held {
+			t.Errorf("%s is new: add its line to internal/db/sqlite/migrations.sum:\n%s  %s", name, checksumOf(body), name)
+			continue
+		}
+		assert.Equal(t, sum, checksumOf(body), "%s was changed after it was added: add a new migration instead", name)
+	}
+	for name := range recorded {
+		assert.True(t, carried[name], "%s was taken away after it was added: a node that ran it still holds what it did", name)
+	}
 }

@@ -90,6 +90,36 @@ func (a Asking) Ask(ctx context.Context, arrived map[string]any) Asked {
 	return *asked
 }
 
+// Within is one sigil asked from inside the node, by a subsystem linked into
+// it: another surface, with no request to carry it and no gate before it,
+// since what asks is the node's own build. What arrived is read and refused as
+// on every surface, and the function answers with no caller in the context.
+func Within(ctx context.Context, held *protocol.Sigil, answer Answer, arrived map[string]any) (any, *protocol.Refusal) {
+	sent, refusal := Read(held, arrived)
+	if refusal != nil {
+		return nil, refusal
+	}
+	if refusal := Refuses(held, sent); refusal != nil {
+		return nil, refusal
+	}
+	return answer(context.WithValue(ctx, arrivedKey{}, arrived), sent)
+}
+
+// On is whether a sigil is asked over a surface: one naming no surfaces is
+// asked over every one.
+func On(held *protocol.Sigil, surface string) bool {
+	surfaces := held.GetSurfaces()
+	if len(surfaces) == 0 {
+		return true
+	}
+	for _, named := range surfaces {
+		if named == surface {
+			return true
+		}
+	}
+	return false
+}
+
 // arrivedKey is where Ask leaves what arrived, whole, for what answers.
 type arrivedKey struct{}
 

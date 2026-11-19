@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/teranos/QNTX/internal/db"
@@ -48,10 +47,6 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (_ int, err error) {
 	}
 
 	for _, e := range stale {
-		table := vecTableName(e.model)
-		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), e.id); err != nil {
-			return 0, db.Undone(errors.Wrapf(err, "failed to delete from %s for stale embedding %s", table, e.id), tx)
-		}
 		if _, err := tx.Exec(`DELETE FROM embeddings WHERE id = ?`, e.id); err != nil {
 			return 0, db.Undone(errors.Wrapf(err, "failed to delete stale embedding %s", e.id), tx)
 		}
@@ -63,6 +58,16 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (_ int, err error) {
 
 	s.logger.Info("swept stale embeddings",
 		zap.Int("count", len(stale)))
+
+	// A swept row's vector left in its index is no search result (rowsByID),
+	// so a vector not forgotten is said and the sweep stands.
+	byModel := map[string][]string{}
+	for _, e := range stale {
+		byModel[e.model] = append(byModel[e.model], e.id)
+	}
+	if err := s.forget(byModel); err != nil {
+		s.logger.Warn("swept embeddings' vectors are still indexed", zap.Error(err))
+	}
 
 	return len(stale), nil
 }

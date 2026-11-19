@@ -53,6 +53,9 @@ const (
 	Text = ""
 	// Count is a whole number, zero or more.
 	Count = "count"
+	// List is a JSON array: numbers of a vector, entries of an index. It is
+	// handed to the function that answers as its JSON.
+	List = "list"
 )
 
 // The kind of no (protocol.Refusal.Why).
@@ -211,6 +214,21 @@ func Read(sigil *protocol.Sigil, arrived map[string]any) (Sent, *protocol.Refusa
 			continue
 		}
 		var read string
+		if param.GetKind() == List {
+			if _, array := value.([]any); !array {
+				if raw, err := json.Marshal(value); err != nil || len(raw) == 0 || raw[0] != '[' {
+					return nil, &protocol.Refusal{Why: Invalid, Param: param.GetName(),
+						Says: sigil.GetName() + " takes " + param.GetName() + " as a list, and what was sent is not one."}
+				}
+			}
+			raw, err := json.Marshal(value)
+			if err != nil {
+				return nil, &protocol.Refusal{Why: Invalid, Param: param.GetName(),
+					Says: sigil.GetName() + " takes " + param.GetName() + " as a list, and what was sent does not read: " + err.Error()}
+			}
+			sent[param.GetName()] = string(raw)
+			continue
+		}
 		switch v := value.(type) {
 		case string:
 			read = v
@@ -239,6 +257,9 @@ func Read(sigil *protocol.Sigil, arrived map[string]any) (Sent, *protocol.Refusa
 func kindInWords(kind string) string {
 	if kind == Count {
 		return "a count"
+	}
+	if kind == List {
+		return "a list"
 	}
 	return "text"
 }

@@ -7,8 +7,7 @@
 // phased out over time. New database features should be implemented in the Rust
 // backend, which is accessed via CGO through the rustsqlite build tag.
 //
-// The Rust backend provides better performance, memory safety, and integration
-// with advanced features like sqlite-vec for vector similarity search.
+// The Rust backend provides better performance and memory safety.
 package db
 
 import (
@@ -17,18 +16,11 @@ import (
 	"os"
 	"path/filepath"
 
-	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 
 	errors "github.com/teranos/sacred-error"
 )
-
-func init() {
-	// Initialize sqlite-vec extension for vector similarity search.
-	// Still needed for test helpers and ground_bridge.go (separate DB files).
-	sqlite_vec.Auto()
-}
 
 const (
 	// SQLiteJournalMode configures the database journal mode (WAL enables concurrent reads)
