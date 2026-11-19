@@ -121,7 +121,7 @@ func (h *Handler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.Logger.Errorw("Failed to perform semantic search",
 			"query", query, "limit", limit, "threshold", threshold, "error", err)
-		http.Error(w, "Failed to perform search", http.StatusInternalServerError)
+		http.Error(w, "Failed to perform search: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	searchMS := time.Since(startSearch).Milliseconds()

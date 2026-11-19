@@ -107,6 +107,29 @@ func (s *EmbeddingServer) Embed(ctx context.Context, req *protocol.EmbedRequest)
 	}, nil
 }
 
+// ModelInfo is a model the embedding provider embeds with, by name; none is
+// its first.
+func (s *EmbeddingServer) ModelInfo(ctx context.Context, req *protocol.ModelInfoRequest) (*protocol.ModelInfoResponse, error) {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+		return nil, err
+	}
+
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := svc.GetModelInfo(req.Model)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the model %q was not described", req.Model)
+	}
+	return &protocol.ModelInfoResponse{
+		Name:              info.Name,
+		Dimensions:        int32(info.Dimensions),
+		MaxSequenceLength: int32(info.MaxSequenceLength),
+	}, nil
+}
+
 // BatchEmbed generates vector embeddings for multiple texts.
 func (s *EmbeddingServer) BatchEmbed(ctx context.Context, req *protocol.BatchEmbedRequest) (*protocol.BatchEmbedResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
