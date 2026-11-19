@@ -61,6 +61,7 @@ type gitHubHost interface {
 	buildsOfRun(gitHubWorkflowRun) ([]string, error)
 	approvalsFromGitHub(ctx context.Context, event string, body []byte) ([]string, error)
 	fixturesFromGitHub(ctx context.Context, event string, body []byte) ([]string, error)
+	pluginsFollowMerge(event string, body []byte) ([]string, error)
 	// What each linked subsystem reading the event answered, by name (ADR-056).
 	deliveries(ctx context.Context, event string, body []byte) map[string]any
 	buildsMovedBy(forge.Push) []string
