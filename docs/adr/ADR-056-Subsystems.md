@@ -69,10 +69,6 @@ Status: Implemented
 
 ## What the contract does not carry
 
-- Reach. The tablet is the deployment's, compiled in ([server/reach/tablet.go](https://github.com/teranos/QNTX/blob/main/server/reach/tablet.go)); a deployment builds with its own (`withTablet`, [flake.nix](https://github.com/teranos/QNTX/blob/main/flake.nix)). A subsystem's path no line names is served to ROOT alone, as any such path is.
 - Pinned references. `parity.Reference` reads QNTX's embedded pins ([server/parity/references.go](https://github.com/teranos/QNTX/blob/main/server/parity/references.go)). A subsystem's `Follows` names a reference QNTX pins.
 - A build tag. Linking is what makes a build carry a subsystem.
-
-
-Is Quotes only workable with a frontier model? In practice, yes, at least for this part. The work turns on fine distinctions: whose words a span is, who said it first, what may stand beside what. A session that can't hold your notation all the way produces what the cloud session did, or what k's marker did. Tonight it took this model at high effort, and still a lot of pushing.
 
