@@ -275,7 +275,7 @@ in
 
         {
           name = "Test ats-etcd";
-          run = "scripts/with-etcd.sh result-etcd/bin nix develop --command cargo test --package ats-etcd";
+          run = "scripts/with-etcd.sh result-etcd/bin nix develop --command cargo test --package ats-etcd --features ffi";
         }
 
         {
