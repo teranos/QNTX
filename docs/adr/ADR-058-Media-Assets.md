@@ -33,6 +33,16 @@ From: [[2026-11-11-eleven-i-meant-twelve-labs]]
 - 「[Fable 5.2] Where an asset is, is read from who attests holding it. A holder that is lost loses a copy and no identity.」
 - 「[Fable 5.2] TwelveLabs is a holder that cannot give the bytes back: its asset carries a stream and a thumbnail, and no way to the file that was sent. What it holds is a copy to search, never the one to keep.」
 
+## 「[Fable 5.2] Per person」
+
+"also, isnt media also like, per user or per person"
+"everyone get's to hold some amount of assets"
+
+- 「[Fable 5.2] The bytes are nobody's. The bringing is a person's: each attestation of an asset says who brought it.」
+- 「[Fable 5.2] What a person holds is the sum of the sizes of what they brought and is still kept. Their amount is a bound on that sum.」
+- 「[Fable 5.2] The same bytes brought by two people count for both. Bringing a file tells nobody whether another already has it.」
+- 「[Fable 5.2] Today only ROOT brings: `/api/files` is of ROOT in the tablet of reach.」
+
 ## 「[Fable 5.2] TwelveLabs shaped」
 
 "Suppose we create a new plugin provided service for assets in the twelvelabs sense."
