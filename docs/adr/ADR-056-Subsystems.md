@@ -16,8 +16,6 @@ Status: Implemented
 
 "private repo"
 
-"and k qntx compiles it in"
-
 - A subsystem is its own repository and its own Go module, requiring `github.com/teranos/QNTX`. QNTX's `go.mod` requires nothing of it, so QNTX builds for everyone without it.
 
 "we separate it out from qntx like is demonstrated, it becomes an optional build, and k uses it, not q"
