@@ -419,7 +419,15 @@ impl AttestationStore for SqliteStore {
             return Err(StoreError::AlreadyExists(attestation.id.clone()));
         }
 
-        put_attestation(&self.conn, &attestation)?;
+        // "but this sounds fixable from the code side, your solution is a quick fix"
+        // The row and its lookup rows are one commit. Each apart was five commits
+        // a put, and 129 KB of WAL a put on k (2026-11-18).
+        let put = self
+            .conn
+            .unchecked_transaction()
+            .map_err(SqliteError::from)?;
+        put_attestation(&put, &attestation)?;
+        put.commit().map_err(SqliteError::from)?;
 
         // Periodic PASSIVE checkpoint — moves WAL pages to the main DB without
         // truncating WAL or -shm. Safe with concurrent readers (PASSIVE skips
