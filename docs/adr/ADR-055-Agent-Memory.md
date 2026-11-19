@@ -83,16 +83,9 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 
 "old text get's traced and we see exactly what parts are mosltly hallucinated and what parts are not and come directly from a human"
 
-"the backfill will happen at some point, that feature will exist, but is not in scope now."
-
 - [ ] 「[Fable 5.1] Old text is traced: each span to the human words it came from, exact or by how many corrections, or marked as the agent's.」
 - [ ] 「[Fable 5.1] The signum that keeps a Quote, so the node holds it to tei.」
 - [ ] 「[Fable 5.1] C2PA, for the material a quote arrives in, pinned as TEI is.」
-
----
-
-"there needs to be a process"
-「[Fable] Every row of ground's own attestations table carries qntx_at, qntx_status and qntx_reason: what ground sees is written to a node.」
 
 ---
 
