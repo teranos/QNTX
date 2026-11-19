@@ -103,7 +103,7 @@ Agents talk to each other through A2A: first two nodes, then their Node Agents a
 
 Where it is built:
 
-- **The key.** Ground makes it at SessionStart and keeps it in `~/.qntx/sessions/<session id>/key` (ground `source/naming.d`, branch `session-names`).
+- **The key.** Ground makes it at SessionStart and keeps it in `~/.qntx/sessions/<session id>/key` (ground `source/naming.d`, ground #268).
 - **The admission.** `POST /auth/admit` with the session's DID and what it is called, signed by `~/.qntx/key` (`server/auth/admit.go`, #1656).
 - **The name.** `i name`, signed by the session's own key. Ground asks for what Claude Code calls the session, and keeps the name the node gave beside the key, so the session asks for the same one again. `ground name <Name>` takes another.
 "the name"
@@ -120,6 +120,10 @@ Where it is built:
 - **A name a revoked token held** goes to the agent asking for it (#1668).
 "the token can be GONE"
 "i want false Alder to take a different name for example"
+- **Who gave it**: the user, the session itself, or its harness (`given`, #1683). Ground keeps it beside the name (ground #272).
+"and it needs to be more clear if a session named itself, or if the User gave it that name]"
+- **Said by name.** `ground say <Name> <words>` sends over A2A to the name, a tenant (#1671, ground #272), over gRPC as well (#1690). A name nobody holds answers with the names near it (#1686).
+- **Received or not.** The session's own key asking its status row completes the Task (#1684), and the sender is told (ground #277, #281). A taken Task waits an hour (#1687) and outlives a restart (#1698).
 - Ground holds a session's id, key, DID and name together, in that one directory.
 
 ## What the repository already answers

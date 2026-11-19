@@ -26,16 +26,18 @@ import (
 //
 // "no handrolled tools"
 //
-// The tools are the sigils, and beside them every route the node serves that
-// no sigil answers yet and that asks who is calling. Nothing else is a tool,
-// and no document is read.
+// The tools are the sigils asked over MCP, and beside them every route the
+// node serves that no sigil answers yet and that asks who is calling. Nothing
+// else is a tool, and no document is read.
 func TestTheToolsAreTheSigilsAndTheRoutesServed(t *testing.T) {
 	srv := servedForTest(t)
 
 	var expected []string
 	for _, signum := range srv.signa() {
 		for _, held := range signum.GetSigils() {
-			expected = append(expected, toolNameOf(signum.GetName(), held))
+			if onSurface(held, reach.OverMCP) {
+				expected = append(expected, toolNameOf(signum.GetName(), held))
+			}
 		}
 	}
 	for _, route := range srv.served.Routes() {
