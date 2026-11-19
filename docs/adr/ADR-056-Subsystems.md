@@ -3,7 +3,7 @@
 Date: 2026-11-01
 Status: Implemented
 
-"QNTX needs a formal contract for pluggable, optional, compiled-in subsystems. Agreed. And Quotes is the first one to use it. suggest a .proto for it"
+"QNTX needs a formal contract for pluggable, optional, compiled-in subsystems. suggest a .proto for it"
 
 - The contract is `protocol.Subsystem` ([subsystem.proto](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/subsystem.proto)) and package [server/subsystem](https://github.com/teranos/QNTX/blob/main/server/subsystem/subsystem.go). The proto is what a subsystem declares; the package is how it registers, what it may ask of the node (`Host`), and how its declaration becomes rows and signa the node serves.
 - A subsystem registers itself from the package that links it, in `init`, with `subsystem.Register`. The node reads the registered at boot, in the `linked` step ([server/sub_linked.go](https://github.com/teranos/QNTX/blob/main/server/sub_linked.go)): its standing rows stand with QNTX's own (`watcher.Stand`), it is started with the node as its `Host`, and each built-in it declared is checked to be registered. Fatal when not: a build whose own subsystem does not start is a build that is wrong.
@@ -12,9 +12,6 @@ Status: Implemented
 
 - A plugin is another process, on a node through its record, held and taken away by a person ([ADR-002](ADR-002-plugin-configuration.md)). A subsystem is linked into the binary and is there or not for the life of the node. It is not loaded, enabled, disabled or restarted; it is built.
 
-"and you know, i dont even want quote control to be open source, the whole subsystem needs to move into its own repo actually. and only k get's to use it."
-
-"private repo"
 
 - A subsystem is its own repository and its own Go module, requiring `github.com/teranos/QNTX`. QNTX's `go.mod` requires nothing of it, so QNTX builds for everyone without it.
 
