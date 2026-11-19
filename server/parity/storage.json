@@ -279,6 +279,16 @@
     ]
   },
   {
+    "name": "embedding_vectors_to_forget",
+    "sqlite": true,
+    "duckdb": false,
+    "postgres": false,
+    "rebuilt": false,
+    "sites": [
+      "ats/storage/embedding_index.go"
+    ]
+  },
+  {
     "name": "embeddings",
     "sqlite": true,
     "duckdb": false,
