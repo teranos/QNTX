@@ -14,7 +14,8 @@ func (embeddingSubsystem) Init(s *QNTXServer) error {
 	s.embeddingStore = s.held.ServedUniverse().Embeddings()
 	// Its vectors are kept and found by vector search, a service a plugin
 	// provides; the rows stay in the store.
-	s.embeddingStore.SetIndex(&routedIndex{s: s})
+	s.vectorIndex = &routedIndex{s: s}
+	s.embeddingStore.SetIndex(s.vectorIndex)
 	s.SetupEmbeddingService()
 
 	// Use the primary rustsqlite connection for reads — the Rust driver

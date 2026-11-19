@@ -7,6 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -16,7 +17,24 @@ import (
 // a vector of that model is kept.
 type routedIndex struct {
 	s    *QNTXServer
-	made sync.Map // index names made since the node started
+	made sync.Map // index names made with the provider registered now
+	// router is the vector search router and its token; the node's own when
+	// nil.
+	router func() (*services.VectorSearchServer, string, *protocol.Refusal)
+}
+
+// vectorRouter is the router this index reaches vector search through.
+func (r *routedIndex) vectorRouter() (*services.VectorSearchServer, string, *protocol.Refusal) {
+	if r.router != nil {
+		return r.router()
+	}
+	return r.s.vectorRouter()
+}
+
+// providerChanged forgets which indexes were made: a provider that registers
+// may hold none of them, and is asked to make each again.
+func (r *routedIndex) providerChanged() {
+	r.made.Clear()
 }
 
 // indexCallTimeout bounds one call to the vector search provider.
@@ -26,7 +44,7 @@ const indexCallTimeout = 30 * time.Second
 func embeddingsIndex(model string) string { return "embeddings." + model }
 
 func (r *routedIndex) Keep(model string, dimensions int, id string, vector []float32) error {
-	router, token, refused := r.s.vectorRouter()
+	router, token, refused := r.vectorRouter()
 	if refused != nil {
 		return errors.New(refused.GetSays())
 	}
@@ -47,7 +65,7 @@ func (r *routedIndex) Keep(model string, dimensions int, id string, vector []flo
 }
 
 func (r *routedIndex) Forget(model string, ids []string) error {
-	router, token, refused := r.s.vectorRouter()
+	router, token, refused := r.vectorRouter()
 	if refused != nil {
 		return errors.New(refused.GetSays())
 	}
@@ -60,7 +78,7 @@ func (r *routedIndex) Forget(model string, ids []string) error {
 }
 
 func (r *routedIndex) Nearest(model string, query []float32, limit int) ([]storage.VectorHit, error) {
-	router, token, refused := r.s.vectorRouter()
+	router, token, refused := r.vectorRouter()
 	if refused != nil {
 		return nil, errors.New(refused.GetSays())
 	}
@@ -92,6 +110,9 @@ func (r *routedIndex) Nearest(model string, query []float32, limit int) ([]stora
 // embedding store kept while none was, or before it had an index, is offered
 // to it, off the caller's time.
 func (s *QNTXServer) VectorSearchProvided() {
+	if s.vectorIndex != nil {
+		s.vectorIndex.providerChanged()
+	}
 	if s.embeddingStore == nil {
 		return
 	}
