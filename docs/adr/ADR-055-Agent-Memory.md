@@ -96,3 +96,5 @@ A memory is an agent's utterance: it stands inside 「 」 with the agent's name
 
 ---
 
+
+- [ ] distributed memory, etcd
