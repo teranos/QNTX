@@ -174,6 +174,20 @@ const (
 	// was written back) or unanswered (the request ended first). Admitted counts
 	// a call at the gate; this is the call at its end.
 	MCPToolTook = "qntx.mcp.tool.took"
+
+	// 「[Opus 5.5] LinesServed is one per time the primary answered a peer asking for its」
+	// 「[Opus 5.5] lines, sliced by the peer and by how it ended: served, or refused. A peer」
+	// 「[Opus 5.5] asks every auth.LinesEvery, so a peer that stopped asking is this number」
+	// 「[Opus 5.5] going flat, which no log line says.」
+	//
+	// "「[Opus 5.5] but like sentry and otel」"
+	// "「[Opus 5.5] we have stuff for this」"
+	LinesServed = "qntx.lines.served"
+
+	// 「[Opus 5.5] LinesHeard is the same exchange from the peer: one per time it asked its」
+	// 「[Opus 5.5] primary, sliced by how it ended: heard, or unanswered. Unanswered is also」
+	// 「[Opus 5.5] the error line the node writes; heard was written nowhere.」
+	LinesHeard = "qntx.lines.heard"
 )
 
 // The dimensions.
@@ -254,6 +268,10 @@ const (
 	// what the node serves, never by a name a caller sent: a call to a tool
 	// the node does not have never reaches one.
 	AttrTool = "tool"
+
+	// 「[Opus 5.5] AttrPeer is which peer: its name in nodes.peers, or "undeclared" for an」
+	// 「[Opus 5.5] asker no line there names. Bounded by the list ROOT writes.」
+	AttrPeer = "peer"
 )
 
 // Attr is what a call site builds a dimension with. It is Sentry's own builder,

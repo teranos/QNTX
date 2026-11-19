@@ -33,6 +33,24 @@ backup_interval_seconds = 3600
 #
 # [storage.parquet]
 # location = "s3://bucket/prefix"
+#
+# 「[Opus 5.5] Namespaces this node serves because ROOT says so here. Each one the node」
+# 「[Opus 5.5] does not hold is created at start, owned by the first of」
+# 「[Opus 5.5] auth.root_identities, and given the storage named: parquet or sqlite. One」
+# 「[Opus 5.5] the node holds is left as it stands; nothing here ends a namespace.」
+# 「[Fable 5.2] namespaces = [」
+#   「[Opus 5.5] { name = "fleetingmem", record = "parquet" },」
+# 「[Opus 5.5] ]」
+
+# 「[Opus 5.5] ── etcd ────────────────────────────────────────────────────────」
+# 「[Opus 5.5] Another place what the node holds goes, for a reader to watch
+# 「[Opus 5.5] rather than ask the node, named as endpoint = "http://127.0.0.1:2379" under a」
+# 「[Opus 5.5] table [etcd]. Each attestation a namespace creates is put at」
+# 「[Opus 5.5] /attestations/<namespace>/<id> under a 72-hour lease, and what is collected」
+# 「[Opus 5.5] for each agent at /collected/<node DID>/<agent DID>, as collected list says」
+# 「[Opus 5.5] it, deleted once nothing waits. A node whose etcd does not answer does not」
+# 「[Opus 5.5] start, and a build without the rustetcd tag refuses one that names an etcd.」
+# 「[Opus 5.5] Left out, nothing goes to etcd.」」
 
 # ── Postgres records ────────────────────────────────────────────
 # A namespace given Postgres names its connection string in its own
@@ -255,6 +273,23 @@ enabled = false
 
 # Unset, it is this machine's loopback origin; it is never read off a request.
 # public_origin = "https://api.qntx.example.com"
+
+# 「[Opus 5.5] Keys admitted while listed, each ATTESTOR in the namespaces its line names,」
+# 「[Opus 5.5] signing as itself and speaking for the first of root_identities. Striking a」
+# 「[Opus 5.5] line ends its grant. The roles a line names are held by its label in each of」
+# 「[Opus 5.5] those namespaces, as a grant line ROOT wrote in the store would be (ADR-034).」
+# 「[Fable 5.2] grants = [」
+#   「[Opus 5.5] { label = "guest1", did = "did:key:z6MkExampleExampleExampleExampleExampleExample", namespaces = ["fleetingmem"], roles = ["GROUND"] },」
+# 「[Opus 5.5] ]」
+
+# 「[Opus 5.5] What a role may write and read, as WRITE and READ lines ROOT wrote in the」
+# 「[Opus 5.5] store would say (ADR-034). Read out loud, the line below is: WRITE is * of」
+# 「[Opus 5.5] GROUND. A line ROOT writes in the store later outranks one listed here, and」
+# 「[Opus 5.5] striking a line here takes it away.」
+# 「[Opus 5.5] words = [」
+#   「[Opus 5.5] { write = ["*"], of = ["GROUND"] },」
+#   「[Opus 5.5] { read = ["visit:done"], of = ["COORDINATOR"], all = true },」
+# 「[Opus 5.5] ]」
 
 # ── Front doors (ADR-032) ───────────────────────────────────────
 #

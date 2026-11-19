@@ -181,8 +181,13 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		followed, err := g.host.pluginsFollowMerge(event, body)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		fixed := g.fixturesOf(r.Context(), event, body)
-		answer := map[string]any{"approvals": touched, "fixtures": fixed}
+		answer := map[string]any{"approvals": touched, "plugins": followed, "fixtures": fixed}
 		g.deliveredInto(answer, r.Context(), event, body)
 		respond(w, g.host.log(), http.StatusOK, answer)
 		return

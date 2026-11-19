@@ -121,6 +121,10 @@ func (h *Handler) handleCreateToken(w http.ResponseWriter, r *http.Request, p Pr
 			return
 		}
 	}
+	if h.declaresLabel(req.Label) {
+		h.writeError(w, http.StatusConflict, "auth.grants in am.toml already names "+req.Label)
+		return
+	}
 
 	// A session and only a session: a half-admission has no device behind it
 	// and must never name the minter of something that outlives the session.

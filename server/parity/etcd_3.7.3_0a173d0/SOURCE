@@ -1,0 +1,11 @@
+etcd
+
+https://github.com/etcd-io/etcd/tree/0a173d0410a96d01091b484daae81365bbcde57e (the commit tag v3.7.3 names)
+
+/nix/store/acx093c9lwfijslhqxr9y47s5l80hi85-etcd-3.7.3  nix build .#etcd
+
+c46b85f82f5189ce66d901425833ee2d94440a571e8071252db5776cc66dea63  etcd-client 0.21.1
+
+The store path is the etcd flake.nix builds from the nixpkgs it pins, which
+scripts/with-etcd.sh runs for ats-etcd's tests. The checksum is the one
+Cargo.lock holds for the client ats-etcd speaks to it through.
