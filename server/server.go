@@ -71,6 +71,7 @@ type QNTXServer struct {
 	identityTokensRenewed identityTokens      // Each ROOT agent home whose identity token is renewed
 	collected             *collection         // What agents said to an agent, collected until it is delivered together (collected.go)
 	collectedOnce         sync.Once
+	etcdWindows           etcdWindows                   // 「[Opus 5.5] Each namespace's etcd window, one each (etcd_window_kept.go)」
 	shows                 shower                        // How this node reaches a phone (phones.go); Apple's once asked for, a stand-in in a test
 	underGround           groundHomes                   // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)
 	scrubWith             scrubber                      // A test's scanner in place of ground's (fixtures.go); nil is ground's

@@ -45,6 +45,43 @@
         }
       ]
     },
+    "ats-etcd": {
+      "name": "etcd Backend",
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v5"
+        },
+        {
+          "name": "Install Nix",
+          "uses": "cachix/install-nix-action@v26",
+          "with": {
+            "extra_nix_config": "experimental-features = nix-command flakes\n"
+          }
+        },
+        {
+          "name": "Setup Cachix",
+          "uses": "cachix/cachix-action@v14",
+          "with": {
+            "authToken": "${{ secrets.CACHIX_AUTH_TOKEN }}",
+            "name": "qntx"
+          }
+        },
+        {
+          "name": "Build the pinned etcd via Nix",
+          "run": "nix build .#etcd --print-build-logs --out-link result-etcd\nresult-etcd/bin/etcd --version\n"
+        },
+        {
+          "name": "Test ats-etcd",
+          "run": "scripts/with-etcd.sh result-etcd/bin nix develop --command cargo test --package ats-etcd --features ffi"
+        },
+        {
+          "name": "Test the Go side",
+          "run": "scripts/with-etcd.sh result-etcd/bin nix develop --command bash -c 'make rust-sqlite rust-etcd && export LD_LIBRARY_PATH=\"$PWD/target/release:${LD_LIBRARY_PATH:-}\" && go test -tags rustetcd -v -timeout 5m ./ats/storage/etcdcgo/...'\n"
+        }
+      ]
+    },
     "ats-postgres": {
       "name": "Postgres Backend",
       "runs-on": "ubuntu-latest",
@@ -111,7 +148,7 @@
         },
         {
           "name": "Test Rust libraries",
-          "run": "cargo test --workspace --exclude ats-duckdb --exclude ats-postgres --exclude qntx-reduce-plugin"
+          "run": "cargo test --workspace --exclude ats-duckdb --exclude ats-postgres --exclude ats-etcd --exclude qntx-reduce-plugin"
         },
         {
           "name": "Build release with FFI",
@@ -177,6 +214,7 @@
         "crates/ats-sqlite/Cargo.toml",
         "crates/ats-duckdb/Cargo.toml",
         "crates/ats-postgres/Cargo.toml",
+        "crates/ats-etcd/Cargo.toml",
         "crates/ats-wasm/Cargo.toml",
         "ats/storage/duckdbcgo/**",
         "cmd/qntx/commands/database_parquet.go",
@@ -189,6 +227,8 @@
         "internal/db/postgres/migrations/**",
         "cmd/parity/**",
         "scripts/with-postgres.sh",
+        "scripts/with-etcd.sh",
+        "ats/storage/etcdcgo/**",
         "flake.lock",
         ".github/workflows/rs.yml"
       ]
