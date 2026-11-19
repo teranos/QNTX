@@ -22,6 +22,7 @@ import "C"
 import (
 	"encoding/json"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/teranos/QNTX/ats/storage"
@@ -128,9 +129,17 @@ func (s *Store) Put(as *types.As) error {
 type Window struct {
 	store   putter
 	failed  func(error)
+	drain   time.Duration
 	queue   chan *types.As
 	stopped chan struct{}
-	once    sync.Once
+	// 「[Opus 5.5] mu holds the send and the close as one: a send against a closing
+	// queue was a race the recover only hid (CodeRabbit on #1765).」
+	mu     sync.Mutex
+	closed bool
+	// 「[Opus 5.5] cut is closed when the drain is over: what the worker has not put by
+	// then is handed to failed, not put.」
+	cut  chan struct{}
+	once sync.Once
 }
 
 // 「[Opus 5.5] putter is what the window puts into: the Store, or what a test holds.」
@@ -143,15 +152,20 @@ type putter interface {
 // handed to failed: about a second of a node writing hard.」
 const WindowQueue = 1024
 
+// 「[Opus 5.5] WindowDrain is how long closing waits for what is queued to be put.」
+const WindowDrain = 10 * time.Second
+
 var _ storage.AttestationObserver = (*Window)(nil)
 
 func NewWindow(store *Store, failed func(error)) *Window {
-	return NewWindowOver(store, WindowQueue, failed)
+	return NewWindowOver(store, WindowQueue, WindowDrain, failed)
 }
 
-// 「[Opus 5.5] NewWindowOver is a window over any putter, with a queue of queue.」
-func NewWindowOver(store putter, queue int, failed func(error)) *Window {
-	w := &Window{store: store, failed: failed, queue: make(chan *types.As, queue), stopped: make(chan struct{})}
+// 「[Opus 5.5] NewWindowOver is a window over any putter, with a queue of queue, whose
+// close waits drain for what is queued.」
+func NewWindowOver(store putter, queue int, drain time.Duration, failed func(error)) *Window {
+	w := &Window{store: store, failed: failed, drain: drain, queue: make(chan *types.As, queue),
+		stopped: make(chan struct{}), cut: make(chan struct{})}
 	go w.work()
 	return w
 }
@@ -159,6 +173,12 @@ func NewWindowOver(store putter, queue int, failed func(error)) *Window {
 func (w *Window) work() {
 	defer close(w.stopped)
 	for as := range w.queue {
+		select {
+		case <-w.cut:
+			w.failed(errors.Newf("the etcd window closed before %s was put: it waited %s", as.ID, w.drain))
+			continue
+		default:
+		}
 		if err := w.store.Put(as); err != nil {
 			w.failed(err)
 		}
@@ -166,25 +186,46 @@ func (w *Window) work() {
 }
 
 func (w *Window) OnAttestationCreated(as *types.As) {
-	defer func() {
-		// 「[Opus 5.5] A window closed while its namespace still wrote: said, not a panic.」
-		if recover() != nil {
-			w.failed(errors.Newf("the etcd window is closed: %s is not put", as.ID))
-		}
-	}()
+	w.mu.Lock()
+	if w.closed {
+		w.mu.Unlock()
+		w.failed(errors.Newf("the etcd window is closed: %s is not put", as.ID))
+		return
+	}
+	queued := false
 	select {
 	case w.queue <- as:
+		queued = true
 	default:
+	}
+	w.mu.Unlock()
+	if !queued {
 		w.failed(errors.Newf("%d attestations wait for etcd already: %s is not put into the window", cap(w.queue), as.ID))
 	}
 }
 
-// 「[Opus 5.5] Close puts what waits, stops the worker and closes the store. Safe to
-// call more than once.」
+// 「[Opus 5.5] Close takes nothing more, waits drain for what is queued to be put, hands
+// what is not put by then to failed, lets the put under way finish, and closes the
+// store after it. Safe to call more than once.」
 func (w *Window) Close() {
 	w.once.Do(func() {
+		w.mu.Lock()
+		w.closed = true
 		close(w.queue)
-		<-w.stopped
+		w.mu.Unlock()
+		timer := time.NewTimer(w.drain)
+		defer timer.Stop()
+		select {
+		case <-w.stopped:
+		case <-timer.C:
+			// 「[Opus 5.5] The drain is over: what is still queued is said now, while the put
+			// under way may still be held; the worker says any it took after the cut.」
+			close(w.cut)
+			for as := range w.queue {
+				w.failed(errors.Newf("the etcd window closed before %s was put: it waited %s", as.ID, w.drain))
+			}
+			<-w.stopped
+		}
 		w.store.Close()
 	})
 }
