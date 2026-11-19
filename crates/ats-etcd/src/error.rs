@@ -20,6 +20,10 @@ pub enum EtcdError {
     BadNamespace {
         value: String,
     },
+    /// 「[Opus 5.5] Keys are kept under a prefix that starts and ends at `/`.」
+    BadPrefix {
+        value: String,
+    },
     /// 「[Opus 5.5] An argument handed over the FFI was not a string.」
     BadArgument {
         call: &'static str,
@@ -65,6 +69,7 @@ impl EtcdError {
             EtcdError::Runtime(_) => "runtime",
             EtcdError::Connect { .. } => "connect",
             EtcdError::BadNamespace { .. } => "bad-namespace",
+            EtcdError::BadPrefix { .. } => "bad-prefix",
             EtcdError::BadArgument { .. } => "bad-argument",
             EtcdError::NullPointer { .. } => "null-pointer",
             EtcdError::TooLong { .. } => "too-long",
@@ -90,6 +95,9 @@ impl EtcdError {
             }
             EtcdError::BadNamespace { value } => {
                 format!("namespace {value:?} cannot name a key prefix")
+            }
+            EtcdError::BadPrefix { value } => {
+                format!("prefix {value:?} does not start and end at /")
             }
             EtcdError::NullPointer { call, argument } => {
                 format!("{call} was handed a null {argument}")
@@ -117,6 +125,7 @@ impl EtcdError {
             EtcdError::Runtime(e) => e.to_string(),
             EtcdError::BadArgument { source, .. } => source.to_string(),
             EtcdError::BadNamespace { .. }
+            | EtcdError::BadPrefix { .. }
             | EtcdError::NullPointer { .. }
             | EtcdError::TooLong { .. }
             | EtcdError::Store(_) => String::new(),
@@ -131,6 +140,7 @@ impl EtcdError {
             EtcdError::BadArgument { .. } => Some("qntx-ffi-common"),
             EtcdError::Store(_) => Some("ats"),
             EtcdError::BadNamespace { .. }
+            | EtcdError::BadPrefix { .. }
             | EtcdError::NullPointer { .. }
             | EtcdError::TooLong { .. } => None,
         }

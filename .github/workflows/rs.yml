@@ -73,6 +73,10 @@
           "run": "nix build .#etcd --print-build-logs --out-link result-etcd\nresult-etcd/bin/etcd --version\n"
         },
         {
+          "name": "Test scripts/with-etcd.sh",
+          "run": "scripts/with-etcd.test.sh"
+        },
+        {
           "name": "Test ats-etcd",
           "run": "scripts/with-etcd.sh result-etcd/bin nix develop --command cargo test --package ats-etcd --features ffi"
         },
@@ -228,6 +232,7 @@
         "cmd/parity/**",
         "scripts/with-postgres.sh",
         "scripts/with-etcd.sh",
+        "scripts/with-etcd.test.sh",
         "ats/storage/etcdcgo/**",
         "flake.lock",
         ".github/workflows/rs.yml"

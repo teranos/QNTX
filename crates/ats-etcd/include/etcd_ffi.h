@@ -33,6 +33,27 @@ typedef struct {
     EtcdStore *store;
 } OpenResultC;
 
+typedef struct EtcdKeys EtcdKeys;
+
+typedef struct {
+    bool success;
+    char *error_msg;
+    EtcdKeys *keys;
+} KeysOpenResultC;
+
+typedef struct {
+    bool success;
+    char *error_msg;
+    char *json;
+} HeldResultC;
+
+KeysOpenResultC etcd_keys_new(const char *endpoint, const char *prefix);
+void etcd_keys_free(EtcdKeys *keys);
+StorageResultC etcd_keys_set(EtcdKeys *keys, const char *whole_json);
+HeldResultC etcd_keys_held(EtcdKeys *keys);
+void etcd_keys_open_result_free(KeysOpenResultC result);
+void etcd_held_result_free(HeldResultC result);
+
 OpenResultC etcd_storage_new(const char *endpoint, const char *ns);
 void etcd_storage_free(EtcdStore *store);
 
