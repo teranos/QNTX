@@ -373,6 +373,26 @@
     ]
   },
   {
+    "name": "room_agent_told",
+    "sqlite": true,
+    "duckdb": false,
+    "postgres": false,
+    "rebuilt": false,
+    "sites": [
+      "internal/roomcomments/told.go"
+    ]
+  },
+  {
+    "name": "room_agent_wake_due",
+    "sqlite": true,
+    "duckdb": false,
+    "postgres": false,
+    "rebuilt": false,
+    "sites": [
+      "internal/roomcomments/due.go"
+    ]
+  },
+  {
     "name": "schedule_ticks",
     "sqlite": false,
     "duckdb": true,

@@ -20,9 +20,18 @@ type Config struct {
 	Nodes      NodesConfig      `mapstructure:"nodes"`
 	Laye       LayeConfig       `mapstructure:"laye"`
 	Agent      AgentConfig      `mapstructure:"agent"`
+	Etcd       EtcdConfig       `mapstructure:"etcd"`
 
 	// said is the keys something said, recorded as the config is read.
 	said map[string]bool
+}
+
+// "「[Opus 5.5] isnt the right framing to think of etcd another place where attestations can go? while QNTX holds it durably?」"
+
+// 「[Opus 5.5] EtcdConfig names the etcd the node puts each attestation it
+// 「[Opus 5.5] creates into, for the window ats-etcd keeps. Empty endpoint: no window.」」
+type EtcdConfig struct {
+	Endpoint string `mapstructure:"endpoint"`
 }
 
 // AgentConfig is the agents this node runs (ADR-048).
