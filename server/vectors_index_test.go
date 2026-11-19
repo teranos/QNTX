@@ -57,3 +57,33 @@ func TestAReplacementProviderIsAskedToMakeTheIndexAgain(t *testing.T) {
 	require.NoError(t, index.Keep("m", 2, "a", []float32{1, 0}), "the new provider is asked to make embeddings.m")
 	assert.True(t, second.made["embeddings.m"])
 }
+
+// replacedMidCall is a provider replaced while its CreateIndex is answering.
+type replacedMidCall struct {
+	freshProvider
+	replace func()
+}
+
+func (p *replacedMidCall) CreateIndex(ctx context.Context, in *protocol.CreateIndexRequest, opts ...grpc.CallOption) (*protocol.CreateIndexResponse, error) {
+	p.replace()
+	return p.freshProvider.CreateIndex(ctx, in, opts...)
+}
+
+// An index a call to the old provider made, ending after the new provider
+// registered, is not taken as made for the new one.
+func TestAnIndexMadeByAProviderReplacedMidCallIsMadeAgain(t *testing.T) {
+	router := services.NewVectorSearchServer("token", zap.NewNop().Sugar())
+	index := &routedIndex{router: func() (*services.VectorSearchServer, string, *protocol.Refusal) {
+		return router, "token", nil
+	}}
+	second := &freshProvider{made: map[string]bool{}}
+	first := &replacedMidCall{freshProvider: freshProvider{made: map[string]bool{}}, replace: func() {
+		router.SetService(second)
+		index.providerChanged()
+	}}
+	router.SetService(first)
+
+	_ = index.Keep("m", 2, "a", []float32{1, 0})
+	require.NoError(t, index.Keep("m", 2, "b", []float32{0, 1}), "the new provider is asked to make embeddings.m")
+	assert.True(t, second.made["embeddings.m"])
+}

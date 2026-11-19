@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
@@ -17,7 +18,10 @@ import (
 // a vector of that model is kept.
 type routedIndex struct {
 	s    *QNTXServer
-	made sync.Map // index names made with the provider registered now
+	made sync.Map // made indexes, by provider generation and name
+	// generation counts the providers registered: an index made for one is
+	// not made for the next, even when a call to the first ends after.
+	generation atomic.Uint64
 	// router is the vector search router and its token; the node's own when
 	// nil.
 	router func() (*services.VectorSearchServer, string, *protocol.Refusal)
@@ -34,7 +38,14 @@ func (r *routedIndex) vectorRouter() (*services.VectorSearchServer, string, *pro
 // providerChanged forgets which indexes were made: a provider that registers
 // may hold none of them, and is asked to make each again.
 func (r *routedIndex) providerChanged() {
+	r.generation.Add(1)
 	r.made.Clear()
+}
+
+// madeKey is an index as made for the provider of one generation.
+type madeKey struct {
+	generation uint64
+	index      string
 }
 
 // indexCallTimeout bounds one call to the vector search provider.
@@ -51,11 +62,12 @@ func (r *routedIndex) Keep(model string, dimensions int, id string, vector []flo
 	ctx, cancel := context.WithTimeout(context.Background(), indexCallTimeout)
 	defer cancel()
 	index := embeddingsIndex(model)
-	if _, made := r.made.Load(index); !made {
+	made := madeKey{generation: r.generation.Load(), index: index}
+	if _, done := r.made.Load(made); !done {
 		if _, err := router.CreateIndex(ctx, &protocol.CreateIndexRequest{AuthToken: token, Name: index, Dimensions: int32(dimensions)}); err != nil {
 			return errors.Wrapf(err, "the index %s of %d dimensions was not made", index, dimensions)
 		}
-		r.made.Store(index, true)
+		r.made.Store(made, true)
 	}
 	if _, err := router.AddVectors(ctx, &protocol.AddVectorsRequest{AuthToken: token, Index: index,
 		Vectors: []*protocol.VectorEntry{{Id: id, Vector: vector}}}); err != nil {
