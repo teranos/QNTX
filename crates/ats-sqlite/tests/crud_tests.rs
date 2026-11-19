@@ -292,3 +292,43 @@ fn an_update_moves_the_lookups_with_the_row() {
     };
     assert_eq!(store.query(&by_new).unwrap().attestations.len(), 1);
 }
+
+/// The commits in a WAL: the frames whose header says how large the database
+/// is after them (bytes 4..8 of a frame header; zero in a frame that ends no
+/// transaction).
+fn commits_in(wal: &std::path::Path, page_size: usize) -> usize {
+    let bytes = std::fs::read(wal).unwrap();
+    let frames = bytes.get(32..).unwrap_or(&[]);
+    frames
+        .chunks_exact(24 + page_size)
+        .filter(|frame| frame.get(4..8) != Some(&[0, 0, 0, 0]))
+        .count()
+}
+
+// "but this sounds fixable from the code side, your solution is a quick fix"
+// A replay of 7,087 rows into a node on k left a WAL of 913,395,792 bytes
+// (2026-11-18): a put committed its row and each of its lookup rows apart.
+#[test]
+fn test_a_put_is_one_commit() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("puts.db");
+    let mut store = SqliteStore::open(&path).unwrap();
+    let page_size: usize = rusqlite::Connection::open(&path)
+        .unwrap()
+        .query_row("PRAGMA page_size", [], |row| row.get::<_, i64>(0))
+        .unwrap() as usize;
+    let wal = dir.path().join("puts.db-wal");
+    let before = commits_in(&wal, page_size);
+
+    for i in 0..20 {
+        store
+            .put(create_test_attestation(&format!("AS-commit-{i}")))
+            .unwrap();
+    }
+
+    assert_eq!(
+        commits_in(&wal, page_size) - before,
+        20,
+        "twenty puts are twenty commits"
+    );
+}
