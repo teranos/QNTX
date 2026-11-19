@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             path.display().to_string()
         ));
         // Matches Go: a filename containing "optional" may fail without
-        // failing the run, because it depends on sqlite-vec being present.
+        // failing the run.
         if name.contains("optional") {
             optional.push_str(&format!("    {version:?},\n"));
         }

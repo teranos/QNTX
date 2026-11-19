@@ -99,6 +99,7 @@ type QNTXServer struct {
 	pluginManager         pluginManaging              // Plugin process manager, or why the node has none
 	services              plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager       *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+	vectorIndex           *routedIndex                // where the embedding store keeps and finds its vectors
 	// What the mail service was wired with (ADR-041), read back by the mail
 	// signum so ROOT sees what sends and not what am.toml says since.
 	mailConfig config.MailConfig

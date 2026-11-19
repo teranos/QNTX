@@ -659,6 +659,9 @@ message Sigil {
   // gives is that message's fields, each in its .proto's words, and nothing
   // is said of them a second time.
   string answer = 6;
+  // The surfaces it is asked over: http, mcp, a2a, subsystem. None is every
+  // surface; not everything needs to be a sigil an LLM calls.
+  repeated string surfaces = 7;
 }
 
 // A Param is one thing a sigil takes. It says nothing about how it travels:
@@ -669,7 +672,8 @@ message Param {
   bool required = 3;
   // Every value it takes, when it takes only some.
   repeated string one_of = 4;
-  // What its value is: empty is text, "count" is a whole number, zero or more.
+  // What its value is: empty is text, "count" is a whole number, zero or
+  // more, "list" is a JSON array.
   string kind = 5;
 }
 

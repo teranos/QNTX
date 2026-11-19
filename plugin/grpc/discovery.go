@@ -176,6 +176,7 @@ type PluginManager struct {
 	pluginRestarted []func(name string)                                         // told after a plugin comes back (clear HTTP mux state)
 	embeddingReady  []func(name string, client protocol.EmbeddingServiceClient) // told when an embedding provider is ready (init or restart)
 	pythonReady     []func(name string, client protocol.PythonServiceClient)    // told when a python_provider plugin initializes
+	vectorReady     []func(name string)                                         // told when a vector search provider is ready (init or restart)
 	lifecycle       []func(pluginName, version, event string, routes []string)  // told on plugin lifecycle events
 
 	// The node's WebSocket settings, kept so a plugin loaded after they were
@@ -471,6 +472,15 @@ func (m *PluginManager) SetOnEmbeddingProviderReady(fn func(name string, client 
 	m.embeddingReady = append(m.embeddingReady, fn)
 }
 
+// SetOnVectorSearchProviderReady adds fn to what is told when a vector search
+// provider plugin is ready, on init or after a restart or an enable: the
+// server offers it what the embedding store kept.
+func (m *PluginManager) SetOnVectorSearchProviderReady(fn func(name string)) {
+	m.wiringMu.Lock()
+	defer m.wiringMu.Unlock()
+	m.vectorReady = append(m.vectorReady, fn)
+}
+
 // SetOnPythonProviderReady adds fn to what is told when a plugin declaring
 // python_provider=true finishes initialization. The server uses this to
 // wire the gRPC PythonService executor for "py" element execution.
@@ -638,8 +648,20 @@ func (j servicesJoint) join(name string, proxy *ExternalDomainProxy) ([]string, 
 		j.m.logger.Debugf("Re-registered search provider '%s' after restart", name)
 	}
 	j.m.wiringMu.RLock()
-	embeddingReady, pythonReady := j.m.embeddingReady, j.m.pythonReady
+	embeddingReady, pythonReady, vectorReady := j.m.embeddingReady, j.m.pythonReady, j.m.vectorReady
 	j.m.wiringMu.RUnlock()
+	if proxy.IsVectorSearchProvider() {
+		roles = append(roles, "vector-search-provider")
+		router := j.sm.GetVectorSearchRouter()
+		if router == nil {
+			return roles, errors.Newf("vector search provider %s is not joined: the node runs no vector search router", name)
+		}
+		router.SetService(proxy.VectorSearchServiceClient())
+		j.m.logger.Debugf("Re-registered vector search provider '%s' after restart", name)
+		for _, fn := range vectorReady {
+			fn(name)
+		}
+	}
 	if proxy.IsEmbeddingProvider() {
 		roles = append(roles, "embedding-provider")
 		for _, fn := range embeddingReady {

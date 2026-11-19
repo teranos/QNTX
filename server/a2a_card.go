@@ -119,6 +119,9 @@ func (s *QNTXServer) a2aCardOf(r *http.Request, admitted auth.Admission, known b
 		reached := false
 		for _, sigil := range signum.GetSigils() {
 			held := heldBy{signum: signum.GetName(), sigil: sigil}
+			if !onSurface(sigil, reach.OverA2A) {
+				continue
+			}
 			if reaching, anyone := s.reachingOver(reach.OverA2A, held); offeredTo(admitted, known, reaching, anyone) {
 				reached = true
 				break

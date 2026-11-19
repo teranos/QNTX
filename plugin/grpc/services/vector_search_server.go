@@ -163,3 +163,30 @@ func (s *VectorSearchServer) CreateIndex(ctx context.Context, req *protocol.Crea
 		Dimensions: int32(dimensions.Int()),
 	})
 }
+
+// DeleteVectors removes vectors from a named index by their ids.
+func (s *VectorSearchServer) DeleteVectors(ctx context.Context, req *protocol.DeleteVectorsRequest) (*protocol.DeleteVectorsResponse, error) {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+		return nil, err
+	}
+
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
+	}
+
+	index, err := named.TextOf("index", req.Index)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := named.ItemsOf("ids", req.Ids)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc.DeleteVectors(ctx, &protocol.DeleteVectorsRequest{
+		AuthToken: req.AuthToken,
+		Index:     index.String(),
+		Ids:       ids.All(),
+	})
+}

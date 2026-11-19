@@ -35,9 +35,13 @@ message EmbedRequest {
 }
 
 message EmbedResponse {
+  // The text as a vector, a number per dimension.
   repeated float vector = 1;
+  // How many numbers the vector holds.
   int32 dimensions = 2;
+  // The model that embedded it.
   string model = 3;
+  // How many tokens the text was read as.
   int32 tokens = 4;
 }
 
@@ -48,14 +52,20 @@ message BatchEmbedRequest {
 }
 
 message BatchEmbedResponse {
+  // A vector per text, in the order the texts were sent.
   repeated EmbeddingVector results = 1;
+  // How many numbers each vector holds.
   int32 dimensions = 2;
+  // The model that embedded them.
   string model = 3;
+  // How many tokens the texts were read as, together.
   int32 total_tokens = 4;
 }
 
 message EmbeddingVector {
+  // One text as a vector, a number per dimension.
   repeated float vector = 1;
+  // How many tokens that text was read as.
   int32 tokens = 2;
 }
 
