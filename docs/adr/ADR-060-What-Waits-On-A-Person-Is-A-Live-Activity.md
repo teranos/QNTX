@@ -3,9 +3,7 @@
 Date: 2026-11-14
 Status: Decided
 
-"the magic island"
-
-"AND ON MY MAC AS WELL"
+"the magic island on iPhone and OSX"
 
 ## The rule
 
