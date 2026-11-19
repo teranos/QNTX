@@ -1,16 +1,22 @@
 package server
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/teranos/QNTX/ats/identity"
+	"github.com/teranos/QNTX/ats/types"
 	pb "github.com/teranos/QNTX/element/proto"
+	"github.com/teranos/QNTX/internal/measure"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -27,6 +33,11 @@ var allowedContentTypes = map[string]bool{
 	"image/webp":      true,
 	"image/svg+xml":   true,
 	"text/plain":      true,
+	"audio/mp4":       true,
+	"audio/webm":      true,
+	"audio/wav":       true,
+	"audio/mpeg":      true,
+	"audio/ogg":       true,
 }
 
 // allowedExtensions is the set of file extensions accepted for upload.
@@ -39,7 +50,32 @@ var allowedExtensions = map[string]bool{
 	".webp": true,
 	".svg":  true,
 	".txt":  true,
+	".m4a":  true,
+	".webm": true,
+	".wav":  true,
+	".mp3":  true,
+	".ogg":  true,
 }
+
+// "Think. As a human user I STT into the room from my phone."
+//
+// 「[Fable 5.2] recordingStartsAs is what the bytes of a recording are detected as, by its」
+// 「[Fable 5.2] extension. A container that also carries video is detected as video, and a」
+// 「[Fable 5.2] file named as a recording is kept as the sound its name says (mimeByExtension).」
+var recordingStartsAs = map[string]string{
+	".m4a":  "video/mp4",
+	".webm": "video/webm",
+	".wav":  "audio/wave",
+	".mp3":  "audio/mpeg",
+	".ogg":  "application/ogg",
+}
+
+// 「[Fable 5.2] The line the node writes of a file it keeps (ADR-058): the asset, by the name」
+// 「[Fable 5.2] its bytes have, is held of the node, by who brought it.」
+const (
+	assetNamePrefix = "sha256:"
+	assetHeld       = "held"
+)
 
 // filesDir returns the directory for stored files, derived from the database path.
 // Creates the directory if it doesn't exist.
@@ -122,6 +158,10 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		detectedType = strings.TrimSpace(detectedType[:idx])
 	}
 
+	if startsAs, recording := recordingStartsAs[ext]; recording && detectedType == startsAs {
+		detectedType = mimeByExtension[ext]
+	}
+
 	if !allowedContentTypes[detectedType] {
 		s.logger.Warnw("Rejected file upload: disallowed content type",
 			"filename", header.Filename, "detected_type", detectedType, "extension", ext)
@@ -145,6 +185,15 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// "k would be storing media assets"
+	// 「[Fable 5.2] A kept file is attested as held of this node, so a node that has no name」
+	// 「[Fable 5.2] to hold it as keeps none.」
+	if s.nodeDID == nil || s.nodeDID.DID == "" {
+		s.logger.Errorw("File not kept: this node has no DID to hold it as", "filename", header.Filename)
+		http.Error(w, "this node has no name to hold a file as", http.StatusInternalServerError)
+		return
+	}
+
 	id := uuid.New().String()
 	storedName := id + ext
 	destPath := filepath.Join(dir, storedName)
@@ -156,7 +205,10 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	written, err := io.Copy(dest, file)
+	// "i never wanted twelvelabs to be the source of truth"
+	// 「[Fable 5.2] The bytes are hashed as they are written: the name is of what is on disk.」
+	hashed := sha256.New()
+	written, err := io.Copy(io.MultiWriter(dest, hashed), file)
 	if err != nil {
 		s.logger.Errorw("Failed to write uploaded file", "path", destPath, "written", written, "error", err)
 		sqlclose.Log(dest.Close(), s.logger, "the partial upload")
@@ -177,14 +229,61 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.logger.Infow("File uploaded", "id", id, "filename", header.Filename, "size", written, "content_type", detectedType)
+	asset := assetNamePrefix + hex.EncodeToString(hashed.Sum(nil))
+	if err := s.attestHeld(actorOf(r.Context()), asset, id, header.Filename, detectedType, written); err != nil {
+		s.logger.Errorw("File not kept: the node did not attest it", "path", destPath, "asset", asset, "error", err)
+		if rmErr := os.Remove(destPath); rmErr != nil {
+			s.logger.Errorw("Failed to remove a file nothing attests", "path", destPath, "error", rmErr)
+		}
+		http.Error(w, "failed to attest file", http.StatusInternalServerError)
+		return
+	}
+
+	s.logger.Infow("File uploaded", "id", id, "asset", asset, "filename", header.Filename, "size", written, "content_type", detectedType)
 
 	respond(w, s.logger, http.StatusOK, &pb.FileUploadResult{
 		Id:          id,
 		Filename:    header.Filename,
 		ContentType: detectedType,
 		Size:        written,
+		Asset:       asset,
 	})
+}
+
+// "twelvelabs shaped"
+// "everyone get's to hold some amount of assets"
+//
+// 「[Fable 5.2] attestHeld writes that this node holds an asset, by who brought it, and what」
+// 「[Fable 5.2] TwelveLabs says of an asset of its own: filename, file_type, size, created_at,」
+// 「[Fable 5.2] method and status. file_id is where this node serves the bytes.」
+func (s *QNTXServer) attestHeld(by, asset, fileID, filename, fileType string, size int64) error {
+	store := s.held.TheNodesOwnRecords()
+	if store == nil {
+		return errors.Newf("this node holds no store to attest %s into", asset)
+	}
+	holder := s.nodeDID.DID
+	id, err := identity.GenerateASUIDWithRetry("AS", asset, assetHeld, holder, store.AttestationExists)
+	if err != nil {
+		return errors.Wrapf(err, "failed to name the %s line of %s", assetHeld, asset)
+	}
+	at := time.Now()
+	if err := store.CreateAttestation(&types.As{
+		ID: id, Subjects: []string{asset}, Predicates: []string{assetHeld}, Contexts: []string{holder},
+		Actors: []string{by}, Timestamp: at, CreatedAt: at, Source: pluginSource,
+		Attributes: map[string]any{
+			"file_id":    fileID,
+			"filename":   filename,
+			"file_type":  fileType,
+			"size":       size,
+			"created_at": at.UTC().Format(time.RFC3339),
+			"method":     "direct",
+			"status":     "ready",
+		},
+	}); err != nil {
+		return errors.Wrapf(err, "the %s line of %s was not written", assetHeld, asset)
+	}
+	measure.Count(measure.AttestationsWritten, 1)
+	return nil
 }
 
 // handleFileServe serves a stored file by ID.
@@ -247,6 +346,11 @@ var mimeByExtension = map[string]string{
 	".webp": "image/webp",
 	".svg":  "image/svg+xml",
 	".txt":  "text/plain",
+	".m4a":  "audio/mp4",
+	".webm": "audio/webm",
+	".wav":  "audio/wav",
+	".mp3":  "audio/mpeg",
+	".ogg":  "audio/ogg",
 }
 
 // storedFile is where the file with this ID is kept, by the ID alone or with
