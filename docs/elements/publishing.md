@@ -94,9 +94,9 @@ with `Content-Type: text/javascript`; what produced that string is yours.
 `--to` names the node. Without it, the one this machine runs, on the port
 `am.toml` gives.
 
-The token is `--token`, then `$QNTX_TOKEN`, then `~/.qntx/token`. A refusal
-names which of those it used, so a 403 tells you which credential was refused
-rather than that something was.
+Each request is signed with `~/.qntx/key`, the key `ground code login` keeps
+and the node holds a grant for: "A signature proves the key, and nothing
+reusable leaves the node."
 
 An element is published into the namespace the caller acts in, and served to that
 namespace alone. Namespaces are their own universes and nothing crosses

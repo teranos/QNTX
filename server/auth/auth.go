@@ -110,7 +110,10 @@ type Handler struct {
 	issuers []string
 	// The did:key each issuer says it signs as, asked once (signed.go).
 	issuerDIDs sync.Map
-	issued     issuedAnswers
+	// laye.did: the laye in front of this node, whose signature carries a
+	// session on the grant this node holds for it (laye.go).
+	laye   string
+	issued issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
 	logsInElsewhere bool
@@ -119,9 +122,15 @@ type Handler struct {
 	githubForPeers         GitHubGet
 	githubLocationForPeers GitHubLocate
 	// nodes.peers: this primary's peers, by did:key and by name.
-	nodes    map[string]Client
-	tokens   TokenStore // bearer token path; may be nil during init
-	attestor Attestor   // records admissions; nil until the store is up
+	nodes map[string]Client
+	// 「[Opus 5.5] auth.grants: a live grant for each key it lists, by did:key, re-read」
+	// 「[Opus 5.5] when am.toml changes.」
+	declared atomic.Pointer[map[string]TokenInfo]
+	// 「[Opus 5.5] auth.grants' roles and auth.words: the lines ROOT says in am.toml, read」
+	// 「[Opus 5.5] beside the store's, re-read with the grants.」
+	declaredRoles atomic.Pointer[declaredLines]
+	tokens        TokenStore // bearer token path; may be nil during init
+	attestor      Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
 	// reader is a node where nobody holds a role.
@@ -572,14 +581,9 @@ func (h *Handler) MintedBy(did string) (string, bool) {
 	if h == nil || h.tokens == nil || did == "" {
 		return "", false
 	}
-	held, err := h.tokens.List()
-	if err != nil {
-		return "", false
-	}
-	for _, t := range held {
-		if t.DID == did && t.MintedBy != "" {
-			return t.MintedBy, true
-		}
+	// Found by its DID, and the list not read: a DID names one token.
+	if found, known := h.tokenOf(did); known && found.MintedBy != "" {
+		return found.MintedBy, true
 	}
 	return "", false
 }
@@ -629,6 +633,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(deviceAuthorizationPath, h.handleDeviceAuthorization)
 	mux.answer(deviceApprovePath, h.handleDeviceApprove)
 	mux.answer(deviceDonePath, h.handleDeviceDone)
+	// A key that was said yes to admits a session's key, signing as itself (ADR-059).
+	mux.answer(admitPath, h.handleAdmit)
 	// A node asks whether a token this node issued is live, signing as itself.
 	mux.answer(introspectPath, h.handleIntrospect)
 	// A peer asks for the lines about the namespaces it serves, signing as itself.
@@ -868,6 +874,10 @@ var a2aStatus = map[int]string{http.StatusUnauthorized: "UNAUTHENTICATED", http.
 // "HTTP error responses use the google.rpc.Status JSON representation" (A2A
 // §11.6), and as every other refusal here elsewhere.
 func (h *Handler) refuse(w http.ResponseWriter, r *http.Request, status int, message string) {
+	if asksOverGRPC(r) {
+		h.refuseGRPC(w, status, message)
+		return
+	}
 	if strings.HasPrefix(r.URL.Path, ixOtelPrefix) {
 		h.refuseOTLP(w, r, status, message)
 		return
@@ -903,5 +913,5 @@ func isAPIRequest(r *http.Request) bool {
 			return true
 		}
 	}
-	return strings.Contains(r.Header.Get("Accept"), "application/json")
+	return asksOverGRPC(r) || strings.Contains(r.Header.Get("Accept"), "application/json")
 }

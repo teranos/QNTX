@@ -1,0 +1,12 @@
+Hermes Agent by Nous Research
+
+Repository: https://github.com/NousResearch/hermes-agent
+Release: https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.5
+Git tag: v0.22.5 (annotated)
+Commit: bf0203a794a07aac3ff764972ab9087baa4e4f4e
+Published: 2026-10-23T05:28:45Z
+
+This pin records the exact upstream source commit for Hermes Agent 0.22.5.
+The GitHub release has no attached binary assets. No binary, source archive,
+dependencies, or environment are vendored or verified by this pin.
+No installer, executable, agent runtime, or model selection is implemented.

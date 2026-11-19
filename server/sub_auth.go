@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
@@ -243,35 +244,32 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
 		return s.accessLog(s.authGate(handler))
 	}
-	// A sqlite deployment has no token store,
-	// and the bool says so by name. The nil store makes Middleware skip the
-	// bearer path and /auth/tokens answer 503.
 	spent, err := auth.ExpiredTokenHashes(s.nodeDB, time.Now().UTC().UnixMilli())
 	if err != nil {
 		return errors.Wrap(err, "failed to read which access tokens the operational db holds as expired")
 	}
-	tokenRecord, hasTokenStore, err := newTokenRecord(s.deps.cfg, spent)
+	tokenRecord, hasTokenRecord, err := newTokenRecord(s.deps.cfg, spent)
 	if err != nil {
 		return errors.Wrap(err, "failed to open the access token record")
 	}
 	// An access token lives in the operational db (ADR-037). The record behind
 	// it is read once here and never on a request; recording a use writes the
 	// table alone, which is what stopped a PUT per authenticated request.
-	var tokenStore auth.TokenStore
-	if hasTokenStore {
-		table, tookIn, err := auth.OpenTokenTable(s.nodeDB, tokenRecord)
-		if err != nil {
-			return errors.Wrap(err, "failed to open the access_tokens table")
-		}
-		tokenStore = table
-		s.keepLastUsed(table)
-		s.logger.Infow("Access tokens held in the operational db",
-			"backend", s.deps.cfg.Storage.Backend,
-			"held", tookIn.Held,
-			"taken_in", tookIn.TakenIn,
-			"written_back", tookIn.WrittenBack,
-		)
+	// The operational db is sqlite on every backend, so every node keeps the
+	// table; a node with no record behind it keeps the table alone.
+	table, tookIn, err := auth.OpenTokenTable(s.nodeDB, tokenRecord)
+	if err != nil {
+		return errors.Wrap(err, "failed to open the access_tokens table")
 	}
+	tokenStore := auth.TokenStore(table)
+	s.keepLastUsed(table)
+	s.logger.Infow("Access tokens held in the operational db",
+		"backend", s.deps.cfg.Storage.Backend,
+		"record", hasTokenRecord,
+		"held", tookIn.Held,
+		"taken_in", tookIn.TakenIn,
+		"written_back", tookIn.WrittenBack,
+	)
 	// The take-in above is the record's whole cost for tokens now. It is worth
 	// seeing beside the readers that have not moved.
 	if reporter, ok := recordSpendOf(tokenRecord); ok {
@@ -338,11 +336,23 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := authHandler.SetPrimary(s.deps.cfg.Nodes.Primary); err != nil {
 		return err
 	}
+	// The laye in front of this node.
+	if err := authHandler.SetLaye(s.deps.cfg.Laye.DID); err != nil {
+		return err
+	}
 	// On the primary, its peers.
 	for _, peer := range s.deps.cfg.Nodes.Peers {
 		if err := authHandler.DeclarePeer(peer.Name, peer.DID, peer.Namespaces, peer.Origin, peer.ReturnAddress); err != nil {
 			return err
 		}
+	}
+	// 「[Opus 5.5] The keys am.toml admits while it lists them.」
+	if err := authHandler.SetGrants(declaredGrants(s.deps.cfg), declaredWords(s.deps.cfg)); err != nil {
+		return err
+	}
+	// 「[Opus 5.5] And the namespaces they act in, which am.toml names as well.」
+	if err := s.serveDeclaredNamespaces(s.deps.cfg); err != nil {
+		return err
 	}
 	// The status row asks them for theirs, as the person asking (statusline/peers.go).
 	s.askPeers = authHandler.AskPeers
@@ -371,6 +381,8 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		authHandler.SetRoleReader(held)
 		s.keepPrimaryLines(held)
 	}
+	// A node whose primary is laye goes by the roots laye says.
+	s.keepPrimaryRoots(authHandler)
 	// A peer's ci.watch asks GitHub through this node, with this node's token;
 	// this node, when it is a peer, asks through its own primary.
 	authHandler.SetGitHubForPeers(githubForPeers, githubLocationForPeers)
@@ -408,13 +420,40 @@ func (authSubsystem) Init(s *QNTXServer) error {
 func (s *QNTXServer) keepPrimaryLines(held *auth.PrimaryLines) {
 	ask := func() {
 		if err := held.Refresh(time.Now()); err != nil {
+			measure.Count(measure.LinesHeard, 1, measure.String(measure.AttrOutcome, "unanswered"))
 			s.logger.Errorw("The primary did not say what the lines are; the ones last heard stand", "error", err)
 			return
 		}
+		measure.Count(measure.LinesHeard, 1, measure.String(measure.AttrOutcome, "heard"))
 	}
 	s.wg.Go("auth.primaryLines", func() {
 		ask()
 		ticker := time.NewTicker(auth.LinesEvery)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-ticker.C:
+				ask()
+			}
+		}
+	})
+}
+
+// keepPrimaryRoots asks the primary for the roots once before anything that
+// speaks for ROOT starts (the Node Agent takes the first of them as it is
+// named), then every auth.RootsEvery until the node stops. A primary that
+// does not answer is said, and the roots last heard stand.
+func (s *QNTXServer) keepPrimaryRoots(h *auth.Handler) {
+	ask := func() {
+		if err := h.RefreshPrimaryRoots(time.Now()); err != nil {
+			s.logger.Errorw("The primary did not say who the roots are; the ones last heard stand", "error", err)
+		}
+	}
+	ask()
+	s.wg.Go("auth.primaryRoots", func() {
+		ticker := time.NewTicker(auth.RootsEvery)
 		defer ticker.Stop()
 		for {
 			select {
@@ -452,4 +491,22 @@ func (s *QNTXServer) keepLastUsed(table *auth.TokenTable) {
 			}
 		}
 	})
+}
+
+// 「[Opus 5.5] declaredGrants is auth.grants, as the auth handler holds it.」
+func declaredGrants(cfg *appcfg.Config) []auth.DeclaredGrant {
+	declared := make([]auth.DeclaredGrant, 0, len(cfg.Auth.Grants))
+	for _, grant := range cfg.Auth.Grants {
+		declared = append(declared, auth.DeclaredGrant{Label: grant.Label, DID: grant.DID, Namespaces: grant.Namespaces, Roles: grant.Roles})
+	}
+	return declared
+}
+
+// 「[Opus 5.5] declaredWords is auth.words, as the auth handler holds it.」
+func declaredWords(cfg *appcfg.Config) []auth.DeclaredWords {
+	declared := make([]auth.DeclaredWords, 0, len(cfg.Auth.Words))
+	for _, line := range cfg.Auth.Words {
+		declared = append(declared, auth.DeclaredWords{Write: line.Write, Read: line.Read, Of: line.Of, All: line.All})
+	}
+	return declared
 }

@@ -25,8 +25,11 @@ ats.workspace = true
 ats-duckdb = { path = "../ats-duckdb", optional = true }
 ats-postgres = { path = "../ats-postgres", optional = true }
 ats-sign = { path = "../ats-sign" }
+# The request JWT's encoding, and the client `push` posts with: the versions and
+# features this workspace already builds (libduckdb-sys's build takes ureq so).
+base64 = "=0.22.1"
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
 ats-sqlite = { path = "../ats-sqlite" }
-laye-me = { path = "../laye-me" }
 libp2p-identity = { version = "=0.2.14", features = ["ed25519"] }
 sacred-error.workspace = true
 serde_json.workspace = true

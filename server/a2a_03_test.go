@@ -1,0 +1,197 @@
+package server
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2aclient"
+	"github.com/a2aproject/a2a-go/v2/a2aclient/agentcard"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
+	a2agrpcv0 "github.com/a2aproject/a2a-go/v2/a2agrpc/v0"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/parity"
+	"github.com/teranos/QNTX/server/reach"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+)
+
+// "WHY CANT WE MAKE IT NOT MATTER"
+//
+// 「[Opus 5.5] The node speaks what the a2a-go it pins speaks, 0.3 and 1.0, each where」
+// 「[Opus 5.5] a2aSpoken mounts it, and a caller is answered in the version of where it」
+// 「[Opus 5.5] arrived, whichever it names or none.」
+
+// A client speaking only 0.3, by a2a-go's own compat, finds the node by its
+// card and is answered over HTTP+JSON and JSON-RPC alike.
+func TestAClientSpeaking03IsAnswered(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	served := httptest.NewServer(srv.served)
+	t.Cleanup(served.Close)
+	ctx := context.Background()
+	bearer := &http.Client{Transport: bearing{token: tokens[auth.LevelRoot]}}
+
+	card, err := (&agentcard.Resolver{Client: bearer, CardParser: a2av0.NewAgentCardParser()}).Resolve(ctx, served.URL)
+	require.NoError(t, err)
+
+	for binding, factory := range map[a2asdk.TransportProtocol]a2aclient.TransportFactory{
+		a2asdk.TransportProtocolHTTPJSON: a2av0.NewRESTTransportFactory(a2av0.RESTTransportConfig{Client: bearer}),
+		a2asdk.TransportProtocolJSONRPC:  a2av0.NewJSONRPCTransportFactory(a2av0.JSONRPCTransportConfig{Client: bearer}),
+	} {
+		t.Run(string(binding), func(t *testing.T) {
+			client, err := a2aclient.NewFromCard(ctx, card, a2aclient.WithDefaultsDisabled(), a2aclient.WithCompatTransport(a2av0.Version, binding, factory))
+			require.NoError(t, err)
+			answered, err := client.SendMessage(ctx, &a2asdk.SendMessageRequest{Message: a2asdk.NewMessage(a2asdk.MessageRoleUser, a2asdk.NewTextPart("how long has the box been up?"))})
+			require.NoError(t, err)
+			task, isTask := answered.(*a2asdk.Task)
+			require.True(t, isTask, "%T", answered)
+			assert.Equal(t, a2asdk.TaskStateCompleted, task.Status.State)
+			require.NotEmpty(t, task.Artifacts)
+			assert.Equal(t, "Up 3 days.", task.Artifacts[0].Parts[0].Text())
+		})
+	}
+}
+
+// "Clients that only speak 0.3 get sent to the 1.0 endpoint" (Qodo on #1745):
+// 「[Opus 5.5] the public card's 0.3 keys name where 0.3 is answered.」
+func TestThePublicCardSendsA03ClientTo03(t *testing.T) {
+	srv, _, _ := nodeAgentOverA2A(t, "")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/.well-known/agent-card.json", nil))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var card struct {
+		URL                string `json:"url"`
+		PreferredTransport string `json:"preferredTransport"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &card))
+	assert.True(t, strings.HasSuffix(card.URL, "/a2a/0.3"), card.URL)
+	assert.NotEmpty(t, card.PreferredTransport)
+}
+
+// The extended card asked over 0.3 is written in 0.3, naming where 0.3 is
+// answered, and verifies by the node's key over the bytes served.
+func TestTheExtendedCardIn03IsSignedAsServed(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, asBearer(http.MethodGet, "/a2a/0.3/v1/card", tokens[auth.LevelRoot]))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.NoError(t, verifiedBy(context.Background(), w.Body.Bytes(), srv.nodeDID.PublicKey, srv.nodeDID.KeyID()), w.Body.String())
+	var card struct {
+		URL             string `json:"url"`
+		ProtocolVersion string `json:"protocolVersion"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &card))
+	assert.Equal(t, "0.3", card.ProtocolVersion)
+	assert.True(t, strings.HasSuffix(card.URL, "/a2a/0.3"), card.URL)
+}
+
+// 「[Opus 5.5] Where a request arrives is the version it is answered in, whichever version」
+// 「[Opus 5.5] it names: GetTask is 1.0's method, which 0.3's JSON-RPC has none of.」
+func TestThePathDecidesTheVersionItsCallerNamesOrNot(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	asked := func(path, named string) int {
+		body := `{"jsonrpc": "2.0", "id": 1, "method": "GetTask", "params": {"id": "no-such-task"}}`
+		r := asBearer(http.MethodPost, path, tokens[auth.LevelRoot])
+		r.Body = io.NopCloser(strings.NewReader(body))
+		r.ContentLength = int64(len(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("A2A-Version", named)
+		w := httptest.NewRecorder()
+		srv.served.ServeHTTP(w, r)
+		var answered struct {
+			Error struct {
+				Code int `json:"code"`
+			} `json:"error"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &answered), w.Body.String())
+		return answered.Error.Code
+	}
+	assert.Equal(t, -32601, asked("/a2a/0.3", "1.0"), "0.3 at its base has no GetTask, whatever the caller names")
+	assert.NotEqual(t, -32601, asked("/a2a", "0.3"), "1.0 at its base has GetTask, whatever the caller names")
+}
+
+// 「[Fable 5.2] A client speaking only 0.3 over gRPC, by a2a-go's a2agrpc/v0, is answered at」
+// 「[Fable 5.2] 0.3's service path, naming no version.」
+func TestAClientSpeaking03IsAnsweredOverGRPC(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	node := httptest.NewUnstartedServer(srv.served)
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	protocols.SetUnencryptedHTTP2(true)
+	node.Config.Protocols = protocols
+	node.Start()
+	t.Cleanup(node.Close)
+	ctx := context.Background()
+	bearer := grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		return invoker(metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+tokens[auth.LevelRoot]), method, req, reply, cc, opts...)
+	})
+	client, err := a2aclient.NewFromEndpoints(ctx,
+		[]*a2asdk.AgentInterface{{URL: strings.TrimPrefix(node.URL, "http://"), ProtocolBinding: a2asdk.TransportProtocolGRPC, ProtocolVersion: a2av0.Version}},
+		a2aclient.WithDefaultsDisabled(),
+		a2aclient.WithCompatTransport(a2av0.Version, a2asdk.TransportProtocolGRPC, a2agrpcv0.NewGRPCTransportFactory(grpc.WithTransportCredentials(insecure.NewCredentials()), bearer)))
+	require.NoError(t, err)
+	answered, err := client.SendMessage(ctx, &a2asdk.SendMessageRequest{Message: a2asdk.NewMessage(a2asdk.MessageRoleUser, a2asdk.NewTextPart("how long has the box been up?"))})
+	require.NoError(t, err)
+	task, isTask := answered.(*a2asdk.Task)
+	require.True(t, isTask, "%T", answered)
+	assert.Equal(t, a2asdk.TaskStateCompleted, task.Status.State)
+}
+
+// 「[Fable 5.2] The node serves what the a2a-go it pins serves: every binding the SDK ships a」
+// 「[Opus 5.5] server for, in the version that server speaks, is a binding of a2aSpoken, and」
+// 「[Opus 5.5] nothing else is; and a card says the node is reached at each of them. A pin」
+// 「[Opus 5.5] bringing a version or a binding the node does not serve fails here, and the」
+// 「[Opus 5.5] row that serves it is the whole change.」
+func TestTheNodeServesWhatThePinnedSDKServes(t *testing.T) {
+	served, err := parity.A2AServes()
+	require.NoError(t, err)
+	var sdk []string
+	for _, binding := range served {
+		sdk = append(sdk, binding.Version+" "+binding.Binding)
+	}
+	var spoken []string
+	for _, v := range a2aSpoken {
+		for _, binding := range v.bindings() {
+			spoken = append(spoken, string(v.version)+" "+string(binding))
+		}
+	}
+	assert.ElementsMatch(t, sdk, spoken, "a2a.serves.json is what the pinned a2a-go serves (make says), and a2aSpoken what the node serves")
+
+	var carded []string
+	for _, held := range interfacesOf("https://node.example", "node.example:443", "") {
+		carded = append(carded, string(held.ProtocolVersion)+" "+string(held.ProtocolBinding))
+	}
+	assert.ElementsMatch(t, spoken, carded, "the node's card says it is reached at every binding it serves")
+}
+
+// 「[Opus 5.5] Every path a version is mounted at is one the tablet of REACH names.」
+func TestEveryVersionIsMountedWhereReachNamesIt(t *testing.T) {
+	named := reach.Paths()
+	for _, v := range a2aSpoken {
+		for _, path := range []string{v.base, v.base + "/", v.grpcService} {
+			assert.Contains(t, named, path, string(v.version)+" is mounted at "+path+", which no REACH line names")
+		}
+	}
+}
+
+// A 1.0 request naming no version, which a2a-go alone reads as 0.3, is answered
+// in 1.0: the version it is in.
+func TestA10RequestNamingNoVersionIsAnswered(t *testing.T) {
+	srv, tokens, _ := nodeAgentOverA2A(t, "")
+	body := saidToTheNode("how long has the box been up?", "")
+	r := asBearer(http.MethodPost, "/a2a/message:send", tokens[auth.LevelRoot])
+	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
+	w := httptest.NewRecorder()
+	srv.served.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "TASK_STATE_COMPLETED")
+}

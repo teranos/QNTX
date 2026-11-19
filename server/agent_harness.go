@@ -3,8 +3,12 @@ package server
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/teranos/QNTX/internal/claudecode"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
@@ -117,10 +121,18 @@ func (s *QNTXServer) nodeAgentSignum() sigil.Signum {
 					Answer: "protocol.SessionTranscript",
 					Http:   &protocol.Endpoint{Method: http.MethodGet, Path: nodeAgentPath + "/session"},
 				},
+				{
+					Name:   "stop",
+					Does:   "Stops the Node Agent's turn running in the harness named, as a person stops it: what it printed until then stays in its session, and it answers no more in that turn. Answers who the Node Agent is now.",
+					Takes:  []*protocol.Param{harness},
+					Answer: "protocol.NodeAgentAm",
+					Http:   &protocol.Endpoint{Method: http.MethodPost, Path: nodeAgentPath + "/stop"},
+				},
 				login.sigil,
 			},
 		},
 		Answers: map[string]sigil.Answer{
+			"stop":    s.nodeAgentStop,
 			"say":     s.nodeAgentSay,
 			"am":      s.nodeAgentAm,
 			"session": s.nodeAgentSession,
@@ -164,6 +176,36 @@ func (s *QNTXServer) nodeAgentSay(ctx context.Context, sent sigil.Sent) (any, *p
 		return &protocol.NodeAgentSaid{Agy: said}, nil
 	}
 	return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent answered in " + h.called + " as no Coding Agent Harness this node runs"}
+}
+
+// "i want to be able to make it stop"
+// "the sent button needs to change"
+// "into a stop button"
+// "why is an a2a message more importabt than a human message"
+//
+// nodeAgentStop interrupts the turn the Node Agent is in, in the harness
+// named, as a Task canceled over A2A interrupts its turn: by the stream the
+// turn prints to, whether the node runs it or its harness plugin does.
+func (s *QNTXServer) nodeAgentStop(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	h, refused := s.harnessNamed(sent)
+	if refused != nil {
+		return nil, refused
+	}
+	if s.nodeAgent == nil {
+		return nil, s.thereIsNoNodeAgent()
+	}
+	going := s.nodeAgent.in(h).answering.Load()
+	if going == nil {
+		return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "the Node Agent is in no turn in " + h.called + ", so there is nothing to stop"}
+	}
+	if going.stream == "" {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's turn in " + h.called + " prints to no stream yet, so it was not stopped: in Claude Code it does once it starts, and Pi, Codex and agy print to none"}
+	}
+	if err := claudecode.Interrupt(s.nodeAgent.home, filepath.Base(going.stream)); err != nil {
+		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the Node Agent's turn was not stopped: " + err.Error()}
+	}
+	s.logger.Infow("The Node Agent's turn was stopped", "harness", h.name, "session", going.session, "stream", going.stream, "by", actorOf(ctx))
+	return s.nodeAgentAm(ctx, sent)
 }
 
 func (s *QNTXServer) nodeAgentAm(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -298,11 +340,29 @@ func (s *QNTXServer) harnessSay(ctx context.Context, h *harness, sent sigil.Sent
 	return s.sayTo(ctx, h, agent, h.spec(), sent)
 }
 
+// collectsFor is whether what caller says to agent is collected for it rather
+// than said: the Node Agent, spoken to by no person.
+func (s *QNTXServer) collectsFor(agent *rootAgent, caller *http.Request) bool {
+	return agent != nil && agent == s.nodeAgent && agent.element == "" && !aPersonSpeaks(caller)
+}
+
 // sayTo says something to one agent in h, running as spec says.
 func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, spec agentSpec, sent sigil.Sent) (any, *protocol.Refusal) {
 	caller := sigil.Caller(ctx)
 	if caller == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what is said to " + agent.called + " is written down with who said it, and this asking carried no request"}
+	}
+	// "Agents cant wake Agents willy nilly"
+	// What is said to the Node Agent by no person is collected (collected.go):
+	// an agent's words, a room's wake, a delivery of GitHub's.
+	if s.collectsFor(agent, caller) {
+		due, err := s.collect(
+			collectedFor{DID: agent.did, Called: s.calledInMemory(agent.home), Model: spec.Model},
+			collectedSaid{From: s.calledBy(spokenBy(caller)), FromDID: spokenBy(caller), Says: sent["says"], At: time.Now(), Room: roomOf(caller)})
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what was said to " + agent.called + " by no person was not collected, and was not said: " + err.Error()}
+		}
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: collectedSays(s.calledInMemory(agent.home), due)}
 	}
 	screenshot, refused := s.screenshotFor(agent, sent)
 	if refused != nil {
@@ -348,11 +408,26 @@ type harnessesHeld struct {
 	held map[string]*harnessHeld
 }
 
-// harnessHeldBy is the binary of the harness named, or nil when the node holds none.
+// harnessHeldBy is the binary of the harness named, or nil when the node holds
+// none. A harness a plugin runs is held where the plugin is (ADR-059): the
+// binary is the plugin's own. Only a harness the node holds no binary of is
+// held so (harnessesAPluginHolds).
 func (s *QNTXServer) harnessHeldBy(name string) *harnessHeld {
 	s.harnessBinaries.mu.Lock()
-	defer s.harnessBinaries.mu.Unlock()
-	return s.harnessBinaries.held[name]
+	held := s.harnessBinaries.held[name]
+	s.harnessBinaries.mu.Unlock()
+	if held != nil {
+		return held
+	}
+	if !harnessesAPluginHolds[name] {
+		return nil
+	}
+	if _, runs := s.harnessBackend(name); !runs {
+		return nil
+	}
+	arrived := make(chan struct{})
+	close(arrived)
+	return &harnessHeld{name: name, fetched: arrived, path: harnessPluginHeld(name)}
 }
 
 // 「[Opus 5.5] holdHarnessOnce is the binary of the harness named, kept by

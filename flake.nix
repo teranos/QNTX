@@ -85,12 +85,12 @@
               curlOptsList = [ "--user-agent" "qntx-nix" ];
             });
           }) {
-            lockFile = ./Cargo.lock;
-            # sacred-error is a git dependency (github.com/teranos/sacred-error,
-            # the rev in Cargo.toml). Change the rev, change this hash: nix hash
-            # path --sri on a `git archive` of that rev.
-            outputHashes."sacred-error-0.1.0" = "sha256-AFWB5DT1EjfHvjuODxri3Dw+vGYo/EAnTwF0xpJwSQQ=";
-          };
+          lockFile = ./Cargo.lock;
+          # sacred-error is a git dependency (github.com/teranos/sacred-error,
+          # the rev in Cargo.toml). Change the rev, change this hash: nix hash
+          # path --sri on a `git archive` of that rev.
+          outputHashes."sacred-error-0.1.0" = "sha256-AFWB5DT1EjfHvjuODxri3Dw+vGYo/EAnTwF0xpJwSQQ=";
+        };
 
         # "i doubt we need to build ats each and every time / or laye / or the go backend"
         # The Rust derivations see only what the Rust build reads. A commit to
@@ -132,7 +132,7 @@
         ]);
         craneWasm = (crane.mkLib pkgs).overrideToolchain rustWasmToolchain;
 
-        # The three FFI libraries in one build: the dependencies they share
+        # The four FFI libraries in one build: the dependencies they share
         # are compiled once, with their features unified once, and the
         # artifacts carry over from one Cargo.lock to the next crate change.
         ffiArgs = {
@@ -140,10 +140,12 @@
           version = rustVersion;
           src = rustSrc;
           inherit cargoVendorDir;
-          cargoExtraArgs = "--locked --lib -p ats-sqlite -p ats-duckdb -p ats-postgres --features ats-sqlite/ffi,ats-duckdb/ffi,ats-postgres/ffi";
+          cargoExtraArgs = "--locked --lib -p ats-sqlite -p ats-duckdb -p ats-postgres -p ats-etcd --features ats-sqlite/ffi,ats-duckdb/ffi,ats-postgres/ffi,ats-etcd/ffi";
           # libduckdb as server/parity pins it, matching the bindings — dynamic link, no
           # source compile. ats-postgres speaks the wire protocol itself: no libpq.
           buildInputs = [ duckdbPinned ];
+          # etcd-client compiles etcd's protos in its build script, with protoc.
+          nativeBuildInputs = [ pkgs.protobuf ];
           doCheck = false;
         };
         ats-ffi-deps = craneHost.buildDepsOnly ffiArgs;
@@ -156,9 +158,11 @@
             cp target/release/libats_sqlite.a target/release/libats_sqlite${so} $out/lib/
             cp target/release/libats_duckdb.a target/release/libats_duckdb${so} $out/lib/
             cp target/release/libats_postgres.a target/release/libats_postgres${so} $out/lib/
+            cp target/release/libats_etcd.a target/release/libats_etcd${so} $out/lib/
             cp crates/ats-sqlite/include/storage_ffi.h $out/include/
             cp crates/ats-duckdb/include/duckdb_ffi.h $out/include/
             cp crates/ats-postgres/include/postgres_ffi.h $out/include/
+            cp crates/ats-etcd/include/etcd_ffi.h $out/include/
           '';
         });
 
@@ -194,6 +198,7 @@
           cp ${ats-ffi}/lib/libats_sqlite.a target/release/
           cp ${ats-ffi}/lib/libats_duckdb.a target/release/
           cp ${ats-ffi}/lib/libats_postgres.a target/release/
+          cp ${ats-ffi}/lib/libats_etcd.a target/release/
         '';
 
         # Pre-commit hooks configuration
@@ -304,7 +309,9 @@
           # Without rustduckdb, backend = "parquet" in am.toml would validate
           # but the duckdbcgo wrapper wouldn't be compiled in.
           # 「[Opus 5.5] libacp: an ACP harness runs through libACP (internal/acp).」
-          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" "libacp" ];
+          # rustetcd: the etcd window and the collected keys (ats-etcd + etcdcgo),
+          # each off until am.toml names an [etcd] endpoint.
+          tags = [ "rustsqlite" "qntxwasm" "rustduckdb" "rustpostgres" "libacp" "rustetcd" ];
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -312,7 +319,12 @@
             "-X 'github.com/teranos/QNTX/internal/version.VersionTag=${versionTag}'"
           ];
 
-          subPackages = [ "cmd/qntx" ];
+          # plugins/claude is qntx-claude-plugin (ADR-059): built with the node, so a
+          # node is handed it as it is handed qntx, and builds nothing itself.
+          subPackages = [ "cmd/qntx" "plugins/claude" ];
+          postInstall = ''
+            mv $out/bin/claude $out/bin/qntx-claude-plugin
+          '';
         };
 
         # "It should be private, owned by the node's deployment repository"
@@ -464,11 +476,22 @@
 
           # Default: CLI binary for easy installation
           default = qntx;
+
+          # 「[Opus 5.5] The etcd ats-etcd is tested against, server/parity/etcd_<version>_<rev>.」
+          etcd = pkgs.etcd;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
 
           qntx-image = QNTXImage;
           qntx-image-amd64 = mkQNTXImage "amd64";
           qntx-image-arm64 = mkQNTXImage "arm64";
+        } // pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
+          # Hermes is a separate agent runtime, not a Pyre PythonService provider.
+          # getFlake uses an immutable upstream commit; Hermes' own flake.lock
+          # supplies its uv2nix, npm and Nix dependency graph. No system Python.
+          # Keep the revision identical to server/parity/hermes_*/manifest.json.
+          hermes = (builtins.getFlake
+            "github:NousResearch/hermes-agent/bf0203a794a07aac3ff764972ab9087baa4e4f4e"
+          ).packages.${system}.minimal;
         } // pkgs.lib.optionalAttrs (builtins.elem system [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ]) {
           # The pinned Supabase Postgres server, which make parity runs
           # ats-postgres's migrations in: postgresql_17, the server psql_17 is

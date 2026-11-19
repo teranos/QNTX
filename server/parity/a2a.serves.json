@@ -1,0 +1,32 @@
+[
+  {
+    "version": "0.3",
+    "binding": "GRPC",
+    "package": "a2agrpc/v0"
+  },
+  {
+    "version": "0.3",
+    "binding": "HTTP+JSON",
+    "package": "a2acompat/a2av0"
+  },
+  {
+    "version": "0.3",
+    "binding": "JSONRPC",
+    "package": "a2acompat/a2av0"
+  },
+  {
+    "version": "1.0",
+    "binding": "GRPC",
+    "package": "a2agrpc/v1"
+  },
+  {
+    "version": "1.0",
+    "binding": "HTTP+JSON",
+    "package": "a2asrv"
+  },
+  {
+    "version": "1.0",
+    "binding": "JSONRPC",
+    "package": "a2asrv"
+  }
+]

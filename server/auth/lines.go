@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/slug"
 	errors "github.com/teranos/sacred-error"
 )
@@ -58,14 +59,26 @@ func (h *Handler) handleLines(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.writeError(w, http.StatusUnauthorized, "the asking node did not prove itself")
 		h.logger.Infow("Lines refused", "client", r.PostFormValue("client_id"), "error", err)
+		h.countLines(r.PostFormValue("client_id"), "refused")
 		return
 	}
 	asker, ok := h.clientByDID(asked.GetID())
 	if !ok || !asker.Node {
 		h.writeError(w, http.StatusUnauthorized, "only a node asks for lines")
+		h.countLines(asked.GetID(), "refused")
 		return
 	}
 	h.writeJSON(w, http.StatusOK, h.linesAbout(asker.Namespaces))
+	h.countLines(asked.GetID(), "served")
+}
+
+// 「[Opus 5.5] countLines counts one answer to an asker by the name nodes.peers gives it.」
+func (h *Handler) countLines(did, outcome string) {
+	peer := "undeclared"
+	if node, declared := h.nodes[did]; declared {
+		peer = node.Label
+	}
+	measure.Count(measure.LinesServed, 1, measure.String(measure.AttrPeer, peer), measure.String(measure.AttrOutcome, outcome))
 }
 
 // linesAbout is every grant in each namespace served, and every word line
@@ -99,9 +112,13 @@ type PrimaryLines struct {
 }
 
 // LinesFromThePrimary is the reader a peer reads its lines through, or false
-// on a node with no primary, whose own store holds its lines.
+// on a node with no primary, whose own store holds its lines. A node with laye
+// in front holds its own lines too, whoever it logs in at: laye owns identity,
+// and who holds which role is the node's.
+//
+// "BUT LAYE DOES NOT REALLY OWN USER, THE QNTX WAY"
 func (h *Handler) LinesFromThePrimary() (*PrimaryLines, bool) {
-	if !h.logsInElsewhere {
+	if !h.logsInElsewhere || h.laye != "" {
 		return nil, false
 	}
 	return &PrimaryLines{h: h}, true

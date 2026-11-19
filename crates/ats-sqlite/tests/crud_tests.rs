@@ -279,8 +279,16 @@ fn an_update_moves_the_lookups_with_the_row() {
 
     assert_eq!(store.subjects().unwrap(), vec!["ZED"]);
     assert_eq!(store.actors().unwrap(), vec!["human:carol"]);
-    let by_old = ats::AxFilter { subjects: vec!["ALICE".into()], limit: 10, ..Default::default() };
+    let by_old = ats::AxFilter {
+        subjects: vec!["ALICE".into()],
+        limit: 10,
+        ..Default::default()
+    };
     assert_eq!(store.query(&by_old).unwrap().attestations.len(), 0);
-    let by_new = ats::AxFilter { subjects: vec!["ZED".into()], limit: 10, ..Default::default() };
+    let by_new = ats::AxFilter {
+        subjects: vec!["ZED".into()],
+        limit: 10,
+        ..Default::default()
+    };
     assert_eq!(store.query(&by_new).unwrap().attestations.len(), 1);
 }

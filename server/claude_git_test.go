@@ -60,6 +60,27 @@ func TestTheNodeAgentIsToldHowItsGitWorks(t *testing.T) {
 	assert.Contains(t, told, "github_ask")
 }
 
+// "I NEED TO BE ABLE TO EDIT SYSTEM PROMPTS IN MY OBSIDIAN"
+// What the node's own file says is what the Node Agent is told, as the file
+// reads at that turn; a file that cannot be read is said, not passed over.
+func TestTheNodeAgentIsToldWhatItsNodesFileSays(t *testing.T) {
+	s, _ := runningTheNodeAgent(t, opusLow)
+	assert.NotContains(t, s.nodeAgent.isSaidToBe(), "What this node tells you", "a node that names no file told it something")
+
+	file := filepath.Join(t.TempDir(), "NODE-AGENT.md")
+	require.NoError(t, os.WriteFile(file, []byte("Answer in Dutch.\n"), 0o600))
+	s.nodeAgent.instructions = file
+	assert.Contains(t, s.nodeAgent.isSaidToBe(), "Answer in Dutch.")
+
+	require.NoError(t, os.WriteFile(file, []byte("Answer in Frisian.\n"), 0o600))
+	told := s.nodeAgent.isSaidToBe()
+	assert.Contains(t, told, "Answer in Frisian.")
+	assert.NotContains(t, told, "Answer in Dutch.", "what the file said before is still told")
+
+	require.NoError(t, os.Remove(file))
+	assert.Contains(t, s.nodeAgent.isSaidToBe(), "could not be read")
+}
+
 // git itself, reading the configuration the node writes, runs the helper it
 // names with the node's address, says which repository it is reaching, and
 // takes what the helper hands back.

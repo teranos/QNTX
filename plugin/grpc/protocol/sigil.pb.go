@@ -1206,7 +1206,8 @@ type ClaudeAm struct {
 	SignedIn bool `protobuf:"varint,11,opt,name=signed_in,json=signedIn,proto3" json:"signed_in,omitempty"`
 	// How it is signed in, as Claude Code names it, or empty when it is not.
 	AuthMethod string `protobuf:"bytes,12,opt,name=auth_method,json=authMethod,proto3" json:"auth_method,omitempty"`
-	// Every model a turn can be said to answer with.
+	// The model am.toml names. The node keeps no list of models: a name goes to
+	// Claude Code, which runs the model and refuses a name it does not know.
 	Models        []string `protobuf:"bytes,13,rep,name=models,proto3" json:"models,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

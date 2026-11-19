@@ -361,3 +361,123 @@ func TestATokenIsFoundByItsDID(t *testing.T) {
 	require.True(t, held)
 	assert.Equal(t, "two", found.Label)
 }
+
+// q starved on this: every request signed by a session's key asked for the
+// list, and the list parsed every token's record again. 89% of the node's CPU.
+func TestTheTableIsParsedOnceUntilATokenChanges(t *testing.T) {
+	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
+	require.NoError(t, err)
+	for _, hash := range []string{"abc", "def", "ghi"} {
+		_, err = table.Issue(aToken(hash, "token "+hash))
+		require.NoError(t, err)
+	}
+
+	// The tokens were made in one second, so their order is their ids': each is found by its label.
+	labeled := func(listed []TokenInfo, label string) *TokenInfo {
+		for at := range listed {
+			if listed[at].Label == label {
+				return &listed[at]
+			}
+		}
+		require.Fail(t, "no token is labeled "+label)
+		return nil
+	}
+
+	for range 50 {
+		listed, err := table.List()
+		require.NoError(t, err)
+		require.Len(t, listed, 3)
+	}
+	assert.Equal(t, 1, table.parses, "a request parsed the table again")
+
+	// A token that changes is read anew, once.
+	listed, err := table.List()
+	require.NoError(t, err)
+	require.NoError(t, table.Revoke(labeled(listed, "token abc").ID))
+	for range 10 {
+		listed, err = table.List()
+		require.NoError(t, err)
+	}
+	assert.NotNil(t, labeled(listed, "token abc").RevokedAt, "the list did not see the token revoked")
+	assert.Equal(t, 2, table.parses)
+
+	// A use is seen without reading anything again.
+	require.NoError(t, table.Touch("def"))
+	listed, err = table.List()
+	require.NoError(t, err)
+	assert.NotNil(t, labeled(listed, "token def").LastUsedAt, "the list did not see the token used")
+	assert.Equal(t, 2, table.parses)
+
+	// What a caller does to what it was handed is not in the next list.
+	mine := labeled(listed, "token def")
+	mine.Namespaces[0] = "elsewhere"
+	mine.Label = "scribbled on"
+	again, err := table.List()
+	require.NoError(t, err)
+	assert.Equal(t, "default", labeled(again, "token def").Namespaces[0])
+}
+
+// countedLists is the table, saying how often it was listed.
+type countedLists struct {
+	*TokenTable
+	lists int
+}
+
+func (l *countedLists) List() ([]TokenInfo, error) {
+	l.lists++
+	return l.TokenTable.List()
+}
+
+// A client is asked for on every request a key signs, a session's own key
+// among them: it is found by its DID, and the table is not listed for either.
+// Listed for each, it was what q spent its CPU on.
+func TestAClientIsFoundByItsDIDAndTheTableIsNotListed(t *testing.T) {
+	table, _, err := OpenTokenTable(qntxtest.CreateTestDB(t), &countingTokens{})
+	require.NoError(t, err)
+	_, _, err = table.Create(NewToken{
+		Label: "app", MintedBy: mastodonAccount, Level: LevelOAuth,
+		Namespaces: []string{NamespaceDefault}, ReturnAddress: appReturn, ExpiresAt: NeverEnds(),
+	})
+	require.NoError(t, err)
+	for _, hash := range []string{"abc", "def"} {
+		_, err = table.Issue(aToken(hash, "token "+hash))
+		require.NoError(t, err)
+	}
+	all, err := table.List()
+	require.NoError(t, err)
+	var app TokenInfo
+	for _, one := range all {
+		if one.Label == "app" {
+			app = one
+		}
+	}
+	require.NotEmpty(t, app.DID)
+	parsedSoFar := table.parses
+
+	h := handlerWithDoors(t)
+	asked := &countedLists{TokenTable: table}
+	h.tokens = asked
+	for range 50 {
+		// A session's own key, which names a token and no client: the case every signed request is.
+		_, found := h.clientByDID("did:key:zabc")
+		require.False(t, found, "a token that is no client's was taken for a client")
+		client, found := h.clientByDID(app.DID)
+		require.True(t, found, "the client its DID names was not found")
+		assert.Equal(t, "app", client.Label)
+		assert.Equal(t, appReturn, client.ReturnAddress)
+		by, known := h.MintedBy(app.DID)
+		require.True(t, known)
+		assert.Equal(t, mastodonAccount, by)
+	}
+	assert.Equal(t, parsedSoFar, table.parses, "finding a client by its DID parsed the table")
+	assert.Zero(t, asked.lists, "finding a client by its DID listed the table")
+
+	// A DID no token holds names no client, and one whose token is no client's names none either.
+	_, found := h.clientByDID("did:key:z6Mknobody")
+	assert.False(t, found)
+
+	// A client revoked is no door.
+	require.NoError(t, table.Revoke(app.ID))
+	_, found = h.clientByDID(app.DID)
+	assert.False(t, found, "a revoked client still answers")
+}

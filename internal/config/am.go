@@ -15,12 +15,23 @@ type Config struct {
 	Fetch      FetchConfig      `mapstructure:"fetch"`
 	Mail       MailConfig       `mapstructure:"mail"`
 	Sentry     SentryConfig     `mapstructure:"sentry"`
+	Apns       ApnsConfig       `mapstructure:"apns"`
 	Node       NodeConfig       `mapstructure:"node"`
 	Nodes      NodesConfig      `mapstructure:"nodes"`
+	Laye       LayeConfig       `mapstructure:"laye"`
 	Agent      AgentConfig      `mapstructure:"agent"`
+	Etcd       EtcdConfig       `mapstructure:"etcd"`
 
 	// said is the keys something said, recorded as the config is read.
 	said map[string]bool
+}
+
+// "「[Opus 5.5] isnt the right framing to think of etcd another place where attestations can go? while QNTX holds it durably?」"
+
+// 「[Opus 5.5] EtcdConfig names the etcd the node puts each attestation it
+// 「[Opus 5.5] creates into, for the window ats-etcd keeps. Empty endpoint: no window.」」
+type EtcdConfig struct {
+	Endpoint string `mapstructure:"endpoint"`
 }
 
 // AgentConfig is the agents this node runs (ADR-048).
@@ -42,6 +53,12 @@ type NodeAgentConfig struct {
 	Codex CodexConfig `mapstructure:"codex"`
 	// "wiring it into node and namespace config as an actual harness"
 	Agy AgyConfig `mapstructure:"agy"`
+
+	// "the Node Agent system prompt"
+	// "should live with the Node repo"
+	// Instructions is the file of what this node tells its Node Agent, in
+	// every harness. QNTX says what the Node Agent is; the node says the rest.
+	Instructions string `mapstructure:"instructions"`
 
 	// 「[Opus 5.5] Moved is Claude Code as am.toml named it before
 	// [agent.root.claude]: read as Claude when that is not named, and said
@@ -179,6 +196,14 @@ type NodesConfig struct {
 	Peers   []PeerConfig `mapstructure:"peers"` // On the primary: its peers, one line each.
 }
 
+// "LAYE IN FRONT OF QNTX"
+
+// LayeConfig is the laye in front of this node, apart from it: its settings
+// are laye's own. Empty is no laye in front.
+type LayeConfig struct {
+	DID string `mapstructure:"did"` // laye's did:key, which carries a session to this node.
+}
+
 // PeerConfig is one peer of the primary.
 type PeerConfig struct {
 	Name string `mapstructure:"name"` // What it is called here.
@@ -188,6 +213,21 @@ type PeerConfig struct {
 	Namespaces    []string `mapstructure:"namespaces"`
 	Origin        string   `mapstructure:"origin"`         // Where it answers.
 	ReturnAddress string   `mapstructure:"return_address"` // Where its people are sent back to, + /auth/elsewhere/back.
+}
+
+// ApnsConfig is how the node reaches a phone through Apple: the app it reaches
+// and the team's APNs auth key. The key itself is kept where secrets are kept
+// and named here, as the identity providers' keys are. See internal/secretref.
+type ApnsConfig struct {
+	BundleID string `mapstructure:"bundle_id"` // The app's bundle id, which is the topic a notification is sent to.
+	KeyID    string `mapstructure:"key_id"`    // The id Apple gave the key.
+	TeamID   string `mapstructure:"team_id"`   // The Apple Developer team's id.
+	// PrivateKeyRef names the .p8 as Apple gave it: ssm:///path or env:VAR. Empty = the node reaches no phone.
+	PrivateKeyRef string `mapstructure:"private_key"`
+	// Development is whether the app the phones run was built for development:
+	// Apple takes its tokens at another host, and refuses them at the one a
+	// TestFlight or App Store build is reached at.
+	Development bool `mapstructure:"development"`
 }
 
 // SentryConfig points the node's logs at a Sentry project.
@@ -212,12 +252,12 @@ type SentryConfig struct {
 	// as prose. 0 ships none. 1 ships all.
 	TracesSampleRate float64 `mapstructure:"traces_sample_rate"`
 
-	// Reading back what the node shipped, for the weekly report (ADR-042). All
-	// four or the report says which is missing and leaves Sentry out.
-	ReadTokenRef string `mapstructure:"read_token"`   // ssm:// or env: reference to a Sentry token that may read events — a literal is rejected
-	API          string `mapstructure:"api"`          // The API origin the organization lives in (e.g. "https://de.sentry.io")
+	// Reading back what the node shipped, for the weekly report (ADR-042), through the Sentry MCP server the
+	// node consumes, named sentry (mcp connect): "the node gives Agents access to the MCP of Sentry". No token:
+	// "ADR-025 is DEAD ok?" All three, or the report says which is missing and leaves Sentry out.
+	API          string `mapstructure:"api"`          // The region the organization lives in (e.g. "https://de.sentry.io")
 	Organization string `mapstructure:"organization"` // The organization's slug
-	Project      string `mapstructure:"project"`      // The project's id: the last segment of the DSN
+	Project      string `mapstructure:"project"`      // The project's slug or id
 }
 
 // LLMConfig configures LLM request queuing and rate limiting at the core routing layer.
@@ -269,7 +309,30 @@ type AuthConfig struct {
 	BindingSigners     []string              `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
 	PublicOrigin       string                `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Left out, this machine's loopback origin; it is never read off a request.
 	Provider           ProviderConfig        `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
+	Grants             []GrantConfig         `mapstructure:"grants"`               // Keys admitted while listed, each in the namespaces it names. Empty = none.
+	Words              []WordsConfig         `mapstructure:"words"`                // WRITE and READ lines ROOT says here rather than in the store (ADR-034): what a role may say, while listed. Empty = none.
 	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the slug of the namespace behind each — the name lowercased, because a TOML key arrives lowercase and a namespace keeps the name it was created with. A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
+}
+
+// 「[Opus 5.5] GrantConfig is one key auth.grants admits, as nodes.peers names a peer: its」
+// 「[Opus 5.5] did:key and the namespaces it acts in. It is a live grant while its line」
+// 「[Opus 5.5] stands, and striking the line ends it.」
+type GrantConfig struct {
+	Label      string   `mapstructure:"label"`      // What it is called here: the label roles are granted to.
+	DID        string   `mapstructure:"did"`        // Its did:key, which it signs as.
+	Namespaces []string `mapstructure:"namespaces"` // Where it acts.
+	// 「[Opus 5.5] Roles its label holds in each of those namespaces, said by ROOT the way」
+	// 「[Opus 5.5] a grant line in the store is (ADR-034): guest1 is GROUND of fleetingmem.」
+	Roles []string `mapstructure:"roles"`
+}
+
+// 「[Opus 5.5] WordsConfig is one WRITE or READ line ROOT says in am.toml, read out loud」
+// 「[Opus 5.5] as the store's are: WRITE is * of GROUND. It stands while listed.」
+type WordsConfig struct {
+	Write []string `mapstructure:"write"` // The words the roles may write: a predicate, a prefix ending in a colon, or *.
+	Read  []string `mapstructure:"read"`  // The words the roles may read.
+	Of    []string `mapstructure:"of"`    // The roles the line is about.
+	All   bool     `mapstructure:"all"`   // By all on the READ line: everyone's rows, not only the reader's own.
 }
 
 // DoorConfig is one front door: a domain people arrive at, and the namespace
@@ -357,6 +420,16 @@ type SqliteConfig struct {
 // default chain resolves them.
 type ParquetConfig struct {
 	Location string `mapstructure:"location"`
+	// 「[Opus 5.5] Namespaces this node serves because ROOT says so here: each one it does」
+	// 「[Opus 5.5] not hold is created at start, owned by the first of auth.root_identities,」
+	// 「[Opus 5.5] and given the storage named. One it holds is left as it stands.」
+	Namespaces []NamespaceConfig `mapstructure:"namespaces"`
+}
+
+// 「[Opus 5.5] NamespaceConfig is one namespace storage.parquet.namespaces names.」
+type NamespaceConfig struct {
+	Name   string `mapstructure:"name"`   // As it is created.
+	Record string `mapstructure:"record"` // Its storage: parquet or sqlite.
 }
 
 // PostgresConfig is this node's side of a namespace whose record is Postgres:

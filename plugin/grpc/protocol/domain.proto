@@ -289,6 +289,12 @@ message InitializeResponse {
   // rooms_provider indicates this plugin implements RoomsService (ADR-057).
   // Core's rooms signum reaches the rooms it holds by the plugin's name.
   bool rooms_provider = 12;
+
+  // "Harness is a plugin that speaks grpc A2A"
+  // harness_provider indicates this plugin runs a Coding Agent Harness and
+  // serves A2A's own A2AService (lf.a2a.v1) on its port (ADR-059). Core's
+  // harness service routes a turn to it by the plugin's name.
+  bool harness_provider = 13;
 }
 
 // SigilsFrom is where a plugin's sigils are taken from.

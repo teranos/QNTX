@@ -58,16 +58,25 @@ fn shapes() -> Vec<(&'static str, AxFilter)> {
         ("a predicate", one(&|f| f.predicates = vec!["p1".into()])),
         ("a context", one(&|f| f.contexts = vec!["c1".into()])),
         ("an actor", one(&|f| f.actors = vec!["a1".into()])),
-        ("two predicates", one(&|f| f.predicates = vec!["p1".into(), "p2".into()])),
-        ("a subject and a predicate", one(&|f| {
-            f.subjects = vec!["s1".into()];
-            f.predicates = vec!["p1".into()];
-        })),
+        (
+            "two predicates",
+            one(&|f| f.predicates = vec!["p1".into(), "p2".into()]),
+        ),
+        (
+            "a subject and a predicate",
+            one(&|f| {
+                f.subjects = vec!["s1".into()];
+                f.predicates = vec!["p1".into()];
+            }),
+        ),
         ("since a time", one(&|f| f.time_start = Some(since))),
-        ("a predicate since a time", one(&|f| {
-            f.predicates = vec!["p1".into()];
-            f.time_start = Some(since);
-        })),
+        (
+            "a predicate since a time",
+            one(&|f| {
+                f.predicates = vec!["p1".into()];
+                f.time_start = Some(since);
+            }),
+        ),
     ]
 }
 
@@ -85,7 +94,11 @@ fn older_rows_cost_a_read_nothing() {
         let (few, answer) = read(&small, &f);
         let (many, same) = read(&big, &f);
         assert_eq!(answer.len(), LIMIT, "{}", name);
-        assert_eq!(answer, same, "{}: ten times the older rows changed the answer", name);
+        assert_eq!(
+            answer, same,
+            "{}: ten times the older rows changed the answer",
+            name
+        );
         assert!(
             many <= few + few / 10,
             "{}: {} steps with 2,000 rows, {} with 22,000 — the read pays for rows it does not answer with",
@@ -120,14 +133,26 @@ fn a_window_with_less_than_a_page_costs_only_its_rows() {
     let shapes: Vec<(&str, AxFilter, usize)> = vec![
         ("since nothing came", window(empty, &|_| {}), 0),
         ("since ten came", window(short, &|_| {}), 10),
-        ("a predicate since nothing came", window(empty, &|f| f.predicates = vec!["p1".into()]), 0),
-        ("a predicate since ten came", window(short, &|f| f.predicates = vec!["p1".into()]), 2),
+        (
+            "a predicate since nothing came",
+            window(empty, &|f| f.predicates = vec!["p1".into()]),
+            0,
+        ),
+        (
+            "a predicate since ten came",
+            window(short, &|f| f.predicates = vec!["p1".into()]),
+            2,
+        ),
     ];
     for (name, f, rows) in shapes {
         let (few, answer) = read(&small, &f);
         let (many, same) = read(&big, &f);
         assert_eq!(answer.len(), rows, "{}", name);
-        assert_eq!(answer, same, "{}: ten times the older rows changed the answer", name);
+        assert_eq!(
+            answer, same,
+            "{}: ten times the older rows changed the answer",
+            name
+        );
         assert!(
             many <= few + few / 10,
             "{}: {} steps with 2,000 rows, {} with 22,000 — the read pays for rows outside its window",
@@ -209,7 +234,11 @@ fn a_junction_row_written_without_its_age_is_given_it() {
         )
         .unwrap();
     let own: String = conn
-        .query_row("SELECT created_at FROM attestations WHERE id = 'AS-7'", [], |row| row.get(0))
+        .query_row(
+            "SELECT created_at FROM attestations WHERE id = 'AS-7'",
+            [],
+            |row| row.get(0),
+        )
         .unwrap();
     assert_eq!(age, Some(own));
 }
@@ -217,7 +246,10 @@ fn a_junction_row_written_without_its_age_is_given_it() {
 #[test]
 fn the_count_is_kept_not_counted() {
     let count = |store: &SqliteStore| {
-        let mut stmt = store.connection().prepare(ats_sqlite::store::COUNT_SQL).unwrap();
+        let mut stmt = store
+            .connection()
+            .prepare(ats_sqlite::store::COUNT_SQL)
+            .unwrap();
         let n: i64 = stmt.query_row([], |row| row.get(0)).unwrap();
         (stmt.get_status(StatementStatus::VmStep), n)
     };
@@ -228,7 +260,10 @@ fn the_count_is_kept_not_counted() {
     let (few, _) = count(&small);
     let (many, n) = count(&big);
     assert_eq!(n, 20_000);
-    assert_eq!(few, many, "counting 20,000 rows took more steps than counting 2,000");
+    assert_eq!(
+        few, many,
+        "counting 20,000 rows took more steps than counting 2,000"
+    );
 
     big.delete("AS-3").unwrap();
     assert_eq!(big.count().unwrap(), 19_999);

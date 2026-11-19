@@ -88,6 +88,10 @@ func (h *Handler) tokenOf(did string) (TokenInfo, bool) {
 // 「[Opus 5.5] askingToken is the live token whose DID this is, and whether there is one:」
 // 「[Opus 5.5] revoked, expired or gone is none.」
 func (h *Handler) askingToken(did string) (TokenInfo, bool) {
+	// 「[Opus 5.5] A grant am.toml lists is live while its line stands.」
+	if t, listed := h.declaredGrant(did); listed {
+		return t, true
+	}
 	if h.tokens == nil || did == "" {
 		return TokenInfo{}, false
 	}

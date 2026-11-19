@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 )
@@ -279,4 +281,44 @@ func TestALimitOnAnUnmeteredItemHalts(t *testing.T) {
 	halted, why := s.googleItemHalted(googleNodeItem)
 	assert.True(t, halted)
 	assert.Contains(t, why, "Connect costs")
+}
+
+// "I wish that mail, just had the one click answer somehow"
+//
+// 「[Opus 5.5] A halt only Connect costs ends is mailed with Connect costs in it,
+// where the element's own press goes, and says nothing of resuming by itself.」
+func TestAnUnmeteredHaltIsMailedWithConnectCosts(t *testing.T) {
+	s, _ := connectedToGoogle(t)
+	b := billingStandingIn(t, s, "billingAccounts/0-1", "monthly")
+	require.Nil(t, s.keepGoogleCostLine(googleCostsLineSubject, "wired", "google:root-sub", map[string]any{"billing_account": b.account}))
+	mailed := make(chan services.NodeMail, 8)
+	s.googleOutcome = func(m services.NodeMail) { mailed <- m }
+	require.Nil(t, rootSetsLimit(t, s, sigil.Sent{"amount": "1", "per": "day"}))
+
+	var m services.NodeMail
+	select {
+	case m = <-mailed:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the halt was never mailed")
+	}
+	assert.Contains(t, m.Subject, "is halted")
+	connect := rootAsksGoogle(t, s).GetCostsConnect()
+	require.NotEmpty(t, connect)
+	require.Len(t, m.Bodies, 2)
+	text, page := m.Bodies[0].Content, m.Bodies[1].Content
+	assert.Contains(t, text, connect, "the mail goes where the element's Connect costs goes")
+	assert.Contains(t, page, `href="`+html.EscapeString(connect)+`">Connect costs</a>`)
+	assert.NotContains(t, text, "resumes by itself", "no budget frees up a halt the node does not meter")
+}
+
+// 「[Opus 5.5] With Connect costs not read, the halt still says nothing of
+// resuming by itself, and gives no link it does not have.」
+func TestAnUnmeteredHaltWithoutConnectCostsSaysNoResume(t *testing.T) {
+	m := googleConnectCostsMail("What the node spends at Google Cloud is halted", "ROOT set a limit on the node, and the node does not meter what it spends: ROOT presses Connect costs again", "")
+	require.Len(t, m.Bodies, 2)
+	for _, body := range m.Bodies {
+		assert.NotContains(t, body.Content, "resumes by itself")
+		assert.NotContains(t, body.Content, "href=")
+		assert.Contains(t, body.Content, "presses Connect costs again")
+	}
 }

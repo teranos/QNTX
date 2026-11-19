@@ -1,8 +1,11 @@
 package auth
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,4 +96,76 @@ func TestANamedDoorPicksItsOwnClient(t *testing.T) {
 
 	require.Equal(t, http.StatusFound, recorded.Code)
 	assert.Contains(t, recorded.Header().Get("Location"), "gardens-own-client")
+}
+
+// theAppTakesBack is the ticket the app takes from the URL its sheet came back
+// on, by the app's own rule (QNTX-Web ts/app-door.ts, ticketIn): the URL up to
+// its query is exactly the door, and the query holds the ceremony. Empty where
+// the app throws the URL away.
+func theAppTakesBack(door, cameBack string) string {
+	cut := strings.Index(cameBack, "?")
+	if cut < 0 || cameBack[:cut] != door {
+		return ""
+	}
+	said, err := url.ParseQuery(cameBack[cut+1:])
+	if err != nil {
+		return ""
+	}
+	return said.Get("ceremony")
+}
+
+// "i cant login"
+//
+// The app's sign-in, the whole way: it starts at the node naming its door and
+// its page, GitHub answers, the sheet is sent back, the app takes the ticket
+// back by its own rule, and the ticket collects the binding. With the page the
+// app names, "/", the sheet came back to qntx://door/ and the app threw it
+// away: every sign-in by a provider in the app ended there.
+func TestTheAppSignsInByAProviderTheWholeWay(t *testing.T) {
+	standInGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login/oauth/access_token":
+			_ = json.NewEncoder(w).Encode(map[string]string{"access_token": "spent-once"})
+		case "/user":
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 1739143, "login": "teranos"})
+		}
+	})
+	for _, page := range []string{"/", "/branch/x/"} {
+		h := handlerWithDoors(t, gardenWithAnApp())
+		h.SetGitHubClient("the-nodes-client", "the-nodes-secret")
+		h.nodeKey = testNodeKey(t)
+
+		// The app starts it, naming its door and the page it is on.
+		started := httptest.NewRecorder()
+		h.handleBindingGo(started, httptest.NewRequest(http.MethodGet, "/auth/binding/go?provider=github&door=garden%3A%2F%2Fdoor&page="+
+			urlEncode(page)+"&peer_pubkey_hex="+testPeerPubkeyHex, nil))
+		require.Equal(t, http.StatusFound, started.Code, started.Body.String())
+		toGitHub, err := url.Parse(started.Header().Get("Location"))
+		require.NoError(t, err)
+		var cookie *http.Cookie
+		for _, c := range started.Result().Cookies() {
+			if c.Name == ceremonyCookieName {
+				cookie = c
+			}
+		}
+		require.NotNil(t, cookie, page)
+
+		// GitHub sends the sheet back to the node, which holds the cookie it set.
+		back := httptest.NewRequest(http.MethodGet, callbackPath+"?state="+url.QueryEscape(toGitHub.Query().Get("state"))+"&code=the-code", nil)
+		back.AddCookie(cookie)
+		returned := httptest.NewRecorder()
+		h.handleBindingCallback(returned, back)
+		require.Equal(t, http.StatusFound, returned.Code, returned.Body.String())
+
+		// The app takes the ticket back from where the sheet landed.
+		cameBack := returned.Header().Get("Location")
+		ticket := theAppTakesBack("garden://door", cameBack)
+		require.NotEmpty(t, ticket, "the app throws away %s (page %s)", cameBack, page)
+
+		// And the ticket collects the binding, from the app's page, with no cookie.
+		collected := httptest.NewRecorder()
+		h.handleBindingResult(collected, httptest.NewRequest(http.MethodGet, "/auth/binding/result?ceremony="+url.QueryEscape(ticket), nil))
+		require.Equal(t, http.StatusOK, collected.Code, collected.Body.String())
+		assert.Contains(t, collected.Body.String(), "github:1739143")
+	}
 }

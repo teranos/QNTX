@@ -57,7 +57,8 @@ fn make(i: u64, rng: &mut Rng, subjects: u64) -> Attestation {
         ..Attestation::default()
     };
     a.attributes.insert("n".into(), serde_json::json!(i));
-    a.attributes.insert("note".into(), serde_json::json!("x".repeat(120)));
+    a.attributes
+        .insert("note".into(), serde_json::json!("x".repeat(120)));
     a
 }
 
@@ -117,7 +118,13 @@ fn col(v: Option<f64>, places: usize) -> String {
 /// Peak resident set, MB (`VmHWM`).
 fn peak_rss_mb() -> Option<f64> {
     let text = std::fs::read_to_string("/proc/self/status").ok()?;
-    let kb: f64 = text.lines().find(|l| l.starts_with("VmHWM"))?.split_whitespace().nth(1)?.parse().ok()?;
+    let kb: f64 = text
+        .lines()
+        .find(|l| l.starts_with("VmHWM"))?
+        .split_whitespace()
+        .nth(1)?
+        .parse()
+        .ok()?;
     Some(kb / 1024.0)
 }
 
@@ -137,13 +144,16 @@ fn put_in_txn(s: &mut SqliteStore, a: Attestation) -> Result<(), Box<Error>> {
 
 fn number(flag: &str, v: Option<&&String>) -> Result<u64, Box<Error>> {
     let v = v.ok_or_else(|| fail(&format!("{flag} needs a number"), "none given"))?;
-    v.parse().map_err(|e| fail(&format!("{flag} is not a number"), format!("{v}: {e}")))
+    v.parse()
+        .map_err(|e| fail(&format!("{flag} is not a number"), format!("{v}: {e}")))
 }
 
 pub fn run(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
     let usage = "ats-dev bench load N [--step S] [--batch K] [--replace] | probe N | query";
     let mut it = tail.iter();
-    let sub = it.next().ok_or_else(|| fail("bench needs load, probe or query", usage))?;
+    let sub = it
+        .next()
+        .ok_or_else(|| fail("bench needs load, probe or query", usage))?;
     let rest: Vec<&&String> = it.collect();
     match sub.as_str() {
         "load" => load(o, &rest),
@@ -153,7 +163,10 @@ pub fn run(o: &Opts, tail: &[&String]) -> Result<(), Box<Error>> {
             let rows = s.count().map_err(|e| fail("count failed", e))?;
             queries(&s, rows as i64)
         }
-        other => Err(fail("unknown bench subcommand", format!("{other}: {usage}"))),
+        other => Err(fail(
+            "unknown bench subcommand",
+            format!("{other}: {usage}"),
+        )),
     }
 }
 
@@ -176,7 +189,10 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
     // Before anything is looked at or removed: `--replace` deletes the files named by
     // `--db`, and what another backend calls `--db` is not a SQLite file to replace.
     if o.backend != Kind::Sqlite {
-        return Err(fail("this command is SQLite's", format!("--backend {} given", o.backend.name())));
+        return Err(fail(
+            "this command is SQLite's",
+            format!("--backend {} given", o.backend.name()),
+        ));
     }
     for suffix in ["", "-wal", "-shm"] {
         let f = format!("{}{suffix}", o.db);
@@ -187,7 +203,8 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
                     format!("{f} exists; --replace to delete it and the -wal/-shm beside it"),
                 ));
             }
-            std::fs::remove_file(&f).map_err(|e| fail("could not remove the old database", format!("{f}: {e}")))?;
+            std::fs::remove_file(&f)
+                .map_err(|e| fail("could not remove the old database", format!("{f}: {e}")))?;
         }
     }
 
@@ -195,9 +212,21 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
     let mut s = open_sqlite(o)?;
     let mut rng = Rng(SEED);
     let mode = batch.map_or_else(|| "put".to_string(), |k| format!("batch:{k}"));
-    println!("# mode={mode} total={total} step={step} subjects={subjects} sync={}", o.sync.as_deref().unwrap_or("db default"));
-    println!("# latency columns are per put{}", if batch.is_some() { " batch (one transaction)" } else { "" });
-    println!("n_done,put_per_s,p50_ms,p99_ms,max_ms,db_MB,wal_MB,write_MB_total,write_syscalls_total");
+    println!(
+        "# mode={mode} total={total} step={step} subjects={subjects} sync={}",
+        o.sync.as_deref().unwrap_or("db default")
+    );
+    println!(
+        "# latency columns are per put{}",
+        if batch.is_some() {
+            " batch (one transaction)"
+        } else {
+            ""
+        }
+    );
+    println!(
+        "n_done,put_per_s,p50_ms,p99_ms,max_ms,db_MB,wal_MB,write_MB_total,write_syscalls_total"
+    );
     let io0 = io();
     let mut i = 0u64;
     while i < total {
@@ -218,16 +247,21 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
             Some(k) => {
                 while i < step_end {
                     let t = Instant::now();
-                    s.connection().execute_batch("BEGIN").map_err(|e| fail("BEGIN failed", e))?;
+                    s.connection()
+                        .execute_batch("BEGIN")
+                        .map_err(|e| fail("BEGIN failed", e))?;
                     for _ in 0..k.min(step_end - i) {
                         put_in_txn(&mut s, make(i, &mut rng, subjects))?;
                         i += 1;
                     }
-                    s.connection().execute_batch("COMMIT").map_err(|e| fail("COMMIT failed", e))?;
+                    s.connection()
+                        .execute_batch("COMMIT")
+                        .map_err(|e| fail("COMMIT failed", e))?;
                     lat.push(ms(t));
                 }
                 // wal_autocheckpoint is 0 in SqliteStore::open: nothing else folds the WAL back.
-                s.wal_checkpoint_truncate().map_err(|e| fail("checkpoint failed", e))?;
+                s.wal_checkpoint_truncate()
+                    .map_err(|e| fail("checkpoint failed", e))?;
             }
         }
         let elapsed = t0.elapsed().as_secs_f64();
@@ -244,9 +278,14 @@ fn load(o: &Opts, rest: &[&&String]) -> Result<(), Box<Error>> {
             used.map_or_else(|| "-".into(), |u| u.write_syscalls.to_string()),
         );
     }
-    s.wal_checkpoint_truncate().map_err(|e| fail("checkpoint failed", e))?;
+    s.wal_checkpoint_truncate()
+        .map_err(|e| fail("checkpoint failed", e))?;
     let bytes = std::fs::metadata(&o.db).map(|m| m.len()).unwrap_or(0);
-    println!("# final db_bytes={bytes} bytes_per_attestation={} peak_rss_MB={}", bytes / total, col(peak_rss_mb(), 0));
+    println!(
+        "# final db_bytes={bytes} bytes_per_attestation={} peak_rss_MB={}",
+        bytes / total,
+        col(peak_rss_mb(), 0)
+    );
     queries(&s, total as i64)
 }
 
@@ -289,7 +328,12 @@ fn probe(o: &Opts, n: Option<&String>) -> Result<(), Box<Error>> {
 /// The query set the workload is built for: subjects, predicates, contexts and
 /// actors it drew from, times it spaced a second apart.
 fn queries(s: &SqliteStore, rows: i64) -> Result<(), Box<Error>> {
-    let f = |subjects: &[&str], predicates: &[&str], contexts: &[&str], actors: &[&str], from: Option<i64>, to: Option<i64>| AxFilter {
+    let f = |subjects: &[&str],
+             predicates: &[&str],
+             contexts: &[&str],
+             actors: &[&str],
+             from: Option<i64>,
+             to: Option<i64>| AxFilter {
         subjects: subjects.iter().map(|x| x.to_string()).collect(),
         predicates: predicates.iter().map(|x| x.to_string()).collect(),
         contexts: contexts.iter().map(|x| x.to_string()).collect(),
@@ -301,26 +345,54 @@ fn queries(s: &SqliteStore, rows: i64) -> Result<(), Box<Error>> {
     };
     let at = |n: i64| EPOCH_MS + n * 1000;
     let set: Vec<(&str, AxFilter)> = vec![
-        ("by_subject(rare)", f(&["subject-7"], &[], &[], &[], None, None)),
-        ("by_predicate(common)", f(&[], &["pred-3"], &[], &[], None, None)),
-        ("by_actor(common)", f(&[], &[], &[], &["actor-1"], None, None)),
-        ("subject+predicate", f(&["subject-7"], &["pred-3"], &[], &[], None, None)),
-        ("window(newest 1%)", f(&[], &[], &[], &[], Some(at(rows * 99 / 100)), None)),
-        ("window(oldest 1%)", f(&[], &[], &[], &[], None, Some(at(rows / 100)))),
+        (
+            "by_subject(rare)",
+            f(&["subject-7"], &[], &[], &[], None, None),
+        ),
+        (
+            "by_predicate(common)",
+            f(&[], &["pred-3"], &[], &[], None, None),
+        ),
+        (
+            "by_actor(common)",
+            f(&[], &[], &[], &["actor-1"], None, None),
+        ),
+        (
+            "subject+predicate",
+            f(&["subject-7"], &["pred-3"], &[], &[], None, None),
+        ),
+        (
+            "window(newest 1%)",
+            f(&[], &[], &[], &[], Some(at(rows * 99 / 100)), None),
+        ),
+        (
+            "window(oldest 1%)",
+            f(&[], &[], &[], &[], None, Some(at(rows / 100))),
+        ),
         (
             "pred+ctx+actor mid-window",
-            f(&[], &["pred-3"], &["ctx-2"], &["actor-1"], Some(at(rows / 2)), Some(at(rows / 2 + rows / 100))),
+            f(
+                &[],
+                &["pred-3"],
+                &["ctx-2"],
+                &["actor-1"],
+                Some(at(rows / 2)),
+                Some(at(rows / 2 + rows / 100)),
+            ),
         ),
     ];
     println!("# queries (rows={rows}), limit 50: label,rows,first_ms,second_ms,phys_read_KB_first,read_syscalls_first");
     for (name, filter) in &set {
         let (sql, params) = build_query_sql(filter);
-        let params = serde_json::to_string(&params).map_err(|e| fail("could not encode the query parameters", e))?;
+        let params = serde_json::to_string(&params)
+            .map_err(|e| fail("could not encode the query parameters", e))?;
         let (mut times, mut got, mut used) = ([0f64; 2], 0usize, None);
         for (k, slot) in times.iter_mut().enumerate() {
             let io0 = io();
             let t = Instant::now();
-            let v = s.query_attestations_raw(&sql, &params).map_err(|e| fail("query failed", e))?;
+            let v = s
+                .query_attestations_raw(&sql, &params)
+                .map_err(|e| fail("query failed", e))?;
             *slot = ms(t);
             got = v.len();
             if k == 0 {

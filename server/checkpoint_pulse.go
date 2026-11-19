@@ -124,6 +124,10 @@ const jobsKeptFor = 7 * 24 * time.Hour
 // jobsCleanedEvery is how often completed and failed jobs past jobsKeptFor go.
 const jobsCleanedEvery = time.Hour
 
+// forwardBodiesPerPass is how many forwards' bodies one pass empties: a body is
+// about 17 KB on q, so a pass rewrites under 2 MB while it holds the queue.
+const forwardBodiesPerPass = 100
+
 // jobsRemovedPerPass is how many rows one cleanup statement takes, so the
 // write lock is held for a batch and freed between batches; jobsPassPause is
 // how long the locks stay free between two.
@@ -186,6 +190,31 @@ func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
 	// 「[Fable 5.1] stale forward the worker may run.」
 	if _, err := dropStaleForwards(s.ctx, s.daemon.GetQueue(), s.logger.Named("forward")); err != nil {
 		log.Errorw("Stale forwards were not dropped", "error", err)
+	}
+	// "anything that isnt operational in operational db, just needs to get out of there probably"
+	//
+	// A forward's row refuses its redelivery; the webhook body it carried is
+	// not needed once it reached the far node or was dropped. On q the bodies
+	// were 721 MB of the operational db (2026-11-12).
+	forgotten := 0
+	for {
+		n, err := s.daemon.GetQueue().ForgetPayloads(s.ctx, forwardHandlerName, forwardBodiesPerPass)
+		if err != nil {
+			log.Errorw("The bodies of delivered forwards were not forgotten", "forgotten_before", forgotten, "error", err)
+			break
+		}
+		forgotten += n
+		if n < forwardBodiesPerPass {
+			break
+		}
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-time.After(jobsPassPause):
+		}
+	}
+	if forgotten > 0 {
+		log.Infow("The bodies of delivered forwards are forgotten", "forwards", forgotten)
 	}
 	removed := 0
 	for {

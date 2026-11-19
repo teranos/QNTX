@@ -80,10 +80,10 @@ func TestAShakenScreenshotIsPutWhereTheElementReadsIt(t *testing.T) {
 	copied, err := os.ReadFile(at)
 	require.NoError(t, err)
 	assert.Equal(t, "PNG bytes", string(copied))
-	// The stand-in writes one argument per line, and this one spans three.
-	args, err := os.ReadFile(filepath.Join(ran, theRunSaying(t, ran), "args"))
+	// What is said reaches it on stdin, whole.
+	stdin, err := os.ReadFile(filepath.Join(ran, theRunSaying(t, ran), "stdin"))
 	require.NoError(t, err)
-	assert.Contains(t, string(args), "-p\nwhy is this red?\n\nA screenshot of element note-1 is at "+at+". Read it.\n--output-format\n")
+	assert.Equal(t, "why is this red?\n\nA screenshot of element note-1 is at "+at+". Read it.", string(stdin))
 
 	// What was said is written down as it was said, and where the screenshot went.
 	told := toldRows(t, s, answer.GetSession())
@@ -110,9 +110,9 @@ func TestAPictureAttachedInChatIsCarriedToTheAgent(t *testing.T) {
 	at := filepath.Join(s.nodeAgent.home, "work", "shake", id+".png")
 	_, err = os.Stat(at)
 	require.NoError(t, err)
-	args, err := os.ReadFile(filepath.Join(ran, "0", "args"))
+	stdin, err := os.ReadFile(filepath.Join(ran, "0", "stdin"))
 	require.NoError(t, err)
-	assert.Contains(t, string(args), "-p\nwhat is in this?\n\nA picture is at "+at+". Read it.\n--output-format\n")
+	assert.Equal(t, "what is in this?\n\nA picture is at "+at+". Read it.", string(stdin))
 
 	told := toldRows(t, s, answer.GetSession())
 	require.Len(t, told, 1)

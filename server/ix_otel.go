@@ -7,9 +7,11 @@ package server
 // 「[Opus 5.5] v1/traces or v1/metrics, to it. Binary protobuf and JSON bodies, gzip or not, answered in the」
 // 「[Opus 5.5] Content-Type they came in.」
 //
-// 「[Opus 5.5] Who may send is the reach table's line and the token's own namespace and WRITE」
-// 「[Opus 5.5] lines, as for /api/attestations: a sender names its token in the OTLP headers,」
-// 「[Opus 5.5] Authorization=Bearer <token>, and what it sends lands where that token acts.」
+// "Tokens are to be removed from QNTX except for third-party OAuth clients"
+//
+// 「[Opus 5.5] Who may send is the reach table's line and what the gate admitted, as for」
+// 「[Opus 5.5] /api/attestations: an agent through its door, a person's session, or a request」
+// 「[Opus 5.5] signed by a key this node holds a grant for. What it sends lands where that one acts.」
 
 import (
 	"bytes"
@@ -416,7 +418,7 @@ func (s *QNTXServer) keepSpans(admitted auth.Admission, store ats.AttestationSto
 	return rejected, strings.Join(why, "; "), nil
 }
 
-// 「[Opus 5.5] otlpActors is who a kept span is by: the token that sent it, as /api/attestations writes it, or the node.」
+// 「[Opus 5.5] otlpActors is who a kept span is by: who the gate admitted, as /api/attestations writes it, or the node.」
 func (s *QNTXServer) otlpActors(admitted auth.Admission) []string {
 	if by := admitted.ActsAs(); by != "" {
 		return []string{by}

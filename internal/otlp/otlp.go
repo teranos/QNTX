@@ -204,11 +204,22 @@ func Flush() error {
 		cancel()
 		meters = nil
 	}
+	// 「[Opus 5.5] The node's last log lines leave before the provider stops: the line that ended it is among them.」
+	var lines error
+	if logs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), flushWithin)
+		lines = logs.Shutdown(ctx)
+		cancel()
+		logs = nil
+	}
+	if lines != nil {
+		numbers = errors.WithSecondaryError(errors.Wrapf(lines, "the node's last log lines did not leave over OTLP within %s", flushWithin), numbers)
+	}
 	if spans != nil {
 		return errors.WithSecondaryError(errors.Wrapf(spans, "the last OTLP batch did not leave within %s", flushWithin), numbers)
 	}
 	if numbers != nil {
-		return errors.Wrapf(numbers, "the node's last numbers did not leave over OTLP within %s", flushWithin)
+		return errors.Wrapf(numbers, "the node's last numbers or log lines did not leave over OTLP within %s", flushWithin)
 	}
 	return nil
 }

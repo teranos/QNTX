@@ -1,0 +1,387 @@
+package server
+
+// "it's like a VIP room: you need to be on the list"
+// "if it comes from an App I authorised"
+// "it ends up in the room first, and then everything that was in the room since
+// the agent was told gets told all at once as one turn"
+
+import (
+	"context"
+	"net/http"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/roomcomments"
+	"github.com/teranos/QNTX/internal/sacred"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	errors "github.com/teranos/sacred-error"
+)
+
+type speakerKey struct{}
+
+// withSpeaker is ctx with who said what the turn is told, for a turn no
+// admitted caller started. Only the node's own wake for a comment sets it.
+func withSpeaker(ctx context.Context, speaker string) context.Context {
+	return context.WithValue(ctx, speakerKey{}, speaker)
+}
+
+func speakerOf(ctx context.Context) string {
+	speaker, _ := ctx.Value(speakerKey{}).(string)
+	return speaker
+}
+
+// wakeApps is the list of GitHub Apps whose comments wake an agent, read from
+// the config table github.wake_apps. A key is a room's name, or the asterisk
+// for every room; a value is a list of app slugs. Qodo is on it for every
+// room until the node says otherwise.
+func wakeApps() roomcomments.Guests {
+	listed := config.GetViper().GetStringMapStringSlice("github.wake_apps")
+	if len(listed) == 0 {
+		return roomcomments.Guests{roomcomments.Everyone: {"qodo-code-review"}}
+	}
+	guests := make(roomcomments.Guests, len(listed))
+	for room, apps := range listed {
+		guests[strings.ToLower(room)] = apps
+	}
+	return guests
+}
+
+// wakeAgent is the Node Agent a comment on a Claude Code pull request wakes.
+const wakeAgent = agentLineClaude
+
+// roomWakes holds one wake of an agent in a room at a time. A comment that
+// arrives while the agent is being told asks for one more, after it: what was
+// said meanwhile is told together, as one turn.
+type roomWakes struct {
+	mu      sync.Mutex
+	running map[string]bool
+	again   map[string]string
+}
+
+var wakes = &roomWakes{running: map[string]bool{}, again: map[string]string{}}
+
+func (w *roomWakes) ask(key, speaker string, tell func(speaker string)) {
+	w.mu.Lock()
+	if w.running[key] {
+		w.again[key] = speaker
+		w.mu.Unlock()
+		return
+	}
+	w.running[key] = true
+	w.mu.Unlock()
+	sacred.Go("rooms.github.wake", func() {
+		for {
+			tell(speaker)
+			w.mu.Lock()
+			next, more := w.again[key]
+			delete(w.again, key)
+			if !more {
+				delete(w.running, key)
+				w.mu.Unlock()
+				return
+			}
+			speaker = next
+			w.mu.Unlock()
+		}
+	})
+}
+
+// findingsSeen is, by comment, the sum of what it found when it last woke the
+// agent and the agent took the turn. An edit finding the same wakes no one. It
+// lives as long as the node: after a restart the first edit wakes once more.
+type findingsSeen struct {
+	mu   sync.Mutex
+	seen map[string]string
+}
+
+var findings = &findingsSeen{seen: map[string]string{}}
+
+func (f *findingsSeen) same(c roomcomments.Comment) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.seen[c.URL] == c.Findings()
+}
+
+// keep is said once the agent took the turn the comment woke: a turn refused
+// leaves the next edit, finding the same, to wake it again.
+func (f *findingsSeen) keep(c roomcomments.Comment) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.seen[c.URL] = c.Findings()
+}
+
+// wakeAfterComment tells the agent the room, when the comment just said into
+// it is one the agent is to be woken by.
+func (s *QNTXServer) wakeAfterComment(target roomcomments.Target, c roomcomments.Comment) {
+	if !c.Wakes(wakeApps(), nodeRoomName) {
+		return
+	}
+	if findings.same(c) {
+		return
+	}
+	speaker := c.Speaker()
+	if c.Quiet() {
+		// A review is many comments: the agent is told when none has come for
+		// the quiet stretch, and each one that does moves that later.
+		if err := s.dueWakes().Defer(s.lifetime(), target, wakeAgent, speaker, c.At, time.Now().Add(wakeQuiet())); err != nil {
+			s.logger.Errorw("A review comment was said into the Node Room and the agent's wake was not kept", "agent", wakeAgent, "room", target.Room, "error", err)
+			return
+		}
+		findings.keep(c)
+		return
+	}
+	s.tellNow(target, speaker, c)
+}
+
+// tellNow tells the agent the room, one wake of it at a time, and keeps what
+// the comment found once the agent was told it.
+func (s *QNTXServer) tellNow(target roomcomments.Target, speaker string, c roomcomments.Comment) {
+	wakes.ask(target.Provider+"/"+target.Room+"/"+wakeAgent, speaker, func(speaker string) {
+		more, err := s.tellAgentTheRoom(target, wakeAgent, speaker, c.At)
+		if err != nil {
+			s.logger.Errorw("A PR comment was said into the Node Room and the agent was not told", "agent", wakeAgent, "room", target.Room, "error", err)
+			return
+		}
+		findings.keep(c)
+		// What did not fit is told with a wake of its own, once the room is quiet:
+		// a room that says nothing more would leave it waiting for no one.
+		if more {
+			if err := s.dueWakes().Defer(s.lifetime(), target, wakeAgent, speaker, c.At, time.Now().Add(wakeQuiet())); err != nil {
+				s.logger.Errorw("The agent was told part of the room and the wake for the rest was not kept", "agent", wakeAgent, "room", target.Room, "error", err)
+			}
+		}
+	})
+}
+
+// wakeQuiet is how long the room is to go without a review comment before the
+// agent is told them. The config key is github.wake_quiet, as a duration.
+func wakeQuiet() time.Duration {
+	if quiet := config.GetViper().GetDuration("github.wake_quiet"); quiet > 0 {
+		return quiet
+	}
+	return 30 * time.Minute
+}
+
+// dueWakes is the wakes waiting for a quiet room, in the node's own file.
+func (s *QNTXServer) dueWakes() roomcomments.Due {
+	return roomcomments.Due{DB: s.nodeDB}
+}
+
+// tellDueAgents tells each agent whose room has been quiet long enough. A wake
+// is held for another quiet stretch while its agent is told, and removed once
+// it was: one that could not be carried out, or that the node stopped in the
+// middle of, comes again when the hold is out.
+func (s *QNTXServer) tellDueAgents() {
+	for {
+		select {
+		case <-s.lifetime().Done():
+			return
+		case <-time.After(30 * time.Second):
+		}
+		if s.nodeDB == nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(s.lifetime(), 10*time.Second)
+		due := s.dueWakes()
+		ready, err := due.Ready(ctx, time.Now())
+		if err != nil {
+			s.logger.Errorw("The wakes waiting for a quiet room were not read", "error", err)
+		}
+		for _, w := range ready {
+			held, took, err := due.Claim(ctx, w, time.Now().Add(wakeQuiet()))
+			if err != nil {
+				s.logger.Errorw("A wake waiting for a quiet room was not claimed", "room", w.Target.Room, "agent", w.Agent, "error", err)
+				continue
+			}
+			if took {
+				s.tellWhenQuiet(held)
+			}
+		}
+		cancel()
+	}
+}
+
+func (s *QNTXServer) tellWhenQuiet(w roomcomments.Wake) {
+	wakes.ask(w.Target.Provider+"/"+w.Target.Room+"/"+w.Agent, w.Speaker, func(speaker string) {
+		more, err := s.tellAgentTheRoom(w.Target, w.Agent, speaker, w.Since)
+		if err != nil {
+			// The wake is still held: it comes again when the hold is out,
+			// and a comment that came since keeps its own speaker and time.
+			s.logger.Errorw("The room went quiet and the agent was not told", "agent", w.Agent, "room", w.Target.Room, "error", err)
+			return
+		}
+		// Part of the room was told, and the rest was left for the next wake:
+		// the wake is kept, held, and comes again when the hold is out.
+		if more {
+			s.logger.Infow("The agent was told part of the quiet room, and the rest comes with its wake again", "agent", w.Agent, "room", w.Target.Room)
+			return
+		}
+		// Not the node's lifetime: a node that is stopping still removes what it told.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(s.lifetime()), 10*time.Second)
+		defer cancel()
+		if err := s.dueWakes().Done(ctx, w); err != nil {
+			s.logger.Errorw("The agent was told the quiet room and its wake was not removed", "agent", w.Agent, "room", w.Target.Room, "error", err)
+		}
+	})
+}
+
+// roomPagesMost is how many pages a wake reads back towards its mark.
+const roomPagesMost = 20
+
+// readToTheMark is what was said in a room at or after from, oldest first. A
+// read answers the newest of what it holds, and says when older was left
+// out ("Older than this was not answered"): what is read is read back, a page
+// before the oldest so far, until nothing older is left. Before is not
+// inclusive, so each page reaches a millisecond past the oldest so far, and
+// what is read twice is known by its id. short is whether it stopped before
+// reaching from.
+func readToTheMark(ctx context.Context, rooms protocol.RoomsServiceClient, provider, room, from string) (all []*protocol.RoomMessage, short bool, err error) {
+	seen := map[string]bool{}
+	before := ""
+	for page := 0; page < roomPagesMost; page++ {
+		read, err := rooms.ReadRoom(ctx, &protocol.ReadRoomRequest{Provider: provider, Room: room, Since: from, Before: before, Limit: 100})
+		if err != nil {
+			return nil, false, errors.Wrap(err, "the Node Room was not read")
+		}
+		var fresh []*protocol.RoomMessage
+		for _, m := range read.GetMessages() {
+			if !seen[m.GetId()] {
+				seen[m.GetId()] = true
+				fresh = append(fresh, m)
+			}
+		}
+		all = append(fresh, all...)
+		if !read.GetTruncated() {
+			return all, false, nil
+		}
+		if len(read.GetMessages()) == 0 {
+			return all, true, nil
+		}
+		// The page's oldest time is read whole before reading on from before
+		// it: a time a page cut through, with more said at it than a page
+		// holds, would otherwise be read again and again and never past.
+		oldest := read.GetMessages()[0].GetAt()
+		after, err := roomcomments.ReadFrom(oldest)
+		if err != nil {
+			return nil, false, err
+		}
+		group, err := rooms.ReadRoom(ctx, &protocol.ReadRoomRequest{Provider: provider, Room: room, Since: oldest, Before: after, Limit: roomGroupMost})
+		if err != nil {
+			return nil, false, errors.Wrap(err, "the Node Room was not read")
+		}
+		var fromGroup []*protocol.RoomMessage
+		for _, m := range group.GetMessages() {
+			if !seen[m.GetId()] {
+				seen[m.GetId()] = true
+				fromGroup = append(fromGroup, m)
+			}
+		}
+		all = append(fromGroup, all...)
+		if group.GetTruncated() {
+			return all, true, nil
+		}
+		before = oldest
+	}
+	return all, true, nil
+}
+
+// roomGroupMost is the most read of one time in a room at once.
+const roomGroupMost = 1000
+
+// roomDigestMostBytes is the most one wake tells of a room. Sixteen wakes of
+// 142,092 to 165,714 characters each stood for Lamplighter on 2026-11-15: one
+// wake is one thing said, and each is kept well under what one delivery holds
+// (collectedMostBytes).
+const roomDigestMostBytes = 100_000
+
+// whatFits is what one wake tells of what was read of a room: what agent did
+// not say itself, oldest first, for as long as it fits in roomDigestMostBytes,
+// and the time of the last message it got to, which is where the mark is kept.
+// more is whether something was left for the next wake: what is said after it
+// is told then, and none of it is told twice or lost.
+//
+// Messages said at one time are never split: the mark is a time, and the next
+// read begins after it, so one left behind at the mark's own time would never
+// be told.
+func whatFits(messages []*protocol.RoomMessage, agent string, truncated bool) (said []roomcomments.Said, last string, more bool) {
+	for _, m := range messages {
+		heard := roomcomments.Said{Sender: m.GetSenderName(), Body: m.GetBody(), At: m.GetAt()}
+		if !roomcomments.Unheard(heard, agent) {
+			if len(said) > 0 && heard.At != last && len(roomcomments.Digest(append(slices.Clone(said), heard), truncated)) > roomDigestMostBytes {
+				return said, last, true
+			}
+			said = append(said, heard)
+		}
+		last = heard.At
+	}
+	return said, last, false
+}
+
+// tellAgentTheRoom runs a turn of the Node Agent told everything said in the
+// room since it was last told, and posts its answer into the room as it. What
+// it was told is kept once it took the turn, not before: a turn it refused
+// leaves it to be told again. more is whether something was left for the next
+// wake, which the caller sees to.
+//
+// An agent never told is told from since, the time of the comment that woke it:
+// a room reads oldest first, so reading it all would tell the oldest.
+func (s *QNTXServer) tellAgentTheRoom(target roomcomments.Target, agent, speaker, since string) (more bool, err error) {
+	if s.nodeDB == nil {
+		return false, errors.New("the node has no operational store for what an agent was told")
+	}
+	lifetime := s.lifetime()
+	ctx, cancel := context.WithTimeout(lifetime, 30*time.Second)
+	defer cancel()
+	_, rooms, refused := s.roomsOf(target.Provider)
+	if refused != nil {
+		return false, errors.New(refused.Says)
+	}
+	if !s.nodeAgentsInNodeRoom(ctx, target.Provider, rooms, target.Room)[agent] {
+		return false, errors.Newf("%s is no Node Agent in the Node Room", agent)
+	}
+	told := roomcomments.Told{DB: s.nodeDB}
+	marked, err := told.Mark(ctx, target.Room, agent)
+	if err != nil {
+		return false, err
+	}
+	from := since
+	if marked != "" {
+		if from, err = roomcomments.ReadFrom(marked); err != nil {
+			return false, err
+		}
+	}
+	read, short, err := readToTheMark(ctx, rooms, target.Provider, target.Room, from)
+	if err != nil {
+		return false, err
+	}
+	said, last, more := whatFits(read, agent, short)
+	// Read back as far as a wake reads, and not to the mark: more waits.
+	more = more || short
+	if len(said) == 0 {
+		if last == "" {
+			return more, nil
+		}
+		return more, told.Keep(ctx, target.Room, agent, last)
+	}
+	request, err := http.NewRequestWithContext(withSpeaker(lifetime, speaker), http.MethodPost, "/github/comments", nil)
+	if err != nil {
+		return false, errors.Wrap(err, "the asking did not build")
+	}
+	digest := roomcomments.Digest(said, short)
+	if more {
+		digest += "\n(More was said after this. It is told with the next wake.)\n"
+	}
+	took, err := s.answerInRoom(request, target.Provider, rooms, target.Room, "", agent, "GitHub", digest)
+	if err != nil {
+		// Its answer did not reach the room: nothing is kept, so it is told the same again.
+		return false, err
+	}
+	if !took {
+		return false, errors.Newf("%s did not take the turn, so what it was to be told is told again with the next", agent)
+	}
+	// Kept once the agent took the turn: what is said during it is the next one's.
+	return more, told.Keep(context.WithoutCancel(ctx), target.Room, agent, last)
+}

@@ -3,6 +3,7 @@ package claudecode
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
@@ -44,6 +45,10 @@ type Said struct {
 	// Allow is the tools the session may use without being asked, each by
 	// Claude Code's own name for it.
 	Allow []string
+	// In is the repository of its work the turn is said in, as owner/repo: it
+	// runs in that checkout, so what stands there, a project's rituals, is
+	// where its hooks stand. Empty, it runs in its work.
+	In string
 	// Env is what the session's environment holds beyond what this sets, each
 	// NAME=value. What the session runs inherits it.
 	Env []string
@@ -140,7 +145,11 @@ func (m Message) Blocks() []Block {
 
 // Answer is how a run ended, as Claude Code's own result says it.
 type Answer struct {
-	Text string
+	// NotLetGo is what the node did not tidy after a turn that ran: what it
+	// was handed, its pid. Kept with the answer, never in place of it, and
+	// said by whoever reads it.
+	NotLetGo error
+	Text     string
 	// IsError is Claude Code reporting that the turn failed, in Text's words,
 	// and Subtype which way.
 	IsError bool
@@ -173,10 +182,17 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 			return Answer{}, errors.Wrapf(err, "could not create %s", dir)
 		}
 	}
+	at, err := s.place(work)
+	if err != nil {
+		return Answer{}, err
+	}
 
 	// Partial messages are the stream_event lines: the words as the model says
 	// them, for whoever tails the stream while the turn runs (Tail).
-	args := []string{"-p", s.Says, "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+	// What is said goes on stdin, not as an argument: Linux refuses one argument
+	// over 131,072 bytes (MAX_ARG_STRLEN), and a turn that holds a room's
+	// digest, or a delivery of what was collected, is larger than that.
+	args := []string{"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
 		"--model", s.Model, "--effort", s.Effort, "--permission-mode", s.Mode}
 	if len(s.Allow) > 0 {
 		args = append(args, "--allowedTools", strings.Join(s.Allow, ","))
@@ -239,17 +255,36 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 			env = append(env, bus...)
 		}
 	}
+	// What is said is written whole to a file of the turn's before it starts,
+	// and the file is its stdin: copied in by a goroutine of the node's, a turn
+	// apart that outlives the node would read only what was copied before it
+	// stopped. Unlinked once the turn holds it.
+	told, err := os.CreateTemp(turns, "said-*")
+	if err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.Wrap(err, "the file what is said is handed over in was not made"), handedOver())
+	}
+	letGo := func() error {
+		closed := told.Close()
+		return errors.WithSecondaryError(errors.Wrapf(os.Remove(told.Name()), "%s was not removed", told.Name()), closed)
+	}
+	if _, err := told.WriteString(s.Says); err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "what is said was not written to %s", told.Name()), letGo()), handedOver())
+	}
+	if _, err := told.Seek(0, io.SeekStart); err != nil {
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "%s was not read from its start", told.Name()), letGo()), handedOver())
+	}
 	cmd := exec.Command(binary, argv...)
-	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = work, env, out, said
+	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr, cmd.Stdin = at, env, out, said, told
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: s.Apart}
 	if err := cmd.Start(); err != nil {
-		return Answer{}, errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), handedOver())
+		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(errors.Wrapf(err, "could not start %s", binary), letGo()), handedOver())
 	}
-	if err := handedOver(); err != nil {
-		return Answer{}, err
-	}
+	// Started, the turn is followed to its end whatever else fails: a failure
+	// of what was handed over is returned with what it answered, and never
+	// leaves a process nobody follows or waits for.
+	notLetGo := errors.WithSecondaryError(handedOver(), letGo())
 	if err := os.WriteFile(stream+".pid", []byte(strconv.Itoa(cmd.Process.Pid)), 0o600); err != nil {
-		return Answer{}, errors.Wrapf(err, "the pid of %s was not kept", stream)
+		notLetGo = errors.WithSecondaryError(errors.Wrapf(err, "the pid of %s was not kept", stream), notLetGo)
 	}
 	s.Started(stream)
 	var exited atomic.Bool
@@ -262,11 +297,55 @@ func (s Said) Run(ctx context.Context, each func(Message)) (Answer, error) {
 	// A process of the node's own, not apart, stops when the node does, the
 	// way a person stops it, so the session is left as written. One that
 	// already printed its result has answered, and its answer is returned.
+	// What was not let go of is kept with the answer, never in its place: a
+	// turn that answered has answered, whatever else failed around it.
+	answer.NotLetGo = notLetGo
 	if ctxErr := ctx.Err(); ctxErr != nil && err != nil && !s.Apart {
 		signalled := cmd.Process.Signal(os.Interrupt)
-		return Answer{}, errors.WithSecondaryError(errors.WithSecondaryError(err, signalled), <-waited)
+		stopped := errors.WithSecondaryError(errors.WithSecondaryError(err, signalled), <-waited)
+		// One that printed its result before the node stopped has answered.
+		if answer.Subtype != "" {
+			answer.NotLetGo = errors.WithSecondaryError(stopped, notLetGo)
+			return answer, nil
+		}
+		return Answer{NotLetGo: notLetGo}, stopped
 	}
 	return answer, err
+}
+
+// place is where the turn runs: its work, or the checkout of the repository In names there.
+// Anything but an owner/repo checked out in its work is no place to say it in.
+func (s Said) place(work string) (string, error) {
+	if s.In == "" {
+		return work, nil
+	}
+	refused := errors.Newf("%q is no repository of the agent's work to say a turn in: one is owner/repo, checked out under %s", s.In, work)
+	parts := strings.Split(s.In, "/")
+	if len(parts) != 2 {
+		return "", refused
+	}
+	for _, part := range parts {
+		// A name that is only dots climbs out of the work.
+		if part == "" || strings.Trim(part, ".") == "" || strings.ContainsAny(part, `\`) {
+			return "", refused
+		}
+	}
+	// Resolved, so a link in the work that leads out of it is no checkout of it.
+	root, err := filepath.EvalSymlinks(work)
+	if err != nil {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	dir, err := filepath.EvalSymlinks(filepath.Join(work, parts[0], parts[1]))
+	if err != nil {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	if within, err := filepath.Rel(root, dir); err != nil || within != filepath.Join(parts[0], parts[1]) {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	if info, err := os.Stat(filepath.Join(dir, ".git")); err != nil || info == nil {
+		return "", errors.WithSecondaryError(refused, err)
+	}
+	return dir, nil
 }
 
 // Holds reports whether Claude Code under home keeps the session: it writes
