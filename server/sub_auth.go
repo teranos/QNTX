@@ -340,6 +340,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := authHandler.SetLaye(s.deps.cfg.Laye.DID); err != nil {
 		return err
 	}
+	// What laye's etcd says a key is, for a key laye carries that this node holds no grant for.
+	if s.deps.cfg.Laye.DID != "" {
+		authHandler.SetLayeSays(layeSays())
+	}
 	// On the primary, its peers.
 	for _, peer := range s.deps.cfg.Nodes.Peers {
 		if err := authHandler.DeclarePeer(peer.Name, peer.DID, peer.Namespaces, peer.Origin, peer.ReturnAddress); err != nil {

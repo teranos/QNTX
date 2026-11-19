@@ -109,3 +109,44 @@ func TestANodeLoggingInAtLayeHoldsItsOwnRoles(t *testing.T) {
 	_, fromThePrimary := h.LinesFromThePrimary()
 	assert.False(t, fromThePrimary, "a node with laye in front read who holds which role from laye")
 }
+
+// "AND LAYE OWNS IDENTITY"
+// A key the node holds no grant for, which laye's record says is a person's,
+// is that person, at the level the node gives them.
+func TestLayeCarriesAKeyItsRecordSaysIsAPersons(t *testing.T) {
+	h, _, laye, layeDID, nodeDID := behindLaye(t)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	keyDID := EncodeDIDKey(key.Public().(ed25519.PublicKey))
+	h.SetLayeSays(func(did string) (string, bool, error) {
+		return mastodonAccount, did == keyDID, nil
+	})
+	admitted, ok := presentedSigned(h, carriedBy(t, laye, layeDID, keyDID, nodeDID))
+	require.True(t, ok, "a key laye's record names a person for was not admitted")
+	assert.Equal(t, keyDID, admitted.ActsAs())
+	assert.Equal(t, mastodonAccount, admitted.Identity)
+	assert.Equal(t, string(LevelRoot), admitted.LevelName(), "the level is the node's for the person, not laye's word")
+}
+
+// A person the node no longer lists is nobody, whatever laye's record says.
+func TestLayeNamingAPersonTheNodeDoesNotAdmitAdmitsNobody(t *testing.T) {
+	h, _, laye, layeDID, nodeDID := behindLaye(t)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	keyDID := EncodeDIDKey(key.Public().(ed25519.PublicKey))
+	h.SetLayeSays(func(string) (string, bool, error) { return "https://mastodon.example/@nobody", true, nil })
+	_, ok := presentedSigned(h, carriedBy(t, laye, layeDID, keyDID, nodeDID))
+	assert.False(t, ok, "laye named a person this node does not admit, and the key was admitted")
+}
+
+// Only laye's carrying reads laye's record: a key signing as itself stands on
+// the node's own grant alone.
+func TestAKeySigningAsItselfIsNotTakenOnLayesWord(t *testing.T) {
+	h, _, _, _, _ := behindLaye(t)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	keyDID := EncodeDIDKey(key.Public().(ed25519.PublicKey))
+	h.SetLayeSays(func(string) (string, bool, error) { return mastodonAccount, true, nil })
+	_, ok := presentedSigned(h, carriedBy(t, key, keyDID, keyDID, h.publicOrigin()))
+	assert.False(t, ok, "a key was taken on laye's word without laye carrying it")
+}

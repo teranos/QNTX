@@ -112,8 +112,11 @@ type Handler struct {
 	issuerDIDs sync.Map
 	// laye.did: the laye in front of this node, whose signature carries a
 	// session on the grant this node holds for it (laye.go).
-	laye   string
-	issued issuedAnswers
+	laye string
+	// What laye's etcd says a key is: the person whose passkey said yes to it
+	// (laye_says.go). Nil asks nobody.
+	layeSays LayeSays
+	issued   issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
 	logsInElsewhere bool
