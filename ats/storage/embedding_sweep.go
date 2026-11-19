@@ -37,7 +37,11 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (_ int, err error) {
 		return 0, errors.Wrap(err, "failed to iterate stale embeddings")
 	}
 
+	// Nothing is stale: what is recorded to be taken out is still asked again.
 	if len(stale) == 0 {
+		if _, err := s.ForgetPending(); err != nil {
+			s.logger.Warn("vectors recorded to be taken out are still indexed", zap.Error(err))
+		}
 		return 0, nil
 	}
 

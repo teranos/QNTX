@@ -209,8 +209,11 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 		return err
 	}
 
+	// Nothing of this source is kept: what is recorded to be taken out is
+	// still asked again.
 	if len(entries) == 0 {
-		return nil
+		_, err := s.ForgetPending()
+		return err
 	}
 
 	// Each vector is recorded to be taken out before its row goes.

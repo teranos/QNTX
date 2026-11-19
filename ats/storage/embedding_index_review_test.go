@@ -118,3 +118,40 @@ func TestAVectorNotTakenOutIsAskedAgain(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, hits)
 }
+
+// A delete or a sweep that finds nothing to delete still asks again for what
+// is recorded to be taken out.
+func TestAVectorNotTakenOutIsAskedAgainByADeleteOrSweepOfNothing(t *testing.T) {
+	for _, again := range map[string]func(*EmbeddingStore) error{
+		"delete": func(s *EmbeddingStore) error { return s.DeleteBySource("attestation", "never") },
+		"sweep":  func(s *EmbeddingStore) error { _, err := s.SweepStaleEmbeddings(); return err },
+	} {
+		index := &refusingIndex{refuses: true}
+		store := NewEmbeddingStore(qntxtest.CreateTestDB(t), zap.NewNop())
+		store.SetIndex(index)
+		kept(t, store, "gone", -1, 1, 0)
+		require.Error(t, store.DeleteBySource("attestation", "gone"))
+
+		index.refuses = false
+		require.NoError(t, again(store))
+		pending, err := store.pendingForgets()
+		require.NoError(t, err)
+		assert.Empty(t, pending)
+	}
+}
+
+// A search whose hits are more than SQLite binds in one query reads their
+// rows in batches.
+func TestRowsAreReadPastSQLitesLimitOnBoundParameters(t *testing.T) {
+	store := NewEmbeddingStore(qntxtest.CreateTestDB(t), zap.NewNop())
+	kept(t, store, "held", -1, 1, 0)
+	ids := make([]string, 40000)
+	for i := range ids {
+		ids[i] = "absent"
+	}
+	ids[len(ids)-1] = "held"
+	rows, err := store.rowsByID(ids)
+	require.NoError(t, err)
+	assert.Len(t, rows, 1)
+	assert.Contains(t, rows, "held")
+}

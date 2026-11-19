@@ -438,6 +438,10 @@ func wireRestartHooks(defaultServer *server.QNTXServer, pluginLogger *zap.Sugare
 		defaultServer.SetupPluginEmbeddingService(client)
 		pluginLogger.Debugw("Re-wired embedding provider after restart", "plugin", name)
 	})
+	pm.SetOnVectorSearchProviderReady(func(name string) {
+		defaultServer.VectorSearchProvided()
+		pluginLogger.Debugw("Offered the kept embeddings to the vector search provider after restart", "plugin", name)
+	})
 	pm.SetOnPythonProviderReady(func(name string, client protocol.PythonServiceClient) {
 		defaultServer.AddPythonProvider(client)
 		pluginLogger.Debugw("Registered Python provider after restart", "plugin", name)

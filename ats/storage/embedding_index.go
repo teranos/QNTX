@@ -277,12 +277,23 @@ type searchedRow struct {
 	clusterID                  int
 }
 
-// rowsByID is the rows of these embeddings, by id.
-func (s *EmbeddingStore) rowsByID(ids []string) (_ map[string]searchedRow, err error) {
+// rowsPerRead is how many ids one read of rows binds, below SQLite's limit
+// on bound parameters (32,766).
+const rowsPerRead = 500
+
+// rowsByID is the rows of these embeddings, by id, read in batches.
+func (s *EmbeddingStore) rowsByID(ids []string) (map[string]searchedRow, error) {
 	held := map[string]searchedRow{}
-	if len(ids) == 0 {
-		return held, nil
+	for start := 0; start < len(ids); start += rowsPerRead {
+		if err := s.readRows(ids[start:min(start+rowsPerRead, len(ids))], held); err != nil {
+			return nil, err
+		}
 	}
+	return held, nil
+}
+
+// readRows reads one batch of rows into held.
+func (s *EmbeddingStore) readRows(ids []string, held map[string]searchedRow) (err error) {
 	placeholders := make([]string, len(ids))
 	args := make([]any, len(ids))
 	for i, id := range ids {
@@ -292,19 +303,19 @@ func (s *EmbeddingStore) rowsByID(ids []string) (_ map[string]searchedRow, err e
 	rows, err := s.db.Query(`SELECT id, source_type, source_id, text, COALESCE(cluster_id, -1)
 		FROM embeddings WHERE id IN (`+strings.Join(placeholders, ",")+`)`, args...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read %d embeddings a search found", len(ids))
+		return errors.Wrapf(err, "failed to read %d embeddings a search found", len(ids))
 	}
 	defer func() { err = sqlclose.With(err, rows.Close(), "rows for rowsByID") }()
 	for rows.Next() {
 		var id string
 		var row searchedRow
 		if err := rows.Scan(&id, &row.sourceType, &row.sourceID, &row.text, &row.clusterID); err != nil {
-			return nil, errors.Wrapf(err, "failed to scan an embedding a search found, after %d", len(held))
+			return errors.Wrapf(err, "failed to scan an embedding a search found, after %d", len(held))
 		}
 		held[id] = row
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "failed to read the embeddings a search found (read %d)", len(held))
+		return errors.Wrapf(err, "failed to read the embeddings a search found (read %d)", len(held))
 	}
-	return held, nil
+	return nil
 }
