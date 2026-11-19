@@ -122,9 +122,15 @@ type Handler struct {
 	githubForPeers         GitHubGet
 	githubLocationForPeers GitHubLocate
 	// nodes.peers: this primary's peers, by did:key and by name.
-	nodes    map[string]Client
-	tokens   TokenStore // bearer token path; may be nil during init
-	attestor Attestor   // records admissions; nil until the store is up
+	nodes map[string]Client
+	// 「[Opus 5.5] auth.grants: a live grant for each key it lists, by did:key, re-read」
+	// 「[Opus 5.5] when am.toml changes.」
+	declared atomic.Pointer[map[string]TokenInfo]
+	// 「[Opus 5.5] auth.grants' roles and auth.words: the lines ROOT says in am.toml, read」
+	// 「[Opus 5.5] beside the store's, re-read with the grants.」
+	declaredRoles atomic.Pointer[declaredLines]
+	tokens        TokenStore // bearer token path; may be nil during init
+	attestor      Attestor   // records admissions; nil until the store is up
 	// roles is the read half attestor is not: who holds what in a namespace,
 	// read back out of the system store. Nil until the store is up, and a nil
 	// reader is a node where nobody holds a role.

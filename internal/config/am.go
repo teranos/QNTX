@@ -309,7 +309,30 @@ type AuthConfig struct {
 	BindingSigners     []string              `mapstructure:"binding_signers"`      // Hex ed25519 public keys whose signature on an account binding is trusted. A binding carries its own signer, so without this list any peer can claim any account.
 	PublicOrigin       string                `mapstructure:"public_origin"`        // The origin this node answers on (e.g. "https://api.example.com"), used to build the provider ceremony's redirect_uri. This is the API origin, not rp_origins, which is where the page is. Left out, this machine's loopback origin; it is never read off a request.
 	Provider           ProviderConfig        `mapstructure:"provider"`             // Per-provider credentials the operator holds. A provider absent here is one that needs nothing: Mastodon registers its own app mid-ceremony, atproto spends a password the person types.
+	Grants             []GrantConfig         `mapstructure:"grants"`               // Keys admitted while listed, each in the namespaces it names. Empty = none.
+	Words              []WordsConfig         `mapstructure:"words"`                // WRITE and READ lines ROOT says here rather than in the store (ADR-034): what a role may say, while listed. Empty = none.
 	Door               map[string]DoorConfig `mapstructure:"door"`                 // Front doors, keyed by the slug of the namespace behind each — the name lowercased, because a TOML key arrives lowercase and a namespace keeps the name it was created with. A namespace absent here has no door, which is every namespace today. rp_id and rp_origins above are the door onto "default" and are not repeated here.
+}
+
+// 「[Opus 5.5] GrantConfig is one key auth.grants admits, as nodes.peers names a peer: its」
+// 「[Opus 5.5] did:key and the namespaces it acts in. It is a live grant while its line」
+// 「[Opus 5.5] stands, and striking the line ends it.」
+type GrantConfig struct {
+	Label      string   `mapstructure:"label"`      // What it is called here: the label roles are granted to.
+	DID        string   `mapstructure:"did"`        // Its did:key, which it signs as.
+	Namespaces []string `mapstructure:"namespaces"` // Where it acts.
+	// 「[Opus 5.5] Roles its label holds in each of those namespaces, said by ROOT the way」
+	// 「[Opus 5.5] a grant line in the store is (ADR-034): guest1 is GROUND of fleetingmem.」
+	Roles []string `mapstructure:"roles"`
+}
+
+// 「[Opus 5.5] WordsConfig is one WRITE or READ line ROOT says in am.toml, read out loud」
+// 「[Opus 5.5] as the store's are: WRITE is * of GROUND. It stands while listed.」
+type WordsConfig struct {
+	Write []string `mapstructure:"write"` // The words the roles may write: a predicate, a prefix ending in a colon, or *.
+	Read  []string `mapstructure:"read"`  // The words the roles may read.
+	Of    []string `mapstructure:"of"`    // The roles the line is about.
+	All   bool     `mapstructure:"all"`   // By all on the READ line: everyone's rows, not only the reader's own.
 }
 
 // DoorConfig is one front door: a domain people arrive at, and the namespace
@@ -397,6 +420,16 @@ type SqliteConfig struct {
 // default chain resolves them.
 type ParquetConfig struct {
 	Location string `mapstructure:"location"`
+	// 「[Opus 5.5] Namespaces this node serves because ROOT says so here: each one it does」
+	// 「[Opus 5.5] not hold is created at start, owned by the first of auth.root_identities,」
+	// 「[Opus 5.5] and given the storage named. One it holds is left as it stands.」
+	Namespaces []NamespaceConfig `mapstructure:"namespaces"`
+}
+
+// 「[Opus 5.5] NamespaceConfig is one namespace storage.parquet.namespaces names.」
+type NamespaceConfig struct {
+	Name   string `mapstructure:"name"`   // As it is created.
+	Record string `mapstructure:"record"` // Its storage: parquet or sqlite.
 }
 
 // PostgresConfig is this node's side of a namespace whose record is Postgres:
