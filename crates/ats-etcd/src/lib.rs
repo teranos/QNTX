@@ -38,6 +38,23 @@ pub fn attestation_of_node_json(json: &str) -> Result<Attestation> {
     Ok(attestation)
 }
 
+/// 「[Opus 5.5] One etcd call, and once more when it fails: a connection cut under the
+/// client, as a laptop's sleep cuts one, fails the first call after it, and the
+/// client connects again for the next (l, 2026-11-19 08:03:02). Says whether it
+/// was asked twice. Every call it runs is one that may be asked again.」
+pub(crate) async fn once_more<T, F, Fut>(
+    mut call: F,
+) -> std::result::Result<(T, bool), etcd_client::Error>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = std::result::Result<T, etcd_client::Error>>,
+{
+    match call().await {
+        Ok(v) => Ok((v, false)),
+        Err(_) => call().await.map(|v| (v, true)),
+    }
+}
+
 /// 「[Opus 5.5] How long an attestation stays in the window.」
 pub const SPAN: Duration = Duration::from_secs(72 * 60 * 60);
 
@@ -143,34 +160,59 @@ impl AttestationStore for EtcdStore {
         attestation.writable()?;
         let body = serde_json::to_vec(&attestation).map_err(serde)?;
         let key = self.key(&attestation.id);
-        let mut client = self.client.clone();
+        let client = self.client.clone();
         self.runtime.block_on(async {
-            let lease = client
-                .lease_grant(SPAN.as_secs() as i64, None)
-                .await
-                .map_err(refused)?
-                .id();
-            let txn = Txn::new()
-                .when([Compare::create_revision(key.clone(), CompareOp::Equal, 0)])
-                .and_then([TxnOp::put(
-                    key,
-                    body,
-                    Some(PutOptions::new().with_lease(lease)),
-                )]);
-            if client.txn(txn).await.map_err(refused)?.succeeded() {
+            let attempt = || {
+                let mut client = client.clone();
+                let key = key.clone();
+                let body = body.clone();
+                async move {
+                    let lease = client.lease_grant(SPAN.as_secs() as i64, None).await?.id();
+                    let txn = Txn::new()
+                        .when([Compare::create_revision(key.clone(), CompareOp::Equal, 0)])
+                        .and_then([TxnOp::put(
+                            key,
+                            body,
+                            Some(PutOptions::new().with_lease(lease)),
+                        )]);
+                    if client.txn(txn).await?.succeeded() {
+                        return Ok(true);
+                    }
+                    // 「[Opus 5.5] The key was there: the lease granted for it holds nothing.」
+                    client.lease_revoke(lease).await?;
+                    Ok(false)
+                }
+            };
+            let (landed, retried) = once_more(attempt).await.map_err(refused)?;
+            if landed {
                 return Ok(());
             }
-            // 「[Opus 5.5] The key was there: the lease granted for it holds nothing.」
-            client.lease_revoke(lease).await.map_err(refused)?;
+            // 「[Opus 5.5] Asked again, the key that is there may be the first ask's, whose
+            // answer the cut connection lost: holding this very attestation, it landed.」
+            if retried {
+                let held = client
+                    .clone()
+                    .get(key.clone(), None)
+                    .await
+                    .map_err(refused)?;
+                if held.kvs().first().map(|kv| kv.value()) == Some(body.as_slice()) {
+                    return Ok(());
+                }
+            }
             Err(StoreError::AlreadyExists(attestation.id.clone()))
         })
     }
 
     fn get(&self, id: &str) -> StoreResult<Option<Attestation>> {
-        let mut client = self.client.clone();
+        let client = self.client.clone();
         let key = self.key(id);
         self.runtime.block_on(async {
-            let got = client.get(key, None).await.map_err(refused)?;
+            let attempt = || {
+                let mut client = client.clone();
+                let key = key.clone();
+                async move { client.get(key, None).await }
+            };
+            let (got, _) = once_more(attempt).await.map_err(refused)?;
             match got.kvs().first() {
                 Some(kv) => serde_json::from_slice(kv.value()).map(Some).map_err(serde),
                 None => Ok(None),
