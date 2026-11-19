@@ -16,8 +16,6 @@ From: [[2026-11-11-eleven-i-meant-twelve-labs]]
 
 ## 「[Fable 5.2] An asset is its bytes」
 
-"i never wanted twelvelabs to be the source of truth"
-
 - 「[Fable 5.2] An asset is named by the SHA-256 of its bytes: `sha256:<hex>`. Nobody issues the name, and nobody can take it back.」
 - 「[Fable 5.2] Any copy that hashes to the name is the original. So no service is the source of truth: the bytes are, wherever they sit.」
 - 「[Fable 5.2] Everything else about an asset is an attestation with that name as its subject: who brought it, who holds it, what it was called, what a model heard in it, which quote points at it.」
@@ -26,8 +24,6 @@ From: [[2026-11-11-eleven-i-meant-twelve-labs]]
 「[ChatGPT] An attachment belongs to a message. An asset does not have to.」
 
 ## 「[Fable 5.2] Holding is said, not built」
-
-"k would be storing media assets"
 
 - 「[Fable 5.2] A node that keeps an asset's bytes attests that it holds them. K holds. A node that receives bytes and does not keep them hands them to one that does, and the name is unchanged by the trip.」
 - 「[Fable 5.2] Where an asset is, is read from who attests holding it. A holder that is lost loses a copy and no identity.」
