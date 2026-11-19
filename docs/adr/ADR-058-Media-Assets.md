@@ -49,6 +49,10 @@ From: [[2026-11-11-eleven-i-meant-twelve-labs]]
 - 「[Fable 5.2] A person's amount is granted, on a line as a role is. Nobody holds an amount by default, and no line is none.」
 - 「[Fable 5.2] The node adds up what a person brought when they bring more, and refuses what would pass their newest grant.」
 
+"and your personal media assets, you may place them on a canvas of yours if you have one"
+
+- 「[Fable 5.2] Placing an asset on a canvas is the canvas naming it. Nothing is copied, and what a person may place is what they brought.」
+
 "it kind of ties into this idea of variable or per user rate limits"
 "which is still doable since we are small"
 
