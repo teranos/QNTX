@@ -43,6 +43,17 @@ From: [[2026-11-11-eleven-i-meant-twelve-labs]]
 - 「[Fable 5.2] The same bytes brought by two people count for both. Bringing a file tells nobody whether another already has it.」
 - 「[Fable 5.2] Today only ROOT brings: `/api/files` is of ROOT in the tablet of reach.」
 
+"the allowance is a type of grant line i would say"
+"like PUBLIC_REGISTRATION never gets any"
+
+- 「[Fable 5.2] A person's amount is granted, on a line as a role is. Nobody holds an amount by default, and no line is none.」
+- 「[Fable 5.2] The node adds up what a person brought when they bring more, and refuses what would pass their newest grant.」
+
+"it kind of ties into this idea of variable or per user rate limits"
+"which is still doable since we are small"
+
+- 「[Fable 5.2] How much a person may hold and how often a person may ask are one kind of line: a bound granted to one person, with what it measures named on it.」
+
 ## 「[Fable 5.2] TwelveLabs shaped」
 
 "Suppose we create a new plugin provided service for assets in the twelvelabs sense."
