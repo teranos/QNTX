@@ -243,35 +243,32 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
 		return s.accessLog(s.authGate(handler))
 	}
-	// A sqlite deployment has no token store,
-	// and the bool says so by name. The nil store makes Middleware skip the
-	// bearer path and /auth/tokens answer 503.
 	spent, err := auth.ExpiredTokenHashes(s.nodeDB, time.Now().UTC().UnixMilli())
 	if err != nil {
 		return errors.Wrap(err, "failed to read which access tokens the operational db holds as expired")
 	}
-	tokenRecord, hasTokenStore, err := newTokenRecord(s.deps.cfg, spent)
+	tokenRecord, hasTokenRecord, err := newTokenRecord(s.deps.cfg, spent)
 	if err != nil {
 		return errors.Wrap(err, "failed to open the access token record")
 	}
 	// An access token lives in the operational db (ADR-037). The record behind
 	// it is read once here and never on a request; recording a use writes the
 	// table alone, which is what stopped a PUT per authenticated request.
-	var tokenStore auth.TokenStore
-	if hasTokenStore {
-		table, tookIn, err := auth.OpenTokenTable(s.nodeDB, tokenRecord)
-		if err != nil {
-			return errors.Wrap(err, "failed to open the access_tokens table")
-		}
-		tokenStore = table
-		s.keepLastUsed(table)
-		s.logger.Infow("Access tokens held in the operational db",
-			"backend", s.deps.cfg.Storage.Backend,
-			"held", tookIn.Held,
-			"taken_in", tookIn.TakenIn,
-			"written_back", tookIn.WrittenBack,
-		)
+	// The operational db is sqlite on every backend, so every node keeps the
+	// table; a node with no record behind it keeps the table alone.
+	table, tookIn, err := auth.OpenTokenTable(s.nodeDB, tokenRecord)
+	if err != nil {
+		return errors.Wrap(err, "failed to open the access_tokens table")
 	}
+	tokenStore := auth.TokenStore(table)
+	s.keepLastUsed(table)
+	s.logger.Infow("Access tokens held in the operational db",
+		"backend", s.deps.cfg.Storage.Backend,
+		"record", hasTokenRecord,
+		"held", tookIn.Held,
+		"taken_in", tookIn.TakenIn,
+		"written_back", tookIn.WrittenBack,
+	)
 	// The take-in above is the record's whole cost for tokens now. It is worth
 	// seeing beside the readers that have not moved.
 	if reporter, ok := recordSpendOf(tokenRecord); ok {

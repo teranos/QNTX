@@ -14,9 +14,8 @@ import (
 // and written through after the table.
 //
 // Parquet is the reference implementation and ships first, so this is the only
-// backend wired today. On sqlite the result is nil, which makes the bearer
-// path skip and /auth/tokens answer 503 — nothing mints a credential that
-// cannot be looked up again.
+// backend wired today. On sqlite there is no record, and the access_tokens
+// table is kept alone.
 func newTokenRecord(cfg *appcfg.Config, skip []string) (auth.TokenRecordStore, bool, error) {
 	if cfg.Storage.Backend != "parquet" {
 		return nil, false, nil
