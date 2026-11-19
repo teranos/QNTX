@@ -3,7 +3,7 @@
 Date: 2026-11-01
 Status: Implemented
 
-"QNTX needs a formal contract for pluggable, optional, compiled-in subsystems. suggest a .proto for it"
+"QNTX needs a formal contract for pluggable, optional, compiled-in subsystems. Suggest a .proto for it"
 
 - The contract is `protocol.Subsystem` ([subsystem.proto](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/subsystem.proto)) and package [server/subsystem](https://github.com/teranos/QNTX/blob/main/server/subsystem/subsystem.go). The proto is what a subsystem declares; the package is how it registers, what it may ask of the node (`Host`), and how its declaration becomes rows and signa the node serves.
 - A subsystem registers itself from the package that links it, in `init`, with `subsystem.Register`. The node reads the registered at boot, in the `linked` step ([server/sub_linked.go](https://github.com/teranos/QNTX/blob/main/server/sub_linked.go)): its standing rows stand with QNTX's own (`watcher.Stand`), it is started with the node as its `Host`, and each built-in it declared is checked to be registered. Fatal when not: a build whose own subsystem does not start is a build that is wrong.
