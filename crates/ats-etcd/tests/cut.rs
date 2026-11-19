@@ -12,7 +12,9 @@ use std::thread;
 
 use ats::attestation::Attestation;
 use ats::storage::AttestationStore;
-use ats_etcd::EtcdStore;
+use std::collections::BTreeMap;
+
+use ats_etcd::{EtcdKeys, EtcdStore};
 
 fn endpoint() -> String {
     std::env::var("QNTX_ETCD_ENDPOINT")
@@ -89,4 +91,20 @@ fn a_put_after_the_connection_was_cut_lands() {
     proxy.cut();
     store.put(attestation("AS-after")).unwrap();
     assert!(store.get("AS-after").unwrap().is_some());
+}
+
+/// 「[Opus 5.5] The keys what is collected is kept at are set, read and deleted after a
+/// cut as before it: the keeper said a failure on the first pass after each sleep.」
+#[test]
+fn keys_are_set_after_the_connection_was_cut() {
+    let proxy = Proxy::to(&endpoint());
+    let at = format!("/cut-keys/{}/", std::process::id());
+    let mut keys = EtcdKeys::open(&proxy.endpoint(), &at).unwrap();
+    let one: BTreeMap<String, Vec<u8>> = [("a".to_string(), b"1".to_vec())].into();
+    keys.set(&one).unwrap();
+    proxy.cut();
+    let two: BTreeMap<String, Vec<u8>> = [("b".to_string(), b"2".to_vec())].into();
+    keys.set(&two).unwrap();
+    proxy.cut();
+    assert_eq!(keys.held().unwrap(), two);
 }
