@@ -104,6 +104,9 @@ From: [[2026-11-11-eleven-i-meant-twelve-labs]]
 
 ## 「[Fable 5.2] After」
 
+"like, in the QNTX-App, you would be able to add a file to QNTX as a media asset"
+
+- [ ] 「[Fable 5.2] The app adds a file: it brings it to the node and is answered with its name.」
 - [ ] 「[Fable 5.2] A node hands what it received to the node that holds.」
 - [ ] 「[Fable 5.2] A provider plugin hands a copy to TwelveLabs and attests the id it was given.」
 - [ ] 「[Fable 5.2] A Room message names an asset, and plays it.」
