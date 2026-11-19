@@ -209,11 +209,17 @@ func arrivedIn(r *http.Request) (map[string]any, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "the body of %s %s did not read", r.Method, r.URL.Path)
 	}
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return arrived, nil
+	if len(bytes.TrimSpace(raw)) != 0 {
+		if err := json.Unmarshal(raw, &arrived); err != nil {
+			return nil, errors.Newf("the body of %s %s is not a JSON object", r.Method, r.URL.Path)
+		}
 	}
-	if err := json.Unmarshal(raw, &arrived); err != nil {
-		return nil, errors.Newf("the body of %s %s is not a JSON object", r.Method, r.URL.Path)
+	// What the query names arrives too, unless the body named it: a route
+	// that read model from the query of a POST still finds it there.
+	for name := range r.URL.Query() {
+		if _, inBody := arrived[name]; !inBody {
+			arrived[name] = r.URL.Query().Get(name)
+		}
 	}
 	return arrived, nil
 }

@@ -213,6 +213,11 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 		return nil
 	}
 
+	// Each vector is recorded to be taken out before its row goes.
+	if err := toForget(s.db, entries); err != nil {
+		return err
+	}
+
 	// Delete from embeddings table
 	_, err = s.db.Exec(
 		`DELETE FROM embeddings WHERE source_type = ? AND source_id = ?`,
@@ -227,11 +232,10 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 		zap.String("source_id", sourceID),
 		zap.Int("count", len(entries)))
 
-	byModel := map[string][]string{}
-	for _, e := range entries {
-		byModel[e.model] = append(byModel[e.model], e.id)
+	if _, err := s.ForgetPending(); err != nil {
+		return err
 	}
-	return s.forget(byModel)
+	return nil
 }
 
 // BatchSaveAttestationEmbeddings saves embeddings for multiple attestations

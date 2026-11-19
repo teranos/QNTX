@@ -87,3 +87,21 @@ func (r *routedIndex) Nearest(model string, query []float32, limit int) ([]stora
 	}
 	return hits, nil
 }
+
+// VectorSearchProvided is a vector search provider registering: what the
+// embedding store kept while none was, or before it had an index, is offered
+// to it, off the caller's time.
+func (s *QNTXServer) VectorSearchProvided() {
+	if s.embeddingStore == nil {
+		return
+	}
+	store := s.embeddingStore
+	go func() {
+		kept, err := store.IndexKept()
+		if err != nil {
+			s.logger.Errorw("Kept embeddings were not all indexed by the vector search provider", "indexed", kept, "error", err)
+			return
+		}
+		s.logger.Infow("Kept embeddings indexed by the vector search provider", "indexed", kept)
+	}()
+}

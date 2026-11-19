@@ -12,17 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO: Fix sqlite-vec integration
-// These tests currently fail with "no such module: vec0" because the standard
-// mattn/go-sqlite3 driver doesn't include sqlite-vec extension.
-//
-// To fix:
-// 1. Replace mattn/go-sqlite3 with github.com/asg017/sqlite-vec-go-bindings/ncruces
-// 2. Or build a custom SQLite with vec0 module included
-// 3. Or make the vec_embeddings table creation conditional in migration 019
-//
-// See docs/embeddings_integration_status.md for details.
-
 // Simple test ID generator
 var testIDCounter = 0
 

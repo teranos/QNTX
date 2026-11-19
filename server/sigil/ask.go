@@ -102,7 +102,9 @@ func Within(ctx context.Context, held *protocol.Sigil, answer Answer, arrived ma
 	if refusal := Refuses(held, sent); refusal != nil {
 		return nil, refusal
 	}
-	return answer(context.WithValue(ctx, arrivedKey{}, arrived), sent)
+	// No request carries this asking, whatever the context it came in held.
+	within := context.WithValue(ctx, callerKey{}, (*http.Request)(nil))
+	return answer(context.WithValue(within, arrivedKey{}, arrived), sent)
 }
 
 // On is whether a sigil is asked over a surface: one naming no surfaces is
@@ -143,7 +145,7 @@ func WithCaller(ctx context.Context, r *http.Request) context.Context {
 // node. Nil for an answer asked with no request.
 func Caller(ctx context.Context) *http.Request {
 	r, carried := ctx.Value(callerKey{}).(*http.Request)
-	if !carried {
+	if !carried || r == nil {
 		return nil
 	}
 	return r

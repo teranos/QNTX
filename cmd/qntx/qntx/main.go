@@ -554,6 +554,7 @@ func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *gr
 			if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
 				vsRouter.SetService(proxy.VectorSearchServiceClient())
 				logger.Debugw("Registered VectorSearch provider", "plugin", meta.Name)
+				srv.VectorSearchProvided()
 			}
 		}
 		if proxy.IsSearchProvider() {

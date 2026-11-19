@@ -46,6 +46,13 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (_ int, err error) {
 		return 0, errors.Wrap(err, "failed to begin transaction for stale sweep")
 	}
 
+	recorded := make([]sourceEmbedding, len(stale))
+	for i, e := range stale {
+		recorded[i] = sourceEmbedding{id: e.id, model: e.model}
+	}
+	if err := toForget(tx, recorded); err != nil {
+		return 0, db.Undone(err, tx)
+	}
 	for _, e := range stale {
 		if _, err := tx.Exec(`DELETE FROM embeddings WHERE id = ?`, e.id); err != nil {
 			return 0, db.Undone(errors.Wrapf(err, "failed to delete stale embedding %s", e.id), tx)
@@ -59,14 +66,11 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (_ int, err error) {
 	s.logger.Info("swept stale embeddings",
 		zap.Int("count", len(stale)))
 
-	// A swept row's vector left in its index is no search result (rowsByID),
-	// so a vector not forgotten is said and the sweep stands.
-	byModel := map[string][]string{}
-	for _, e := range stale {
-		byModel[e.model] = append(byModel[e.model], e.id)
-	}
-	if err := s.forget(byModel); err != nil {
-		s.logger.Warn("swept embeddings' vectors are still indexed", zap.Error(err))
+	// The vectors go after the rows; one the index does not take out stays
+	// recorded and is asked again (ForgetPending), and is no search result
+	// meanwhile, since its row is gone.
+	if _, err := s.ForgetPending(); err != nil {
+		s.logger.Warn("swept embeddings' vectors are still indexed, and recorded to be taken out", zap.Error(err))
 	}
 
 	return len(stale), nil

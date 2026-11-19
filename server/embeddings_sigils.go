@@ -71,8 +71,12 @@ func (s *QNTXServer) embeddingsSignum() sigil.Signum {
 	for _, held := range sigils {
 		held.Surfaces = providedSurfaces
 	}
+	takes := map[string][]*protocol.Param{}
+	for _, held := range sigils {
+		takes[held.GetName()] = held.GetTakes()
+	}
 	handled := func(name, method, path string) sigil.Answer {
-		return s.throughHandler(name, method, path)
+		return s.throughHandler(name, method, path, takes[name])
 	}
 	return sigil.Signum{
 		Signum: &protocol.Signum{
@@ -119,7 +123,7 @@ func (s *QNTXServer) searchSignum() sigil.Signum {
 				Surfaces: providedSurfaces,
 			}},
 		},
-		Answers: map[string]sigil.Answer{"semantic": s.throughHandler("semantic", http.MethodGet, "/api/search/semantic")},
+		Answers: map[string]sigil.Answer{"semantic": s.throughHandler("semantic", http.MethodGet, "/api/search/semantic", nil)},
 	}
 }
 
@@ -151,13 +155,13 @@ func (s *QNTXServer) embeddingsRoute(name string) http.HandlerFunc {
 // before it was one: what arrived goes in as the query, and as the JSON body
 // where the method carries one, with who is asking in the context; what the
 // handler wrote is the answer, and what it refused with is the refusal.
-func (s *QNTXServer) throughHandler(name, method, path string) sigil.Answer {
-	return func(ctx context.Context, _ sigil.Sent) (any, *protocol.Refusal) {
+func (s *QNTXServer) throughHandler(name, method, path string, takes []*protocol.Param) sigil.Answer {
+	return func(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 		handler := s.embeddingsRoute(name)
 		if handler == nil {
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "embeddings are not served on this node yet"}
 		}
-		arrived := sigil.Arrived(ctx)
+		arrived := countsAsNumbers(sigil.Arrived(ctx), sent, takes)
 		query := url.Values{}
 		for key, value := range arrived {
 			switch v := value.(type) {
@@ -228,4 +232,23 @@ func (w *handlerWrote) Write(b []byte) (int, error) {
 		w.status = http.StatusOK
 	}
 	return w.body.Write(b)
+}
+
+// countsAsNumbers is what arrived, with each count the sigil takes as the
+// number it was read as, so a "7" sent as text reaches a handler that decodes
+// an int. What arrived is not changed.
+func countsAsNumbers(arrived map[string]any, sent sigil.Sent, takes []*protocol.Param) map[string]any {
+	handed := map[string]any{}
+	for key, value := range arrived {
+		handed[key] = value
+	}
+	for _, param := range takes {
+		if param.GetKind() != sigil.Count || sent[param.GetName()] == "" {
+			continue
+		}
+		if n, err := strconv.Atoi(sent[param.GetName()]); err == nil {
+			handed[param.GetName()] = n
+		}
+	}
+	return handed
 }

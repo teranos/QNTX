@@ -2,6 +2,9 @@ package server
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,4 +62,23 @@ func TestAProvidedServiceWithoutItsRouterSaysSo(t *testing.T) {
 	require.NotNil(t, refusal)
 	assert.Equal(t, sigil.Failed, refusal.GetWhy())
 	assert.Contains(t, refusal.GetSays(), "vector search")
+}
+
+// A count past what the RPC carries is refused, not cut to another number.
+func TestACountPastAnInt32IsRefused(t *testing.T) {
+	_, f := linkedServer(t)
+
+	_, refusal := f.host.Ask(context.Background(), "vectors", "create index", map[string]any{"index": "i", "dimensions": "4294967297"})
+	require.NotNil(t, refusal)
+	assert.Equal(t, sigil.Invalid, refusal.GetWhy())
+	assert.Equal(t, "dimensions", refusal.GetParam())
+}
+
+// A param named in the query of a POST arrives, unless the body named it.
+func TestAPOSTsQueryArrivesBesideItsBody(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/api/embeddings/cluster?model=B&min_cluster_size=9", strings.NewReader(`{"min_cluster_size":5}`))
+	arrived, err := arrivedIn(r)
+	require.NoError(t, err)
+	assert.Equal(t, "B", arrived["model"])
+	assert.Equal(t, float64(5), arrived["min_cluster_size"], "the body's value stands")
 }

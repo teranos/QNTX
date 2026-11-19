@@ -117,21 +117,26 @@ func listOf(sent sigil.Sent, param string, into any) *protocol.Refusal {
 	return nil
 }
 
-// sentCount is a count param, read: sigil.Read has refused one that is not.
-func sentCount(sent sigil.Sent, param string) int32 {
-	n, err := strconv.Atoi(sent[param])
+// sentCount is a count param as the RPC carries it: sigil.Read has refused
+// one that is no count, and one past what an int32 holds is refused here.
+func sentCount(sent sigil.Sent, param string) (int32, *protocol.Refusal) {
+	n, err := strconv.ParseInt(sent[param], 10, 32)
 	if err != nil {
-		return 0
+		return 0, &protocol.Refusal{Why: sigil.Invalid, Param: param, Says: param + " is " + sent[param] + ", which is more than an index takes"}
 	}
-	return int32(n)
+	return int32(n), nil
 }
 
 func (s *QNTXServer) vectorsCreateIndex(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	dimensions, refused := sentCount(sent, "dimensions")
+	if refused != nil {
+		return nil, refused
+	}
 	router, token, refused := s.vectorRouter()
 	if refused != nil {
 		return nil, refused
 	}
-	answered, err := router.CreateIndex(ctx, &protocol.CreateIndexRequest{AuthToken: token, Name: sent["index"], Dimensions: sentCount(sent, "dimensions")})
+	answered, err := router.CreateIndex(ctx, &protocol.CreateIndexRequest{AuthToken: token, Name: sent["index"], Dimensions: dimensions})
 	if err != nil {
 		return nil, failedProvided("vector search", err)
 	}
@@ -188,11 +193,15 @@ func (s *QNTXServer) vectorsSearch(ctx context.Context, sent sigil.Sent) (any, *
 	if refused := listOf(sent, "vector", &vector); refused != nil {
 		return nil, refused
 	}
+	topK, refused := sentCount(sent, "top_k")
+	if refused != nil {
+		return nil, refused
+	}
 	router, token, refused := s.vectorRouter()
 	if refused != nil {
 		return nil, refused
 	}
-	answered, err := router.Search(ctx, &protocol.VectorSearchRequest{AuthToken: token, Index: sent["index"], QueryVector: vector, TopK: sentCount(sent, "top_k")})
+	answered, err := router.Search(ctx, &protocol.VectorSearchRequest{AuthToken: token, Index: sent["index"], QueryVector: vector, TopK: topK})
 	if err != nil {
 		return nil, failedProvided("vector search", err)
 	}

@@ -215,16 +215,11 @@ func Read(sigil *protocol.Sigil, arrived map[string]any) (Sent, *protocol.Refusa
 		}
 		var read string
 		if param.GetKind() == List {
-			if _, array := value.([]any); !array {
-				if raw, err := json.Marshal(value); err != nil || len(raw) == 0 || raw[0] != '[' {
-					return nil, &protocol.Refusal{Why: Invalid, Param: param.GetName(),
-						Says: sigil.GetName() + " takes " + param.GetName() + " as a list, and what was sent is not one."}
-				}
-			}
+			// A nil slice is written null, which is no list.
 			raw, err := json.Marshal(value)
-			if err != nil {
+			if err != nil || len(raw) == 0 || raw[0] != '[' {
 				return nil, &protocol.Refusal{Why: Invalid, Param: param.GetName(),
-					Says: sigil.GetName() + " takes " + param.GetName() + " as a list, and what was sent does not read: " + err.Error()}
+					Says: sigil.GetName() + " takes " + param.GetName() + " as a list, and what was sent is not one."}
 			}
 			sent[param.GetName()] = string(raw)
 			continue

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"database/sql"
 	"encoding/binary"
 	"math"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/internal/sqlclose"
 	errors "github.com/teranos/sacred-error"
+	"go.uber.org/zap"
 )
 
 // VectorIndex is where the store's vectors are kept and found: vector search,
@@ -90,22 +92,112 @@ func (s *EmbeddingStore) keep(embedding *EmbeddingModel) error {
 	return nil
 }
 
-// forget takes deleted embeddings' vectors out of their models' indexes, by
-// model.
-func (s *EmbeddingStore) forget(byModel map[string][]string) error {
-	if len(byModel) == 0 {
-		return nil
-	}
-	index, err := s.index()
-	if err != nil {
-		return NotIndexed{why: err}
-	}
-	for model, ids := range byModel {
-		if err := index.Forget(model, ids); err != nil {
-			return NotIndexed{why: errors.Wrapf(err, "%d vectors of %s", len(ids), model)}
+// vectorExec is what a vector to forget is recorded through: the store's
+// database, or a transaction the rows are deleted in.
+type vectorExec interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+// toForget records embeddings whose vectors are to be taken out of their
+// models' indexes, before their rows are deleted, so a vector the index did
+// not take out is asked again rather than lost with the row.
+func toForget(db vectorExec, embeddings []sourceEmbedding) error {
+	for _, e := range embeddings {
+		if _, err := db.Exec(`INSERT OR IGNORE INTO embedding_vectors_to_forget (embedding_id, model) VALUES (?, ?)`, e.id, e.model); err != nil {
+			return errors.Wrapf(err, "the vector of %s of %s was not recorded to be taken out", e.id, e.model)
 		}
 	}
 	return nil
+}
+
+// ForgetPending takes every recorded vector out of its model's index, and
+// forgets the record of each the index took out. A model whose vectors the
+// index did not take out stays recorded, to be asked again.
+func (s *EmbeddingStore) ForgetPending() (forgotten int, err error) {
+	byModel, err := s.pendingForgets()
+	if err != nil {
+		return 0, err
+	}
+	if len(byModel) == 0 {
+		return 0, nil
+	}
+	index, err := s.index()
+	if err != nil {
+		return 0, NotIndexed{why: err}
+	}
+	var first error
+	for model, ids := range byModel {
+		if err := index.Forget(model, ids); err != nil {
+			if first == nil {
+				first = NotIndexed{why: errors.Wrapf(err, "%d vectors of %s", len(ids), model)}
+			}
+			continue
+		}
+		for _, id := range ids {
+			if _, err := s.db.Exec(`DELETE FROM embedding_vectors_to_forget WHERE embedding_id = ? AND model = ?`, id, model); err != nil {
+				return forgotten, errors.Wrapf(err, "the record of %s of %s, taken out of its index, was not forgotten", id, model)
+			}
+			forgotten++
+		}
+	}
+	return forgotten, first
+}
+
+// pendingForgets is every recorded vector to take out, by model.
+func (s *EmbeddingStore) pendingForgets() (_ map[string][]string, err error) {
+	rows, err := s.db.Query(`SELECT embedding_id, model FROM embedding_vectors_to_forget`)
+	if err != nil {
+		return nil, errors.Wrap(err, "the vectors recorded to be taken out were not read")
+	}
+	defer func() { err = sqlclose.With(err, rows.Close(), "rows for pendingForgets") }()
+	byModel := map[string][]string{}
+	for rows.Next() {
+		var id, model string
+		if err := rows.Scan(&id, &model); err != nil {
+			return nil, errors.Wrap(err, "a vector recorded to be taken out did not read")
+		}
+		byModel[model] = append(byModel[model], id)
+	}
+	return byModel, rows.Err()
+}
+
+// IndexKept offers every kept embedding to its model's index, and takes out
+// what is recorded to be taken out. It is asked when a vector search provider
+// registers: what was kept while none was, or before the store had an index,
+// is then searchable. Adding a vector the index holds already replaces it.
+func (s *EmbeddingStore) IndexKept() (kept int, err error) {
+	if _, err := s.ForgetPending(); err != nil {
+		s.logger.Warn("vectors recorded to be taken out are still indexed", zap.Error(err))
+	}
+	index, err := s.index()
+	if err != nil {
+		return 0, err
+	}
+	models, err := s.CountEmbeddingsByModel()
+	if err != nil {
+		return 0, err
+	}
+	var first error
+	for _, model := range models {
+		ids, blobs, err := s.GetAllEmbeddingVectors(model.Model)
+		if err != nil {
+			return kept, err
+		}
+		for i, id := range ids {
+			vector, err := floatsOf(blobs[i])
+			if err == nil {
+				err = index.Keep(model.Model, model.Dimensions, id, vector)
+			}
+			if err != nil {
+				if first == nil {
+					first = NotIndexed{why: errors.Wrapf(err, "embedding %s of %s", id, model.Model)}
+				}
+				continue
+			}
+			kept++
+		}
+	}
+	return kept, first
 }
 
 // SemanticSearch is the embeddings nearest to a query embedding, through the
@@ -125,37 +217,47 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 	if err != nil {
 		return nil, err
 	}
-	// The cluster is the store's to know, so a search within one asks the
-	// index for more than it answers.
-	asked := limit
-	if clusterID != nil {
-		asked = min(limit*10, 1000)
+	// A hit whose row was swept, or of another cluster, is no result, and the
+	// cluster is the store's to know: the index is asked for more until the
+	// search holds limit results or the index has no more to answer.
+	for asked := limit; ; asked *= 4 {
+		hits, err := index.Nearest(model, query, asked)
+		if err != nil {
+			return nil, errors.Wrapf(err, "the nearest %d to the query in %q", asked, model)
+		}
+		results, beyond, err := s.resultsOf(hits, limit, threshold, clusterID)
+		if err != nil {
+			return nil, err
+		}
+		// Nearest first: past the threshold, no further hit is similar enough.
+		if len(results) == limit || len(hits) < asked || beyond {
+			return results, nil
+		}
 	}
-	hits, err := index.Nearest(model, query, asked)
-	if err != nil {
-		return nil, errors.Wrapf(err, "the nearest %d to the query in %q", asked, model)
-	}
+}
+
+// resultsOf is the hits that are results, nearest first, up to limit, and
+// whether a hit fell below the threshold, past which none further is a result.
+func (s *EmbeddingStore) resultsOf(hits []VectorHit, limit int, threshold float32, clusterID *int) ([]*SearchResult, bool, error) {
 	ids := make([]string, len(hits))
 	for i, hit := range hits {
 		ids[i] = hit.ID
 	}
 	rows, err := s.rowsByID(ids)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-
 	var results []*SearchResult
 	for _, hit := range hits {
+		similarity := 1 - hit.Distance
+		if similarity < threshold {
+			return results, true, nil
+		}
 		row, held := rows[hit.ID]
-		// A vector whose row was swept is no result.
 		if !held {
 			continue
 		}
 		if clusterID != nil && row.clusterID != *clusterID {
-			continue
-		}
-		similarity := 1 - hit.Distance
-		if similarity < threshold {
 			continue
 		}
 		results = append(results, &SearchResult{
@@ -166,7 +268,7 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 			break
 		}
 	}
-	return results, nil
+	return results, false, nil
 }
 
 // searchedRow is what a search answers of an embedding's row.
