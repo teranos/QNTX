@@ -76,9 +76,3 @@ Status: Implemented
 
 Is Quotes only workable with a frontier model? In practice, yes, at least for this part. The work turns on fine distinctions: whose words a span is, who said it first, what may stand beside what. A session that can't hold your notation all the way produces what the cloud session did, or what k's marker did. Tonight it took this model at high effort, and still a lot of pushing.
 
-
-
-That makes it a real test of the other case: an agent's words, mine, pasted into your document by you. Reading what the branch shows now:
-
-  BUT THIS I ALSO WANT TO HAVE WORK, SO MY TEST WOULD BE PUT IN QUOTES AUTOMATIVALLY, AND YOURS IN YOUR QUOTES.
-
