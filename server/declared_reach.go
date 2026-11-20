@@ -44,10 +44,16 @@ func declaredReach(cfg *appcfg.Config) ([]reach.Line, error) {
 func (s *QNTXServer) setDeclaredReach(lines []reach.Line) error {
 	s.opening.Lock()
 	defer s.opening.Unlock()
+	before := s.declaredReach
 	s.declaredReach = lines
 	if s.served == nil {
 		return nil
 	}
-	_, err := s.reopenHeld()
-	return err
+	// What is served stays what it was when reopening fails, and so do the
+	// lines held for it: a later reopen does not serve what this one refused.
+	if _, err := s.reopenHeld(); err != nil {
+		s.declaredReach = before
+		return err
+	}
+	return nil
 }
