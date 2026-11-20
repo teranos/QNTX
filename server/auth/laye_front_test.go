@@ -123,7 +123,8 @@ func TestLayeCarriesAKeyItsRecordSaysIsAPersons(t *testing.T) {
 	})
 	admitted, ok := presentedSigned(h, carriedBy(t, laye, layeDID, keyDID, nodeDID))
 	require.True(t, ok, "a key laye's record names a person for was not admitted")
-	assert.Equal(t, keyDID, admitted.ActsAs())
+	// As a device sign-in is (device.go): its own client, admitted as the person.
+	assert.Equal(t, keyDID, admitted.TokenDID)
 	assert.Equal(t, mastodonAccount, admitted.Identity)
 	assert.Equal(t, string(LevelRoot), admitted.LevelName(), "the level is the node's for the person, not laye's word")
 }
