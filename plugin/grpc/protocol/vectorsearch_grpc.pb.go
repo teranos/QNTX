@@ -23,6 +23,7 @@ const (
 	VectorSearchService_AddVectors_FullMethodName    = "/protocol.VectorSearchService/AddVectors"
 	VectorSearchService_CreateIndex_FullMethodName   = "/protocol.VectorSearchService/CreateIndex"
 	VectorSearchService_DeleteVectors_FullMethodName = "/protocol.VectorSearchService/DeleteVectors"
+	VectorSearchService_Holds_FullMethodName         = "/protocol.VectorSearchService/Holds"
 )
 
 // VectorSearchServiceClient is the client API for VectorSearchService service.
@@ -41,6 +42,9 @@ type VectorSearchServiceClient interface {
 	// DeleteVectors removes vectors from a named index by their ids. An id the
 	// index does not hold is no error.
 	DeleteVectors(ctx context.Context, in *DeleteVectorsRequest, opts ...grpc.CallOption) (*DeleteVectorsResponse, error)
+	// Holds answers which of some ids a named index holds, each with the
+	// revision it was added with. An index that is not there holds none.
+	Holds(ctx context.Context, in *HoldsRequest, opts ...grpc.CallOption) (*HoldsResponse, error)
 }
 
 type vectorSearchServiceClient struct {
@@ -91,6 +95,16 @@ func (c *vectorSearchServiceClient) DeleteVectors(ctx context.Context, in *Delet
 	return out, nil
 }
 
+func (c *vectorSearchServiceClient) Holds(ctx context.Context, in *HoldsRequest, opts ...grpc.CallOption) (*HoldsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HoldsResponse)
+	err := c.cc.Invoke(ctx, VectorSearchService_Holds_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VectorSearchServiceServer is the server API for VectorSearchService service.
 // All implementations must embed UnimplementedVectorSearchServiceServer
 // for forward compatibility.
@@ -107,6 +121,9 @@ type VectorSearchServiceServer interface {
 	// DeleteVectors removes vectors from a named index by their ids. An id the
 	// index does not hold is no error.
 	DeleteVectors(context.Context, *DeleteVectorsRequest) (*DeleteVectorsResponse, error)
+	// Holds answers which of some ids a named index holds, each with the
+	// revision it was added with. An index that is not there holds none.
+	Holds(context.Context, *HoldsRequest) (*HoldsResponse, error)
 	mustEmbedUnimplementedVectorSearchServiceServer()
 }
 
@@ -128,6 +145,9 @@ func (UnimplementedVectorSearchServiceServer) CreateIndex(context.Context, *Crea
 }
 func (UnimplementedVectorSearchServiceServer) DeleteVectors(context.Context, *DeleteVectorsRequest) (*DeleteVectorsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteVectors not implemented")
+}
+func (UnimplementedVectorSearchServiceServer) Holds(context.Context, *HoldsRequest) (*HoldsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Holds not implemented")
 }
 func (UnimplementedVectorSearchServiceServer) mustEmbedUnimplementedVectorSearchServiceServer() {}
 func (UnimplementedVectorSearchServiceServer) testEmbeddedByValue()                             {}
@@ -222,6 +242,24 @@ func _VectorSearchService_DeleteVectors_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VectorSearchService_Holds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HoldsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VectorSearchServiceServer).Holds(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VectorSearchService_Holds_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VectorSearchServiceServer).Holds(ctx, req.(*HoldsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VectorSearchService_ServiceDesc is the grpc.ServiceDesc for VectorSearchService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -244,6 +282,10 @@ var VectorSearchService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteVectors",
 			Handler:    _VectorSearchService_DeleteVectors_Handler,
+		},
+		{
+			MethodName: "Holds",
+			Handler:    _VectorSearchService_Holds_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

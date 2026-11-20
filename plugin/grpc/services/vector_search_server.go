@@ -190,3 +190,31 @@ func (s *VectorSearchServer) DeleteVectors(ctx context.Context, req *protocol.De
 		Ids:       ids.All(),
 	})
 }
+
+// Holds answers which of some ids a named index holds, each with the revision
+// it was added with.
+func (s *VectorSearchServer) Holds(ctx context.Context, req *protocol.HoldsRequest) (*protocol.HoldsResponse, error) {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+		return nil, err
+	}
+
+	svc, err := s.backend()
+	if err != nil {
+		return nil, err
+	}
+
+	index, err := named.TextOf("index", req.Index)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := named.ItemsOf("ids", req.Ids)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc.Holds(ctx, &protocol.HoldsRequest{
+		AuthToken: req.AuthToken,
+		Index:     index.String(),
+		Ids:       ids.All(),
+	})
+}
