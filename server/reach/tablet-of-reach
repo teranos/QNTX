@@ -49,6 +49,9 @@ REACH is '/auth/device' '/auth/device/approve' '/auth/device/done'        of ANY
 REACH is '/auth/introspect'                                               of ANYONE
 # A peer asks for the lines about the namespaces it serves, the same way.
 REACH is '/auth/lines/served'                                             of ANYONE
+# laye has the node mail an invitation it holds, holding no session: laye's
+# own signature is the credential, checked at the endpoint itself.
+REACH is '/auth/laye/invited'                                             of ANYONE
 # A peer asks GitHub through its primary, the same way: the token stays here.
 REACH is '/auth/github' '/auth/github/location'                           of ANYONE
 # A node whose people log in at another sends them there and takes them back,
