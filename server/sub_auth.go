@@ -226,6 +226,11 @@ func (s *QNTXServer) systemAttestor() auth.Attestor {
 }
 
 func (authSubsystem) Init(s *QNTXServer) error {
+	// 「[Opus 5.5] And how long what the agents say to each other waits here (collected.wait).」
+	// Before auth: a node without it collects all the same (CodeRabbit on #1772).
+	if err := dialCollected(s.deps.cfg); err != nil {
+		return err
+	}
 	if !s.deps.cfg.Auth.Enabled {
 		return nil
 	}
@@ -352,6 +357,14 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	}
 	// 「[Opus 5.5] And the namespaces they act in, which am.toml names as well.」
 	if err := s.serveDeclaredNamespaces(s.deps.cfg); err != nil {
+		return err
+	}
+	// 「[Opus 5.5] And what the roles reach, which am.toml may say too (auth.reach).」
+	declared, err := declaredReach(s.deps.cfg)
+	if err != nil {
+		return err
+	}
+	if err := s.setDeclaredReach(declared); err != nil {
 		return err
 	}
 	// The status row asks them for theirs, as the person asking (statusline/peers.go).
