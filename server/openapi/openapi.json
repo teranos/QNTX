@@ -953,6 +953,11 @@
         "ANYONE"
       ]
     },
+    "/auth/laye/invited": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/laye/verify": {
       "x-qntx-reach": [
         "ANYONE"
