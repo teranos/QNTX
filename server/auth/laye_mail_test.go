@@ -156,3 +156,20 @@ func TestATemplateThatDoesNotFillSendsNothing(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, layeInvited(h, layeSigns(t, h, laye), broken).Code)
 	assert.Empty(t, box.sent)
 }
+
+// Every link the filled mail holds leads to laye, not only the one named link:
+// one written into laye's template, or one with no scheme, is refused too.
+func TestEveryLinkInTheMailLeadsToLaye(t *testing.T) {
+	for _, html := range []string{
+		`<a href="{{.link}}">{{.link_label}}</a><a href="https://evil.example/">{{.body}}</a>`,
+		`<a href="{{.link}}">{{.link_label}}</a><img src="//evil.example/p.png">{{.body}}`,
+		`<a href="{{.link}}">{{.link_label}}</a> {{.body}} ftp://evil.example/x`,
+	} {
+		h, box, laye := layeMailing(t)
+		elsewhere := invitedAtLaye()
+		elsewhere.Friend.Template.HTML = html
+		rec := layeInvited(h, layeSigns(t, h, laye), elsewhere)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, html)
+		assert.Empty(t, box.sent, html)
+	}
+}

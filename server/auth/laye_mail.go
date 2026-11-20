@@ -99,7 +99,58 @@ func (h *Handler) filled(m layeMail, name string) (services.NodeMail, error) {
 	if err != nil {
 		return services.NodeMail{}, errors.Wrapf(err, "the %s mail does not fill", name)
 	}
-	return services.NodeMail{Name: name, Subject: filled.Subject, Bodies: filled.Bodies.All()}, nil
+	bodies := filled.Bodies.All()
+	for _, body := range bodies {
+		if elsewhere, found := h.leadsElsewhere(body.Content); found {
+			return services.NodeMail{}, errors.Newf("the %s mail's %s leads to %q, and this node's mail leads only to laye (%s)", name, body.Kind, elsewhere, h.loginAt)
+		}
+	}
+	return services.NodeMail{Name: name, Subject: filled.Subject, Bodies: bodies}, nil
+}
+
+// leadsElsewhere is the first place a filled body leads that is not laye:
+// any address with a scheme, and any href or src, however it is written.
+func (h *Handler) leadsElsewhere(body string) (string, bool) {
+	ours := func(to string) bool { return strings.HasPrefix(to, h.loginAt+"/") }
+	for rest := body; ; {
+		at := strings.Index(rest, "://")
+		if at < 0 {
+			break
+		}
+		start := at
+		for start > 0 && isSchemeByte(rest[start-1]) {
+			start--
+		}
+		end := at + 3
+		for end < len(rest) && !strings.ContainsRune(" \t\r\n\"'<>", rune(rest[end])) {
+			end++
+		}
+		if to := rest[start:end]; !ours(to) {
+			return to, true
+		}
+		rest = rest[end:]
+	}
+	for _, attr := range []string{"href=", "src="} {
+		for rest := strings.ToLower(body); ; {
+			at := strings.Index(rest, attr)
+			if at < 0 {
+				break
+			}
+			rest = strings.TrimLeft(rest[at+len(attr):], " \t\"'")
+			end := strings.IndexAny(rest, " \t\r\n\"'>")
+			if end < 0 {
+				end = len(rest)
+			}
+			if to := rest[:end]; !ours(to) {
+				return to, true
+			}
+		}
+	}
+	return "", false
+}
+
+func isSchemeByte(b byte) bool {
+	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9' || b == '+' || b == '-' || b == '.'
 }
 
 // handleLayeInvited mails an invitation laye holds: the friend's to their
