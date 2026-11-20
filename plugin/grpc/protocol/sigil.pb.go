@@ -3357,7 +3357,10 @@ type Sigil struct {
 	// The message its answer is, named in full: protocol.VersionInfo. What it
 	// gives is that message's fields, each in its .proto's words, and nothing
 	// is said of them a second time.
-	Answer        string `protobuf:"bytes,6,opt,name=answer,proto3" json:"answer,omitempty"`
+	Answer string `protobuf:"bytes,6,opt,name=answer,proto3" json:"answer,omitempty"`
+	// The surfaces it is asked over: http, mcp, a2a, subsystem. None is every
+	// surface; not everything needs to be a sigil an LLM calls.
+	Surfaces      []string `protobuf:"bytes,7,rep,name=surfaces,proto3" json:"surfaces,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3434,6 +3437,13 @@ func (x *Sigil) GetAnswer() string {
 	return ""
 }
 
+func (x *Sigil) GetSurfaces() []string {
+	if x != nil {
+		return x.Surfaces
+	}
+	return nil
+}
+
 // A Param is one thing a sigil takes. It says nothing about how it travels:
 // that is each surface's to decide.
 type Param struct {
@@ -3443,7 +3453,8 @@ type Param struct {
 	Required bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
 	// Every value it takes, when it takes only some.
 	OneOf []string `protobuf:"bytes,4,rep,name=one_of,json=oneOf,proto3" json:"one_of,omitempty"`
-	// What its value is: empty is text, "count" is a whole number, zero or more.
+	// What its value is: empty is text, "count" is a whole number, zero or
+	// more, "list" is a JSON array.
 	Kind          string `protobuf:"bytes,5,opt,name=kind,proto3" json:"kind,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4117,14 +4128,15 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x04Fold\x12\x14\n" +
 	"\x05field\x18\x01 \x01(\tR\x05field\x12\x16\n" +
 	"\x06column\x18\x02 \x01(\tR\x06column\x12\x10\n" +
-	"\x03key\x18\x03 \x01(\tR\x03key\"\xbd\x01\n" +
+	"\x03key\x18\x03 \x01(\tR\x03key\"\xd9\x01\n" +
 	"\x05Sigil\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04does\x18\x02 \x01(\tR\x04does\x12%\n" +
 	"\x05takes\x18\x03 \x03(\v2\x0f.protocol.ParamR\x05takes\x12%\n" +
 	"\x05gives\x18\x04 \x03(\v2\x0f.protocol.FieldR\x05gives\x12&\n" +
 	"\x04http\x18\x05 \x01(\v2\x12.protocol.EndpointR\x04http\x12\x16\n" +
-	"\x06answer\x18\x06 \x01(\tR\x06answer\"v\n" +
+	"\x06answer\x18\x06 \x01(\tR\x06answer\x12\x1a\n" +
+	"\bsurfaces\x18\a \x03(\tR\bsurfaces\"v\n" +
 	"\x05Param\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04says\x18\x02 \x01(\tR\x04says\x12\x1a\n" +

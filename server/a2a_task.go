@@ -129,7 +129,7 @@ func (s *QNTXServer) taskAgentAt(r *http.Request, tenant string) (taskAgent, err
 	}
 	// What the lines say of the say over A2A, before anything is written or
 	// read: the gate asks again when the turn is asked.
-	if reaching, anyone := s.reachingOver(reach.OverA2A, ta.say); !offeredTo(admitted, gated, reaching, anyone) {
+	if reaching, anyone := s.reachingOver(reach.OverA2A, ta.say); !onSurface(ta.say.sigil, reach.OverA2A) || !offeredTo(admitted, gated, reaching, anyone) {
 		return taskAgent{}, a2aRefusal(a2asdk.ErrTaskNotFound, ta.called+" is no agent "+spokenBy(r)+" reaches over A2A")
 	}
 	return ta, nil

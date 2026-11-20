@@ -82,11 +82,15 @@ func (x *EmbedRequest) GetModel() string {
 }
 
 type EmbedResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Vector        []float32              `protobuf:"fixed32,1,rep,packed,name=vector,proto3" json:"vector,omitempty"`
-	Dimensions    int32                  `protobuf:"varint,2,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
-	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	Tokens        int32                  `protobuf:"varint,4,opt,name=tokens,proto3" json:"tokens,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The text as a vector, a number per dimension.
+	Vector []float32 `protobuf:"fixed32,1,rep,packed,name=vector,proto3" json:"vector,omitempty"`
+	// How many numbers the vector holds.
+	Dimensions int32 `protobuf:"varint,2,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
+	// The model that embedded it.
+	Model string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	// How many tokens the text was read as.
+	Tokens        int32 `protobuf:"varint,4,opt,name=tokens,proto3" json:"tokens,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -210,11 +214,15 @@ func (x *BatchEmbedRequest) GetModel() string {
 }
 
 type BatchEmbedResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Results       []*EmbeddingVector     `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
-	Dimensions    int32                  `protobuf:"varint,2,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
-	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	TotalTokens   int32                  `protobuf:"varint,4,opt,name=total_tokens,json=totalTokens,proto3" json:"total_tokens,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A vector per text, in the order the texts were sent.
+	Results []*EmbeddingVector `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	// How many numbers each vector holds.
+	Dimensions int32 `protobuf:"varint,2,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
+	// The model that embedded them.
+	Model string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	// How many tokens the texts were read as, together.
+	TotalTokens   int32 `protobuf:"varint,4,opt,name=total_tokens,json=totalTokens,proto3" json:"total_tokens,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -278,9 +286,11 @@ func (x *BatchEmbedResponse) GetTotalTokens() int32 {
 }
 
 type EmbeddingVector struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Vector        []float32              `protobuf:"fixed32,1,rep,packed,name=vector,proto3" json:"vector,omitempty"`
-	Tokens        int32                  `protobuf:"varint,2,opt,name=tokens,proto3" json:"tokens,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One text as a vector, a number per dimension.
+	Vector []float32 `protobuf:"fixed32,1,rep,packed,name=vector,proto3" json:"vector,omitempty"`
+	// How many tokens that text was read as.
+	Tokens        int32 `protobuf:"varint,2,opt,name=tokens,proto3" json:"tokens,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
