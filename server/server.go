@@ -71,6 +71,8 @@ type QNTXServer struct {
 	identityTokensRenewed identityTokens      // Each ROOT agent home whose identity token is renewed
 	collected             *collection         // What agents said to an agent, collected until it is delivered together (collected.go)
 	collectedOnce         sync.Once
+	collectedKeys         collectedKeeper               // 「[Opus 5.5] Where what is collected is kept a key for each agent, for a reader to watch (collected_keys_etcd.go); nil is the node's own, or none」
+	etcdWindows           etcdWindows                   // 「[Opus 5.5] Each namespace's etcd window, one each (etcd_window_kept.go)」
 	shows                 shower                        // How this node reaches a phone (phones.go); Apple's once asked for, a stand-in in a test
 	underGround           groundHomes                   // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)
 	scrubWith             scrubber                      // A test's scanner in place of ground's (fixtures.go); nil is ground's
@@ -97,6 +99,7 @@ type QNTXServer struct {
 	pluginManager         pluginManaging              // Plugin process manager, or why the node has none
 	services              plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager       *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+	vectorIndex           *routedIndex                // where the embedding store keeps and finds its vectors
 	// What the mail service was wired with (ADR-041), read back by the mail
 	// signum so ROOT sees what sends and not what am.toml says since.
 	mailConfig config.MailConfig

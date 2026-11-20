@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	VectorSearchService_Search_FullMethodName      = "/protocol.VectorSearchService/Search"
-	VectorSearchService_AddVectors_FullMethodName  = "/protocol.VectorSearchService/AddVectors"
-	VectorSearchService_CreateIndex_FullMethodName = "/protocol.VectorSearchService/CreateIndex"
+	VectorSearchService_Search_FullMethodName        = "/protocol.VectorSearchService/Search"
+	VectorSearchService_AddVectors_FullMethodName    = "/protocol.VectorSearchService/AddVectors"
+	VectorSearchService_CreateIndex_FullMethodName   = "/protocol.VectorSearchService/CreateIndex"
+	VectorSearchService_DeleteVectors_FullMethodName = "/protocol.VectorSearchService/DeleteVectors"
 )
 
 // VectorSearchServiceClient is the client API for VectorSearchService service.
@@ -37,6 +38,9 @@ type VectorSearchServiceClient interface {
 	AddVectors(ctx context.Context, in *AddVectorsRequest, opts ...grpc.CallOption) (*AddVectorsResponse, error)
 	// CreateIndex creates a new named vector index.
 	CreateIndex(ctx context.Context, in *CreateIndexRequest, opts ...grpc.CallOption) (*CreateIndexResponse, error)
+	// DeleteVectors removes vectors from a named index by their ids. An id the
+	// index does not hold is no error.
+	DeleteVectors(ctx context.Context, in *DeleteVectorsRequest, opts ...grpc.CallOption) (*DeleteVectorsResponse, error)
 }
 
 type vectorSearchServiceClient struct {
@@ -77,6 +81,16 @@ func (c *vectorSearchServiceClient) CreateIndex(ctx context.Context, in *CreateI
 	return out, nil
 }
 
+func (c *vectorSearchServiceClient) DeleteVectors(ctx context.Context, in *DeleteVectorsRequest, opts ...grpc.CallOption) (*DeleteVectorsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteVectorsResponse)
+	err := c.cc.Invoke(ctx, VectorSearchService_DeleteVectors_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VectorSearchServiceServer is the server API for VectorSearchService service.
 // All implementations must embed UnimplementedVectorSearchServiceServer
 // for forward compatibility.
@@ -90,6 +104,9 @@ type VectorSearchServiceServer interface {
 	AddVectors(context.Context, *AddVectorsRequest) (*AddVectorsResponse, error)
 	// CreateIndex creates a new named vector index.
 	CreateIndex(context.Context, *CreateIndexRequest) (*CreateIndexResponse, error)
+	// DeleteVectors removes vectors from a named index by their ids. An id the
+	// index does not hold is no error.
+	DeleteVectors(context.Context, *DeleteVectorsRequest) (*DeleteVectorsResponse, error)
 	mustEmbedUnimplementedVectorSearchServiceServer()
 }
 
@@ -108,6 +125,9 @@ func (UnimplementedVectorSearchServiceServer) AddVectors(context.Context, *AddVe
 }
 func (UnimplementedVectorSearchServiceServer) CreateIndex(context.Context, *CreateIndexRequest) (*CreateIndexResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateIndex not implemented")
+}
+func (UnimplementedVectorSearchServiceServer) DeleteVectors(context.Context, *DeleteVectorsRequest) (*DeleteVectorsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteVectors not implemented")
 }
 func (UnimplementedVectorSearchServiceServer) mustEmbedUnimplementedVectorSearchServiceServer() {}
 func (UnimplementedVectorSearchServiceServer) testEmbeddedByValue()                             {}
@@ -184,6 +204,24 @@ func _VectorSearchService_CreateIndex_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VectorSearchService_DeleteVectors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteVectorsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VectorSearchServiceServer).DeleteVectors(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VectorSearchService_DeleteVectors_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VectorSearchServiceServer).DeleteVectors(ctx, req.(*DeleteVectorsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VectorSearchService_ServiceDesc is the grpc.ServiceDesc for VectorSearchService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -202,6 +240,10 @@ var VectorSearchService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateIndex",
 			Handler:    _VectorSearchService_CreateIndex_Handler,
+		},
+		{
+			MethodName: "DeleteVectors",
+			Handler:    _VectorSearchService_DeleteVectors_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

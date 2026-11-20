@@ -6,17 +6,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/internal/db"
 )
-
-func init() {
-	sqlite_vec.Auto()
-}
 
 // createTestStore creates a file-backed RustBackedStore for testing.
 // Returns the store (for CRUD), the Go *sql.DB (for raw SQL queries in tests),

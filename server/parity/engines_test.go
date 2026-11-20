@@ -5,7 +5,7 @@ import "testing"
 // TestEnginesArePinned: each storage engine has exactly one pin here, and the
 // pin names its version and commit.
 func TestEnginesArePinned(t *testing.T) {
-	for _, engine := range []string{"sqlite", "duckdb", "postgres"} {
+	for _, engine := range []string{"sqlite", "duckdb", "postgres", "etcd"} {
 		pin, err := PinOf(".", engine)
 		if err != nil {
 			t.Fatalf("PinOf(%q): %v", engine, err)

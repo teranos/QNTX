@@ -169,6 +169,10 @@ libacp: ## Build libACP, the ACP client an ACP harness runs through (build tag l
 	@$(MAKE) -C libacp install PREFIX=$(CURDIR)/target/libacp
 	@echo "✓ libacp in target/libacp"
 
+rust-etcd: ## Build the Rust etcd window library with FFI support (build tag rustetcd)
+	@cargo build --release --package ats-etcd --features ffi --lib
+	@echo "✓ libats_etcd built in target/release/"
+
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
 	@echo "Building Rust SQLite storage library..."
 	$(call ground-notify,rust-build,Rust: building ats-sqlite)

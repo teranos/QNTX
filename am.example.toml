@@ -42,6 +42,16 @@ backup_interval_seconds = 3600
 #   「[Opus 5.5] { name = "fleetingmem", record = "parquet" },」
 # 「[Opus 5.5] ]」
 
+# 「[Opus 5.5] ── etcd ────────────────────────────────────────────────────────」
+# 「[Opus 5.5] Another place what the node holds goes, for a reader to watch
+# 「[Opus 5.5] rather than ask the node, named as endpoint = "http://127.0.0.1:2379" under a」
+# 「[Opus 5.5] table [etcd]. Each attestation a namespace creates is put at」
+# 「[Opus 5.5] /attestations/<namespace>/<id> under a 72-hour lease, and what is collected」
+# 「[Opus 5.5] for each agent at /collected/<node DID>/<agent DID>, as collected list says」
+# 「[Opus 5.5] it, deleted once nothing waits. A node whose etcd does not answer does not」
+# 「[Opus 5.5] start, and a build without the rustetcd tag refuses one that names an etcd.」
+# 「[Opus 5.5] Left out, nothing goes to etcd.」」
+
 # ── Postgres records ────────────────────────────────────────────
 # A namespace given Postgres names its connection string in its own
 # ns.toml, by reference. The string says whether it is TLS:

@@ -2,11 +2,10 @@ package storage
 
 import (
 	"database/sql"
-	"fmt"
-	"github.com/teranos/QNTX/internal/sqlclose"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/teranos/QNTX/ats/identity"
 	errors "github.com/teranos/sacred-error"
@@ -34,68 +33,18 @@ type EmbeddingModel struct {
 
 // EmbeddingStore provides database operations for embeddings
 type EmbeddingStore struct {
-	db        *sql.DB
-	logger    *zap.Logger
-	vecTables sync.Map // tracks created vec0 tables by name
+	db     *sql.DB
+	logger *zap.Logger
+	// vectors is where the vectors are kept and found (VectorIndex).
+	vectors indexHeld
 }
 
 // NewEmbeddingStore creates a new embedding store
 func NewEmbeddingStore(db *sql.DB, logger *zap.Logger) *EmbeddingStore {
-	s := &EmbeddingStore{
+	return &EmbeddingStore{
 		db:     db,
 		logger: logger,
 	}
-	// Register the legacy vec_embeddings table (created by migration 024)
-	s.vecTables.Store("vec_embeddings", true)
-	return s
-}
-
-// modelSlug converts a model name to a safe SQL identifier suffix.
-// Only alphanumeric characters are kept; everything else becomes underscore.
-func modelSlug(model string) string {
-	if model == "" {
-		return ""
-	}
-	var b strings.Builder
-	for _, r := range strings.ToLower(model) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-		} else {
-			b.WriteRune('_')
-		}
-	}
-	return b.String()
-}
-
-// vecTableName returns the vec0 virtual table name for a given model.
-// Empty model uses the legacy "vec_embeddings" table.
-func vecTableName(model string) string {
-	if model == "" {
-		return "vec_embeddings"
-	}
-	return "vec_embeddings_" + modelSlug(model)
-}
-
-// EnsureVecTable creates the per-model vec0 virtual table if it doesn't exist.
-func (s *EmbeddingStore) EnsureVecTable(model string, dimensions int) error {
-	table := vecTableName(model)
-
-	// LoadOrStore is atomic — only one goroutine proceeds to CREATE
-	if _, loaded := s.vecTables.LoadOrStore(table, true); loaded {
-		return nil
-	}
-
-	query := fmt.Sprintf(
-		`CREATE VIRTUAL TABLE IF NOT EXISTS %s USING vec0(embedding_id TEXT PRIMARY KEY, embedding FLOAT32[%d])`,
-		table, dimensions,
-	)
-	if _, err := s.db.Exec(query); err != nil {
-		s.vecTables.Delete(table) // rollback on failure so next call retries
-		return errors.Wrapf(err, "failed to create vec table %s with %d dimensions", table, dimensions)
-	}
-
-	s.logger.Info("created vec0 table", zap.String("table", table), zap.Int("dimensions", dimensions))
-	return nil
 }
 
 // Save stores an embedding in the database
@@ -148,32 +97,14 @@ func (s *EmbeddingStore) Save(embedding *EmbeddingModel) error {
 			embedding.ID, embedding.SourceType, embedding.SourceID)
 	}
 
-	// Ensure the per-model vec0 table exists, then insert
-	table := vecTableName(embedding.Model)
-	if err := s.EnsureVecTable(embedding.Model, embedding.Dimensions); err != nil {
-		return err
-	}
-
-	// Virtual tables don't support UPSERT, so we delete then insert. A delete
-	// that failed leaves the old vector in place and the insert then writes a
-	// second row, so the table holds two embeddings for one id.
-	if _, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), embedding.ID); err != nil {
-		return errors.Wrapf(err, "failed to clear embedding %s from %s before rewriting it", embedding.ID, table)
-	}
-
-	vecQuery := fmt.Sprintf(`INSERT INTO %s (embedding_id, embedding) VALUES (?, ?)`, table)
-	_, err = s.db.Exec(vecQuery, embedding.ID, embedding.Embedding)
-	if err != nil {
-		return errors.Wrapf(err, "failed to save embedding %s to %s", embedding.ID, table)
-	}
-
 	s.logger.Debug("saved embedding",
 		zap.String("id", embedding.ID),
 		zap.String("source_type", embedding.SourceType),
 		zap.String("source_id", embedding.SourceID),
 		zap.Int("dimensions", embedding.Dimensions))
 
-	return nil
+	// The row is kept; the vector goes to its model's index.
+	return s.keep(embedding)
 }
 
 // GetBySource retrieves an embedding by its source.
@@ -237,104 +168,6 @@ type SearchResult struct {
 	Similarity  float32 `json:"similarity"` // 1.0 - normalized distance
 }
 
-// SemanticSearch performs a vector similarity search.
-// When model is non-empty, results are scoped to that model's embeddings.
-// When clusterID is non-nil, results are scoped to that cluster only.
-func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, threshold float32, clusterID *int, model string) (_ []*SearchResult, err error) {
-	if len(queryEmbedding) == 0 {
-		return nil, errors.New("query embedding is empty")
-	}
-
-	if limit <= 0 {
-		limit = 10 // Default limit
-	}
-
-	// Use L2 distance with sqlite-vec
-	// Lower distance means more similar
-	var query string
-	var args []any
-
-	// Build WHERE clauses
-	var filters []string
-	if clusterID != nil {
-		filters = append(filters, "e.cluster_id = ?")
-		args = append(args, *clusterID)
-	}
-	if model != "" {
-		filters = append(filters, "e.model = ?")
-		args = append(args, model)
-	}
-
-	whereClause := ""
-	if len(filters) > 0 {
-		whereClause = "WHERE " + strings.Join(filters, " AND ")
-	}
-
-	table := vecTableName(model)
-	query = fmt.Sprintf(`
-		SELECT
-			v.embedding_id,
-			e.source_type,
-			e.source_id,
-			e.text,
-			vec_distance_L2(v.embedding, ?) as distance
-		FROM %s v
-		JOIN embeddings e ON v.embedding_id = e.id
-		%s
-		ORDER BY distance
-		LIMIT ?
-	`, table, whereClause)
-	// Prepend queryEmbedding, append limit
-	args = append([]any{queryEmbedding}, args...)
-	args = append(args, limit)
-
-	rows, err := s.db.Query(query, args...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to perform semantic search (limit=%d, threshold=%.2f)", limit, threshold)
-	}
-	defer func() { err = sqlclose.With(err, rows.Close(), "rows for SemanticSearch") }()
-
-	var results []*SearchResult
-	for rows.Next() {
-		var result SearchResult
-		err := rows.Scan(
-			&result.EmbeddingID,
-			&result.SourceType,
-			&result.SourceID,
-			&result.Text,
-			&result.Distance,
-		)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to scan search result at row %d", len(results)+1)
-		}
-
-		// Convert L2 distance to similarity score
-		// Normalize based on typical L2 distances for normalized embeddings
-		// L2 distance for normalized vectors ranges from 0 to 2
-		// Convert to similarity: 1 - (distance / 2)
-		result.Similarity = 1.0 - (result.Distance / 2.0)
-		if result.Similarity < 0 {
-			result.Similarity = 0
-		}
-
-		// Apply threshold filter
-		if result.Similarity >= threshold {
-			results = append(results, &result)
-		}
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "failed to iterate search results (scanned %d rows)", len(results))
-	}
-
-	s.logger.Debug("semantic search completed",
-		zap.Int("results", len(results)),
-		zap.Int("limit", limit),
-		zap.Float32("threshold", threshold))
-
-	return results, nil
-}
-
 // sourceEmbedding names one embedding row DeleteBySource must clean up.
 type sourceEmbedding struct {
 	id    string
@@ -376,16 +209,16 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 		return err
 	}
 
+	// Nothing of this source is kept: what is recorded to be taken out is
+	// still asked again.
 	if len(entries) == 0 {
-		return nil
+		_, err := s.ForgetPending()
+		return err
 	}
 
-	// Delete from each model's vec table
-	for _, e := range entries {
-		table := vecTableName(e.model)
-		if _, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), e.id); err != nil {
-			return errors.Wrapf(err, "failed to delete from %s for %s", table, e.id)
-		}
+	// Each vector is recorded to be taken out before its row goes.
+	if err := toForget(s.db, entries); err != nil {
+		return err
 	}
 
 	// Delete from embeddings table
@@ -402,6 +235,9 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 		zap.String("source_id", sourceID),
 		zap.Int("count", len(entries)))
 
+	if _, err := s.ForgetPending(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -409,14 +245,6 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingModel) (err error) {
 	if len(embeddings) == 0 {
 		return nil
-	}
-
-	// Ensure per-model vec tables exist before opening the transaction
-	// (EnsureVecTable uses s.db.Exec which would deadlock inside an open tx on SQLite)
-	for _, embedding := range embeddings {
-		if err := s.EnsureVecTable(embedding.Model, embedding.Dimensions); err != nil {
-			return err
-		}
 	}
 
 	tx, err := s.db.Begin()
@@ -480,17 +308,6 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 		if err != nil {
 			return errors.Wrapf(err, "failed to insert embedding %s", embedding.ID)
 		}
-
-		// Delete existing vec entry if it exists, then insert into per-model vec
-		// table. Discarding the delete would leave two vectors under one id.
-		table := vecTableName(embedding.Model)
-		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), embedding.ID); err != nil {
-			return errors.Wrapf(err, "failed to clear embedding %s from %s before rewriting it", embedding.ID, table)
-		}
-		_, err = tx.Exec(fmt.Sprintf("INSERT INTO %s (embedding_id, embedding) VALUES (?, ?)", table), embedding.ID, embedding.Embedding)
-		if err != nil {
-			return errors.Wrapf(err, "failed to insert into %s for %s", table, embedding.ID)
-		}
 	}
 
 	if err = tx.Commit(); err != nil {
@@ -500,6 +317,21 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 	s.logger.Info("batch saved embeddings",
 		zap.Int("count", len(embeddings)))
 
+	// The rows are kept; each vector goes to its model's index. The first
+	// that is not taken is said, with how many were not.
+	var first error
+	missed := 0
+	for _, embedding := range embeddings {
+		if keepErr := s.keep(embedding); keepErr != nil {
+			missed++
+			if first == nil {
+				first = keepErr
+			}
+		}
+	}
+	if first != nil {
+		return errors.Wrapf(first, "%d of %d vectors not indexed", missed, len(embeddings))
+	}
 	return nil
 }
 
