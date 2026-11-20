@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"github.com/teranos/QNTX/internal/sqlclose"
 	"io"
@@ -55,6 +56,50 @@ var allowedExtensions = map[string]bool{
 	".wav":  true,
 	".mp3":  true,
 	".ogg":  true,
+}
+
+// 「[Fable 5.2] m4aBrands are the brands an ftyp box names for the sound a phone records, besides」
+// 「[Fable 5.2] those starting with mp4, the only ones net/http's sniffing knows an MP4 by.」
+var m4aBrands = map[string]bool{"M4A ": true, "M4B ": true, "isom": true, "iso2": true}
+
+// 「[Fable 5.2] startsAsRecording is whether head starts as the recording ext names, for the two」
+// 「[Fable 5.2] net/http's sniffing misses: an M4A whose ftyp box names no mp4 brand, and an MP3」
+// 「[Fable 5.2] that starts with its first sound frame and no ID3 tag before it.」
+func startsAsRecording(ext string, head []byte) bool {
+	switch ext {
+	case ".m4a":
+		if len(head) < 12 || string(head[4:8]) != "ftyp" {
+			return false
+		}
+		box := int(binary.BigEndian.Uint32(head[:4]))
+		if box < 12 || box%4 != 0 {
+			return false
+		}
+		if box > len(head) {
+			box = len(head) - len(head)%4
+		}
+		// The major brand is at 8, the minor version at 12, the compatible brands after it.
+		for at := 8; at+4 <= box; at += 4 {
+			if at == 12 {
+				continue
+			}
+			brand := string(head[at : at+4])
+			if m4aBrands[brand] || strings.HasPrefix(brand, "mp4") {
+				return true
+			}
+		}
+		return false
+	case ".mp3":
+		// An MPEG audio frame header: eleven sync bits, then a version, layer III,
+		// a bitrate and a sample rate that are each one the format has.
+		if len(head) < 4 || head[0] != 0xFF || head[1]&0xE0 != 0xE0 {
+			return false
+		}
+		version, layer := head[1]>>3&0x3, head[1]>>1&0x3
+		bitrate, sampleRate := head[2]>>4, head[2]>>2&0x3
+		return version != 0x1 && layer == 0x1 && bitrate != 0x0 && bitrate != 0xF && sampleRate != 0x3
+	}
+	return false
 }
 
 // "Think. As a human user I STT into the room from my phone."
@@ -158,7 +203,7 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		detectedType = strings.TrimSpace(detectedType[:idx])
 	}
 
-	if startsAs, recording := recordingStartsAs[ext]; recording && detectedType == startsAs {
+	if startsAs, recording := recordingStartsAs[ext]; recording && (detectedType == startsAs || startsAsRecording(ext, buf[:n])) {
 		detectedType = mimeByExtension[ext]
 	}
 

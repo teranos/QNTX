@@ -90,6 +90,10 @@ var recordings = map[string][]byte{
 	"voice.wav":  []byte("RIFF\x24\x00\x00\x00WAVEfmt then the sound"),
 	"voice.mp3":  []byte("ID3\x03\x00\x00\x00\x00\x00\x0A then the sound"),
 	"voice.ogg":  []byte("OggS\x00\x02 then the sound"),
+	// 「[Fable 5.2] An ftyp box of 24 bytes that names no mp4 brand: major brand M4A, compatible M4A, isom.」
+	"memo.m4a": append([]byte{0, 0, 0, 24}, []byte("ftypM4A \x00\x00\x00\x00M4A isom then the sound")...),
+	// 「[Fable 5.2] No ID3 tag: the first frame's header, MPEG-1 layer III at 128 kbit/s and 44.1 kHz.」
+	"memo.mp3": []byte("\xFF\xFB\x90\x00 then the sound"),
 }
 
 var recordingTypes = map[string]string{
@@ -98,6 +102,8 @@ var recordingTypes = map[string]string{
 	"voice.wav":  "audio/wav",
 	"voice.mp3":  "audio/mpeg",
 	"voice.ogg":  "audio/ogg",
+	"memo.m4a":   "audio/mp4",
+	"memo.mp3":   "audio/mpeg",
 }
 
 // "Think. As a human user I STT into the room from my phone."
@@ -133,6 +139,27 @@ func TestARecordingThatIsNotOneIsRefused(t *testing.T) {
 }
 
 // "i never wanted twelvelabs to be the source of truth"
+// 「[Fable 5.2] Bytes that only look like the start of a recording are refused as well.」
+func TestWhatOnlyLooksLikeARecordingIsRefused(t *testing.T) {
+	notRecordings := map[string][]byte{
+		// An ftyp box whose brands are a picture's.
+		"picture.m4a": append([]byte{0, 0, 0, 24}, []byte("ftypheic\x00\x00\x00\x00heicmif1 a picture")...),
+		// The sync bits of a frame, and a layer no MP3 has.
+		"noise.mp3": []byte("\xFF\xFF\x90\x00 not a frame"),
+		// The sync bits of a frame, and a bitrate the format has none of.
+		"static.mp3": []byte("\xFF\xFB\xF0\x00 not a frame"),
+	}
+	for filename, content := range notRecordings {
+		t.Run(filename, func(t *testing.T) {
+			srv := createFileTestServer(t)
+			w := bring(t, srv, filename, content)
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("answered %d, want 400: %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestAKeptFileIsAnsweredWithItsName(t *testing.T) {
 	srv := createFileTestServer(t)
 	result := keptFile(t, bring(t, srv, "report.pdf", pdfHeader()))
