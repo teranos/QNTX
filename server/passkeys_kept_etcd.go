@@ -32,7 +32,7 @@ func (e *etcdPasskeys) Held() (map[string][]byte, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.keys == nil {
-		keys, err := etcdcgo.OpenKeys(e.endpoint, passkeysPrefix)
+		keys, err := openEtcdKeys(e.endpoint, passkeysPrefix)
 		if err != nil {
 			return nil, errors.Wrapf(err, "laye's passkeys were not read from etcd at %s", e.endpoint)
 		}
