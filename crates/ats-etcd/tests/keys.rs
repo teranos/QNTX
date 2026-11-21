@@ -133,3 +133,59 @@ fn a_prefix_that_is_not_one_is_refused() {
         Err(EtcdError::BadPrefix { .. })
     ));
 }
+
+// "LAYE OWNS IDENTITY"
+
+/// 「[Opus 5.5] A swap writes only while what it compared is as it was read; one that
+/// 「[Opus 5.5] another wrote between is not taken, and writes nothing.」」
+#[test]
+fn a_swap_is_taken_only_while_nothing_moved() {
+    let base = prefix();
+    let keys = EtcdKeys::open(&endpoint(), &base).unwrap();
+    let name = format!("{base}names/alder");
+    let named = format!("{base}named/did:key:a");
+
+    // 「[Opus 5.5] Neither is held: each is compared at 0.」
+    let free: BTreeMap<String, i64> = [(name.clone(), 0), (named.clone(), 0)].into();
+    let put = whole(&[
+        (name.as_str(), "{\"did\":\"did:key:a\"}"),
+        (named.as_str(), "alder"),
+    ]);
+    assert!(keys.swap(&free, &put, &[]).unwrap());
+
+    let read = keys
+        .read(&[name.clone(), named.clone(), format!("{base}names/none")])
+        .unwrap();
+    assert_eq!(read.len(), 2, "a key etcd does not hold is left out");
+    let (value, revision) = read.get(&name).unwrap();
+    assert_eq!(value, b"{\"did\":\"did:key:a\"}");
+    assert!(*revision > 0);
+
+    // 「[Opus 5.5] Compared as free again, after it was taken: not taken, nothing written.」
+    let other = whole(&[(name.as_str(), "{\"did\":\"did:key:b\"}")]);
+    assert!(!keys.swap(&free, &other, &[]).unwrap());
+    assert_eq!(
+        keys.read(std::slice::from_ref(&name))
+            .unwrap()
+            .get(&name)
+            .unwrap()
+            .0,
+        b"{\"did\":\"did:key:a\"}"
+    );
+
+    // 「[Opus 5.5] At the revision it was read at, the swap deletes as it puts.」
+    let at: BTreeMap<String, i64> = [(name.clone(), *revision)].into();
+    assert!(keys
+        .swap(&at, &BTreeMap::new(), &[name.clone(), named.clone()])
+        .unwrap());
+    assert!(keys.read(&[name, named]).unwrap().is_empty());
+}
+
+#[test]
+fn a_key_not_whole_is_refused() {
+    let keys = EtcdKeys::open(&endpoint(), &prefix()).unwrap();
+    assert!(matches!(
+        keys.read(&["names/alder".to_string()]),
+        Err(EtcdError::BadPrefix { .. })
+    ));
+}

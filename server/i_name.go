@@ -65,6 +65,18 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "given",
 			Says: strconv.Quote(given) + " is not who gives a name: " + strings.Join(nameGivers, ", ")}
 	}
+	// "AND LAYE OWNS IDENTITY"
+	// Where laye's etcd is named, the name is taken there: one name for one
+	// agent on every node naming it, and while QNTX is down, at laye.
+	if s.names != nil {
+		s.seedNames()
+		taken, refusal := s.names.take(did, name, given, s.revoked, namingNow())
+		if refusal != nil {
+			return nil, refusal
+		}
+		s.logger.Infow("an agent named itself at laye's etcd", "did", did, "name", taken)
+		return &protocol.Named{Name: taken, Did: did}, nil
+	}
 	if s.held == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no store to keep a name in"}
 	}
@@ -283,6 +295,10 @@ func wholeAttribute(as *types.As, attribute string) (int64, error) {
 // held before is free from then on. A line some other actor wrote about a DID
 // is not the agent naming itself, and is no name.
 func (s *QNTXServer) agentNames() ([]agentName, error) {
+	if s.names != nil {
+		s.seedNames()
+		return s.names.standing()
+	}
 	lines, err := s.agentLines()
 	if err != nil {
 		return nil, err
@@ -439,4 +455,43 @@ func (s *QNTXServer) keepNameLine(predicate, did, by, name, given string, newest
 	}
 	measure.Count(measure.AttestationsWritten, 1)
 	return now, nil
+}
+
+// "AND LAYE OWNS IDENTITY"
+//
+// nameKeeper is where names are kept when it is not the node's own lines:
+// laye's etcd (names_at_laye_etcd.go).
+type nameKeeper interface {
+	// standing is the name each agent holds.
+	standing() ([]agentName, error)
+	// take gives did the name, as i name does; revoked says whether a DID
+	// holding it was revoked, and lets it go.
+	take(did, name, given string, revoked func(string) bool, now time.Time) (string, *protocol.Refusal)
+	// seed gives did the name only where neither is held yet.
+	seed(did, name, given string, at time.Time) (bool, error)
+}
+
+// seedNames brings the names this node's lines hold into laye's etcd, once a
+// start, where neither the name nor the agent is held there yet: what was
+// named before laye kept names is named the same after.
+func (s *QNTXServer) seedNames() {
+	if s.held == nil {
+		return
+	}
+	s.seeding.Do(func() {
+		lines, err := s.agentLines()
+		if err != nil {
+			s.logger.Warnw("the names this node holds were not read to bring into laye's etcd", "error", err)
+			return
+		}
+		for _, held := range standing(lines) {
+			seeded, err := s.names.seed(held.did, held.name, "", held.at)
+			switch {
+			case err != nil:
+				s.logger.Warnw("a name this node holds was not brought into laye's etcd", "did", held.did, "name", held.name, "error", err)
+			case seeded:
+				s.logger.Infow("a name this node holds is kept in laye's etcd", "did", held.did, "name", held.name)
+			}
+		}
+	})
 }
