@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -246,5 +247,52 @@ func TestAPeerNobodyNamedIsNotReached(t *testing.T) {
 	w := httptest.NewRecorder()
 	primary.handlePeer(w, httptest.NewRequest(http.MethodGet, peerPath+"nobody/api/attestations", nil))
 	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Empty(t, got.path)
+}
+
+// "Q should never be used for backfill type ops"
+//
+// The primary signs for who it admits and hands them the signature: they go to
+// the peer themselves, the peer admits them by the primary's word, and what
+// they send does not pass through the primary.
+func TestThePrimarySignsAndTheAdmittedGoToThePeerThemselves(t *testing.T) {
+	peerKey, peerDID := otherNode(t)
+	primary, served, got := primaryAndPeer(t, peerDID)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	did := EncodeDIDKey(key.Public().(ed25519.PublicKey))
+	_, err = primary.tokens.Issue(IssuedToken{Hash: signedOnly(did), DID: did, Label: "ground on l", MintedBy: mastodonAccount,
+		Level: LevelAttestor, Namespaces: []string{NamespaceDefault}, ExpiresAt: NeverEnds()})
+	require.NoError(t, err)
+
+	r := httptest.NewRequest(http.MethodPost, peerPath+peerName, nil)
+	r.Header.Set("Authorization", signedScheme+signature(t, key, did, served, time.Minute))
+	w := httptest.NewRecorder()
+	primary.handlePeer(w, r)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Empty(t, got.path, "the peer was sent a request the primary was only asked to sign for")
+
+	var said struct {
+		Authorization string `json:"authorization"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &said))
+	node := handlerWithDoors(t)
+	node.tokens = newMemTokenStore()
+	node.nodeKey = peerKey
+	require.NoError(t, node.SetPrimary(served))
+	direct := httptest.NewRequest(http.MethodPost, "/api/attestations", nil)
+	direct.Header.Set("Authorization", said.Authorization)
+	admission, admitted := node.admissionOf(node.presented(direct))
+	require.True(t, admitted, "the peer did not admit who came to it with the primary's signature")
+	assert.Equal(t, mastodonAccount, admission.Identity)
+}
+
+// Nobody presented is handed no signature.
+func TestNobodyPresentedIsHandedNoSignature(t *testing.T) {
+	primary, got, _ := anyPeer(t)
+	w := httptest.NewRecorder()
+	primary.handlePeer(w, httptest.NewRequest(http.MethodPost, peerPath+peerName, nil))
+	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
+	assert.NotContains(t, w.Body.String(), signedScheme)
 	assert.Empty(t, got.path)
 }
