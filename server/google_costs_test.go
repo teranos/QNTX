@@ -188,6 +188,8 @@ func TestConnectingCostsWiresTheBudgetsToTheNode(t *testing.T) {
 	said, err := s.connectGoogleCosts(context.Background(), "root-token-2", "google:root-sub")
 	require.NoError(t, err)
 	assert.Contains(t, said, "hours", "the first report can take that long, and the page says so")
+	// "fix the budget count": ROOT's one budget, and the node's meter made by this press.
+	assert.Contains(t, said, "from 2 budgets")
 
 	assert.ElementsMatch(t, googleCostServices, b.enabled)
 	assert.Contains(t, b.roles["/v1/billingAccounts/0-1"], "roles/billing.viewer serviceAccount:"+theAccount)
