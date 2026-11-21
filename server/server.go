@@ -72,7 +72,6 @@ type QNTXServer struct {
 	collected             *collection         // What agents said to an agent, collected until it is delivered together (collected.go)
 	collectedOnce         sync.Once
 	collectedKeys         collectedKeeper               // 「[Opus 5.5] Where what is collected is kept a key for each agent, for a reader to watch (collected_keys_etcd.go); nil is the node's own, or none」
-	etcdWindows           etcdWindows                   // 「[Opus 5.5] Each namespace's etcd window, one each (etcd_window_kept.go)」
 	shows                 shower                        // How this node reaches a phone (phones.go); Apple's once asked for, a stand-in in a test
 	underGround           groundHomes                   // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)
 	scrubWith             scrubber                      // A test's scanner in place of ground's (fixtures.go); nil is ground's
@@ -163,6 +162,12 @@ type QNTXServer struct {
 	// naming is held from reading who holds a name to writing down who now
 	// does (i name), so two agents asking for one name at once do not both get it.
 	naming sync.Mutex
+	// "AND LAYE OWNS IDENTITY"
+	// names is laye's etcd, where names are kept when am.toml names one; nil
+	// keeps them as the node's own lines. seeding brings those lines into it
+	// once a start.
+	names   nameKeeper
+	seeding sync.Once
 	// 「[Opus 5.5] anthropicLining is held from reading the node's ANTHROPIC line to writing it anew」
 	// 「[Opus 5.5] (changeAnthropicLine), so an order, a cap and the ids asked at once each stand.」
 	anthropicLining sync.Mutex

@@ -249,6 +249,42 @@ pub extern "C" fn etcd_keys_new(endpoint: *const c_char, prefix: *const c_char) 
     })
 }
 
+/// 「[Opus 5.5] As `etcd_keys_new`, asking as `user` with `password`; an empty `user`
+/// 「[Opus 5.5] asks as nobody.」」
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn etcd_keys_new_as(
+    endpoint: *const c_char,
+    prefix: *const c_char,
+    user: *const c_char,
+    password: *const c_char,
+) -> KeysOpenResultC {
+    qntx_ffi_common::guarded_result("etcd_keys_new_as", || {
+        const CALL: &str = "etcd_keys_new_as";
+        let args = || -> Result<(&str, &str, &str, &str), EtcdError> {
+            Ok((
+                unsafe { argument(CALL, "endpoint", endpoint) }?,
+                unsafe { argument(CALL, "prefix", prefix) }?,
+                unsafe { argument(CALL, "user", user) }?,
+                unsafe { argument(CALL, "password", password) }?,
+            ))
+        };
+        let (endpoint, prefix, user, password) = match args() {
+            Ok(a) => a,
+            Err(e) => return KeysOpenResultC::error(e.crosses(CALL)),
+        };
+        let as_user = (!user.is_empty()).then_some((user, password));
+        match EtcdKeys::open_as(endpoint, prefix, as_user) {
+            Ok(keys) => KeysOpenResultC {
+                success: true,
+                error_msg: ptr::null_mut(),
+                keys: Box::into_raw(Box::new(keys)),
+            },
+            Err(e) => KeysOpenResultC::error(e.crosses(CALL)),
+        }
+    })
+}
+
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn etcd_keys_free(keys: *mut EtcdKeys) {
@@ -324,6 +360,127 @@ pub extern "C" fn etcd_keys_held(keys: *mut EtcdKeys) -> HeldResultC {
                 success: true,
                 error_msg: ptr::null_mut(),
                 json: qntx_ffi_common::cstring_new_or_empty(&json),
+            },
+            Err(e) => HeldResultC::error(e.crosses(CALL)),
+        }
+    })
+}
+
+/// 「[Opus 5.5] The keys named (a JSON array of whole keys), each etcd holds as
+/// 「[Opus 5.5] {"value", "revision"}. Freed with `etcd_held_result_free`.」」
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn etcd_keys_read(keys: *mut EtcdKeys, keys_json: *const c_char) -> HeldResultC {
+    qntx_ffi_common::guarded_result("etcd_keys_read", || {
+        const CALL: &str = "etcd_keys_read";
+        if keys.is_null() {
+            return HeldResultC::error(
+                EtcdError::NullPointer {
+                    call: CALL,
+                    argument: "keys",
+                }
+                .crosses(CALL),
+            );
+        }
+        let json = match unsafe { argument(CALL, "keys_json", keys_json) } {
+            Ok(s) => s,
+            Err(e) => return HeldResultC::error(e.crosses(CALL)),
+        };
+        let asked: Vec<String> = match serde_json::from_str(json) {
+            Ok(a) => a,
+            Err(e) => return HeldResultC::error(e.crosses(CALL)),
+        };
+        let keys = unsafe { &*keys };
+        let read = match keys.read(&asked) {
+            Ok(r) => r,
+            Err(e) => return HeldResultC::error(e.crosses(CALL)),
+        };
+        let read: BTreeMap<String, serde_json::Value> = read
+            .into_iter()
+            .map(|(key, (value, revision))| {
+                (
+                    key,
+                    serde_json::json!({
+                        "value": String::from_utf8_lossy(&value),
+                        "revision": revision,
+                    }),
+                )
+            })
+            .collect();
+        match serde_json::to_string(&read) {
+            Ok(json) => HeldResultC {
+                success: true,
+                error_msg: ptr::null_mut(),
+                json: qntx_ffi_common::cstring_new_or_empty(&json),
+            },
+            Err(e) => HeldResultC::error(e.crosses(CALL)),
+        }
+    })
+}
+
+/// 「[Opus 5.5] What a swap is asked as: whole keys and the revisions they must still be
+/// 「[Opus 5.5] at, and what is put and deleted when they are.」」
+#[derive(Default)]
+struct Swap {
+    unchanged: BTreeMap<String, i64>,
+    put: BTreeMap<String, String>,
+    delete: Vec<String>,
+}
+
+/// 「[Opus 5.5] {"unchanged": {key: revision}, "put": {key: value}, "delete": [key]}, each
+/// 「[Opus 5.5] part left out when empty.」」
+fn swap_of(json: &str) -> Result<Swap, serde_json::Error> {
+    let mut asked: BTreeMap<String, serde_json::Value> = serde_json::from_str(json)?;
+    let mut swap = Swap::default();
+    if let Some(v) = asked.remove("unchanged").filter(|v| !v.is_null()) {
+        swap.unchanged = serde_json::from_value(v)?;
+    }
+    if let Some(v) = asked.remove("put").filter(|v| !v.is_null()) {
+        swap.put = serde_json::from_value(v)?;
+    }
+    if let Some(v) = asked.remove("delete").filter(|v| !v.is_null()) {
+        swap.delete = serde_json::from_value(v)?;
+    }
+    Ok(swap)
+}
+
+/// 「[Opus 5.5] A swap (see `EtcdKeys::swap`), answered as {"swapped": bool}. Freed with
+/// 「[Opus 5.5] `etcd_held_result_free`.」」
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn etcd_keys_swap(keys: *mut EtcdKeys, swap_json: *const c_char) -> HeldResultC {
+    qntx_ffi_common::guarded_result("etcd_keys_swap", || {
+        const CALL: &str = "etcd_keys_swap";
+        if keys.is_null() {
+            return HeldResultC::error(
+                EtcdError::NullPointer {
+                    call: CALL,
+                    argument: "keys",
+                }
+                .crosses(CALL),
+            );
+        }
+        let json = match unsafe { argument(CALL, "swap_json", swap_json) } {
+            Ok(s) => s,
+            Err(e) => return HeldResultC::error(e.crosses(CALL)),
+        };
+        let swap = match swap_of(json) {
+            Ok(s) => s,
+            Err(e) => return HeldResultC::error(e.crosses(CALL)),
+        };
+        let put = swap
+            .put
+            .into_iter()
+            .map(|(key, value)| (key, value.into_bytes()))
+            .collect();
+        let keys = unsafe { &*keys };
+        match keys.swap(&swap.unchanged, &put, &swap.delete) {
+            Ok(swapped) => HeldResultC {
+                success: true,
+                error_msg: ptr::null_mut(),
+                json: qntx_ffi_common::cstring_new_or_empty(
+                    &serde_json::json!({ "swapped": swapped }).to_string(),
+                ),
             },
             Err(e) => HeldResultC::error(e.crosses(CALL)),
         }

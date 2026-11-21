@@ -33,6 +33,11 @@ type Config struct {
 // 「[Opus 5.5] creates into, for the window ats-etcd keeps. Empty endpoint: no window.」」
 type EtcdConfig struct {
 	Endpoint string `mapstructure:"endpoint"`
+	// "names and collections and just smaller things, messages say's status"
+	// User is the etcd user the node asks as, whose role reaches only the keys
+	// it keeps; PasswordFile holds its password. Empty asks as nobody.
+	User         string `mapstructure:"user"`
+	PasswordFile string `mapstructure:"password_file"`
 }
 
 // AgentConfig is the agents this node runs (ADR-048).
