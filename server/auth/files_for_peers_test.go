@@ -61,7 +61,8 @@ func TestAPeerBringsAFileStraightToAPeer(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"there","asset":"sha256:abc"}`))
 	}))
 	t.Cleanup(kServed.Close)
-	require.NoError(t, primary.DeclarePeer("k", kDID, []string{"Ground"}, whereThePrimaryReachesK, whereThePrimaryReachesK))
+	// A namespace lives at one peer, and l has Ground: k is declared with one of its own.
+	require.NoError(t, primary.DeclarePeer("k", kDID, []string{"Kapteyn"}, whereThePrimaryReachesK, whereThePrimaryReachesK))
 	require.NoError(t, l.SetDirect(map[string]string{"k": kServed.URL}))
 
 	status, said, err := l.BringFileToPeer(context.Background(), "k", "shot.jpeg", []byte("the picture"))
@@ -73,6 +74,19 @@ func TestAPeerBringsAFileStraightToAPeer(t *testing.T) {
 	// k was told a peer brought it, and which: no person, and no level a person holds.
 	assert.Equal(t, LevelPeer, by.Level)
 	assert.Equal(t, lDID, by.MintedBy)
+
+	// "the identity is not listed": l is on no list of people at k, and is let
+	// in all the same, as a peer and as l.
+	admitted, in := k.admissionOf(Presented{Bearer: &by})
+	require.True(t, in, "k refused the peer its primary vouched for")
+	assert.Equal(t, string(LevelPeer), admitted.LevelName())
+	assert.Equal(t, lDID, admitted.Identity)
+
+	// Named a peer by anybody but k's primary, it is let in nowhere.
+	forged := by
+	forged.DID = lDID
+	_, in = k.admissionOf(Presented{Bearer: &forged})
+	assert.False(t, in, "k let in a peer its primary did not vouch for")
 }
 
 // A peer the primary does not know is brought nothing, and the node is told so.

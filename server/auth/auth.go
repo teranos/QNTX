@@ -386,6 +386,26 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 				"reason", "a GitHub token is not a bearer")
 			return Admission{}, false
 		}
+		// "all other nodes are peers of the primary"
+		// A peer node the primary vouched for is no person, and stands on no
+		// list of people: on k, 2026-11-21 22:08:32, l's file was refused with
+		// "the identity is not listed". What admits it is the primary's
+		// signature, and it is admitted as a peer and nothing more: PEER
+		// reaches what a line of the tablet names it for.
+		if grant.Level == LevelPeer {
+			if !h.signsForItsPeople(grant.DID) {
+				h.logger.Infow("Bearer token refused",
+					"did", grant.DID,
+					"reason", "named a peer by a signer that is not this node's primary")
+				return Admission{}, false
+			}
+			return admission.Granted(Admission{
+				Namespaces:  grant.Namespaces,
+				Identity:    grant.MintedBy,
+				DisplayName: grant.MintedByDisplayName,
+				Grant:       grant,
+			}, LevelPeer, nil, false, h.WordsOf(nil)), true
+		}
 		// A token speaks for whoever minted it, so striking them out
 		// of am.toml has to reach it too. An empty list strikes out everyone.
 		if !h.stillAdmitted(grant.MintedBy) {
