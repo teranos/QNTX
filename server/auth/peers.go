@@ -38,6 +38,10 @@ type carriedClaims struct {
 func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 	name, rest, onPeer := strings.Cut(strings.TrimPrefix(r.URL.Path, peerPath), "/")
 	if !onPeer {
+		if r.Method == http.MethodPost && name != "" {
+			h.handSignature(w, r, name)
+			return
+		}
 		h.writeError(w, http.StatusNotFound, "a request for a peer names a path on it: "+peerPath+"<name>/<path>")
 		return
 	}
@@ -46,35 +50,10 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusNotFound, "no peer is called "+name)
 		return
 	}
-	p := h.presented(r)
-	carriedAs := ""
-	// What this node admitted is carried, a session or a signature: what was
-	// presented here is spent here, and the peer is handed this node's word.
-	//
-	// "k should be delegating auth to the node entirely to q"
-	carries := p.SessionLive || p.Bearer != nil
-	if carries {
-		admitted, ok := h.admissionOf(p)
-		if !ok {
-			h.writeError(w, http.StatusUnauthorized, "what was presented here admits nobody")
-			return
-		}
-		level, name, namespaces := h.levelOf(admitted.Identity), p.DisplayName, peer.Namespaces
-		if !p.SessionLive {
-			// A grant goes as far as it reaches here, and no further.
-			level, name, namespaces = Level(admitted.LevelName()), admitted.DisplayName, nil
-			for _, namespace := range peer.Namespaces {
-				if admitted.MayActIn(namespace) {
-					namespaces = append(namespaces, namespace)
-				}
-			}
-		}
-		signed, err := h.carriedSignature(admitted.Identity, name, level, peer, namespaces, time.Now())
-		if err != nil {
-			h.writeError(w, http.StatusInternalServerError, "this node did not sign to carry you to "+peer.Label+": "+err.Error())
-			return
-		}
-		carriedAs = signed
+	carriedAs, carries, refused, why := h.carriedFor(r, peer)
+	if refused != 0 {
+		h.writeError(w, refused, why)
+		return
 	}
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(out *httputil.ProxyRequest) {
@@ -106,6 +85,67 @@ func (h *Handler) handlePeer(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	proxy.ServeHTTP(w, r)
+}
+
+// carriedFor is the Authorization the primary signs for who a request presents
+// here, for peer: carries is whether anybody was presented, and refused is the
+// status the request ends on when what was presented admits nobody or nothing
+// could be signed.
+//
+// What this node admitted is carried, a session or a signature: what was
+// presented here is spent here, and the peer is handed this node's word.
+//
+// "k should be delegating auth to the node entirely to q"
+func (h *Handler) carriedFor(r *http.Request, peer Client) (carriedAs string, carries bool, refused int, why string) {
+	p := h.presented(r)
+	carries = p.SessionLive || p.Bearer != nil
+	if !carries {
+		return "", false, 0, ""
+	}
+	admitted, ok := h.admissionOf(p)
+	if !ok {
+		return "", true, http.StatusUnauthorized, "what was presented here admits nobody"
+	}
+	level, name, namespaces := h.levelOf(admitted.Identity), p.DisplayName, peer.Namespaces
+	if !p.SessionLive {
+		// A grant goes as far as it reaches here, and no further.
+		level, name, namespaces = Level(admitted.LevelName()), admitted.DisplayName, nil
+		for _, namespace := range peer.Namespaces {
+			if admitted.MayActIn(namespace) {
+				namespaces = append(namespaces, namespace)
+			}
+		}
+	}
+	signed, err := h.carriedSignature(admitted.Identity, name, level, peer, namespaces, time.Now())
+	if err != nil {
+		return "", true, http.StatusInternalServerError, "this node did not sign to carry you to " + peer.Label + ": " + err.Error()
+	}
+	return signed, true, 0, ""
+}
+
+// "Q should never be used for backfill type ops"
+// "its really important the stream ground produces stops hammering the box"
+
+// 「[Fable 5.2] handSignature answers POST /n/<name>, with no path on the peer: the primary signs」
+// 「[Fable 5.2] for who it admits, as it does when it carries them, and hands them the signature.」
+// 「[Fable 5.2] They go to the peer themselves with it, for one request within carriedLife, and」
+// 「[Fable 5.2] what they send does not pass through here. The peer still admits only the primary's word.」
+func (h *Handler) handSignature(w http.ResponseWriter, r *http.Request, name string) {
+	peer, known := h.peerNamed(name)
+	if !known {
+		h.writeError(w, http.StatusNotFound, "no peer is called "+name)
+		return
+	}
+	carriedAs, carries, refused, why := h.carriedFor(r, peer)
+	if refused != 0 {
+		h.writeError(w, refused, why)
+		return
+	}
+	if !carries {
+		h.writeError(w, http.StatusUnauthorized, "a signature for "+peer.Label+" is made for who this node admits, and nothing was presented")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]string{"authorization": carriedAs})
 }
 
 // carriedSignature is the Authorization a request carrying identity to peer
