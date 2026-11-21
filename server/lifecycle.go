@@ -238,6 +238,12 @@ func (s *QNTXServer) Stop() error {
 	for _, engine := range s.allEngines() {
 		engine.Stop()
 	}
+	if s.watcherDB != nil {
+		sqlclose.Log(s.watcherDB.Close(), s.logger, "the watcher db")
+	}
+	if s.pulseReadDB != nil && s.pulseReadDB != s.nodeDB {
+		sqlclose.Log(s.pulseReadDB.Close(), s.logger, "the pulse read db")
+	}
 	// The embeddings handler reads the node's own db, which its opener closes
 	// after Stop returns. Closed here, every reader after this line failed.
 
@@ -319,15 +325,6 @@ waiting:
 				"timeout", ShutdownTimeout, "running", s.wg.Running())
 			break waiting
 		}
-	}
-
-	// Closed after the requests and goroutines that read them have stopped, and
-	// before the node's own db, which its opener closes last, after Stop returns.
-	if s.watcherDB != nil {
-		sqlclose.Log(s.watcherDB.Close(), s.logger, "the watcher db")
-	}
-	if s.pulseReadDB != nil && s.pulseReadDB != s.nodeDB {
-		sqlclose.Log(s.pulseReadDB.Close(), s.logger, "the pulse read db")
 	}
 
 	// Every namespace sends what its landing file holds before the process
