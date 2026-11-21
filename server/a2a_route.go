@@ -589,8 +589,16 @@ func (s *QNTXServer) a2aServed(r *http.Request, tenant string) (bool, error) {
 		_, refused := elementOf(sigil.Sent{"element": element})
 		return gated && admitted.IsRoot() && s.nodeAgent != nil && refused == nil, nil
 	}
-	if !gated || tenant == auth.NamespaceSystem || !admitted.MayActIn(tenant) {
+	if !gated || tenant == auth.NamespaceSystem {
 		return false, nil
+	}
+	// "「[Opus 5.5] AGENTS CAN TALK TO EACH OTHER BY THEIR NAME」"
+	// 「[Opus 5.5] A name is no namespace anyone acts in: who reaches /a2a reaches an agent」
+	// 「[Opus 5.5] by its name (taskAgentAt), whichever namespaces they act in. f42d's」
+	// 「[Opus 5.5] guests act in fleetingmem and speak to each other by name.」
+	if !admitted.MayActIn(tenant) {
+		_, held, err := s.agentNamedAt(tenant)
+		return held, err
 	}
 	// A namespace a peer serves is the peer's to say: its card is asked of it,
 	// and the peer answers whether it has an agent there.

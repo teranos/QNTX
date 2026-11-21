@@ -231,6 +231,12 @@ func parseBody(i int, body *protocol.MailTemplateBody) (mailPart, MailBodyKind, 
 	return mailPart{}, "", errors.Newf("body %d names neither html nor text", i)
 }
 
+// FillTemplate is a template filled with values, as a plugin's Send fills
+// one: for mail whose template is not kept here, but handed in with it.
+func FillTemplate(t *protocol.MailTemplate, values map[string]string) (FilledMail, error) {
+	return fillMail(t, values)
+}
+
 // fillMail fills every part of a template with values.
 func fillMail(t *protocol.MailTemplate, values map[string]string) (FilledMail, error) {
 	parsed, err := parseMail(t)
