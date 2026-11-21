@@ -89,6 +89,6 @@ var namespaceSubsystems = []struct {
 	// took a day to find.
 	{sub: standingSubsystem{}, policy: SubsystemFatal},
 	{sub: watcherEngineSubsystem{}, policy: SubsystemWarn},
-	// 「[Opus 5.5] Fatal: a node told to keep the etcd window and unable to is wrong.」
-	{sub: etcdWindowSubsystem{}, policy: SubsystemFatal},
+	// Fatal: a node told its names are kept in etcd and unable to keep them there is wrong.
+	{sub: etcdNamedSubsystem{}, policy: SubsystemFatal},
 }

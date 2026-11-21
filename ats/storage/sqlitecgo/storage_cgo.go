@@ -318,6 +318,59 @@ func (rs *RustStore) createAttestationWithPriority(as *types.As, high bool) erro
 	})
 }
 
+// "if k took the list in memory and wrote it in one transaction, the drain would go far faster"
+//
+// CreateAttestations writes many attestations in one transaction, ahead of
+// queued plugin writes as a POST's are: one commit for the list where a put
+// each is several. Each is answered in the order given, nil for one written,
+// and what CreateAttestation would have said for one that was not; the second
+// error is the write as a whole failing.
+func (rs *RustStore) CreateAttestations(attestations []*types.As) ([]error, error) {
+	if len(attestations) == 0 {
+		return nil, nil
+	}
+	list := make([]json.RawMessage, 0, len(attestations))
+	for _, as := range attestations {
+		jsonBytes, err := toRustJSON(as)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to convert attestation %s", as.ID)
+		}
+		list = append(list, jsonBytes)
+	}
+	body, err := json.Marshal(list)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to say the attestations as one list")
+	}
+	cJSON := C.CString(string(body))
+	defer C.free(unsafe.Pointer(cJSON))
+
+	var said []*string
+	err = rs.SubmitWrite(true, "put-many", func() error {
+		if rs.closed {
+			return errors.New("store is closed")
+		}
+		result := C.storage_put_many(rs.store, cJSON)
+		defer C.attestation_result_free(result)
+		if !result.success {
+			return errors.Decode(C.GoString(result.error_msg))
+		}
+		return json.Unmarshal([]byte(C.GoString(result.attestation_json)), &said)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(said) != len(attestations) {
+		return nil, errors.Newf("the store answered %d of %d attestations", len(said), len(attestations))
+	}
+	answers := make([]error, len(said))
+	for i, one := range said {
+		if one != nil {
+			answers[i] = errors.Decode(*one)
+		}
+	}
+	return answers, nil
+}
+
 // BatchCreateAttestations stores multiple attestations in a single write queue slot.
 // All JSON serialization happens upfront; the write function calls putLocked N times
 // under one mutex acquisition. Returns the number of successfully created attestations.
