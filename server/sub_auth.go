@@ -338,6 +338,9 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// different hosts, and a real one does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
 	// The primary node: people log in there, and its tokens are accepted here.
+	if err := authHandler.SetDirect(s.deps.cfg.Nodes.Direct); err != nil {
+		return err
+	}
 	if err := authHandler.SetPrimary(s.deps.cfg.Nodes.Primary); err != nil {
 		return err
 	}
@@ -410,6 +413,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authHandler.SetGoogleCosts(s.connectGoogleCosts)
 	authHandler.SetGoogleAgy(s.connectGoogleAgy)
 	authHandler.SetGoogleKey(s.connectGoogleKey)
+	authHandler.SetGoogleNext(s.googleNext)
 	sacred.Go("google.costs", s.watchGoogleCosts)
 	if through, locate, hasPrimary := authHandler.GitHubThroughThePrimary(); hasPrimary {
 		s.ciGitHubGet = githubThroughThePrimary(through)

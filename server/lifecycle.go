@@ -54,6 +54,7 @@ func (s *QNTXServer) startBackgroundServices() {
 	s.wg.Go("rooms.githubWakes", s.tellDueAgents)
 	s.wg.Go("memory.inStep", s.keepMemoriesInStep)
 	s.wg.Go("collected.deliver", s.keepDeliveringCollected)
+	s.wg.Go("passkeys.kept", s.keepLayesPasskeys)
 	// On its own: a phone Apple is slow to reach holds up nothing that is delivered.
 	s.wg.Go("waits.shown", s.keepShowingWhatWaits)
 	// Pulse runs because the node runs. It is not separate enough from the node

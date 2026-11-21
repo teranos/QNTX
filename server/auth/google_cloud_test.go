@@ -318,7 +318,39 @@ func TestConnectingOffersTheWayBack(t *testing.T) {
 	}
 
 	assert.Equal(t, "https://web.example.org/branch/x/", hrefOf(t, begin("https://web.example.org/").Body.String(), "Back to QNTX"))
-	assert.NotContains(t, begin("https://elsewhere.example.org/").Body.String(), "Back to QNTX")
+	// "Find more instances like this that are unstyled and dead end and at least give a way
+	// to return to QNTX": from a page this node does not know, back to the node's own.
+	assert.Equal(t, "https://web.example.org", hrefOf(t, begin("https://elsewhere.example.org/").Body.String(), "Back to QNTX"))
+}
+
+// 「[Opus 5.5] A press opened straight from a link or a mail names no page, and still ends with the」
+// 「[Opus 5.5] way back to QNTX, on the node's own door.」
+func TestEveryCeremonyPageLeadsBackToQNTX(t *testing.T) {
+	// 「[Opus 5.5] pickingHandler: the pick the select page keeps is let go of when it expires.」
+	h, _, _ := pickingHandler(t)
+	h.ownOrigins = []string{"app://qntx", "https://web.example.org/"}
+	for _, ok := range []bool{true, false} {
+		page := httptest.NewRecorder()
+		h.renderCeremonyPage(page, http.StatusOK, ok, "said")
+		assert.Equal(t, "https://web.example.org", hrefOf(t, page.Body.String(), "Back to QNTX"))
+		assert.Contains(t, page.Body.String(), `name="viewport"`)
+	}
+	done := httptest.NewRecorder()
+	h.renderCloudDone(done, "wired", "")
+	assert.Equal(t, "https://web.example.org", hrefOf(t, done.Body.String(), "Back to QNTX"))
+	assert.Contains(t, done.Body.String(), "wired")
+	picked := httptest.NewRecorder()
+	h.renderCloudSelect(picked, []GoogleCloudProject{{ID: "a"}, {ID: "b"}}, "token", "ceremony", "by", "handle", "")
+	assert.Equal(t, "https://web.example.org", hrefOf(t, picked.Body.String(), "Back to QNTX"))
+}
+
+// 「[Opus 5.5] A node that names no web door of its own has nowhere to lead back to, and says nothing of it.」
+func TestANodeWithNoWebDoorOffersNoWayBack(t *testing.T) {
+	h, _ := cloudHandler(t)
+	h.ownOrigins = nil
+	page := httptest.NewRecorder()
+	h.renderCeremonyPage(page, http.StatusOK, true, "said")
+	assert.NotContains(t, page.Body.String(), "Back to QNTX")
 }
 
 // Only ROOT's own Google account connects the node.
@@ -346,4 +378,18 @@ func TestTheGoogleLoginAsksForNoCloud(t *testing.T) {
 	login, _, err := googleProvider(OperatorClient{ID: "client-id"}).authorize(context.Background(), googleAuthHost, "https://node/auth/binding/callback")
 	require.NoError(t, err)
 	assert.NotContains(t, login, "cloud-platform")
+}
+
+// "I got this from you, not from the mail": after Connect costs, the page offers each
+// namespace's key; what could not be read is said.
+func TestConnectCostsOffersTheKeysNext(t *testing.T) {
+	h, _ := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	h.SetGoogleCosts(func(context.Context, string, string) (string, error) { return "wired", nil })
+	h.SetGoogleNext(func() []GoogleCloudPress {
+		return []GoogleCloudPress{{Label: "Connect a key for garden", Link: "https://node.test/auth/google/cloud?thing=key&namespace=garden"}, {Label: "the shed was not read"}}
+	})
+	page := consenting(t, h, "?project=the-project&thing=costs").Body.String()
+	assert.Equal(t, "https://node.test/auth/google/cloud?thing=key&namespace=garden", hrefOf(t, page, "Connect a key for garden"))
+	assert.Contains(t, page, "the shed was not read")
 }

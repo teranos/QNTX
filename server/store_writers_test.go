@@ -112,6 +112,10 @@ var storeWriters = map[string]string{
 		"through Write as the caller is admitted to act there. Reached from the Task operations at the " +
 		"namespace's tenant, which '/a2a/' gives to ROOT alone, after the lines say the sender reaches agents say over A2A",
 
+	"keepPasskeysOnce": "each record laye keeps of a person's passkey under /passkeys/ in the etcd am.toml names, " +
+		"in system through WriteWhatTheNodeKnowsOfItself, as the node: \"QNTX can be the thing that holds stuff durably\". " +
+		"Reached from nothing anyone calls, only from the node's own loop",
+
 	"systemAttestor": "what the node writes about itself at the door. The /auth/… routes " +
 		"are ANYONE because logging in cannot ask you to be logged in, so no admission " +
 		"stands behind this one. The closed predicate vocabulary in server/auth does",
