@@ -45,7 +45,7 @@ func (e *etcdCollectedKeys) Set(whole map[string][]byte) error {
 		return e.noPrefix
 	}
 	if e.keys == nil {
-		keys, err := etcdcgo.OpenKeys(e.endpoint, e.prefix)
+		keys, err := openEtcdKeys(e.endpoint, e.prefix)
 		if err != nil {
 			return errors.Wrapf(err, "what is collected was not kept in etcd at %s", e.endpoint)
 		}
