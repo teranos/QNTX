@@ -169,7 +169,6 @@ func (h *forwardHandler) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrapf(err, "%s: %s", forwardUnanswered, p.URL)
 	}
 	defer answer.Body.Close()
-	h.logger.Infow("A delivery reached the node it is forwarded to", "url", p.URL, "event", p.Event, "delivery", p.Delivery, "status", answer.StatusCode)
 	if unanswered(int64(answer.StatusCode)) {
 		return errors.Newf("%s: %s gave %d", forwardUnanswered, p.URL, answer.StatusCode)
 	}

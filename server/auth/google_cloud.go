@@ -87,6 +87,17 @@ type GoogleKeyConnect func(ctx context.Context, token, by, namespace string) (st
 // "one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item."
 func (h *Handler) SetGoogleKey(connect GoogleKeyConnect) { h.googleKey = connect }
 
+// "I got this from you, not from the mail"
+//
+// 「[Opus 5.5] GoogleCloudPress is what the page after a yes at Google offers next. A press with」
+// 「[Opus 5.5] no link is said, not pressed.」
+type GoogleCloudPress struct {
+	Label, Link string
+}
+
+// 「[Opus 5.5] SetGoogleNext is what the page after Connect costs or Connect key offers next.」
+func (h *Handler) SetGoogleNext(next func() []GoogleCloudPress) { h.googleNext = next }
+
 // SetGoogleCloud is what connects the node once ROOT said yes.
 func (h *Handler) SetGoogleCloud(connect GoogleCloudConnect) { h.googleCloud = connect }
 
@@ -185,7 +196,7 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 			return
 		}
 		h.logger.Infow("a namespace's key at Google Cloud is made", "namespace", fl.namespace, "by", acct.CanonicalID, "said", said)
-		h.renderCloudDone(w, said, fl.returnTo)
+		h.renderCloudDone(w, said, fl.returnTo, h.nextAtGoogle()...)
 		return
 	}
 	if connect := map[string]GoogleThingConnect{"costs": h.googleCosts, "agy": h.googleAgy}[fl.thing]; connect != nil {
@@ -198,7 +209,11 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 			return
 		}
 		h.logger.Infow("a thing of the node's at Google Cloud is connected", "thing", fl.thing, "by", acct.CanonicalID, "said", said)
-		h.renderCloudDone(w, said, fl.returnTo)
+		var next []GoogleCloudPress
+		if fl.thing == "costs" {
+			next = h.nextAtGoogle()
+		}
+		h.renderCloudDone(w, said, fl.returnTo, next...)
 		return
 	}
 	project := fl.project
@@ -260,21 +275,16 @@ func (h *Handler) renderCloudSelect(w http.ResponseWriter, seen []GoogleCloudPro
 			h.googleCloudLetGo(pick.token)
 		}
 	})
-	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
-		`<body style="background:#12111a;color:#e6e4ef;font:14px ui-monospace,monospace;margin:0;padding:24px;word-break:break-word;overflow-wrap:break-word">` +
-		`<p>Which Google Cloud project does this node belong in?</p>`
+	page := `<p>Which Google Cloud project does this node belong in?</p>`
 	for _, project := range seen {
 		called := project.ID
 		if project.Name != "" && project.Name != project.ID {
 			called = project.Name + " (" + project.ID + ")"
 		}
-		page += `<p><a style="display:inline-block;padding:8px 12px;border:1px solid currentColor;color:#e6e4ef;text-decoration:none" href="` +
+		page += `<p><a ` + pagePress + ` href="` +
 			html.EscapeString(googleCloudSelectedPath+"?selected="+urlEncode(ticket)+"&project="+urlEncode(project.ID)) + `">` + html.EscapeString(called) + `</a></p>`
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if _, wrote := w.Write([]byte(page)); wrote != nil {
-		h.logger.Infow("the Google Cloud selection was not delivered", "error", wrote)
-	}
+	h.renderPage(w, http.StatusOK, pageSays, page+h.backToQNTX(back))
 }
 
 // takeCloudPick hands out ROOT's kept yes, once.
@@ -319,28 +329,41 @@ func asAccount(link, handle string) string {
 	return at.String()
 }
 
-// backToQNTX is the way back to the page a connecting began on, as a press.
-func backToQNTX(back string) string {
+// backToQNTX is the way back to the page a connecting began on, as a press. A
+// browser that named no page of this node's goes back to the node's own door.
+func (h *Handler) backToQNTX(back string) string {
+	if back == "" {
+		back = h.home()
+	}
 	if back == "" {
 		return ""
 	}
-	return `<p><a style="display:inline-block;padding:8px 12px;border:1px solid currentColor;color:#e6e4ef;text-decoration:none" href="` + html.EscapeString(back) + `">Back to QNTX</a></p>`
+	return `<p><a ` + pagePress + ` href="` + html.EscapeString(back) + `">Back to QNTX</a></p>`
 }
 
-// renderCloudDone says what was set up, and offers the way back. A browser that named
-// no page gets the plain ceremony page.
-func (h *Handler) renderCloudDone(w http.ResponseWriter, said, back string) {
-	if back == "" {
-		h.renderCeremonyPage(w, http.StatusOK, true, said)
-		return
+// renderCloudDone says what was set up, what is next, and offers the way back.
+func (h *Handler) renderCloudDone(w http.ResponseWriter, said, back string, next ...GoogleCloudPress) {
+	page := `<p>` + html.EscapeString(said) + `</p>`
+	if len(next) > 0 {
+		page += `<p style="color:` + pageSays + `">Next:</p><p>`
+		for _, press := range next {
+			if press.Link == "" {
+				page += `</p><p style="color:` + pageRefused + `">` + html.EscapeString(press.Label) + `</p><p>`
+				continue
+			}
+			page += `<a ` + pagePress + ` href="` + html.EscapeString(press.Link) + `">` + html.EscapeString(press.Label) + `</a>`
+		}
+		page += `</p>`
 	}
-	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
-		`<body style="background:#12111a;color:#2ecc71;font:14px ui-monospace,monospace;margin:0;padding:24px;word-break:break-word;overflow-wrap:break-word">` +
-		html.EscapeString(said) + backToQNTX(back)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if _, wrote := w.Write([]byte(page)); wrote != nil {
-		h.logger.Infow("the connecting's page was not delivered", "error", wrote)
+	h.renderPage(w, http.StatusOK, pageOK, page+h.backToQNTX(back))
+}
+
+// 「[Opus 5.5] nextAtGoogle is what the node offers after a yes at Google, or nothing.」
+func (h *Handler) nextAtGoogle() []GoogleCloudPress {
+	if h.googleNext == nil {
+		return nil
 	}
+	return h.googleNext()
 }
 
 func (h *Handler) renderCloudStopped(w http.ResponseWriter, err error, project, thing, namespace, handle, back string) {
@@ -367,25 +390,18 @@ func (h *Handler) renderCloudStopped(w http.ResponseWriter, err error, project, 
 	if errors.As(err, &fix) {
 		says, full, fixAt = fix.Says, fix.Full, asAccount(fix.Link, handle)
 	}
-	const link = `style="display:inline-block;margin:0 8px 8px 0;padding:8px 12px;border:1px solid currentColor;color:#e6e4ef;text-decoration:none"`
-	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
-		`<body style="background:#12111a;color:#e06060;font:14px ui-monospace,monospace;margin:0;padding:24px;word-break:break-word;overflow-wrap:break-word">` +
-		`<p>` + html.EscapeString(says) + `</p><p>`
+	page := `<p>` + html.EscapeString(says) + `</p><p>`
 	if fixAt != "" {
-		page += `<a ` + link + ` target="_blank" rel="noopener" href="` + html.EscapeString(fixAt) + `">1. Do it at Google</a>`
-		page += `<a ` + link + ` href="` + html.EscapeString(again) + `">2. Try again</a>`
+		page += `<a ` + pagePress + ` target="_blank" rel="noopener" href="` + html.EscapeString(fixAt) + `">1. Do it at Google</a>`
+		page += `<a ` + pagePress + ` href="` + html.EscapeString(again) + `">2. Try again</a>`
 	} else {
-		page += `<a ` + link + ` href="` + html.EscapeString(again) + `">Try again</a>`
+		page += `<a ` + pagePress + ` href="` + html.EscapeString(again) + `">Try again</a>`
 	}
-	page += `</p>` + backToQNTX(back)
+	page += `</p>` + h.backToQNTX(back)
 	if full != "" {
-		page += `<details style="color:#e6e4ef;opacity:.7"><summary>What Google said</summary>` + html.EscapeString(full) + `</details>`
+		page += `<details style="color:` + pageSays + `;opacity:.7"><summary>What Google said</summary>` + html.EscapeString(full) + `</details>`
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusBadGateway)
-	if _, wrote := w.Write([]byte(page)); wrote != nil {
-		h.logger.Infow("the Google Cloud page was not delivered", "error", wrote)
-	}
+	h.renderPage(w, http.StatusBadGateway, pageRefused, page)
 }
 
 // googleCloudSetup is how long the node takes to set itself up at Google Cloud:

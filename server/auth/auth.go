@@ -69,6 +69,7 @@ type Handler struct {
 	googleCosts         GoogleThingConnect
 	googleAgy           GoogleThingConnect
 	googleKey           GoogleKeyConnect
+	googleNext          func() []GoogleCloudPress
 	cloudPicksMu        sync.Mutex
 	cloudPicks          map[string]cloudPick
 	// auth.provider.apple, the same way: the key already resolved, nil on a

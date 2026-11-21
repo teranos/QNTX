@@ -848,6 +848,7 @@
   "protocol.NodeGoogle.issuer": "The node's OIDC issuer, which the node's pool at Google trusts.",
   "protocol.NodeGoogle.items": "\"one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item.\" 「[Opus 5.5] Each thing that spends at Google, in a project of its own: the node's identity, and each namespace's key.」",
   "protocol.NodeGoogle.key_connect": "「[Opus 5.5] Where ROOT goes to make a namespace's key, by saying yes at Google once: namespace appended.」",
+  "protocol.NodeGoogle.key_connects": "\"I got this from you, not from the mail\" 「[Opus 5.5] Connect key for each namespace the node serves that has no key yet, by namespace.」",
   "protocol.NodeGoogle.limit": "The limit ROOT set on this node; zero is none.",
   "protocol.NodeGoogle.pool": "The workload identity pool the node is set up in.",
   "protocol.NodeGoogle.project_id": "The project the node is set up in, by its id.",

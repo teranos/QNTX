@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"html"
 	"io"
 	"os"
 	"os/exec"
@@ -706,11 +705,7 @@ func buildFailureMail(b pluginBuild, revs []string, failed error) services.NodeM
 		fmt.Fprintf(&text, "%s at %s\n", source.String(), rev)
 	}
 	fmt.Fprintf(&text, "\n%s\n", failed.Error())
-	return services.NodeMail{
-		Name:    "build.failed",
-		Subject: b.name + " did not build",
-		Bodies:  []services.MailBody{services.TextBody(text.String()), services.HTMLBody("<pre>" + html.EscapeString(text.String()) + "</pre>")},
-	}
+	return services.DrawnNodeMail("build.failed", b.name+" did not build", text.String())
 }
 
 // mailBuildFailure mails ROOT that b did not build, and says so when it cannot.
