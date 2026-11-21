@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	errors "github.com/teranos/sacred-error"
@@ -35,6 +36,29 @@ type FileServiceServer struct {
 	authToken string
 	logger    *zap.SugaredLogger
 	keep      FileKeeper
+	// Set after the service is serving, while plugins may already be calling.
+	plugins atomic.Pointer[PluginNames]
+}
+
+// SetPluginNames hands the service which plugin each token the node handed out
+// is for (ADR-046). A plugin standing in a namespace is handed a token of its
+// own and not the shared one, and reaches this service with it.
+func (s *FileServiceServer) SetPluginNames(plugins PluginNames) {
+	s.plugins.Store(&plugins)
+}
+
+// calling is who a token is: a plugin by the name the node minted its token
+// for, or nobody named for the shared token. Any other token is refused.
+func (s *FileServiceServer) calling(token string) (plugin string, err error) {
+	if sameToken(token, s.authToken) {
+		return "", nil
+	}
+	if names := s.plugins.Load(); names != nil {
+		if plugin, minted := (*names)(token); minted {
+			return plugin, nil
+		}
+	}
+	return "", errors.New("invalid authentication token")
 }
 
 // KeptFile is what the node says of a file it kept.
@@ -61,20 +85,27 @@ func (s *FileServiceServer) KeepWith(keep FileKeeper) { s.keep = keep }
 
 // KeepFile hands the node a file to keep.
 func (s *FileServiceServer) KeepFile(ctx context.Context, req *protocol.KeepFileRequest) (*protocol.KeepFileResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	plugin, err := s.calling(req.AuthToken)
+	if err != nil {
 		return &protocol.KeepFileResponse{Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 	}
-	if req.By == "" {
+	// Who brought it is the plugin the node minted the token for, whatever the
+	// call says of itself. Only the shared token leaves that to the call.
+	by := plugin
+	if by == "" {
+		by = req.By
+	}
+	if by == "" {
 		return &protocol.KeepFileResponse{Error: "a file is kept for the one who brought it, and this names nobody"}, nil
 	}
 	if s.keep == nil {
 		return &protocol.KeepFileResponse{Error: "this node keeps no file for a plugin"}, nil
 	}
-	kept, err := s.keep(req.By, req.Filename, req.Content, req.BringTo)
+	kept, err := s.keep(by, req.Filename, req.Content, req.BringTo)
 	if err != nil {
 		return &protocol.KeepFileResponse{Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 	}
-	s.logger.Debugw("File kept via gRPC", "by", req.By, "filename", req.Filename, "file_id", kept.ID, "asset", kept.Asset, "size", kept.Size)
+	s.logger.Debugw("File kept via gRPC", "by", by, "filename", req.Filename, "file_id", kept.ID, "asset", kept.Asset, "size", kept.Size)
 	return &protocol.KeepFileResponse{
 		Success: true, FileId: kept.ID, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size,
 		BroughtTo: kept.BroughtTo, BroughtFileId: kept.BroughtID, NotBrought: kept.NotBrought,
@@ -92,7 +123,7 @@ func NewFileServiceServer(filesDir string, authToken string, logger *zap.Sugared
 
 // ReadFileBase64 reads a stored file and returns its MIME type and base64-encoded content.
 func (s *FileServiceServer) ReadFileBase64(ctx context.Context, req *protocol.ReadFileRequest) (*protocol.ReadFileResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	if _, err := s.calling(req.AuthToken); err != nil {
 		return &protocol.ReadFileResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),

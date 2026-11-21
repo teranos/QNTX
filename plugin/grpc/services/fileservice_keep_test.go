@@ -71,3 +71,48 @@ func TestKeepFileRefuses(t *testing.T) {
 		})
 	}
 }
+
+// "its on k, i had to do nothing for it"
+// 「[Fable 5.2] ipluk stands in a namespace, so the node hands it a token of its own (ADR-046) and」
+// 「[Fable 5.2] not the shared one. On l, 2026-11-21 16:46, three screenshots were refused with」
+// 「[Fable 5.2] "invalid authentication token": this service knew the shared token only.」
+func TestAPluginIsKnownByItsOwnToken(t *testing.T) {
+	s := keepTestServer(t)
+	s.SetPluginNames(func(token string) (string, bool) {
+		if token == "the token minted for ipluk" {
+			return "ipluk", true
+		}
+		return "", false
+	})
+	var by string
+	s.KeepWith(func(b, _ string, _ []byte, _ string) (KeptFile, error) {
+		by = b
+		return KeptFile{ID: "an-id"}, nil
+	})
+
+	// Its own token is taken, and who brought the file is the plugin the token
+	// was minted for, whatever the call says of itself.
+	resp, err := s.KeepFile(context.Background(), &protocol.KeepFileRequest{
+		AuthToken: "the token minted for ipluk", By: "somebody else", Filename: "shot.jpeg", Content: []byte("the picture"),
+	})
+	if err != nil {
+		t.Fatalf("KeepFile: %v", err)
+	}
+	if !resp.Success {
+		t.Fatalf("a plugin was refused with its own token: %q", resp.Error)
+	}
+	if by != "ipluk" {
+		t.Errorf("kept as brought by %q, want ipluk", by)
+	}
+
+	// A token the node minted for nobody is still refused.
+	resp, err = s.KeepFile(context.Background(), &protocol.KeepFileRequest{
+		AuthToken: "a token minted for nobody", By: "ipluk", Filename: "shot.jpeg",
+	})
+	if err != nil {
+		t.Fatalf("KeepFile: %v", err)
+	}
+	if resp.Success || resp.Error == "" {
+		t.Errorf("answered %v, want a refusal", resp)
+	}
+}
