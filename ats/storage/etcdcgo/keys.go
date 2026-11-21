@@ -44,6 +44,29 @@ func OpenKeys(endpoint, prefix string) (*Keys, error) {
 	return &Keys{ptr: unsafe.Pointer(result.keys), prefix: prefix}, nil
 }
 
+// "names and collections and just smaller things, messages say's status"
+//
+// OpenKeysAs is OpenKeys asking as user with password, whose role reaches only
+// the keys the node keeps. An empty user asks as nobody, and so does an etcd
+// that authenticates nobody yet.
+func OpenKeysAs(endpoint, prefix, user, password string) (*Keys, error) {
+	cEndpoint := C.CString(endpoint)
+	defer C.free(unsafe.Pointer(cEndpoint))
+	cPrefix := C.CString(prefix)
+	defer C.free(unsafe.Pointer(cPrefix))
+	cUser := C.CString(user)
+	defer C.free(unsafe.Pointer(cUser))
+	cPassword := C.CString(password)
+	defer C.free(unsafe.Pointer(cPassword))
+
+	result := C.etcd_keys_new_as(cEndpoint, cPrefix, cUser, cPassword)
+	defer C.etcd_keys_open_result_free(result)
+	if !result.success {
+		return nil, failed(result.error_msg, "failed to open the keys at %s under %s as %q", endpoint, prefix, user)
+	}
+	return &Keys{ptr: unsafe.Pointer(result.keys), prefix: prefix}, nil
+}
+
 // 「[Opus 5.5] Close frees the Rust keys and their client. Safe to call more than once.」
 func (k *Keys) Close() {
 	k.mu.Lock()
