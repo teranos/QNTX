@@ -49,6 +49,7 @@ type ServicesManager struct {
 	openRun            atomic.Pointer[OpenRun]
 	fileServiceServer  *grpc.Server
 	keepFile           services.FileKeeper // how the node keeps a file a plugin brings
+	fileSrv            *services.FileServiceServer
 	llmServer          *grpc.Server
 	llm                routing[*services.LLMServer]
 	llmConfig          config.LLMConfig
@@ -393,6 +394,7 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 	m.fileServiceServer = grpc.NewServer()
 	fileServer := services.NewFileServiceServer(filesDir, authToken, m.logger)
 	fileServer.KeepWith(m.keepFile)
+	m.fileSrv = fileServer
 	protocol.RegisterFileServiceServer(m.fileServiceServer, fileServer)
 
 	return m.serveAt(ctx, "File", m.fileServiceServer, listener, &m.endpoints.FileService), nil
@@ -520,6 +522,11 @@ func (m *ServicesManager) SetPluginStores(plugins services.PluginStores) {
 // SetPluginNames hands the mail service which plugin each token the node handed out is for.
 func (m *ServicesManager) SetPluginNames(plugins services.PluginNames) {
 	m.mailSrv.SetPluginNames(plugins)
+	// The file service knows a plugin by its own token too: one standing in a
+	// namespace is handed that and not the shared one.
+	if m.fileSrv != nil {
+		m.fileSrv.SetPluginNames(plugins)
+	}
 }
 
 // SetCallers hands the schedule service the callers of the calls plugins are
