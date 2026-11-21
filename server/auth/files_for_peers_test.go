@@ -61,7 +61,8 @@ func TestAPeerBringsAFileStraightToAPeer(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"there","asset":"sha256:abc"}`))
 	}))
 	t.Cleanup(kServed.Close)
-	require.NoError(t, primary.DeclarePeer("k", kDID, []string{"Ground"}, whereThePrimaryReachesK, whereThePrimaryReachesK))
+	// A namespace lives at one peer, and l has Ground: k is declared with one of its own.
+	require.NoError(t, primary.DeclarePeer("k", kDID, []string{"Kapteyn"}, whereThePrimaryReachesK, whereThePrimaryReachesK))
 	require.NoError(t, l.SetDirect(map[string]string{"k": kServed.URL}))
 
 	status, said, err := l.BringFileToPeer(context.Background(), "k", "shot.jpeg", []byte("the picture"))
