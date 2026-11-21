@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -54,6 +55,16 @@ var heartbeatPaths = map[string]bool{
 	"/am/version":    true,
 	"/api/plugins":   true,
 	"/am/statusline": true,
+}
+
+// polled is whether this request is a poll by what it asks. A ground asks for
+// its comet again and again until one is kept, and the path carries the comet's
+// hash, so no fixed list names it. A POST builds one and is said every time.
+func polled(r *http.Request) bool {
+	if heartbeatPaths[r.URL.Path] {
+		return true
+	}
+	return strings.HasPrefix(r.URL.Path, "/comet/") && (r.Method == http.MethodGet || r.Method == http.MethodHead)
 }
 
 // Whether this poll went well: it answered. How long it took is not the
@@ -135,7 +146,7 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 
 		// A polled path says something when its answer turns, and nothing while
 		// it stays the same.
-		if heartbeatPaths[r.URL.Path] {
+		if polled(r) {
 			if !s.heartbeats.worthSaying(r.URL.Path, heartbeatWell(recorder.status)) {
 				return
 			}

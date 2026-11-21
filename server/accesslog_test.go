@@ -177,3 +177,35 @@ func TestOnlyPolledPathsAreThinned(t *testing.T) {
 		t.Fatal("arriving is not a poll, and is always worth a line")
 	}
 }
+
+// A ground asks for a comet nobody has built, every few minutes, and is told the
+// same each time. That is a state: said twice, and again only when the answer
+// changes. A POST that builds one is never a poll.
+func TestAGroundAskingForAnUnbuiltCometIsSaidTwiceAndThenQuiet(t *testing.T) {
+	core, written := observer.New(zapcore.InfoLevel)
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.New(core).Sugar()}
+	status := http.StatusNotFound
+	handler := s.accessLog(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) })
+
+	ask := func(method, path string) {
+		handler(httptest.NewRecorder(), httptest.NewRequest(method, path, nil))
+	}
+	for range 6 {
+		ask(http.MethodGet, "/comet/teranos/QNTX/aarch64-darwin/1")
+	}
+	if got := written.Len(); got != 2 {
+		t.Fatalf("six identical refusals wrote %d lines, want 2", got)
+	}
+
+	ask(http.MethodGet, "/comet/teranos/QNTX/aarch64-darwin/2")
+	if got := written.Len(); got != 3 {
+		t.Fatalf("another comet's refusal wrote %d lines in all, want 3", got)
+	}
+
+	for range 3 {
+		ask(http.MethodPost, "/comet/teranos/QNTX/aarch64-darwin")
+	}
+	if got := written.Len(); got != 6 {
+		t.Fatalf("three refused builds wrote %d lines in all, want 6", got)
+	}
+}
