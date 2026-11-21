@@ -51,6 +51,8 @@ KeysOpenResultC etcd_keys_new(const char *endpoint, const char *prefix);
 void etcd_keys_free(EtcdKeys *keys);
 StorageResultC etcd_keys_set(EtcdKeys *keys, const char *whole_json);
 HeldResultC etcd_keys_held(EtcdKeys *keys);
+HeldResultC etcd_keys_read(EtcdKeys *keys, const char *keys_json);
+HeldResultC etcd_keys_swap(EtcdKeys *keys, const char *swap_json);
 void etcd_keys_open_result_free(KeysOpenResultC result);
 void etcd_held_result_free(HeldResultC result);
 

@@ -79,7 +79,11 @@ func (h *Handler) signedGrant(signed string, now time.Time) (Grant, error) {
 	if byLaye {
 		var live bool
 		if held, live = h.askingToken(claims.Subject); !live {
-			return Grant{}, errors.Newf("laye carried %s, and this node holds no live grant for it", claims.Subject)
+			said, err := h.whoLayeSays(claims.Subject)
+			if err != nil {
+				return Grant{}, errors.Wrapf(err, "laye carried %s, and this node holds no live grant for it", claims.Subject)
+			}
+			held = said
 		}
 	} else if carried {
 		if !h.signsForItsPeople(claims.Issuer) {
