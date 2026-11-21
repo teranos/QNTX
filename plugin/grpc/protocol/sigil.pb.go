@@ -2065,7 +2065,10 @@ type NodeGoogle struct {
 	// 「[Opus 5.5] Each thing that spends at Google, in a project of its own: the node's identity, and each namespace's key.」
 	Items []*GoogleSpendItem `protobuf:"bytes,24,rep,name=items,proto3" json:"items,omitempty"`
 	// 「[Opus 5.5] Where ROOT goes to make a namespace's key, by saying yes at Google once: namespace appended.」
-	KeyConnect    string `protobuf:"bytes,25,opt,name=key_connect,json=keyConnect,proto3" json:"key_connect,omitempty"`
+	KeyConnect string `protobuf:"bytes,25,opt,name=key_connect,json=keyConnect,proto3" json:"key_connect,omitempty"`
+	// "I got this from you, not from the mail"
+	// 「[Opus 5.5] Connect key for each namespace the node serves that has no key yet, by namespace.」
+	KeyConnects   map[string]string `protobuf:"bytes,26,rep,name=key_connects,json=keyConnects,proto3" json:"key_connects,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2273,6 +2276,13 @@ func (x *NodeGoogle) GetKeyConnect() string {
 		return x.KeyConnect
 	}
 	return ""
+}
+
+func (x *NodeGoogle) GetKeyConnects() map[string]string {
+	if x != nil {
+		return x.KeyConnects
+	}
+	return nil
 }
 
 // 「[Opus 5.5] GoogleSpendItem is one thing that spends at Google, in its own project, halted on its own.」
@@ -4003,7 +4013,7 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"\x03agy\x18\x05 \x01(\tR\x03agy\x12\x1f\n" +
 	"\vagy_version\x18\x06 \x01(\tR\n" +
 	"agyVersion\x12\x1b\n" +
-	"\tnot_ready\x18\a \x01(\tR\bnotReady\"\xf5\x05\n" +
+	"\tnot_ready\x18\a \x01(\tR\bnotReady\"\xff\x06\n" +
 	"\n" +
 	"NodeGoogle\x12\x16\n" +
 	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x18\n" +
@@ -4037,7 +4047,11 @@ const file_plugin_grpc_protocol_sigil_proto_rawDesc = "" +
 	"spentToday\x12/\n" +
 	"\x05items\x18\x18 \x03(\v2\x19.protocol.GoogleSpendItemR\x05items\x12\x1f\n" +
 	"\vkey_connect\x18\x19 \x01(\tR\n" +
-	"keyConnect\"\xb6\x02\n" +
+	"keyConnect\x12H\n" +
+	"\fkey_connects\x18\x1a \x03(\v2%.protocol.NodeGoogle.KeyConnectsEntryR\vkeyConnects\x1a>\n" +
+	"\x10KeyConnectsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb6\x02\n" +
 	"\x0fGoogleSpendItem\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x1d\n" +
@@ -4177,7 +4191,7 @@ func file_plugin_grpc_protocol_sigil_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_sigil_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
+var file_plugin_grpc_protocol_sigil_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*Signum)(nil),             // 0: protocol.Signum
 	(*Node)(nil),               // 1: protocol.Node
@@ -4220,6 +4234,7 @@ var file_plugin_grpc_protocol_sigil_proto_goTypes = []any{
 	(*Refusal)(nil),            // 38: protocol.Refusal
 	(*NodePeers)(nil),          // 39: protocol.NodePeers
 	(*NodePeer)(nil),           // 40: protocol.NodePeer
+	nil,                        // 41: protocol.NodeGoogle.KeyConnectsEntry
 }
 var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	34, // 0: protocol.Signum.sigils:type_name -> protocol.Sigil
@@ -4244,22 +4259,23 @@ var file_plugin_grpc_protocol_sigil_proto_depIdxs = []int32{
 	21, // 19: protocol.NodeAgentAm.agy:type_name -> protocol.AgyAm
 	24, // 20: protocol.NodeGoogle.budgets:type_name -> protocol.GoogleBudget
 	23, // 21: protocol.NodeGoogle.items:type_name -> protocol.GoogleSpendItem
-	26, // 22: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
-	28, // 23: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
-	14, // 24: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
-	29, // 25: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
-	19, // 26: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
-	32, // 27: protocol.Follows.columns:type_name -> protocol.Corresponds
-	33, // 28: protocol.Follows.folds:type_name -> protocol.Fold
-	35, // 29: protocol.Sigil.takes:type_name -> protocol.Param
-	36, // 30: protocol.Sigil.gives:type_name -> protocol.Field
-	37, // 31: protocol.Sigil.http:type_name -> protocol.Endpoint
-	40, // 32: protocol.NodePeers.peers:type_name -> protocol.NodePeer
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	41, // 22: protocol.NodeGoogle.key_connects:type_name -> protocol.NodeGoogle.KeyConnectsEntry
+	26, // 23: protocol.NodeAnthropic.session:type_name -> protocol.AnthropicWindow
+	28, // 24: protocol.NamespaceKeys.keys:type_name -> protocol.NamespaceKey
+	14, // 25: protocol.NamespaceAgentAm.agent:type_name -> protocol.ClaudeAm
+	29, // 26: protocol.NamespaceAgentAm.pi:type_name -> protocol.PiAm
+	19, // 27: protocol.NamespaceAgentAm.codex:type_name -> protocol.CodexAm
+	32, // 28: protocol.Follows.columns:type_name -> protocol.Corresponds
+	33, // 29: protocol.Follows.folds:type_name -> protocol.Fold
+	35, // 30: protocol.Sigil.takes:type_name -> protocol.Param
+	36, // 31: protocol.Sigil.gives:type_name -> protocol.Field
+	37, // 32: protocol.Sigil.http:type_name -> protocol.Endpoint
+	40, // 33: protocol.NodePeers.peers:type_name -> protocol.NodePeer
+	34, // [34:34] is the sub-list for method output_type
+	34, // [34:34] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_sigil_proto_init() }
@@ -4273,7 +4289,7 @@ func file_plugin_grpc_protocol_sigil_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_sigil_proto_rawDesc), len(file_plugin_grpc_protocol_sigil_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   41,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

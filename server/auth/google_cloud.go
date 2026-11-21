@@ -87,6 +87,17 @@ type GoogleKeyConnect func(ctx context.Context, token, by, namespace string) (st
 // "one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item."
 func (h *Handler) SetGoogleKey(connect GoogleKeyConnect) { h.googleKey = connect }
 
+// "I got this from you, not from the mail"
+//
+// 「[Opus 5.5] GoogleCloudPress is what the page after a yes at Google offers next. A press with」
+// 「[Opus 5.5] no link is said, not pressed.」
+type GoogleCloudPress struct {
+	Label, Link string
+}
+
+// 「[Opus 5.5] SetGoogleNext is what the page after Connect costs or Connect key offers next.」
+func (h *Handler) SetGoogleNext(next func() []GoogleCloudPress) { h.googleNext = next }
+
 // SetGoogleCloud is what connects the node once ROOT said yes.
 func (h *Handler) SetGoogleCloud(connect GoogleCloudConnect) { h.googleCloud = connect }
 
@@ -185,7 +196,7 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 			return
 		}
 		h.logger.Infow("a namespace's key at Google Cloud is made", "namespace", fl.namespace, "by", acct.CanonicalID, "said", said)
-		h.renderCloudDone(w, said, fl.returnTo)
+		h.renderCloudDone(w, said, fl.returnTo, h.nextAtGoogle()...)
 		return
 	}
 	if connect := map[string]GoogleThingConnect{"costs": h.googleCosts, "agy": h.googleAgy}[fl.thing]; connect != nil {
@@ -198,7 +209,11 @@ func (h *Handler) googleCloudCallback(w http.ResponseWriter, r *http.Request, fl
 			return
 		}
 		h.logger.Infow("a thing of the node's at Google Cloud is connected", "thing", fl.thing, "by", acct.CanonicalID, "said", said)
-		h.renderCloudDone(w, said, fl.returnTo)
+		var next []GoogleCloudPress
+		if fl.thing == "costs" {
+			next = h.nextAtGoogle()
+		}
+		h.renderCloudDone(w, said, fl.returnTo, next...)
 		return
 	}
 	project := fl.project
@@ -326,9 +341,29 @@ func (h *Handler) backToQNTX(back string) string {
 	return `<p><a ` + pagePress + ` href="` + html.EscapeString(back) + `">Back to QNTX</a></p>`
 }
 
-// renderCloudDone says what was set up, and offers the way back.
-func (h *Handler) renderCloudDone(w http.ResponseWriter, said, back string) {
-	h.renderPage(w, http.StatusOK, pageOK, `<p>`+html.EscapeString(said)+`</p>`+h.backToQNTX(back))
+// renderCloudDone says what was set up, what is next, and offers the way back.
+func (h *Handler) renderCloudDone(w http.ResponseWriter, said, back string, next ...GoogleCloudPress) {
+	page := `<p>` + html.EscapeString(said) + `</p>`
+	if len(next) > 0 {
+		page += `<p style="color:` + pageSays + `">Next:</p><p>`
+		for _, press := range next {
+			if press.Link == "" {
+				page += `</p><p style="color:` + pageRefused + `">` + html.EscapeString(press.Label) + `</p><p>`
+				continue
+			}
+			page += `<a ` + pagePress + ` href="` + html.EscapeString(press.Link) + `">` + html.EscapeString(press.Label) + `</a>`
+		}
+		page += `</p>`
+	}
+	h.renderPage(w, http.StatusOK, pageOK, page+h.backToQNTX(back))
+}
+
+// 「[Opus 5.5] nextAtGoogle is what the node offers after a yes at Google, or nothing.」
+func (h *Handler) nextAtGoogle() []GoogleCloudPress {
+	if h.googleNext == nil {
+		return nil
+	}
+	return h.googleNext()
 }
 
 func (h *Handler) renderCloudStopped(w http.ResponseWriter, err error, project, thing, namespace, handle, back string) {

@@ -129,7 +129,16 @@ func (s *QNTXServer) proveGoogleCosts() {
 		err := s.googleCostsTick(proving)
 		if err == nil {
 			s.logger.Infow("Google lets the node read its costs")
-			s.tellGoogleOutcome(googleOutcomeMail("The node reads what Google Cloud costs", "Google lets the node read what its budgets report. Google's first report can take several hours.\n"))
+			said := "Google lets the node read what its budgets report. Google's first report can take several hours."
+			// "I got this from you, not from the mail"
+			keys, err := s.googleKeyLinks()
+			switch {
+			case err != nil:
+				said += "\n\n" + errors.Wrap(err, "the keys to connect were not read").Error()
+			case len(keys) > 0:
+				said += "\n\nEach namespace spends with a key of its own, in a project of its own, halted by its own budget."
+			}
+			s.tellGoogleOutcome(googleOutcomeMail("The node reads what Google Cloud costs", said, keys...))
 			return
 		}
 		if said == nil || proving.Err() == nil {
@@ -618,6 +627,9 @@ func (s *QNTXServer) googleCostsAm(am *protocol.NodeGoogle, connect string) *pro
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	am.CostsWired = wired
+	if am.KeyConnects, err = s.googleKeysToConnect(connect, am.GetProjectId()); err != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
 	am.AgyConnect = connect + "?project=" + url.QueryEscape(am.GetProjectId()) + "&thing=agy"
 	if am.AgyWired, err = s.googleAgyWired(); err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}

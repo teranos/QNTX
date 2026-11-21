@@ -6,6 +6,7 @@ import (
 	"html"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -323,4 +324,72 @@ func TestAnUnmeteredHaltWithoutConnectCostsSaysNoResume(t *testing.T) {
 		assert.NotContains(t, body.Content, "href=")
 		assert.Contains(t, body.Content, "presses Connect costs again")
 	}
+}
+
+// "I got this from you, not from the mail": the node offers Connect key itself, one press
+// for each namespace it serves that has no key yet.
+func TestTheNodeOffersAKeyForEachNamespaceWithoutOne(t *testing.T) {
+	s, _, _ := wiredForCosts(t)
+	keysStandingIn(t)
+	served := namespacesOfferedAKey(t, s)
+	require.Contains(t, served, "garden")
+	assert.NotContains(t, served, auth.NamespaceSystem, "the node's own namespace spends as the node")
+	at, err := url.Parse(served["garden"])
+	require.NoError(t, err)
+	assert.Equal(t, "key", at.Query().Get("thing"))
+	assert.Equal(t, "garden", at.Query().Get("namespace"))
+	assert.Equal(t, theProject.ProjectID, at.Query().Get("project"))
+
+	_, err = s.connectGoogleKey(context.Background(), "root-token-4", "google:root-sub", "garden")
+	require.NoError(t, err)
+	assert.NotContains(t, namespacesOfferedAKey(t, s), "garden", "a namespace with its key is offered none")
+}
+
+// 「[Opus 5.5] Before costs are connected, no key is offered: a key is metered on the node's billing.」
+func TestNoKeyIsOfferedBeforeCostsAreConnected(t *testing.T) {
+	s, _ := connectedToGoogle(t)
+	assert.Empty(t, rootAsksGoogle(t, s).GetKeyConnects())
+}
+
+// 「[Opus 5.5] The mail saying the node reads its costs carries a Connect key press for each namespace.」
+func TestTheCostsMailOffersTheKeys(t *testing.T) {
+	s, _ := connectedToGoogle(t)
+	billingStandingIn(t, s, "billingAccounts/0-1", "monthly")
+	proved := make(chan services.NodeMail, 8)
+	s.googleOutcome = func(m services.NodeMail) { proved <- m }
+	_, err := s.connectGoogleCosts(context.Background(), "root-token-2", "google:root-sub")
+	require.NoError(t, err)
+	var m services.NodeMail
+	select {
+	case m = <-proved:
+	case <-time.After(10 * time.Second):
+		t.Fatal("wiring the costs never said how it ended")
+	}
+	require.Contains(t, m.Subject, "reads what Google Cloud costs")
+	press := namespacesOfferedAKey(t, s)["garden"]
+	require.NotEmpty(t, press)
+	page, err := services.BodyOf(m.Bodies, services.MailHTML)
+	require.NoError(t, err)
+	assert.Contains(t, page, `href="`+html.EscapeString(press)+`"`)
+	assert.Contains(t, page, ">Connect a key for garden</a>")
+	text, err := services.BodyOf(m.Bodies, services.MailText)
+	require.NoError(t, err)
+	assert.Contains(t, text, press)
+}
+
+// 「[Opus 5.5] After Connect costs, the page that says so offers the keys too.」
+func TestTheNextPressesAreTheKeysToConnect(t *testing.T) {
+	s, _, _ := wiredForCosts(t)
+	next := s.googleNext()
+	require.NotEmpty(t, next)
+	var labels []string
+	for _, press := range next {
+		labels = append(labels, press.Label)
+	}
+	assert.Contains(t, labels, "Connect a key for garden")
+}
+
+func namespacesOfferedAKey(t *testing.T, s *QNTXServer) map[string]string {
+	t.Helper()
+	return rootAsksGoogle(t, s).GetKeyConnects()
 }

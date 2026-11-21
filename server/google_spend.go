@@ -12,12 +12,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
 )
@@ -452,4 +454,77 @@ func budgetCovers(set []googleBudgetSet, id string, project googleProject) bool 
 		return len(each.projects) == 0 || slices.Contains(each.projects, "projects/"+project.ProjectNumber)
 	}
 	return true
+}
+
+// "I got this from you, not from the mail"
+//
+// 「[Opus 5.5] googleKeysToConnect is Connect key, from connect, for each namespace the node」
+// 「[Opus 5.5] serves that has no key yet: none before costs are connected, and none for the」
+// 「[Opus 5.5] node's own namespace, which spends as the node.」
+func (s *QNTXServer) googleKeysToConnect(connect, project string) (map[string]string, error) {
+	wired, err := s.googleCostsWired()
+	if err != nil || !wired {
+		return nil, err
+	}
+	known := s.held.Known()
+	if known == nil {
+		return nil, nil
+	}
+	served, err := known.List()
+	if err != nil {
+		return nil, errors.Wrap(err, "the namespaces a key is offered for were not read")
+	}
+	items, err := s.googleSpendItems()
+	if err != nil {
+		return nil, err
+	}
+	keyed := map[string]bool{}
+	for _, item := range items {
+		keyed[item.name] = true
+	}
+	keys := map[string]string{}
+	for _, ns := range served {
+		if ns.Name == auth.NamespaceSystem || keyed[ns.Name] || (ns.Definition != nil && !ns.Definition.Enabled) {
+			continue
+		}
+		keys[ns.Name] = connect + "?project=" + url.QueryEscape(project) + "&thing=key&namespace=" + url.QueryEscape(ns.Name)
+	}
+	return keys, nil
+}
+
+// 「[Opus 5.5] googleKeyLinks is googleKeysToConnect as presses, by namespace: what the mail and」
+// 「[Opus 5.5] the page after a yes at Google offer next.」
+func (s *QNTXServer) googleKeyLinks() ([]services.MailLink, error) {
+	kept, held, err := s.googleLine()
+	if err != nil || !held {
+		return nil, err
+	}
+	i, err := s.theIssuer()
+	if err != nil {
+		return nil, err
+	}
+	keys, err := s.googleKeysToConnect(i.url+auth.GoogleCloudPath(), kept.project.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	links := make([]services.MailLink, 0, len(keys))
+	for _, namespace := range slices.Sorted(maps.Keys(keys)) {
+		links = append(links, services.MailLink{Label: "Connect a key for " + namespace, URL: keys[namespace]})
+	}
+	return links, nil
+}
+
+// 「[Opus 5.5] googleNext is what the page after a yes at Google offers next. What could not be」
+// 「[Opus 5.5] read is said as a press that goes nowhere, so the page still says it.」
+func (s *QNTXServer) googleNext() []auth.GoogleCloudPress {
+	links, err := s.googleKeyLinks()
+	if err != nil {
+		s.logger.Errorw("The keys to connect were not read", "error", err)
+		return []auth.GoogleCloudPress{{Label: errors.Wrap(err, "the keys to connect were not read").Error()}}
+	}
+	next := make([]auth.GoogleCloudPress, 0, len(links))
+	for _, link := range links {
+		next = append(next, auth.GoogleCloudPress{Label: link.Label, Link: link.URL})
+	}
+	return next
 }

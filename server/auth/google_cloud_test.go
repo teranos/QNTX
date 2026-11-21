@@ -378,3 +378,17 @@ func TestTheGoogleLoginAsksForNoCloud(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, login, "cloud-platform")
 }
+
+// "I got this from you, not from the mail": after Connect costs, the page offers each
+// namespace's key; what could not be read is said.
+func TestConnectCostsOffersTheKeysNext(t *testing.T) {
+	h, _ := cloudHandler(t)
+	googleAnswering(t, "root-sub")
+	h.SetGoogleCosts(func(context.Context, string, string) (string, error) { return "wired", nil })
+	h.SetGoogleNext(func() []GoogleCloudPress {
+		return []GoogleCloudPress{{Label: "Connect a key for garden", Link: "https://node.test/auth/google/cloud?thing=key&namespace=garden"}, {Label: "the shed was not read"}}
+	})
+	page := consenting(t, h, "?project=the-project&thing=costs").Body.String()
+	assert.Equal(t, "https://node.test/auth/google/cloud?thing=key&namespace=garden", hrefOf(t, page, "Connect a key for garden"))
+	assert.Contains(t, page, "the shed was not read")
+}

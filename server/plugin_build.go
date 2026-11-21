@@ -705,7 +705,7 @@ func buildFailureMail(b pluginBuild, revs []string, failed error) services.NodeM
 		fmt.Fprintf(&text, "%s at %s\n", source.String(), rev)
 	}
 	fmt.Fprintf(&text, "\n%s\n", failed.Error())
-	return services.DrawnNodeMail("build.failed", b.name+" did not build", text.String(), "", "")
+	return services.DrawnNodeMail("build.failed", b.name+" did not build", text.String())
 }
 
 // mailBuildFailure mails ROOT that b did not build, and says so when it cannot.
