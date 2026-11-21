@@ -155,19 +155,20 @@ func meterProject(ctx context.Context, token, account, topic, called string, pro
 	return made.Name, nil
 }
 
-// 「[Opus 5.5] meterTheNode makes the node's own meter, once: its project, alone.」
-func (s *QNTXServer) meterTheNode(ctx context.Context, token, account, topic, by string, kept googleKept) error {
+// 「[Opus 5.5] meterTheNode makes the node's own meter, once: its project, alone. made is」
+// 「[Opus 5.5] whether this call made it.」
+func (s *QNTXServer) meterTheNode(ctx context.Context, token, account, topic, by string, kept googleKept) (made bool, err error) {
 	node, _, err := s.googleSpendItemNamed(googleNodeItem)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if node.budget != "" {
-		return nil
+		return false, nil
 	}
 	if node.budget, err = meterProject(ctx, token, account, topic, "qntx node", kept.project); err != nil {
-		return err
+		return false, err
 	}
-	return s.keepSpendItem(node, by)
+	return true, s.keepSpendItem(node, by)
 }
 
 // 「[Opus 5.5] googleKeyProject is the id of a new project for namespace's key: qntx-, the」

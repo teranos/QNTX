@@ -277,3 +277,28 @@ func fillText(part string, parsed *texttemplate.Template, values map[string]stri
 	}
 	return out.String(), nil
 }
+
+// "make sure that the mails also use like a nicer.   QNTX Mail template"
+//
+// 「[Opus 5.5] DrawnNodeMail is a mail the node sends in its own name, filled from the dark」
+// 「[Opus 5.5] template: titled with its subject, its body, and its link when it has one. A」
+// 「[Opus 5.5] template that does not draw sends the mail plain, and says so in it.」
+func DrawnNodeMail(name, subject, body, link, linkLabel string) NodeMail {
+	values := map[string]string{"subject": subject, "body": strings.TrimSpace(body)}
+	if link != "" {
+		values["link"], values["link_label"] = link, linkLabel
+	}
+	dark, err := DarkTemplate()
+	if err == nil {
+		var filled FilledMail
+		if filled, err = FillTemplate(dark, values); err == nil {
+			return NodeMail{Name: name, Subject: filled.Subject, Bodies: filled.Bodies.All()}
+		}
+	}
+	plain := values["body"] + "\n"
+	if link != "" {
+		plain += "\n" + link + "\n"
+	}
+	plain += "\nThis mail is plain: " + errors.Wrap(err, "the QNTX template did not draw").Error() + "\n"
+	return NodeMail{Name: name, Subject: subject, Bodies: []MailBody{TextBody(plain), HTMLBody("<pre>" + htmltemplate.HTMLEscapeString(plain) + "</pre>")}}
+}

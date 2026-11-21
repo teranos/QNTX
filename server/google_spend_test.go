@@ -134,9 +134,10 @@ func TestConnectingCostsMetersTheNodeInItsOwnProject(t *testing.T) {
 	assert.Equal(t, theProject.ProjectID, node.GetProjectId())
 	assert.Equal(t, "billingAccounts/0-1/budgets/"+id, node.GetBudget())
 
-	// Pressed again, the node's meter is kept, not made twice.
-	_, err := s.connectGoogleCosts(context.Background(), "root-token-3", "google:root-sub")
+	// Pressed again, the node's meter is kept, not made twice, and counted once.
+	said, err := s.connectGoogleCosts(context.Background(), "root-token-3", "google:root-sub")
 	require.NoError(t, err)
+	assert.Contains(t, said, "from 2 budgets")
 	b.mu.Lock()
 	assert.Len(t, b.order, 1)
 	b.mu.Unlock()
@@ -307,7 +308,8 @@ func TestAnUnmeteredHaltIsMailedWithConnectCosts(t *testing.T) {
 	require.Len(t, m.Bodies, 2)
 	text, page := m.Bodies[0].Content, m.Bodies[1].Content
 	assert.Contains(t, text, connect, "the mail goes where the element's Connect costs goes")
-	assert.Contains(t, page, `href="`+html.EscapeString(connect)+`">Connect costs</a>`)
+	assert.Contains(t, page, `href="`+html.EscapeString(connect)+`"`)
+	assert.Contains(t, page, `>Connect costs</a>`)
 	assert.NotContains(t, text, "resumes by itself", "no budget frees up a halt the node does not meter")
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"html"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -314,11 +313,7 @@ func stalledMail(node string, waited time.Duration, p operationalPatience, pool 
 	if len(turned) > 0 {
 		fmt.Fprintf(&text, "\nTurned away until it answers in time: %s\n", strings.Join(turned, ", "))
 	}
-	return services.NodeMail{
-		Name:    "operational.stalled",
-		Subject: subject,
-		Bodies:  []services.MailBody{services.TextBody(text.String()), services.HTMLBody("<pre>" + html.EscapeString(text.String()) + "</pre>")},
-	}
+	return services.DrawnNodeMail("operational.stalled", subject, text.String(), "", "")
 }
 
 // recoveredMail is the mail saying the operational store answers in time again.
@@ -332,9 +327,5 @@ func recoveredMail(node string, stalled, answered time.Time, longest time.Durati
 	if len(lifted) > 0 {
 		fmt.Fprintf(&text, "\nLet back in: %s\n", strings.Join(lifted, ", "))
 	}
-	return services.NodeMail{
-		Name:    "operational.recovered",
-		Subject: fmt.Sprintf("%s: The operational store answers again, after %s", node, took),
-		Bodies:  []services.MailBody{services.TextBody(text.String()), services.HTMLBody("<pre>" + html.EscapeString(text.String()) + "</pre>")},
-	}
+	return services.DrawnNodeMail("operational.recovered", fmt.Sprintf("%s: The operational store answers again, after %s", node, took), text.String(), "", "")
 }

@@ -211,14 +211,24 @@ func (s *QNTXServer) connectGoogleCosts(ctx context.Context, token, by string) (
 		}
 	}
 	// "one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item."
-	if err := s.meterTheNode(ctx, token, billing.Account, topic, by, kept); err != nil {
+	metered, err := s.meterTheNode(ctx, token, billing.Account, topic, by, kept)
+	if err != nil {
 		return "", err
+	}
+	// "fix the budget count": the budgets were listed before the node's meter was made.
+	budgets := len(listed.Budgets)
+	if metered {
+		budgets++
+	}
+	counted := fmt.Sprintf("%d budgets", budgets)
+	if budgets == 1 {
+		counted = "1 budget"
 	}
 	if refused := s.keepGoogleCostLine(googleCostsLineSubject, "wired", by, map[string]any{"billing_account": billing.Account}); refused != nil {
 		return "", errors.New(refused.Says)
 	}
 	sacred.Go("google.costs.proving", s.proveGoogleCosts)
-	return fmt.Sprintf("You get a mail once Google lets the node read them. The node reads the costs of %s, from %d budget(s). Google's first report can take several hours. What costs halts at %d%% of the budget, and you get a mail when it does.", billing.Account, len(listed.Budgets), int(googleHaltsAt*100)), nil
+	return fmt.Sprintf("You get a mail once Google lets the node read them. The node reads the costs of %s, from %s. Google's first report can take several hours. What costs halts at %d%% of the budget, and you get a mail when it does.", billing.Account, counted, int(googleHaltsAt*100)), nil
 }
 
 // keepGoogleCostLine writes one of the node's lines about its costs.
