@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"github.com/teranos/QNTX/internal/sqlclose"
 
 	"github.com/teranos/QNTX/internal/db"
@@ -38,7 +37,11 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (_ int, err error) {
 		return 0, errors.Wrap(err, "failed to iterate stale embeddings")
 	}
 
+	// Nothing is stale: what is recorded to be taken out is still asked again.
 	if len(stale) == 0 {
+		if _, err := s.ForgetPending(); err != nil {
+			s.logger.Warn("vectors recorded to be taken out are still indexed", zap.Error(err))
+		}
 		return 0, nil
 	}
 
@@ -47,11 +50,14 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (_ int, err error) {
 		return 0, errors.Wrap(err, "failed to begin transaction for stale sweep")
 	}
 
+	recorded := make([]sourceEmbedding, len(stale))
+	for i, e := range stale {
+		recorded[i] = sourceEmbedding{id: e.id, model: e.model}
+	}
+	if err := toForget(tx, recorded); err != nil {
+		return 0, db.Undone(err, tx)
+	}
 	for _, e := range stale {
-		table := vecTableName(e.model)
-		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), e.id); err != nil {
-			return 0, db.Undone(errors.Wrapf(err, "failed to delete from %s for stale embedding %s", table, e.id), tx)
-		}
 		if _, err := tx.Exec(`DELETE FROM embeddings WHERE id = ?`, e.id); err != nil {
 			return 0, db.Undone(errors.Wrapf(err, "failed to delete stale embedding %s", e.id), tx)
 		}
@@ -63,6 +69,13 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (_ int, err error) {
 
 	s.logger.Info("swept stale embeddings",
 		zap.Int("count", len(stale)))
+
+	// The vectors go after the rows; one the index does not take out stays
+	// recorded and is asked again (ForgetPending), and is no search result
+	// meanwhile, since its row is gone.
+	if _, err := s.ForgetPending(); err != nil {
+		s.logger.Warn("swept embeddings' vectors are still indexed, and recorded to be taken out", zap.Error(err))
+	}
 
 	return len(stale), nil
 }

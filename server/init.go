@@ -282,6 +282,15 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		if err := server.serveDeclaredNamespaces(newCfg); err != nil {
 			serverLogger.Errorw("storage.parquet.namespaces not served", "error", err)
 		}
+		// 「[Opus 5.5] And auth.reach: a line struck takes its reach away now, and a list」
+		// 「[Opus 5.5] that does not read leaves what was served before.」
+		if declared, err := declaredReach(newCfg); err != nil {
+			serverLogger.Errorw("auth.reach not reloaded, the reach served before stands", "error", err)
+		} else if err := server.setDeclaredReach(declared); err != nil {
+			serverLogger.Errorw("auth.reach reloaded and not served, what the node served before stands", "error", err)
+		} else {
+			serverLogger.Infow("auth.reach reloaded", "lines", len(declared))
+		}
 		return nil
 	})
 

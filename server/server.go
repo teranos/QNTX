@@ -99,6 +99,7 @@ type QNTXServer struct {
 	pluginManager         pluginManaging              // Plugin process manager, or why the node has none
 	services              plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager       *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+	vectorIndex           *routedIndex                // where the embedding store keeps and finds its vectors
 	// What the mail service was wired with (ADR-041), read back by the mail
 	// signum so ROOT sees what sends and not what am.toml says since.
 	mailConfig config.MailConfig
@@ -150,6 +151,9 @@ type QNTXServer struct {
 	// built from the lines in its table.
 	answering map[string]reach.Answering
 	served    *reach.Served
+	// 「[Opus 5.5] declaredReach is auth.reach: the REACH lines am.toml says, served」
+	// 「[Opus 5.5] beside the store's (declared_reach.go). Held under opening.」
+	declaredReach []reach.Line
 	// sigilPaths is the paths answering holds because a sigil is bound there,
 	// so the ones no sigil is bound to any more can be taken out.
 	sigilPaths map[string]bool
@@ -159,6 +163,12 @@ type QNTXServer struct {
 	// naming is held from reading who holds a name to writing down who now
 	// does (i name), so two agents asking for one name at once do not both get it.
 	naming sync.Mutex
+	// "AND LAYE OWNS IDENTITY"
+	// names is laye's etcd, where names are kept when am.toml names one; nil
+	// keeps them as the node's own lines. seeding brings those lines into it
+	// once a start.
+	names   nameKeeper
+	seeding sync.Once
 	// 「[Opus 5.5] anthropicLining is held from reading the node's ANTHROPIC line to writing it anew」
 	// 「[Opus 5.5] (changeAnthropicLine), so an order, a cap and the ids asked at once each stand.」
 	anthropicLining sync.Mutex

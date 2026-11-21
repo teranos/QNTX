@@ -197,8 +197,10 @@ func TestParityHoldsEverySigilToMCP(t *testing.T) {
 			t.Errorf("%s: Sigil.does says %q", name, held.Ours["protocol.Sigil.does"])
 		}
 		// answer names the message outputSchema is made from, through the
-		// fields given, and no column of MCP is a message's name.
-		if !slices.Equal(held.Unfollowed["protocol.Sigil"], []string{"answer"}) {
+		// fields given, and no column of MCP is a message's name. surfaces
+		// says where a sigil is asked: one not asked over MCP is no tool, so
+		// no column of a tool says it.
+		if !slices.Equal(held.Unfollowed["protocol.Sigil"], []string{"answer", "surfaces"}) {
 			t.Errorf("%s: Sigil unfollowed is %v", name, held.Unfollowed["protocol.Sigil"])
 		}
 		holds(t, signum, "hold", answer)
