@@ -249,6 +249,42 @@ pub extern "C" fn etcd_keys_new(endpoint: *const c_char, prefix: *const c_char) 
     })
 }
 
+/// 「[Opus 5.5] As `etcd_keys_new`, asking as `user` with `password`; an empty `user`
+/// 「[Opus 5.5] asks as nobody.」」
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn etcd_keys_new_as(
+    endpoint: *const c_char,
+    prefix: *const c_char,
+    user: *const c_char,
+    password: *const c_char,
+) -> KeysOpenResultC {
+    qntx_ffi_common::guarded_result("etcd_keys_new_as", || {
+        const CALL: &str = "etcd_keys_new_as";
+        let args = || -> Result<(&str, &str, &str, &str), EtcdError> {
+            Ok((
+                unsafe { argument(CALL, "endpoint", endpoint) }?,
+                unsafe { argument(CALL, "prefix", prefix) }?,
+                unsafe { argument(CALL, "user", user) }?,
+                unsafe { argument(CALL, "password", password) }?,
+            ))
+        };
+        let (endpoint, prefix, user, password) = match args() {
+            Ok(a) => a,
+            Err(e) => return KeysOpenResultC::error(e.crosses(CALL)),
+        };
+        let as_user = (!user.is_empty()).then_some((user, password));
+        match EtcdKeys::open_as(endpoint, prefix, as_user) {
+            Ok(keys) => KeysOpenResultC {
+                success: true,
+                error_msg: ptr::null_mut(),
+                keys: Box::into_raw(Box::new(keys)),
+            },
+            Err(e) => KeysOpenResultC::error(e.crosses(CALL)),
+        }
+    })
+}
+
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn etcd_keys_free(keys: *mut EtcdKeys) {

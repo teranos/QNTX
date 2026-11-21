@@ -174,6 +174,17 @@ StringArrayResultC read_conn_integrity_check(const ReadConn *rc);
 StorageResultC storage_put(SqliteStore *store, const char *attestation_json);
 
 /**
+ * Write many attestations, a JSON array of them, in one transaction.
+ *
+ * @param store Store pointer
+ * @param attestations_json JSON array of attestations
+ * @return Result whose attestation_json is a JSON array in the same order:
+ *         null for one written, the error storage_put would say for one not.
+ *         Must be freed with attestation_result_free().
+ */
+AttestationResultC storage_put_many(SqliteStore *store, const char *attestations_json);
+
+/**
  * Retrieve an attestation by ID.
  *
  * @param store Store handle

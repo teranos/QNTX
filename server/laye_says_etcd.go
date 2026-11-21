@@ -77,7 +77,7 @@ func (e *etcdPrefix) held() (map[string][]byte, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.keys == nil {
-		keys, err := etcdcgo.OpenKeys(e.endpoint, e.prefix)
+		keys, err := openEtcdKeys(e.endpoint, e.prefix)
 		if err != nil {
 			return nil, errors.Wrapf(err, "laye's %s was not read from etcd at %s", e.prefix, e.endpoint)
 		}
