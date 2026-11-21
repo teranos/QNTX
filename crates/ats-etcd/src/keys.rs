@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use etcd_client::{Client, ConnectOptions, GetOptions};
+use etcd_client::{Client, Compare, CompareOp, ConnectOptions, GetOptions, Txn, TxnOp};
 use tokio::runtime::Runtime;
 
 use crate::error::{EtcdError, Result};
@@ -198,5 +198,75 @@ impl EtcdKeys {
             }
         }
         Ok(())
+    }
+
+    // "LAYE OWNS IDENTITY"
+    //
+    // 「[Opus 5.5] read and swap take whole keys, each starting at `/`, and not names under
+    // 「[Opus 5.5] the prefix: a name is taken under /names/ and /named/ at once, in one」
+    // 「[Opus 5.5] transaction, as laye takes it (laye-front names.rs).」」
+
+    /// 「[Opus 5.5] Each key's value and the revision it was last put at; a key etcd does
+    /// 「[Opus 5.5] not hold is left out.」」
+    pub fn read(&self, keys: &[String]) -> Result<BTreeMap<String, (Vec<u8>, i64)>> {
+        for key in keys {
+            whole(key)?;
+        }
+        let client = self.client.clone();
+        self.runtime.block_on(async {
+            let mut read = BTreeMap::new();
+            for key in keys {
+                let (got, _) = once_more(|| {
+                    let mut client = client.clone();
+                    let key = key.clone();
+                    async move { client.get(key, None).await }
+                })
+                .await?;
+                if let Some(kv) = got.kvs().first() {
+                    read.insert(key.clone(), (kv.value().to_vec(), kv.mod_revision()));
+                }
+            }
+            Ok(read)
+        })
+    }
+
+    /// 「[Opus 5.5] Puts `put` and deletes `delete` only while each key in `unchanged` is at
+    /// 「[Opus 5.5] the revision named, 0 for a key etcd does not hold. False when one moved:」
+    /// 「[Opus 5.5] another wrote between the reading and this, and nothing was written. Asked」
+    /// 「[Opus 5.5] once: a second asking of one that was taken would be said as not taken.」」
+    pub fn swap(
+        &self,
+        unchanged: &BTreeMap<String, i64>,
+        put: &BTreeMap<String, Vec<u8>>,
+        delete: &[String],
+    ) -> Result<bool> {
+        for key in unchanged.keys().chain(put.keys()).chain(delete) {
+            whole(key)?;
+        }
+        let compares: Vec<Compare> = unchanged
+            .iter()
+            .map(|(key, revision)| Compare::mod_revision(key.as_str(), CompareOp::Equal, *revision))
+            .collect();
+        let ops: Vec<TxnOp> = put
+            .iter()
+            .map(|(key, value)| TxnOp::put(key.as_str(), value.clone(), None))
+            .chain(delete.iter().map(|key| TxnOp::delete(key.as_str(), None)))
+            .collect();
+        let mut client = self.client.clone();
+        self.runtime.block_on(async {
+            let done = client.txn(Txn::new().when(compares).and_then(ops)).await?;
+            Ok(done.succeeded())
+        })
+    }
+}
+
+/// 「[Opus 5.5] A whole key starts at `/`.」
+fn whole(key: &str) -> Result<()> {
+    if key.len() > 1 && key.starts_with('/') {
+        Ok(())
+    } else {
+        Err(EtcdError::BadPrefix {
+            value: key.to_string(),
+        })
     }
 }

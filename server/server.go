@@ -163,6 +163,12 @@ type QNTXServer struct {
 	// naming is held from reading who holds a name to writing down who now
 	// does (i name), so two agents asking for one name at once do not both get it.
 	naming sync.Mutex
+	// "AND LAYE OWNS IDENTITY"
+	// names is laye's etcd, where names are kept when am.toml names one; nil
+	// keeps them as the node's own lines. seeding brings those lines into it
+	// once a start.
+	names   nameKeeper
+	seeding sync.Once
 	// 「[Opus 5.5] anthropicLining is held from reading the node's ANTHROPIC line to writing it anew」
 	// 「[Opus 5.5] (changeAnthropicLine), so an order, a cap and the ids asked at once each stand.」
 	anthropicLining sync.Mutex

@@ -349,6 +349,8 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if s.deps.cfg.Laye.DID != "" {
 		authHandler.SetLayeSays(layeSays())
 	}
+	// "AND LAYE OWNS IDENTITY": the names agents hold, in the etcd am.toml names.
+	s.names = namesAtLaye(s.deps.cfg.Etcd.Endpoint)
 	// On the primary, its peers.
 	for _, peer := range s.deps.cfg.Nodes.Peers {
 		if err := authHandler.DeclarePeer(peer.Name, peer.DID, peer.Namespaces, peer.Origin, peer.ReturnAddress); err != nil {
