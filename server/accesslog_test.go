@@ -293,3 +293,22 @@ func TestAHeldPathDoesNotKeepTheRequestLineItCameFrom(t *testing.T) {
 		return true
 	})
 }
+
+// The second poll of a path is backed by another request line. Storing it again
+// must not leave that line as the key.
+func TestASecondPollOfAHeldPathDoesNotKeepItsRequestLineEither(t *testing.T) {
+	var beats heartbeats
+	first := "/comet/o/r/p/1?pad=" + strings.Repeat("x", 4096)
+	second := "/comet/o/r/p/1?pad=" + strings.Repeat("y", 4096)
+	path := first[:len("/comet/o/r/p/1")]
+	again := second[:len("/comet/o/r/p/1")]
+	beats.worthSaying(path, false)
+	beats.worthSaying(again, false)
+
+	beats.seen.Range(func(key, _ any) bool {
+		if unsafe.StringData(key.(string)) == unsafe.StringData(again) {
+			t.Fatal("the held path is the second request's slice of its request line")
+		}
+		return true
+	})
+}
