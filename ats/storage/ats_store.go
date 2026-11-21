@@ -60,6 +60,65 @@ func (s *AtsStore) CreateAttestation(as *types.As) error {
 	return nil
 }
 
+// "if k took the list in memory and wrote it in one transaction, the drain would go far faster"
+//
+// ManyCreator writes many attestations at once, answering each in the order
+// given: nil for one written, what CreateAttestation would have said for one
+// that was not. The second error is the write as a whole failing.
+type ManyCreator interface {
+	CreateAttestations(attestations []*types.As) ([]error, error)
+}
+
+// CreateAttestations signs each, writes them in one go where the backend can
+// (ManyCreator) and one at a time where it cannot, and tells the observers of
+// each one written.
+func (s *AtsStore) CreateAttestations(attestations []*types.As) ([]error, error) {
+	answers, err := createMany(s.log, attestations, s.raw.CreateAttestation, s.raw)
+	if err != nil {
+		return nil, err
+	}
+	for i, as := range attestations {
+		if answers[i] == nil {
+			NotifyObservers(s.namespace, as)
+		}
+	}
+	return answers, nil
+}
+
+// createMany signs each attestation and writes those it could sign: through
+// many when it is a ManyCreator, and with one for each otherwise.
+func createMany(log *zap.SugaredLogger, attestations []*types.As, one func(*types.As) error, many any) ([]error, error) {
+	answers := make([]error, len(attestations))
+	signed := make([]*types.As, 0, len(attestations))
+	at := make([]int, 0, len(attestations))
+	for i, as := range attestations {
+		if err := signBeforeStore(log, as); err != nil {
+			answers[i] = err
+			continue
+		}
+		signed = append(signed, as)
+		at = append(at, i)
+	}
+	if creator, ok := many.(ManyCreator); ok {
+		written, err := creator.CreateAttestations(signed)
+		if err != nil {
+			return nil, err
+		}
+		for j, i := range at {
+			if written[j] != nil {
+				answers[i] = errors.Wrapf(written[j], "backend create attestation %s", signed[j].ID)
+			}
+		}
+		return answers, nil
+	}
+	for j, i := range at {
+		if err := one(signed[j]); err != nil {
+			answers[i] = errors.Wrapf(err, "backend create attestation %s", signed[j].ID)
+		}
+	}
+	return answers, nil
+}
+
 // CreateAttestationInbound stores a synced attestation without signing.
 func (s *AtsStore) CreateAttestationInbound(as *types.As) error {
 	warnIDLikeSubjects(s.log, as.ID, as.Subjects)
