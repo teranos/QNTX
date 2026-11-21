@@ -3,11 +3,17 @@
 package server
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 )
@@ -111,4 +117,77 @@ func findDID(held map[string]string, name string) string {
 		}
 	}
 	return ""
+}
+
+// "names and collections and just smaller things, messages say's status"
+
+// etcdAsks is etcd's gateway, asked with a token or none.
+func etcdAsks(t *testing.T, endpoint, path, token string, body map[string]any) map[string]any {
+	t.Helper()
+	sent, err := json.Marshal(body)
+	require.NoError(t, err)
+	req, err := http.NewRequest(http.MethodPost, endpoint+path, bytes.NewReader(sent))
+	require.NoError(t, err)
+	if token != "" {
+		req.Header.Set("Authorization", token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var answer map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&answer))
+	require.Equal(t, http.StatusOK, resp.StatusCode, "%s: %v", path, answer)
+	return answer
+}
+
+// With etcd's authentication enabled and the node asking as a user whose role
+// reaches only the keys it keeps, an agent is named, and that user writes
+// nothing anywhere else.
+func TestTheNodeAsksEtcdAsItsOwnUserAndReachesOnlyWhatItKeeps(t *testing.T) {
+	endpoint := os.Getenv("QNTX_ETCD_ENDPOINT")
+	require.NotEmpty(t, endpoint, "QNTX_ETCD_ENDPOINT names no etcd; run under scripts/with-etcd.sh")
+	b64 := func(s string) string { return base64.StdEncoding.EncodeToString([]byte(s)) }
+	for _, step := range []struct {
+		path string
+		body map[string]any
+	}{
+		{"/v3/auth/role/add", map[string]any{"name": "root"}},
+		{"/v3/auth/user/add", map[string]any{"name": "root", "password": "root-word"}},
+		{"/v3/auth/user/grant", map[string]any{"user": "root", "role": "root"}},
+		{"/v3/auth/role/add", map[string]any{"name": "qntx"}},
+		{"/v3/auth/user/add", map[string]any{"name": "qntx", "password": "qntx-word"}},
+		{"/v3/auth/user/grant", map[string]any{"user": "qntx", "role": "qntx"}},
+	} {
+		etcdAsks(t, endpoint, step.path, "", step.body)
+	}
+	for _, prefix := range []string{namesAt, namedAt} {
+		end := []byte(prefix)
+		end[len(end)-1]++
+		etcdAsks(t, endpoint, "/v3/auth/role/grant", "", map[string]any{"name": "qntx",
+			"perm": map[string]any{"permType": "READWRITE", "key": b64(prefix), "range_end": b64(string(end))}})
+	}
+	etcdAsks(t, endpoint, "/v3/auth/enable", "", map[string]any{})
+	t.Cleanup(func() {
+		root := etcdAsks(t, endpoint, "/v3/auth/authenticate", "", map[string]any{"name": "root", "password": "root-word"})
+		etcdAsks(t, endpoint, "/v3/auth/disable", root["token"].(string), map[string]any{})
+	})
+
+	password := filepath.Join(t.TempDir(), "etcd-password")
+	require.NoError(t, os.WriteFile(password, []byte("qntx-word\n"), 0o600))
+	t.Setenv("QNTX_ETCD_USER", "qntx")
+	t.Setenv("QNTX_ETCD_PASSWORD_FILE", password)
+	appcfg.Reset()
+	t.Cleanup(appcfg.Reset)
+
+	q := nodeNamingAtLaye(t)
+	named, refusal := q.iName(asAgent("did:key:z6Mkoakasuser"), sigil.Sent{"name": "Oak"})
+	require.Nil(t, refusal, refusal.GetSays())
+	assert.Equal(t, "Oak", named.(*protocol.Named).GetName())
+
+	keys, err := openEtcdKeys(endpoint, namesAt)
+	require.NoError(t, err)
+	defer keys.Close()
+	_, err = keys.Swap(map[string]int64{"/attestations/default/x": 0}, map[string][]byte{"/attestations/default/x": []byte("x")}, nil)
+	require.Error(t, err, "the node's user wrote outside what it keeps")
+	assert.Contains(t, err.Error(), "permission denied")
 }

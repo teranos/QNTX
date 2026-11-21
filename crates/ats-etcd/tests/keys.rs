@@ -189,3 +189,10 @@ fn a_key_not_whole_is_refused() {
         Err(EtcdError::BadPrefix { .. })
     ));
 }
+
+/// 「[Opus 5.5] A node given its user before etcd authenticates anyone asks as nobody.」
+#[test]
+fn a_user_asks_an_etcd_that_authenticates_nobody_yet() {
+    let keys = EtcdKeys::open_as(&endpoint(), &prefix(), Some(("qntx", "qntx-word"))).unwrap();
+    assert!(keys.names().unwrap().is_empty());
+}
