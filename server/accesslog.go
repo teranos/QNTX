@@ -94,7 +94,14 @@ type heartbeatState struct {
 type heartbeats struct {
 	seen sync.Map // path -> heartbeatState
 	mu   sync.Mutex
+	held int
 }
+
+// How many paths are remembered. A comet's path carries whatever a caller
+// writes, so the set is not the three fixed polls and cannot be left to grow.
+// Past it a new path is said every time, as every path was before polls were
+// remembered.
+const heartbeatHolds = 1024
 
 // worthSaying reports whether this poll is a change worth a line.
 func (h *heartbeats) worthSaying(path string, well bool) bool {
@@ -104,7 +111,11 @@ func (h *heartbeats) worthSaying(path string, well bool) bool {
 	defer h.mu.Unlock()
 
 	state := heartbeatState{well: well}
-	if last, seen := h.seen.Load(path); seen {
+	last, seen := h.seen.Load(path)
+	if !seen && h.held >= heartbeatHolds {
+		return true
+	}
+	if seen {
 		// A different answer resets the count, which is what makes a change
 		// always said and a state never.
 		if was, ok := last.(heartbeatState); ok && was.well == well {
@@ -115,6 +126,9 @@ func (h *heartbeats) worthSaying(path string, well bool) bool {
 		return false
 	}
 	state.said++
+	if !seen {
+		h.held++
+	}
 	h.seen.Store(path, state)
 	return true
 }

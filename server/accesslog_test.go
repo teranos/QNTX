@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"github.com/teranos/QNTX/plugin"
 	"net/http"
 	"net/http/httptest"
@@ -207,5 +208,27 @@ func TestAGroundAskingForAnUnbuiltCometIsSaidTwiceAndThenQuiet(t *testing.T) {
 	}
 	if got := written.Len(); got != 6 {
 		t.Fatalf("three refused builds wrote %d lines in all, want 6", got)
+	}
+}
+
+// A caller who writes a new comet path every time cannot make the node
+// remember each one. Past what is held, a new path is said every time, and the
+// ones already held stay quiet.
+func TestTheSetOfPollsTheAccessLogHoldsDoesNotGrowWithoutEnd(t *testing.T) {
+	var beats heartbeats
+	for i := range heartbeatHolds {
+		beats.worthSaying(fmt.Sprintf("/comet/o/r/p/%d", i), false)
+	}
+	for range 3 {
+		if !beats.worthSaying("/comet/o/r/p/new", false) {
+			t.Fatal("a path past the held set was not said")
+		}
+	}
+	if beats.held != heartbeatHolds {
+		t.Fatalf("held %d paths, want %d", beats.held, heartbeatHolds)
+	}
+	beats.worthSaying("/comet/o/r/p/0", false)
+	if beats.worthSaying("/comet/o/r/p/0", false) {
+		t.Fatal("a held path that was said twice spoke a third time")
 	}
 }
