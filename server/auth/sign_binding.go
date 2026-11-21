@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"html"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -681,21 +682,45 @@ func (h *Handler) RenderCeremonyPage(w http.ResponseWriter, status int, ok bool,
 // already polling for the result, so this window's only job is to stop being
 // the thing the person is looking at.
 func (h *Handler) renderCeremonyPage(w http.ResponseWriter, status int, ok bool, message string) {
-	colour := "#e06060"
+	colour := pageRefused
 	if ok {
-		colour = "#2ecc71"
+		colour = pageOK
 	}
+	h.renderPage(w, status, colour, `<p>`+html.EscapeString(message)+`</p>`+
+		`<p style="color:`+pageSays+`;opacity:.6">You can close this window.</p>`+h.backToQNTX(""))
+}
+
+// "Find more instances like this that are unstyled and dead end and at least give a way
+// to return to QNTX, reuse existing styling"
+//
+// 「[Opus 5.5] The colours and press every page the node answers a browser with is drawn in.」
+const (
+	pageOK      = "#2ecc71"
+	pageRefused = "#e06060"
+	pageSays    = "#e6e4ef"
+	pagePress   = `style="display:inline-block;margin:0 8px 8px 0;padding:8px 12px;border:1px solid currentColor;color:#e6e4ef;text-decoration:none"`
+)
+
+// 「[Opus 5.5] renderPage is the whole of a page the node answers a browser with, in colour.」
+func (h *Handler) renderPage(w http.ResponseWriter, status int, colour, inner string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	page := `<!doctype html><meta charset="utf-8"><title>QNTX</title>` +
+	page := `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>QNTX</title>` +
 		`<body style="background:#12111a;color:` + colour +
 		`;font:14px ui-monospace,monospace;margin:0;padding:24px;` +
-		`word-break:break-word;overflow-wrap:break-word">` +
-		html.EscapeString(message) +
-		`<p style="color:#e6e4ef;opacity:.6">You can close this window.</p>`
+		`word-break:break-word;overflow-wrap:break-word">` + inner
 	if _, err := w.Write([]byte(page)); err != nil {
-		// The binding is already signed and stored, so the element still collects
-		// it. What is lost is the person being told, and only that.
-		h.logger.Infow("ceremony page not delivered", "status", status, "error", err)
+		// What is lost is the person being told, and only that.
+		h.logger.Infow("a page was not delivered", "status", status, "error", err)
 	}
+}
+
+// 「[Opus 5.5] home is the node's own door a browser stands at: its first web origin.」
+func (h *Handler) home() string {
+	for _, origin := range h.ownOrigins {
+		if isWebOrigin(origin) {
+			return strings.TrimSuffix(origin, "/")
+		}
+	}
+	return ""
 }

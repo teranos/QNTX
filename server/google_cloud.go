@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -581,12 +580,8 @@ func (s *QNTXServer) proveGoogle(i *issuer, kept googleKept) {
 }
 
 // googleOutcomeMail is how connecting ended, as ROOT reads it.
-func googleOutcomeMail(subject, text string) services.NodeMail {
-	return services.NodeMail{
-		Name:    "google-cloud",
-		Subject: subject,
-		Bodies:  []services.MailBody{services.TextBody(text), services.HTMLBody("<pre>" + html.EscapeString(text) + "</pre>")},
-	}
+func googleOutcomeMail(subject, text string, links ...services.MailLink) services.NodeMail {
+	return services.DrawnNodeMail("google-cloud", subject, text, links...)
 }
 
 // 「[Opus 5.5] googleConnectCostsMail is a halt only Connect costs ends, with
@@ -594,18 +589,11 @@ func googleOutcomeMail(subject, text string) services.NodeMail {
 // Connect costs not read, the halt is said without it, and still not as one a
 // budget frees up.
 func googleConnectCostsMail(subject, why, connect string) services.NodeMail {
-	text, page := why+".\n\n", "<p>"+html.EscapeString(why)+".</p>"
+	var links []services.MailLink
 	if connect != "" {
-		text += "Connect costs:\n" + connect + "\n\n"
-		page += "<p><a href=\"" + html.EscapeString(connect) + "\">Connect costs</a></p>"
+		links = append(links, services.MailLink{Label: "Connect costs", URL: connect})
 	}
-	text += "The node stays connected, and nothing else halts for it.\n"
-	page += "<p>The node stays connected, and nothing else halts for it.</p>"
-	return services.NodeMail{
-		Name:    "google-cloud",
-		Subject: subject,
-		Bodies:  []services.MailBody{services.TextBody(text), services.HTMLBody(page)},
-	}
+	return services.DrawnNodeMail("google-cloud", subject, why+".\n\nThe node stays connected, and nothing else halts for it.", links...)
 }
 
 // tellGoogleOutcome mails ROOT how connecting ended, and says so when it cannot.
