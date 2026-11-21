@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -373,5 +374,56 @@ func TestRustStore_WALCheckpoint_PassiveUntilTheLimit(t *testing.T) {
 	}
 	if got := wal(); got != 0 {
 		t.Errorf("TRUNCATE left the WAL at %d bytes, want 0", got)
+	}
+}
+
+// "i mean, it should right?"
+// Every read connection says who holds it while it is held, and "free" once
+// it is given back; a read waiting on all of them gets one when one is freed.
+func TestRustStore_ReadConnectionsNameTheirHolders(t *testing.T) {
+	store, err := NewFileStore(filepath.Join(t.TempDir(), "landing.db"))
+	if err != nil {
+		t.Fatalf("NewFileStore() error: %v", err)
+	}
+	defer store.Close()
+
+	held := make([]*readConnEntry, 0, readPoolSize)
+	for i := range readPoolSize {
+		held = append(held, store.acquireReadConn(fmt.Sprintf("query-%d", i)))
+	}
+	for _, said := range store.ReadHolders() {
+		if !strings.HasPrefix(said, "query-") || !strings.Contains(said, " for ") {
+			t.Fatalf("a held connection said %q, want its holder and for how long: %v", said, store.ReadHolders())
+		}
+	}
+
+	got := make(chan *readConnEntry)
+	go func() { got <- store.acquireReadConn("exists") }()
+	select {
+	case <-got:
+		t.Fatal("a read got a connection while every one was held")
+	case <-time.After(50 * time.Millisecond):
+	}
+	for _, entry := range held {
+		store.releaseReadConn(entry)
+	}
+	waiter := <-got
+	saidExists := 0
+	for _, said := range store.ReadHolders() {
+		switch {
+		case strings.HasPrefix(said, "exists for "):
+			saidExists++
+		case said != "free":
+			t.Fatalf("a given-back connection said %q: %v", said, store.ReadHolders())
+		}
+	}
+	if saidExists != 1 {
+		t.Fatalf("the waiting read is named by %d connections, want 1: %v", saidExists, store.ReadHolders())
+	}
+	store.releaseReadConn(waiter)
+	for _, said := range store.ReadHolders() {
+		if said != "free" {
+			t.Fatalf("after every read is done a connection said %q", said)
+		}
 	}
 }
