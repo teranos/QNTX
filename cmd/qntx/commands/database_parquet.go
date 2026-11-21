@@ -291,6 +291,21 @@ func (l *landed) CreateAttestation(as *types.As) error {
 	return nil
 }
 
+// CreateAttestations lands many in one transaction (storage.ManyCreator), and
+// counts each landed as unsent.
+func (l *landed) CreateAttestations(attestations []*types.As) ([]error, error) {
+	answers, err := l.RustStore.CreateAttestations(attestations)
+	if err != nil {
+		return nil, err
+	}
+	for _, err := range answers {
+		if err == nil {
+			l.unsent.Add(1)
+		}
+	}
+	return answers, nil
+}
+
 // openLanding opens the file a namespace's attestations land in and are read
 // from (ADR-037): one per namespace, beside the operational db, named by the
 // slug. The operational db is one file for the node and its attestations

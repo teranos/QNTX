@@ -871,6 +871,57 @@ pub extern "C" fn storage_put(
     })
 }
 
+/// Many attestations, a JSON array of them, written in one transaction
+/// (`SqliteStore::put_many`). Answered as a JSON array in the same order: null
+/// for one written, and the error `storage_put` would have said for one that
+/// was not. Freed with `attestation_result_free`.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_put_many(
+    store: *mut SqliteStore,
+    attestations_json: *const c_char,
+) -> AttestationResultC {
+    qntx_ffi_common::guarded_result("storage_put_many", || {
+        if store.is_null() {
+            return AttestationResultC::error("null store pointer");
+        }
+        let json_str = match unsafe { cstr_to_str(attestations_json) } {
+            Ok(s) => s,
+            Err(e) => return AttestationResultC::error(e),
+        };
+        let protos: Vec<qntx_proto::Attestation> = match serde_json::from_str(json_str) {
+            Ok(a) => a,
+            Err(e) => return AttestationResultC::error(format!("failed to parse JSON: {}", e)),
+        };
+        let attestations: Vec<_> = protos.into_iter().map(proto_convert::from_proto).collect();
+        crate::flight_recorder::record_fmt("storage_put_many", &attestations.len().to_string());
+
+        let store = unsafe { &mut *store };
+        let answers = match store.put_many(attestations) {
+            Ok(answers) => answers,
+            Err(e) => {
+                return AttestationResultC::error(qntx_ffi_common::store::sacred(
+                    e,
+                    SURFACE,
+                    "storage_put_many",
+                ))
+            }
+        };
+        let said: Vec<Option<String>> = answers
+            .into_iter()
+            .map(|answer| {
+                answer
+                    .err()
+                    .map(|e| qntx_ffi_common::store::sacred(e, SURFACE, "storage_put_many"))
+            })
+            .collect();
+        match serde_json::to_string(&said) {
+            Ok(json) => AttestationResultC::ok(json),
+            Err(e) => AttestationResultC::error(format!("failed to say the answers: {}", e)),
+        }
+    })
+}
+
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn storage_get(store: *const SqliteStore, id: *const c_char) -> AttestationResultC {
