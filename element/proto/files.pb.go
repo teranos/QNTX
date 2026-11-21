@@ -24,11 +24,15 @@ const (
 // FileUploadResult is returned after a successful file upload.
 // Used as the HTTP response body for POST /api/files.
 type FileUploadResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Filename      string                 `protobuf:"bytes,2,opt,name=filename,proto3" json:"filename,omitempty"`
-	ContentType   string                 `protobuf:"bytes,3,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
-	Size          int64                  `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Filename    string                 `protobuf:"bytes,2,opt,name=filename,proto3" json:"filename,omitempty"`
+	ContentType string                 `protobuf:"bytes,3,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Size        int64                  `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
+	// "i never wanted twelvelabs to be the source of truth"
+	// 「[Fable 5.2] The name its bytes have, sha256:<hex> (ADR-058). Any copy that hashes to it」
+	// 「[Fable 5.2] is the original.」
+	Asset         string `protobuf:"bytes,5,opt,name=asset,proto3" json:"asset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -91,16 +95,24 @@ func (x *FileUploadResult) GetSize() int64 {
 	return 0
 }
 
+func (x *FileUploadResult) GetAsset() string {
+	if x != nil {
+		return x.Asset
+	}
+	return ""
+}
+
 var File_element_proto_files_proto protoreflect.FileDescriptor
 
 const file_element_proto_files_proto_rawDesc = "" +
 	"\n" +
-	"\x19element/proto/files.proto\x12\aelement\"u\n" +
+	"\x19element/proto/files.proto\x12\aelement\"\x8b\x01\n" +
 	"\x10FileUploadResult\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bfilename\x18\x02 \x01(\tR\bfilename\x12!\n" +
 	"\fcontent_type\x18\x03 \x01(\tR\vcontentType\x12\x12\n" +
-	"\x04size\x18\x04 \x01(\x03R\x04sizeB'Z%github.com/teranos/QNTX/element/protob\x06proto3"
+	"\x04size\x18\x04 \x01(\x03R\x04size\x12\x14\n" +
+	"\x05asset\x18\x05 \x01(\tR\x05assetB'Z%github.com/teranos/QNTX/element/protob\x06proto3"
 
 var (
 	file_element_proto_files_proto_rawDescOnce sync.Once

@@ -34,6 +34,41 @@ type FileServiceServer struct {
 	filesDir  string
 	authToken string
 	logger    *zap.SugaredLogger
+	keep      FileKeeper
+}
+
+// KeptFile is what the node says of a file it kept.
+type KeptFile struct {
+	ID          string // where the node serves the bytes
+	Asset       string // "sha256:<hex>" of the bytes
+	ContentType string
+	Size        int64
+}
+
+// FileKeeper keeps a file for who brought it, as the node keeps one a person brings.
+type FileKeeper func(by, filename string, content []byte) (KeptFile, error)
+
+// KeepWith hands the service how the node keeps a file. Until it is handed
+// one, KeepFile answers that this node keeps none for a plugin.
+func (s *FileServiceServer) KeepWith(keep FileKeeper) { s.keep = keep }
+
+// KeepFile hands the node a file to keep.
+func (s *FileServiceServer) KeepFile(ctx context.Context, req *protocol.KeepFileRequest) (*protocol.KeepFileResponse, error) {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+		return &protocol.KeepFileResponse{Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
+	}
+	if req.By == "" {
+		return &protocol.KeepFileResponse{Error: "a file is kept for the one who brought it, and this names nobody"}, nil
+	}
+	if s.keep == nil {
+		return &protocol.KeepFileResponse{Error: "this node keeps no file for a plugin"}, nil
+	}
+	kept, err := s.keep(req.By, req.Filename, req.Content)
+	if err != nil {
+		return &protocol.KeepFileResponse{Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
+	}
+	s.logger.Debugw("File kept via gRPC", "by", req.By, "filename", req.Filename, "file_id", kept.ID, "asset", kept.Asset, "size", kept.Size)
+	return &protocol.KeepFileResponse{Success: true, FileId: kept.ID, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size}, nil
 }
 
 // NewFileServiceServer creates a new file service gRPC server.
