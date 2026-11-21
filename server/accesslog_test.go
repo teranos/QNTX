@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
@@ -275,4 +276,20 @@ func TestAPathTooLongToBeAPollIsSaidEveryTimeAndNotHeld(t *testing.T) {
 	if beats.held != 0 {
 		t.Fatalf("held %d paths, want none", beats.held)
 	}
+}
+
+// The path of a request is a slice of its request line. What is held must be a
+// copy, or one short path keeps the whole line, and its query, in memory.
+func TestAHeldPathDoesNotKeepTheRequestLineItCameFrom(t *testing.T) {
+	var beats heartbeats
+	line := "/comet/o/r/p/1?pad=" + strings.Repeat("x", 4096)
+	path := line[:len("/comet/o/r/p/1")]
+	beats.worthSaying(path, false)
+
+	beats.seen.Range(func(key, _ any) bool {
+		if unsafe.StringData(key.(string)) == unsafe.StringData(path) {
+			t.Fatal("the held path shares its bytes with the request line")
+		}
+		return true
+	})
 }

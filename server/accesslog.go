@@ -153,6 +153,9 @@ func (h *heartbeats) worthSaying(path string, well bool) bool {
 	state.said++
 	if !seen {
 		h.held++
+		// A path with nothing escaped in it is a slice of the request line, and
+		// held as a key it keeps the whole line, query and all, alive.
+		path = strings.Clone(path)
 	}
 	h.seen.Store(path, state)
 	return true
