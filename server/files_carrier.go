@@ -223,7 +223,8 @@ func (s *QNTXServer) stillToBring() ([]toBring, error) {
 	if s.nodeDID == nil || s.nodeDID.DID == "" {
 		return nil, nil
 	}
-	store := s.held.TheNodesOwnRecords()
+	// Read where attestHeld and attestBrought wrote, and not handed a store it could write.
+	store := s.held.ReadTheNodesOwnRecords()
 	if store == nil {
 		return nil, nil
 	}
