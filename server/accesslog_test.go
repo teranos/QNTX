@@ -209,6 +209,16 @@ func TestAGroundAskingForAnUnbuiltCometIsSaidTwiceAndThenQuiet(t *testing.T) {
 	if got := written.Len(); got != 6 {
 		t.Fatalf("three refused builds wrote %d lines in all, want 6", got)
 	}
+
+	// The same path refused for who is asking is not a ground waiting on a
+	// build: it is said every time.
+	status = http.StatusForbidden
+	for range 3 {
+		ask(http.MethodGet, "/comet/teranos/QNTX/aarch64-darwin/1")
+	}
+	if got := written.Len(); got != 9 {
+		t.Fatalf("three 403s on a comet path wrote %d lines in all, want 9", got)
+	}
 }
 
 // A caller who writes a new comet path every time cannot make the node

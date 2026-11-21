@@ -57,14 +57,18 @@ var heartbeatPaths = map[string]bool{
 	"/am/statusline": true,
 }
 
-// polled is whether this request is a poll by what it asks. A ground asks for
-// its comet again and again until one is kept, and the path carries the comet's
-// hash, so no fixed list names it. A POST builds one and is said every time.
-func polled(r *http.Request) bool {
+// polled is whether this request is a poll, by what it asks and what it was
+// told. A ground asks for its comet again and again until one is kept, and is
+// told 404 each time; the path carries the comet's hash, so no fixed list names
+// it. Only that answer is a poll: a 403 or a 429 on the same path is a refusal
+// and is said every time, and a POST that builds one is never one.
+func polled(r *http.Request, status int) bool {
 	if heartbeatPaths[r.URL.Path] {
 		return true
 	}
-	return strings.HasPrefix(r.URL.Path, "/comet/") && (r.Method == http.MethodGet || r.Method == http.MethodHead)
+	return strings.HasPrefix(r.URL.Path, "/comet/") &&
+		(r.Method == http.MethodGet || r.Method == http.MethodHead) &&
+		status == http.StatusNotFound
 }
 
 // Whether this poll went well: it answered. How long it took is not the
@@ -160,7 +164,7 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 
 		// A polled path says something when its answer turns, and nothing while
 		// it stays the same.
-		if polled(r) {
+		if polled(r, recorder.status) {
 			if !s.heartbeats.worthSaying(r.URL.Path, heartbeatWell(recorder.status)) {
 				return
 			}
