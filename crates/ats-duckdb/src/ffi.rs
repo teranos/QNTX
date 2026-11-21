@@ -26,6 +26,14 @@ use crate::{DuckdbStore, QueryFilter};
 const MAX_ID_LENGTH: usize = 256;
 const MAX_JSON_LENGTH: usize = 1_000_000;
 
+// "if ground is a recording device, it needs to miss not a single sounds"
+//
+// An attestation is as large as the request that carries it: the node takes a
+// body of 10 MB (server/attestation_handlers.go, maxAttestationBody), and a
+// store that kept only a megabyte of it refused what the node had let in. A
+// line of a transcript ran to 1.08 MB on 2026-11-21 and was refused here.
+const MAX_ATTESTATION_JSON_LENGTH: usize = 10 * 1024 * 1024;
+
 #[repr(C)]
 pub struct StorageResultC {
     pub success: bool,
@@ -323,7 +331,7 @@ pub extern "C" fn duckdb_storage_put(
             Ok(s) => s,
             Err(e) => return StorageResultC::error(e),
         };
-        if json_str.len() > MAX_JSON_LENGTH {
+        if json_str.len() > MAX_ATTESTATION_JSON_LENGTH {
             return StorageResultC::error("attestation JSON exceeds maximum length");
         }
         let store = unsafe { &mut *store };

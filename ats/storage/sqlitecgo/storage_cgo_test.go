@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -373,5 +374,39 @@ func TestRustStore_WALCheckpoint_PassiveUntilTheLimit(t *testing.T) {
 	}
 	if got := wal(); got != 0 {
 		t.Errorf("TRUNCATE left the WAL at %d bytes, want 0", got)
+	}
+}
+
+// "if ground is a recording device, it needs to miss not a single sounds"
+//
+// A line of a transcript ran to 1.08 MB and the store refused it, though the
+// node had taken the request: an attestation is kept as large as it may arrive.
+func TestRustStore_KeepsAnAttestationPastAMegabyte(t *testing.T) {
+	store, err := NewMemoryStore()
+	if err != nil {
+		t.Fatalf("NewMemoryStore() error: %v", err)
+	}
+	defer store.Close()
+
+	line := strings.Repeat("x", 1_200_000)
+	as := &types.As{
+		ID:         "ground:transcript:/t/a.jsonl:0",
+		Subjects:   []string{"session:s"},
+		Predicates: []string{"transcript:line"},
+		Contexts:   []string{"session:s"},
+		Actors:     []string{"ground"},
+		Timestamp:  time.Now(),
+		Source:     "ground",
+		Attributes: map[string]any{"line": line},
+	}
+	if err := store.CreateAttestation(as); err != nil {
+		t.Fatalf("CreateAttestation() of a 1.2 MB attestation: %v", err)
+	}
+	kept, err := store.GetAttestation(as.ID)
+	if err != nil || kept == nil {
+		t.Fatalf("GetAttestation() = %v, %v", kept, err)
+	}
+	if kept.Attributes["line"] != line {
+		t.Errorf("the line came back %d bytes, and went in %d", len(fmt.Sprint(kept.Attributes["line"])), len(line))
 	}
 }
