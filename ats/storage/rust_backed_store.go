@@ -40,6 +40,20 @@ func (s *RustBackedStore) CreateAttestation(as *types.As) error {
 	return nil
 }
 
+// CreateAttestations signs each and writes them in one transaction (ManyCreator).
+func (s *RustBackedStore) CreateAttestations(attestations []*types.As) ([]error, error) {
+	answers, err := createMany(s.log, attestations, s.rust.CreateAttestationHighPriority, s.rust)
+	if err != nil {
+		return nil, err
+	}
+	for i, as := range attestations {
+		if answers[i] == nil {
+			NotifyObservers(s.namespace, as)
+		}
+	}
+	return answers, nil
+}
+
 // CreateAttestationInbound inserts a synced attestation without signing (preserves provenance).
 func (s *RustBackedStore) CreateAttestationInbound(as *types.As) error {
 	warnIDLikeSubjects(s.log, as.ID, as.Subjects)
