@@ -242,3 +242,22 @@ func TestTheSetOfPollsTheAccessLogHoldsDoesNotGrowWithoutEnd(t *testing.T) {
 		t.Fatal("a held path that was said twice spoke a third time")
 	}
 }
+
+// A comet that was refused for who asked, or kept, has changed its answer: a
+// 404 after that is said again, however many were said before.
+func TestACometAnsweredOtherwiseIsSaidAgainWhenItGoes404Again(t *testing.T) {
+	core, written := observer.New(zapcore.InfoLevel)
+	s := &QNTXServer{pluginRegistry: plugin.GetDefaultRegistry(), logger: zap.New(core).Sugar()}
+	var status int
+	handler := s.accessLog(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) })
+
+	for i, answer := range []int{http.StatusNotFound, http.StatusNotFound, http.StatusForbidden, http.StatusNotFound, http.StatusNotFound, http.StatusNotFound} {
+		status = answer
+		handler(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/comet/teranos/QNTX/aarch64-darwin/1", nil))
+		// 404, 404 | 403 | 404, 404 | the sixth is quiet again.
+		want := []int{1, 2, 3, 4, 5, 5}[i]
+		if got := written.Len(); got != want {
+			t.Fatalf("after answer %d (%d) the log holds %d lines, want %d", i+1, answer, got, want)
+		}
+	}
+}

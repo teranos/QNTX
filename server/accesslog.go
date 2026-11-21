@@ -66,9 +66,12 @@ func polled(r *http.Request, status int) bool {
 	if heartbeatPaths[r.URL.Path] {
 		return true
 	}
-	return strings.HasPrefix(r.URL.Path, "/comet/") &&
-		(r.Method == http.MethodGet || r.Method == http.MethodHead) &&
-		status == http.StatusNotFound
+	return asksForComet(r) && status == http.StatusNotFound
+}
+
+// asksForComet is a GET or HEAD under /comet/: a ground reading, not a build.
+func asksForComet(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Path, "/comet/") && (r.Method == http.MethodGet || r.Method == http.MethodHead)
 }
 
 // Whether this poll went well: it answered. How long it took is not the
@@ -108,6 +111,16 @@ type heartbeats struct {
 const heartbeatHolds = 1024
 
 // worthSaying reports whether this poll is a change worth a line.
+// forget drops what was said about a path, so the next answer is news again.
+// A comet answered otherwise than 404 has changed, and a 404 after that is said.
+func (h *heartbeats) forget(path string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if _, seen := h.seen.LoadAndDelete(path); seen {
+		h.held--
+	}
+}
+
 func (h *heartbeats) worthSaying(path string, well bool) bool {
 	// Read and write as one: two polls landing together would each see the
 	// same count and each decide it was the one to speak.
@@ -156,6 +169,9 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		// Counted before the heartbeat check, or the row would report only the
 		// refusals that were also worth a log line.
 		s.answers.note(recorder.status)
+		if asksForComet(r) && recorder.status != http.StatusNotFound {
+			s.heartbeats.forget(r.URL.Path)
+		}
 
 		// A refusal Sentry is told of is said there, bounded, and not again here.
 		if said.Load() {
