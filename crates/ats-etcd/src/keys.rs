@@ -37,6 +37,15 @@ pub struct EtcdKeys {
 impl EtcdKeys {
     /// 「[Opus 5.5] Connect to the etcd at `endpoint`, for the keys under `prefix`.」
     pub fn open(endpoint: &str, prefix: &str) -> Result<Self> {
+        Self::open_as(endpoint, prefix, None)
+    }
+
+    // "names and collections and just smaller things, messages say's status"
+    //
+    /// 「[Opus 5.5] Connect as `user` and its password, whose role reaches only the keys」
+    /// 「[Opus 5.5] the node keeps. An etcd that authenticates nobody yet is asked as nobody,」
+    /// 「[Opus 5.5] so each node is given its user before authentication is enabled.」
+    pub fn open_as(endpoint: &str, prefix: &str, user: Option<(&str, &str)>) -> Result<Self> {
         if !fits(prefix) {
             return Err(EtcdError::BadPrefix {
                 value: prefix.to_string(),
@@ -46,12 +55,27 @@ impl EtcdKeys {
             .enable_all()
             .build()
             .map_err(EtcdError::Runtime)?;
-        let options = ConnectOptions::new()
-            .with_connect_timeout(OPEN_TIMEOUT)
-            .with_timeout(OPEN_TIMEOUT);
+        let options = || {
+            ConnectOptions::new()
+                .with_connect_timeout(OPEN_TIMEOUT)
+                .with_timeout(OPEN_TIMEOUT)
+        };
         let client = runtime
             .block_on(async {
-                let mut client = Client::connect([endpoint], Some(options)).await?;
+                let asked = match user {
+                    Some((name, password)) => {
+                        match Client::connect([endpoint], Some(options().with_user(name, password)))
+                            .await
+                        {
+                            Err(e) if e.to_string().contains("authentication is not enabled") => {
+                                Client::connect([endpoint], Some(options())).await
+                            }
+                            connected => connected,
+                        }
+                    }
+                    None => Client::connect([endpoint], Some(options())).await,
+                };
+                let mut client = asked?;
                 client.status().await?;
                 Ok::<Client, etcd_client::Error>(client)
             })

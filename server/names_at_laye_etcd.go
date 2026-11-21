@@ -178,7 +178,7 @@ func (e *etcdPrefix) with(call func(*etcdcgo.Keys) error) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.keys == nil {
-		keys, err := etcdcgo.OpenKeys(e.endpoint, e.prefix)
+		keys, err := openEtcdKeys(e.endpoint, e.prefix)
 		if err != nil {
 			return errors.Wrapf(err, "etcd at %s was not reached", e.endpoint)
 		}
