@@ -9,6 +9,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	appcfg "github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/internal/sacred"
 	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/server/auth"
@@ -225,6 +226,11 @@ func (s *QNTXServer) systemAttestor() auth.Attestor {
 }
 
 func (authSubsystem) Init(s *QNTXServer) error {
+	// 「[Opus 5.5] And how long what the agents say to each other waits here (collected.wait).」
+	// Before auth: a node without it collects all the same (CodeRabbit on #1772).
+	if err := dialCollected(s.deps.cfg); err != nil {
+		return err
+	}
 	if !s.deps.cfg.Auth.Enabled {
 		return nil
 	}
@@ -339,11 +345,31 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if err := authHandler.SetLaye(s.deps.cfg.Laye.DID); err != nil {
 		return err
 	}
+	// What laye's etcd says a key is, for a key laye carries that this node holds no grant for.
+	if s.deps.cfg.Laye.DID != "" {
+		authHandler.SetLayeSays(layeSays())
+	}
 	// On the primary, its peers.
 	for _, peer := range s.deps.cfg.Nodes.Peers {
 		if err := authHandler.DeclarePeer(peer.Name, peer.DID, peer.Namespaces, peer.Origin, peer.ReturnAddress); err != nil {
 			return err
 		}
+	}
+	// 「[Opus 5.5] The keys am.toml admits while it lists them.」
+	if err := authHandler.SetGrants(declaredGrants(s.deps.cfg), declaredWords(s.deps.cfg)); err != nil {
+		return err
+	}
+	// 「[Opus 5.5] And the namespaces they act in, which am.toml names as well.」
+	if err := s.serveDeclaredNamespaces(s.deps.cfg); err != nil {
+		return err
+	}
+	// 「[Opus 5.5] And what the roles reach, which am.toml may say too (auth.reach).」
+	declared, err := declaredReach(s.deps.cfg)
+	if err != nil {
+		return err
+	}
+	if err := s.setDeclaredReach(declared); err != nil {
+		return err
 	}
 	// The status row asks them for theirs, as the person asking (statusline/peers.go).
 	s.askPeers = authHandler.AskPeers
@@ -411,9 +437,11 @@ func (authSubsystem) Init(s *QNTXServer) error {
 func (s *QNTXServer) keepPrimaryLines(held *auth.PrimaryLines) {
 	ask := func() {
 		if err := held.Refresh(time.Now()); err != nil {
+			measure.Count(measure.LinesHeard, 1, measure.String(measure.AttrOutcome, "unanswered"))
 			s.logger.Errorw("The primary did not say what the lines are; the ones last heard stand", "error", err)
 			return
 		}
+		measure.Count(measure.LinesHeard, 1, measure.String(measure.AttrOutcome, "heard"))
 	}
 	s.wg.Go("auth.primaryLines", func() {
 		ask()
@@ -480,4 +508,22 @@ func (s *QNTXServer) keepLastUsed(table *auth.TokenTable) {
 			}
 		}
 	})
+}
+
+// 「[Opus 5.5] declaredGrants is auth.grants, as the auth handler holds it.」
+func declaredGrants(cfg *appcfg.Config) []auth.DeclaredGrant {
+	declared := make([]auth.DeclaredGrant, 0, len(cfg.Auth.Grants))
+	for _, grant := range cfg.Auth.Grants {
+		declared = append(declared, auth.DeclaredGrant{Label: grant.Label, DID: grant.DID, Namespaces: grant.Namespaces, Roles: grant.Roles})
+	}
+	return declared
+}
+
+// 「[Opus 5.5] declaredWords is auth.words, as the auth handler holds it.」
+func declaredWords(cfg *appcfg.Config) []auth.DeclaredWords {
+	declared := make([]auth.DeclaredWords, 0, len(cfg.Auth.Words))
+	for _, line := range cfg.Auth.Words {
+		declared = append(declared, auth.DeclaredWords{Write: line.Write, Read: line.Read, Of: line.Of, All: line.All})
+	}
+	return declared
 }

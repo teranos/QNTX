@@ -109,6 +109,9 @@ func (s *QNTXServer) iReaches(ctx context.Context, sent sigil.Sent) (any, *proto
 	bound := map[string][]heldBy{}
 	for _, signum := range s.checkedSigna() {
 		for _, held := range signum.GetSigils() {
+			if !onSurface(held, reach.OverHTTP) {
+				continue
+			}
 			path := held.GetHttp().GetPath()
 			bound[path] = append(bound[path], heldBy{signum: signum.GetName(), sigil: held})
 		}

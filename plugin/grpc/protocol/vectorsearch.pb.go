@@ -21,6 +21,111 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type DeleteVectorsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
+	Index         string                 `protobuf:"bytes,2,opt,name=index,proto3" json:"index,omitempty"` // target index
+	Ids           []string               `protobuf:"bytes,3,rep,name=ids,proto3" json:"ids,omitempty"`     // ids of the vectors to remove
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteVectorsRequest) Reset() {
+	*x = DeleteVectorsRequest{}
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteVectorsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteVectorsRequest) ProtoMessage() {}
+
+func (x *DeleteVectorsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteVectorsRequest.ProtoReflect.Descriptor instead.
+func (*DeleteVectorsRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *DeleteVectorsRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
+	}
+	return ""
+}
+
+func (x *DeleteVectorsRequest) GetIndex() string {
+	if x != nil {
+		return x.Index
+	}
+	return ""
+}
+
+func (x *DeleteVectorsRequest) GetIds() []string {
+	if x != nil {
+		return x.Ids
+	}
+	return nil
+}
+
+type DeleteVectorsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// How many ids were handed to the index to take out.
+	Deleted       int32 `protobuf:"varint,1,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteVectorsResponse) Reset() {
+	*x = DeleteVectorsResponse{}
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteVectorsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteVectorsResponse) ProtoMessage() {}
+
+func (x *DeleteVectorsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteVectorsResponse.ProtoReflect.Descriptor instead.
+func (*DeleteVectorsResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *DeleteVectorsResponse) GetDeleted() int32 {
+	if x != nil {
+		return x.Deleted
+	}
+	return 0
+}
+
 type VectorSearchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
@@ -33,7 +138,7 @@ type VectorSearchRequest struct {
 
 func (x *VectorSearchRequest) Reset() {
 	*x = VectorSearchRequest{}
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[0]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +150,7 @@ func (x *VectorSearchRequest) String() string {
 func (*VectorSearchRequest) ProtoMessage() {}
 
 func (x *VectorSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[0]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +163,7 @@ func (x *VectorSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VectorSearchRequest.ProtoReflect.Descriptor instead.
 func (*VectorSearchRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{0}
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *VectorSearchRequest) GetAuthToken() string {
@@ -90,15 +195,16 @@ func (x *VectorSearchRequest) GetTopK() int32 {
 }
 
 type VectorSearchResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Results       []*VectorSearchHit     `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The nearest vectors, nearest first.
+	Results       []*VectorSearchHit `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *VectorSearchResponse) Reset() {
 	*x = VectorSearchResponse{}
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -110,7 +216,7 @@ func (x *VectorSearchResponse) String() string {
 func (*VectorSearchResponse) ProtoMessage() {}
 
 func (x *VectorSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -123,7 +229,7 @@ func (x *VectorSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VectorSearchResponse.ProtoReflect.Descriptor instead.
 func (*VectorSearchResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{1}
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *VectorSearchResponse) GetResults() []*VectorSearchHit {
@@ -134,16 +240,18 @@ func (x *VectorSearchResponse) GetResults() []*VectorSearchHit {
 }
 
 type VectorSearchHit struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`               // identifier of the matched item
-	Distance      float32                `protobuf:"fixed32,2,opt,name=distance,proto3" json:"distance,omitempty"` // distance from query vector
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The id the vector was added under.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Its distance from the query vector: 0 is the same direction.
+	Distance      float32 `protobuf:"fixed32,2,opt,name=distance,proto3" json:"distance,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *VectorSearchHit) Reset() {
 	*x = VectorSearchHit{}
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -155,7 +263,7 @@ func (x *VectorSearchHit) String() string {
 func (*VectorSearchHit) ProtoMessage() {}
 
 func (x *VectorSearchHit) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -168,7 +276,7 @@ func (x *VectorSearchHit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VectorSearchHit.ProtoReflect.Descriptor instead.
 func (*VectorSearchHit) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{2}
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *VectorSearchHit) GetId() string {
@@ -196,7 +304,7 @@ type AddVectorsRequest struct {
 
 func (x *AddVectorsRequest) Reset() {
 	*x = AddVectorsRequest{}
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -208,7 +316,7 @@ func (x *AddVectorsRequest) String() string {
 func (*AddVectorsRequest) ProtoMessage() {}
 
 func (x *AddVectorsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -221,7 +329,7 @@ func (x *AddVectorsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddVectorsRequest.ProtoReflect.Descriptor instead.
 func (*AddVectorsRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{3}
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AddVectorsRequest) GetAuthToken() string {
@@ -255,7 +363,7 @@ type VectorEntry struct {
 
 func (x *VectorEntry) Reset() {
 	*x = VectorEntry{}
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +375,7 @@ func (x *VectorEntry) String() string {
 func (*VectorEntry) ProtoMessage() {}
 
 func (x *VectorEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +388,7 @@ func (x *VectorEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VectorEntry.ProtoReflect.Descriptor instead.
 func (*VectorEntry) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *VectorEntry) GetId() string {
@@ -298,15 +406,16 @@ func (x *VectorEntry) GetVector() []float32 {
 }
 
 type AddVectorsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Added         int32                  `protobuf:"varint,1,opt,name=added,proto3" json:"added,omitempty"` // number of vectors successfully added
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// How many vectors the index took.
+	Added         int32 `protobuf:"varint,1,opt,name=added,proto3" json:"added,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AddVectorsResponse) Reset() {
 	*x = AddVectorsResponse{}
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -318,7 +427,7 @@ func (x *AddVectorsResponse) String() string {
 func (*AddVectorsResponse) ProtoMessage() {}
 
 func (x *AddVectorsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -331,7 +440,7 @@ func (x *AddVectorsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddVectorsResponse.ProtoReflect.Descriptor instead.
 func (*AddVectorsResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AddVectorsResponse) GetAdded() int32 {
@@ -352,7 +461,7 @@ type CreateIndexRequest struct {
 
 func (x *CreateIndexRequest) Reset() {
 	*x = CreateIndexRequest{}
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -364,7 +473,7 @@ func (x *CreateIndexRequest) String() string {
 func (*CreateIndexRequest) ProtoMessage() {}
 
 func (x *CreateIndexRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[6]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -377,7 +486,7 @@ func (x *CreateIndexRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateIndexRequest.ProtoReflect.Descriptor instead.
 func (*CreateIndexRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{6}
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateIndexRequest) GetAuthToken() string {
@@ -402,15 +511,16 @@ func (x *CreateIndexRequest) GetDimensions() int32 {
 }
 
 type CreateIndexResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // confirmed index name
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The index, by its name.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateIndexResponse) Reset() {
 	*x = CreateIndexResponse{}
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -422,7 +532,7 @@ func (x *CreateIndexResponse) String() string {
 func (*CreateIndexResponse) ProtoMessage() {}
 
 func (x *CreateIndexResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[7]
+	mi := &file_plugin_grpc_protocol_vectorsearch_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -435,7 +545,7 @@ func (x *CreateIndexResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateIndexResponse.ProtoReflect.Descriptor instead.
 func (*CreateIndexResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{7}
+	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CreateIndexResponse) GetName() string {
@@ -449,7 +559,14 @@ var File_plugin_grpc_protocol_vectorsearch_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_vectorsearch_proto_rawDesc = "" +
 	"\n" +
-	"'plugin/grpc/protocol/vectorsearch.proto\x12\bprotocol\"\x82\x01\n" +
+	"'plugin/grpc/protocol/vectorsearch.proto\x12\bprotocol\"]\n" +
+	"\x14DeleteVectorsRequest\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x14\n" +
+	"\x05index\x18\x02 \x01(\tR\x05index\x12\x10\n" +
+	"\x03ids\x18\x03 \x03(\tR\x03ids\"1\n" +
+	"\x15DeleteVectorsResponse\x12\x18\n" +
+	"\adeleted\x18\x01 \x01(\x05R\adeleted\"\x82\x01\n" +
 	"\x13VectorSearchRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x14\n" +
@@ -479,12 +596,13 @@ const file_plugin_grpc_protocol_vectorsearch_proto_rawDesc = "" +
 	"dimensions\x18\x03 \x01(\x05R\n" +
 	"dimensions\")\n" +
 	"\x13CreateIndexResponse\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name2\xf3\x01\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name2\xc5\x02\n" +
 	"\x13VectorSearchService\x12G\n" +
 	"\x06Search\x12\x1d.protocol.VectorSearchRequest\x1a\x1e.protocol.VectorSearchResponse\x12G\n" +
 	"\n" +
 	"AddVectors\x12\x1b.protocol.AddVectorsRequest\x1a\x1c.protocol.AddVectorsResponse\x12J\n" +
-	"\vCreateIndex\x12\x1c.protocol.CreateIndexRequest\x1a\x1d.protocol.CreateIndexResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\vCreateIndex\x12\x1c.protocol.CreateIndexRequest\x1a\x1d.protocol.CreateIndexResponse\x12P\n" +
+	"\rDeleteVectors\x12\x1e.protocol.DeleteVectorsRequest\x1a\x1f.protocol.DeleteVectorsResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_vectorsearch_proto_rawDescOnce sync.Once
@@ -498,28 +616,32 @@ func file_plugin_grpc_protocol_vectorsearch_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_vectorsearch_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_vectorsearch_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_plugin_grpc_protocol_vectorsearch_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_plugin_grpc_protocol_vectorsearch_proto_goTypes = []any{
-	(*VectorSearchRequest)(nil),  // 0: protocol.VectorSearchRequest
-	(*VectorSearchResponse)(nil), // 1: protocol.VectorSearchResponse
-	(*VectorSearchHit)(nil),      // 2: protocol.VectorSearchHit
-	(*AddVectorsRequest)(nil),    // 3: protocol.AddVectorsRequest
-	(*VectorEntry)(nil),          // 4: protocol.VectorEntry
-	(*AddVectorsResponse)(nil),   // 5: protocol.AddVectorsResponse
-	(*CreateIndexRequest)(nil),   // 6: protocol.CreateIndexRequest
-	(*CreateIndexResponse)(nil),  // 7: protocol.CreateIndexResponse
+	(*DeleteVectorsRequest)(nil),  // 0: protocol.DeleteVectorsRequest
+	(*DeleteVectorsResponse)(nil), // 1: protocol.DeleteVectorsResponse
+	(*VectorSearchRequest)(nil),   // 2: protocol.VectorSearchRequest
+	(*VectorSearchResponse)(nil),  // 3: protocol.VectorSearchResponse
+	(*VectorSearchHit)(nil),       // 4: protocol.VectorSearchHit
+	(*AddVectorsRequest)(nil),     // 5: protocol.AddVectorsRequest
+	(*VectorEntry)(nil),           // 6: protocol.VectorEntry
+	(*AddVectorsResponse)(nil),    // 7: protocol.AddVectorsResponse
+	(*CreateIndexRequest)(nil),    // 8: protocol.CreateIndexRequest
+	(*CreateIndexResponse)(nil),   // 9: protocol.CreateIndexResponse
 }
 var file_plugin_grpc_protocol_vectorsearch_proto_depIdxs = []int32{
-	2, // 0: protocol.VectorSearchResponse.results:type_name -> protocol.VectorSearchHit
-	4, // 1: protocol.AddVectorsRequest.vectors:type_name -> protocol.VectorEntry
-	0, // 2: protocol.VectorSearchService.Search:input_type -> protocol.VectorSearchRequest
-	3, // 3: protocol.VectorSearchService.AddVectors:input_type -> protocol.AddVectorsRequest
-	6, // 4: protocol.VectorSearchService.CreateIndex:input_type -> protocol.CreateIndexRequest
-	1, // 5: protocol.VectorSearchService.Search:output_type -> protocol.VectorSearchResponse
-	5, // 6: protocol.VectorSearchService.AddVectors:output_type -> protocol.AddVectorsResponse
-	7, // 7: protocol.VectorSearchService.CreateIndex:output_type -> protocol.CreateIndexResponse
-	5, // [5:8] is the sub-list for method output_type
-	2, // [2:5] is the sub-list for method input_type
+	4, // 0: protocol.VectorSearchResponse.results:type_name -> protocol.VectorSearchHit
+	6, // 1: protocol.AddVectorsRequest.vectors:type_name -> protocol.VectorEntry
+	2, // 2: protocol.VectorSearchService.Search:input_type -> protocol.VectorSearchRequest
+	5, // 3: protocol.VectorSearchService.AddVectors:input_type -> protocol.AddVectorsRequest
+	8, // 4: protocol.VectorSearchService.CreateIndex:input_type -> protocol.CreateIndexRequest
+	0, // 5: protocol.VectorSearchService.DeleteVectors:input_type -> protocol.DeleteVectorsRequest
+	3, // 6: protocol.VectorSearchService.Search:output_type -> protocol.VectorSearchResponse
+	7, // 7: protocol.VectorSearchService.AddVectors:output_type -> protocol.AddVectorsResponse
+	9, // 8: protocol.VectorSearchService.CreateIndex:output_type -> protocol.CreateIndexResponse
+	1, // 9: protocol.VectorSearchService.DeleteVectors:output_type -> protocol.DeleteVectorsResponse
+	6, // [6:10] is the sub-list for method output_type
+	2, // [2:6] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
 	2, // [2:2] is the sub-list for extension extendee
 	0, // [0:2] is the sub-list for field type_name
@@ -536,7 +658,7 @@ func file_plugin_grpc_protocol_vectorsearch_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_vectorsearch_proto_rawDesc), len(file_plugin_grpc_protocol_vectorsearch_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

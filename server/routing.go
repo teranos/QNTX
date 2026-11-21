@@ -42,15 +42,17 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// The A2A agent card, where an agent that has never seen the node looks.
 	s.answer(agentCardPath, s.HandleAgentCard)
 
-	// A2A over HTTP+JSON (server/a2a).
-	// The card names JSON-RPC at /a2a itself, so it is answered there and not
-	// redirected to /a2a/, which a client that does not follow it never reads.
+	// 「[Opus 5.5] A2A, each version a2aSpoken holds at its base and over gRPC at its」
+	// 「[Opus 5.5] service's path (§10), on the same port: gRPC is HTTP/2 at that path. The」
+	// 「[Opus 5.5] card names JSON-RPC at a base itself, so it is answered there and not」
+	// 「[Opus 5.5] redirected to base/, which a client that does not follow it never reads.」
 	a2aServed := s.a2aHTTP()
 	s.a2aOwn = a2aServed
-	s.answer(a2aPrefix, a2aServed)
-	s.answer(a2aPrefix[:len(a2aPrefix)-1], a2aServed)
-	// A2A over gRPC (§10), on the same port: gRPC is HTTP/2 at the service's path.
-	s.answer(a2aGRPCPrefix, s.a2aGRPC)
+	for _, v := range a2aSpoken {
+		s.answer(v.base, a2aServed)
+		s.answer(v.base+"/", a2aServed)
+		s.answer(v.grpcService, s.a2aGRPC)
+	}
 	// A2AService's streaming operations, spoken to a peer's agent or a card's (SSE).
 	s.answerA2AStreams()
 
@@ -182,20 +184,6 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// 「[Opus 5.5] Each MCP server the node consumes, served to the node's agents as one of its own (mcp_consumed.go).」
 	s.answer(ConsumedServedAt+"{name}", s.HandleConsumedServer)
 
-	s.answer("/api/search/semantic", s.embeddingsHandler.HandleSemanticSearch)                     // Semantic search (GET)
-	s.answer("/api/embeddings/generate", s.embeddingsHandler.HandleEmbeddingGenerate)              // Generate embedding (POST)
-	s.answer("/api/embeddings/batch", s.embeddingsHandler.HandleEmbeddingBatch)                    // Batch generate embeddings (POST)
-	s.answer("/api/embeddings/clusters", s.embeddingsHandler.HandleEmbeddingClusters)              // List stable clusters (GET)
-	s.answer("/api/embeddings/clusters/samples", s.embeddingsHandler.HandleClusterSamples)         // Sample texts from a cluster (GET)
-	s.answer("/api/embeddings/clusters/members", s.embeddingsHandler.HandleClusterMembers)         // Recent attestations in a cluster (GET)
-	s.answer("/api/embeddings/clusters/memberships", s.embeddingsHandler.HandleClusterMemberships) // Cluster assignments for attestation IDs (GET)
-	s.answer("/api/embeddings/cluster-timeline", s.embeddingsHandler.HandleClusterTimeline)        // Cluster evolution timeline (GET)
-	s.answer("/api/embeddings/cluster", s.embeddingsHandler.HandleCluster)                         // HDBSCAN clustering (POST)
-	s.answer("/api/embeddings/by-source", s.embeddingsHandler.HandleEmbeddingsBySource)            // Embeddings by attestation source IDs (POST)
-	s.answer("/api/embeddings/info", s.embeddingsHandler.HandleEmbeddingInfo)                      // Embedding service status (GET)
-	s.answer("/api/embeddings/unembedded", s.embeddingsHandler.HandleUnembeddedPage)               // Paginated unembedded IDs (GET)
-	s.answer("/api/embeddings/project", s.embeddingsHandler.HandleProject)                         // UMAP projection (POST)
-	s.answer("/api/embeddings/projections", s.embeddingsHandler.HandleEmbeddingProjections)        // Get 2D projections (GET)
 	s.answer("/", s.HandleUnmatched)
 
 }

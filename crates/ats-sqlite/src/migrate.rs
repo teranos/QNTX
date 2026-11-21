@@ -20,7 +20,7 @@ const FK_OFF_VERSIONS: &[&str] = &["050"];
 ///
 /// Creates the schema_migrations table if it doesn't exist,
 /// then applies any migrations that haven't been applied yet.
-/// Optional migrations (sqlite-vec dependent) are silently skipped on failure.
+/// Optional migrations are silently skipped on failure.
 ///
 /// # Errors
 ///

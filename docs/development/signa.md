@@ -1,6 +1,6 @@
 # Signa
 
-Every signum the node holds or will hold, a table each, a row per sigil (ADR-039). The mark says whether the sigil is real: `done` is served from its sigil over every surface, empty is not yet, `wont` is decided against. The names are the sigils' own; where a sigil is not yet real its name is provisional.
+Every signum the node holds or will hold, a table each, a row per sigil (ADR-039). The mark says whether the sigil is real: `done` is served from its sigil over every surface it names, empty is not yet, `wont` is decided against. Every sigil is asked by subsystems too, over the subsystem surface (`Host.Ask`). The names are the sigils' own; where a sigil is not yet real its name is provisional.
 
 ## staands
 
@@ -169,8 +169,8 @@ One handler per path. `search` is answered by the embeddings handler and may bel
 
 | sigil | mark |
 | --- | --- |
-| generate | |
-| batch | |
+| generate | done |
+| batch | done |
 | cluster | |
 | clusters | |
 | samples | |
@@ -182,6 +182,17 @@ One handler per path. `search` is answered by the embeddings handler and may bel
 | unembedded | |
 | project | |
 | projections | |
+
+## vectors
+
+Vector search, a service a plugin provides (ADR-016). Asked over HTTP and by subsystems.
+
+| sigil | mark |
+| --- | --- |
+| create index | done |
+| add | done |
+| delete | done |
+| search | done |
 
 ## search
 

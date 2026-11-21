@@ -99,6 +99,7 @@ type QNTXServer struct {
 	pluginManager         pluginManaging              // Plugin process manager, or why the node has none
 	services              plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager       *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+	vectorIndex           *routedIndex                // where the embedding store keeps and finds its vectors
 	// What the mail service was wired with (ADR-041), read back by the mail
 	// signum so ROOT sees what sends and not what am.toml says since.
 	mailConfig config.MailConfig
@@ -150,6 +151,9 @@ type QNTXServer struct {
 	// built from the lines in its table.
 	answering map[string]reach.Answering
 	served    *reach.Served
+	// 「[Opus 5.5] declaredReach is auth.reach: the REACH lines am.toml says, served」
+	// 「[Opus 5.5] beside the store's (declared_reach.go). Held under opening.」
+	declaredReach []reach.Line
 	// sigilPaths is the paths answering holds because a sigil is bound there,
 	// so the ones no sigil is bound to any more can be taken out.
 	sigilPaths map[string]bool
