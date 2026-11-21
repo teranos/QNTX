@@ -141,6 +141,161 @@ func (x *ReadFileResponse) GetBase64Data() string {
 	return ""
 }
 
+type KeepFileRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AuthToken string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
+	// Who brought it: the actor of the node's held line, e.g. "ipluk".
+	By string `protobuf:"bytes,2,opt,name=by,proto3" json:"by,omitempty"`
+	// The file's name; its extension says what kind it is, and the bytes must agree.
+	Filename string `protobuf:"bytes,3,opt,name=filename,proto3" json:"filename,omitempty"`
+	// The file whole. One gRPC message carries it, so it is at most what one carries.
+	Content       []byte `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeepFileRequest) Reset() {
+	*x = KeepFileRequest{}
+	mi := &file_plugin_grpc_protocol_fileservice_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeepFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeepFileRequest) ProtoMessage() {}
+
+func (x *KeepFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_fileservice_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeepFileRequest.ProtoReflect.Descriptor instead.
+func (*KeepFileRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_fileservice_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *KeepFileRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
+	}
+	return ""
+}
+
+func (x *KeepFileRequest) GetBy() string {
+	if x != nil {
+		return x.By
+	}
+	return ""
+}
+
+func (x *KeepFileRequest) GetFilename() string {
+	if x != nil {
+		return x.Filename
+	}
+	return ""
+}
+
+func (x *KeepFileRequest) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+type KeepFileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	FileId        string                 `protobuf:"bytes,3,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"` // Where the node serves the bytes: /api/files/<file_id>
+	Asset         string                 `protobuf:"bytes,4,opt,name=asset,proto3" json:"asset,omitempty"`                 // "sha256:<hex>" of the bytes
+	ContentType   string                 `protobuf:"bytes,5,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Size          int64                  `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeepFileResponse) Reset() {
+	*x = KeepFileResponse{}
+	mi := &file_plugin_grpc_protocol_fileservice_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeepFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeepFileResponse) ProtoMessage() {}
+
+func (x *KeepFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_fileservice_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeepFileResponse.ProtoReflect.Descriptor instead.
+func (*KeepFileResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_fileservice_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *KeepFileResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *KeepFileResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *KeepFileResponse) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *KeepFileResponse) GetAsset() string {
+	if x != nil {
+		return x.Asset
+	}
+	return ""
+}
+
+func (x *KeepFileResponse) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *KeepFileResponse) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
 var File_plugin_grpc_protocol_fileservice_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_fileservice_proto_rawDesc = "" +
@@ -155,9 +310,23 @@ const file_plugin_grpc_protocol_fileservice_proto_rawDesc = "" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x1b\n" +
 	"\tmime_type\x18\x03 \x01(\tR\bmimeType\x12\x1f\n" +
 	"\vbase64_data\x18\x04 \x01(\tR\n" +
-	"base64Data2V\n" +
+	"base64Data\"v\n" +
+	"\x0fKeepFileRequest\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x0e\n" +
+	"\x02by\x18\x02 \x01(\tR\x02by\x12\x1a\n" +
+	"\bfilename\x18\x03 \x01(\tR\bfilename\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\fR\acontent\"\xa8\x01\n" +
+	"\x10KeepFileResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x12\x17\n" +
+	"\afile_id\x18\x03 \x01(\tR\x06fileId\x12\x14\n" +
+	"\x05asset\x18\x04 \x01(\tR\x05asset\x12!\n" +
+	"\fcontent_type\x18\x05 \x01(\tR\vcontentType\x12\x12\n" +
+	"\x04size\x18\x06 \x01(\x03R\x04size2\x99\x01\n" +
 	"\vFileService\x12G\n" +
-	"\x0eReadFileBase64\x12\x19.protocol.ReadFileRequest\x1a\x1a.protocol.ReadFileResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\x0eReadFileBase64\x12\x19.protocol.ReadFileRequest\x1a\x1a.protocol.ReadFileResponse\x12A\n" +
+	"\bKeepFile\x12\x19.protocol.KeepFileRequest\x1a\x1a.protocol.KeepFileResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_fileservice_proto_rawDescOnce sync.Once
@@ -171,16 +340,20 @@ func file_plugin_grpc_protocol_fileservice_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_fileservice_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_fileservice_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_plugin_grpc_protocol_fileservice_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_plugin_grpc_protocol_fileservice_proto_goTypes = []any{
 	(*ReadFileRequest)(nil),  // 0: protocol.ReadFileRequest
 	(*ReadFileResponse)(nil), // 1: protocol.ReadFileResponse
+	(*KeepFileRequest)(nil),  // 2: protocol.KeepFileRequest
+	(*KeepFileResponse)(nil), // 3: protocol.KeepFileResponse
 }
 var file_plugin_grpc_protocol_fileservice_proto_depIdxs = []int32{
 	0, // 0: protocol.FileService.ReadFileBase64:input_type -> protocol.ReadFileRequest
-	1, // 1: protocol.FileService.ReadFileBase64:output_type -> protocol.ReadFileResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: protocol.FileService.KeepFile:input_type -> protocol.KeepFileRequest
+	1, // 2: protocol.FileService.ReadFileBase64:output_type -> protocol.ReadFileResponse
+	3, // 3: protocol.FileService.KeepFile:output_type -> protocol.KeepFileResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -197,7 +370,7 @@ func file_plugin_grpc_protocol_fileservice_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_fileservice_proto_rawDesc), len(file_plugin_grpc_protocol_fileservice_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
