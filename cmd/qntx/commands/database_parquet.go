@@ -854,10 +854,25 @@ func (h *parquetHandles) Universes(dflt ats.AttestationStore) (*namespaces.Held,
 	return held, nil
 }
 
+// flushBackoffCap is the longest the flush waits after failing. A store that
+// cannot take a write at 5s will not at 10, and each try buffers the same fires
+// again.
+const flushBackoffCap = 5 * time.Minute
+
+// nextFlushWait doubles the wait after a failed flush, up to flushBackoffCap,
+// and returns to the base once one succeeds.
+func nextFlushWait(wait, base time.Duration, failed bool) time.Duration {
+	if !failed {
+		return base
+	}
+	return min(wait*2, flushBackoffCap)
+}
+
 func flushWatcherFires(watchers *duckdbcgo.WatcherStore, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for range ticker.C {
+	wait := interval
+	failures := 0
+	for {
+		time.Sleep(wait)
 		// Per tick, not per goroutine. This is the only thing that moves
 		// buffered fires into Parquet, so a recover at the goroutine boundary
 		// would log the panic and then leave the node recording fires that
@@ -865,8 +880,16 @@ func flushWatcherFires(watchers *duckdbcgo.WatcherStore, interval time.Duration)
 		// still runs.
 		func() {
 			defer sacred.Said("parquet.flush.watcher_fires")
-			if err := watchers.Flush(); err != nil {
-				logger.Logger.Errorw("periodic watcher fire flush failed", "error", err)
+			err := watchers.Flush()
+			wait = nextFlushWait(wait, interval, err != nil)
+			if err != nil {
+				failures++
+				logger.Logger.Errorw("periodic watcher fire flush failed", "error", err, "failures_in_a_row", failures, "retry_in", wait.String())
+				return
+			}
+			if failures > 0 {
+				logger.Logger.Infow("periodic watcher fire flush recovered", "failures_in_a_row", failures)
+				failures = 0
 			}
 		}()
 	}
