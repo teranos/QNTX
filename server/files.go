@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -18,6 +19,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	pb "github.com/teranos/QNTX/element/proto"
 	"github.com/teranos/QNTX/internal/measure"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -168,28 +170,52 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { sqlclose.Log(file.Close(), s.logger, "the uploaded form file") }()
 
-	// Validate file extension
-	ext := strings.ToLower(filepath.Ext(header.Filename))
-	if !allowedExtensions[ext] {
-		http.Error(w, "unsupported file type: "+ext, http.StatusBadRequest)
+	kept, err := s.keepFile(actorOf(r.Context()), header.Filename, file)
+	if err != nil {
+		var refused *notKept
+		if errors.As(err, &refused) {
+			http.Error(w, refused.said, refused.status)
+			return
+		}
+		http.Error(w, "failed to store file", http.StatusInternalServerError)
 		return
+	}
+	respond(w, s.logger, http.StatusOK, kept)
+}
+
+// notKept is why the node did not keep a file, as the one who brought it is told.
+type notKept struct {
+	status int
+	said   string
+}
+
+func (n *notKept) Error() string { return n.said }
+
+// "in reality, the photo syncs to my iCloud" "and iPluk picks it up"
+//
+// 「[Fable 5.2] keepFile is the one way a file comes to be kept by this node, whoever brings it:」
+// 「[Fable 5.2] a person over /api/files, or a plugin over the file service (KeepFileForPlugin).」
+// 「[Fable 5.2] by is who brought it. What is refused is a *notKept.」
+func (s *QNTXServer) keepFile(by, filename string, file io.ReadSeeker) (*pb.FileUploadResult, error) {
+	// Validate file extension
+	ext := strings.ToLower(filepath.Ext(filename))
+	if !allowedExtensions[ext] {
+		return nil, &notKept{http.StatusBadRequest, "unsupported file type: " + ext}
 	}
 
 	// Detect actual content type from file bytes (don't trust client headers)
 	// Detection runs on these bytes, so a short read rejects a valid file as an
 	// unsupported type. io.EOF is an empty upload, which is also not detectable.
 	buf := make([]byte, 512)
-	n, err := file.Read(buf)
-	if err != nil && !errors.Is(err, io.EOF) {
-		s.logger.Errorw("File read failed", "filename", header.Filename, "error", err)
-		http.Error(w, "failed to read upload", http.StatusInternalServerError)
-		return
+	n, err := io.ReadFull(file, buf)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		s.logger.Errorw("File read failed", "filename", filename, "error", err)
+		return nil, &notKept{http.StatusInternalServerError, "failed to read upload"}
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		wrappedErr := errors.Wrapf(err, "failed to seek uploaded file %s after content detection", header.Filename)
+		wrappedErr := errors.Wrapf(err, "failed to seek uploaded file %s after content detection", filename)
 		s.logger.Errorw("File seek failed", "error", wrappedErr)
-		http.Error(w, "failed to process upload", http.StatusInternalServerError)
-		return
+		return nil, &notKept{http.StatusInternalServerError, "failed to process upload"}
 	}
 	detectedType := http.DetectContentType(buf[:n])
 
@@ -209,34 +235,30 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 	if !allowedContentTypes[detectedType] {
 		s.logger.Warnw("Rejected file upload: disallowed content type",
-			"filename", header.Filename, "detected_type", detectedType, "extension", ext)
-		http.Error(w, "unsupported content type: "+detectedType, http.StatusBadRequest)
-		return
+			"filename", filename, "detected_type", detectedType, "extension", ext)
+		return nil, &notKept{http.StatusBadRequest, "unsupported content type: " + detectedType}
 	}
 
 	// Verify extension matches detected content type to prevent mismatched files
 	if expectedMIME, ok := mimeByExtension[ext]; ok && expectedMIME != detectedType {
 		s.logger.Warnw("Rejected file upload: extension/content mismatch",
-			"filename", header.Filename, "extension", ext,
+			"filename", filename, "extension", ext,
 			"expected_mime", expectedMIME, "detected_mime", detectedType)
-		http.Error(w, "file content does not match extension "+ext, http.StatusBadRequest)
-		return
+		return nil, &notKept{http.StatusBadRequest, "file content does not match extension " + ext}
 	}
 
 	dir, err := s.filesDir()
 	if err != nil {
 		s.logger.Errorw("Failed to resolve files directory", "error", err, "dbPath", s.dbPath)
-		http.Error(w, "failed to resolve storage directory", http.StatusInternalServerError)
-		return
+		return nil, &notKept{http.StatusInternalServerError, "failed to resolve storage directory"}
 	}
 
 	// "k would be storing media assets"
 	// 「[Fable 5.2] A kept file is attested as held of this node, so a node that has no name」
 	// 「[Fable 5.2] to hold it as keeps none.」
 	if s.nodeDID == nil || s.nodeDID.DID == "" {
-		s.logger.Errorw("File not kept: this node has no DID to hold it as", "filename", header.Filename)
-		http.Error(w, "this node has no name to hold a file as", http.StatusInternalServerError)
-		return
+		s.logger.Errorw("File not kept: this node has no DID to hold it as", "filename", filename)
+		return nil, &notKept{http.StatusInternalServerError, "this node has no name to hold a file as"}
 	}
 
 	id := uuid.New().String()
@@ -246,8 +268,7 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	dest, err := os.Create(destPath)
 	if err != nil {
 		s.logger.Errorw("Failed to create file on disk", "path", destPath, "error", err)
-		http.Error(w, "failed to store file", http.StatusInternalServerError)
-		return
+		return nil, &notKept{http.StatusInternalServerError, "failed to store file"}
 	}
 
 	// "i never wanted twelvelabs to be the source of truth"
@@ -260,8 +281,7 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		if rmErr := os.Remove(destPath); rmErr != nil {
 			s.logger.Warnw("Partial upload not removed", "path", destPath, "error", rmErr)
 		}
-		http.Error(w, "failed to write file", http.StatusInternalServerError)
-		return
+		return nil, &notKept{http.StatusInternalServerError, "failed to write file"}
 	}
 	// ENOSPC and EIO commonly surface only at close; answering 200 past this
 	// would hand the client a file ID for a truncated file.
@@ -270,29 +290,40 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		if rmErr := os.Remove(destPath); rmErr != nil {
 			s.logger.Errorw("Failed to remove truncated upload", "path", destPath, "error", rmErr)
 		}
-		http.Error(w, "failed to store file", http.StatusInternalServerError)
-		return
+		return nil, &notKept{http.StatusInternalServerError, "failed to store file"}
 	}
 
 	asset := assetNamePrefix + hex.EncodeToString(hashed.Sum(nil))
-	if err := s.attestHeld(actorOf(r.Context()), asset, id, header.Filename, detectedType, written); err != nil {
+	if err := s.attestHeld(by, asset, id, filename, detectedType, written); err != nil {
 		s.logger.Errorw("File not kept: the node did not attest it", "path", destPath, "asset", asset, "error", err)
 		if rmErr := os.Remove(destPath); rmErr != nil {
 			s.logger.Errorw("Failed to remove a file nothing attests", "path", destPath, "error", rmErr)
 		}
-		http.Error(w, "failed to attest file", http.StatusInternalServerError)
-		return
+		return nil, &notKept{http.StatusInternalServerError, "failed to attest file"}
 	}
 
-	s.logger.Infow("File uploaded", "id", id, "asset", asset, "filename", header.Filename, "size", written, "content_type", detectedType)
+	s.logger.Infow("File kept", "id", id, "asset", asset, "by", by, "filename", filename, "size", written, "content_type", detectedType)
 
-	respond(w, s.logger, http.StatusOK, &pb.FileUploadResult{
+	return &pb.FileUploadResult{
 		Id:          id,
-		Filename:    header.Filename,
+		Filename:    filename,
 		ContentType: detectedType,
 		Size:        written,
 		Asset:       asset,
-	})
+	}, nil
+}
+
+// 「[Fable 5.2] KeepFileForPlugin keeps what a plugin hands the node, as keepFile keeps what a」
+// 「[Fable 5.2] person brings: the same kinds, the same name by its bytes, the same held line.」
+func (s *QNTXServer) KeepFileForPlugin(by, filename string, content []byte) (services.KeptFile, error) {
+	if int64(len(content)) > maxUploadSize {
+		return services.KeptFile{}, errors.Newf("%s is %d bytes, and the node keeps a file of at most %d", filename, len(content), int64(maxUploadSize))
+	}
+	kept, err := s.keepFile(by, filename, bytes.NewReader(content))
+	if err != nil {
+		return services.KeptFile{}, errors.Wrapf(err, "the node did not keep %s for %s", filename, by)
+	}
+	return services.KeptFile{ID: kept.Id, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size}, nil
 }
 
 // "twelvelabs shaped"
