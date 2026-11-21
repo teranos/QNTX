@@ -419,6 +419,11 @@
         "ROOT"
       ]
     },
+    "/api/embeddings/generate/batch": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/embeddings/info": {
       "x-qntx-reach": [
         "ROOT"
@@ -813,6 +818,26 @@
       ]
     },
     "/api/vault/unbind": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vectors/{index}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vectors/{index}/add": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vectors/{index}/delete": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vectors/{index}/search": {
       "x-qntx-reach": [
         "ROOT"
       ]

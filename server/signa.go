@@ -31,7 +31,7 @@ import (
 // signa is every signum the node holds: its own, every linked subsystem's
 // (ADR-056), and every ready plugin's.
 func (s *QNTXServer) signa() []sigil.Signum {
-	own := []sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.openapiSignum(), s.paritySignum(), s.transcriptsSignum(), s.vaultSignum(), s.agentsSignum(), s.keysSignum(), s.consumedSignum(), s.anthropicSignum(), s.googleSignum(), s.approvalsSignum(), s.nodeAgentSignum(), s.elementsSignum(), s.roomsSignum(), s.memorySignum(), s.collectedSignum()}
+	own := []sigil.Signum{s.staandsSignum(), s.iSignum(), s.reachSignum(), s.mailSignum(), s.pluginsSignum(), s.githubSignum(), s.namespacesSignum(), s.rolesSignum(), s.amSignum(), s.openapiSignum(), s.paritySignum(), s.transcriptsSignum(), s.vaultSignum(), s.agentsSignum(), s.keysSignum(), s.consumedSignum(), s.anthropicSignum(), s.googleSignum(), s.approvalsSignum(), s.nodeAgentSignum(), s.elementsSignum(), s.roomsSignum(), s.memorySignum(), s.collectedSignum(), s.vectorsSignum(), s.embeddingsSignum(), s.searchSignum()}
 	if a2a, err := s.a2aClientSignum(); err != nil {
 		s.logger.Errorw("a signum is not served", "signum", "a2a", "error", err)
 	} else {
@@ -83,6 +83,9 @@ func (s *QNTXServer) answeredFromSigils() map[string]http.HandlerFunc {
 			continue
 		}
 		for _, held := range signum.GetSigils() {
+			if !onSurface(held, reach.OverHTTP) {
+				continue
+			}
 			path := held.GetHttp().GetPath()
 			bound[path] = append(bound[path], heldBy{signum: signum.GetName(), sigil: held, answer: signum.Answers[held.GetName()]})
 		}
@@ -93,6 +96,11 @@ func (s *QNTXServer) answeredFromSigils() map[string]http.HandlerFunc {
 		answering[path] = overHTTP(path, sigils, s.gate, s.reachingOver, s.logger)
 	}
 	return answering
+}
+
+// onSurface is whether a sigil is asked over a surface (protocol.Sigil.surfaces).
+func onSurface(held *protocol.Sigil, surface string) bool {
+	return sigil.On(held, surface)
 }
 
 // heldBy is a sigil with the signum that holds it, which is what a reach line
@@ -201,11 +209,17 @@ func arrivedIn(r *http.Request) (map[string]any, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "the body of %s %s did not read", r.Method, r.URL.Path)
 	}
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return arrived, nil
+	if len(bytes.TrimSpace(raw)) != 0 {
+		if err := json.Unmarshal(raw, &arrived); err != nil {
+			return nil, errors.Newf("the body of %s %s is not a JSON object", r.Method, r.URL.Path)
+		}
 	}
-	if err := json.Unmarshal(raw, &arrived); err != nil {
-		return nil, errors.Newf("the body of %s %s is not a JSON object", r.Method, r.URL.Path)
+	// What the query names arrives too, unless the body named it: a route
+	// that read model from the query of a POST still finds it there.
+	for name := range r.URL.Query() {
+		if _, inBody := arrived[name]; !inBody {
+			arrived[name] = r.URL.Query().Get(name)
+		}
 	}
 	return arrived, nil
 }
@@ -215,6 +229,9 @@ func arrivedIn(r *http.Request) (map[string]any, error) {
 func schemaTypeOf(kind string) string {
 	if kind == sigil.Count {
 		return "integer"
+	}
+	if kind == sigil.List {
+		return "array"
 	}
 	return "string"
 }
@@ -600,6 +617,9 @@ func sigilsInto(document map[string]any, signa []sigil.Signum) {
 	}
 	for _, signum := range signa {
 		for _, held := range signum.GetSigils() {
+			if !onSurface(held, reach.OverHTTP) {
+				continue
+			}
 			path := held.GetHttp().GetPath()
 			operations, ok := paths[path].(map[string]any)
 			if !ok {

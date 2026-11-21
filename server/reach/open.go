@@ -105,6 +105,9 @@ const (
 	OverHTTP = "http"
 	OverMCP  = "mcp"
 	OverA2A  = "a2a"
+	// OverSubsystem is a subsystem linked into the node asking a sigil from
+	// inside it (sigil.Within): no line governs it, since no caller crosses.
+	OverSubsystem = "subsystem"
 )
 
 // ReachingSigil is who reaches one sigil over one surface. A line names what

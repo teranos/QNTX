@@ -297,7 +297,8 @@
           # Hash of vendored Go dependencies (uses shared rootVendorHash)
           vendorHash = self.rootVendorHash;
 
-          # sqlite3.h needed by sqlite-vec CGO bindings (internal/db/connection.go).
+          # sqlite3.h was for sqlite-vec's CGO bindings, which are gone; kept
+          # until a build without it has run.
           # libduckdb linked by crates/ats-duckdb — Nix build, no source recompile.
           buildInputs = [ pkgs.sqlite duckdbPinned libacp pkgs.json_c ];
 

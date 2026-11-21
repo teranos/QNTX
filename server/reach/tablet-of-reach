@@ -288,6 +288,7 @@ REACH is '/comet/'                                                        of ROO
 REACH is '/api/python/execute'                                            of ROOT
 REACH is '/api/search/semantic'                                           of ROOT
 REACH is '/api/embeddings/generate' '/api/embeddings/batch'               of ROOT
+REACH is '/api/embeddings/generate/batch'                                 of ROOT
 REACH is '/api/embeddings/clusters'                                       of ROOT
 REACH is '/api/embeddings/clusters/samples'                               of ROOT
 REACH is '/api/embeddings/clusters/members'                               of ROOT
@@ -296,3 +297,5 @@ REACH is '/api/embeddings/cluster' '/api/embeddings/by-source'            of ROO
 REACH is '/api/embeddings/cluster-timeline'                               of ROOT
 REACH is '/api/embeddings/info' '/api/embeddings/unembedded'              of ROOT
 REACH is '/api/embeddings/project' '/api/embeddings/projections'          of ROOT
+REACH is '/api/vectors/{index}' '/api/vectors/{index}/add'                of ROOT
+REACH is '/api/vectors/{index}/delete' '/api/vectors/{index}/search'      of ROOT

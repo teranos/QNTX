@@ -84,8 +84,10 @@ func (s *QNTXServer) runtime() reach.Runtime {
 		runtime.IsRoot = s.authHandler.IsRoot
 	}
 	// A backend that keeps no system store keeps no lines: the tablet serves
-	// alone, and that is not an error to say.
+	// alone, and that is not an error to say. What am.toml says (auth.reach)
+	// serves beside it, for nothing ROOT stored can outrank it there.
 	if !s.held.KeepsSystem() {
+		runtime.Lines = append(runtime.Lines, s.declaredReach...)
 		return runtime
 	}
 	store, err := s.held.Read(auth.NamespaceSystem)
@@ -103,6 +105,12 @@ func (s *QNTXServer) runtime() reach.Runtime {
 			"error", err)
 		return runtime
 	}
+	// 「[Opus 5.5] What am.toml says (auth.reach), beside whatever the store holds.」
+	// It serves only once the store was read: a line ROOT stored outranks it,
+	// a revocation among them, and a store not read would leave it standing
+	// where ROOT took it back (CodeRabbit on #1772). The two failed reads above
+	// serve the tablet alone, as they did before auth.reach.
+	runtime.Lines = append(runtime.Lines, s.declaredReach...)
 	for _, as := range found {
 		line, err := reach.ReadLine(as.Subjects, as.Predicates, as.Contexts, as.Actors, as.Timestamp)
 		if err != nil {

@@ -249,6 +249,9 @@ func (s *QNTXServer) mcpServerFor(r *http.Request) *mcp.Server {
 	for _, signum := range signa {
 		for _, sigil := range signum.GetSigils() {
 			held := heldBy{signum: signum.GetName(), sigil: sigil, answer: signum.Answers[sigil.GetName()]}
+			if !onSurface(sigil, reach.OverMCP) {
+				continue
+			}
 			if reaching, anyone := s.reachingOver(reach.OverMCP, held); !offeredTo(admitted, known, reaching, anyone) {
 				continue
 			}

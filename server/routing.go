@@ -184,20 +184,6 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// 「[Opus 5.5] Each MCP server the node consumes, served to the node's agents as one of its own (mcp_consumed.go).」
 	s.answer(ConsumedServedAt+"{name}", s.HandleConsumedServer)
 
-	s.answer("/api/search/semantic", s.embeddingsHandler.HandleSemanticSearch)                     // Semantic search (GET)
-	s.answer("/api/embeddings/generate", s.embeddingsHandler.HandleEmbeddingGenerate)              // Generate embedding (POST)
-	s.answer("/api/embeddings/batch", s.embeddingsHandler.HandleEmbeddingBatch)                    // Batch generate embeddings (POST)
-	s.answer("/api/embeddings/clusters", s.embeddingsHandler.HandleEmbeddingClusters)              // List stable clusters (GET)
-	s.answer("/api/embeddings/clusters/samples", s.embeddingsHandler.HandleClusterSamples)         // Sample texts from a cluster (GET)
-	s.answer("/api/embeddings/clusters/members", s.embeddingsHandler.HandleClusterMembers)         // Recent attestations in a cluster (GET)
-	s.answer("/api/embeddings/clusters/memberships", s.embeddingsHandler.HandleClusterMemberships) // Cluster assignments for attestation IDs (GET)
-	s.answer("/api/embeddings/cluster-timeline", s.embeddingsHandler.HandleClusterTimeline)        // Cluster evolution timeline (GET)
-	s.answer("/api/embeddings/cluster", s.embeddingsHandler.HandleCluster)                         // HDBSCAN clustering (POST)
-	s.answer("/api/embeddings/by-source", s.embeddingsHandler.HandleEmbeddingsBySource)            // Embeddings by attestation source IDs (POST)
-	s.answer("/api/embeddings/info", s.embeddingsHandler.HandleEmbeddingInfo)                      // Embedding service status (GET)
-	s.answer("/api/embeddings/unembedded", s.embeddingsHandler.HandleUnembeddedPage)               // Paginated unembedded IDs (GET)
-	s.answer("/api/embeddings/project", s.embeddingsHandler.HandleProject)                         // UMAP projection (POST)
-	s.answer("/api/embeddings/projections", s.embeddingsHandler.HandleEmbeddingProjections)        // Get 2D projections (GET)
 	s.answer("/", s.HandleUnmatched)
 
 }
