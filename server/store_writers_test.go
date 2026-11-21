@@ -69,6 +69,11 @@ var storeWriters = map[string]string{
 		"the asset, by the name its bytes have, held of the node's own DID by who brought it. " +
 		"Reached from /api/files, which the reach table gives to ROOT",
 
+	// 「[Fable 5.2] A file this node brought to the peer that is to hold it.」
+	"attestBrought": "that a peer holds the bytes this node brought it, what the node knows of itself: " +
+		"the asset, brought to the peer by the name the primary calls it, by this node. " +
+		"Written by the node's own carrier and reached by no route",
+
 	"keepNameLine": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
 		"a name is one agent's on the whole node, and an agent acting in one namespace does not see system. " +
 		"Reached from i name, which the reach table gives to ROOT, SUPER and TOKEN, after itsOwnDID says the " +

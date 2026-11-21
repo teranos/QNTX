@@ -94,6 +94,9 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	// "a schedule remembers who created it and where", and each run goes there.
 	servicesManager.SetCallers(s.callerOf)
+
+	// "and slowly": what this node kept for a peer before it last stopped is brought now.
+	s.carryWhatWaits()
 	servicesManager.SetOpenRun(s.openRun)
 
 	// Mail to a User on a plugin's behalf (ADR-041): the Users exist once auth
