@@ -309,14 +309,12 @@ func (s *QNTXServer) connectGoogleKey(ctx context.Context, token, by, namespace 
 	}
 	if found {
 		// 「[Opus 5.5] A project made and metered whose key was not kept is finished, not made twice.」
-		keys, err := s.newestKeys(namespace)
+		kept, err := s.googleKeyKept(namespace)
 		if err != nil {
 			return "", err
 		}
-		if line, held := keys[googleKeyName]; held {
-			if _, sealed := line.Attributes[keySealed].(string); sealed {
-				return "", errors.Newf("%s has its key at Google already, in %s", namespace, item.project.ProjectID)
-			}
+		if kept {
+			return "", errors.Newf("%s has its key at Google already, in %s", namespace, item.project.ProjectID)
 		}
 	} else {
 		id, err := googleKeyProject(namespace)
@@ -478,14 +476,24 @@ func (s *QNTXServer) googleKeysToConnect(connect, project string) (map[string]st
 	if err != nil {
 		return nil, err
 	}
-	keyed := map[string]bool{}
+	made := map[string]bool{}
 	for _, item := range items {
-		keyed[item.name] = true
+		made[item.name] = true
 	}
 	keys := map[string]string{}
 	for _, ns := range served {
-		if ns.Name == auth.NamespaceSystem || keyed[ns.Name] || (ns.Definition != nil && !ns.Definition.Enabled) {
+		if ns.Name == auth.NamespaceSystem || (ns.Definition != nil && !ns.Definition.Enabled) {
 			continue
+		}
+		// 「[Opus 5.5] An item made whose key was not kept is offered again: pressed, it finishes in its own project.」
+		if made[ns.Name] {
+			kept, err := s.googleKeyKept(ns.Name)
+			if err != nil {
+				return nil, err
+			}
+			if kept {
+				continue
+			}
 		}
 		keys[ns.Name] = connect + "?project=" + url.QueryEscape(project) + "&thing=key&namespace=" + url.QueryEscape(ns.Name)
 	}
@@ -527,4 +535,18 @@ func (s *QNTXServer) googleNext() []auth.GoogleCloudPress {
 		next = append(next, auth.GoogleCloudPress{Label: link.Label, Link: link.URL})
 	}
 	return next
+}
+
+// 「[Opus 5.5] googleKeyKept is whether namespace's key from Google is sealed in its keys.」
+func (s *QNTXServer) googleKeyKept(namespace string) (bool, error) {
+	keys, err := s.newestKeys(namespace)
+	if err != nil {
+		return false, err
+	}
+	line, held := keys[googleKeyName]
+	if !held {
+		return false, nil
+	}
+	_, sealed := line.Attributes[keySealed].(string)
+	return sealed, nil
 }

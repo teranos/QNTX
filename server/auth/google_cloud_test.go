@@ -326,7 +326,8 @@ func TestConnectingOffersTheWayBack(t *testing.T) {
 // 「[Opus 5.5] A press opened straight from a link or a mail names no page, and still ends with the」
 // 「[Opus 5.5] way back to QNTX, on the node's own door.」
 func TestEveryCeremonyPageLeadsBackToQNTX(t *testing.T) {
-	h, _ := cloudHandler(t)
+	// 「[Opus 5.5] pickingHandler: the pick the select page keeps is let go of when it expires.」
+	h, _, _ := pickingHandler(t)
 	h.ownOrigins = []string{"app://qntx", "https://web.example.org/"}
 	for _, ok := range []bool{true, false} {
 		page := httptest.NewRecorder()

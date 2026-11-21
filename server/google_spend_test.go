@@ -29,6 +29,8 @@ type standInKeys struct {
 	projects map[string]map[string]any
 	keys     map[string]map[string]any
 	strings  map[string]string
+	// 「[Opus 5.5] refusingKeys is API Keys refusing to mint, after the project and its meter were made.」
+	refusingKeys bool
 }
 
 func keysStandingIn(t *testing.T) *standInKeys {
@@ -68,6 +70,9 @@ func (k *standInKeys) answer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		write(map[string]any{"name": "projects/9" + id[len(id)-6:], "projectId": id})
+	case strings.HasSuffix(path, "/locations/global/keys") && r.Method == http.MethodPost && k.refusingKeys:
+		w.WriteHeader(http.StatusForbidden)
+		write(map[string]any{"error": map[string]any{"message": "the stand-in refuses to mint"}})
 	case strings.HasSuffix(path, "/locations/global/keys") && r.Method == http.MethodPost:
 		name := strings.TrimPrefix(path, "/v2/") + "/k" + string(rune('0'+len(k.keys)+1))
 		k.keys[name] = sent
@@ -392,4 +397,23 @@ func TestTheNextPressesAreTheKeysToConnect(t *testing.T) {
 func namespacesOfferedAKey(t *testing.T, s *QNTXServer) map[string]string {
 	t.Helper()
 	return rootAsksGoogle(t, s).GetKeyConnects()
+}
+
+// 「[Opus 5.5] A namespace whose project was made and metered but whose key was not kept is still」
+// 「[Opus 5.5] offered its Connect key, and pressing it again finishes in the same project.」
+func TestAKeyNotKeptIsStillOffered(t *testing.T) {
+	s, _, _ := wiredForCosts(t)
+	k := keysStandingIn(t)
+	k.refusingKeys = true
+	_, err := s.connectGoogleKey(context.Background(), "root-token-4", "google:root-sub", "garden")
+	require.Error(t, err)
+	assert.Contains(t, namespacesOfferedAKey(t, s), "garden", "the key was never kept")
+
+	k.mu.Lock()
+	k.refusingKeys = false
+	k.mu.Unlock()
+	_, err = s.connectGoogleKey(context.Background(), "root-token-5", "google:root-sub", "garden")
+	require.NoError(t, err)
+	assert.Len(t, k.projects, 1, "the same project, not a second")
+	assert.NotContains(t, namespacesOfferedAKey(t, s), "garden")
 }
