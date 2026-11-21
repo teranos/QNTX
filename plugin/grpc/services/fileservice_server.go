@@ -43,10 +43,17 @@ type KeptFile struct {
 	Asset       string // "sha256:<hex>" of the bytes
 	ContentType string
 	Size        int64
+	// BroughtTo is the peer the file was brought to and BroughtID the id that
+	// peer serves it under. NotBrought is why a file meant for a peer is not
+	// there: this node still keeps it.
+	BroughtTo  string
+	BroughtID  string
+	NotBrought string
 }
 
 // FileKeeper keeps a file for who brought it, as the node keeps one a person brings.
-type FileKeeper func(by, filename string, content []byte) (KeptFile, error)
+// bringTo names the peer that is to hold it, or nothing.
+type FileKeeper func(by, filename string, content []byte, bringTo string) (KeptFile, error)
 
 // KeepWith hands the service how the node keeps a file. Until it is handed
 // one, KeepFile answers that this node keeps none for a plugin.
@@ -63,12 +70,15 @@ func (s *FileServiceServer) KeepFile(ctx context.Context, req *protocol.KeepFile
 	if s.keep == nil {
 		return &protocol.KeepFileResponse{Error: "this node keeps no file for a plugin"}, nil
 	}
-	kept, err := s.keep(req.By, req.Filename, req.Content)
+	kept, err := s.keep(req.By, req.Filename, req.Content, req.BringTo)
 	if err != nil {
 		return &protocol.KeepFileResponse{Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 	}
 	s.logger.Debugw("File kept via gRPC", "by", req.By, "filename", req.Filename, "file_id", kept.ID, "asset", kept.Asset, "size", kept.Size)
-	return &protocol.KeepFileResponse{Success: true, FileId: kept.ID, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size}, nil
+	return &protocol.KeepFileResponse{
+		Success: true, FileId: kept.ID, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size,
+		BroughtTo: kept.BroughtTo, BroughtFileId: kept.BroughtID, NotBrought: kept.NotBrought,
+	}, nil
 }
 
 // NewFileServiceServer creates a new file service gRPC server.

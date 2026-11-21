@@ -21,6 +21,7 @@ import (
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	errors "github.com/teranos/sacred-error"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // maxUploadSize limits file uploads to 50MB — sized for large PDFs while staying
@@ -315,7 +316,12 @@ func (s *QNTXServer) keepFile(by, filename string, file io.ReadSeeker) (*pb.File
 
 // 「[Fable 5.2] KeepFileForPlugin keeps what a plugin hands the node, as keepFile keeps what a」
 // 「[Fable 5.2] person brings: the same kinds, the same name by its bytes, the same held line.」
-func (s *QNTXServer) KeepFileForPlugin(by, filename string, content []byte) (services.KeptFile, error) {
+//
+// "to me it feels like k should own my Media Assets"
+// 「[Fable 5.2] bringTo names the peer that is to hold it. The file is kept here first, so it is」
+// 「[Fable 5.2] held somewhere whatever becomes of the way there, and then brought through the」
+// 「[Fable 5.2] primary. A file that did not get there is still kept, and why is said.」
+func (s *QNTXServer) KeepFileForPlugin(by, filename string, content []byte, bringTo string) (services.KeptFile, error) {
 	if int64(len(content)) > maxUploadSize {
 		return services.KeptFile{}, errors.Newf("%s is %d bytes, and the node keeps a file of at most %d", filename, len(content), int64(maxUploadSize))
 	}
@@ -323,7 +329,43 @@ func (s *QNTXServer) KeepFileForPlugin(by, filename string, content []byte) (ser
 	if err != nil {
 		return services.KeptFile{}, errors.Wrapf(err, "the node did not keep %s for %s", filename, by)
 	}
-	return services.KeptFile{ID: kept.Id, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size}, nil
+	held := services.KeptFile{ID: kept.Id, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size}
+	if bringTo == "" {
+		return held, nil
+	}
+	there, err := s.bringToPeer(bringTo, filename, content, kept.Asset)
+	if err != nil {
+		held.NotBrought = err.Error()
+		s.logger.Warnw("A file meant for a peer was kept here and not brought", "to", bringTo, "asset", kept.Asset, "by", by, "error", err)
+		return held, nil
+	}
+	held.BroughtTo, held.BroughtID = bringTo, there
+	s.logger.Infow("File brought to a peer", "to", bringTo, "asset", kept.Asset, "by", by, "file_id_there", there)
+	return held, nil
+}
+
+// bringToPeer brings a file this node keeps to the peer named, through the
+// primary, and answers the id the peer serves it under. The peer names the
+// file by its bytes as this node does: another name is not the same file.
+func (s *QNTXServer) bringToPeer(to, filename string, content []byte, asset string) (string, error) {
+	if s.authHandler == nil {
+		return "", errors.Newf("this node asks nobody who its peers are, so %s is not brought to %s", filename, to)
+	}
+	status, said, err := s.authHandler.BringFileToPeer(s.ctx, to, filename, content)
+	if err != nil {
+		return "", err
+	}
+	if status != http.StatusOK {
+		return "", errors.Newf("%s answered %d for %s: %s", to, status, filename, said)
+	}
+	there := &pb.FileUploadResult{}
+	if err := protojson.Unmarshal(said, there); err != nil {
+		return "", errors.Wrapf(err, "the answer of %s about %s did not read: %s", to, filename, said)
+	}
+	if there.Asset != asset {
+		return "", errors.Newf("%s named %s %q, and it is %s here", to, filename, there.Asset, asset)
+	}
+	return there.Id, nil
 }
 
 // "twelvelabs shaped"
