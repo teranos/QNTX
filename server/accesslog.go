@@ -110,6 +110,11 @@ type heartbeats struct {
 // remembered.
 const heartbeatHolds = 1024
 
+// How long a remembered path can be. The count above bounds the entries and
+// this bounds each one, so the set cannot hold more than a few hundred
+// kilobytes whatever a caller writes. A comet's path is a few dozen bytes.
+const heartbeatPathMax = 256
+
 // worthSaying reports whether this poll is a change worth a line.
 // forget drops what was said about a path, so the next answer is news again.
 // A comet answered otherwise than 404 has changed, and a 404 after that is said.
@@ -127,6 +132,9 @@ func (h *heartbeats) worthSaying(path string, well bool) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	if len(path) > heartbeatPathMax {
+		return true
+	}
 	state := heartbeatState{well: well}
 	last, seen := h.seen.Load(path)
 	if !seen && h.held >= heartbeatHolds {

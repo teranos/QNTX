@@ -261,3 +261,18 @@ func TestACometAnsweredOtherwiseIsSaidAgainWhenItGoes404Again(t *testing.T) {
 		}
 	}
 }
+
+// A path longer than a comet's can be is said every time and not remembered, so
+// what the log holds is bounded in bytes as well as in entries.
+func TestAPathTooLongToBeAPollIsSaidEveryTimeAndNotHeld(t *testing.T) {
+	var beats heartbeats
+	long := "/comet/" + strings.Repeat("a", heartbeatPathMax)
+	for range 3 {
+		if !beats.worthSaying(long, false) {
+			t.Fatal("a path too long to be held was not said")
+		}
+	}
+	if beats.held != 0 {
+		t.Fatalf("held %d paths, want none", beats.held)
+	}
+}
