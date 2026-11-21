@@ -21,7 +21,7 @@ func TestKeepFileHandsTheNodeWhatAPluginBrings(t *testing.T) {
 	s := keepTestServer(t)
 	var by, filename string
 	var content []byte
-	s.KeepWith(func(b, f string, c []byte) (KeptFile, error) {
+	s.KeepWith(func(b, f string, c []byte, _ string) (KeptFile, error) {
 		by, filename, content = b, f, c
 		return KeptFile{ID: "an-id", Asset: "sha256:abc", ContentType: "image/jpeg", Size: int64(len(c))}, nil
 	})
@@ -43,8 +43,8 @@ func TestKeepFileHandsTheNodeWhatAPluginBrings(t *testing.T) {
 }
 
 func TestKeepFileRefuses(t *testing.T) {
-	kept := func(string, string, []byte) (KeptFile, error) { return KeptFile{ID: "an-id"}, nil }
-	refuses := func(string, string, []byte) (KeptFile, error) {
+	kept := func(string, string, []byte, string) (KeptFile, error) { return KeptFile{ID: "an-id"}, nil }
+	refuses := func(string, string, []byte, string) (KeptFile, error) {
 		return KeptFile{}, errors.New("unsupported file type: .exe")
 	}
 	for name, tc := range map[string]struct {

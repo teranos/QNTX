@@ -149,7 +149,11 @@ type KeepFileRequest struct {
 	// The file's name; its extension says what kind it is, and the bytes must agree.
 	Filename string `protobuf:"bytes,3,opt,name=filename,proto3" json:"filename,omitempty"`
 	// The file whole. One gRPC message carries it, so it is at most what one carries.
-	Content       []byte `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	Content []byte `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	// "to me it feels like k should own my Media Assets"
+	// The peer that is to hold it, as the primary calls it, e.g. "k". The node
+	// keeps the file and brings it there through the primary. Empty: it stays here.
+	BringTo       string `protobuf:"bytes,5,opt,name=bring_to,json=bringTo,proto3" json:"bring_to,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -212,14 +216,27 @@ func (x *KeepFileRequest) GetContent() []byte {
 	return nil
 }
 
+func (x *KeepFileRequest) GetBringTo() string {
+	if x != nil {
+		return x.BringTo
+	}
+	return ""
+}
+
 type KeepFileResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	FileId        string                 `protobuf:"bytes,3,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"` // Where the node serves the bytes: /api/files/<file_id>
-	Asset         string                 `protobuf:"bytes,4,opt,name=asset,proto3" json:"asset,omitempty"`                 // "sha256:<hex>" of the bytes
-	ContentType   string                 `protobuf:"bytes,5,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
-	Size          int64                  `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Success     bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error       string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	FileId      string                 `protobuf:"bytes,3,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"` // Where the node serves the bytes: /api/files/<file_id>
+	Asset       string                 `protobuf:"bytes,4,opt,name=asset,proto3" json:"asset,omitempty"`                 // "sha256:<hex>" of the bytes
+	ContentType string                 `protobuf:"bytes,5,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Size        int64                  `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
+	// Where the file was brought, when bring_to named a peer and the peer kept it,
+	// and the id that peer serves it under.
+	BroughtTo     string `protobuf:"bytes,7,opt,name=brought_to,json=broughtTo,proto3" json:"brought_to,omitempty"`
+	BroughtFileId string `protobuf:"bytes,8,opt,name=brought_file_id,json=broughtFileId,proto3" json:"brought_file_id,omitempty"`
+	// Why the file was not brought to the peer bring_to named. The node still keeps it.
+	NotBrought    string `protobuf:"bytes,9,opt,name=not_brought,json=notBrought,proto3" json:"not_brought,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -296,6 +313,27 @@ func (x *KeepFileResponse) GetSize() int64 {
 	return 0
 }
 
+func (x *KeepFileResponse) GetBroughtTo() string {
+	if x != nil {
+		return x.BroughtTo
+	}
+	return ""
+}
+
+func (x *KeepFileResponse) GetBroughtFileId() string {
+	if x != nil {
+		return x.BroughtFileId
+	}
+	return ""
+}
+
+func (x *KeepFileResponse) GetNotBrought() string {
+	if x != nil {
+		return x.NotBrought
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_fileservice_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_fileservice_proto_rawDesc = "" +
@@ -310,20 +348,26 @@ const file_plugin_grpc_protocol_fileservice_proto_rawDesc = "" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x1b\n" +
 	"\tmime_type\x18\x03 \x01(\tR\bmimeType\x12\x1f\n" +
 	"\vbase64_data\x18\x04 \x01(\tR\n" +
-	"base64Data\"v\n" +
+	"base64Data\"\x91\x01\n" +
 	"\x0fKeepFileRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x0e\n" +
 	"\x02by\x18\x02 \x01(\tR\x02by\x12\x1a\n" +
 	"\bfilename\x18\x03 \x01(\tR\bfilename\x12\x18\n" +
-	"\acontent\x18\x04 \x01(\fR\acontent\"\xa8\x01\n" +
+	"\acontent\x18\x04 \x01(\fR\acontent\x12\x19\n" +
+	"\bbring_to\x18\x05 \x01(\tR\abringTo\"\x90\x02\n" +
 	"\x10KeepFileResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x17\n" +
 	"\afile_id\x18\x03 \x01(\tR\x06fileId\x12\x14\n" +
 	"\x05asset\x18\x04 \x01(\tR\x05asset\x12!\n" +
 	"\fcontent_type\x18\x05 \x01(\tR\vcontentType\x12\x12\n" +
-	"\x04size\x18\x06 \x01(\x03R\x04size2\x99\x01\n" +
+	"\x04size\x18\x06 \x01(\x03R\x04size\x12\x1d\n" +
+	"\n" +
+	"brought_to\x18\a \x01(\tR\tbroughtTo\x12&\n" +
+	"\x0fbrought_file_id\x18\b \x01(\tR\rbroughtFileId\x12\x1f\n" +
+	"\vnot_brought\x18\t \x01(\tR\n" +
+	"notBrought2\x99\x01\n" +
 	"\vFileService\x12G\n" +
 	"\x0eReadFileBase64\x12\x19.protocol.ReadFileRequest\x1a\x1a.protocol.ReadFileResponse\x12A\n" +
 	"\bKeepFile\x12\x19.protocol.KeepFileRequest\x1a\x1a.protocol.KeepFileResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"

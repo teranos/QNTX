@@ -23,6 +23,7 @@ const (
 	LevelAttestor           = access.LevelAttestor
 	LevelPublicRegistration = access.LevelPublicRegistration
 	LevelUser               = access.LevelUser
+	LevelPeer               = access.LevelPeer
 	LevelConnector          = access.LevelConnector
 	LevelOAuth              = access.LevelOAuth
 	LevelRefresh            = access.LevelRefresh

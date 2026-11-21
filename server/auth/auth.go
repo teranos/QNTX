@@ -119,7 +119,9 @@ type Handler struct {
 	layeSays LayeSays
 	issued   issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
-	loginAt         string
+	loginAt string
+	// direct is where this node reaches a peer itself, by the name the primary calls it (nodes.direct).
+	direct          map[string]string
 	logsInElsewhere bool
 	elsewhere       elsewhereJourneys
 	// How this primary asks GitHub for a peer (github_for_peers.go).
@@ -648,6 +650,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// A peer asks GitHub through this node, signing as itself.
 	mux.answer(githubForPeersPath, h.handleGitHubForPeers)
 	mux.answer(githubLocationForPeersPath, h.handleGitHubLocationForPeers)
+	// A peer hands this node a file for another peer, signing as itself.
+	mux.answer(filesForPeersPath, h.handleFilesForPeers)
 	// A node whose people log in at another sends them there and takes them back.
 	mux.answer(elsewherePath, h.handleElsewhere)
 	mux.answer(elsewhereBackPath, h.handleElsewhereBack)

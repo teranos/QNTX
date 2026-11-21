@@ -207,6 +207,11 @@ type NodesConfig struct {
 	// While it is down this node keeps going, and nobody new logs in.
 	Primary string       `mapstructure:"primary"`
 	Peers   []PeerConfig `mapstructure:"peers"` // On the primary: its peers, one line each.
+	// "just for clarification, the bytes dont go through Q to K but L to K right?"
+	// Direct is, on a peer, where it reaches another peer itself, by the name
+	// the primary calls it: k = "http://k.example.net:8770". What it brings
+	// there goes that way and not by the primary.
+	Direct map[string]string `mapstructure:"direct"`
 }
 
 // "LAYE IN FRONT OF QNTX"
