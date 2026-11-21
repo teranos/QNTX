@@ -42,6 +42,14 @@ func recordWait(start time.Time, mutex string) {
 	collector.record("mutex:"+mutex, elapsed)
 }
 
+// logReadWait says that caller waited for every read connection of the file
+// at path, and who held each when the wait began.
+func logReadWait(path, caller string, waited time.Duration, heldBy []string) {
+	collector.record("mutex:read_pool", waited)
+	logger.Logger.Warnw("A read waited for every read connection",
+		"file", path, "caller", caller, "waited", waited, "held_by", strings.Join(heldBy, "; "))
+}
+
 const historySize = 60 // 60 x 5min = 5 hours of rolling history
 
 // slowCollector accumulates all slow events (ops and waits) into buckets
