@@ -1,6 +1,9 @@
 package server
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -72,6 +75,51 @@ func TestTheNodeKeepsTheOriginalAPhotoIs(t *testing.T) {
 	}
 	if waiting, _ := srv.stillToRead(readPerNight); len(waiting) != 2 {
 		t.Errorf("%d originals wait to be read, want the HEIC and the DNG", len(waiting))
+	}
+}
+
+// "in my mind i expect to see the actual picture."
+// 「[Opus 5.5] What the node holds is listed newest first, each picture once, with what was read in it.」
+func TestWhatTheNodeHoldsIsListedWithItsReadings(t *testing.T) {
+	srv := createFileTestServer(t)
+	older, err := srv.KeepFileForPlugin("ipluk", "older.jpeg", screenshot, "")
+	if err != nil {
+		t.Fatalf("the node did not keep it: %v", err)
+	}
+	time.Sleep(1100 * time.Millisecond)
+	newer, err := srv.KeepFileForPlugin("ipluk", "newer.jpeg", append(append([]byte{}, screenshot...), " and more"...), "")
+	if err != nil {
+		t.Fatalf("the node did not keep it: %v", err)
+	}
+	if err := srv.attestRead(toRead{asset: older.Asset, fileID: older.ID}, "gaze", "Qwen2.5 VL 3B Instruct", "A screenshot of a chat."); err != nil {
+		t.Fatalf("the reading was not written: %v", err)
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/api/files/", nil)
+	w := httptest.NewRecorder()
+	srv.HandleFiles(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /api/files/ answered %d: %s", w.Code, w.Body.String())
+	}
+	var pictures []heldPicture
+	if err := json.Unmarshal(w.Body.Bytes(), &pictures); err != nil {
+		t.Fatalf("the answer did not read: %v", err)
+	}
+	if len(pictures) != 2 || pictures[0].Asset != newer.Asset || pictures[1].Asset != older.Asset {
+		t.Fatalf("pictures = %+v, want %s then %s", pictures, newer.Asset, older.Asset)
+	}
+	if len(pictures[0].Readings) != 0 {
+		t.Errorf("the newer one has readings: %+v", pictures[0].Readings)
+	}
+	if got := pictures[1].Readings; len(got) != 1 || got[0].Said != "A screenshot of a chat." || got[0].By != "gaze/Qwen2.5 VL 3B Instruct" {
+		t.Errorf("the older one's readings = %+v", got)
+	}
+
+	// /api/files, which a peer may bring a file to, lists nothing.
+	w = httptest.NewRecorder()
+	srv.HandleFiles(w, httptest.NewRequest(http.MethodGet, "/api/files", nil))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("GET /api/files answered %d, want 400", w.Code)
 	}
 }
 
