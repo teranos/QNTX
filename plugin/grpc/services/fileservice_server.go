@@ -26,6 +26,11 @@ var mimeByExtension = map[string]string{
 	".webp": "image/webp",
 	".svg":  "image/svg+xml",
 	".txt":  "text/plain",
+	".m4a":  "audio/mp4",
+	".webm": "audio/webm",
+	".wav":  "audio/wav",
+	".mp3":  "audio/mpeg",
+	".ogg":  "audio/ogg",
 }
 
 // FileServiceServer implements the FileService gRPC server.

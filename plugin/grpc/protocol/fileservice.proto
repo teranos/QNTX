@@ -38,7 +38,8 @@ message KeepFileRequest {
   bytes content = 4;
   // "to me it feels like k should own my Media Assets"
   // The peer that is to hold it, as the primary calls it, e.g. "k". The node
-  // keeps the file and brings it there through the primary. Empty: it stays here.
+  // keeps the file and later brings it to that peer itself: the primary only
+  // vouches for the node, and the bytes go straight to the peer. Empty: it stays here.
   string bring_to = 5;
 }
 
@@ -49,10 +50,10 @@ message KeepFileResponse {
   string asset = 4;         // "sha256:<hex>" of the bytes
   string content_type = 5;
   int64 size = 6;
-  // Where the file was brought, when bring_to named a peer and the peer kept it,
-  // and the id that peer serves it under.
+  // Empty in every answer: success says the node keeps the file, not that a
+  // peer does. A file meant for a peer is brought after the answer, and the
+  // node's brought line says when it is there.
   string brought_to = 7;
   string brought_file_id = 8;
-  // Why the file was not brought to the peer bring_to named. The node still keeps it.
   string not_brought = 9;
 }
