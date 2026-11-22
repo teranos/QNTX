@@ -110,7 +110,7 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	if ec.StoredTask == nil && !yield(submitted, nil) {
 		return
 	}
-	// "Agents cant wake Agents willy nilly"
+	// Not handed over now: held until it is due, or a person releases it.
 	// Said by no person, it is collected for the agent (collected.go), and
 	// its Task ends when what was collected is delivered.
 	if !aPersonSpeaks(call.request) {
