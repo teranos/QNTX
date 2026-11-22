@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,6 +57,23 @@ var heartbeatPaths = map[string]bool{
 	"/am/statusline": true,
 }
 
+// polled is whether this request is a poll, by what it asks and what it was
+// told. A ground asks for its comet again and again until one is kept, and is
+// told 404 each time; the path carries the comet's hash, so no fixed list names
+// it. Only that answer is a poll: a 403 or a 429 on the same path is a refusal
+// and is said every time, and a POST that builds one is never one.
+func polled(r *http.Request, status int) bool {
+	if heartbeatPaths[r.URL.Path] {
+		return true
+	}
+	return asksForComet(r) && status == http.StatusNotFound
+}
+
+// asksForComet is a GET or HEAD under /comet/: a ground reading, not a build.
+func asksForComet(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Path, "/comet/") && (r.Method == http.MethodGet || r.Method == http.MethodHead)
+}
+
 // Whether this poll went well: it answered. How long it took is not the
 // state; a quick endpoint crossing a latency line and back was a turn each way.
 
@@ -83,17 +101,46 @@ type heartbeatState struct {
 type heartbeats struct {
 	seen sync.Map // path -> heartbeatState
 	mu   sync.Mutex
+	held int
 }
 
+// How many paths are remembered. A comet's path carries whatever a caller
+// writes, so the set is not the three fixed polls and cannot be left to grow.
+// Past it a new path is said every time, as every path was before polls were
+// remembered.
+const heartbeatHolds = 1024
+
+// How long a remembered path can be. The count above bounds the entries and
+// this bounds each one, so the set cannot hold more than a few hundred
+// kilobytes whatever a caller writes. A comet's path is a few dozen bytes.
+const heartbeatPathMax = 256
+
 // worthSaying reports whether this poll is a change worth a line.
+// forget drops what was said about a path, so the next answer is news again.
+// A comet answered otherwise than 404 has changed, and a 404 after that is said.
+func (h *heartbeats) forget(path string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if _, seen := h.seen.LoadAndDelete(path); seen {
+		h.held--
+	}
+}
+
 func (h *heartbeats) worthSaying(path string, well bool) bool {
 	// Read and write as one: two polls landing together would each see the
 	// same count and each decide it was the one to speak.
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	if len(path) > heartbeatPathMax {
+		return true
+	}
 	state := heartbeatState{well: well}
-	if last, seen := h.seen.Load(path); seen {
+	last, seen := h.seen.Load(path)
+	if !seen && h.held >= heartbeatHolds {
+		return true
+	}
+	if seen {
 		// A different answer resets the count, which is what makes a change
 		// always said and a state never.
 		if was, ok := last.(heartbeatState); ok && was.well == well {
@@ -104,7 +151,13 @@ func (h *heartbeats) worthSaying(path string, well bool) bool {
 		return false
 	}
 	state.said++
-	h.seen.Store(path, state)
+	if !seen {
+		h.held++
+	}
+	// A path with nothing escaped in it is a slice of the request line, and held
+	// as a key it keeps the whole line, query and all, alive. Stored again, an
+	// equal key replaces the one held, so every store is of a copy.
+	h.seen.Store(strings.Clone(path), state)
 	return true
 }
 
@@ -127,6 +180,9 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 		// Counted before the heartbeat check, or the row would report only the
 		// refusals that were also worth a log line.
 		s.answers.note(recorder.status)
+		if asksForComet(r) && recorder.status != http.StatusNotFound {
+			s.heartbeats.forget(r.URL.Path)
+		}
 
 		// A refusal Sentry is told of is said there, bounded, and not again here.
 		if said.Load() {
@@ -135,7 +191,7 @@ func (s *QNTXServer) accessLog(next http.HandlerFunc) http.HandlerFunc {
 
 		// A polled path says something when its answer turns, and nothing while
 		// it stays the same.
-		if heartbeatPaths[r.URL.Path] {
+		if polled(r, recorder.status) {
 			if !s.heartbeats.worthSaying(r.URL.Path, heartbeatWell(recorder.status)) {
 				return
 			}

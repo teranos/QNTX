@@ -280,6 +280,11 @@ impl WatcherStore {
             }
         }
 
+        // What S3 is reached with expires: it is resolved again before each
+        // write, as the attestations flush does. Without it every flush after
+        // the first credentials expired was refused with ExpiredToken (q,
+        // 2026-11-18 16:00 to 2026-11-21 09:43 UTC, 18,961 times).
+        crate::resolve_credentials_again(&self.conn, &self.location)?;
         self.seq += 1;
         let path = format!("{}/{}.parquet", self.fires_prefix, self.batch_name());
         self.conn
