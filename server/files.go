@@ -160,12 +160,19 @@ func (s *QNTXServer) filesDir() (string, error) {
 // HandleFiles routes file upload and serve requests.
 //
 //	POST /api/files      - Upload a file (multipart form)
+//	GET  /api/files/     - What this node holds, newest first, with what was read in each
 //	GET  /api/files/{id} - Serve a stored file
 func (s *QNTXServer) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		s.handleFileUpload(w, r)
 	case http.MethodGet:
+		// /api/files/ is ROOT's alone in the tablet of reach; /api/files, which a
+		// peer may bring a file to, lists nothing.
+		if r.URL.Path == "/api/files/" {
+			s.handleFilesHeld(w, r)
+			return
+		}
 		id := strings.TrimPrefix(r.URL.Path, "/api/files/")
 		if id == "" || id == r.URL.Path {
 			http.Error(w, "file ID required", http.StatusBadRequest)
