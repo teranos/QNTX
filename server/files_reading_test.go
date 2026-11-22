@@ -52,7 +52,7 @@ func TestThePicturesReadAreTheNewestNotYetRead(t *testing.T) {
 
 // "i see, we would want the real original for this"
 // 「[Opus 5.5] A phone's HEIC and a camera's DNG are kept as the originals they are, by their」
-// 「[Opus 5.5] bytes; one named so that is not is refused. Neither is read: the reader opens neither.」
+// 「[Opus 5.5] bytes; one named so that is not is refused. Both wait to be read, as a JPEG made of them.」
 func TestTheNodeKeepsTheOriginalAPhotoIs(t *testing.T) {
 	srv := createFileTestServer(t)
 	heic := append([]byte("\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic"), " then the picture"...)
@@ -70,8 +70,8 @@ func TestTheNodeKeepsTheOriginalAPhotoIs(t *testing.T) {
 	if _, err := srv.KeepFileForPlugin("ipluk", "IMG_0002.heic", []byte("not a picture at all"), ""); err == nil {
 		t.Error("a .heic that is no HEIC was kept")
 	}
-	if waiting, _ := srv.stillToRead(readPerNight); len(waiting) != 0 {
-		t.Errorf("%d originals wait to be read that the reader cannot open", len(waiting))
+	if waiting, _ := srv.stillToRead(readPerNight); len(waiting) != 2 {
+		t.Errorf("%d originals wait to be read, want the HEIC and the DNG", len(waiting))
 	}
 }
 
