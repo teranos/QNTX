@@ -140,7 +140,7 @@ func (s *QNTXServer) takeIn(w http.ResponseWriter, r *http.Request, encoding str
 		otlpRefuse(w, s, encoding, http.StatusBadRequest, fmt.Sprintf("the body is no %s: %v", export.ProtoReflect().Descriptor().Name(), err))
 		return
 	}
-	store, err := s.storeFor(r)
+	store, err := s.otlpStoreFor(r)
 	if err != nil {
 		otlpRefuse(w, s, encoding, http.StatusForbidden, err.Error())
 		return
@@ -154,6 +154,39 @@ func (s *QNTXServer) takeIn(w http.ResponseWriter, r *http.Request, encoding str
 		return
 	}
 	otlpAnswer(w, s, encoding, http.StatusOK, answer)
+}
+
+// "system (Recommended)"
+//
+// 「[Opus 5.5] otlpStoreFor is where an export is kept: system for one of ROOT's agents, which keeps its」
+// 「[Opus 5.5] sessions there, and otherwise the namespace the caller acts in.」
+func (s *QNTXServer) otlpStoreFor(r *http.Request) (ats.AttestationStore, error) {
+	if auth.ThroughARootsAgentsDoor(r.Context()) {
+		system, err := s.held.WriteWhatTheNodeKnowsOfItself()
+		if err != nil {
+			return nil, err
+		}
+		return otlpInSystem{system}, nil
+	}
+	return s.storeFor(r)
+}
+
+// otlpSystemSubject heads the subject of what ix/otel keeps in system.
+const otlpSystemSubject = "otel:"
+
+// otlpInSystem keeps an export in system under subjects of its own. The node's
+// own lines in system are read by subject (its GitHub settings, the reach
+// table, a stand), and a span whose service.name is GITHUB, named node, would
+// otherwise be read as the newest of them.
+type otlpInSystem struct{ ats.AttestationStore }
+
+func (s otlpInSystem) CreateAttestation(as *types.As) error {
+	held := *as
+	held.Subjects = make([]string, len(as.Subjects))
+	for i, subject := range as.Subjects {
+		held.Subjects[i] = otlpSystemSubject + subject
+	}
+	return s.AttestationStore.CreateAttestation(&held)
 }
 
 // 「[Opus 5.5] otlpEncodingOf is the encoding the request's Content-Type names, or empty for one OTLP does not speak.」
