@@ -22,6 +22,7 @@ type Config struct {
 	Agent      AgentConfig      `mapstructure:"agent"`
 	Collected  CollectedConfig  `mapstructure:"collected"`
 	Etcd       EtcdConfig       `mapstructure:"etcd"`
+	Files      FilesConfig      `mapstructure:"files"`
 
 	// said is the keys something said, recorded as the config is read.
 	said map[string]bool
@@ -38,6 +39,13 @@ type EtcdConfig struct {
 	// it keeps; PasswordFile holds its password. Empty asks as nobody.
 	User         string `mapstructure:"user"`
 	PasswordFile string `mapstructure:"password_file"`
+}
+
+// "and have a read on everything"
+// FilesConfig is what the node does with the files it holds. ReadWith names
+// the provider that reads its pictures at night, e.g. "gaze"; empty reads none.
+type FilesConfig struct {
+	ReadWith string `mapstructure:"read_with"`
 }
 
 // AgentConfig is the agents this node runs (ADR-048).
