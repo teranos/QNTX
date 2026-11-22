@@ -55,6 +55,10 @@ func pluginRecord(name string) (PluginRecord, bool, error) {
 	recordsMu.RLock()
 	held := records
 	recordsMu.RUnlock()
+	// Records handed as nothing are records not handed.
+	if held == nil {
+		held = recordsNotHanded{}
+	}
 	record, found, err := held.Plugin(name)
 	if err != nil {
 		return PluginRecord{}, false, errors.Wrapf(err, "failed to read the record of plugin %s", name)
