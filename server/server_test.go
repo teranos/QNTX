@@ -621,7 +621,7 @@ func TestGetDaemon(t *testing.T) {
 
 	// Verify registry has only built-in handlers,
 	// and what the subsystems linked into this build declare (ADR-056).
-	allowed := []string{"wal-checkpoint", watcher.CIWatchHandlerName, reportHandlerName}
+	allowed := []string{"wal-checkpoint", watcher.CIWatchHandlerName, reportHandlerName, readingHandlerName}
 	for _, sub := range subsystem.Registered() {
 		allowed = append(allowed, sub.Declare().GetHandlerNames()...)
 	}

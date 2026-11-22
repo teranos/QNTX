@@ -177,7 +177,9 @@ func (s *QNTXServer) stillToRead(most int) ([]toRead, error) {
 			done[asset] = true
 		}
 	}
-	var waiting []toRead
+	// The same bytes held twice are read once, and are as new as when they
+	// were first held: handed over again later, a picture is no newer.
+	first := map[string]toRead{}
 	for _, line := range held {
 		if len(line.Subjects) != 1 || done[line.Subjects[0]] {
 			continue
@@ -187,9 +189,15 @@ func (s *QNTXServer) stillToRead(most int) ([]toRead, error) {
 		if !readable[fileType] || fileID == "" {
 			continue
 		}
-		// The same bytes held twice are read once.
-		done[line.Subjects[0]] = true
-		waiting = append(waiting, toRead{asset: line.Subjects[0], fileID: fileID, heldAt: line.Timestamp})
+		asset := line.Subjects[0]
+		if earlier, seen := first[asset]; seen && !line.Timestamp.Before(earlier.heldAt) {
+			continue
+		}
+		first[asset] = toRead{asset: asset, fileID: fileID, heldAt: line.Timestamp}
+	}
+	waiting := make([]toRead, 0, len(first))
+	for _, picture := range first {
+		waiting = append(waiting, picture)
 	}
 	sort.SliceStable(waiting, func(i, j int) bool { return waiting[i].heldAt.After(waiting[j].heldAt) })
 	if len(waiting) > most {
