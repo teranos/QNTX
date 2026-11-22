@@ -124,6 +124,17 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateInputRequired, failedWhy(id, ec.ContextID, collectedSays(ta.called, due))), nil)
 		return
 	}
+	// Handed to laye where am.toml names one; else the node keeps it, on the
+	// status row, as it did before laye collected (CodeRabbit on #1822).
+	if fromDID, connector := aConnectorSpeaks(call.request); connector && e.s.layeOrigin() != "" {
+		said, err := e.s.handToLaye(ctx, ta.called, fromDID, e.s.calledBy(fromDID), says, ec.ContextID)
+		if err != nil {
+			yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "it was not collected by laye for "+ta.called+", and was not said: "+err.Error())), nil)
+			return
+		}
+		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateInputRequired, failedWhy(id, ec.ContextID, said)), nil)
+		return
+	}
 	if e.s.news == nil {
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "this node keeps no status row to leave it on")), nil)
 		return
