@@ -74,4 +74,7 @@ if [ -z "$started" ]; then
 fi
 
 export QNTX_ETCD_ENDPOINT="$client"
+# Where this etcd is, for a test that runs one of its own with other flags
+# (crates/ats-etcd/tests/stale_token.rs).
+export QNTX_ETCD_BIN="$bin"
 "$@"
