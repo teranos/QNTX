@@ -58,6 +58,15 @@ impl From<serde_json::Error> for EtcdError {
     }
 }
 
+impl EtcdError {
+    /// Whether etcd refused for a token it no longer holds: one left unused past
+    /// etcd's --auth-token-ttl is forgotten, and asking again with it is refused
+    /// every time.
+    pub(crate) fn stale_token(&self) -> bool {
+        matches!(self, EtcdError::Etcd(e) if e.to_string().contains("invalid auth token"))
+    }
+}
+
 /// 「[Opus 5.5] The surface every error from this crate names.」
 pub const SURFACE: &str = "ats-etcd";
 
