@@ -5,6 +5,7 @@
 // "「[Opus 5.5] our gap is kv」"
 
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 use etcd_client::{Client, Compare, CompareOp, ConnectOptions, GetOptions, Txn, TxnOp};
 use tokio::runtime::Runtime;
@@ -30,8 +31,46 @@ fn fits(prefix: &str) -> bool {
 
 pub struct EtcdKeys {
     runtime: Runtime,
-    client: Client,
+    /// The client, and the token it signed in with, held until etcd forgets the
+    /// token and it is signed in again as `user`: q stopped reading who holds a
+    /// name when its token went unused past etcd's --auth-token-ttl.
+    client: Mutex<Client>,
+    endpoint: String,
+    user: Option<(String, String)>,
     prefix: String,
+}
+
+/// A client of the etcd at `endpoint`, signed in as `user` where etcd
+/// authenticates anyone, and as nobody where it does not yet.
+fn connect(runtime: &Runtime, endpoint: &str, user: Option<(&str, &str)>) -> Result<Client> {
+    let options = || {
+        ConnectOptions::new()
+            .with_connect_timeout(OPEN_TIMEOUT)
+            .with_timeout(OPEN_TIMEOUT)
+    };
+    runtime
+        .block_on(async {
+            let asked = match user {
+                Some((name, password)) => {
+                    match Client::connect([endpoint], Some(options().with_user(name, password)))
+                        .await
+                    {
+                        Err(e) if e.to_string().contains("authentication is not enabled") => {
+                            Client::connect([endpoint], Some(options())).await
+                        }
+                        connected => connected,
+                    }
+                }
+                None => Client::connect([endpoint], Some(options())).await,
+            };
+            let mut client = asked?;
+            client.status().await?;
+            Ok::<Client, etcd_client::Error>(client)
+        })
+        .map_err(|source| EtcdError::Connect {
+            endpoint: endpoint.to_string(),
+            source,
+        })
 }
 
 impl EtcdKeys {
@@ -55,46 +94,54 @@ impl EtcdKeys {
             .enable_all()
             .build()
             .map_err(EtcdError::Runtime)?;
-        let options = || {
-            ConnectOptions::new()
-                .with_connect_timeout(OPEN_TIMEOUT)
-                .with_timeout(OPEN_TIMEOUT)
-        };
-        let client = runtime
-            .block_on(async {
-                let asked = match user {
-                    Some((name, password)) => {
-                        match Client::connect([endpoint], Some(options().with_user(name, password)))
-                            .await
-                        {
-                            Err(e) if e.to_string().contains("authentication is not enabled") => {
-                                Client::connect([endpoint], Some(options())).await
-                            }
-                            connected => connected,
-                        }
-                    }
-                    None => Client::connect([endpoint], Some(options())).await,
-                };
-                let mut client = asked?;
-                client.status().await?;
-                Ok::<Client, etcd_client::Error>(client)
-            })
-            .map_err(|source| EtcdError::Connect {
-                endpoint: endpoint.to_string(),
-                source,
-            })?;
+        let client = connect(&runtime, endpoint, user)?;
         Ok(Self {
             runtime,
-            client,
+            client: Mutex::new(client),
+            endpoint: endpoint.to_string(),
+            user: user.map(|(name, password)| (name.to_string(), password.to_string())),
             prefix: prefix.to_string(),
         })
+    }
+
+    /// The client as it is now.
+    fn client(&self) -> Client {
+        self.client
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// What `once` answers, asked again once signed in afresh where etcd forgot
+    /// the token it was asked with. A request etcd refuses for its token is
+    /// refused before anything in it is done, so asking it again does it once.
+    fn asked<T>(&self, once: impl Fn() -> Result<T>) -> Result<T> {
+        match once() {
+            Err(e) if e.stale_token() => {
+                let user = self
+                    .user
+                    .as_ref()
+                    .map(|(name, password)| (name.as_str(), password.as_str()));
+                let fresh = connect(&self.runtime, &self.endpoint, user)?;
+                *self
+                    .client
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = fresh;
+                once()
+            }
+            answered => answered,
+        }
     }
 
     /// 「[Opus 5.5] The names under the prefix, read without their values and a page at
     /// 「[Opus 5.5] a time: one answer holding every value passed gRPC's 4 MiB, and then」
     /// 「[Opus 5.5] nothing under the prefix could be set or deleted (CodeRabbit on #1768).」」
     pub fn names(&self) -> Result<Vec<String>> {
-        let client = self.client.clone();
+        self.asked(|| self.names_once())
+    }
+
+    fn names_once(&self) -> Result<Vec<String>> {
+        let client = self.client();
         let prefix = self.prefix.clone();
         let mut end = prefix.clone().into_bytes();
         if let Some(last) = end.last_mut() {
@@ -154,16 +201,18 @@ impl EtcdKeys {
 
     /// 「[Opus 5.5] One name's value; None when the prefix does not hold it.」
     pub fn value(&self, name: &str) -> Result<Option<Vec<u8>>> {
-        let client = self.client.clone();
         let key = format!("{}{name}", self.prefix);
-        self.runtime.block_on(async {
-            let (got, _) = once_more(|| {
-                let mut client = client.clone();
-                let key = key.clone();
-                async move { client.get(key, None).await }
+        self.asked(|| {
+            let client = self.client();
+            self.runtime.block_on(async {
+                let (got, _) = once_more(|| {
+                    let mut client = client.clone();
+                    let key = key.clone();
+                    async move { client.get(key, None).await }
+                })
+                .await?;
+                Ok(got.kvs().first().map(|kv| kv.value().to_vec()))
             })
-            .await?;
-            Ok(got.kvs().first().map(|kv| kv.value().to_vec()))
         })
     }
 
@@ -181,11 +230,14 @@ impl EtcdKeys {
 
     /// 「[Opus 5.5] The revision a key was last put at; None when the prefix does not hold it.」
     pub fn revision_of(&self, name: &str) -> Result<Option<i64>> {
-        let mut client = self.client.clone();
         let key = format!("{}{name}", self.prefix);
-        self.runtime.block_on(async {
-            let got = client.get(key, None).await?;
-            Ok(got.kvs().first().map(|kv| kv.mod_revision()))
+        self.asked(|| {
+            let mut client = self.client();
+            let key = key.clone();
+            self.runtime.block_on(async {
+                let got = client.get(key, None).await?;
+                Ok(got.kvs().first().map(|kv| kv.mod_revision()))
+            })
         })
     }
 
@@ -196,7 +248,6 @@ impl EtcdKeys {
     /// 「[Opus 5.5] value alone is held under that by its writer.」」
     pub fn set(&mut self, whole: &BTreeMap<String, Vec<u8>>) -> Result<()> {
         let names = self.names()?;
-        let client = self.client.clone();
         let prefix = self.prefix.clone();
         // 「[Opus 5.5] A put and a delete of a key are each asked once more when they fail:
         // asked twice, each leaves the key as it was asked to.」
@@ -205,20 +256,32 @@ impl EtcdKeys {
                 continue;
             }
             let key = format!("{prefix}{name}");
-            self.runtime.block_on(once_more(|| {
-                let mut client = client.clone();
-                let (key, value) = (key.clone(), value.clone());
-                async move { client.put(key, value, None).await }
-            }))?;
+            self.asked(|| {
+                let client = self.client();
+                self.runtime
+                    .block_on(once_more(|| {
+                        let mut client = client.clone();
+                        let (key, value) = (key.clone(), value.clone());
+                        async move { client.put(key, value, None).await }
+                    }))
+                    .map(|_| ())
+                    .map_err(EtcdError::from)
+            })?;
         }
         for name in &names {
             if !whole.contains_key(name) {
                 let key = format!("{prefix}{name}");
-                self.runtime.block_on(once_more(|| {
-                    let mut client = client.clone();
-                    let key = key.clone();
-                    async move { client.delete(key, None).await }
-                }))?;
+                self.asked(|| {
+                    let client = self.client();
+                    self.runtime
+                        .block_on(once_more(|| {
+                            let mut client = client.clone();
+                            let key = key.clone();
+                            async move { client.delete(key, None).await }
+                        }))
+                        .map(|_| ())
+                        .map_err(EtcdError::from)
+                })?;
             }
         }
         Ok(())
@@ -236,21 +299,23 @@ impl EtcdKeys {
         for key in keys {
             whole(key)?;
         }
-        let client = self.client.clone();
-        self.runtime.block_on(async {
-            let mut read = BTreeMap::new();
-            for key in keys {
-                let (got, _) = once_more(|| {
-                    let mut client = client.clone();
-                    let key = key.clone();
-                    async move { client.get(key, None).await }
-                })
-                .await?;
-                if let Some(kv) = got.kvs().first() {
-                    read.insert(key.clone(), (kv.value().to_vec(), kv.mod_revision()));
+        self.asked(|| {
+            let client = self.client();
+            self.runtime.block_on(async {
+                let mut read = BTreeMap::new();
+                for key in keys {
+                    let (got, _) = once_more(|| {
+                        let mut client = client.clone();
+                        let key = key.clone();
+                        async move { client.get(key, None).await }
+                    })
+                    .await?;
+                    if let Some(kv) = got.kvs().first() {
+                        read.insert(key.clone(), (kv.value().to_vec(), kv.mod_revision()));
+                    }
                 }
-            }
-            Ok(read)
+                Ok(read)
+            })
         })
     }
 
@@ -267,19 +332,25 @@ impl EtcdKeys {
         for key in unchanged.keys().chain(put.keys()).chain(delete) {
             whole(key)?;
         }
-        let compares: Vec<Compare> = unchanged
-            .iter()
-            .map(|(key, revision)| Compare::mod_revision(key.as_str(), CompareOp::Equal, *revision))
-            .collect();
-        let ops: Vec<TxnOp> = put
-            .iter()
-            .map(|(key, value)| TxnOp::put(key.as_str(), value.clone(), None))
-            .chain(delete.iter().map(|key| TxnOp::delete(key.as_str(), None)))
-            .collect();
-        let mut client = self.client.clone();
-        self.runtime.block_on(async {
-            let done = client.txn(Txn::new().when(compares).and_then(ops)).await?;
-            Ok(done.succeeded())
+        // A swap etcd refused for its token did nothing, and is asked again
+        // signed in afresh.
+        self.asked(|| {
+            let compares: Vec<Compare> = unchanged
+                .iter()
+                .map(|(key, revision)| {
+                    Compare::mod_revision(key.as_str(), CompareOp::Equal, *revision)
+                })
+                .collect();
+            let ops: Vec<TxnOp> = put
+                .iter()
+                .map(|(key, value)| TxnOp::put(key.as_str(), value.clone(), None))
+                .chain(delete.iter().map(|key| TxnOp::delete(key.as_str(), None)))
+                .collect();
+            let mut client = self.client();
+            self.runtime.block_on(async {
+                let done = client.txn(Txn::new().when(compares).and_then(ops)).await?;
+                Ok(done.succeeded())
+            })
         })
     }
 }
