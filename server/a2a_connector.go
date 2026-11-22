@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -58,16 +60,49 @@ type layeCollected struct {
 	} `json:"task"`
 }
 
+// layeOrigin is the [laye] origin am.toml names, without a trailing slash, or
+// empty when it names none.
+func (s *QNTXServer) layeOrigin() string {
+	if s.deps == nil || s.deps.cfg == nil {
+		return ""
+	}
+	return strings.TrimSuffix(strings.TrimSpace(s.deps.cfg.Laye.Origin), "/")
+}
+
+// layeReachable is nil for an origin a node-signed request may go to: over
+// HTTPS, or plain HTTP to this machine alone (CodeRabbit on #1822: what a
+// person said and the node's signature never cross a network in the clear).
+func layeReachable(origin string) error {
+	at, err := url.Parse(origin)
+	if err != nil {
+		return errors.Wrapf(err, "the [laye] origin %q does not read", origin)
+	}
+	if at.Scheme == "https" {
+		return nil
+	}
+	if host := at.Hostname(); at.Scheme == "http" && (host == "localhost" || net.ParseIP(host) != nil && net.ParseIP(host).IsLoopback()) {
+		return nil
+	}
+	return errors.Newf("the [laye] origin %q is not HTTPS: the node signs what it hands laye, and sends it over HTTPS or to this machine alone", origin)
+}
+
+// toLaye follows no redirect: a node-signed request goes to the origin
+// am.toml names and nowhere it is sent on to.
+var toLaye = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+
 // handToLaye hands what a connector said to the agent called to laye, which
 // collects it. It answers what laye said of it.
 func (s *QNTXServer) handToLaye(ctx context.Context, to, fromDID, from, says, contextID string) (string, error) {
-	if s.deps == nil || s.deps.cfg == nil || strings.TrimSpace(s.deps.cfg.Laye.Origin) == "" {
+	origin := s.layeOrigin()
+	if origin == "" {
 		return "", errors.New("am.toml names no [laye] origin to hand it to")
+	}
+	if refused := layeReachable(origin); refused != nil {
+		return "", refused
 	}
 	if s.authHandler == nil {
 		return "", errors.New("this node has no key to sign as")
 	}
-	origin := strings.TrimSuffix(strings.TrimSpace(s.deps.cfg.Laye.Origin), "/")
 	signed, err := s.authHandler.SignedAsNode(origin)
 	if err != nil {
 		return "", err
@@ -84,7 +119,7 @@ func (s *QNTXServer) handToLaye(ctx context.Context, to, fromDID, from, says, co
 	}
 	req.Header.Set("Authorization", signed)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := toLaye.Do(req)
 	if err != nil {
 		return "", errors.Wrapf(err, "laye at %s did not answer", origin)
 	}
