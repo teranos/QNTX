@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/parity"
 	"github.com/teranos/QNTX/server/reach"
@@ -126,6 +127,19 @@ func (h linkedHost) StoreFor(ctx context.Context) (ats.AttestationStore, error) 
 		return nil, errors.New("the asking carried no request to find the caller's namespace by")
 	}
 	return h.s.storeFor(caller)
+}
+
+func (h linkedHost) NamespaceFor(ctx context.Context) (string, error) {
+	caller := sigil.Caller(ctx)
+	if caller == nil {
+		return "", errors.New("the asking carried no request to find the caller's namespace by")
+	}
+	admitted, gated := auth.AdmissionFrom(caller.Context())
+	u, err := h.s.universeFor(admitted, gated)
+	if err != nil {
+		return "", err
+	}
+	return u.Name(), nil
 }
 
 func (h linkedHost) OfStandingRow(namespace string) (ats.AttestationStore, error) {
