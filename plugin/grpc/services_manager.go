@@ -391,7 +391,9 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 		return "", err
 	}
 
-	m.fileServiceServer = grpc.NewServer()
+	// "i see, we would want the real original for this"
+	// A plugin hands a file whole in one message: as large as a person may upload, and its framing.
+	m.fileServiceServer = grpc.NewServer(grpc.MaxRecvMsgSize(services.KeepFileMost))
 	fileServer := services.NewFileServiceServer(filesDir, authToken, m.logger)
 	fileServer.KeepWith(m.keepFile)
 	m.fileSrv = fileServer

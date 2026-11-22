@@ -43,6 +43,11 @@ const (
 	readingAsks = "Describe what is in this picture in three sentences. Name the app if it is a screenshot and you can tell."
 )
 
+// readable is the kinds of picture the reader opens. A HEIC or DNG original is
+// kept and not read: newest first, one the reader cannot open would be tried
+// first every night and fail every night.
+var readable = map[string]bool{"image/png": true, "image/jpeg": true}
+
 type readingHandler struct{ server *QNTXServer }
 
 func (h *readingHandler) Name() string { return readingHandlerName }
@@ -179,7 +184,7 @@ func (s *QNTXServer) stillToRead(most int) ([]toRead, error) {
 		}
 		fileType, _ := line.Attributes["file_type"].(string)
 		fileID, _ := line.Attributes["file_id"].(string)
-		if !strings.HasPrefix(fileType, "image/") || fileID == "" {
+		if !readable[fileType] || fileID == "" {
 			continue
 		}
 		// The same bytes held twice are read once.
