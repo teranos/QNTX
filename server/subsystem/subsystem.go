@@ -77,6 +77,11 @@ type Host interface {
 	// StoreFor is the store of the namespace the caller of a sigil stands in,
 	// from the context the sigil's Answer was handed.
 	StoreFor(ctx context.Context) (ats.AttestationStore, error)
+	// NamespaceFor is the name of the namespace StoreFor's store is, for a
+	// subsystem that keeps its own rows of it: Provenance answers quotes
+	// measure from the prompts it keeps, not by reading each one out of
+	// ground.db every time it is asked.
+	NamespaceFor(ctx context.Context) (string, error)
 	// OfStandingRow is the store of the namespace a standing row landed in,
 	// for what its built-in writes beside the row. system is refused.
 	OfStandingRow(namespace string) (ats.AttestationStore, error)

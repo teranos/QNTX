@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/server/sigil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -93,6 +95,28 @@ func TestNoCallerReachesNoStore(t *testing.T) {
 	s := routeServer()
 	if _, err := s.storeFor(httptest.NewRequest(http.MethodGet, "/api/attestations", nil)); err == nil {
 		t.Fatal("a request nobody admitted got the served store")
+	}
+}
+
+// A subsystem is told the name of the namespace its caller stands in, by the
+// same door storeFor goes through: one it does not stand in, or no caller,
+// is no name.
+func TestASubsystemIsToldTheNamespaceItsCallerStandsIn(t *testing.T) {
+	h := linkedHost{routeServer()}
+	asking := func(r *http.Request) context.Context { return sigil.WithCaller(context.Background(), r) }
+
+	name, err := h.NamespaceFor(asking(requestAs(auth.Admitted(auth.LevelAttestor, auth.NamespaceDefault))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != auth.NamespaceDefault {
+		t.Fatalf("the caller stands in %q, and was told %q", auth.NamespaceDefault, name)
+	}
+	if _, err := h.NamespaceFor(asking(requestAs(auth.Admitted(auth.LevelAttestor, "pond")))); err == nil {
+		t.Error("a caller in an unopened namespace was given its name")
+	}
+	if _, err := h.NamespaceFor(context.Background()); err == nil {
+		t.Error("an asking with no caller was given a namespace")
 	}
 }
 
