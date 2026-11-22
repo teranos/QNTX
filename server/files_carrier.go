@@ -47,19 +47,29 @@ type toBring struct {
 	to       string // the peer, as the primary calls it
 }
 
-// fileCarrier is what waits to be brought, and whether the one worker runs.
+// fileCarrier is what waits to be brought, whether the one worker runs, and,
+// for each peer that did not take a file, how long it is left alone.
 type fileCarrier struct {
-	mu      sync.Mutex
-	waiting []toBring
-	wake    chan struct{}
-	running bool
+	mu        sync.Mutex
+	waiting   []toBring
+	wake      chan struct{}
+	running   bool
+	notBefore map[string]time.Time     // peer → when it is tried again
+	backoff   map[string]time.Duration // peer → how long it waits after its next refusal
 }
 
 // carry puts a file among those waiting to be brought, and starts the worker
-// when it is not running. It answers at once.
+// when it is not running. It answers at once. The same bytes for the same
+// peer wait once.
 func (s *QNTXServer) carry(item toBring) {
 	c := &s.carrier
 	c.mu.Lock()
+	for _, already := range c.waiting {
+		if already.asset == item.asset && already.to == item.to {
+			c.mu.Unlock()
+			return
+		}
+	}
 	c.waiting = append(c.waiting, item)
 	c.mu.Unlock()
 	s.startCarrier()
@@ -85,87 +95,158 @@ func (s *QNTXServer) startCarrier() {
 }
 
 // carryWhatWaits reads what this node still holds for a peer from its own
-// lines and has the worker bring it. Called when the node has started.
+// lines and has the worker bring it. Called when the node has started. When
+// the lines do not read, they are read again, waiting longer each time.
 func (s *QNTXServer) carryWhatWaits() {
+	if s.carryWhatIsRead() {
+		return
+	}
+	s.wg.Go("files.carrier.recover", func() {
+		stops := s.stopping()
+		again := carrierFirstBackoff
+		for {
+			select {
+			case <-stops.Done():
+				return
+			case <-time.After(again):
+			}
+			if s.carryWhatIsRead() {
+				return
+			}
+			if again *= 2; again > carrierMostBackoff {
+				again = carrierMostBackoff
+			}
+		}
+	})
+}
+
+// carryWhatIsRead has the worker bring what this node's lines say it still
+// holds for a peer, and says whether the lines read.
+func (s *QNTXServer) carryWhatIsRead() bool {
 	waiting, err := s.stillToBring()
 	if err != nil {
-		s.logger.Errorw("What this node still holds for a peer was not read; nothing kept before this start is brought until it is", "error", err)
-		return
+		s.logger.Errorw("What this node still holds for a peer was not read; it is read again", "error", err)
+		return false
 	}
-	if len(waiting) == 0 {
-		return
+	if len(waiting) > 0 {
+		s.logger.Infow("Files kept here are still to be brought to a peer", "files", len(waiting))
 	}
-	s.logger.Infow("Files kept here are still to be brought to a peer", "files", len(waiting))
 	for _, item := range waiting {
 		s.carry(item)
 	}
+	return true
 }
 
-// next is the first file waiting, or false.
-func (c *fileCarrier) next() (toBring, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if len(c.waiting) == 0 {
-		return toBring{}, false
+// stopping is what ends when the node stops.
+func (s *QNTXServer) stopping() context.Context {
+	if s.ctx == nil {
+		return context.Background()
 	}
-	return c.waiting[0], true
+	return s.ctx
 }
 
-// done takes the first file waiting off, once it is brought or cannot be.
-func (c *fileCarrier) done() {
+// next is the first file waiting whose peer is not being left alone, or, when
+// every one waiting is, how long until the first of them is tried again.
+func (c *fileCarrier) next(now time.Time) (item toBring, ready bool, wait time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.waiting) > 0 {
-		c.waiting = c.waiting[1:]
+	for _, waiting := range c.waiting {
+		at, left := c.notBefore[waiting.to]
+		if !left || !now.Before(at) {
+			return waiting, true, 0
+		}
+		if soonest := at.Sub(now); wait == 0 || soonest < wait {
+			wait = soonest
+		}
 	}
+	return toBring{}, false, wait
+}
+
+// done takes a file off those waiting, once it is brought or cannot be, and
+// its peer is no longer left alone.
+func (c *fileCarrier) done(item toBring) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i, waiting := range c.waiting {
+		if waiting.asset == item.asset && waiting.to == item.to {
+			c.waiting = append(c.waiting[:i:i], c.waiting[i+1:]...)
+			break
+		}
+	}
+	delete(c.notBefore, item.to)
+	delete(c.backoff, item.to)
+}
+
+// refused leaves a peer alone for longer each time it does not take a file,
+// up to the most, and says for how long. Files for other peers go on.
+func (c *fileCarrier) refused(to string, now time.Time) time.Duration {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.notBefore == nil {
+		c.notBefore, c.backoff = map[string]time.Time{}, map[string]time.Duration{}
+	}
+	wait, waited := c.backoff[to]
+	if !waited {
+		wait = carrierFirstBackoff
+	}
+	c.notBefore[to] = now.Add(wait)
+	next := wait * 2
+	if next > carrierMostBackoff {
+		next = carrierMostBackoff
+	}
+	c.backoff[to] = next
+	return wait
 }
 
 // carrierLoop brings one file at a time until the node stops.
 func (s *QNTXServer) carrierLoop() {
 	c := &s.carrier
-	stops := s.ctx
-	if stops == nil {
-		stops = context.Background()
-	}
-	backoff := carrierFirstBackoff
+	stops := s.stopping()
 	for {
-		item, waiting := c.next()
-		if !waiting {
+		item, ready, until := c.next(time.Now())
+		if !ready {
+			// Nothing waits, or every peer something waits for is left alone.
+			var later <-chan time.Time
+			if until > 0 {
+				later = time.After(until)
+			}
 			select {
 			case <-stops.Done():
 				return
 			case <-c.wake:
-				continue
+			case <-later:
 			}
+			continue
 		}
-		wait := carrierPause
 		gone, err := s.bringOne(item)
 		switch {
 		case err == nil:
-			c.done()
-			backoff = carrierFirstBackoff
+			c.done(item)
 		case gone:
 			// Nothing here to bring any more: trying again brings nothing.
 			s.logger.Errorw("A file meant for a peer is not brought: it is not here any more", "to", item.to, "asset", item.asset, "file_id", item.fileID, "error", err)
-			c.done()
+			c.done(item)
 		default:
-			s.logger.Warnw("A file meant for a peer was not brought; it is kept here and tried again", "to", item.to, "asset", item.asset, "again_in", backoff.String(), "error", err)
-			wait = backoff
-			if backoff *= 2; backoff > carrierMostBackoff {
-				backoff = carrierMostBackoff
-			}
+			again := c.refused(item.to, time.Now())
+			s.logger.Warnw("A file meant for a peer was not brought; it is kept here and tried again", "to", item.to, "asset", item.asset, "again_in", again.String(), "error", err)
 		}
 		select {
 		case <-stops.Done():
 			return
-		case <-time.After(wait):
+		case <-time.After(carrierPause):
 		}
 	}
 }
 
 // bringOne brings one file this node keeps to the peer it is meant for, and
-// writes that it is there. gone is whether the file is not here to bring.
+// writes that it is there. gone is whether the file is not here to bring. A
+// file a line already says is there is not brought again.
 func (s *QNTXServer) bringOne(item toBring) (gone bool, err error) {
+	if there, err := s.alreadyBrought(item); err != nil {
+		return false, err
+	} else if there {
+		return false, nil
+	}
 	path, found, err := s.storedFile(item.fileID)
 	if err != nil {
 		return true, err
@@ -217,13 +298,30 @@ func (s *QNTXServer) attestBrought(item toBring, there string) error {
 	return nil
 }
 
+// alreadyBrought is whether a line of this node says the peer holds these bytes.
+func (s *QNTXServer) alreadyBrought(item toBring) (bool, error) {
+	store := s.held.ReadTheNodesOwnRecords()
+	if store == nil {
+		return false, nil
+	}
+	lines, err := store.GetAttestations(ats.AttestationFilter{
+		Subjects: []string{item.asset}, Predicates: []string{assetBrought}, Contexts: []string{item.to},
+		TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: 1,
+	})
+	if err != nil {
+		return false, errors.Wrapf(err, "whether %s is at %s did not read", item.asset, item.to)
+	}
+	return len(lines) > 0, nil
+}
+
 // stillToBring is every file this node holds for a peer that no line says was
 // brought there: its held lines naming a peer, less its brought lines.
 func (s *QNTXServer) stillToBring() ([]toBring, error) {
 	if s.nodeDID == nil || s.nodeDID.DID == "" {
 		return nil, nil
 	}
-	store := s.held.TheNodesOwnRecords()
+	// Read where attestHeld and attestBrought wrote, and not handed a store it could write.
+	store := s.held.ReadTheNodesOwnRecords()
 	if store == nil {
 		return nil, nil
 	}

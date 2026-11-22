@@ -287,7 +287,7 @@ REACH is '/api/canvas/minimized-windows'                                  of ROO
 REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/api/canvas/export' '/api/canvas/export-dom'                    of ROOT
 # "to me it feels like k should own my Media Assets"
-# A peer node brings a file here through the primary, as that node (PEER), and
+# A peer node brings a file here, vouched for by the primary, as that node (PEER), and
 # reads none back: what a node keeps is served to ROOT.
 REACH is '/api/files'                                                     of ROOT PEER
 REACH is '/api/files/'                                                    of ROOT
