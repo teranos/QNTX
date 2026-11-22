@@ -613,6 +613,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer("/auth/laye/verify", h.handleLayeVerify)
 	// laye has the node mail an invitation laye holds (laye_mail.go).
 	mux.answer(layeInvitedPath, h.handleLayeInvited)
+	// laye has the node write a reach line its person approved on a peer (laye_reach.go).
+	mux.answer(layeReachPath, h.handleLayeReach)
 	// The ceremony: the element asks what can be linked, starts one, and collects
 	// the result. Everything the provider requires happens on this side of the
 	// wire, so no page holds a secret and no page holds logic.
