@@ -29,6 +29,8 @@ const (
 	assetMeantFor = "bring_to"
 	// assetBrought is the line this node writes once the peer named holds the same bytes.
 	assetBrought = "brought"
+	// assetLetGo is the line this node writes once it removed its own copy of what the peer holds.
+	assetLetGo = "let_go"
 )
 
 // How slowly: one file, then a pause; and how long a file that could not be
@@ -245,6 +247,8 @@ func (s *QNTXServer) bringOne(item toBring) (gone bool, err error) {
 	if there, err := s.alreadyBrought(item); err != nil {
 		return false, err
 	} else if there {
+		// The same bytes handed over again: the peer holds them already.
+		s.letGo(item, "")
 		return false, nil
 	}
 	path, found, err := s.storedFile(item.fileID)
@@ -268,7 +272,63 @@ func (s *QNTXServer) bringOne(item toBring) (gone bool, err error) {
 		return false, err
 	}
 	s.logger.Infow("File brought to a peer", "to", item.to, "asset", item.asset, "file_id_there", there)
+	s.letGo(item, there)
 	return false, nil
+}
+
+// "to me it feels like k should own my Media Assets"
+//
+// 「[Opus 5.5] letGo removes this node's copy of a file the peer named holds, when this node」
+// 「[Opus 5.5] is set to (files.let_go_once_brought), and writes that it did. It is called only」
+// 「[Opus 5.5] once the peer answered with the same sha256 (bringToPeer), or a line says it did.」
+// 「[Opus 5.5] A copy that is not removed stays, and is said.」
+func (s *QNTXServer) letGo(item toBring, there string) {
+	if s.deps == nil || s.deps.cfg == nil || !s.deps.cfg.Files.LetGoOnceBrought {
+		return
+	}
+	path, found, err := s.storedFile(item.fileID)
+	if err != nil || !found {
+		return
+	}
+	if err := os.Remove(path); err != nil {
+		s.logger.Errorw("A file the peer holds was not let go of here", "to", item.to, "asset", item.asset, "file_id", item.fileID, "error", err)
+		return
+	}
+	if err := s.attestLetGo(item, there); err != nil {
+		s.logger.Errorw("A file the peer holds was let go of here, and that was not written", "to", item.to, "asset", item.asset, "file_id", item.fileID, "error", err)
+		return
+	}
+	s.logger.Infow("Let go of a file the peer holds", "to", item.to, "asset", item.asset, "file_id", item.fileID)
+}
+
+// attestLetGo writes that this node no longer keeps its copy of the asset,
+// because the peer named holds the same bytes.
+func (s *QNTXServer) attestLetGo(item toBring, there string) error {
+	store := s.held.TheNodesOwnRecords()
+	if store == nil {
+		return errors.Newf("this node holds no store to attest %s into", item.asset)
+	}
+	id, err := identity.GenerateASUIDWithRetry("AS", item.asset, assetLetGo, item.to, store.AttestationExists)
+	if err != nil {
+		return errors.Wrapf(err, "failed to name the %s line of %s", assetLetGo, item.asset)
+	}
+	at := time.Now()
+	said := map[string]any{
+		"file_id":   item.fileID,
+		"filename":  item.filename,
+		"let_go_at": at.UTC().Format(time.RFC3339),
+	}
+	if there != "" {
+		said["file_id_there"] = there
+	}
+	if err := store.CreateAttestation(&types.As{
+		ID: id, Subjects: []string{item.asset}, Predicates: []string{assetLetGo}, Contexts: []string{item.to},
+		Actors: []string{s.nodeDID.DID}, Timestamp: at, CreatedAt: at, Source: pluginSource, Attributes: said,
+	}); err != nil {
+		return errors.Wrapf(err, "the %s line of %s was not written", assetLetGo, item.asset)
+	}
+	measure.Count(measure.AttestationsWritten, 1)
+	return nil
 }
 
 // attestBrought writes that the peer named holds the bytes this node brought it.

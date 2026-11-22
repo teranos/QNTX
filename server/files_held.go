@@ -51,6 +51,36 @@ func (s *QNTXServer) handleFilesHeld(w http.ResponseWriter, r *http.Request) {
 	respond(w, s.logger, http.StatusOK, pictures)
 }
 
+// fileIDOf is where this node keeps the asset named, read off its held lines:
+// the first time it was held whose file is still here.
+func (s *QNTXServer) fileIDOf(asset string) (string, bool, error) {
+	if s.nodeDID == nil || s.nodeDID.DID == "" {
+		return "", false, nil
+	}
+	store := s.held.ReadTheNodesOwnRecords()
+	if store == nil {
+		return "", false, nil
+	}
+	lines, err := store.GetAttestations(ats.AttestationFilter{
+		Subjects: []string{asset}, Predicates: []string{assetHeld}, Contexts: []string{s.nodeDID.DID},
+		TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: ats.EveryRow,
+	})
+	if err != nil {
+		return "", false, err
+	}
+	sort.SliceStable(lines, func(i, j int) bool { return lines[i].Timestamp.Before(lines[j].Timestamp) })
+	for _, line := range lines {
+		fileID, _ := line.Attributes["file_id"].(string)
+		if fileID == "" {
+			continue
+		}
+		if _, here, err := s.storedFile(fileID); err == nil && here {
+			return fileID, true, nil
+		}
+	}
+	return "", false, nil
+}
+
 // picturesHeld is up to most of what this node holds, newest first by when it
 // was first held, with every reading of each.
 func (s *QNTXServer) picturesHeld(most int) ([]heldPicture, error) {
