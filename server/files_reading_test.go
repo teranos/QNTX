@@ -115,6 +115,21 @@ func TestWhatTheNodeHoldsIsListedWithItsReadings(t *testing.T) {
 		t.Errorf("the older one's readings = %+v", got)
 	}
 
+	// "the image needs to stay on screen for the duration that gaze is looking and then fade back"
+	// While the reader looks at a picture, the listing says since when.
+	since := time.Now()
+	srv.looking.begin(newer.Asset, since)
+	w = httptest.NewRecorder()
+	srv.HandleFiles(w, httptest.NewRequest(http.MethodGet, "/api/files/", nil))
+	pictures = nil
+	if err := json.Unmarshal(w.Body.Bytes(), &pictures); err != nil {
+		t.Fatalf("the answer did not read: %v", err)
+	}
+	if pictures[0].LookedAtSince == nil || !pictures[0].LookedAtSince.Equal(since) || pictures[1].LookedAtSince != nil {
+		t.Errorf("looked at: %v and %v, want %v and nothing", pictures[0].LookedAtSince, pictures[1].LookedAtSince, since)
+	}
+	srv.looking.end()
+
 	// /api/files, which a peer may bring a file to, lists nothing.
 	w = httptest.NewRecorder()
 	srv.HandleFiles(w, httptest.NewRequest(http.MethodGet, "/api/files", nil))

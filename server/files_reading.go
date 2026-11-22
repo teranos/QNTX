@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -71,6 +72,37 @@ type toRead struct {
 	asset  string
 	fileID string
 	heldAt time.Time
+	// lookedFrom is when the reader began looking at it.
+	lookedFrom time.Time
+}
+
+// "the image needs to stay on screen for the duration that gaze is looking and then fade back"
+//
+// lookingAt is the picture the reader is looking at now, and since when: what
+// GET /api/files/ says of it, so it can be shown for as long as it is looked at.
+type lookingAt struct {
+	mu    sync.Mutex
+	asset string
+	since time.Time
+}
+
+func (l *lookingAt) begin(asset string, at time.Time) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.asset, l.since = asset, at
+}
+
+func (l *lookingAt) end() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.asset, l.since = "", time.Time{}
+}
+
+// now is the asset looked at and since when, or false.
+func (l *lookingAt) now() (string, time.Time, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.asset, l.since, l.asset != ""
 }
 
 // readTonight reads up to readPerNight of the newest pictures without a
@@ -125,6 +157,9 @@ func (s *QNTXServer) readOne(ctx context.Context, with string, picture toRead) e
 	if err != nil {
 		return errors.Wrapf(err, "no JPEG to read was made of %s", picture.asset)
 	}
+	picture.lookedFrom = time.Now()
+	s.looking.begin(picture.asset, picture.lookedFrom)
+	defer s.looking.end()
 	ask := provider.ChatRequest{UserPrompt: readingAsks, Attachments: []provider.ContentPart{{
 		Type:     "image_url",
 		ImageURL: &provider.ContentPartImage{URL: "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(small)},
@@ -155,16 +190,22 @@ func (s *QNTXServer) attestRead(picture toRead, with, model, said string) error 
 		return errors.Wrapf(err, "failed to name the %s line of %s", assetRead, picture.asset)
 	}
 	at := time.Now()
+	attributes := map[string]any{
+		"file_id": picture.fileID,
+		"asked":   readingAsks,
+		"read_as": fmt.Sprintf("jpeg, %d pixels on the long side", readSize),
+		"said":    said,
+		"read_at": at.UTC().Format(time.RFC3339),
+	}
+	// How long the reader looked at it, from the moment it was handed the picture.
+	if !picture.lookedFrom.IsZero() {
+		attributes["looked_from"] = picture.lookedFrom.UTC().Format(time.RFC3339Nano)
+		attributes["looked_for_seconds"] = at.Sub(picture.lookedFrom).Seconds()
+	}
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{picture.asset}, Predicates: []string{assetRead}, Contexts: []string{reader},
 		Actors: []string{s.nodeDID.DID}, Timestamp: at, CreatedAt: at, Source: pluginSource,
-		Attributes: map[string]any{
-			"file_id": picture.fileID,
-			"asked":   readingAsks,
-			"read_as": fmt.Sprintf("jpeg, %d pixels on the long side", readSize),
-			"said":    said,
-			"read_at": at.UTC().Format(time.RFC3339),
-		},
+		Attributes: attributes,
 	}); err != nil {
 		return errors.Wrapf(err, "the %s line of %s was not written", assetRead, picture.asset)
 	}
