@@ -135,4 +135,4 @@ and the folder itself carries nothing.
 
 ## Quotes
 
-TODO: Figure out how this interacts with [[QNTX-Quote]] [[ADR-056-Subsystems|Subsystem]]
+TODO: Figure out how this interacts with [[QNTX-Provenance]] [[ADR-056-Subsystems|Subsystem]]

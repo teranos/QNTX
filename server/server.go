@@ -37,36 +37,42 @@ type QNTXServer struct {
 	// its doors, and the health of the file underneath. What a namespace keeps
 	// is the namespace's, and is reached through it.
 	nodeDB                *sql.DB
-	issuesSeeded          atomic.Bool                   // today's issues_seen was read into the ledger, so a write may replace its rows
-	issuesWrite           sync.Mutex                    // one take-and-write of the issue ledger at a time, the last one included
-	nodeAgentApart        bool                          // The Node Agent's turns run apart from this process; set as the agent subsystem boots
-	startedAt             time.Time                     // When this process began answering; zero until New runs
-	dbPath                string                        // Database file path (for display in banner)
-	logPath               string                        // File log path (for banner)
-	deps                  *serverDependencies           // Initialization dependencies (available during subsystem init)
-	store                 string                        // Configured storage backend, "sqlite" or "parquet" (ADR-023)
-	held                  *namespaces.Held              // The node's universes, and the only way to reach one
-	bindAddress           string                        // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
-	port                  int                           // The port am.toml says the node listens on
-	authHandler           *auth.Handler                 // nil when auth.enabled = false
-	authEnabled           bool                          // resolved at init, never changes
-	nodeDID               *nodedid.Handler              // node's decentralized identity
-	harnessBinaries       harnessesHeld                 // Each harness the Node Agent runs in, as this node holds its binary, by the harness's name (ADR-048)
-	nodeAgent             *rootAgent                    // The Node Agent this node runs; nil when am.toml names none (ADR-048)
-	taskEnds              sync.Mutex                    // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
-	taskStreams           sync.Map                      // Each Task whose turn this process runs, by id, to the stream the turn prints to
-	taskCancels           sync.Map                      // Each Task canceled in this process, by id, to who canceled it
-	noNodeAgent           error                         // Why the Node Agent am.toml names did not start, for whoever speaks to it
-	namespaceAgents       agentsHeld                    // Each namespace agent this node has held, by its purpose (ADR-048)
-	elementAgents         agentsHeld                    // Each element's agent this node has held, by its purpose (ADR-054)
-	providersAt           map[string]string             // Where each provider a key is asked of answers; nil is providersAt (provider_keys.go)
-	consuming             consumedFlows                 // 「[Opus 5.5] Each yes at an MCP server the node consumes, waiting on its callback (mcp_consumed.go)」
-	agentsDir             string                        // Where agents are kept; empty is ~/.qntx/agents
-	ownURL                string                        // Where this node answers on its own machine; empty until it listens
-	doors                 agentDoors                    // The door each agent the node runs reaches it at (agent_door.go)
-	anthropicBaseURL      string                        // Where Anthropic's API is; empty is api.anthropic.com
-	anthropicInUse        inUse                         // What ROOT's agents last ran on at Anthropic
-	identityTokensRenewed identityTokens                // Each ROOT agent home whose identity token is renewed
+	issuesSeeded          atomic.Bool         // today's issues_seen was read into the ledger, so a write may replace its rows
+	issuesWrite           sync.Mutex          // one take-and-write of the issue ledger at a time, the last one included
+	nodeAgentApart        bool                // The Node Agent's turns run apart from this process; set as the agent subsystem boots
+	startedAt             time.Time           // When this process began answering; zero until New runs
+	dbPath                string              // Database file path (for display in banner)
+	logPath               string              // File log path (for banner)
+	deps                  *serverDependencies // Initialization dependencies (available during subsystem init)
+	store                 string              // Configured storage backend, "sqlite" or "parquet" (ADR-023)
+	held                  *namespaces.Held    // The node's universes, and the only way to reach one
+	bindAddress           string              // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
+	port                  int                 // The port am.toml says the node listens on
+	authHandler           *auth.Handler       // nil when auth.enabled = false
+	authEnabled           bool                // resolved at init, never changes
+	nodeDID               *nodedid.Handler    // node's decentralized identity
+	harnessBinaries       harnessesHeld       // Each harness the Node Agent runs in, as this node holds its binary, by the harness's name (ADR-048)
+	nodeAgent             *rootAgent          // The Node Agent this node runs; nil when am.toml names none (ADR-048)
+	taskEnds              sync.Mutex          // A Task of the Node Agent ends once: by its turn, a restart or a cancel, whichever is first
+	taskStreams           sync.Map            // Each Task whose turn this process runs, by id, to the stream the turn prints to
+	a2aGRPC               http.HandlerFunc    // The node's A2A binding over gRPC (a2a_grpc.go)
+	a2aOwn                http.HandlerFunc    // The node's own A2A binding, asked in process for an agent this node serves (a2a_named.go)
+	taskCancels           sync.Map            // Each Task canceled in this process, by id, to who canceled it
+	noNodeAgent           error               // Why the Node Agent am.toml names did not start, for whoever speaks to it
+	namespaceAgents       agentsHeld          // Each namespace agent this node has held, by its purpose (ADR-048)
+	elementAgents         agentsHeld          // Each element's agent this node has held, by its purpose (ADR-054)
+	providersAt           map[string]string   // Where each provider a key is asked of answers; nil is providersAt (provider_keys.go)
+	consuming             consumedFlows       // 「[Opus 5.5] Each yes at an MCP server the node consumes, waiting on its callback (mcp_consumed.go)」
+	agentsDir             string              // Where agents are kept; empty is ~/.qntx/agents
+	ownURL                string              // Where this node answers on its own machine; empty until it listens
+	doors                 agentDoors          // The door each agent the node runs reaches it at (agent_door.go)
+	anthropicBaseURL      string              // Where Anthropic's API is; empty is api.anthropic.com
+	anthropicInUse        inUse               // What ROOT's agents last ran on at Anthropic
+	identityTokensRenewed identityTokens      // Each ROOT agent home whose identity token is renewed
+	collected             *collection         // What agents said to an agent, collected until it is delivered together (collected.go)
+	collectedOnce         sync.Once
+	collectedKeys         collectedKeeper               // 「[Opus 5.5] Where what is collected is kept a key for each agent, for a reader to watch (collected_keys_etcd.go); nil is the node's own, or none」
+	shows                 shower                        // How this node reaches a phone (phones.go); Apple's once asked for, a stand-in in a test
 	underGround           groundHomes                   // The homes of the agents that run under ground, built once the node knows its own URL (ADR-050)
 	scrubWith             scrubber                      // A test's scanner in place of ground's (fixtures.go); nil is ground's
 	daemon                *async.WorkerPool             // Background job processor (daemon)
@@ -92,6 +98,7 @@ type QNTXServer struct {
 	pluginManager         pluginManaging              // Plugin process manager, or why the node has none
 	services              plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager       *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+	vectorIndex           *routedIndex                // where the embedding store keeps and finds its vectors
 	// What the mail service was wired with (ADR-041), read back by the mail
 	// signum so ROOT sees what sends and not what am.toml says since.
 	mailConfig config.MailConfig
@@ -143,6 +150,9 @@ type QNTXServer struct {
 	// built from the lines in its table.
 	answering map[string]reach.Answering
 	served    *reach.Served
+	// 「[Opus 5.5] declaredReach is auth.reach: the REACH lines am.toml says, served」
+	// 「[Opus 5.5] beside the store's (declared_reach.go). Held under opening.」
+	declaredReach []reach.Line
 	// sigilPaths is the paths answering holds because a sigil is bound there,
 	// so the ones no sigil is bound to any more can be taken out.
 	sigilPaths map[string]bool
@@ -152,6 +162,12 @@ type QNTXServer struct {
 	// naming is held from reading who holds a name to writing down who now
 	// does (i name), so two agents asking for one name at once do not both get it.
 	naming sync.Mutex
+	// "AND LAYE OWNS IDENTITY"
+	// names is laye's etcd, where names are kept when am.toml names one; nil
+	// keeps them as the node's own lines. seeding brings those lines into it
+	// once a start.
+	names   nameKeeper
+	seeding sync.Once
 	// 「[Opus 5.5] anthropicLining is held from reading the node's ANTHROPIC line to writing it anew」
 	// 「[Opus 5.5] (changeAnthropicLine), so an order, a cap and the ids asked at once each stand.」
 	anthropicLining sync.Mutex

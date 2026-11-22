@@ -455,6 +455,30 @@ func TestRegistry_validateVersion(t *testing.T) {
 			wantErr:     false,
 		},
 		{
+			name:        "a rolling build past a tag is checked as that tag",
+			qntxVersion: "v0.55.0-925-gaf1299b51",
+			constraint:  ">= 0.1.0",
+			wantErr:     false,
+		},
+		{
+			name:        "a rolling build past a tag is still held to the constraint",
+			qntxVersion: "v0.55.0-925-gaf1299b51-dirty",
+			constraint:  ">= 1.0.0",
+			wantErr:     true,
+		},
+		{
+			name:        "a prerelease the tag names stays a prerelease",
+			qntxVersion: "v1.0.0-rc.1",
+			constraint:  ">= 1.0.0",
+			wantErr:     true,
+		},
+		{
+			name:        "a rolling build past a prerelease tag stays that prerelease",
+			qntxVersion: "v1.0.0-rc.1-3-gabc1234",
+			constraint:  ">= 1.0.0",
+			wantErr:     true,
+		},
+		{
 			name:        "invalid QNTX version",
 			qntxVersion: "invalid",
 			constraint:  "^1.0.0",

@@ -89,4 +89,6 @@ var namespaceSubsystems = []struct {
 	// took a day to find.
 	{sub: standingSubsystem{}, policy: SubsystemFatal},
 	{sub: watcherEngineSubsystem{}, policy: SubsystemWarn},
+	// Fatal: a node told its names are kept in etcd and unable to keep them there is wrong.
+	{sub: etcdNamedSubsystem{}, policy: SubsystemFatal},
 }

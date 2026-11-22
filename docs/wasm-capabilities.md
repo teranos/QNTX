@@ -4,7 +4,7 @@ What runs in the shared Rust core, and how each runtime reaches it.
 
 The Rust is in `crates/`: `ats` (parsing, filters, resolution, watchers), `ats-id`, `ats-sign`, and the stores `ats-sqlite`, `ats-duckdb` and `ats-indexeddb`. It reaches a runtime by one of three bridges:
 
-- **Browser:** wasm-bindgen exports in `crates/ats-wasm/src/browser.rs`, wrapped by `web/ts/ats-wasm.ts`. Signing goes through laye-p2p's wasm (`web/ts/laye.ts`).
+- 「[Opus 5.5] **Browser:** wasm-bindgen exports in `crates/ats-wasm/src/browser.rs`, wrapped by `web/ts/ats-wasm.ts`. Signing: ats-wasm says the bytes (`canonical_attestation`), and laye's laye-p2p, released by [Ground-Institute/laye](https://github.com/Ground-Institute/laye), signs them.」
 - **Go, pure functions:** wazero, `crates/ats-wasm/src/lib.rs` loaded by `ats/wasm/engine.go`, behind the `qntxwasm` build tag.
 - **Go, the stores:** cgo into `libats_sqlite` (`ats/storage/sqlitecgo`) and `libats_duckdb` (`ats/storage/duckdbcgo`).
 
@@ -21,7 +21,7 @@ The Rust is in `crates/`: `ats` (parsing, filters, resolution, watchers), `ats-i
 | Query resolution: aliases, cartesian expansion, grouping, classification, conflicts | `ats::ax::execute_with_aliases` | no | cgo `storage_query_resolved`, `read_conn_query_resolved`; a parquet node reads its SQLite landing file |
 | Watcher matching | `ats::watcher::match_watchers` | no | wazero `match_watchers`, and nothing else: a build without `qntxwasm` matches no watcher |
 | Identity (ASUID) | `ats-id` | `generateASUID`, used by ts-element | wazero `generate_asuid`, `generate_compact_asuid`, `generate_random_id` |
-| Attestation signing | `ats-sign` | laye-p2p `sign_attestation`, used by ts-element | wazero `canonical_attestation`; `ats/signing/testdata` holds the vectors both are tested against |
+| Attestation signing | `ats-sign` | `canonical_attestation`, signed by laye-p2p's `sign`, used by ts-element | wazero `canonical_attestation`; `ats/signing/testdata` holds the vectors both are tested against |
 | Cosine similarity | `ats::similarity` | `cosineSimilarity`, wrapped in `local-semantic-search.ts`, which nothing imports | not called: `server/embeddings/clustering.go` has its own `cosineSimilarityF32` |
 
 ## Exported and not called
@@ -39,7 +39,7 @@ The server classifies through the cgo query path, not these.
 |---|---|---|
 | Attribute schema | `ats/attrs/` | `reflect`: Rust has no runtime reflection, so struct-tag schemas need a redesign, not a translation |
 | SO action payloads | `ats/so/` | Rust parses the `so` actions (`ax_filter` returns them); Go turns them into a job |
-| SO prompt execution | `ats/so/actions/prompt/` | holds a `database/sql` handle, calls `internal/ai/provider`, submits through `pulse/async` |
+| SO prompt execution | `ats/so/actions/prompt/` | holds a `database/sql` handle, calls `internal/ai/provider`, runs as a `so.Handler` that `pulse/async` adapts via `ForSo` |
 | Pulse scheduling | `pulse/` | job orchestration, goroutines, database-bound |
 
 ## Elsewhere

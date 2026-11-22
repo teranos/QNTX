@@ -255,7 +255,8 @@ message ClaudeAm {
   bool signed_in = 11;
   // How it is signed in, as Claude Code names it, or empty when it is not.
   string auth_method = 12;
-  // Every model a turn can be said to answer with.
+  // The model am.toml names. The node keeps no list of models: a name goes to
+  // Claude Code, which runs the model and refuses a name it does not know.
   repeated string models = 13;
 }
 
@@ -439,6 +440,9 @@ message NodeGoogle {
   repeated GoogleSpendItem items = 24;
   // 「[Opus 5.5] Where ROOT goes to make a namespace's key, by saying yes at Google once: namespace appended.」
   string key_connect = 25;
+  // "I got this from you, not from the mail"
+  // 「[Opus 5.5] Connect key for each namespace the node serves that has no key yet, by namespace.」
+  map<string, string> key_connects = 26;
 }
 
 // 「[Opus 5.5] GoogleSpendItem is one thing that spends at Google, in its own project, halted on its own.」
@@ -658,6 +662,9 @@ message Sigil {
   // gives is that message's fields, each in its .proto's words, and nothing
   // is said of them a second time.
   string answer = 6;
+  // The surfaces it is asked over: http, mcp, a2a, subsystem. None is every
+  // surface; not everything needs to be a sigil an LLM calls.
+  repeated string surfaces = 7;
 }
 
 // A Param is one thing a sigil takes. It says nothing about how it travels:
@@ -668,7 +675,8 @@ message Param {
   bool required = 3;
   // Every value it takes, when it takes only some.
   repeated string one_of = 4;
-  // What its value is: empty is text, "count" is a whole number, zero or more.
+  // What its value is: empty is text, "count" is a whole number, zero or
+  // more, "list" is a JSON array.
   string kind = 5;
 }
 

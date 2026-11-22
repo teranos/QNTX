@@ -340,16 +340,17 @@ func TestWhatA2AGoSaysIsASentryLog(t *testing.T) {
 	}, 5*time.Second, 20*time.Millisecond, "a2a-go's error was not a Sentry log")
 }
 
-// "acceptedOutputModes": a client that takes no text is refused, since the agent answers in text.
-func TestAClientThatTakesNoTextIsRefused(t *testing.T) {
+// "acceptedOutputModes": a client that takes nothing the agent gives is
+// refused; one that takes a file it gives, and no text, is not.
+func TestAClientThatTakesNothingTheAgentGivesIsRefused(t *testing.T) {
 	srv, tokens, _ := nodeAgentOverA2A(t, "")
 	code, refused := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send",
-		saidToTheNode("hi", `{"acceptedOutputModes": ["image/png"]}`), tokens[auth.LevelRoot])
+		saidToTheNode("hi", `{"acceptedOutputModes": ["audio/mpeg"]}`), tokens[auth.LevelRoot])
 	assert.Equal(t, http.StatusBadRequest, code, refused)
 	said, _ := json.Marshal(refused)
 	assert.Contains(t, string(said), "CONTENT_TYPE_NOT_SUPPORTED")
 
 	code, sent := a2aAsked(t, srv, http.MethodPost, "/a2a/message:send",
-		saidToTheNode("hi", `{"acceptedOutputModes": ["image/png", "text/plain"]}`), tokens[auth.LevelRoot])
+		saidToTheNode("hi", `{"acceptedOutputModes": ["image/png"]}`), tokens[auth.LevelRoot])
 	assert.Equal(t, http.StatusOK, code, sent)
 }

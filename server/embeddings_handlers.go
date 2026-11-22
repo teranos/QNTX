@@ -28,6 +28,14 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 	embStore := s.embeddingStore
 	s.embeddingService = svc
 
+	// The router plugins and sigils reach embedding through: it is handed the
+	// provider here, when the provider registers, and not only at boot.
+	if s.servicesManager != nil {
+		if router := s.servicesManager.GetEmbeddingRouter(); router != nil {
+			router.SetService(svc)
+		}
+	}
+
 	// Update the handler to use the plugin backend
 	if s.embeddingsHandler != nil {
 		s.embeddingsHandler.Service = svc

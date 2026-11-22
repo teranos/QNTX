@@ -231,6 +231,12 @@ func parseBody(i int, body *protocol.MailTemplateBody) (mailPart, MailBodyKind, 
 	return mailPart{}, "", errors.Newf("body %d names neither html nor text", i)
 }
 
+// FillTemplate is a template filled with values, as a plugin's Send fills
+// one: for mail whose template is not kept here, but handed in with it.
+func FillTemplate(t *protocol.MailTemplate, values map[string]string) (FilledMail, error) {
+	return fillMail(t, values)
+}
+
 // fillMail fills every part of a template with values.
 func fillMail(t *protocol.MailTemplate, values map[string]string) (FilledMail, error) {
 	parsed, err := parseMail(t)
@@ -270,4 +276,30 @@ func fillText(part string, parsed *texttemplate.Template, values map[string]stri
 		return "", errors.Wrapf(err, "the %s could not be filled", part)
 	}
 	return out.String(), nil
+}
+
+// "make sure that the mails also use like a nicer.   QNTX Mail template"
+//
+// 「[Opus 5.5] MailLink is a press in a mail: what it says, and where it goes.」
+type MailLink struct {
+	Label, URL string
+}
+
+// 「[Opus 5.5] DrawnNodeMail is a mail the node sends in its own name, drawn as a QNTX window」
+// 「[Opus 5.5] (DrawMail): titled with its subject, its body, and a press for each link. A window」
+// 「[Opus 5.5] that does not draw sends the mail plain, and says so in it.」
+func DrawnNodeMail(name, subject, body string, links ...MailLink) NodeMail {
+	body = strings.TrimSpace(body)
+	text := body + "\n"
+	page := `<div style="padding:0 8px;white-space:pre-line">` + htmltemplate.HTMLEscapeString(body) + `</div>`
+	for _, link := range links {
+		text += "\n" + link.Label + ":\n" + link.URL + "\n"
+		page += `<div style="padding:12px 8px 0"><a href="` + htmltemplate.HTMLEscapeString(link.URL) + `" style="color:inherit">` + htmltemplate.HTMLEscapeString(link.Label) + `</a></div>`
+	}
+	drawn, err := DrawMail(MailWindow{Title: subject, TitleAlone: true, Sections: []MailSection{{HTML: page, Headless: true}}})
+	if err != nil {
+		text += "\nThis mail is plain: " + errors.Wrap(err, "the QNTX window did not draw").Error() + "\n"
+		drawn = "<pre>" + htmltemplate.HTMLEscapeString(text) + "</pre>"
+	}
+	return NodeMail{Name: name, Subject: subject, Bodies: []MailBody{TextBody(text), HTMLBody(drawn)}}
 }

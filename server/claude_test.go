@@ -52,6 +52,7 @@ func claudeStandIn(t *testing.T, stream string) (binary, ran string) {
 		"mkdir '" + ran + "'/$n\n" +
 		"for arg in \"$@\"; do printf '%s\\n' \"$arg\"; done > '" + ran + "'/$n/args\n" +
 		"env > '" + ran + "'/$n/env\n" +
+		"pwd > '" + ran + "'/$n/cwd\n" +
 		// Signing in, as Claude Code does it headless: the URL, then the code
 		// read on stdin and kept in the config dir. Status reads what is kept.
 		"if [ \"$1\" = auth ]; then\n" +
@@ -72,6 +73,8 @@ func claudeStandIn(t *testing.T, stream string) (binary, ran string) {
 		"  echo '{\"loggedIn\":false,\"authMethod\":\"none\",\"apiProvider\":\"firstParty\"}'\n" +
 		"  exit 1\n" +
 		"fi\n" +
+		// What is said comes on stdin (internal/claudecode, Run).
+		"cat > '" + ran + "'/$n/stdin\n" +
 		"prev=''\n" +
 		"for arg in \"$@\"; do\n" +
 		"  if [ \"$prev\" = '--session-id' ] && [ -n \"$CLAUDE_CONFIG_DIR\" ]; then\n" +
@@ -198,7 +201,8 @@ func TestWhatIsSaidToTheNodeAgentIsAnsweredByClaudeCode(t *testing.T) {
 	holds(t, s.nodeAgentSignum(), "say", &protocol.NodeAgentSaid{Claude: answer})
 
 	args := ranWith(t, ran, "0", "args")
-	assert.Equal(t, "how long has the box been up?", after(args, "-p"))
+	assert.Equal(t, []string{"how long has the box been up?"}, ranWith(t, ran, "0", "stdin"))
+	assert.Contains(t, args, "-p")
 	assert.Equal(t, "claude-opus-5-5", after(args, "--model"))
 	assert.Equal(t, "low", after(args, "--effort"))
 	assert.Equal(t, "dontAsk", after(args, "--permission-mode"))

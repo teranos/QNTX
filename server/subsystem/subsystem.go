@@ -96,6 +96,10 @@ type Host interface {
 	// AskGitHub asks GitHubService one operation as the App's installation,
 	// and hands back GitHub's answer as JSON.
 	AskGitHub(ctx context.Context, operation string, request any) ([]byte, error)
+	// Ask is a sigil the node serves, asked from inside it over the subsystem
+	// surface: the node's own, a linked subsystem's, a ready plugin's. What
+	// arrived is read as every surface reads it (sigil.Within).
+	Ask(ctx context.Context, signum, sigil string, arrived map[string]any) (any, *protocol.Refusal)
 	// Logger is the node's, for the subsystem to name its own under.
 	Logger() *zap.SugaredLogger
 }

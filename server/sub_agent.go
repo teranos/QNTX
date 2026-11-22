@@ -142,8 +142,9 @@ func (agentSubsystem) Init(s *QNTXServer) (err error) {
 	if s.deps.cfg.Agent.Root.Agy.Named() {
 		s.holdHarness(agentLineAgy, holdAgy(s.ctx, filepath.Join(filepath.Dir(dir), "agy"), s.wg.Go, s.logger))
 	}
-	// No node holds Pi, so neither the Node Agent nor a namespace's agent runs in it:
-	// "disable Pi tmp as a Namespace Agent and as a Node Agent"
+	// No node holds Pi itself: "disable Pi tmp as a Namespace Agent and as a
+	// Node Agent". Pi is the pi plugin's to run (ADR-059), and an agent runs
+	// in it where that plugin does.
 
 	if err := s.nameNodeAgent(home); err != nil {
 		return err
@@ -189,6 +190,9 @@ func (s *QNTXServer) nameNodeAgent(home string) error {
 		if err := s.openDoor(agent, grant, home); err != nil {
 			return errors.Wrap(err, "the Node Agent has no door to the node")
 		}
+	}
+	if s.deps != nil && s.deps.cfg != nil {
+		agent.instructions = s.deps.cfg.Agent.Root.Instructions
 	}
 	s.nodeAgent = agent
 	s.underGround.add(home)

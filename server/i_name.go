@@ -59,6 +59,24 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 	if says, refused := noName(name); refused {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "name", Says: says}
 	}
+	// "and it needs to be more clear if a session named itself, or if the User gave it that name]"
+	given := sent["given"]
+	if given != "" && !slices.Contains(nameGivers, given) {
+		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "given",
+			Says: strconv.Quote(given) + " is not who gives a name: " + strings.Join(nameGivers, ", ")}
+	}
+	// "AND LAYE OWNS IDENTITY"
+	// Where laye's etcd is named, the name is taken there: one name for one
+	// agent on every node naming it, and while QNTX is down, at laye.
+	if s.names != nil {
+		s.seedNames()
+		taken, refusal := s.names.take(did, name, given, s.revoked, namingNow())
+		if refusal != nil {
+			return nil, refusal
+		}
+		s.logger.Infow("an agent named itself at laye's etcd", "did", did, "name", taken)
+		return &protocol.Named{Name: taken, Did: did}, nil
+	}
 	if s.held == nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: "this node holds no store to keep a name in"}
 	}
@@ -78,7 +96,11 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 			return &protocol.Named{Name: left, Did: did}, nil
 		}
 	}
-	if slices.ContainsFunc(names, func(kept agentName) bool { return kept.did != did && strings.EqualFold(kept.name, name) }) {
+	// "the token can be GONE"
+	// A name a revoked token holds is held by nobody who can ask: it is let go
+	// of here, in a line of its own, and taken by the agent asking.
+	gone := slices.IndexFunc(names, func(kept agentName) bool { return kept.did != did && strings.EqualFold(kept.name, name) })
+	if gone >= 0 && !s.revoked(names[gone].did) {
 		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "name",
 			Says: strconv.Quote(name) + " is taken: another agent holds it. Ask again with another name."}
 	}
@@ -91,7 +113,18 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 			newestStamp = line.at
 		}
 	}
-	if err := s.keepAgentName(did, name, newest, newestStamp); err != nil {
+	if gone >= 0 {
+		let, err := s.keepNameLine(predicateAgentUnnamed, names[gone].did, did, names[gone].name, "", newest, newestStamp)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		}
+		s.logger.Infow("a revoked token's name was let go of", "did", names[gone].did, "name", names[gone].name, "by", did)
+		newest++
+		if let.After(newestStamp) {
+			newestStamp = let
+		}
+	}
+	if _, err := s.keepNameLine(predicateAgentNamed, did, did, name, given, newest, newestStamp); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	if left != "" {
@@ -100,6 +133,12 @@ func (s *QNTXServer) iName(ctx context.Context, sent sigil.Sent) (any, *protocol
 		s.logger.Infow("an agent named itself", "did", did, "name", name)
 	}
 	return &protocol.Named{Name: name, Did: did}, nil
+}
+
+// revoked is whether the agent whose DID this is was revoked: a token the node
+// holds for it, switched off.
+func (s *QNTXServer) revoked(did string) bool {
+	return s.authHandler != nil && s.authHandler.SwitchedOff(did)
 }
 
 // itsOwnDID is the DID a name is held by: a token asking as itself, by the
@@ -150,14 +189,62 @@ func noName(name string) (string, bool) {
 	case strings.EqualFold(name, auth.RootName):
 		return auth.RootName + " is not available", true
 	}
+	// "i want to ban numbers in names"
+	// "a name is an Uppercase character followed by normal lowercase characters"
+	// "and a name can be two names after each other as well"
+	// "or three"
+	// "so no special chars in names as well"
+	// "a Name needs to be able to be phonetically spoken"
+	// "Names need to be compatible with STT/TTS"
+	words := strings.Split(name, " ")
+	if len(words) > 3 {
+		return "a name is one, two or three words", true
+	}
+	for _, word := range words {
+		if !canBeSaid(word) {
+			return "a name is one, two or three words, each a capital letter and then lowercase letters, " +
+				"with a vowel to say it by: " + strconv.Quote(word) + " is not one", true
+		}
+	}
 	return "", false
 }
 
-// agentName is one agent:named line: the DID, and the name it took.
+// canBeSaid is whether word is a capital letter and then lowercase letters, a to
+// z, one of them a vowel.
+func canBeSaid(word string) bool {
+	if len(word) < 2 || word[0] < 'A' || word[0] > 'Z' {
+		return false
+	}
+	voiced := strings.ContainsRune("AEIOUY", rune(word[0]))
+	for _, letter := range word[1:] {
+		if letter < 'a' || letter > 'z' {
+			return false
+		}
+		voiced = voiced || strings.ContainsRune("aeiouy", letter)
+	}
+	return voiced
+}
+
+// nameGivers is who gives an agent its name, as the agent says it of its own
+// name: the person, the agent itself, or the harness the session runs in.
+var nameGivers = []string{"user", "itself", "harness"}
+
+// nameGivenAttribute is the attribute a name line keeps its giver under.
+const nameGivenAttribute = "given"
+
+// predicateAgentUnnamed is the line a revoked token's name is let go of in:
+// its subject is the DID that held the name, its actor the agent that asked
+// for it.
+const predicateAgentUnnamed = "agent:unnamed"
+
+// agentName is one agent:named line: the DID, and the name it took; or one
+// agent:unnamed line: the DID, and the name it was let go of.
 type agentName struct {
 	did  string
 	name string
-	at   time.Time
+	// let is an agent:unnamed line: did holds name no longer.
+	let bool
+	at  time.Time
 	// 「[Opus 5.5] sequence is the line's place among every name line; 0 is a line written before lines」
 	// 「[Opus 5.5] carried one, before any that does.」
 	sequence int64
@@ -208,6 +295,10 @@ func wholeAttribute(as *types.As, attribute string) (int64, error) {
 // held before is free from then on. A line some other actor wrote about a DID
 // is not the agent naming itself, and is no name.
 func (s *QNTXServer) agentNames() ([]agentName, error) {
+	if s.names != nil {
+		s.seedNames()
+		return s.names.standing()
+	}
 	lines, err := s.agentLines()
 	if err != nil {
 		return nil, err
@@ -216,7 +307,7 @@ func (s *QNTXServer) agentNames() ([]agentName, error) {
 }
 
 // agentLines is every line an agent wrote naming itself, in the order they
-// were written: by the sequence each carries, which keepAgentName makes one
+// were written: by the sequence each carries, which keepNameLine makes one
 // more than every one before it; lines from before sequences come first, by
 // when each is stamped.
 func (s *QNTXServer) agentLines() ([]agentName, error) {
@@ -231,10 +322,28 @@ func (s *QNTXServer) agentLines() ([]agentName, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read the %s lines", predicateAgentNamed)
 	}
+	// One read per line kind: a filter naming several predicates reads lines
+	// that carry them all.
+	let, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(),
+		Predicates: []string{predicateAgentUnnamed},
+		Limit:      ats.EveryRow,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read the %s lines", predicateAgentUnnamed)
+	}
+	unnamed := make(map[string]bool, len(let))
+	for _, as := range let {
+		unnamed[as.ID] = true
+	}
 	var names []agentName
-	for _, as := range found {
+	for _, as := range append(found, let...) {
 		name, _ := as.Attributes["name"].(string)
-		if len(as.Subjects) != 1 || len(as.Actors) == 0 || as.Actors[0] != as.Subjects[0] || name == "" {
+		if unnamed[as.ID] {
+			if len(as.Subjects) != 1 || name == "" {
+				s.logger.Warnw("an agent:unnamed line names no one DID and its name, and lets go of nothing", "id", as.ID)
+				continue
+			}
+		} else if len(as.Subjects) != 1 || len(as.Actors) == 0 || as.Actors[0] != as.Subjects[0] || name == "" {
 			s.logger.Warnw("an agent:named line is no agent naming itself, and is no name", "id", as.ID)
 			continue
 		}
@@ -244,7 +353,7 @@ func (s *QNTXServer) agentLines() ([]agentName, error) {
 			s.logger.Warnw("an agent:named line carries a sequence that does not read, and is no name", "id", as.ID, "error", err)
 			continue
 		}
-		line := agentName{did: as.Subjects[0], name: name, at: as.Timestamp, sequence: sequence, after: as.Timestamp}
+		line := agentName{did: as.Subjects[0], name: name, let: unnamed[as.ID], at: as.Timestamp, sequence: sequence, after: as.Timestamp}
 		after, err := wholeAttribute(as, nameAfterAttribute)
 		if err != nil {
 			s.logger.Warnw("an agent:named line carries an after that does not read, and is no name", "id", as.ID, "error", err)
@@ -291,6 +400,12 @@ func standing(names []agentName) []agentName {
 	// to be written; any other line is the agent's name from then on.
 	var stands []agentName
 	for _, line := range names {
+		if line.let {
+			stands = slices.DeleteFunc(stands, func(held agentName) bool {
+				return held.did == line.did && strings.EqualFold(held.name, line.name)
+			})
+			continue
+		}
 		if slices.ContainsFunc(stands, func(held agentName) bool {
 			return held.did != line.did && strings.EqualFold(held.name, line.name)
 		}) {
@@ -315,23 +430,68 @@ const stampPrecision = time.Millisecond
 // 「[Opus 5.5] namingNow is when a name line is written: the clock, which a test holds still.」
 var namingNow = time.Now
 
-func (s *QNTXServer) keepAgentName(did, name string, newest int64, newestStamp time.Time) error {
+// keepNameLine writes one line of either kind, about did by the agent asking,
+// and answers when it is stamped.
+func (s *QNTXServer) keepNameLine(predicate, did, by, name, given string, newest int64, newestStamp time.Time) (time.Time, error) {
 	store, err := s.held.WriteWhatTheNodeKnowsOfItself()
 	if err != nil {
-		return errors.Wrapf(err, "no store to keep the name of %s in", did)
+		return time.Time{}, errors.Wrapf(err, "no store to keep the name of %s in", did)
 	}
-	id, err := identity.GenerateASUIDWithRetry("AS", did, predicateAgentNamed, auth.NamespaceSystem, store.AttestationExists)
+	id, err := identity.GenerateASUIDWithRetry("AS", did, predicate, auth.NamespaceSystem, store.AttestationExists)
 	if err != nil {
-		return errors.Wrapf(err, "failed to name the %s line of %s", predicateAgentNamed, did)
+		return time.Time{}, errors.Wrapf(err, "failed to name the %s line of %s", predicate, did)
 	}
 	now := namingNow()
+	said := map[string]any{"name": name, nameSequenceAttribute: newest + 1, nameAfterAttribute: max(newestStamp.UnixMilli(), 1)}
+	if given != "" {
+		said[nameGivenAttribute] = given
+	}
 	if err := store.CreateAttestation(&types.As{
-		ID: id, Subjects: []string{did}, Predicates: []string{predicateAgentNamed}, Contexts: []string{auth.NamespaceSystem},
-		Actors: []string{did}, Timestamp: now, CreatedAt: now, Source: did,
-		Attributes: map[string]any{"name": name, nameSequenceAttribute: newest + 1, nameAfterAttribute: max(newestStamp.UnixMilli(), 1)},
+		ID: id, Subjects: []string{did}, Predicates: []string{predicate}, Contexts: []string{auth.NamespaceSystem},
+		Actors: []string{by}, Timestamp: now, CreatedAt: now, Source: by,
+		Attributes: said,
 	}); err != nil {
-		return errors.Wrapf(err, "the name of %s was not kept", did)
+		return time.Time{}, errors.Wrapf(err, "the %s line of %s was not kept", predicate, did)
 	}
 	measure.Count(measure.AttestationsWritten, 1)
-	return nil
+	return now, nil
+}
+
+// "AND LAYE OWNS IDENTITY"
+//
+// nameKeeper is where names are kept when it is not the node's own lines:
+// laye's etcd (names_at_laye_etcd.go).
+type nameKeeper interface {
+	// standing is the name each agent holds.
+	standing() ([]agentName, error)
+	// take gives did the name, as i name does; revoked says whether a DID
+	// holding it was revoked, and lets it go.
+	take(did, name, given string, revoked func(string) bool, now time.Time) (string, *protocol.Refusal)
+	// seed gives did the name only where neither is held yet.
+	seed(did, name, given string, at time.Time) (bool, error)
+}
+
+// seedNames brings the names this node's lines hold into laye's etcd, once a
+// start, where neither the name nor the agent is held there yet: what was
+// named before laye kept names is named the same after.
+func (s *QNTXServer) seedNames() {
+	if s.held == nil {
+		return
+	}
+	s.seeding.Do(func() {
+		lines, err := s.agentLines()
+		if err != nil {
+			s.logger.Warnw("the names this node holds were not read to bring into laye's etcd", "error", err)
+			return
+		}
+		for _, held := range standing(lines) {
+			seeded, err := s.names.seed(held.did, held.name, "", held.at)
+			switch {
+			case err != nil:
+				s.logger.Warnw("a name this node holds was not brought into laye's etcd", "did", held.did, "name", held.name, "error", err)
+			case seeded:
+				s.logger.Infow("a name this node holds is kept in laye's etcd", "did", held.did, "name", held.name)
+			}
+		}
+	})
 }

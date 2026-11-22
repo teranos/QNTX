@@ -10,10 +10,12 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/namespaces"
 	"github.com/teranos/QNTX/server/parity"
+	"github.com/teranos/QNTX/server/reach"
 	"github.com/teranos/QNTX/server/sigil"
 	"github.com/teranos/QNTX/server/statusline"
 	"github.com/teranos/QNTX/server/subsystem"
@@ -195,3 +197,27 @@ func (h linkedHost) AskGitHub(ctx context.Context, operation string, request any
 }
 
 func (h linkedHost) Logger() *zap.SugaredLogger { return h.s.logger }
+
+// Ask is a sigil the node serves, asked by a subsystem from inside the node:
+// everything accessible through signa is there for a subsystem to call.
+func (h linkedHost) Ask(ctx context.Context, signum, name string, arrived map[string]any) (any, *protocol.Refusal) {
+	for _, served := range h.s.checkedSigna() {
+		if served.GetName() != signum {
+			continue
+		}
+		for _, held := range served.GetSigils() {
+			if held.GetName() != name {
+				continue
+			}
+			if !onSurface(held, reach.OverSubsystem) {
+				return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: signum + " " + name + " is not asked over the subsystem surface"}
+			}
+			answer, answers := served.Answers[name]
+			if !answers {
+				return nil, &protocol.Refusal{Why: sigil.Failed, Says: signum + " " + name + " has nothing that answers it"}
+			}
+			return sigil.Within(ctx, held, answer, arrived)
+		}
+	}
+	return nil, &protocol.Refusal{Why: sigil.NotFound, Says: "the node serves no sigil " + name + " of " + signum}
+}

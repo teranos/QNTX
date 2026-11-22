@@ -409,9 +409,7 @@ var _ ats.AttestationStore = (*handed)(nil)
 func TestThePiAgentOfANamespaceAnswersOnTheNamespacesKey(t *testing.T) {
 	s, _, in := runningNamespaceAgents(t)
 	binary, piRan := claudeStandIn(t, piAnswered)
-	fetched := make(chan struct{})
-	close(fetched)
-	s.holdHarness("pi", &harnessHeld{name: "Pi", fetched: fetched, path: binary})
+	piPluginRuns(t, s, binary)
 	set, refused := rootAsksAm(s, "set", sigil.Sent{"namespace": "garden", "harness": "pi", "model": "anthropic/claude-opus-4.6", "thinking": "low", "provider": "openrouter"})
 	require.Nil(t, refused)
 

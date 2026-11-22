@@ -69,9 +69,6 @@ impl SqliteStore {
 
     /// Create a new in-memory SQLite store (for testing)
     pub fn in_memory() -> crate::error::Result<Self> {
-        // Initialize sqlite-vec extension BEFORE creating connection
-        crate::vec::init_vec_extension();
-
         let conn = Connection::open_in_memory()?;
         crate::migrate::migrate(&conn)?;
         Ok(Self::new(conn))
@@ -82,9 +79,6 @@ impl SqliteStore {
     /// Opens a read-write connection. Use [`open_read_conn`] to create a
     /// separate read-only connection for concurrent queries.
     pub fn open(path: impl AsRef<std::path::Path>) -> crate::error::Result<Self> {
-        // Initialize sqlite-vec extension BEFORE creating connection
-        crate::vec::init_vec_extension();
-
         let path_str = path.as_ref().to_string_lossy().to_string();
 
         // Initialize flight recorder next to the database file
@@ -331,13 +325,19 @@ impl SqliteStore {
 /// write that cannot keep a date says so, it does not keep today's.
 fn instant(id: &str, field: &str, ms: i64) -> StoreResult<String> {
     try_timestamp_to_sql(ms).ok_or_else(|| {
-        StoreError::InvalidData(format!("{id}: {field} {ms} ms is outside the dates a store holds"))
+        StoreError::InvalidData(format!(
+            "{id}: {field} {ms} ms is outside the dates a store holds"
+        ))
     })
 }
 
 /// The rows the indexed lookups read (`attestation_{actors,contexts,subjects,predicates}`),
 /// one per value of the attestation.
-fn write_junctions(conn: &Connection, attestation: &Attestation, created_at_sql: &str) -> StoreResult<()> {
+fn write_junctions(
+    conn: &Connection,
+    attestation: &Attestation,
+    created_at_sql: &str,
+) -> StoreResult<()> {
     crate::flight_recorder::record_fmt("put:junction_actors", &attestation.id);
     for actor in &attestation.actors {
         conn.execute(
@@ -410,6 +410,66 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
 
     crate::flight_recorder::record_fmt("put:done", &attestation.id);
     Ok(())
+}
+
+impl SqliteStore {
+    // "if k took the list in memory and wrote it in one transaction, the drain would go far faster"
+    //
+    /// Many attestations in one transaction: one commit, so one sync of the
+    /// WAL for the whole list where a put each is several. Each is answered as
+    /// `put` would answer it, in the order given: one the store refuses, one
+    /// it holds already (or that came earlier in the list) and one whose write
+    /// failed leave the others written, each in a savepoint of its own.
+    pub fn put_many(
+        &mut self,
+        attestations: Vec<Attestation>,
+    ) -> StoreResult<Vec<StoreResult<()>>> {
+        let before = self.put_count;
+        let mut tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(SqliteError::from)?;
+        let mut seen = std::collections::HashSet::new();
+        let mut answers = Vec::with_capacity(attestations.len());
+        for attestation in attestations {
+            if let Err(e) = attestation.writable() {
+                answers.push(Err(StoreError::from(e)));
+                continue;
+            }
+            let held = !seen.insert(attestation.id.clone())
+                || tx
+                    .query_row(
+                        "SELECT 1 FROM attestations WHERE id = ? LIMIT 1",
+                        [&attestation.id],
+                        |_| Ok(()),
+                    )
+                    .optional()
+                    .map_err(SqliteError::from)?
+                    .is_some();
+            if held {
+                answers.push(Err(StoreError::AlreadyExists(attestation.id.clone())));
+                continue;
+            }
+            let one = tx.savepoint().map_err(SqliteError::from)?;
+            match put_attestation(&one, &attestation) {
+                Ok(()) => {
+                    one.commit().map_err(SqliteError::from)?;
+                    self.put_count += 1;
+                    answers.push(Ok(()));
+                }
+                // Dropped, the savepoint rolls back what this one wrote.
+                Err(e) => answers.push(Err(e)),
+            }
+        }
+        tx.commit().map_err(SqliteError::from)?;
+        // The periodic checkpoint `put` keeps, for every 5000 crossed.
+        if before / 5000 != self.put_count / 5000 {
+            self.conn
+                .execute_batch("PRAGMA wal_checkpoint(PASSIVE)")
+                .map_err(|e| StoreError::Backend(format!("wal_checkpoint(PASSIVE) failed: {e}")))?;
+        }
+        Ok(answers)
+    }
 }
 
 impl AttestationStore for SqliteStore {
@@ -510,34 +570,45 @@ impl AttestationStore for SqliteStore {
         // no longer has, and miss it under the ones it has now.
         let created_at_sql: String = self
             .conn
-            .query_row("SELECT created_at FROM attestations WHERE id = ?", [&attestation.id], |r| r.get(0))
+            .query_row(
+                "SELECT created_at FROM attestations WHERE id = ?",
+                [&attestation.id],
+                |r| r.get(0),
+            )
             .map_err(SqliteError::from)?;
         let tx = self.conn.transaction().map_err(SqliteError::from)?;
 
-        tx
-            .execute(
-                "UPDATE attestations
+        tx.execute(
+            "UPDATE attestations
              SET subjects = ?, predicates = ?, contexts = ?, actors = ?,
                  timestamp = ?, source = ?, attributes = ?, signature = ?, signer_did = ?
              WHERE id = ?",
-                rusqlite::params![
-                    subjects_json,
-                    predicates_json,
-                    contexts_json,
-                    actors_json,
-                    timestamp_sql,
-                    attestation.source,
-                    attributes_json,
-                    attestation.signature,
-                    attestation.signer_did,
-                    attestation.id,
-                ],
+            rusqlite::params![
+                subjects_json,
+                predicates_json,
+                contexts_json,
+                actors_json,
+                timestamp_sql,
+                attestation.source,
+                attributes_json,
+                attestation.signature,
+                attestation.signer_did,
+                attestation.id,
+            ],
+        )
+        .map_err(SqliteError::from)?;
+
+        for table in [
+            "attestation_actors",
+            "attestation_contexts",
+            "attestation_subjects",
+            "attestation_predicates",
+        ] {
+            tx.execute(
+                &format!("DELETE FROM {table} WHERE attestation_id = ?"),
+                [&attestation.id],
             )
             .map_err(SqliteError::from)?;
-
-        for table in ["attestation_actors", "attestation_contexts", "attestation_subjects", "attestation_predicates"] {
-            tx.execute(&format!("DELETE FROM {table} WHERE attestation_id = ?"), [&attestation.id])
-                .map_err(SqliteError::from)?;
         }
         write_junctions(&tx, &attestation, &created_at_sql)?;
         tx.commit().map_err(SqliteError::from)?;
@@ -580,10 +651,30 @@ fn placeholders(n: usize) -> String {
 pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
     // Each table with the index that finds one attestation's names.
     let names: [(&str, &str, &str, &Vec<String>); 4] = [
-        ("attestation_subjects", "subject", "idx_junc_subject_id", &filter.subjects),
-        ("attestation_predicates", "predicate", "idx_junc_predicate_id", &filter.predicates),
-        ("attestation_contexts", "context", "idx_junc_context_id", &filter.contexts),
-        ("attestation_actors", "actor", "idx_junc_actor_id", &filter.actors),
+        (
+            "attestation_subjects",
+            "subject",
+            "idx_junc_subject_id",
+            &filter.subjects,
+        ),
+        (
+            "attestation_predicates",
+            "predicate",
+            "idx_junc_predicate_id",
+            &filter.predicates,
+        ),
+        (
+            "attestation_contexts",
+            "context",
+            "idx_junc_context_id",
+            &filter.contexts,
+        ),
+        (
+            "attestation_actors",
+            "actor",
+            "idx_junc_actor_id",
+            &filter.actors,
+        ),
     ];
 
     // A window walks its own rows. Newest first, a window with less than a

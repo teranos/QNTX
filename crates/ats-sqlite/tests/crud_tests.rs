@@ -1,7 +1,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 //! CRUD operation tests for SqliteStore
 
-use ats::{storage::AttestationStore, AttestationBuilder};
+use ats::{
+    storage::{AttestationStore, StoreError},
+    AttestationBuilder,
+};
 use ats_sqlite::SqliteStore;
 
 /// Helper to create a test attestation
@@ -279,8 +282,51 @@ fn an_update_moves_the_lookups_with_the_row() {
 
     assert_eq!(store.subjects().unwrap(), vec!["ZED"]);
     assert_eq!(store.actors().unwrap(), vec!["human:carol"]);
-    let by_old = ats::AxFilter { subjects: vec!["ALICE".into()], limit: 10, ..Default::default() };
+    let by_old = ats::AxFilter {
+        subjects: vec!["ALICE".into()],
+        limit: 10,
+        ..Default::default()
+    };
     assert_eq!(store.query(&by_old).unwrap().attestations.len(), 0);
-    let by_new = ats::AxFilter { subjects: vec!["ZED".into()], limit: 10, ..Default::default() };
+    let by_new = ats::AxFilter {
+        subjects: vec!["ZED".into()],
+        limit: 10,
+        ..Default::default()
+    };
     assert_eq!(store.query(&by_new).unwrap().attestations.len(), 1);
+}
+
+// "if k took the list in memory and wrote it in one transaction, the drain would go far faster"
+//
+/// A list is written in one transaction and answered one by one, in order:
+/// one the store already holds, one given twice and one it refuses are each
+/// answered as `put` answers them, and the others are written.
+#[test]
+fn many_are_written_at_once_and_each_is_answered() {
+    let mut store = SqliteStore::in_memory().unwrap();
+    store.put(create_test_attestation("held")).unwrap();
+
+    let mut refused = create_test_attestation("refused");
+    refused.subjects.clear();
+    let answers = store
+        .put_many(vec![
+            create_test_attestation("one"),
+            create_test_attestation("held"),
+            create_test_attestation("two"),
+            create_test_attestation("one"),
+            refused,
+        ])
+        .unwrap();
+
+    let [one, held, two, again, refused] =
+        <[_; 5]>::try_from(answers).expect("one answer for each of the five");
+    assert!(one.is_ok());
+    assert!(matches!(held, Err(StoreError::AlreadyExists(_))));
+    assert!(two.is_ok());
+    assert!(matches!(again, Err(StoreError::AlreadyExists(_))));
+    assert!(matches!(refused, Err(StoreError::Unwritable(_))));
+
+    assert!(store.get("one").unwrap().is_some());
+    assert!(store.get("two").unwrap().is_some());
+    assert!(store.get("refused").unwrap().is_none());
 }

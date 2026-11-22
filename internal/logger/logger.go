@@ -314,3 +314,14 @@ func Debugw(msg string, keysAndValues ...any) {
 		Logger.Debugw(msg, keysAndValues...)
 	}
 }
+
+// "OUR SHAPE OF OBSERVABILITY IS OTEL"
+//
+// 「[Opus 5.5] AddOTLPOutput tees core, internal/otlp's, onto the global logger, so everything logged」
+// 「[Opus 5.5] through logger.Logger from here on also leaves as OTLP logs. A nil core adds nothing.」
+func AddOTLPOutput(core zapcore.Core) {
+	if core == nil {
+		return
+	}
+	Logger = zap.New(zapcore.NewTee(Logger.Desugar().Core(), core)).Sugar()
+}

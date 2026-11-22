@@ -645,3 +645,37 @@ func TestCancelQueuedBeforeDropsOnlyTheOldQueuedOfTheHandler(t *testing.T) {
 		}
 	}
 }
+
+// "anything that isnt operational in operational db, just needs to get out of there probably"
+//
+// A handler's done and dropped jobs keep their rows and lose their payloads;
+// one still to run keeps what it is run with. Cleanup takes a dropped job too.
+func TestADoneJobForgetsItsPayloadAndADroppedOneIsCleanedUp(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewStore(db)
+	old := time.Now().Add(-48 * time.Hour)
+	for id, status := range map[string]JobStatus{"DONE": JobStatusCompleted, "DROPPED": JobStatusCancelled, "WAITING": JobStatusQueued} {
+		j := &Job{Pulse: NoPulse(), Started: NotYet(), Completed: NotYet(), ID: id, HandlerName: "github.forward", Source: id,
+			Status: status, Payload: []byte(`{"body":"the whole webhook"}`), CreatedAt: old, UpdatedAt: old}
+		if err := store.CreateJob(j); err != nil {
+			t.Fatalf("CreateJob(%s): %v", id, err)
+		}
+	}
+	forgotten, err := store.ForgetPayloads(t.Context(), "github.forward", 10)
+	if err != nil || forgotten != 2 {
+		t.Fatalf("ForgetPayloads = %d, %v; want the done and the dropped one", forgotten, err)
+	}
+	for id, kept := range map[string]bool{"DONE": false, "DROPPED": false, "WAITING": true} {
+		job, err := store.GetJob(id)
+		if err != nil {
+			t.Fatalf("GetJob(%s): %v", id, err)
+		}
+		if (len(job.Payload) > 0) != kept {
+			t.Errorf("%s holds payload %q", id, job.Payload)
+		}
+	}
+	removed, err := store.CleanupOldJobs(24*time.Hour, 10)
+	if err != nil || removed != 2 {
+		t.Fatalf("CleanupOldJobs = %d, %v; want the done and the dropped job", removed, err)
+	}
+}

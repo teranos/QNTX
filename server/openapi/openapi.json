@@ -46,7 +46,24 @@
         "ROOT"
       ]
     },
+    "/a2a.v1.A2AService/": {
+      "x-qntx-reach": [
+        "ROOT"
+      ],
+      "x-qntx-prefix": true
+    },
     "/a2a/": {
+      "x-qntx-reach": [
+        "ROOT"
+      ],
+      "x-qntx-prefix": true
+    },
+    "/a2a/0.3": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/a2a/0.3/": {
       "x-qntx-reach": [
         "ROOT"
       ],
@@ -112,6 +129,11 @@
       ]
     },
     "/api/agent/session": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/agent/stop": {
       "x-qntx-reach": [
         "ROOT"
       ]
@@ -272,6 +294,36 @@
       ],
       "x-qntx-prefix": true
     },
+    "/api/collected": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/cancel": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/edit": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/hold": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/later": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/collected/release": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/crash-test": {
       "x-qntx-reach": [
         "ROOT"
@@ -363,6 +415,11 @@
       ]
     },
     "/api/embeddings/generate": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/embeddings/generate/batch": {
       "x-qntx-reach": [
         "ROOT"
       ]
@@ -462,6 +519,36 @@
         "ROOT"
       ]
     },
+    "/api/memory": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/keep": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}/merge": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}/{memory}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/memory/{store}/{memory}/forget": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/namespaces": {
       "x-qntx-reach": [
         "ROOT",
@@ -508,6 +595,11 @@
       ]
     },
     "/api/parity/storage": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/phones": {
       "x-qntx-reach": [
         "ROOT"
       ]
@@ -730,6 +822,26 @@
         "ROOT"
       ]
     },
+    "/api/vectors/{index}": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vectors/{index}/add": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vectors/{index}/delete": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
+    "/api/vectors/{index}/search": {
+      "x-qntx-reach": [
+        "ROOT"
+      ]
+    },
     "/api/watchers": {
       "x-qntx-reach": [
         "ROOT",
@@ -862,6 +974,11 @@
       "x-qntx-prefix": true
     },
     "/auth/laye/challenge": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/laye/invited": {
       "x-qntx-reach": [
         "ANYONE"
       ]
@@ -1061,6 +1178,12 @@
         "SUPER",
         "TOKEN",
         "ATTESTOR"
+      ],
+      "x-qntx-prefix": true
+    },
+    "/lf.a2a.v1.A2AService/": {
+      "x-qntx-reach": [
+        "ROOT"
       ],
       "x-qntx-prefix": true
     },

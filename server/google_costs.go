@@ -129,7 +129,16 @@ func (s *QNTXServer) proveGoogleCosts() {
 		err := s.googleCostsTick(proving)
 		if err == nil {
 			s.logger.Infow("Google lets the node read its costs")
-			s.tellGoogleOutcome(googleOutcomeMail("The node reads what Google Cloud costs", "Google lets the node read what its budgets report. Google's first report can take several hours.\n"))
+			said := "Google lets the node read what its budgets report. Google's first report can take several hours."
+			// "I got this from you, not from the mail"
+			keys, err := s.googleKeyLinks()
+			switch {
+			case err != nil:
+				said += "\n\n" + errors.Wrap(err, "the keys to connect were not read").Error()
+			case len(keys) > 0:
+				said += "\n\nEach namespace spends with a key of its own, in a project of its own, halted by its own budget."
+			}
+			s.tellGoogleOutcome(googleOutcomeMail("The node reads what Google Cloud costs", said, keys...))
 			return
 		}
 		if said == nil || proving.Err() == nil {
@@ -211,14 +220,24 @@ func (s *QNTXServer) connectGoogleCosts(ctx context.Context, token, by string) (
 		}
 	}
 	// "one project per Google spend item (each API key, the OIDC identity), with each budget halting only its own item."
-	if err := s.meterTheNode(ctx, token, billing.Account, topic, by, kept); err != nil {
+	metered, err := s.meterTheNode(ctx, token, billing.Account, topic, by, kept)
+	if err != nil {
 		return "", err
+	}
+	// "fix the budget count": the budgets were listed before the node's meter was made.
+	budgets := len(listed.Budgets)
+	if metered {
+		budgets++
+	}
+	counted := fmt.Sprintf("%d budgets", budgets)
+	if budgets == 1 {
+		counted = "1 budget"
 	}
 	if refused := s.keepGoogleCostLine(googleCostsLineSubject, "wired", by, map[string]any{"billing_account": billing.Account}); refused != nil {
 		return "", errors.New(refused.Says)
 	}
 	sacred.Go("google.costs.proving", s.proveGoogleCosts)
-	return fmt.Sprintf("You get a mail once Google lets the node read them. The node reads the costs of %s, from %d budget(s). Google's first report can take several hours. What costs halts at %d%% of the budget, and you get a mail when it does.", billing.Account, len(listed.Budgets), int(googleHaltsAt*100)), nil
+	return fmt.Sprintf("You get a mail once Google lets the node read them. The node reads the costs of %s, from %s. Google's first report can take several hours. What costs halts at %d%% of the budget, and you get a mail when it does.", billing.Account, counted, int(googleHaltsAt*100)), nil
 }
 
 // keepGoogleCostLine writes one of the node's lines about its costs.
@@ -472,7 +491,19 @@ func (s *QNTXServer) googleHaltChanged() {
 			continue
 		}
 		if halted {
-			s.tellGoogleOutcome(googleOutcomeMail("What "+item.called()+" spends at Google Cloud is halted", why+".\n\nThe node stays connected, and nothing else halts for it. It resumes by itself when the budget frees up.\n"))
+			subject := "What " + item.called() + " spends at Google Cloud is halted"
+			// "I wish that mail, just had the one click answer somehow"
+			// 「[Opus 5.5] A halt only Connect costs ends carries it, as the
+			// element's own press opens it: no budget frees up for it.」
+			if why == googleUnmeteredWhy(item) {
+				connect, err := s.googleCostsConnect()
+				if err != nil {
+					s.logger.Errorw("The halt is mailed without Connect costs, which was not read", "item", item.name, "error", err)
+				}
+				s.tellGoogleOutcome(googleConnectCostsMail(subject, why, connect))
+				continue
+			}
+			s.tellGoogleOutcome(googleOutcomeMail(subject, why+".\n\nThe node stays connected, and nothing else halts for it. It resumes by itself when the budget frees up.\n"))
 			continue
 		}
 		s.tellGoogleOutcome(googleOutcomeMail("What "+item.called()+" spends at Google Cloud has resumed", "The budget freed up.\n"))
@@ -564,15 +595,41 @@ func (s *QNTXServer) watchGoogleCosts() {
 	}
 }
 
+// 「[Opus 5.5] googleCostsConnectAt is where ROOT presses Connect costs: Google's
+// consent for the node's project, from connect.」
+func googleCostsConnectAt(connect, project string) string {
+	return connect + "?project=" + url.QueryEscape(project) + "&thing=costs"
+}
+
+// 「[Opus 5.5] googleCostsConnect is where ROOT presses Connect costs, as the
+// node's Google Cloud element offers it.」
+func (s *QNTXServer) googleCostsConnect() (string, error) {
+	i, err := s.theIssuer()
+	if err != nil {
+		return "", err
+	}
+	kept, held, err := s.googleLine()
+	if err != nil {
+		return "", err
+	}
+	if !held {
+		return "", errors.New("the node is not connected to Google Cloud, so it has no project to connect costs for")
+	}
+	return googleCostsConnectAt(i.url+auth.GoogleCloudPath(), kept.project.ProjectID), nil
+}
+
 // googleCostsAm fills in what the node knows of its costs.
 func (s *QNTXServer) googleCostsAm(am *protocol.NodeGoogle, connect string) *protocol.Refusal {
-	am.CostsConnect = connect + "?project=" + url.QueryEscape(am.GetProjectId()) + "&thing=costs"
+	am.CostsConnect = googleCostsConnectAt(connect, am.GetProjectId())
 	am.KeyConnect = connect + "?project=" + url.QueryEscape(am.GetProjectId()) + "&thing=key&namespace="
 	wired, err := s.googleCostsWired()
 	if err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	am.CostsWired = wired
+	if am.KeyConnects, err = s.googleKeysToConnect(connect, am.GetProjectId()); err != nil {
+		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	}
 	am.AgyConnect = connect + "?project=" + url.QueryEscape(am.GetProjectId()) + "&thing=agy"
 	if am.AgyWired, err = s.googleAgyWired(); err != nil {
 		return &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}

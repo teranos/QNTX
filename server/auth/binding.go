@@ -54,6 +54,15 @@ type identityLists struct {
 	mu      sync.RWMutex
 	root    []string
 	signers []string
+	// The roots the primary says, when it is laye (primary_roots.go).
+	fromPrimary []string
+}
+
+// setFromPrimary replaces the roots the primary said.
+func (l *identityLists) setFromPrimary(root []string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.fromPrimary = slices.Clone(root)
 }
 
 // set replaces both lists. The config watcher calls this, so a request in
@@ -68,7 +77,10 @@ func (l *identityLists) set(root, signers []string) {
 func (l *identityLists) roots() []string {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	return l.root
+	if len(l.fromPrimary) == 0 {
+		return l.root
+	}
+	return slices.Concat(l.root, l.fromPrimary)
 }
 
 func (l *identityLists) trustedSigners() []string {

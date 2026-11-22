@@ -34,7 +34,7 @@ type SemanticSearchResult struct {
 	Similarity float32
 }
 
-// EmbeddingSearcher queries pre-computed embeddings via vector similarity (sqlite-vec).
+// EmbeddingSearcher queries pre-computed embeddings via vector similarity (vector search, ADR-016).
 // Used for historical semantic search. Optional — nil when embeddings unavailable.
 type EmbeddingSearcher interface {
 	Search(queryEmbedding []byte, limit int, threshold float32, clusterID *int) ([]SemanticSearchResult, error)
@@ -448,7 +448,7 @@ func (e *Engine) SetEmbeddingService(svc EmbeddingService) {
 }
 
 // SetEmbeddingSearcher sets the vector similarity searcher for historical semantic queries.
-// Uses pre-computed embeddings in the vector DB (sqlite-vec).
+// Uses pre-computed embeddings in the vector index (vector search, ADR-016).
 func (e *Engine) SetEmbeddingSearcher(searcher EmbeddingSearcher) {
 	e.embeddingSearcher = searcher
 }
@@ -576,7 +576,7 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 		}
 	}
 
-	// Serialize query embedding for sqlite-vec
+	// Serialize query embedding as the store keeps it
 	queryBlob, err := e.embeddingService.SerializeEmbedding(searchEmbedding)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize query embedding for watcher %s", watcherID)

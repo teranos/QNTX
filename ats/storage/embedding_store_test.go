@@ -12,17 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO: Fix sqlite-vec integration
-// These tests currently fail with "no such module: vec0" because the standard
-// mattn/go-sqlite3 driver doesn't include sqlite-vec extension.
-//
-// To fix:
-// 1. Replace mattn/go-sqlite3 with github.com/asg017/sqlite-vec-go-bindings/ncruces
-// 2. Or build a custom SQLite with vec0 module included
-// 3. Or make the vec_embeddings table creation conditional in migration 019
-//
-// See docs/embeddings_integration_status.md for details.
-
 // Simple test ID generator
 var testIDCounter = 0
 
@@ -66,7 +55,7 @@ func createTestEmbedding(dimensions int) []byte {
 func TestEmbeddingStore_Save(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	embedding := &EmbeddingModel{
 		ID:         generateTestID(),
@@ -97,7 +86,7 @@ func TestEmbeddingStore_Save(t *testing.T) {
 func TestEmbeddingStore_GetBySource_NotFound(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	retrieved, err := store.GetBySource("attestation", "non-existent-id", "")
 	require.ErrorIs(t, err, ErrNotFound)
@@ -107,7 +96,7 @@ func TestEmbeddingStore_GetBySource_NotFound(t *testing.T) {
 func TestEmbeddingStore_SemanticSearch(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Create test embeddings with different similarities
 	embeddings := []*EmbeddingModel{
@@ -168,7 +157,7 @@ func TestEmbeddingStore_SemanticSearch(t *testing.T) {
 func TestEmbeddingStore_DeleteBySource(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	embedding := testEmbedding("test content to delete")
 
@@ -198,7 +187,7 @@ func TestEmbeddingStore_DeleteBySource(t *testing.T) {
 func TestEmbeddingStore_BatchSaveAttestationEmbeddings(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	embeddings := []*EmbeddingModel{
 		{
@@ -251,7 +240,7 @@ func TestEmbeddingStore_BatchSaveAttestationEmbeddings(t *testing.T) {
 func TestEmbeddingStore_EmptyBatch(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Empty batch should not error
 	err := store.BatchSaveAttestationEmbeddings([]*EmbeddingModel{})
@@ -261,7 +250,7 @@ func TestEmbeddingStore_EmptyBatch(t *testing.T) {
 func TestEmbeddingStore_UpdateExisting(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	embedding := testEmbedding("original text")
 
@@ -291,7 +280,7 @@ func TestEmbeddingStore_UpdateExisting(t *testing.T) {
 func TestEmbeddingStore_UpdateProjections(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Save 3 embeddings
 	embeddings := make([]*EmbeddingModel, 3)
@@ -340,7 +329,7 @@ func TestEmbeddingStore_UpdateProjections(t *testing.T) {
 func TestEmbeddingStore_MultiMethodProjections(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Save 2 embeddings
 	embeddings := make([]*EmbeddingModel, 2)
@@ -397,7 +386,7 @@ func TestEmbeddingStore_MultiMethodProjections(t *testing.T) {
 func TestEmbeddingStore_GetProjectionsByMethod_ExcludesUnprojected(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Save 3 embeddings
 	embeddings := make([]*EmbeddingModel, 3)
@@ -426,7 +415,7 @@ func TestEmbeddingStore_GetProjectionsByMethod_ExcludesUnprojected(t *testing.T)
 func TestEmbeddingStore_UpdateProjections_Empty(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	err := store.UpdateProjections("umap", []ProjectionAssignment{})
 	require.NoError(t, err)
@@ -440,7 +429,7 @@ func TestEmbeddingStore_UpdateProjections_Empty(t *testing.T) {
 func TestEmbeddingStore_ProjectionRoundTrip(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	embedding := testEmbedding("round trip test")
 	require.NoError(t, store.Save(embedding))
@@ -471,7 +460,7 @@ func TestEmbeddingStore_ProjectionRoundTrip(t *testing.T) {
 func TestEmbeddingStore_ClusterRunCRUD(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	run := &ClusterRun{
 		ID:             "CR_test_001",
@@ -493,7 +482,7 @@ func TestEmbeddingStore_ClusterRunCRUD(t *testing.T) {
 func TestEmbeddingStore_ClusterIdentityLifecycle(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Create run first (foreign key)
 	run := &ClusterRun{
@@ -540,7 +529,7 @@ func TestEmbeddingStore_ClusterIdentityLifecycle(t *testing.T) {
 func TestEmbeddingStore_ClusterSnapshotsAndEvents(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Create run and cluster
 	run := &ClusterRun{
@@ -581,7 +570,7 @@ func TestEmbeddingStore_ClusterSnapshotsAndEvents(t *testing.T) {
 func TestEmbeddingStore_GetLabelEligibleClusters(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Create run (FK target)
 	run := &ClusterRun{
@@ -649,7 +638,7 @@ func TestEmbeddingStore_GetLabelEligibleClusters(t *testing.T) {
 func TestEmbeddingStore_SampleClusterTexts(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Create run and cluster
 	run := &ClusterRun{
@@ -688,7 +677,7 @@ func TestEmbeddingStore_SampleClusterTexts(t *testing.T) {
 func TestEmbeddingStore_UpdateClusterLabel(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	run := &ClusterRun{
 		ID: "CR_label", NPoints: 5, NClusters: 1, NNoise: 0,
@@ -725,7 +714,7 @@ func TestEmbeddingStore_UpdateClusterLabel(t *testing.T) {
 func TestEmbeddingStore_GetClusterTimeline(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Create two runs
 	run1 := &ClusterRun{
@@ -793,7 +782,7 @@ func TestEmbeddingStore_GetClusterTimeline(t *testing.T) {
 func TestEmbeddingStore_GetClusterDetails(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
-	store := NewEmbeddingStore(db, logger)
+	store := indexedStore(db, logger)
 
 	// Create run, cluster, and some embeddings assigned to it
 	run := &ClusterRun{

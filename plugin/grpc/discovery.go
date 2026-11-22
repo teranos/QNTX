@@ -176,6 +176,7 @@ type PluginManager struct {
 	pluginRestarted []func(name string)                                         // told after a plugin comes back (clear HTTP mux state)
 	embeddingReady  []func(name string, client protocol.EmbeddingServiceClient) // told when an embedding provider is ready (init or restart)
 	pythonReady     []func(name string, client protocol.PythonServiceClient)    // told when a python_provider plugin initializes
+	vectorReady     []func(name string)                                         // told when a vector search provider is ready (init or restart)
 	lifecycle       []func(pluginName, version, event string, routes []string)  // told on plugin lifecycle events
 
 	// The node's WebSocket settings, kept so a plugin loaded after they were
@@ -223,11 +224,13 @@ func (attachedPlugin) logs() (*LogBuffer, error) {
 // launchedPlugin is a plugin process QNTX started, its output kept in its own
 // log file and a ring for live streaming.
 type launchedPlugin struct {
-	cmd          *exec.Cmd
-	stdoutLogger *pluginLogger
-	stderrLogger *pluginLogger
-	logBuffer    *LogBuffer
-	logFile      *os.File
+	cmd *exec.Cmd
+	// harnessSecret is what a call to this launch's harness presents.
+	harnessSecret string
+	stdoutLogger  *pluginLogger
+	stderrLogger  *pluginLogger
+	logBuffer     *LogBuffer
+	logFile       *os.File
 }
 
 // exited is what reaping a stopped plugin says. Its exit, the stop itself, is
@@ -390,6 +393,36 @@ func (m *PluginManager) SetPulseResources(db *sql.DB, registry *async.HandlerReg
 	m.joints["pulse"] = pulseJoint{m: m, db: db, handlers: registry}
 }
 
+// pulseDB is Pulse's database, once the manager has been handed it.
+func (m *PluginManager) pulseDB() (*sql.DB, error) {
+	m.wiringMu.RLock()
+	defer m.wiringMu.RUnlock()
+	j, ok := m.joints["pulse"].(pulseJoint)
+	if !ok {
+		return nil, errors.New("the plugin manager has not been handed Pulse's database")
+	}
+	return j.db, nil
+}
+
+// PauseSchedules pauses a plugin's schedules, loaded or not: a plugin that is
+// off has nothing to run them.
+func (m *PluginManager) PauseSchedules(name string) error {
+	db, err := m.pulseDB()
+	if err != nil {
+		return err
+	}
+	return PausePluginSchedules(db, name, m.logger)
+}
+
+// DeleteSchedules deletes a plugin's schedules, for a plugin taken off the node.
+func (m *PluginManager) DeleteSchedules(name string) error {
+	db, err := m.pulseDB()
+	if err != nil {
+		return err
+	}
+	return DeletePluginSchedules(db, name, m.logger)
+}
+
 // SetOnWatchersSetup adds fn to what is told after plugin watchers are written
 // to DB. The server uses this to reload the watcher engine's in-memory map.
 func (m *PluginManager) SetOnWatchersSetup(fn func()) {
@@ -437,6 +470,15 @@ func (m *PluginManager) SetOnEmbeddingProviderReady(fn func(name string, client 
 	m.wiringMu.Lock()
 	defer m.wiringMu.Unlock()
 	m.embeddingReady = append(m.embeddingReady, fn)
+}
+
+// SetOnVectorSearchProviderReady adds fn to what is told when a vector search
+// provider plugin is ready, on init or after a restart or an enable: the
+// server offers it what the embedding store kept.
+func (m *PluginManager) SetOnVectorSearchProviderReady(fn func(name string)) {
+	m.wiringMu.Lock()
+	defer m.wiringMu.Unlock()
+	m.vectorReady = append(m.vectorReady, fn)
 }
 
 // SetOnPythonProviderReady adds fn to what is told when a plugin declaring
@@ -606,8 +648,20 @@ func (j servicesJoint) join(name string, proxy *ExternalDomainProxy) ([]string, 
 		j.m.logger.Debugf("Re-registered search provider '%s' after restart", name)
 	}
 	j.m.wiringMu.RLock()
-	embeddingReady, pythonReady := j.m.embeddingReady, j.m.pythonReady
+	embeddingReady, pythonReady, vectorReady := j.m.embeddingReady, j.m.pythonReady, j.m.vectorReady
 	j.m.wiringMu.RUnlock()
+	if proxy.IsVectorSearchProvider() {
+		roles = append(roles, "vector-search-provider")
+		router := j.sm.GetVectorSearchRouter()
+		if router == nil {
+			return roles, errors.Newf("vector search provider %s is not joined: the node runs no vector search router", name)
+		}
+		router.SetService(proxy.VectorSearchServiceClient())
+		j.m.logger.Debugf("Re-registered vector search provider '%s' after restart", name)
+		for _, fn := range vectorReady {
+			fn(name)
+		}
+	}
 	if proxy.IsEmbeddingProvider() {
 		roles = append(roles, "embedding-provider")
 		for _, fn := range embeddingReady {
@@ -811,6 +865,12 @@ func (m *PluginManager) loadPlugin(ctx context.Context, pluginCfg PluginConfig) 
 	client, err := m.connect(ctx, pluginCfg.Name, addr)
 	if err != nil {
 		return alongside(err, proc.abandon())
+	}
+
+	// A plugin something else runs was handed no secret by this node, and its
+	// harness answers it no turn.
+	if launched, started := proc.(*launchedPlugin); started {
+		client.harnessSecret = launched.harnessSecret
 	}
 
 	// Validate plugin metadata matches config
@@ -1024,7 +1084,14 @@ func (m *PluginManager) launchPlugin(ctx context.Context, pluginCfg PluginConfig
 	// Plugins are not killed on context cancellation — graceful shutdown sends
 	// gRPC Shutdown() first. Orphans from crashes are cleaned up on next startup
 	// via pidfile tracking (see pidfile.go).
-	cmd.Env = os.Environ()
+	// "Harness is a plugin that speaks grpc A2A": the plugin's harness answers
+	// the node that started it. The secret is this launch's, handed where only
+	// the plugin's process reads it; whoever else reaches its port has none.
+	harnessSecret, err := newHarnessSecret()
+	if err != nil {
+		return nil, 0, errors.Wrapf(err, "plugin %s has no secret for its harness to know the node by", pluginCfg.Name)
+	}
+	cmd.Env = append(os.Environ(), HarnessSecretEnv+"="+harnessSecret)
 
 	// Open per-plugin log file (e.g. tmp/myplugin.log).
 	// Plugin output goes here instead of the main QNTX log.
@@ -1093,11 +1160,12 @@ func (m *PluginManager) launchPlugin(ctx context.Context, pluginCfg PluginConfig
 	}
 
 	return &launchedPlugin{
-		cmd:          cmd,
-		stdoutLogger: stdoutLogger,
-		stderrLogger: stderrLogger,
-		logBuffer:    logBuf,
-		logFile:      logFile,
+		harnessSecret: harnessSecret,
+		cmd:           cmd,
+		stdoutLogger:  stdoutLogger,
+		stderrLogger:  stderrLogger,
+		logBuffer:     logBuf,
+		logFile:       logFile,
 	}, actualPort, nil
 }
 

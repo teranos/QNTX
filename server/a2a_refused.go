@@ -47,6 +47,7 @@ const (
 type a2aRefusalSaid struct {
 	Operation       string
 	JSONRPC         bool
+	GRPC            bool
 	Status          int
 	Reason, Message string
 }
@@ -81,6 +82,9 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 	if refusal.JSONRPC {
 		binding = "jsonrpc"
 	}
+	if refusal.GRPC {
+		binding = "grpc"
+	}
 	version := r.Header.Get("A2A-Version")
 	if version == "" {
 		version = r.URL.Query().Get("A2A-Version")
@@ -96,9 +100,14 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 		return
 	}
 
+	// 「[Opus 5.5] The path a request arrived at, before its version's base was taken off.」
+	path := r.URL.Path
+	if exchange, held := a2aExchangeFrom(r.Context()); held && exchange.path != "" {
+		path = exchange.path
+	}
 	said := map[string]string{
 		"a2a.method":    bounded(r.Method, 16),
-		"a2a.path":      bounded(a2aPrefix[:len(a2aPrefix)-1]+r.URL.Path, saidPathMost),
+		"a2a.path":      bounded(path, saidPathMost),
 		"a2a.operation": refusal.Operation,
 		"a2a.binding":   binding,
 		"a2a.version":   bounded(version, saidVersionMost),

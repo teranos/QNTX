@@ -15,6 +15,21 @@ service VectorSearchService {
 
   // CreateIndex creates a new named vector index.
   rpc CreateIndex(CreateIndexRequest) returns (CreateIndexResponse);
+
+  // DeleteVectors removes vectors from a named index by their ids. An id the
+  // index does not hold is no error.
+  rpc DeleteVectors(DeleteVectorsRequest) returns (DeleteVectorsResponse);
+}
+
+message DeleteVectorsRequest {
+  string auth_token = 1;
+  string index = 2;          // target index
+  repeated string ids = 3;   // ids of the vectors to remove
+}
+
+message DeleteVectorsResponse {
+  // How many ids were handed to the index to take out.
+  int32 deleted = 1;
 }
 
 message VectorSearchRequest {
@@ -25,12 +40,15 @@ message VectorSearchRequest {
 }
 
 message VectorSearchResponse {
+  // The nearest vectors, nearest first.
   repeated VectorSearchHit results = 1;
 }
 
 message VectorSearchHit {
-  string id = 1;        // identifier of the matched item
-  float distance = 2;   // distance from query vector
+  // The id the vector was added under.
+  string id = 1;
+  // Its distance from the query vector: 0 is the same direction.
+  float distance = 2;
 }
 
 message AddVectorsRequest {
@@ -45,7 +63,8 @@ message VectorEntry {
 }
 
 message AddVectorsResponse {
-  int32 added = 1;   // number of vectors successfully added
+  // How many vectors the index took.
+  int32 added = 1;
 }
 
 message CreateIndexRequest {
@@ -55,5 +74,6 @@ message CreateIndexRequest {
 }
 
 message CreateIndexResponse {
-  string name = 1;   // confirmed index name
+  // The index, by its name.
+  string name = 1;
 }

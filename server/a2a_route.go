@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"iter"
 	"net/http"
 	"regexp"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	a2asdk "github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2acompat/a2av0"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 	"github.com/a2aproject/a2a-go/v2/errordetails"
 	"github.com/google/uuid"
@@ -52,8 +54,9 @@ var turnQuietMost = 4 * time.Minute
 // a2aContentType is the media type A2A's HTTP+JSON binding speaks in.
 const a2aContentType = "application/a2a+json"
 
-// a2aHTTP is the binding: a2a-go's HTTP+JSON and JSON-RPC, made once, the
-// JSON-RPC one at the binding's root.
+// 「[Opus 5.5] a2aHTTP is the node's A2A over HTTP: each version a2aSpoken holds, at its」
+// 「[Opus 5.5] base, a2a-go's HTTP+JSON and JSON-RPC made once, JSON-RPC at the base itself.」
+// 「[Opus 5.5] gRPC is made beside them, of the same handler (a2a_grpc.go).」
 func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	handler := a2asrv.NewHandler(turnExecutor{s},
 		a2asrv.WithTaskStore(tasksOnLines{s}),
@@ -62,38 +65,64 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 		a2asrv.WithLogger(a2aSaid()),
 		a2asrv.WithAgentInactivityTimeout(turnQuietMost),
 		a2asrv.WithExtendedAgentCardProducer(a2asrv.ExtendedAgentCardProducerFn(s.a2aExtendedCardOf)),
-		a2asrv.WithCapabilityChecks(&a2asdk.AgentCapabilities{Streaming: true, PushNotifications: true, ExtendedAgentCard: true}),
 	)
+	s.a2aGRPC = s.a2aOverGRPC(handler)
 	// A turn can be quiet for minutes: a stream is kept alive through the
 	// gateways in front of the node, which drop idle connections.
 	alive := a2asrv.WithTransportKeepAlive(streamKeptAlive)
-	atNoTenant := a2asrv.NewRESTHandler(handler, alive)
-	atTenant := a2asrv.NewTenantRESTHandler("/{*}", handler, alive)
-	jsonRPC := a2asrv.NewJSONRPCHandler(handler, alive)
+	type made struct{ rest, restAtTenant, jsonRPC http.Handler }
+	served := map[a2asdk.ProtocolVersion]made{}
+	for _, v := range a2aSpoken {
+		answered := v.answeredBy(handler, s)
+		m := made{rest: v.rest(answered, alive), jsonRPC: v.jsonRPC(answered, alive)}
+		if v.restAtTenant != nil {
+			m.restAtTenant = v.restAtTenant(answered, alive)
+		}
+		served[v.version] = m
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
+		v, path, spoken := spokenAt(r.URL.Path)
+		if !spoken {
+			http.NotFound(w, r)
+			return
+		}
 		// One id per request, answered to the client, so what it reports names what the node wrote down.
 		id := uuid.NewString()
 		w.Header().Set("X-Request-Id", id)
-		exchange := &a2aExchange{}
+		exchange := &a2aExchange{path: r.URL.Path}
 		r = r.WithContext(context.WithValue(logger.WithRequestID(r.Context(), id), a2aExchangeKey{}, exchange))
 		at := *r.URL
 		r.URL = &at
-		r.URL.Path = "/" + strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, a2aPrefix[:len(a2aPrefix)-1]), "/")
-		r.URL.RawPath = ""
+		r.URL.Path, r.URL.RawPath = path, ""
+		// 「[Opus 5.5] Where a request arrives is the version it is in: the version a」
+		// 「[Fable 5.2] caller names, or names none, does not matter.」
+		r.Header.Set(a2asdk.SvcParamVersion, string(v.version))
 		if r.Body != nil {
 			r.Body = &a2aBodyRead{ReadCloser: http.MaxBytesReader(w, r.Body, nodeBodyMost), exchange: exchange}
 		}
-		exchange.request = r
-		answered := &a2aAnswered{ResponseWriter: w, keepsAll: r.Method == http.MethodPost && r.URL.Path == "/"}
-		switch _, _, named := tenantOf(r.Method, r.URL.Path); {
+		m := served[v.version]
+		tenant, rest, named := v.tenantAt(r.Method, r.URL.Path)
+		var answeredBy http.Handler
+		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/":
-			exchange.jsonRPC = true
-			jsonRPC.ServeHTTP(answered, r)
+			exchange.jsonRPC, answeredBy = true, m.jsonRPC
+		case named && v.tenantField:
+			answeredBy = m.restAtTenant
 		case named:
-			atTenant.ServeHTTP(answered, r)
+			// 「[Opus 5.5] A version whose requests carry no tenant is given the one its path names.」
+			r = r.WithContext(context.WithValue(r.Context(), tenantIn03Key{}, tenant))
+			r.URL.Path = rest
+			if exchange.jsonRPC = r.Method == http.MethodPost && rest == "/"; exchange.jsonRPC {
+				answeredBy = m.jsonRPC
+			} else {
+				answeredBy = m.rest
+			}
 		default:
-			atNoTenant.ServeHTTP(answered, r)
+			answeredBy = m.rest
 		}
+		exchange.request = r
+		answered := &a2aAnswered{ResponseWriter: w, keepsAll: exchange.jsonRPC}
+		answeredBy.ServeHTTP(answered, r)
 		if answered.status >= http.StatusBadRequest {
 			s.a2aRefused(r, refusalOf(exchange, answered))
 		} else if exchange.jsonRPC {
@@ -105,18 +134,124 @@ func (s *QNTXServer) a2aHTTP() http.HandlerFunc {
 	}
 }
 
-// tenantOf is the tenant a request's path names, and the operation's path
-// after it. A path that is an operation without a tenant names none; any
-// other's first segment is a tenant, a namespace named tasks among them.
-func tenantOf(method, path string) (string, string, bool) {
-	if a2aRoute(method, path) {
-		return "", path, false
+// tenantIn03Key holds the tenant a 0.3 request's path names.
+type tenantIn03Key struct{}
+
+// tenantIn03 is the handler 0.3 is answered by: the one 1.0 is, each request
+// given the tenant its path named, which 0.3's requests have no field for.
+type tenantIn03 struct {
+	a2asrv.RequestHandler
+	s *QNTXServer
+}
+
+func tenantFrom03(ctx context.Context, tenant *string) {
+	if named, _ := ctx.Value(tenantIn03Key{}).(string); named != "" && *tenant == "" {
+		*tenant = named
 	}
-	first, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
-	if first == "" {
-		return "", path, false
+}
+
+func (h tenantIn03) GetTask(ctx context.Context, req *a2asdk.GetTaskRequest) (*a2asdk.Task, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
 	}
-	return first, strings.TrimPrefix(path, "/"+first), true
+	return h.RequestHandler.GetTask(ctx, req)
+}
+
+func (h tenantIn03) ListTasks(ctx context.Context, req *a2asdk.ListTasksRequest) (*a2asdk.ListTasksResponse, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.ListTasks(ctx, req)
+}
+
+func (h tenantIn03) CancelTask(ctx context.Context, req *a2asdk.CancelTaskRequest) (*a2asdk.Task, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.CancelTask(ctx, req)
+}
+
+func (h tenantIn03) SendMessage(ctx context.Context, req *a2asdk.SendMessageRequest) (a2asdk.SendMessageResult, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.SendMessage(ctx, req)
+}
+
+func (h tenantIn03) SubscribeToTask(ctx context.Context, req *a2asdk.SubscribeToTaskRequest) iter.Seq2[a2asdk.Event, error] {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.SubscribeToTask(ctx, req)
+}
+
+func (h tenantIn03) SendStreamingMessage(ctx context.Context, req *a2asdk.SendMessageRequest) iter.Seq2[a2asdk.Event, error] {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.SendStreamingMessage(ctx, req)
+}
+
+func (h tenantIn03) GetTaskPushConfig(ctx context.Context, req *a2asdk.GetTaskPushConfigRequest) (*a2asdk.PushConfig, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.GetTaskPushConfig(ctx, req)
+}
+
+func (h tenantIn03) ListTaskPushConfigs(ctx context.Context, req *a2asdk.ListTaskPushConfigRequest) (*a2asdk.ListTaskPushConfigResponse, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.ListTaskPushConfigs(ctx, req)
+}
+
+func (h tenantIn03) CreateTaskPushConfig(ctx context.Context, req *a2asdk.PushConfig) (*a2asdk.PushConfig, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.CreateTaskPushConfig(ctx, req)
+}
+
+func (h tenantIn03) DeleteTaskPushConfig(ctx context.Context, req *a2asdk.DeleteTaskPushConfigRequest) error {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	return h.RequestHandler.DeleteTaskPushConfig(ctx, req)
+}
+
+// 「[Opus 5.5] GetExtendedAgentCard is the card 0.3's bindings write in 0.3, as a2av0's」
+// 「[Opus 5.5] card producer writes it, signed over the bytes written. A peer's card is the」
+// 「[Fable 5.2] peer's, and is handed over as the peer signed it.」
+func (h tenantIn03) GetExtendedAgentCard(ctx context.Context, req *a2asdk.GetExtendedAgentCardRequest) (*a2asdk.AgentCard, error) {
+	if req != nil {
+		tenantFrom03(ctx, &req.Tenant)
+	}
+	card, err := h.RequestHandler.GetExtendedAgentCard(ctx, req)
+	if err != nil || card == nil {
+		return card, err
+	}
+	if req != nil && req.Tenant != "" && slices.ContainsFunc(h.s.peers(), serving(req.Tenant)) {
+		return card, nil
+	}
+	in03 := *card
+	in03.Signatures = nil
+	raw, err := a2av0.NewStaticAgentCardProducer(&in03).(a2asrv.AgentCardJSONProducer).CardJSON(ctx)
+	if err != nil {
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not written in 0.3: "+err.Error())
+	}
+	signers, err := h.s.cardSigners(ctx)
+	if err != nil {
+		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not signed: "+err.Error())
+	}
+	for _, signer := range signers {
+		sig, err := signer.Sign(ctx, raw)
+		if err != nil {
+			return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not signed: "+err.Error())
+		}
+		in03.Signatures = append(in03.Signatures, *sig)
+	}
+	return &in03, nil
 }
 
 // a2aRoutes is each operation's method and route (§11.3).
@@ -146,9 +281,12 @@ func a2aRoute(method, path string) bool {
 // a2aExchange is what the node knows of one A2A request as the SDK answers
 // it: the request, the operation it is, and whether it came over JSON-RPC.
 type a2aExchange struct {
-	request   *http.Request
+	request *http.Request
+	// 「[Opus 5.5] path is where the request arrived, before its version's base was taken off.」
+	path      string
 	operation string
 	jsonRPC   bool
+	grpc      bool
 	read      int
 }
 
@@ -337,7 +475,7 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 			return ctx, nil, a2aRefusal(a2asdk.ErrInternalError, "whether an agent is served at tenant "+tenant+" was not answered: "+err.Error())
 		}
 		if !served {
-			return ctx, nil, a2aRefusal(a2asdk.ErrTaskNotFound, "no agent is served at tenant "+tenant)
+			return ctx, nil, a2aRefusal(a2asdk.ErrTaskNotFound, "no agent is served at tenant "+tenant+g.s.nearSaid(tenant))
 		}
 	}
 	// The card is the caller's, and needs no agent to give it.
@@ -353,11 +491,28 @@ func (g a2aGate) Before(ctx context.Context, callCtx *a2asrv.CallContext, req *a
 	if err != nil {
 		return ctx, nil, err
 	}
-	ctx = withA2ACall(ctx, a2aCall{agent: ta, tenant: tenant, request: r})
-	if asked, sends := req.Payload.(*a2asdk.SendMessageRequest); sends {
-		return ctx, nil, g.s.messageTaken(ta, asked)
+	// What the agent's card says it does and takes is what it is asked: a2a-go's
+	// enforcer refuses a capability it does not have and a part whose media
+	// type no skill takes, with ContentTypeNotSupportedError (§3.1.1, §13.4).
+	card, err := g.s.a2aCardAt(r, tenant)
+	if err != nil {
+		return ctx, nil, err
 	}
-	return ctx, nil, nil
+	enforcer, err := a2asrv.NewAgentCardEnforcer(card.sdk())
+	if err != nil {
+		return ctx, nil, a2aRefusal(a2asdk.ErrInternalError, "the card of "+ta.called+" is not one a2a-go enforces: "+err.Error())
+	}
+	if ctx, _, err = enforcer.Before(ctx, callCtx, req); err != nil {
+		return ctx, nil, err
+	}
+	call := a2aCall{agent: ta, tenant: tenant, request: r}
+	if asked, sends := req.Payload.(*a2asdk.SendMessageRequest); sends {
+		if asked.Config != nil {
+			call.accepts = asked.Config.AcceptedOutputModes
+		}
+		return withA2ACall(ctx, call), nil, g.s.messageTaken(ta, asked)
+	}
+	return withA2ACall(ctx, call), nil, nil
 }
 
 // After leaves a push config's credentials out of what is answered: the SDK
@@ -395,9 +550,12 @@ func (s *QNTXServer) messageTaken(ta taskAgent, sent *a2asdk.SendMessageRequest)
 	if m.Role != a2asdk.MessageRoleUser {
 		return a2aRefusal(a2asdk.ErrInvalidParams, "a message sent to "+ta.called+" is the user's, and this one's role is "+string(m.Role))
 	}
-	// "acceptedOutputModes": what the client takes, and the agent gives text.
-	if config := sent.Config; config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTextPlain) {
-		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" answers in "+textPlain+", which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" does not take")
+	// "acceptedOutputModes": what the client takes, of what the agent gives.
+	if config := sent.Config; ta.named && config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTextPlain) {
+		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" is told in "+textPlain+", which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" does not take")
+	}
+	if config := sent.Config; !ta.named && config != nil && len(config.AcceptedOutputModes) > 0 && !slices.ContainsFunc(config.AcceptedOutputModes, isTurnMode) {
+		return a2aRefusal(a2asdk.ErrUnsupportedContentType, ta.called+" gives "+strings.Join(turnModes, ", ")+", none of which acceptedOutputModes "+strings.Join(config.AcceptedOutputModes, ", ")+" takes")
 	}
 	// A turn takes nothing more once it is said: a message naming a task is
 	// one no task here accepts (§3.1.1, §3.4.2).
@@ -431,8 +589,16 @@ func (s *QNTXServer) a2aServed(r *http.Request, tenant string) (bool, error) {
 		_, refused := elementOf(sigil.Sent{"element": element})
 		return gated && admitted.IsRoot() && s.nodeAgent != nil && refused == nil, nil
 	}
-	if !gated || tenant == auth.NamespaceSystem || !admitted.MayActIn(tenant) {
+	if !gated || tenant == auth.NamespaceSystem {
 		return false, nil
+	}
+	// "「[Opus 5.5] AGENTS CAN TALK TO EACH OTHER BY THEIR NAME」"
+	// 「[Opus 5.5] A name is no namespace anyone acts in: who reaches /a2a reaches an agent」
+	// 「[Opus 5.5] by its name (taskAgentAt), whichever namespaces they act in. f42d's」
+	// 「[Opus 5.5] guests act in fleetingmem and speak to each other by name.」
+	if !admitted.MayActIn(tenant) {
+		_, held, err := s.agentNamedAt(tenant)
+		return held, err
 	}
 	// A namespace a peer serves is the peer's to say: its card is asked of it,
 	// and the peer answers whether it has an agent there.
@@ -442,7 +608,13 @@ func (s *QNTXServer) a2aServed(r *http.Request, tenant string) (bool, error) {
 	opted, err := s.optedIntoAgent(tenant)
 	var notServed namespaces.NotServed
 	var disabled namespaces.Disabled
-	if errors.As(err, &notServed) || errors.As(err, &disabled) {
+	if errors.As(err, &notServed) {
+		// No namespace by that name: an agent that holds it as its name is
+		// served at it (ADR-059).
+		_, held, err := s.agentNamedAt(tenant)
+		return held, err
+	}
+	if errors.As(err, &disabled) {
 		return false, nil
 	}
 	if err != nil {
@@ -462,43 +634,66 @@ func (s *QNTXServer) a2aExtendedCardOf(ctx context.Context, req *a2asdk.GetExten
 	if peer := slices.IndexFunc(s.peers(), serving(tenant)); tenant != "" && peer >= 0 {
 		return s.peersAgentCard(r, s.peers()[peer], tenant)
 	}
-	var card agentCard
-	switch element, isElement := strings.CutPrefix(tenant, elementTenantPrefix); {
-	case isElement:
-		elements := s.elementsSignum()
-		say, err := sayIn(elements.Signum, "the element "+element)
-		if err != nil {
-			return nil, err
-		}
-		card = s.cardBase(r)
-		card.Name, card.Description, card.Tenant = "the element "+element, elements.GetDescription(), tenant
-		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: elements.GetTags(), Modes: []string{textPlain}}}
-	case tenant != "":
-		model, err := s.namespaceAgentModel(tenant)
-		if err != nil {
-			return nil, err
-		}
-		agents := s.agentsSignum()
-		say, err := sayIn(agents.Signum, "the agent of "+tenant)
-		if err != nil {
-			return nil, err
-		}
-		card = s.cardBase(r)
-		card.Name, card.Description, card.Tenant = "the agent of "+tenant+", "+model, agents.GetDescription(), tenant
-		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: agents.GetTags(), Modes: []string{textPlain}}}
-	default:
-		// "MUST require authentication" (§13.3).
-		admission, admitted := auth.AdmissionFrom(r.Context())
-		if !admitted {
-			return nil, a2aRefusal(a2asdk.ErrUnauthenticated, "the extended agent card is given to a caller the node admitted, and this one came through no gate")
-		}
-		card = s.a2aCardOf(r, admission, admitted)
+	card, err := s.a2aCardAt(r, tenant)
+	if err != nil {
+		return nil, err
 	}
 	signed, err := s.signedCard(ctx, card.sdk())
 	if err != nil {
 		return nil, a2aRefusal(a2asdk.ErrInvalidAgentResponse, "the card was not signed: "+err.Error())
 	}
 	return signed, nil
+}
+
+// a2aCardAt is the card of the agent the node serves at tenant, the node's at
+// none, as the caller of r is given it.
+func (s *QNTXServer) a2aCardAt(r *http.Request, tenant string) (agentCard, error) {
+	var card agentCard
+	switch element, isElement := strings.CutPrefix(tenant, elementTenantPrefix); {
+	case isElement:
+		elements := s.elementsSignum()
+		say, err := sayIn(elements.Signum, "the element "+element)
+		if err != nil {
+			return agentCard{}, err
+		}
+		card = s.cardBase(r)
+		card.Name, card.Description, card.Tenant = "the element "+element, elements.GetDescription(), tenant
+		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: elements.GetTags(), Modes: turnModes}}
+	case s.isTheNodeAgentsName(tenant):
+		// The Node Agent's card, at its name: given to a caller the node admitted (§13.3).
+		admission, admitted := auth.AdmissionFrom(r.Context())
+		if !admitted {
+			return agentCard{}, a2aRefusal(a2asdk.ErrUnauthenticated, "the extended agent card is given to a caller the node admitted, and this one came through no gate")
+		}
+		card = s.a2aCardOf(r, admission, admitted)
+		card.Name, card.Tenant = tenant, tenant
+	case s.holdsAName(tenant):
+		card = s.cardBase(r)
+		card.Name, card.Tenant = tenant, tenant
+		card.Description = "An agent that named itself " + tenant + " (i name). What is said to it is handed to it where it runs, and the Task says whether it was."
+		card.Skills = []cardSkill{{ID: "told", Name: "told", Description: "Takes what is said to it.", Tags: []string{"agent", "session"}, Modes: []string{textPlain}}}
+	case tenant != "":
+		model, err := s.namespaceAgentModel(tenant)
+		if err != nil {
+			return agentCard{}, err
+		}
+		agents := s.agentsSignum()
+		say, err := sayIn(agents.Signum, "the agent of "+tenant)
+		if err != nil {
+			return agentCard{}, err
+		}
+		card = s.cardBase(r)
+		card.Name, card.Description, card.Tenant = "the agent of "+tenant+", "+model, agents.GetDescription(), tenant
+		card.Skills = []cardSkill{{ID: say.GetName(), Name: say.GetName(), Description: say.GetDoes(), Tags: agents.GetTags(), Modes: turnModes}}
+	default:
+		// "MUST require authentication" (§13.3).
+		admission, admitted := auth.AdmissionFrom(r.Context())
+		if !admitted {
+			return agentCard{}, a2aRefusal(a2asdk.ErrUnauthenticated, "the extended agent card is given to a caller the node admitted, and this one came through no gate")
+		}
+		card = s.a2aCardOf(r, admission, admitted)
+	}
+	return card, nil
 }
 
 // sayIn is the say sigil of signum, which an agent's card describes it by.

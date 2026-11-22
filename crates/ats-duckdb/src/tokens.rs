@@ -762,7 +762,11 @@ mod tests {
 
         let held: Vec<String> = opened.list().into_iter().map(|t| t.id).collect();
         assert_eq!(held, vec!["AT-LIVE".to_string()]);
-        assert_eq!(self::store(&dir).list().len(), 2, "nothing skipped reads every token");
+        assert_eq!(
+            self::store(&dir).list().len(),
+            2,
+            "nothing skipped reads every token"
+        );
     }
 
     // A token object written before the node recorded who minted it, and

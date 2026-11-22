@@ -160,9 +160,16 @@ func (o *EmbeddingObserver) embedForModel(as *types.As, text, modelName string) 
 		Dimensions: modelInfo.Dimensions,
 	}
 	if err := o.embeddingStore.Save(emb); err != nil {
-		o.logger.Warnw("Failed to save embedding",
+		var notIndexed storage.NotIndexed
+		if !errors.As(err, &notIndexed) {
+			o.logger.Warnw("Failed to save embedding",
+				"error", errors.Wrapf(err, "attestation %s model %s", as.ID, modelName))
+			return
+		}
+		// The row is kept: watchers and clusters read it and the vector
+		// handed here, so only searching by nearness misses it.
+		o.logger.Warnw("Embedding kept, its vector not indexed",
 			"error", errors.Wrapf(err, "attestation %s model %s", as.ID, modelName))
-		return
 	}
 
 	measure.Count(measure.Embedded, 1)

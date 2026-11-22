@@ -17,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/signing"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/internal/measure"
 	"github.com/teranos/QNTX/server/auth"
@@ -316,13 +317,92 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		Status int             `json:"status"`
 		Answer json.RawMessage `json:"answer"`
 	}
+	answered := make([]*answerWriter, len(batch))
+	// "if k took the list in memory and wrote it in one transaction, the drain would go far faster"
+	//
+	// What is ready is written together, in one go where the store can. A role,
+	// reach or word line changes who may write what comes after it, so it is
+	// written alone, after what came before it, and what comes after is made
+	// ready once it stands.
+	var run []*writing
+	for i, one := range batch {
+		answered[i] = &answerWriter{header: http.Header{}}
+		ready, ok := s.readyAttestation(answered[i], r, one)
+		if !ok {
+			continue
+		}
+		if ready.kind.writesRole || (len(run) > 0 && run[0].store != ready.store) {
+			s.writeTogether(r, run)
+			run = nil
+		}
+		if ready.kind.writesRole {
+			s.writeReady(r, ready)
+			continue
+		}
+		run = append(run, ready)
+	}
+	s.writeTogether(r, run)
+
 	results := make([]result, 0, len(batch))
-	for _, one := range batch {
-		answered := &answerWriter{header: http.Header{}}
-		s.createAttestation(answered, r, one)
-		results = append(results, result{Status: answered.status, Answer: bytes.TrimSpace(answered.body.Bytes())})
+	for _, one := range answered {
+		results = append(results, result{Status: one.status, Answer: bytes.TrimSpace(one.body.Bytes())})
 	}
 	respond(w, s.logger, http.StatusOK, map[string]any{"results": results})
+}
+
+// writing is an attestation made ready to write, with what its answer needs.
+type writing struct {
+	w       http.ResponseWriter
+	req     attestationRequest
+	kind    roleWrite
+	store   ats.AttestationStore
+	as      *types.As
+	times   writeTimes
+	entered time.Time
+}
+
+// writeTogether writes what is ready in one go when the store can
+// (storage.ManyCreator), and each on its own otherwise, answering each.
+func (s *QNTXServer) writeTogether(r *http.Request, run []*writing) {
+	if len(run) == 0 {
+		return
+	}
+	creator, ok := run[0].store.(storage.ManyCreator)
+	if !ok || len(run) == 1 {
+		for _, one := range run {
+			s.writeReady(r, one)
+		}
+		return
+	}
+	ases := make([]*types.As, len(run))
+	for i, one := range run {
+		ases[i] = one.as
+	}
+	putAt := time.Now()
+	answers, err := creator.CreateAttestations(ases)
+	put := time.Since(putAt)
+	for i, one := range run {
+		said := err
+		if err == nil {
+			said = answers[i]
+		}
+		if !s.answerPut(one.w, said, &one.req) {
+			continue
+		}
+		// Each was in the one write, and is said to have taken all of it.
+		one.times.put = put
+		s.attestationWritten(r, one)
+	}
+}
+
+// writeReady writes one attestation made ready, and answers it.
+func (s *QNTXServer) writeReady(r *http.Request, one *writing) {
+	putAt := time.Now()
+	if !s.putAttestation(one.w, one.store, one.as, &one.req) {
+		return
+	}
+	one.times.put = time.Since(putAt)
+	s.attestationWritten(r, one)
 }
 
 // ledBy is the actors with lead first, named once: a caller who already put
@@ -399,13 +479,24 @@ type writeTimes struct {
 
 // createAttestation writes one attestation from its JSON and answers on w.
 func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, raw []byte) {
+	one, ok := s.readyAttestation(w, r, raw)
+	if !ok {
+		return
+	}
+	s.writeReady(r, one)
+}
+
+// readyAttestation reads one attestation from its JSON and makes it ready to
+// write: admitted, its writer and store known, not already held, and built.
+// False when it was answered on w instead.
+func (s *QNTXServer) readyAttestation(w http.ResponseWriter, r *http.Request, raw []byte) (*writing, bool) {
 	entered := time.Now()
 	times := writeTimes{beforeHandler: sinceStarted(r.Context())}
 
 	var req attestationRequest
 	if err := json.Unmarshal(raw, &req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
-		return
+		return nil, false
 	}
 
 	// A signature is the writer's own, so the node signs nothing on its behalf
@@ -414,55 +505,55 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	claim, err := signing.Claimed(req.Signature, req.SignerDID)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("%s: %v", req.ID, err))
-		return
+		return nil, false
 	}
 	if claim == signing.Signed && !s.signerHoldsKey(w, r, &req) {
-		return
+		return nil, false
 	}
 
 	kind, ok := s.authorizeRoleWrite(w, r, &req)
 	if !ok {
-		return
+		return nil, false
 	}
 	if !mayWritePredicates(w, r, kind, req.Predicates) {
-		return
+		return nil, false
 	}
 
 	actors, ok := s.actorsFor(w, r, &req, claim, kind.writesRole)
 	if !ok {
-		return
+		return nil, false
 	}
 
 	storeAt := time.Now()
 	store, ok := s.storeForWrite(w, r, kind.writesRole)
 	times.store = time.Since(storeAt)
 	if !ok {
-		return
+		return nil, false
 	}
 
 	existsAt := time.Now()
 	if req.ID == "" && !s.nameAttestation(w, &req, claim, store) {
-		return
+		return nil, false
 	}
 
 	// Idempotent: if already exists, return success
 	if store.AttestationExists(req.ID) {
 		respond(w, s.logger, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
-		return
+		return nil, false
 	}
 	times.exists = time.Since(existsAt)
 
 	as, ok := s.buildAttestation(w, &req, actors, claim)
 	if !ok {
-		return
+		return nil, false
 	}
+	return &writing{w: w, req: req, kind: kind, store: store, as: as, times: times, entered: entered}, true
+}
 
-	putAt := time.Now()
-	if !s.putAttestation(w, store, as, &req) {
-		return
-	}
-	times.put = time.Since(putAt)
-
+// attestationWritten keeps the node up with what was written, counts it, and
+// answers it as created.
+func (s *QNTXServer) attestationWritten(r *http.Request, one *writing) {
+	req, times, as, kind, w, entered := &one.req, one.times, one.as, one.kind, one.w, one.entered
 	times.rebuild = s.afterWrite(as, kind)
 
 	// One per attestation the node took in over the API. The node's own
@@ -475,7 +566,7 @@ func (s *QNTXServer) createAttestation(w http.ResponseWriter, r *http.Request, r
 	took := times.beforeHandler + tookHandler
 	measure.Took(measure.AttestationWriteTook, took)
 
-	s.logSlowWrite(r, &req, times, tookHandler, took)
+	s.logSlowWrite(r, req, times, tookHandler, took)
 
 	respond(w, s.logger, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
 }
@@ -757,6 +848,13 @@ func (s *QNTXServer) putAttestation(w http.ResponseWriter, store ats.Attestation
 	} else {
 		createErr = store.CreateAttestation(as)
 	}
+	return s.answerPut(w, createErr, req)
+}
+
+// answerPut answers a write the store answered with createErr, and says
+// whether it was written: what the store refuses, holds already or failed at
+// is answered on w.
+func (s *QNTXServer) answerPut(w http.ResponseWriter, createErr error, req *attestationRequest) bool {
 	// What the store takes is the store's to say, for this door and every
 	// other: an attestation it refuses is the writer's to fix.
 	if ats.Unwritable(createErr) {

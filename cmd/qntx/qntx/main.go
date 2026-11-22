@@ -101,8 +101,19 @@ func init() {
 			}
 		}
 
+		// "THE LANGUAGE OF OBSERVABILITY NEEDS TO BE OTEL"
+		// 「[Opus 5.5] Logs leave over OTLP when the environment names where, beside Sentry.」
+		logsOut, logsErr := otlp.StartLogs(context.Background(), version.VersionTag)
+		if logsErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP log export: %v\n", logsErr)
+		}
+		logger.AddOTLPOutput(logsOut)
+
 		// After every output is on, so one count decides for all of them.
 		logger.CollectRepeats()
+		if endpoint, said := otlp.LogsSaid(); said && otlp.LogsRunning() {
+			logger.Infow("Shipping logs over OTLP", "endpoint", endpoint, "release", version.VersionTag)
+		}
 
 		// The numbers ride the same client. Started unconditionally: with no
 		// client the meter is a no-op, and a call site that has to ask whether
@@ -427,6 +438,10 @@ func wireRestartHooks(defaultServer *server.QNTXServer, pluginLogger *zap.Sugare
 		defaultServer.SetupPluginEmbeddingService(client)
 		pluginLogger.Debugw("Re-wired embedding provider after restart", "plugin", name)
 	})
+	pm.SetOnVectorSearchProviderReady(func(name string) {
+		defaultServer.VectorSearchProvided()
+		pluginLogger.Debugw("Offered the kept embeddings to the vector search provider after restart", "plugin", name)
+	})
 	pm.SetOnPythonProviderReady(func(name string, client protocol.PythonServiceClient) {
 		defaultServer.AddPythonProvider(client)
 		pluginLogger.Debugw("Registered Python provider after restart", "plugin", name)
@@ -543,6 +558,7 @@ func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *gr
 			if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
 				vsRouter.SetService(proxy.VectorSearchServiceClient())
 				logger.Debugw("Registered VectorSearch provider", "plugin", meta.Name)
+				srv.VectorSearchProvided()
 			}
 		}
 		if proxy.IsSearchProvider() {
