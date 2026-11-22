@@ -215,6 +215,9 @@ type NodesConfig struct {
 // are laye's own. Empty is no laye in front.
 type LayeConfig struct {
 	DID string `mapstructure:"did"` // laye's did:key, which carries a session to this node.
+	// Origin is where laye answers. What a connector says to a session is
+	// handed there, and collected by laye. Empty, the node keeps it.
+	Origin string `mapstructure:"origin"`
 }
 
 // PeerConfig is one peer of the primary.
