@@ -34,10 +34,13 @@ func aConnectorSpeaks(r *http.Request) (string, bool) {
 		return "", false
 	}
 	admitted, gated := auth.AdmissionFrom(r.Context())
-	if !gated || admitted.Grant == nil || admitted.Grant.DID == "" || admitted.ClientDID == "" {
+	// A connector is admitted as the person who said yes, with no Grant, its
+	// own token's DID beside its client's (auth admittedAsConnector,
+	// admittedAsThePerson).
+	if !gated || admitted.TokenDID == "" || admitted.ClientDID == "" {
 		return "", false
 	}
-	return admitted.Grant.DID, admitted.ClientDID != admitted.Grant.DID
+	return admitted.TokenDID, admitted.ClientDID != admitted.TokenDID
 }
 
 // layeCollected is laye's answer: the Task of what it collected.
