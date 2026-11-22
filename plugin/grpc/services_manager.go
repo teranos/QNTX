@@ -48,6 +48,7 @@ type ServicesManager struct {
 	scheduleSrv        *services.ScheduleServer // handed the callers of open sigil calls
 	openRun            atomic.Pointer[OpenRun]
 	fileServiceServer  *grpc.Server
+	keepFile           services.FileKeeper // how the node keeps a file a plugin brings
 	llmServer          *grpc.Server
 	llm                routing[*services.LLMServer]
 	llmConfig          config.LLMConfig
@@ -378,6 +379,10 @@ func (m *ServicesManager) startScheduleService(ctx context.Context) (string, err
 	return m.serveAt(ctx, "Schedule", m.scheduleServer, listener, &m.endpoints.Schedule), nil
 }
 
+// KeepFilesWith hands the manager how the node keeps a file a plugin brings.
+// It is called before Start.
+func (m *ServicesManager) KeepFilesWith(keep services.FileKeeper) { m.keepFile = keep }
+
 // startFileService starts the File gRPC service
 func (m *ServicesManager) startFileService(ctx context.Context, filesDir string, authToken string) (string, error) {
 	listener, err := listenLocal()
@@ -387,6 +392,7 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 
 	m.fileServiceServer = grpc.NewServer()
 	fileServer := services.NewFileServiceServer(filesDir, authToken, m.logger)
+	fileServer.KeepWith(m.keepFile)
 	protocol.RegisterFileServiceServer(m.fileServiceServer, fileServer)
 
 	return m.serveAt(ctx, "File", m.fileServiceServer, listener, &m.endpoints.FileService), nil
