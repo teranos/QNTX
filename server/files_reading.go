@@ -2,7 +2,11 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -41,12 +45,18 @@ const (
 	readPause = 5 * time.Second
 	// readingAsks is what the reader is asked of each picture.
 	readingAsks = "Describe what is in this picture in three sentences. Name the app if it is a screenshot and you can tell."
+	// "well, it makes sense to give a smaller jpeg to gaze always right?"
+	// readSize is the long side, in pixels, of the JPEG the reader is given.
+	readSize = 1024
+	// readingMaker makes that JPEG of any kind of original kept here (libvips).
+	readingMaker = "vipsthumbnail"
 )
 
-// readable is the kinds of picture the reader opens. A HEIC or DNG original is
-// kept and not read: newest first, one the reader cannot open would be tried
-// first every night and fail every night.
-var readable = map[string]bool{"image/png": true, "image/jpeg": true}
+// readable is the kinds of original a JPEG for the reader is made of.
+var readable = map[string]bool{
+	"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true,
+	"image/heic": true, "image/x-adobe-dng": true,
+}
 
 type readingHandler struct{ server *QNTXServer }
 
@@ -70,6 +80,9 @@ func (s *QNTXServer) readTonight(ctx context.Context) error {
 	with := s.deps.cfg.Files.ReadWith
 	if with == "" {
 		return nil
+	}
+	if _, err := exec.LookPath(readingMaker); err != nil {
+		return errors.Wrapf(err, "this node reads with %s and has no %s to make what it reads", with, readingMaker)
 	}
 	tonight, err := s.stillToRead(readPerNight)
 	if err != nil {
@@ -101,11 +114,21 @@ func (s *QNTXServer) readOne(ctx context.Context, with string, picture toRead) e
 	if err != nil {
 		return err
 	}
-	ask := provider.ChatRequest{UserPrompt: readingAsks}
-	s.attachFiles(&ask, []string{picture.fileID})
-	if len(ask.Attachments) == 0 {
-		return errors.Newf("the file %s of %s did not attach", picture.fileID, picture.asset)
+	original, found, err := s.storedFile(picture.fileID)
+	if err != nil {
+		return err
 	}
+	if !found {
+		return errors.Newf("this node keeps no file %s of %s", picture.fileID, picture.asset)
+	}
+	small, err := smallForReading(ctx, original)
+	if err != nil {
+		return errors.Wrapf(err, "no JPEG to read was made of %s", picture.asset)
+	}
+	ask := provider.ChatRequest{UserPrompt: readingAsks, Attachments: []provider.ContentPart{{
+		Type:     "image_url",
+		ImageURL: &provider.ContentPartImage{URL: "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(small)},
+	}}}
 	answer, err := client.Chat(ctx, ask)
 	if err != nil {
 		return errors.Wrapf(err, "%s did not read %s", with, picture.asset)
@@ -138,6 +161,7 @@ func (s *QNTXServer) attestRead(picture toRead, with, model, said string) error 
 		Attributes: map[string]any{
 			"file_id": picture.fileID,
 			"asked":   readingAsks,
+			"read_as": fmt.Sprintf("jpeg, %d pixels on the long side", readSize),
 			"said":    said,
 			"read_at": at.UTC().Format(time.RFC3339),
 		},
@@ -204,6 +228,27 @@ func (s *QNTXServer) stillToRead(most int) ([]toRead, error) {
 		waiting = waiting[:most]
 	}
 	return waiting, nil
+}
+
+// smallForReading is a JPEG of the original at path, readSize on its long
+// side, made in a directory of its own and gone once read. The original is
+// not touched.
+func smallForReading(ctx context.Context, path string) ([]byte, error) {
+	dir, err := os.MkdirTemp("", "qntx-read-")
+	if err != nil {
+		return nil, errors.Wrap(err, "no directory to make the JPEG in")
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+	out := filepath.Join(dir, "read.jpg")
+	made, err := exec.CommandContext(ctx, readingMaker, path, "--size", fmt.Sprint(readSize), "-o", out+"[Q=85]").CombinedOutput()
+	if err != nil {
+		return nil, errors.Wrapf(err, "%s did not make a JPEG of %s: %s", readingMaker, path, made)
+	}
+	small, err := os.ReadFile(out)
+	if err != nil {
+		return nil, errors.Wrapf(err, "the JPEG of %s did not read", path)
+	}
+	return small, nil
 }
 
 // nextNight is the next readAtHour after now, in now's own time.
