@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -29,5 +30,16 @@ func TestAConnectorSpeaksByItsOwnToken(t *testing.T) {
 		if c.connector && did != c.admitted.TokenDID {
 			t.Errorf("%s: spoke as %q, want its token %q", c.name, did, c.admitted.TokenDID)
 		}
+	}
+}
+
+// What a person said and the node's signature go to laye over HTTPS, or to
+// this machine alone (CodeRabbit on #1822).
+func TestLayeIsReachedOverHTTPSOrOnThisMachine(t *testing.T) {
+	for _, origin := range []string{"https://laye.ground.institute", "http://127.0.0.1:8790", "http://localhost:8790", "http://[::1]:8790"} {
+		assert.NoError(t, layeReachable(origin), origin)
+	}
+	for _, origin := range []string{"http://laye.ground.institute", "ftp://laye.ground.institute", "laye.ground.institute"} {
+		assert.Error(t, layeReachable(origin), origin)
 	}
 }
