@@ -24,7 +24,7 @@ type gitHubPullRequestEvent struct {
 		HTMLURL string `json:"html_url"`
 		Draft   bool   `json:"draft"`
 		Merged  bool   `json:"merged"`
-		// ClosedAt is GitHub's time of the closing, which names one closing among several.
+		// 「[Fable 5.2, Opus 5.5] ClosedAt is GitHub's time of the closing, which names one closing among several.」
 		ClosedAt string `json:"closed_at"`
 		Head     struct {
 			Sha string `json:"sha"`
@@ -143,9 +143,9 @@ func (s *QNTXServer) pullRequestEvent(e gitHubPullRequestEvent) ([]string, error
 		if err := s.approvalLine(s.nodeActor(), subject, watcher.ApprovalClosed, e.Repository.FullName, attrs); err != nil {
 			return nil, err
 		}
-		// Over: collected for each session that was involved in it, waking nobody (involved.go).
-		// What the sessions are told failing is said, and does not fail the rest
-		// of what this delivery is: its approval closed above, and its other readers.
+		// 「[Fable 5.2, Opus 5.5] Over: collected for each session that was involved in it, waking nobody (involved.go).」
+		// 「[Fable 5.2, Opus 5.5] What the sessions are told failing is said, and does not fail the rest」
+		// 「[Fable 5.2, Opus 5.5] of what this delivery is: its approval closed above, and its other readers.」
 		if e.Action == "closed" {
 			if err := s.pullIsOver(subject, e.PullRequest.Title, e.PullRequest.HTMLURL, e.PullRequest.ClosedAt, e.PullRequest.Merged); err != nil {
 				s.logger.Errorw("A pull request closed and the sessions involved in it were not told", "pull", subject, "error", err)

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// whatWaitsFor is what is collected for the agent whose DID this is, as the node keeps it.
+// 「[Opus 5.5] whatWaitsFor is what is collected for the agent whose DID this is, as the node keeps it.」
 func whatWaitsFor(t *testing.T, srv *QNTXServer, did string) *collectedFor {
 	t.Helper()
 	kept, err := srv.theCollection()
@@ -22,8 +22,8 @@ func whatWaitsFor(t *testing.T, srv *QNTXServer, did string) *collectedFor {
 	return held[did]
 }
 
-// The pull request an asking of GitHub is about is named by what was asked,
-// or, for one the asking opened, by what GitHub answered.
+// 「[Opus 5.5] The pull request an asking of GitHub is about is named by what was asked,」
+// 「[Opus 5.5] or, for one the asking opened, by what GitHub answered.」
 func TestThePullRequestAnAskingIsAbout(t *testing.T) {
 	about := func(request string, answered map[string]any) string {
 		pull, _ := pullAskedAbout([]byte(request), answered)
@@ -33,29 +33,29 @@ func TestThePullRequestAnAskingIsAbout(t *testing.T) {
 	assert.Equal(t, "teranos/QNTX#1734", about(`{"owner":"teranos","repo":"QNTX","issue_number":1734,"body":"Thanks"}`, nil))
 	assert.Equal(t, "teranos/QNTX#1740", about(`{"owner":"teranos","repo":"QNTX","title":"t","head":"a","base":"main"}`,
 		map[string]any{"number": float64(1740), "head": map[string]any{"ref": "a"}}))
-	// As GitHubService reads and writes them: the other spelling, and a number in a string.
+	// 「[Fable 5.2, Opus 5.5] As GitHubService reads and writes them: the other spelling, and a number in a string.」
 	assert.Equal(t, "teranos/QNTX#1734", about(`{"owner":"teranos","repo":"QNTX","pullNumber":"1734"}`, nil))
 	assert.Equal(t, "teranos/QNTX#1740", about(`{"owner":"teranos","repo":"QNTX","title":"t","head":"a","base":"main"}`,
 		map[string]any{"number": "1740", "head": map[string]any{"ref": "a"}}))
-	// A review comment read or changed: the pull request GitHub answers it is on.
+	// 「[Fable 5.2, Opus 5.5] A review comment read or changed: the pull request GitHub answers it is on.」
 	assert.Equal(t, "teranos/QNTX#1741", about(`{"owner":"teranos","repo":"QNTX","comment_id":"77"}`,
 		map[string]any{"pull_request_url": "https://api.github.com/repos/teranos/QNTX/pulls/1741"}))
-	// An issue that was opened is no pull request, and a branch that was read is about none.
+	// 「[Opus 5.5] An issue that was opened is no pull request, and a branch that was read is about none.」
 	assert.Empty(t, about(`{"owner":"teranos","repo":"QNTX","title":"t"}`, map[string]any{"number": float64(9)}))
 	assert.Empty(t, about(`{"owner":"teranos","repo":"QNTX","branch":"main"}`, nil))
 	assert.Empty(t, about(`not json`, nil))
 }
 
-// "IF SESSION A AND B ARE INVOLVED, THEY EACH GET THE PR ADDED ONTO THERI COLLECTION"
-// A pull request that is merged is collected for each session that was
-// involved in it, as something that wakes nobody. One that holds no name is
-// told nothing, and nothing fails for it.
+// "「[Opus 5.5] IF SESSION A AND B ARE INVOLVED, THEY EACH GET THE PR ADDED ONTO THERI COLLECTION」"
+// 「[Opus 5.5] A pull request that is merged is collected for each session that was」
+// 「[Opus 5.5] involved in it, as something that wakes nobody. One that holds no name is」
+// 「[Opus 5.5] told nothing, and nothing fails for it.」
 func TestAMergeIsCollectedForEachSessionThatWasInvolved(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
 	asAnAgent(t, srv, "Hazel", "did:key:z6Mkhazel")
 	pull := "teranos/elements#29"
-	// One asked about it by another case than GitHub names it in.
+	// 「[Fable 5.2, Opus 5.5] One asked about it by another case than GitHub names it in.」
 	for did, asked := range map[string]string{"did:key:z6Mkalder": pull, "did:key:z6Mkhazel": "Teranos/Elements#29", "did:key:z6Mknameless": pull} {
 		require.NoError(t, srv.nodeRecords().nodeRecord(did, involvedKey(involvedIn, asked), did, "_", map[string]any{"operation": "CreateAPullRequest"}))
 	}
@@ -64,7 +64,7 @@ func TestAMergeIsCollectedForEachSessionThatWasInvolved(t *testing.T) {
 		require.NoError(t, srv.pullIsOver(pull, "A panel on a phone reads at a phone's size", "https://github.com/teranos/elements/pull/29", closedAt, true))
 	}
 	over("2026-11-14T01:00:00Z")
-	// GitHub delivers the same closing again: nobody is told twice.
+	// 「[Fable 5.2, Opus 5.5] GitHub delivers the same closing again: nobody is told twice.」
 	over("2026-11-14T01:00:00Z")
 
 	for _, did := range []string{"did:key:z6Mkalder", "did:key:z6Mkhazel"} {
@@ -78,13 +78,13 @@ func TestAMergeIsCollectedForEachSessionThatWasInvolved(t *testing.T) {
 	}
 	assert.Nil(t, whatWaitsFor(t, srv, "did:key:z6Mknameless"), "something was collected for a session that holds no name")
 
-	// Opened again and closed again is another closing, and is told.
+	// 「[Fable 5.2, Opus 5.5] Opened again and closed again is another closing, and is told.」
 	over("2026-11-14T02:00:00Z")
 	assert.Len(t, whatWaitsFor(t, srv, "did:key:z6Mkalder").Waiting, 2)
 }
 
-// What was due when it was looked at, and holds only what wakes nobody when
-// it is delivered, a person having canceled what woke, stays.
+// 「[Fable 5.2, Opus 5.5] What was due when it was looked at, and holds only what wakes nobody when」
+// 「[Fable 5.2, Opus 5.5] it is delivered, a person having canceled what woke, stays.」
 func TestWhatIsLeftWakingNobodyIsNotDeliveredAsDue(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	birch := collectedFor{DID: "did:key:z6Mkbirch", Called: "Birch", Tenant: "Birch"}
@@ -97,9 +97,9 @@ func TestWhatIsLeftWakingNobodyIsNotDeliveredAsDue(t *testing.T) {
 	assert.Len(t, whatWaitsFor(t, srv, birch.DID).Waiting, 1)
 }
 
-// "NO, ANY ONE THAT WAKES. PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION"
-// What wakes nobody is due at no time: alone it is not delivered and makes
-// nothing stand. It goes with what wakes, at the time that is due.
+// "「[Opus 5.5] NO, ANY ONE THAT WAKES. PR MERGE UPDATES DONT WAKE PER SE, THEY GET COLLECTED ON A WAKING COLLECTION」"
+// 「[Opus 5.5] What wakes nobody is due at no time: alone it is not delivered and makes」
+// 「[Opus 5.5] nothing stand. It goes with what wakes, at the time that is due.」
 func TestWhatWakesNobodyIsDueAtNoTimeAndGoesWithWhatWakes(t *testing.T) {
 	srv, _ := namedOverA2A(t)
 	apple := &told{}
@@ -113,7 +113,7 @@ func TestWhatWakesNobodyIsDueAtNoTimeAndGoesWithWhatWakes(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, due.IsZero(), "what wakes nobody was due at %s", due)
 
-	// A day on: not delivered, and nothing stood for it.
+	// 「[Opus 5.5] A day on: not delivered, and nothing stood for it.」
 	require.NoError(t, srv.deliverDue(merged.Add(24*time.Hour)))
 	require.NoError(t, srv.showWhatWaits(context.Background(), merged.Add(24*time.Hour)))
 	waits := whatWaitsFor(t, srv, birch.DID)
@@ -121,14 +121,14 @@ func TestWhatWakesNobodyIsDueAtNoTimeAndGoesWithWhatWakes(t *testing.T) {
 	assert.Len(t, waits.Waiting, 1, "what wakes nobody was delivered for itself")
 	assert.Empty(t, apple.sent, "what wakes nobody stood on a phone")
 
-	// An agent says something to Birch: that wakes, and is due its wait after it was said.
+	// 「[Opus 5.5] An agent says something to Birch: that wakes, and is due its wait after it was said.」
 	alder := asAnAgent(t, srv, "Alder", "did:key:z6Mkalder")
 	sayTo(t, srv, alder, "Birch", "pull request two is open")
 	waits = whatWaitsFor(t, srv, birch.DID)
 	require.Len(t, waits.Waiting, 2, "what wakes nobody did not stay to go with what wakes")
 	assert.WithinDuration(t, time.Now().Add(6*time.Hour), waits.due(), time.Minute, "it is due by what wakes nobody, and not by what wakes")
 
-	// It stands now, and shows both.
+	// 「[Opus 5.5] It stands now, and shows both.」
 	require.NoError(t, srv.showWhatWaits(context.Background(), time.Now()))
 	require.Len(t, apple.sent, 1)
 	assert.Equal(t, "2 wait", apple.sent[0].State.(waitsShown).Says)
