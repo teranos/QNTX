@@ -28,5 +28,5 @@ The version is the tag. `git describe --tags --match 'v*' --dirty` is asked once
 
 "you need to make release be set with the tag for non dev deployments, like, q and k"
 
-A rolling branch build asks the same `git describe` and builds with `--impure`, so the tarball q and k install calls itself by the tag and the commits past it (`v0.55.0-925-gaf1299b51`), and that is the release Sentry files its events under.
+「[Opus 5.5] A rolling branch build asks the same `git describe` and builds with `--impure`, so the tarball q and k install calls itself by the tag and the commits past it (`v0.55.0-925-gaf1299b51`), and that is the release Sentry files its events under.」
 
