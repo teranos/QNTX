@@ -45,21 +45,34 @@ const noteSuffix = ".md"
 // 「[Opus 5.5] a story is a note, named as the story with noteSuffix after it.」
 const storySuffix = ".feature"
 
+// "so i can author them the same i would .feature"
+// "i want to see those .pbt in addition to anything else that is for human authorship."
+
+// 「[Fable 5.2] controlSuffix is what a control of a repository's folder ends with. In the vault」
+// 「[Fable 5.2] a control is a note, as a story is.」
+const controlSuffix = ".pbt"
+
+// 「[Fable 5.2] authored says whether a file of the repository is authored in the vault as a」
+// 「[Fable 5.2] note named after it: a story, or a control.」
+func authored(name string) bool {
+	return strings.HasSuffix(name, storySuffix) || strings.HasSuffix(name, controlSuffix)
+}
+
 // noteFile says whether a file of the repository is one note in the vault:
-// a note, or a story.
+// a note, a story, or a control.
 func noteFile(name string) bool {
-	return strings.HasSuffix(name, noteSuffix) || strings.HasSuffix(name, storySuffix)
+	return strings.HasSuffix(name, noteSuffix) || authored(name)
 }
 
 // noteBound says whether the repository's path, bound at place, is one note:
-// a note, or a story placed as a note. A folder may be named as a story is.
+// a note, or a story or control placed as a note. A folder may be named as one is.
 func noteBound(repoPath, place string) bool {
-	return strings.HasSuffix(repoPath, noteSuffix) || (strings.HasSuffix(repoPath, storySuffix) && strings.HasSuffix(place, noteSuffix))
+	return strings.HasSuffix(repoPath, noteSuffix) || (authored(repoPath) && strings.HasSuffix(place, noteSuffix))
 }
 
 // 「[Opus 5.5] placedName is what a file of the repository is named in the vault.」
 func placedName(name string) string {
-	if strings.HasSuffix(name, storySuffix) {
+	if authored(name) {
 		return name + noteSuffix
 	}
 	return name
@@ -68,8 +81,8 @@ func placedName(name string) string {
 // 「[Opus 5.5] repoName is what a note of the vault is named in the repository: a story's」
 // 「[Opus 5.5] note is the story.」
 func repoName(name string) string {
-	if story, ok := strings.CutSuffix(name, noteSuffix); ok && strings.HasSuffix(story, storySuffix) {
-		return story
+	if file, ok := strings.CutSuffix(name, noteSuffix); ok && authored(file) {
+		return file
 	}
 	return name
 }

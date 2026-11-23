@@ -249,7 +249,7 @@ func (s *QNTXServer) repoBindable(ctx context.Context, repo forge.Repo, branch, 
 		switch {
 		case entry.Kind == forge.Dir:
 			dirs = append(dirs, entry.Path)
-		case entry.Kind == forge.File && (strings.HasSuffix(entry.Name, noteSuffix) || strings.HasSuffix(entry.Name, storySuffix)):
+		case entry.Kind == forge.File && noteFile(entry.Name):
 			files = append(files, entry.Path)
 		}
 	}
