@@ -862,6 +862,11 @@
         "SUPER"
       ]
     },
+    "/auth/admit": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/authorize": {
       "x-qntx-reach": [
         "ANYONE"
@@ -978,6 +983,11 @@
         "ANYONE"
       ],
       "x-qntx-prefix": true
+    },
+    "/auth/laye/admit": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
     },
     "/auth/laye/challenge": {
       "x-qntx-reach": [
