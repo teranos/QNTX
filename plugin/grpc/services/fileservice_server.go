@@ -31,7 +31,13 @@ var mimeByExtension = map[string]string{
 	".wav":  "audio/wav",
 	".mp3":  "audio/mpeg",
 	".ogg":  "audio/ogg",
+	".heic": "image/heic",
+	".dng":  "image/x-adobe-dng",
 }
+
+// KeepFileMost is the largest KeepFile message the node takes: a file as
+// large as /api/files takes (50 MiB), and room for the rest of the message.
+const KeepFileMost = 51 << 20
 
 // FileServiceServer implements the FileService gRPC server.
 // It reads files from the core server's filesystem and returns them as base64.

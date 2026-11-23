@@ -30,18 +30,20 @@ const maxUploadSize = 50 << 20
 
 // allowedContentTypes is the set of MIME types accepted for upload.
 var allowedContentTypes = map[string]bool{
-	"application/pdf": true,
-	"image/png":       true,
-	"image/jpeg":      true,
-	"image/gif":       true,
-	"image/webp":      true,
-	"image/svg+xml":   true,
-	"text/plain":      true,
-	"audio/mp4":       true,
-	"audio/webm":      true,
-	"audio/wav":       true,
-	"audio/mpeg":      true,
-	"audio/ogg":       true,
+	"application/pdf":   true,
+	"image/png":         true,
+	"image/jpeg":        true,
+	"image/gif":         true,
+	"image/webp":        true,
+	"image/svg+xml":     true,
+	"text/plain":        true,
+	"audio/mp4":         true,
+	"audio/webm":        true,
+	"audio/wav":         true,
+	"audio/mpeg":        true,
+	"audio/ogg":         true,
+	"image/heic":        true,
+	"image/x-adobe-dng": true,
 }
 
 // allowedExtensions is the set of file extensions accepted for upload.
@@ -59,6 +61,8 @@ var allowedExtensions = map[string]bool{
 	".wav":  true,
 	".mp3":  true,
 	".ogg":  true,
+	".heic": true,
+	".dng":  true,
 }
 
 // 「[Fable 5.2] m4aBrands are the brands an ftyp box names for the sound a phone records, besides」
@@ -120,6 +124,24 @@ var recordingStartsAs = map[string]string{
 	".ogg":  "application/ogg",
 }
 
+// "i see, we would want the real original for this"
+//
+// 「[Opus 5.5] heicBrands are the major brands an ftyp box names for a HEIF picture, as a phone」
+// 「[Opus 5.5] takes it. net/http's sniffing knows neither HEIC nor DNG.」
+var heicBrands = map[string]bool{"heic": true, "heix": true, "heim": true, "heis": true, "hevc": true, "hevx": true, "mif1": true, "msf1": true}
+
+// 「[Opus 5.5] startsAsPhoto is whether head starts as the original ext names: a HEIC by its」
+// 「[Opus 5.5] ftyp box and major brand, a DNG by the TIFF header it is written in.」
+func startsAsPhoto(ext string, head []byte) bool {
+	switch ext {
+	case ".heic":
+		return len(head) >= 12 && string(head[4:8]) == "ftyp" && heicBrands[string(head[8:12])]
+	case ".dng":
+		return len(head) >= 4 && (string(head[:4]) == "II*\x00" || string(head[:4]) == "MM\x00*")
+	}
+	return false
+}
+
 // 「[Fable 5.2] The line the node writes of a file it keeps (ADR-058): the asset, by the name」
 // 「[Fable 5.2] its bytes have, is held of the node, by who brought it.」
 const (
@@ -140,12 +162,19 @@ func (s *QNTXServer) filesDir() (string, error) {
 // HandleFiles routes file upload and serve requests.
 //
 //	POST /api/files      - Upload a file (multipart form)
+//	GET  /api/files/     - What this node holds, newest first, with what was read in each
 //	GET  /api/files/{id} - Serve a stored file
 func (s *QNTXServer) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		s.handleFileUpload(w, r)
 	case http.MethodGet:
+		// /api/files/ is ROOT's alone in the tablet of reach; /api/files, which a
+		// peer may bring a file to, lists nothing.
+		if r.URL.Path == "/api/files/" {
+			s.handleFilesHeld(w, r)
+			return
+		}
 		id := strings.TrimPrefix(r.URL.Path, "/api/files/")
 		if id == "" || id == r.URL.Path {
 			http.Error(w, "file ID required", http.StatusBadRequest)
@@ -234,6 +263,9 @@ func (s *QNTXServer) keepFile(by, filename string, file io.ReadSeeker, meantFor 
 	}
 
 	if startsAs, recording := recordingStartsAs[ext]; recording && (detectedType == startsAs || startsAsRecording(ext, buf[:n])) {
+		detectedType = mimeByExtension[ext]
+	}
+	if startsAsPhoto(ext, buf[:n]) {
 		detectedType = mimeByExtension[ext]
 	}
 
@@ -469,6 +501,8 @@ var mimeByExtension = map[string]string{
 	".wav":  "audio/wav",
 	".mp3":  "audio/mpeg",
 	".ogg":  "audio/ogg",
+	".heic": "image/heic",
+	".dng":  "image/x-adobe-dng",
 }
 
 // storedFile is where the file with this ID is kept, by the ID alone or with
