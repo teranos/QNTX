@@ -255,8 +255,8 @@ message ClaudeAm {
   bool signed_in = 11;
   // How it is signed in, as Claude Code names it, or empty when it is not.
   string auth_method = 12;
-  // The model am.toml names. The node keeps no list of models: a name goes to
-  // Claude Code, which runs the model and refuses a name it does not know.
+  // 「[Fable 5.1, Fable 5.2] The model am.toml names. The node keeps no list of models: a name goes to」
+  // 「[Fable 5.1, Fable 5.2] Claude Code, which runs the model and refuses a name it does not know.」
   repeated string models = 13;
 }
 
