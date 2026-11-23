@@ -92,6 +92,7 @@ func (h *Handler) signedGrant(signed string, now time.Time) (Grant, error) {
 	} else {
 		var live bool
 		if held, live = h.askingToken(claims.Issuer); !live {
+			h.toldUnknown(claims.Issuer, claims.Label, now)
 			return Grant{}, errors.Newf("this node holds no live grant for %s", claims.Issuer)
 		}
 	}

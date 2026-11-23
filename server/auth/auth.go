@@ -120,7 +120,11 @@ type Handler struct {
 	// outOfReach is told of each request refused for reach, the route and who
 	// was refused, so the reach it lacked waits on a person (out_of_reach.go). Nil tells nobody.
 	outOfReach func(admitted Admission, route string)
-	issued   issuedAnswers
+	// unknownKey is told of each key that signed as itself for this node and
+	// is held nothing for, so admitting it waits on a person (unknown_key.go). Nil tells nobody.
+	unknownKey  func(did, label string)
+	unknownKeys unknownKeys
+	issued      issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt string
 	// direct is where this node reaches a peer itself, by the name the primary calls it (nodes.direct).
@@ -638,6 +642,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(layeInvitedPath, h.handleLayeInvited)
 	// laye has the node write a reach line its person approved on a peer (laye_reach.go).
 	mux.answer(layeReachPath, h.handleLayeReach)
+	// laye has the node admit a key its person approved on a peer (laye_admit.go).
+	mux.answer(layeAdmitPath, h.handleLayeAdmit)
 	// The ceremony: the element asks what can be linked, starts one, and collects
 	// the result. Everything the provider requires happens on this side of the
 	// wire, so no page holds a secret and no page holds logic.
