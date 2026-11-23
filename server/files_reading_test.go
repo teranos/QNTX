@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/teranos/QNTX/pulse/schedule"
 )
 
 // "newest first because,"
@@ -31,7 +33,7 @@ func TestThePicturesReadAreTheNewestNotYetRead(t *testing.T) {
 		t.Fatalf("the node did not keep it: %v", err)
 	}
 
-	waiting, err := srv.stillToRead(readPerNight)
+	waiting, err := srv.stillToRead(readPerRound)
 	if err != nil {
 		t.Fatalf("what waits to be read did not read: %v", err)
 	}
@@ -39,16 +41,16 @@ func TestThePicturesReadAreTheNewestNotYetRead(t *testing.T) {
 		t.Fatalf("waiting = %+v, want %s then %s", waiting, newer.Asset, older.Asset)
 	}
 
-	// A night holds no more than it reads.
+	// A round holds no more than it reads.
 	if one, _ := srv.stillToRead(1); len(one) != 1 || one[0].asset != newer.Asset {
-		t.Errorf("one night of one = %+v, want only %s", one, newer.Asset)
+		t.Errorf("one round of one = %+v, want only %s", one, newer.Asset)
 	}
 
 	// Once read, a picture waits no more.
 	if err := srv.attestRead(waiting[0], "gaze", "Qwen2.5 VL 3B Instruct", "A screenshot of a chat."); err != nil {
 		t.Fatalf("the reading was not written: %v", err)
 	}
-	if left, _ := srv.stillToRead(readPerNight); len(left) != 1 || left[0].asset != older.Asset {
+	if left, _ := srv.stillToRead(readPerRound); len(left) != 1 || left[0].asset != older.Asset {
 		t.Errorf("after reading %s, waiting = %+v", newer.Asset, left)
 	}
 }
@@ -73,7 +75,7 @@ func TestTheNodeKeepsTheOriginalAPhotoIs(t *testing.T) {
 	if _, err := srv.KeepFileForPlugin("ipluk", "IMG_0002.heic", []byte("not a picture at all"), ""); err == nil {
 		t.Error("a .heic that is no HEIC was kept")
 	}
-	if waiting, _ := srv.stillToRead(readPerNight); len(waiting) != 2 {
+	if waiting, _ := srv.stillToRead(readPerRound); len(waiting) != 2 {
 		t.Errorf("%d originals wait to be read, want the HEIC and the DNG", len(waiting))
 	}
 }
@@ -115,6 +117,21 @@ func TestWhatTheNodeHoldsIsListedWithItsReadings(t *testing.T) {
 		t.Errorf("the older one's readings = %+v", got)
 	}
 
+	// "the image needs to stay on screen for the duration that gaze is looking and then fade back"
+	// While the reader looks at a picture, the listing says since when.
+	since := time.Now()
+	srv.looking.begin(newer.Asset, since)
+	w = httptest.NewRecorder()
+	srv.HandleFiles(w, httptest.NewRequest(http.MethodGet, "/api/files/", nil))
+	pictures = nil
+	if err := json.Unmarshal(w.Body.Bytes(), &pictures); err != nil {
+		t.Fatalf("the answer did not read: %v", err)
+	}
+	if pictures[0].LookedAtSince == nil || !pictures[0].LookedAtSince.Equal(since) || pictures[1].LookedAtSince != nil {
+		t.Errorf("looked at: %v and %v, want %v and nothing", pictures[0].LookedAtSince, pictures[1].LookedAtSince, since)
+	}
+	srv.looking.end()
+
 	// /api/files, which a peer may bring a file to, lists nothing.
 	w = httptest.NewRecorder()
 	srv.HandleFiles(w, httptest.NewRequest(http.MethodGet, "/api/files", nil))
@@ -123,16 +140,22 @@ func TestWhatTheNodeHoldsIsListedWithItsReadings(t *testing.T) {
 	}
 }
 
-// 「[Opus 5.5] The reading starts at the next readAtHour, today when it is still ahead, else tomorrow.」
-func TestTheReadingStartsAtTheNextNight(t *testing.T) {
-	at := func(h, m int) time.Time { return time.Date(2026, 11, 22, h, m, 0, 0, time.Local) }
-	if got := nextNight(at(1, 30)); !got.Equal(at(readAtHour, 0)) {
-		t.Errorf("from 01:30, %v", got)
+// "and the 02:00 run idea can be removed if gaze is load based"
+// 「[Opus 5.5] The reading runs every readEvery: a node with no job gets one a minute out, one that」
+// 「[Opus 5.5] read once a night has that job moved, and one already every readEvery is left as it is.」
+func TestTheReadingRunsWheneverAPictureWaits(t *testing.T) {
+	now := time.Date(2026, 11, 22, 21, 10, 0, 0, time.Local)
+	made, move := readingSchedule(nil, now)
+	if made == nil || move != "" || time.Duration(made.IntervalSeconds)*time.Second != readEvery || made.NextRunAt != now.Add(time.Minute).Format(time.RFC3339) {
+		t.Fatalf("with no job: made %+v, move %q", made, move)
 	}
-	if got := nextNight(at(readAtHour, 0)); !got.Equal(at(readAtHour, 0).AddDate(0, 0, 1)) {
-		t.Errorf("from %02d:00, %v", readAtHour, got)
+	nightly := &schedule.Job{Id: "SPJ_read_1795339335", HandlerName: readingHandlerName, State: schedule.StateActive, IntervalSeconds: int32((24 * time.Hour).Seconds())}
+	other := &schedule.Job{Id: "SPJ_other", HandlerName: "weekly.report", State: schedule.StateActive, IntervalSeconds: 604800}
+	if made, move := readingSchedule([]*schedule.Job{other, nightly}, now); made != nil || move != nightly.Id {
+		t.Errorf("with the nightly job: made %+v, move %q, want %s moved", made, move, nightly.Id)
 	}
-	if got := nextNight(at(14, 0)); !got.Equal(at(readAtHour, 0).AddDate(0, 0, 1)) {
-		t.Errorf("from 14:00, %v", got)
+	every := &schedule.Job{Id: "SPJ_read_2", HandlerName: readingHandlerName, State: schedule.StateActive, IntervalSeconds: int32(readEvery.Seconds())}
+	if made, move := readingSchedule([]*schedule.Job{every}, now); made != nil || move != "" {
+		t.Errorf("with a job every %v: made %+v, move %q", readEvery, made, move)
 	}
 }
