@@ -347,3 +347,27 @@ func TestTheApprovalsSignumIsServed(t *testing.T) {
 	require.NoError(t, signum.Check())
 	holds(t, s.approvalsSignum(), "list", &protocol.Approvals{Approvals: []*protocol.Approval{{Subject: "teranos/elements#29"}}})
 }
+
+// A check run is about one head: it touches the pull requests asked at that
+// head and reads the lines of no other. On q, reading every approval line for
+// each check_run ran the node out of memory (2026-11-23).
+func TestACheckRunTouchesOnlyThePullRequestsAtItsHead(t *testing.T) {
+	s, _ := approvingServer(t)
+	delivered(t, s, "pull_request", pullRequest("opened", 29, "abe92a9", ""))
+	delivered(t, s, "pull_request", pullRequest("opened", 30, "c0ffee1", ""))
+
+	assert.Equal(t, []string{"teranos/elements#30"}, delivered(t, s, "check_run", checkRun("TypeScript", "c0ffee1", "completed", "success")))
+	assert.Empty(t, delivered(t, s, "check_run", checkRun("TypeScript", "f00d", "completed", "success")), "a head no pull request is asked at")
+
+	for _, open := range listed(t, s) {
+		if open.GetSubject() == "teranos/elements#29" {
+			assert.Empty(t, open.GetChecks(), "a check at another head was written on #29")
+		} else {
+			require.Len(t, open.GetChecks(), 1)
+		}
+	}
+
+	// Closed, a pull request at that head is touched no more.
+	delivered(t, s, "pull_request", pullRequest("closed", 30, "c0ffee1", ""))
+	assert.Empty(t, delivered(t, s, "check_run", checkRun("Browser", "c0ffee1", "completed", "success")))
+}
