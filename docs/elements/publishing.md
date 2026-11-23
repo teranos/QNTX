@@ -94,9 +94,9 @@ with `Content-Type: text/javascript`; what produced that string is yours.
 `--to` names the node. Without it, the one this machine runs, on the port
 `am.toml` gives.
 
-Each request is signed with `~/.qntx/key`, the key `ground code login` keeps
-and the node holds a grant for: "A signature proves the key, and nothing
-reusable leaves the node."
+「[Opus 5.5] Each request is signed with `~/.qntx/key`, the key `ground code login` keeps」
+「[Opus 5.5] and the node holds a grant for: "A signature proves the key, and nothing」
+「[Sonnet 5.5] reusable leaves the node."」
 
 An element is published into the namespace the caller acts in, and served to that
 namespace alone. Namespaces are their own universes and nothing crosses

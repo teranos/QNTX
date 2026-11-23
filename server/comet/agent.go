@@ -22,7 +22,7 @@ import (
 )
 
 // AgentDeclaration is the agent's sand besides ground's own controls: its work directory as its
-// one project, and the node it reports to, at the door the node opened for that agent.
+// 「[Opus 5.5] one project, and the node it reports to, at the door the node opened for that agent.」
 func AgentDeclaration(work, url string) string {
 	return "project {\n  path: \"" + work + "\"\n}\n\nqntx {\n  url: \"" + url + "\"\n}\n"
 }
