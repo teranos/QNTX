@@ -81,16 +81,23 @@ func (h *Handler) handleAuthorizationServerMetadata(w http.ResponseWriter, r *ht
 }
 
 // handleProtectedResourceMetadata is where a client that hit this node finds
-// who issues tokens for it: this node. A bearer is presented in the header.
+// who issues tokens for it: the primary, when this node names one
+// (nodes.primary), else this node. A bearer is presented in the header.
+//
+// "BUT I WANT LAYE TO OWN IT, LAYE IS SUPPOSED TO FALL DOWN LESS EASILY THAN QNTX"
 func (h *Handler) handleProtectedResourceMetadata(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	origin := h.publicOrigin()
+	issuer := origin
+	if primary := h.Primary(); primary != "" {
+		issuer = primary
+	}
 	h.writeJSON(w, http.StatusOK, protectedResourceMetadata{
 		Resource:               origin,
-		AuthorizationServers:   []string{origin},
+		AuthorizationServers:   []string{issuer},
 		BearerMethodsSupported: []string{"header"},
 	})
 }
