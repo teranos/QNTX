@@ -576,9 +576,9 @@ func TestWhatATurnSaysIsStreamedAsItSaysIt(t *testing.T) {
 // A turn Claude Code prints in past turnQuietMost is working, not quiet: it is
 // left to answer.
 func TestATurnThatPrintsPastItsQuietTimeIsNotStopped(t *testing.T) {
-	// A second, and a line every twentieth of it: on a runner that stalls a
-	// shell for 400ms the turn was ended as quiet, and the test failed on a
-	// pull request that touched none of this.
+	// 「[Fable 5.2] A second, and a line every twentieth of it: on a runner that stalls a」
+	// 「[Fable 5.2] shell for 400ms the turn was ended as quiet, and the test failed on a」
+	// 「[Fable 5.2] pull request that touched none of this.」
 	quiet := turnQuietMost
 	turnQuietMost = time.Second
 	t.Cleanup(func() { turnQuietMost = quiet })
