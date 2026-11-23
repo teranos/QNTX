@@ -249,7 +249,9 @@ func (s *QNTXServer) bringOne(item toBring) (gone bool, err error) {
 	}
 	path, found, err := s.storedFile(item.fileID)
 	if err != nil {
-		return true, err
+		// Not found out is not gone: the file waits, and is brought again
+		// after the peer's backoff (CodeRabbit on #1812).
+		return false, err
 	}
 	if !found {
 		return true, errors.Newf("this node keeps no file %s", item.fileID)
