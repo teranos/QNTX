@@ -170,7 +170,7 @@ var pullRequestActionsRead = []string{"opened", "reopened", "ready_for_review", 
 
 // checkRunEvent writes a check run down on every open approval waiting at its head.
 func (s *QNTXServer) checkRunEvent(e gitHubCheckRunEvent) ([]string, error) {
-	open, err := s.openApprovals()
+	open, err := s.openApprovalsAt(e.Repository.FullName, e.CheckRun.HeadSha)
 	if err != nil {
 		return nil, err
 	}
