@@ -39,7 +39,8 @@ func (s *QNTXServer) layeDelivered(ctx context.Context, delivered auth.LayeDeliv
 	if info := answered.TaskInfo(); info.TaskID != "" {
 		task = string(info.TaskID)
 	}
-	s.logger.Infow("What laye released for the Node Agent is its turn", "to", delivered.To, "by", delivered.From, "task", task)
+	// Said, not done: whether the turn ran is its Task's state, not this line.
+	s.logger.Infow("What laye released for the Node Agent is said to it, as a Task", "to", delivered.To, "by", delivered.From, "task", task)
 	return task, nil
 }
 

@@ -317,6 +317,17 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 		span.SetName(r.Method + " " + route)
 		span.SetAttributes(attribute.String("http.route", route))
 
+		// The node asking itself in process presents nothing: it is admitted
+		// as it asked, and held to the reach table as anyone is (in_process.go).
+		if admitted, inside := inProcessAdmission(r.Context()); inside {
+			if !reach.Admits(admitted) {
+				refusedOn(r, "out-of-reach")
+				h.rejectOutOfReach(w, r, admitted, route, reach)
+				return
+			}
+			next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
+			return
+		}
 		p := h.presented(r)
 		if p.turnedAway {
 			refusedOn(r, "turned-away")
