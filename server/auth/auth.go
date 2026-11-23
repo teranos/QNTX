@@ -120,6 +120,10 @@ type Handler struct {
 	// outOfReach is told of each request refused for reach, the route and who
 	// was refused, so the reach it lacked waits on a person (out_of_reach.go). Nil tells nobody.
 	outOfReach func(admitted Admission, route string)
+	// unknownKey is told of each key that signed as itself for this node and
+	// is held nothing for, so admitting it waits on a person (unknown_key.go). Nil tells nobody.
+	unknownKey  func(did, label string)
+	unknownKeys unknownKeys
 	issued   issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
