@@ -202,6 +202,11 @@ impl ScheduleStore {
 
         self.seq += 1;
         let path = format!("{}/{}.parquet", self.ticks_prefix, self.batch_name());
+        // What S3 is reached with expires: it is resolved again before each
+        // write, as the attestations flush does: the watcher fires' flush,
+        // which did not, was refused with ExpiredToken on q from 2026-11-18
+        // 16:00 to 2026-11-21 09:43 UTC.
+        crate::resolve_credentials_again(&self.conn, &self.location)?;
         self.conn
             .execute_batch(&format!(
                 "COPY tick_batch TO '{path}' (FORMAT PARQUET); DROP TABLE tick_batch"

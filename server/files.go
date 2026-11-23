@@ -75,11 +75,13 @@ var m4aBrands = map[string]bool{"M4A ": true, "M4B ": true, "isom": true, "iso2"
 func startsAsRecording(ext string, head []byte) bool {
 	switch ext {
 	case ".m4a":
-		if len(head) < 12 || string(head[4:8]) != "ftyp" {
+		// An ftyp box holds at least its size, its type, a major brand and a
+		// minor version: sixteen bytes, or it is no box (CodeRabbit on #1780).
+		if len(head) < 16 || string(head[4:8]) != "ftyp" {
 			return false
 		}
 		box := int(binary.BigEndian.Uint32(head[:4]))
-		if box < 12 || box%4 != 0 {
+		if box < 16 || box%4 != 0 {
 			return false
 		}
 		if box > len(head) {
