@@ -117,6 +117,9 @@ type Handler struct {
 	// What laye's etcd says a key is: the person whose passkey said yes to it
 	// (laye_says.go). Nil asks nobody.
 	layeSays LayeSays
+	// outOfReach is told of each request refused for reach, the route and who
+	// was refused, so the reach it lacked waits on a person (out_of_reach.go). Nil tells nobody.
+	outOfReach func(admitted Admission, route string)
 	issued   issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
@@ -867,6 +870,9 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, admit
 		measure.String(measure.AttrLevel, admitted.LevelName()),
 		measure.String(measure.AttrRoute, route),
 	)
+	if h.outOfReach != nil {
+		h.outOfReach(admitted, route)
+	}
 	h.refuse(w, r, http.StatusForbidden, "this route is not yours")
 }
 

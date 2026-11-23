@@ -226,8 +226,9 @@ func peerOrigin(did, field, written string) (*url.URL, error) {
 
 // peerNamed is the peer nodes.peers calls name, or false.
 func (h *Handler) peerNamed(name string) (Client, bool) {
+	// By the name nodes.peers gives it, or by its did:key.
 	for _, peer := range h.nodes {
-		if peer.Label == name {
+		if peer.Label == name || peer.DID == name {
 			return peer, true
 		}
 	}
