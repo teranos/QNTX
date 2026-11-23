@@ -96,15 +96,30 @@ func (h *Handler) handleFilesForPeers(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) SetDirect(direct map[string]string) error {
 	h.direct = map[string]string{}
 	for name, origin := range direct {
-		trimmed := strings.TrimSuffix(strings.TrimSpace(origin), "/")
-		parsed, err := url.Parse(trimmed)
-		if err != nil || !parsed.IsAbs() || parsed.Host == "" {
-			return errors.Newf("nodes.direct names %s at %q, which is not an origin such as http://node.example.com:8770", name, origin)
+		trimmed, err := anOrigin(origin)
+		if err != nil {
+			return errors.Wrapf(err, "nodes.direct names %s", name)
 		}
 		h.direct[name] = trimmed
 	}
 	return nil
 }
+
+// anOrigin is origin as scheme, host and port alone, or why it is not one. A
+// path, query, fragment or user in it would move where /api/files lands.
+func anOrigin(origin string) (string, error) {
+	trimmed := strings.TrimSuffix(strings.TrimSpace(origin), "/")
+	parsed, err := url.Parse(trimmed)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" ||
+		parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
+		return "", errors.Newf("%q is not an origin such as http://node.example.com:8770", origin)
+	}
+	return trimmed, nil
+}
+
+// toPeers is how a node speaks to its primary and its peers about a file: it
+// follows no redirect, so the assertion and the file go only where they were sent.
+var toPeers = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 
 // BringFileToPeer brings a file this node holds to the peer the primary calls
 // to. The primary vouches that this node is a peer; the bytes go from here to
@@ -121,7 +136,10 @@ func (h *Handler) BringFileToPeer(ctx context.Context, to, filename string, cont
 	if err != nil {
 		return 0, nil, err
 	}
-	origin := vouched.Origin
+	origin, err := anOrigin(vouched.Origin)
+	if err != nil {
+		return 0, nil, errors.Wrapf(err, "the primary named no origin for %s", to)
+	}
 	if direct, named := h.direct[to]; named {
 		origin = direct
 	}
@@ -145,7 +163,7 @@ func (h *Handler) BringFileToPeer(ctx context.Context, to, filename string, cont
 	}
 	req.Header.Set("Content-Type", form.FormDataContentType())
 	req.Header.Set("Authorization", vouched.Authorization)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := toPeers.Do(req)
 	if err != nil {
 		return 0, nil, errors.Wrapf(err, "%s did not answer at %s", to, at)
 	}
@@ -178,7 +196,7 @@ func (h *Handler) vouchedTo(ctx context.Context, to string) (vouchedToPeer, erro
 		return vouchedToPeer{}, errors.Wrapf(err, "%s is not a request the primary answers", at)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := toPeers.Do(req)
 	if err != nil {
 		return vouchedToPeer{}, errors.Wrapf(err, "%s did not answer", at)
 	}

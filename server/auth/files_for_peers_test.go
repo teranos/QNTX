@@ -61,7 +61,8 @@ func TestAPeerBringsAFileStraightToAPeer(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"there","asset":"sha256:abc"}`))
 	}))
 	t.Cleanup(kServed.Close)
-	require.NoError(t, primary.DeclarePeer("k", kDID, []string{"Ground"}, whereThePrimaryReachesK, whereThePrimaryReachesK))
+	// A namespace lives at one peer, and l has Ground: k is declared with one of its own.
+	require.NoError(t, primary.DeclarePeer("k", kDID, []string{"Kapteyn"}, whereThePrimaryReachesK, whereThePrimaryReachesK))
 	require.NoError(t, l.SetDirect(map[string]string{"k": kServed.URL}))
 
 	status, said, err := l.BringFileToPeer(context.Background(), "k", "shot.jpeg", []byte("the picture"))
@@ -73,6 +74,19 @@ func TestAPeerBringsAFileStraightToAPeer(t *testing.T) {
 	// k was told a peer brought it, and which: no person, and no level a person holds.
 	assert.Equal(t, LevelPeer, by.Level)
 	assert.Equal(t, lDID, by.MintedBy)
+
+	// "the identity is not listed": l is on no list of people at k, and is let
+	// in all the same, as a peer and as l.
+	admitted, in := k.admissionOf(Presented{Bearer: &by})
+	require.True(t, in, "k refused the peer its primary vouched for")
+	assert.Equal(t, string(LevelPeer), admitted.LevelName())
+	assert.Equal(t, lDID, admitted.Identity)
+
+	// Named a peer by anybody but k's primary, it is let in nowhere.
+	forged := by
+	forged.DID = lDID
+	_, in = k.admissionOf(Presented{Bearer: &forged})
+	assert.False(t, in, "k let in a peer its primary did not vouch for")
 }
 
 // A peer the primary does not know is brought nothing, and the node is told so.
@@ -107,4 +121,35 @@ func TestWhereAPeerIsReachedIsAnOrigin(t *testing.T) {
 	require.NoError(t, h.SetDirect(map[string]string{"k": "http://k.example.net:8770/"}))
 	assert.Equal(t, "http://k.example.net:8770", h.direct["k"])
 	require.Error(t, h.SetDirect(map[string]string{"k": "k.example.net"}))
+	// Each of these would land the file somewhere other than /api/files.
+	for _, moved := range []string{
+		"https://k.example.net/?region=west",
+		"https://k.example.net/files",
+		"https://k.example.net#here",
+		"https://tim@example.com",
+		"ftp://k.example.net",
+	} {
+		assert.Error(t, h.SetDirect(map[string]string{"k": moved}), moved)
+	}
+}
+
+// A peer that answers with a redirect is not followed: the file and what
+// vouches for it go only where they were sent.
+func TestAFileForAPeerFollowsNoRedirect(t *testing.T) {
+	primary, l := primaryAskingGitHub(t, asksGitHubForNobody, locatesGitHubForNobody)
+	kDID := func() string { _, did := otherNode(t); return did }()
+	elsewhere := false
+	away := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { elsewhere = true }))
+	t.Cleanup(away.Close)
+	kServed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, away.URL+"/api/files", http.StatusTemporaryRedirect)
+	}))
+	t.Cleanup(kServed.Close)
+	require.NoError(t, primary.DeclarePeer("k", kDID, []string{"Kapteyn"}, whereThePrimaryReachesK, whereThePrimaryReachesK))
+	require.NoError(t, l.SetDirect(map[string]string{"k": kServed.URL}))
+
+	status, _, err := l.BringFileToPeer(context.Background(), "k", "shot.jpeg", []byte("the picture"))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusTemporaryRedirect, status)
+	assert.False(t, elsewhere, "the file went where the peer redirected it")
 }

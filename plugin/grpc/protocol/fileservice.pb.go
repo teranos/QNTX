@@ -152,7 +152,8 @@ type KeepFileRequest struct {
 	Content []byte `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
 	// "to me it feels like k should own my Media Assets"
 	// The peer that is to hold it, as the primary calls it, e.g. "k". The node
-	// keeps the file and brings it there through the primary. Empty: it stays here.
+	// keeps the file and later brings it to that peer itself: the primary only
+	// vouches for the node, and the bytes go straight to the peer. Empty: it stays here.
 	BringTo       string `protobuf:"bytes,5,opt,name=bring_to,json=bringTo,proto3" json:"bring_to,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -231,11 +232,11 @@ type KeepFileResponse struct {
 	Asset       string                 `protobuf:"bytes,4,opt,name=asset,proto3" json:"asset,omitempty"`                 // "sha256:<hex>" of the bytes
 	ContentType string                 `protobuf:"bytes,5,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
 	Size        int64                  `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
-	// Where the file was brought, when bring_to named a peer and the peer kept it,
-	// and the id that peer serves it under.
+	// Empty in every answer: success says the node keeps the file, not that a
+	// peer does. A file meant for a peer is brought after the answer, and the
+	// node's brought line says when it is there.
 	BroughtTo     string `protobuf:"bytes,7,opt,name=brought_to,json=broughtTo,proto3" json:"brought_to,omitempty"`
 	BroughtFileId string `protobuf:"bytes,8,opt,name=brought_file_id,json=broughtFileId,proto3" json:"brought_file_id,omitempty"`
-	// Why the file was not brought to the peer bring_to named. The node still keeps it.
 	NotBrought    string `protobuf:"bytes,9,opt,name=not_brought,json=notBrought,proto3" json:"not_brought,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

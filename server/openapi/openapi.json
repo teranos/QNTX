@@ -446,7 +446,8 @@
     },
     "/api/files": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "PEER"
       ]
     },
     "/api/files/": {
@@ -932,6 +933,11 @@
       ]
     },
     "/auth/elsewhere/back": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/files": {
       "x-qntx-reach": [
         "ANYONE"
       ]

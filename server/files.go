@@ -30,18 +30,20 @@ const maxUploadSize = 50 << 20
 
 // allowedContentTypes is the set of MIME types accepted for upload.
 var allowedContentTypes = map[string]bool{
-	"application/pdf": true,
-	"image/png":       true,
-	"image/jpeg":      true,
-	"image/gif":       true,
-	"image/webp":      true,
-	"image/svg+xml":   true,
-	"text/plain":      true,
-	"audio/mp4":       true,
-	"audio/webm":      true,
-	"audio/wav":       true,
-	"audio/mpeg":      true,
-	"audio/ogg":       true,
+	"application/pdf":   true,
+	"image/png":         true,
+	"image/jpeg":        true,
+	"image/gif":         true,
+	"image/webp":        true,
+	"image/svg+xml":     true,
+	"text/plain":        true,
+	"audio/mp4":         true,
+	"audio/webm":        true,
+	"audio/wav":         true,
+	"audio/mpeg":        true,
+	"audio/ogg":         true,
+	"image/heic":        true,
+	"image/x-adobe-dng": true,
 }
 
 // allowedExtensions is the set of file extensions accepted for upload.
@@ -59,6 +61,8 @@ var allowedExtensions = map[string]bool{
 	".wav":  true,
 	".mp3":  true,
 	".ogg":  true,
+	".heic": true,
+	".dng":  true,
 }
 
 // 「[Fable 5.2] m4aBrands are the brands an ftyp box names for the sound a phone records, besides」
@@ -71,11 +75,13 @@ var m4aBrands = map[string]bool{"M4A ": true, "M4B ": true, "isom": true, "iso2"
 func startsAsRecording(ext string, head []byte) bool {
 	switch ext {
 	case ".m4a":
-		if len(head) < 12 || string(head[4:8]) != "ftyp" {
+		// An ftyp box holds at least its size, its type, a major brand and a
+		// minor version: sixteen bytes, or it is no box (CodeRabbit on #1780).
+		if len(head) < 16 || string(head[4:8]) != "ftyp" {
 			return false
 		}
 		box := int(binary.BigEndian.Uint32(head[:4]))
-		if box < 12 || box%4 != 0 {
+		if box < 16 || box%4 != 0 {
 			return false
 		}
 		if box > len(head) {
@@ -118,6 +124,24 @@ var recordingStartsAs = map[string]string{
 	".ogg":  "application/ogg",
 }
 
+// "i see, we would want the real original for this"
+//
+// 「[Opus 5.5] heicBrands are the major brands an ftyp box names for a HEIF picture, as a phone」
+// 「[Opus 5.5] takes it. net/http's sniffing knows neither HEIC nor DNG.」
+var heicBrands = map[string]bool{"heic": true, "heix": true, "heim": true, "heis": true, "hevc": true, "hevx": true, "mif1": true, "msf1": true}
+
+// 「[Opus 5.5] startsAsPhoto is whether head starts as the original ext names: a HEIC by its」
+// 「[Opus 5.5] ftyp box and major brand, a DNG by the TIFF header it is written in.」
+func startsAsPhoto(ext string, head []byte) bool {
+	switch ext {
+	case ".heic":
+		return len(head) >= 12 && string(head[4:8]) == "ftyp" && heicBrands[string(head[8:12])]
+	case ".dng":
+		return len(head) >= 4 && (string(head[:4]) == "II*\x00" || string(head[:4]) == "MM\x00*")
+	}
+	return false
+}
+
 // 「[Fable 5.2] The line the node writes of a file it keeps (ADR-058): the asset, by the name」
 // 「[Fable 5.2] its bytes have, is held of the node, by who brought it.」
 const (
@@ -138,12 +162,19 @@ func (s *QNTXServer) filesDir() (string, error) {
 // HandleFiles routes file upload and serve requests.
 //
 //	POST /api/files      - Upload a file (multipart form)
+//	GET  /api/files/     - What this node holds, newest first, with what was read in each
 //	GET  /api/files/{id} - Serve a stored file
 func (s *QNTXServer) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		s.handleFileUpload(w, r)
 	case http.MethodGet:
+		// /api/files/ is ROOT's alone in the tablet of reach; /api/files, which a
+		// peer may bring a file to, lists nothing.
+		if r.URL.Path == "/api/files/" {
+			s.handleFilesHeld(w, r)
+			return
+		}
 		id := strings.TrimPrefix(r.URL.Path, "/api/files/")
 		if id == "" || id == r.URL.Path {
 			http.Error(w, "file ID required", http.StatusBadRequest)
@@ -171,7 +202,7 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { sqlclose.Log(file.Close(), s.logger, "the uploaded form file") }()
 
-	kept, err := s.keepFile(actorOf(r.Context()), header.Filename, file)
+	kept, err := s.keepFile(actorOf(r.Context()), header.Filename, file, "")
 	if err != nil {
 		var refused *notKept
 		if errors.As(err, &refused) {
@@ -197,7 +228,8 @@ func (n *notKept) Error() string { return n.said }
 // 「[Fable 5.2] keepFile is the one way a file comes to be kept by this node, whoever brings it:」
 // 「[Fable 5.2] a person over /api/files, or a plugin over the file service (KeepFileForPlugin).」
 // 「[Fable 5.2] by is who brought it. What is refused is a *notKept.」
-func (s *QNTXServer) keepFile(by, filename string, file io.ReadSeeker) (*pb.FileUploadResult, error) {
+// 「[Fable 5.2] meantFor names the peer that is to hold it, or nothing: it is said on the held line.」
+func (s *QNTXServer) keepFile(by, filename string, file io.ReadSeeker, meantFor string) (*pb.FileUploadResult, error) {
 	// Validate file extension
 	ext := strings.ToLower(filepath.Ext(filename))
 	if !allowedExtensions[ext] {
@@ -231,6 +263,9 @@ func (s *QNTXServer) keepFile(by, filename string, file io.ReadSeeker) (*pb.File
 	}
 
 	if startsAs, recording := recordingStartsAs[ext]; recording && (detectedType == startsAs || startsAsRecording(ext, buf[:n])) {
+		detectedType = mimeByExtension[ext]
+	}
+	if startsAsPhoto(ext, buf[:n]) {
 		detectedType = mimeByExtension[ext]
 	}
 
@@ -295,7 +330,7 @@ func (s *QNTXServer) keepFile(by, filename string, file io.ReadSeeker) (*pb.File
 	}
 
 	asset := assetNamePrefix + hex.EncodeToString(hashed.Sum(nil))
-	if err := s.attestHeld(by, asset, id, filename, detectedType, written); err != nil {
+	if err := s.attestHeld(by, asset, id, filename, detectedType, written, meantFor); err != nil {
 		s.logger.Errorw("File not kept: the node did not attest it", "path", destPath, "asset", asset, "error", err)
 		if rmErr := os.Remove(destPath); rmErr != nil {
 			s.logger.Errorw("Failed to remove a file nothing attests", "path", destPath, "error", rmErr)
@@ -317,31 +352,22 @@ func (s *QNTXServer) keepFile(by, filename string, file io.ReadSeeker) (*pb.File
 // 「[Fable 5.2] KeepFileForPlugin keeps what a plugin hands the node, as keepFile keeps what a」
 // 「[Fable 5.2] person brings: the same kinds, the same name by its bytes, the same held line.」
 //
-// "to me it feels like k should own my Media Assets"
-// 「[Fable 5.2] bringTo names the peer that is to hold it. The file is kept here first, so it is」
-// 「[Fable 5.2] held somewhere whatever becomes of the way there, and then brought through the」
-// 「[Fable 5.2] primary. A file that did not get there is still kept, and why is said.」
+// "and slowly" "it needs to kind of get out of the way of other things happening"
+// 「[Fable 5.2] bringTo names the peer that is to hold it. The file is kept here and answered for at」
+// 「[Fable 5.2] once; this node brings it to the peer afterwards, in the background, one at a time」
+// 「[Fable 5.2] (files_carrier.go). Who handed it over waits on no other machine.」
 func (s *QNTXServer) KeepFileForPlugin(by, filename string, content []byte, bringTo string) (services.KeptFile, error) {
 	if int64(len(content)) > maxUploadSize {
 		return services.KeptFile{}, errors.Newf("%s is %d bytes, and the node keeps a file of at most %d", filename, len(content), int64(maxUploadSize))
 	}
-	kept, err := s.keepFile(by, filename, bytes.NewReader(content))
+	kept, err := s.keepFile(by, filename, bytes.NewReader(content), bringTo)
 	if err != nil {
 		return services.KeptFile{}, errors.Wrapf(err, "the node did not keep %s for %s", filename, by)
 	}
-	held := services.KeptFile{ID: kept.Id, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size}
-	if bringTo == "" {
-		return held, nil
+	if bringTo != "" {
+		s.carry(toBring{asset: kept.Asset, fileID: kept.Id, filename: filename, to: bringTo})
 	}
-	there, err := s.bringToPeer(bringTo, filename, content, kept.Asset)
-	if err != nil {
-		held.NotBrought = err.Error()
-		s.logger.Warnw("A file meant for a peer was kept here and not brought", "to", bringTo, "asset", kept.Asset, "by", by, "error", err)
-		return held, nil
-	}
-	held.BroughtTo, held.BroughtID = bringTo, there
-	s.logger.Infow("File brought to a peer", "to", bringTo, "asset", kept.Asset, "by", by, "file_id_there", there)
-	return held, nil
+	return services.KeptFile{ID: kept.Id, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size}, nil
 }
 
 // bringToPeer brings a file this node keeps to the peer named, through the
@@ -374,7 +400,7 @@ func (s *QNTXServer) bringToPeer(to, filename string, content []byte, asset stri
 // 「[Fable 5.2] attestHeld writes that this node holds an asset, by who brought it, and what」
 // 「[Fable 5.2] TwelveLabs says of an asset of its own: filename, file_type, size, created_at,」
 // 「[Fable 5.2] method and status. file_id is where this node serves the bytes.」
-func (s *QNTXServer) attestHeld(by, asset, fileID, filename, fileType string, size int64) error {
+func (s *QNTXServer) attestHeld(by, asset, fileID, filename, fileType string, size int64, meantFor string) error {
 	store := s.held.TheNodesOwnRecords()
 	if store == nil {
 		return errors.Newf("this node holds no store to attest %s into", asset)
@@ -385,18 +411,24 @@ func (s *QNTXServer) attestHeld(by, asset, fileID, filename, fileType string, si
 		return errors.Wrapf(err, "failed to name the %s line of %s", assetHeld, asset)
 	}
 	at := time.Now()
+	said := map[string]any{
+		"file_id":    fileID,
+		"filename":   filename,
+		"file_type":  fileType,
+		"size":       size,
+		"created_at": at.UTC().Format(time.RFC3339),
+		"method":     "direct",
+		"status":     "ready",
+	}
+	// "to me it feels like k should own my Media Assets"
+	// The peer that is to hold it, when one was named: what the carrier reads (files_carrier.go).
+	if meantFor != "" {
+		said[assetMeantFor] = meantFor
+	}
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{asset}, Predicates: []string{assetHeld}, Contexts: []string{holder},
 		Actors: []string{by}, Timestamp: at, CreatedAt: at, Source: pluginSource,
-		Attributes: map[string]any{
-			"file_id":    fileID,
-			"filename":   filename,
-			"file_type":  fileType,
-			"size":       size,
-			"created_at": at.UTC().Format(time.RFC3339),
-			"method":     "direct",
-			"status":     "ready",
-		},
+		Attributes: said,
 	}); err != nil {
 		return errors.Wrapf(err, "the %s line of %s was not written", assetHeld, asset)
 	}
@@ -469,6 +501,8 @@ var mimeByExtension = map[string]string{
 	".wav":  "audio/wav",
 	".mp3":  "audio/mpeg",
 	".ogg":  "audio/ogg",
+	".heic": "image/heic",
+	".dng":  "image/x-adobe-dng",
 }
 
 // storedFile is where the file with this ID is kept, by the ID alone or with
