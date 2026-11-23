@@ -55,6 +55,11 @@ REACH is '/auth/laye/invited'                                             of ANY
 # laye has the node write a reach line its person approved on a peer, holding
 # no session: laye's own signature is the credential, checked at the endpoint.
 REACH is '/auth/laye/reach'                                               of ANYONE
+# laye has the node admit a key its person approved on a peer, the same way.
+REACH is '/auth/laye/admit'                                               of ANYONE
+# A key the person said yes to, or the person carried by the primary, admits
+# a key: the signature is the credential, checked at the endpoint (admit.go).
+REACH is '/auth/admit'                                                    of ANYONE
 # A peer asks GitHub through its primary, the same way: the token stays here.
 REACH is '/auth/github' '/auth/github/location'                           of ANYONE
 # A node whose people log in at another sends them there and takes them back,
