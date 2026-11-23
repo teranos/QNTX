@@ -132,6 +132,12 @@ func headOf(words []string) (string, bool) {
 
 // approvalLines is every approval line the node holds, oldest first.
 func (s *QNTXServer) approvalLines() ([]*types.As, error) {
+	return s.approvalLinesOf(watcher.ApprovalPredicates, nil)
+}
+
+// approvalLinesOf is the approval lines of these kinds, about these subjects
+// (every subject when none are named), oldest first.
+func (s *QNTXServer) approvalLinesOf(predicates, subjects []string) ([]*types.As, error) {
 	// Read where the node's own records are written: system, or default on a
 	// backend with none.
 	where := auth.NamespaceDefault
@@ -145,12 +151,23 @@ func (s *QNTXServer) approvalLines() ([]*types.As, error) {
 	// One read per line kind: a filter naming several predicates reads as all
 	// of them at once, which no line is.
 	var lines []*types.As
-	for _, predicate := range watcher.ApprovalPredicates {
-		found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Limit: ats.EveryRow})
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read the %s lines in %s", predicate, where)
+	// And one read per subject, for the same reason: a pull request is one
+	// subject, and no line is about several.
+	about := [][]string{nil}
+	if len(subjects) > 0 {
+		about = about[:0]
+		for _, subject := range subjects {
+			about = append(about, []string{subject})
 		}
-		lines = append(lines, found...)
+	}
+	for _, predicate := range predicates {
+		for _, subject := range about {
+			found, err := reading.GetAttestations(ats.AttestationFilter{TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Predicates: []string{predicate}, Subjects: subject, Limit: ats.EveryRow})
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to read the %s lines in %s", predicate, where)
+			}
+			lines = append(lines, found...)
+		}
 	}
 	sort.SliceStable(lines, func(i, j int) bool { return lines[i].Timestamp.Before(lines[j].Timestamp) })
 	return lines, nil
@@ -206,6 +223,38 @@ func foldApprovals(lines []*types.As) map[string]*approvalState {
 		}
 	}
 	return states
+}
+
+// openApprovalsAt is every pull request of repo still waiting on somebody
+// whose newest ask is at sha. A check run is about one head: it reads the asks,
+// and every line only of the pull requests asked at that head, not every line
+// the node holds. On q those were 23,000 lines, read and decoded whole for each
+// check_run GitHub delivered, until the node ran out of memory (2026-11-23).
+func (s *QNTXServer) openApprovalsAt(repo, sha string) ([]*approvalState, error) {
+	asks, err := s.approvalLinesOf([]string{watcher.ApprovalAsked}, nil)
+	if err != nil {
+		return nil, err
+	}
+	var subjects []string
+	for subject, st := range foldApprovals(asks) {
+		if st.repo == repo && st.sha == sha {
+			subjects = append(subjects, subject)
+		}
+	}
+	if len(subjects) == 0 {
+		return nil, nil
+	}
+	lines, err := s.approvalLinesOf(watcher.ApprovalPredicates, subjects)
+	if err != nil {
+		return nil, err
+	}
+	var open []*approvalState
+	for _, st := range foldApprovals(lines) {
+		if !st.over && st.repo == repo && st.sha == sha {
+			open = append(open, st)
+		}
+	}
+	return open, nil
 }
 
 // openApprovals is every pull request still waiting on somebody, newest first.
