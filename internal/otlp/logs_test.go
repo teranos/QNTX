@@ -80,7 +80,7 @@ func TestTheNodesLogsLeaveAsOTLPLogs(t *testing.T) {
 		t.Fatal("an endpoint was named and no logs are leaving")
 	}
 	log := zap.New(core).Named("server.forward").Sugar()
-	// A Debug line stays on the box: only Info and above leave.
+	// 「[Opus 5.5] A Debug line stays on the box: only Info and above leave.」
 	log.Debugw("compared one attestation", "id", "AS-1")
 	log.Errorw("A delivery did not reach the node it is forwarded to",
 		"url", "http://10.88.0.2:8770/github/webhook", "error", errors.New("dial tcp 10.88.0.2:8770: i/o timeout"))
