@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/teranos/QNTX/server/auth"
@@ -27,7 +28,9 @@ const reachLackedPath = "/laye/pack/reach"
 
 // reachLacked is what laye is handed of one refusal.
 type reachLacked struct {
-	NodeDID  string `json:"node_did"`
+	NodeDID string `json:"node_did"`
+	// Node is what the node is called, its host's name, so the item says it and not its key.
+	Node     string `json:"node"`
 	Path     string `json:"path"`
 	To       string `json:"to"`
 	AskerDID string `json:"asker_did"`
@@ -59,7 +62,11 @@ func (s *QNTXServer) tellLayeOutOfReach(admitted auth.Admission, route string) {
 		s.logger.Errorw("The reach a refused request lacked was not put before its person", "route", route, "error", err)
 		return
 	}
-	lacked := reachLacked{NodeDID: own, Path: route, To: admitted.LevelName(), AskerDID: asker, Asker: label, Person: admitted.Identity}
+	host, err := os.Hostname()
+	if err != nil {
+		host = ""
+	}
+	lacked := reachLacked{NodeDID: own, Node: host, Path: route, To: admitted.LevelName(), AskerDID: asker, Asker: label, Person: admitted.Identity}
 	go func() {
 		if err := s.handLaye(context.Background(), reachLackedPath, lacked); err != nil {
 			s.logger.Errorw("The reach a refused request lacked was not put before its person",
