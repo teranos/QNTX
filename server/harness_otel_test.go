@@ -46,7 +46,7 @@ func TestAHarnessTheNodeStartsSendsItsSpansToTheNodesIxOtel(t *testing.T) {
 	}
 }
 
-// doorAdmits gives the Node Agent a door admitting level.
+// 「[Opus 5.5] doorAdmits gives the Node Agent a door admitting level.」
 func doorAdmits(s *QNTXServer, level auth.Level) {
 	door := &agentDoor{url: s.nodeAgent.door}
 	door.grant.store(auth.Grant{DID: s.nodeAgent.did, Level: level})
@@ -58,9 +58,9 @@ func doorAdmits(s *QNTXServer, level auth.Level) {
 	s.doors.mu.Unlock()
 }
 
-// An agent whose door admits no more than its namespace is handed no
-// OpenTelemetry: no WRITE line names Claude Code's spans, so ix/otel would
-// refuse every one.
+// 「[Opus 5.5] An agent whose door admits no more than its namespace is handed no」
+// 「[Opus 5.5] OpenTelemetry: no WRITE line names Claude Code's spans, so ix/otel would」
+// 「[Opus 5.5] refuse every one.」
 func TestAHarnessWhoseSpansWouldBeRefusedIsHandedNone(t *testing.T) {
 	s, ran := runningTheNodeAgent(t, opusLow)
 	s.served = servedForTest(t).served
