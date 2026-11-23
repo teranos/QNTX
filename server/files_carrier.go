@@ -178,10 +178,19 @@ func (c *fileCarrier) done(item toBring) {
 }
 
 // refused leaves a peer alone for longer each time it does not take a file,
-// up to the most, and says for how long. Files for other peers go on.
-func (c *fileCarrier) refused(to string, now time.Time) time.Duration {
+// up to the most, and says for how long. Files for other peers go on, and the
+// file that was not taken goes behind the others waiting, so one that fails
+// again and again does not keep the rest from their peer (CodeRabbit on #1812).
+func (c *fileCarrier) refused(item toBring, now time.Time) time.Duration {
+	to := item.to
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	for i, waiting := range c.waiting {
+		if waiting.asset == item.asset && waiting.to == item.to {
+			c.waiting = append(append(c.waiting[:i:i], c.waiting[i+1:]...), waiting)
+			break
+		}
+	}
 	if c.notBefore == nil {
 		c.notBefore, c.backoff = map[string]time.Time{}, map[string]time.Duration{}
 	}
@@ -227,7 +236,7 @@ func (s *QNTXServer) carrierLoop() {
 			s.logger.Errorw("A file meant for a peer is not brought: it is not here any more", "to", item.to, "asset", item.asset, "file_id", item.fileID, "error", err)
 			c.done(item)
 		default:
-			again := c.refused(item.to, time.Now())
+			again := c.refused(item, time.Now())
 			s.logger.Warnw("A file meant for a peer was not brought; it is kept here and tried again", "to", item.to, "asset", item.asset, "again_in", again.String(), "error", err)
 		}
 		select {
@@ -249,7 +258,9 @@ func (s *QNTXServer) bringOne(item toBring) (gone bool, err error) {
 	}
 	path, found, err := s.storedFile(item.fileID)
 	if err != nil {
-		return true, err
+		// Not found out is not gone: the file waits, and is brought again
+		// after the peer's backoff (CodeRabbit on #1812).
+		return false, err
 	}
 	if !found {
 		return true, errors.Newf("this node keeps no file %s", item.fileID)

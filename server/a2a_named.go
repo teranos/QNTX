@@ -110,7 +110,7 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	if ec.StoredTask == nil && !yield(submitted, nil) {
 		return
 	}
-	// "Agents cant wake Agents willy nilly"
+	// Not handed over now: held until it is due, or a person releases it.
 	// Said by no person, it is collected for the agent (collected.go), and
 	// its Task ends when what was collected is delivered.
 	if !aPersonSpeaks(call.request) {
@@ -122,6 +122,17 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 			return
 		}
 		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateInputRequired, failedWhy(id, ec.ContextID, collectedSays(ta.called, due))), nil)
+		return
+	}
+	// Handed to laye where am.toml names one; else the node keeps it, on the
+	// status row, as it did before laye collected (CodeRabbit on #1822).
+	if fromDID, connector := aConnectorSpeaks(call.request); connector && e.s.layeOrigin() != "" {
+		said, err := e.s.handToLaye(ctx, ta.called, fromDID, e.s.calledBy(fromDID), says, ec.ContextID)
+		if err != nil {
+			yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "it was not collected by laye for "+ta.called+", and was not said: "+err.Error())), nil)
+			return
+		}
+		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateInputRequired, failedWhy(id, ec.ContextID, said)), nil)
 		return
 	}
 	if e.s.news == nil {
