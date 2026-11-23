@@ -117,6 +117,9 @@ type Handler struct {
 	// What laye's etcd says a key is: the person whose passkey said yes to it
 	// (laye_says.go). Nil asks nobody.
 	layeSays LayeSays
+	// outOfReach is told of each request refused for reach, the route and who
+	// was refused, so the reach it lacked waits on a person (out_of_reach.go). Nil tells nobody.
+	outOfReach func(admitted Admission, route string)
 	issued   issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt string
@@ -633,6 +636,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer("/auth/laye/verify", h.handleLayeVerify)
 	// laye has the node mail an invitation laye holds (laye_mail.go).
 	mux.answer(layeInvitedPath, h.handleLayeInvited)
+	// laye has the node write a reach line its person approved on a peer (laye_reach.go).
+	mux.answer(layeReachPath, h.handleLayeReach)
 	// The ceremony: the element asks what can be linked, starts one, and collects
 	// the result. Everything the provider requires happens on this side of the
 	// wire, so no page holds a secret and no page holds logic.
@@ -889,6 +894,9 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, admit
 		measure.String(measure.AttrLevel, admitted.LevelName()),
 		measure.String(measure.AttrRoute, route),
 	)
+	if h.outOfReach != nil {
+		h.outOfReach(admitted, route)
+	}
 	h.refuse(w, r, http.StatusForbidden, "this route is not yours")
 }
 

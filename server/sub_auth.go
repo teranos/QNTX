@@ -352,6 +352,10 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if s.deps.cfg.Laye.DID != "" {
 		authHandler.SetLayeSays(layeSays())
 	}
+	// A request refused for reach puts the reach it lacked before its person at laye.
+	if s.deps.cfg.Laye.Origin != "" {
+		authHandler.SetOutOfReach(s.tellLayeOutOfReach)
+	}
 	// "AND LAYE OWNS IDENTITY": the names agents hold, in the etcd am.toml names.
 	s.names = namesAtLaye(s.deps.cfg.Etcd.Endpoint)
 	// On the primary, its peers.
