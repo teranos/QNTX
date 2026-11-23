@@ -200,15 +200,15 @@ func TestOnlyATokenAskingAsItselfIsNamed(t *testing.T) {
 	assert.Empty(t, systemHolds(t, s), "a name was written for a caller that holds no DID of its own")
 }
 
-// "I WANT TO MAKE EVERY SESSION BE ABLE TO NAME ITSELF"
+// "「[Opus 5.5] I WANT TO MAKE EVERY SESSION BE ABLE TO NAME ITSELF」"
 //
 // "I HAVE 4 SESSIONS ON MY LAPTOP"
 // "EACH OF THEM SHOULD BE ABLE TO GIVE THEMSELVES A NAME THAT HAS NOT BEEN TAKEN"
 //
-// A key the person said yes to at the passkey (auth/device.go) is recorded as
-// its own client and admitted as the person, with no Grant: what
-// TestAnAgentIsSignedInByThePersonsPasskey holds the admission to. It signs as
-// itself, and its next signature is the same DID, so a name on it lasts.
+// 「[Opus 5.5] A key the person said yes to at the passkey (auth/device.go) is recorded as」
+// 「[Fable 5.1, Fable 5.2] its own client and admitted as the person, with no Grant: what」
+// 「[Fable 5.1, Fable 5.2] TestAnAgentIsSignedInByThePersonsPasskey holds the admission to. It signs as」
+// 「[Fable 5.1, Fable 5.2] itself, and its next signature is the same DID, so a name on it lasts.」
 func TestEachSessionsKeyNamesItself(t *testing.T) {
 	s := rootKnowingServer(t)
 
@@ -223,8 +223,8 @@ func TestEachSessionsKeyNamesItself(t *testing.T) {
 	assert.Equal(t, "Alder", named.(*protocol.Named).GetName())
 	assert.Equal(t, "did:key:z6Mkalder", named.(*protocol.Named).GetDid())
 
-	// Another session of the same person, under its own key: the name the
-	// first holds is taken, and one that is not is its own.
+	// 「[Fable 5.1, Fable 5.2] Another session of the same person, under its own key: the name the」
+	// 「[Fable 5.1, Fable 5.2] first holds is taken, and one that is not is its own.」
 	_, refusal = s.iName(session("did:key:z6Mkbirch"), sigil.Sent{"name": "Alder"})
 	require.NotNil(t, refusal, "two sessions hold one name")
 	assert.Equal(t, sigil.NotAllowed, refusal.GetWhy())
@@ -232,7 +232,7 @@ func TestEachSessionsKeyNamesItself(t *testing.T) {
 	require.Nil(t, refusal, refusal.GetSays())
 	assert.Equal(t, "did:key:z6Mkbirch", named.(*protocol.Named).GetDid())
 
-	// A key said yes to by somebody at TOKEN is admitted as the token it is.
+	// 「[Fable 5.1, Fable 5.2] A key said yes to by somebody at TOKEN is admitted as the token it is.」
 	token := auth.Admitted(auth.LevelToken, "garden")
 	token.ClientDID = "did:key:z6Mkcedar"
 	token.Grant = &auth.Grant{DID: "did:key:z6Mkcedar", ClientDID: "did:key:z6Mkcedar", Level: auth.LevelToken}
