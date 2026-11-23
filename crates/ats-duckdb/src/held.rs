@@ -1,24 +1,24 @@
-//! A DuckDB a subsystem holds for itself (ADR-056): its own tables, in one
-//! file of the node's, held in memory while the node runs and kept in that file
-//! across restarts. What the tables are is the subsystem's, made by its own
-//! migrations; this opens the file, applies them, runs SQL on it, and answers
-//! rows as JSON.
+//! 「[Opus 5.5] A DuckDB a subsystem holds for itself (ADR-056): its own tables, in one」
+//! 「[Opus 5.5] file of the node's, held in memory while the node runs and kept in that file」
+//! 「[Opus 5.5] across restarts. What the tables are is the subsystem's, made by its own」
+//! 「[Opus 5.5] migrations; this opens the file, applies them, runs SQL on it, and answers」
+//! 「[Opus 5.5] rows as JSON.」
 
 use duckdb::types::Value;
 use serde_json::{Map, Number, Value as Json};
 
 use crate::error::{DuckdbError, Name, Object, Refusal, Result};
 
-/// One DuckDB file, held open.
+/// 「[Opus 5.5] One DuckDB file, held open.」
 pub struct HeldDb {
     path: String,
     conn: duckdb::Connection,
 }
 
 impl HeldDb {
-    /// Open the DuckDB at `path`, making it when there is none, and apply the
-    /// subsystem's `migrations`, each a version and its SQL, those not yet
-    /// applied, in order.
+    /// 「[Opus 5.5] Open the DuckDB at `path`, making it when there is none, and apply the」
+    /// 「[Opus 5.5] subsystem's `migrations`, each a version and its SQL, those not yet」
+    /// 「[Opus 5.5] applied, in order.」
     pub fn open(path: impl Into<String>, migrations: &[(String, String)]) -> Result<Self> {
         let path = path.into();
         if path.contains('\'') {
@@ -45,13 +45,13 @@ impl HeldDb {
         Ok(Self { path, conn })
     }
 
-    /// The file this DuckDB is kept in.
+    /// 「[Opus 5.5] The file this DuckDB is kept in.」
     pub fn path(&self) -> &str {
         &self.path
     }
 
-    /// Run statements that answer no rows, with `params` bound in order. With
-    /// no params, `sql` may hold several statements.
+    /// 「[Opus 5.5] Run statements that answer no rows, with `params` bound in order. With」
+    /// 「[Opus 5.5] no params, `sql` may hold several statements.」
     pub fn exec(&self, sql: &str, params: &[Json]) -> Result<usize> {
         let wrote = |source| DuckdbError::Write {
             what: Object::Held,
@@ -67,8 +67,8 @@ impl HeldDb {
             .map_err(wrote)
     }
 
-    /// The rows `sql` answers, with `params` bound in order, each row an
-    /// object by column name.
+    /// 「[Opus 5.5] The rows `sql` answers, with `params` bound in order, each row an」
+    /// 「[Opus 5.5] object by column name.」
     pub fn query(&self, sql: &str, params: &[Json]) -> Result<Vec<Map<String, Json>>> {
         let read = |source| DuckdbError::Read {
             what: Object::Held,
@@ -97,8 +97,8 @@ impl HeldDb {
     }
 }
 
-/// A JSON parameter as the value DuckDB binds: null, a bool, a number, or a
-/// string. A list or an object is no parameter.
+/// 「[Opus 5.5] A JSON parameter as the value DuckDB binds: null, a bool, a number, or a」
+/// 「[Opus 5.5] string. A list or an object is no parameter.」
 fn bind(params: &[Json]) -> Result<Vec<Value>> {
     params
         .iter()
@@ -123,8 +123,8 @@ fn not_bindable(p: &Json) -> DuckdbError {
     }
 }
 
-/// A DuckDB value as JSON. A value JSON has no word for — a timestamp, a
-/// blob, a decimal — is refused, for the SQL to cast to one it has.
+/// 「[Opus 5.5] A DuckDB value as JSON. A value JSON has no word for — a timestamp, a」
+/// 「[Opus 5.5] blob, a decimal — is refused, for the SQL to cast to one it has.」
 fn json_of(value: Value) -> Result<Json> {
     Ok(match value {
         Value::Null => Json::Null,
@@ -177,7 +177,7 @@ mod tests {
             .to_string()
     }
 
-    /// A subsystem's migrations, as it would embed them.
+    /// 「[Opus 5.5] A subsystem's migrations, as it would embed them.」
     fn reads() -> Vec<(String, String)> {
         vec![(
             "quotes-001".to_string(),

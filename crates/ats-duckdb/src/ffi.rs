@@ -2346,12 +2346,12 @@ pub extern "C" fn duckdb_identity_save(
 }
 
 // ============================================================================
-// A DuckDB a subsystem holds for itself (crate::held)
+// 「[Opus 5.5] A DuckDB a subsystem holds for itself (crate::held)」
 // ============================================================================
 
 use crate::held::HeldDb;
 
-/// The rows a held DuckDB answered: a JSON array of objects by column name.
+/// 「[Opus 5.5] The rows a held DuckDB answered: a JSON array of objects by column name.」
 #[repr(C)]
 pub struct HeldResultC {
     pub success: bool,
@@ -2370,7 +2370,7 @@ impl FfiResult for HeldResultC {
     }
 }
 
-/// One migration as Go hands it: its version and its SQL.
+/// 「[Opus 5.5] One migration as Go hands it: its version and its SQL.」
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct HeldMigration {
@@ -2378,8 +2378,8 @@ struct HeldMigration {
     sql: String,
 }
 
-/// Open the DuckDB at `path` and apply `migrations_json`, a JSON array of
-/// `{"version","sql"}`. NULL on failure, the reason in `error_out`.
+/// 「[Opus 5.5] Open the DuckDB at `path` and apply `migrations_json`, a JSON array of」
+/// 「[Opus 5.5] `{"version","sql"}`. NULL on failure, the reason in `error_out`.」
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn duckdb_held_new(
@@ -2426,7 +2426,7 @@ pub extern "C" fn duckdb_held_free(held: *mut HeldDb) {
     )
 }
 
-/// The SQL and its parameters, read off the C strings.
+/// 「[Opus 5.5] The SQL and its parameters, read off the C strings.」
 unsafe fn held_statement(
     call: &'static str,
     sql: *const c_char,
@@ -2440,9 +2440,9 @@ unsafe fn held_statement(
     Ok((sql.to_string(), params))
 }
 
-/// Run SQL that answers no rows. `params_json` is a JSON array bound in
-/// order; with none, the SQL may hold several statements. The count is the
-/// rows it changed.
+/// 「[Opus 5.5] Run SQL that answers no rows. `params_json` is a JSON array bound in」
+/// 「[Opus 5.5] order; with none, the SQL may hold several statements. The count is the」
+/// 「[Opus 5.5] rows it changed.」
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn duckdb_held_exec(
@@ -2466,8 +2466,8 @@ pub extern "C" fn duckdb_held_exec(
     })
 }
 
-/// The rows SQL answers, as a JSON array of objects in `rows_json`. Free with
-/// `duckdb_held_result_free`.
+/// 「[Opus 5.5] The rows SQL answers, as a JSON array of objects in `rows_json`. Free with」
+/// 「[Opus 5.5] `duckdb_held_result_free`.」
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn duckdb_held_query(

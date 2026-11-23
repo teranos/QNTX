@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// A subsystem's DuckDB is kept beside the node's database, and its name is one
-// segment of the path.
+// 「[Opus 5.5] A subsystem's DuckDB is kept beside the node's database, and its name is one」
+// 「[Opus 5.5] segment of the path.」
 func TestASubsystemsDuckDBIsKeptBesideTheNodesDatabase(t *testing.T) {
 	got, err := heldPath("/var/lib/qntx/qntx.db", "quotes")
 	if err != nil {
