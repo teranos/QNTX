@@ -46,6 +46,10 @@ type EtcdConfig struct {
 // the provider that reads its pictures at night, e.g. "gaze"; empty reads none.
 type FilesConfig struct {
 	ReadWith string `mapstructure:"read_with"`
+	// "to me it feels like k should own my Media Assets"
+	// LetGoOnceBrought removes this node's copy of a file once the peer it was
+	// meant for holds the same bytes. Off: every copy stays.
+	LetGoOnceBrought bool `mapstructure:"let_go_once_brought"`
 }
 
 // AgentConfig is the agents this node runs (ADR-048).

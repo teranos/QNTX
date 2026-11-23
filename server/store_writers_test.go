@@ -79,6 +79,11 @@ var storeWriters = map[string]string{
 		"the asset, read in the words of that provider and its model, by this node. " +
 		"Written by the nightly reading on a Pulse schedule and reached by no route",
 
+	// 「[Opus 5.5] A copy this node let go of, because the peer holds the same bytes.」
+	"attestLetGo": "that this node removed its own copy of a file the peer holds, what the node knows of itself: " +
+		"the asset, let go of towards the peer by the name the primary calls it, by this node. " +
+		"Written by the node's own carrier when files.let_go_once_brought is set, and reached by no route",
+
 	"keepNameLine": "the name an agent gave itself (i name), in system through WriteWhatTheNodeKnowsOfItself: " +
 		"a name is one agent's on the whole node, and an agent acting in one namespace does not see system. " +
 		"Reached from i name, which the reach table gives to ROOT, SUPER and TOKEN, after itsOwnDID says the " +

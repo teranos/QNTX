@@ -24,6 +24,8 @@ type heldPicture struct {
 	Size     int64            `json:"size"`
 	HeldAt   time.Time        `json:"held_at"`
 	Readings []pictureReading `json:"readings"`
+	// LookedAtSince is when the reader began looking at it, while it looks.
+	LookedAtSince *time.Time `json:"looked_at_since,omitempty"`
 }
 
 // pictureReading is what one reader said of a picture.
@@ -31,6 +33,9 @@ type pictureReading struct {
 	By     string    `json:"by"` // provider/model, e.g. gaze/Qwen2.5 VL 3B Instruct
 	Said   string    `json:"said"`
 	ReadAt time.Time `json:"read_at"`
+	// LookedFor is how long the reader looked, in seconds; 0 for a reading
+	// written before it was kept.
+	LookedFor float64 `json:"looked_for_seconds,omitempty"`
 }
 
 // filesHeldMost is the most pictures one answer lists.
@@ -49,6 +54,36 @@ func (s *QNTXServer) handleFilesHeld(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, s.logger, http.StatusOK, pictures)
+}
+
+// fileIDOf is where this node keeps the asset named, read off its held lines:
+// the first time it was held whose file is still here.
+func (s *QNTXServer) fileIDOf(asset string) (string, bool, error) {
+	if s.nodeDID == nil || s.nodeDID.DID == "" {
+		return "", false, nil
+	}
+	store := s.held.ReadTheNodesOwnRecords()
+	if store == nil {
+		return "", false, nil
+	}
+	lines, err := store.GetAttestations(ats.AttestationFilter{
+		Subjects: []string{asset}, Predicates: []string{assetHeld}, Contexts: []string{s.nodeDID.DID},
+		TimeStart: types.Unbounded(), TimeEnd: types.Unbounded(), Limit: ats.EveryRow,
+	})
+	if err != nil {
+		return "", false, err
+	}
+	sort.SliceStable(lines, func(i, j int) bool { return lines[i].Timestamp.Before(lines[j].Timestamp) })
+	for _, line := range lines {
+		fileID, _ := line.Attributes["file_id"].(string)
+		if fileID == "" {
+			continue
+		}
+		if _, here, err := s.storedFile(fileID); err == nil && here {
+			return fileID, true, nil
+		}
+	}
+	return "", false, nil
 }
 
 // picturesHeld is up to most of what this node holds, newest first by when it
@@ -80,7 +115,8 @@ func (s *QNTXServer) picturesHeld(most int) ([]heldPicture, error) {
 			continue
 		}
 		said, _ := line.Attributes["said"].(string)
-		readOf[line.Subjects[0]] = append(readOf[line.Subjects[0]], pictureReading{By: line.Contexts[0], Said: said, ReadAt: line.Timestamp})
+		lookedFor, _ := line.Attributes["looked_for_seconds"].(float64)
+		readOf[line.Subjects[0]] = append(readOf[line.Subjects[0]], pictureReading{By: line.Contexts[0], Said: said, ReadAt: line.Timestamp, LookedFor: lookedFor})
 	}
 	first := map[string]heldPicture{}
 	for _, line := range held {
@@ -105,6 +141,9 @@ func (s *QNTXServer) picturesHeld(most int) ([]heldPicture, error) {
 		}
 		if picture.Readings == nil {
 			picture.Readings = []pictureReading{}
+		}
+		if looked, since, now := s.looking.now(); now && looked == asset {
+			picture.LookedAtSince = &since
 		}
 		first[asset] = picture
 	}

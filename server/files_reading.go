@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -28,19 +29,23 @@ import (
 // "newest first because,"
 // "there's going to be more than 20, think more like 10K+ eventually"
 //
-// 「[Opus 5.5] Once a night the node reads the newest pictures it holds that have no reading」
-// 「[Opus 5.5] yet, with the provider files.read_with names, one at a time, and keeps each」
-// 「[Opus 5.5] reading as a line on its picture. A picture whose reading failed has none, so」
-// 「[Opus 5.5] the next night tries it again. A node that names no provider reads nothing.」
+// "and the 02:00 run idea can be removed if gaze is load based"
+//
+// 「[Opus 5.5] gaze yields: it runs at the lowest priority there is, and the node takes it out of」
+// 「[Opus 5.5] the way while memory is short (plugin_yield.go). So the node reads whenever a」
+// 「[Opus 5.5] picture waits: every readEvery, the newest it holds that have no reading yet, with」
+// 「[Opus 5.5] the provider files.read_with names, one at a time, and keeps each reading as a line」
+// 「[Opus 5.5] on its picture. A picture whose reading failed has none, so the next round tries it」
+// 「[Opus 5.5] again. A node that names no provider reads nothing.」
 
 const (
 	readingHandlerName = "files.read"
 	// assetRead is the line that holds what was read in a picture.
 	assetRead = "read"
-	// readPerNight is how many pictures are read in one night.
-	readPerNight = 20
-	// readAtHour is the hour of the night, in the node's own time, the reading starts.
-	readAtHour = 2
+	// readEvery is how often the node looks for pictures to read.
+	readEvery = 5 * time.Minute
+	// readPerRound is the most pictures read in one round; the rest wait for the next.
+	readPerRound = 20
 	// readPause is the pause between one picture and the next.
 	readPause = 5 * time.Second
 	// readingAsks is what the reader is asked of each picture.
@@ -63,7 +68,7 @@ type readingHandler struct{ server *QNTXServer }
 func (h *readingHandler) Name() string { return readingHandlerName }
 
 func (h *readingHandler) Execute(ctx context.Context, _ *async.Job) error {
-	return h.server.readTonight(ctx)
+	return h.server.readWaiting(ctx)
 }
 
 // toRead is one picture this node holds that has no reading yet.
@@ -71,12 +76,43 @@ type toRead struct {
 	asset  string
 	fileID string
 	heldAt time.Time
+	// lookedFrom is when the reader began looking at it.
+	lookedFrom time.Time
 }
 
-// readTonight reads up to readPerNight of the newest pictures without a
+// "the image needs to stay on screen for the duration that gaze is looking and then fade back"
+//
+// lookingAt is the picture the reader is looking at now, and since when: what
+// GET /api/files/ says of it, so it can be shown for as long as it is looked at.
+type lookingAt struct {
+	mu    sync.Mutex
+	asset string
+	since time.Time
+}
+
+func (l *lookingAt) begin(asset string, at time.Time) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.asset, l.since = asset, at
+}
+
+func (l *lookingAt) end() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.asset, l.since = "", time.Time{}
+}
+
+// now is the asset looked at and since when, or false.
+func (l *lookingAt) now() (string, time.Time, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.asset, l.since, l.asset != ""
+}
+
+// readWaiting reads up to readPerRound of the newest pictures without a
 // reading, one at a time. One that is not read is logged and left for the
-// next night; the rest are still read.
-func (s *QNTXServer) readTonight(ctx context.Context) error {
+// next round; the rest are still read.
+func (s *QNTXServer) readWaiting(ctx context.Context) error {
 	with := s.deps.cfg.Files.ReadWith
 	if with == "" {
 		return nil
@@ -84,13 +120,13 @@ func (s *QNTXServer) readTonight(ctx context.Context) error {
 	if _, err := exec.LookPath(readingMaker); err != nil {
 		return errors.Wrapf(err, "this node reads with %s and has no %s to make what it reads", with, readingMaker)
 	}
-	tonight, err := s.stillToRead(readPerNight)
-	if err != nil {
+	waiting, err := s.stillToRead(readPerRound)
+	if err != nil || len(waiting) == 0 {
 		return err
 	}
-	s.logger.Infow("Reading the pictures this node holds", "with", with, "tonight", len(tonight))
+	s.logger.Infow("Reading the pictures this node holds", "with", with, "waiting", len(waiting))
 	read := 0
-	for i, picture := range tonight {
+	for i, picture := range waiting {
 		if i > 0 {
 			select {
 			case <-ctx.Done():
@@ -99,12 +135,12 @@ func (s *QNTXServer) readTonight(ctx context.Context) error {
 			}
 		}
 		if err := s.readOne(ctx, with, picture); err != nil {
-			s.logger.Warnw("A picture was not read; it is read another night", "asset", picture.asset, "file_id", picture.fileID, "with", with, "error", err)
+			s.logger.Warnw("A picture was not read; the next round reads it", "asset", picture.asset, "file_id", picture.fileID, "with", with, "error", err)
 			continue
 		}
 		read++
 	}
-	s.logger.Infow("Read the pictures of tonight", "with", with, "read", read, "of", len(tonight))
+	s.logger.Infow("Read the pictures that waited", "with", with, "read", read, "of", len(waiting))
 	return nil
 }
 
@@ -125,6 +161,9 @@ func (s *QNTXServer) readOne(ctx context.Context, with string, picture toRead) e
 	if err != nil {
 		return errors.Wrapf(err, "no JPEG to read was made of %s", picture.asset)
 	}
+	picture.lookedFrom = time.Now()
+	s.looking.begin(picture.asset, picture.lookedFrom)
+	defer s.looking.end()
 	ask := provider.ChatRequest{UserPrompt: readingAsks, Attachments: []provider.ContentPart{{
 		Type:     "image_url",
 		ImageURL: &provider.ContentPartImage{URL: "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(small)},
@@ -155,16 +194,22 @@ func (s *QNTXServer) attestRead(picture toRead, with, model, said string) error 
 		return errors.Wrapf(err, "failed to name the %s line of %s", assetRead, picture.asset)
 	}
 	at := time.Now()
+	attributes := map[string]any{
+		"file_id": picture.fileID,
+		"asked":   readingAsks,
+		"read_as": fmt.Sprintf("jpeg, %d pixels on the long side", readSize),
+		"said":    said,
+		"read_at": at.UTC().Format(time.RFC3339),
+	}
+	// How long the reader looked at it, from the moment it was handed the picture.
+	if !picture.lookedFrom.IsZero() {
+		attributes["looked_from"] = picture.lookedFrom.UTC().Format(time.RFC3339Nano)
+		attributes["looked_for_seconds"] = at.Sub(picture.lookedFrom).Seconds()
+	}
 	if err := store.CreateAttestation(&types.As{
 		ID: id, Subjects: []string{picture.asset}, Predicates: []string{assetRead}, Contexts: []string{reader},
 		Actors: []string{s.nodeDID.DID}, Timestamp: at, CreatedAt: at, Source: pluginSource,
-		Attributes: map[string]any{
-			"file_id": picture.fileID,
-			"asked":   readingAsks,
-			"read_as": fmt.Sprintf("jpeg, %d pixels on the long side", readSize),
-			"said":    said,
-			"read_at": at.UTC().Format(time.RFC3339),
-		},
+		Attributes: attributes,
 	}); err != nil {
 		return errors.Wrapf(err, "the %s line of %s was not written", assetRead, picture.asset)
 	}
@@ -251,19 +296,33 @@ func smallForReading(ctx context.Context, path string) ([]byte, error) {
 	return small, nil
 }
 
-// nextNight is the next readAtHour after now, in now's own time.
-func nextNight(now time.Time) time.Time {
-	at := time.Date(now.Year(), now.Month(), now.Day(), readAtHour, 0, 0, 0, now.Location())
-	if !at.After(now) {
-		at = at.AddDate(0, 0, 1)
+// readingSchedule is what the reading's schedule needs, of the jobs there are:
+// a job to make, or the id of the active one to move to readEvery, or neither.
+// A node that read once a night has its job moved, not a second one made.
+func readingSchedule(existing []*schedule.Job, now time.Time) (make *schedule.Job, move string) {
+	for _, j := range existing {
+		if j.HandlerName != readingHandlerName || j.State != schedule.StateActive {
+			continue
+		}
+		if time.Duration(j.IntervalSeconds)*time.Second == readEvery {
+			return nil, ""
+		}
+		return nil, j.Id
 	}
-	return at
+	return &schedule.Job{
+		MadeBy:          string(async.MadeByNoCaller),
+		Id:              fmt.Sprintf("SPJ_read_%d", now.Unix()),
+		HandlerName:     readingHandlerName,
+		IntervalSeconds: int32(readEvery.Seconds()),
+		State:           schedule.StateActive,
+		// The ticker compares next_run_at as text in local time.
+		NextRunAt: now.Add(time.Minute).Format(time.RFC3339),
+	}, ""
 }
 
-// setupNightlyReading registers the reading and keeps its schedule: once a
-// day, starting at the next readAtHour. A node that names no provider in
-// files.read_with has its schedule paused.
-func (s *QNTXServer) setupNightlyReading(cfg *appcfg.Config) {
+// setupReading registers the reading and keeps its schedule: every readEvery.
+// A node that names no provider in files.read_with has its schedule paused.
+func (s *QNTXServer) setupReading(cfg *appcfg.Config) {
 	if s.held == nil {
 		return
 	}
@@ -275,27 +334,28 @@ func (s *QNTXServer) setupNightlyReading(cfg *appcfg.Config) {
 	}
 	existing, err := schedStore.ListAllScheduledJobs()
 	if err != nil {
-		s.logger.Errorw("The nightly reading is not scheduled: the schedules could not be listed", "error", err)
+		s.logger.Errorw("The reading is not scheduled: the schedules could not be listed", "error", err)
 		return
-	}
-	for _, j := range existing {
-		if j.HandlerName == readingHandlerName && j.State == schedule.StateActive {
-			return
-		}
 	}
 	now := time.Now()
-	job := &schedule.Job{
-		MadeBy:          string(async.MadeByNoCaller),
-		Id:              fmt.Sprintf("SPJ_read_%d", now.Unix()),
-		HandlerName:     readingHandlerName,
-		IntervalSeconds: int32((24 * time.Hour).Seconds()),
-		State:           schedule.StateActive,
-		// The ticker compares next_run_at as text in local time.
-		NextRunAt: nextNight(now).Format(time.RFC3339),
-	}
-	if err := schedStore.CreateJob(job); err != nil {
-		s.logger.Errorw("The nightly reading is not scheduled", "error", err)
+	job, move := readingSchedule(existing, now)
+	if move != "" {
+		if err := schedStore.UpdateJobInterval(move, int(readEvery.Seconds())); err != nil {
+			s.logger.Errorw("The reading still runs once a night: its interval was not changed", "job_id", move, "error", err)
+			return
+		}
+		if err := schedStore.UpdateJobNextRun(move, now.Add(time.Minute)); err != nil {
+			s.logger.Errorw("The reading's next run was not brought forward", "job_id", move, "error", err)
+		}
+		s.logger.Infow("The reading runs every few minutes, not once a night", "job_id", move, "every", readEvery)
 		return
 	}
-	s.logger.Infow("Scheduled the nightly reading", "job_id", job.Id, "with", cfg.Files.ReadWith, "first", job.NextRunAt)
+	if job == nil {
+		return
+	}
+	if err := schedStore.CreateJob(job); err != nil {
+		s.logger.Errorw("The reading is not scheduled", "error", err)
+		return
+	}
+	s.logger.Infow("Scheduled the reading", "job_id", job.Id, "with", cfg.Files.ReadWith, "every", readEvery)
 }
