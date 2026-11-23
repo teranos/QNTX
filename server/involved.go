@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
@@ -197,7 +196,7 @@ func (s *QNTXServer) pullIsOver(subject, title, link, closedAt string, merged bo
 			s.logger.Infow("A session that was involved in a pull request holds no name now: it is told nothing of it", "pull", subject, "agent", did)
 			continue
 		}
-		if _, err := s.collect(to, collectedSaid{From: "GitHub", Says: subject + " " + became + ": " + title + "\n" + link, At: time.Now(), Quiet: true}); err != nil {
+		if err := s.collectGitHubs(to, subject+" "+became+": "+title+"\n"+link); err != nil {
 			failed = append(failed, err.Error())
 			continue
 		}
