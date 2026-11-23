@@ -214,8 +214,8 @@ func TestSetupPluginSchedules_MultipleSchedules(t *testing.T) {
 	assert.Equal(t, schedule.StatePaused, job2.State)
 }
 
-// A plugin switched off has its schedules paused, and switched on again they
-// run: what was paused by declaration stays paused.
+// 「[Sonnet 5.5, Fable 5.2] A plugin switched off has its schedules paused, and switched on again they」
+// 「[Sonnet 5.5, Fable 5.2] run: what was paused by declaration stays paused.」
 func TestPluginSchedulesFollowThePlugin(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zaptest.NewLogger(t).Sugar()
@@ -237,7 +237,7 @@ func TestPluginSchedulesFollowThePlugin(t *testing.T) {
 		return got
 	}
 
-	// Metadata that is no JSON object keeps no plugin running.
+	// 「[Sonnet 5.5, Fable 5.2] Metadata that is no JSON object keeps no plugin running.」
 	for id, metadata := range map[string]string{"AS-null": "null", "AS-text": "polls the pond"} {
 		_, err := db.Exec(`UPDATE scheduled_pulse_jobs SET metadata = ? WHERE handler_name = 'duif/poll'`, metadata)
 		require.NoError(t, err, id)
@@ -252,7 +252,7 @@ func TestPluginSchedulesFollowThePlugin(t *testing.T) {
 		"other/poll": schedule.StateActive,
 	}, states())
 
-	// Back: the one the switch-off took out runs; the one declared paused does not.
+	// 「[Sonnet 5.5, Fable 5.2] Back: the one the switch-off took out runs; the one declared paused does not.」
 	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
 	assert.Equal(t, map[string]string{
 		"duif/poll":  schedule.StateActive,
@@ -260,7 +260,7 @@ func TestPluginSchedulesFollowThePlugin(t *testing.T) {
 		"other/poll": schedule.StateActive,
 	}, states())
 
-	// Paused by hand while the plugin is off, it is paused when the plugin is back.
+	// 「[Sonnet 5.5, Fable 5.2] Paused by hand while the plugin is off, it is paused when the plugin is back.」
 	require.NoError(t, PausePluginSchedules(db, "duif", logger))
 	jobs, err := schedule.NewStore(db).ListAllScheduledJobs()
 	require.NoError(t, err)
@@ -273,7 +273,7 @@ func TestPluginSchedulesFollowThePlugin(t *testing.T) {
 	assert.Equal(t, schedule.StatePaused, states()["duif/poll"], "enabling the plugin woke what a person paused")
 }
 
-// A plugin taken off the node has no schedules left, and is added again with none.
+// 「[Sonnet 5.5, Fable 5.2] A plugin taken off the node has no schedules left, and is added again with none.」
 func TestDeletePluginSchedules(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zaptest.NewLogger(t).Sugar()
@@ -281,8 +281,8 @@ func TestDeletePluginSchedules(t *testing.T) {
 	require.NoError(t, SetupPluginSchedules(db, "duif", declared, logger))
 	require.NoError(t, SetupPluginSchedules(db, "other", declared, logger))
 
-	// A schedule another caller made, whose metadata names duif and whose
-	// handler is not duif's: not duif's to pause or delete, whatever it says.
+	// 「[Sonnet 5.5, Fable 5.2] A schedule another caller made, whose metadata names duif and whose」
+	// 「[Sonnet 5.5, Fable 5.2] handler is not duif's: not duif's to pause or delete, whatever it says.」
 	require.NoError(t, schedule.NewStore(db).CreateJob(&schedule.Job{
 		MadeBy: string(async.MadeByNoCaller), Id: "AS-someone-elses", HandlerName: "report", IntervalSeconds: 60,
 		NextRunAt: time.Now().Format(time.RFC3339), State: schedule.StateActive, Metadata: `{"plugin":"duif"}`,
