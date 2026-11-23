@@ -12,42 +12,42 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// "I WANT TO SEE IN OBSIDIAN"
-// "THE LIVE STATE OF AGENT MEMORY"
-// "AND MY EDIT IN OBSIDIAN"
-// "NEEDS TO GO TO QNTX"
-// "AND THEN QNTX WRITES IT INTO THE CORRECT MEMORY STORE SPECIFIC PER HARNESS"
-// "AND IF A NEW MEMORY GETS WRITTEN"
-// "IT GOES TO QNTX"
-// "AND IT GOES TO OBSIDIAN"
+// "「[Opus 5.5] I WANT TO SEE IN OBSIDIAN」"
+// "「[Opus 5.5] THE LIVE STATE OF AGENT MEMORY」"
+// "「[Opus 5.5] AND MY EDIT IN OBSIDIAN」"
+// "「[Opus 5.5] NEEDS TO GO TO QNTX」"
+// "「[Opus 5.5] AND THEN QNTX WRITES IT INTO THE CORRECT MEMORY STORE SPECIFIC PER HARNESS」"
+// "「[Opus 5.5] AND IF A NEW MEMORY GETS WRITTEN」"
+// "「[Opus 5.5] IT GOES TO QNTX」"
+// "「[Opus 5.5] AND IT GOES TO OBSIDIAN」"
 //
-// A harness keeps its agent's memory where that harness keeps it. The node
-// holds each memory as it last stood on both sides, and keeps the two in step
-// with what it holds: the store of the harness, and the store's folder in the
-// vault. What changed in the vault since the node last held it goes to the
-// harness; what changed in the harness goes to the vault. Changed on both, the
-// vault's stands: it is where the person writes.
+// 「[Opus 5.5] A harness keeps its agent's memory where that harness keeps it. The node」
+// 「[Opus 5.5] holds each memory as it last stood on both sides, and keeps the two in step」
+// 「[Opus 5.5] with what it holds: the store of the harness, and the store's folder in the」
+// 「[Opus 5.5] vault. What changed in the vault since the node last held it goes to the」
+// 「[Opus 5.5] harness; what changed in the harness goes to the vault. Changed on both, the」
+// 「[Opus 5.5] vault's stands: it is where the person writes.」
 
-// memoryInStep is how often the node brings the two sides in step.
+// 「[Opus 5.5] memoryInStep is how often the node brings the two sides in step.」
 var memoryInStep = 5 * time.Second
 
-// heldMemoryDir is where the node holds an agent's memories as they last stood
-// on both sides, under the agent's home, by the harness store they are of.
+// 「[Opus 5.5] heldMemoryDir is where the node holds an agent's memories as they last stood」
+// 「[Opus 5.5] on both sides, under the agent's home, by the harness store they are of.」
 const heldMemoryDir = "memory-held"
 
-// harnessStore is one store a harness keeps for an agent: where it is on the
-// box, and the Memory Store it is in the vault.
+// 「[Opus 5.5] harnessStore is one store a harness keeps for an agent: where it is on the」
+// 「[Opus 5.5] box, and the Memory Store it is in the vault.」
 type harnessStore struct {
-	// dir is the harness's own folder of memories.
+	// 「[Opus 5.5] dir is the harness's own folder of memories.」
 	dir string
-	// held is where the node holds them as they last stood on both sides.
+	// 「[Opus 5.5] held is where the node holds them as they last stood on both sides.」
 	held string
-	// store is the Memory Store's name, its folder under where memory is kept.
+	// 「[Opus 5.5] store is the Memory Store's name, its folder under where memory is kept.」
 	store string
 }
 
-// claudeProjectOf is how Claude Code names the project a directory is: every
-// character that is no letter or digit, a dash.
+// 「[Opus 5.5] claudeProjectOf is how Claude Code names the project a directory is: every」
+// 「[Opus 5.5] character that is no letter or digit, a dash.」
 func claudeProjectOf(dir string) string {
 	named := []byte(dir)
 	for i, c := range named {
@@ -58,10 +58,10 @@ func claudeProjectOf(dir string) string {
 	return string(named)
 }
 
-// claudeStoresOf is every store Claude Code keeps for the agent in home, which
-// the node calls called: one per project it has worked in. The store of its
-// work directory is the agent's own, by its name; another is named with the
-// project it is of.
+// 「[Opus 5.5] claudeStoresOf is every store Claude Code keeps for the agent in home, which」
+// 「[Opus 5.5] the node calls called: one per project it has worked in. The store of its」
+// 「[Opus 5.5] work directory is the agent's own, by its name; another is named with the」
+// 「[Opus 5.5] project it is of.」
 func claudeStoresOf(home, called string) ([]harnessStore, error) {
 	projects := filepath.Join(home, "claude", "projects")
 	entries, err := os.ReadDir(projects)
@@ -93,8 +93,8 @@ func claudeStoresOf(home, called string) ([]harnessStore, error) {
 	return stores, nil
 }
 
-// notesIn is every note directly in dir, by its file name, with what it says.
-// A folder that is not there holds none.
+// 「[Opus 5.5] notesIn is every note directly in dir, by its file name, with what it says.」
+// 「[Opus 5.5] A folder that is not there holds none.」
 func notesIn(dir string) (map[string][]byte, error) {
 	notes := map[string][]byte{}
 	entries, err := os.ReadDir(dir)
@@ -118,7 +118,7 @@ func notesIn(dir string) (map[string][]byte, error) {
 	return notes, nil
 }
 
-// putNote makes the note in dir say said, or removes it when said is nil.
+// 「[Opus 5.5] putNote makes the note in dir say said, or removes it when said is nil.」
 func putNote(dir, note string, said []byte) error {
 	at := filepath.Join(dir, note)
 	if said == nil {
@@ -133,8 +133,8 @@ func putNote(dir, note string, said []byte) error {
 	return errors.Wrapf(os.WriteFile(at, said, 0o644), "the memory %s was not written in %s", note, dir)
 }
 
-// inStep brings one store's two sides in step with what the node holds, and
-// answers how many memories went to the harness and how many to the vault.
+// 「[Opus 5.5] inStep brings one store's two sides in step with what the node holds, and」
+// 「[Opus 5.5] answers how many memories went to the harness and how many to the vault.」
 func (h harnessStore) inStep(vault string) (toHarness, toVault int, err error) {
 	inHarness, err := notesIn(h.dir)
 	if err != nil {
@@ -148,9 +148,9 @@ func (h harnessStore) inStep(vault string) (toHarness, toVault int, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	// A vault folder that is gone while the node holds memories of it is the
-	// vault's copy not being there, not the person forgetting everything: the
-	// folder is written again from what the node holds.
+	// 「[Opus 5.5] A vault folder that is gone while the node holds memories of it is the」
+	// 「[Opus 5.5] vault's copy not being there, not the person forgetting everything: the」
+	// 「[Opus 5.5] folder is written again from what the node holds.」
 	if _, statErr := os.Stat(vault); errors.Is(statErr, fs.ErrNotExist) && len(held) > 0 {
 		inVault = held
 		for note, said := range held {
@@ -171,7 +171,7 @@ func (h harnessStore) inStep(vault string) (toHarness, toVault int, err error) {
 	for _, note := range names {
 		harness, vaulted, was := inHarness[note], inVault[note], held[note]
 		switch {
-		// The vault's changed since the node held it: where the person writes.
+		// 「[Opus 5.5] The vault's changed since the node held it: where the person writes.」
 		case !bytes.Equal(vaulted, was) || (vaulted == nil) != (was == nil):
 			if err := putNote(h.dir, note, vaulted); err != nil {
 				return toHarness, toVault, err
@@ -182,7 +182,7 @@ func (h harnessStore) inStep(vault string) (toHarness, toVault int, err error) {
 			if !bytes.Equal(harness, vaulted) || (harness == nil) != (vaulted == nil) {
 				toHarness++
 			}
-		// The harness's changed: what the agent wrote, or let go of.
+		// 「[Opus 5.5] The harness's changed: what the agent wrote, or let go of.」
 		case !bytes.Equal(harness, was) || (harness == nil) != (was == nil):
 			if err := putNote(vault, note, harness); err != nil {
 				return toHarness, toVault, err
@@ -196,11 +196,11 @@ func (h harnessStore) inStep(vault string) (toHarness, toVault int, err error) {
 	return toHarness, toVault, nil
 }
 
-// calledInMemory is the name of the Memory Store of the agent in home: the
-// name the Node Agent holds, or what the node calls an agent that holds none.
+// 「[Opus 5.5] calledInMemory is the name of the Memory Store of the agent in home: the」
+// 「[Opus 5.5] name the Node Agent holds, or what the node calls an agent that holds none.」
 func (s *QNTXServer) calledInMemory(home string) string {
 	if s.nodeAgent == nil || home != s.nodeAgent.home {
-		// A namespace's agent is kept by its namespace and its model.
+		// 「[Opus 5.5] A namespace's agent is kept by its namespace and its model.」
 		return filepath.Base(filepath.Dir(home)) + " " + filepath.Base(home)
 	}
 	if names, err := s.agentNames(); err == nil {
@@ -211,15 +211,15 @@ func (s *QNTXServer) calledInMemory(home string) string {
 	return "Node Agent"
 }
 
-// memoriesInStep brings every store of every agent the node runs in step with
-// its folder in the vault, once. A node whose vault backs no memory, or whose
-// vault's copy is not on the box, keeps nothing in step, and says why.
+// 「[Opus 5.5] memoriesInStep brings every store of every agent the node runs in step with」
+// 「[Opus 5.5] its folder in the vault, once. A node whose vault backs no memory, or whose」
+// 「[Opus 5.5] vault's copy is not on the box, keeps nothing in step, and says why.」
 func (s *QNTXServer) memoriesInStep() error {
 	vault, kept, refused := s.memoryKept()
 	if refused != nil {
 		return nil
 	}
-	// The vault's copy not being there is no vault with every memory deleted.
+	// 「[Opus 5.5] The vault's copy not being there is no vault with every memory deleted.」
 	if info, err := os.Stat(vault.Path); err != nil || !info.IsDir() {
 		return errors.Newf("memory is kept in the vault %s, whose copy is not a folder on the box at %s: nothing is brought in step", vault.Name, vault.Path)
 	}
@@ -247,8 +247,8 @@ func (s *QNTXServer) memoriesInStep() error {
 	return nil
 }
 
-// keepMemoriesInStep brings them in step until the node stops. What failed is
-// said once for as long as it keeps failing the same way.
+// 「[Opus 5.5] keepMemoriesInStep brings them in step until the node stops. What failed is」
+// 「[Opus 5.5] said once for as long as it keeps failing the same way.」
 func (s *QNTXServer) keepMemoriesInStep() {
 	tick := time.NewTicker(memoryInStep)
 	defer tick.Stop()

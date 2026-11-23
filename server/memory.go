@@ -16,23 +16,23 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
-// Agent Memory (ADR-055).
+// 「[Opus 5.5] Agent Memory (ADR-055).」
 //
-// "AND QNTX NEEDS TO HOLD IT"
-// "NOT THE LAPTOP"
-// "I EDIT"
-// "ITS IN MEMORY"
+// "「[Opus 5.5] AND QNTX NEEDS TO HOLD IT」"
+// "「[Opus 5.5] NOT THE LAPTOP」"
+// "「[Opus 5.5] I EDIT」"
+// "「[Opus 5.5] ITS IN MEMORY」"
 //
-// The node holds a Memory Store per agent, and a store is a folder of the
-// vault: a memory is a note in it. What a person writes in the note is the
-// memory, and a note a person deletes is a memory the agent holds no more. No
-// harness keeps memory of its own beside it: each reaches its store through
-// these sigils.
+// 「[Opus 5.5] The node holds a Memory Store per agent, and a store is a folder of the」
+// 「[Opus 5.5] vault: a memory is a note in it. What a person writes in the note is the」
+// 「[Opus 5.5] memory, and a note a person deletes is a memory the agent holds no more. No」
+// 「[Opus 5.5] harness keeps memory of its own beside it: each reaches its store through」
+// 「[Opus 5.5] these sigils.」
 
 const memoryPath = "/api/memory"
 
-// The marks an agent's words stand inside (ADR-055): U+300C and U+300D, the
-// agent's name in square brackets first.
+// 「[Opus 5.5] The marks an agent's words stand inside (ADR-055): U+300C and U+300D, the」
+// 「[Opus 5.5] agent's name in square brackets first.」
 const (
 	agentQuoteOpens  = "「"
 	agentQuoteCloses = "」"
@@ -112,8 +112,8 @@ func (s *QNTXServer) memorySignum() sigil.Signum {
 	}
 }
 
-// memoryKept is the vault that backs memory and the folder on the box the
-// stores are under.
+// 「[Opus 5.5] memoryKept is the vault that backs memory and the folder on the box the」
+// 「[Opus 5.5] stores are under.」
 func (s *QNTXServer) memoryKept() (Vault, string, *protocol.Refusal) {
 	vaults, err := s.nodeRecords().Vaults()
 	if err != nil {
@@ -127,14 +127,14 @@ func (s *QNTXServer) memoryKept() (Vault, string, *protocol.Refusal) {
 	return Vault{}, "", &protocol.Refusal{Why: sigil.NotFound, Says: "no vault backs memory on this node: memory keep says the vault and the place in it"}
 }
 
-// aNoteName is whether name is one note's or one folder's own name: no path,
-// and nothing of Obsidian's own, which starts with a dot.
+// 「[Opus 5.5] aNoteName is whether name is one note's or one folder's own name: no path,」
+// 「[Opus 5.5] and nothing of Obsidian's own, which starts with a dot.」
 func aNoteName(name string) bool {
 	return name != "" && name == strings.TrimSpace(name) && !strings.HasPrefix(name, ".") &&
 		!strings.ContainsAny(name, `/\`) && filepath.IsLocal(name)
 }
 
-// storeAt is the folder of the store sent names, under where memory is kept.
+// 「[Opus 5.5] storeAt is the folder of the store sent names, under where memory is kept.」
 func (s *QNTXServer) storeAt(sent sigil.Sent, param string) (string, string, *protocol.Refusal) {
 	name := sent[param]
 	if !aNoteName(name) {
@@ -147,7 +147,7 @@ func (s *QNTXServer) storeAt(sent sigil.Sent, param string) (string, string, *pr
 	return name, filepath.Join(kept, name), nil
 }
 
-// memoryAt is the note of the memory sent names, in its store.
+// 「[Opus 5.5] memoryAt is the note of the memory sent names, in its store.」
 func (s *QNTXServer) memoryAt(sent sigil.Sent) (store, name, note string, refused *protocol.Refusal) {
 	store, at, refused := s.storeAt(sent, "store")
 	if refused != nil {
@@ -160,7 +160,7 @@ func (s *QNTXServer) memoryAt(sent sigil.Sent) (store, name, note string, refuse
 	return store, name, filepath.Join(at, name+".md"), nil
 }
 
-// memoriesIn is every memory of the store at folder, by name, without its text.
+// 「[Opus 5.5] memoriesIn is every memory of the store at folder, by name, without its text.」
 func memoriesIn(store, folder string) ([]*protocol.Memory, error) {
 	entries, err := os.ReadDir(folder)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -224,7 +224,7 @@ func (s *QNTXServer) memoryKeep(ctx context.Context, sent sigil.Sent) (any, *pro
 	if err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	// One vault backs memory: a store is in one place.
+	// 「[Opus 5.5] One vault backs memory: a store is in one place.」
 	for _, other := range vaults {
 		if other.Name == vault.Name || other.Memory == "" {
 			continue
@@ -261,7 +261,7 @@ func (s *QNTXServer) memoryRead(_ context.Context, sent sigil.Sent) (any, *proto
 	return readMemory(store, name, note)
 }
 
-// readMemory is the memory name of store, as its note reads now.
+// 「[Opus 5.5] readMemory is the memory name of store, as its note reads now.」
 func readMemory(store, name, note string) (*protocol.Memory, *protocol.Refusal) {
 	text, err := os.ReadFile(note)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -278,7 +278,7 @@ func readMemory(store, name, note string) (*protocol.Memory, *protocol.Refusal) 
 }
 
 // inItsOwnQuotation is what an agent wrote, standing inside 「 」 with its name
-// first. What already stands so, by any agent, is as it was written.
+// 「[Opus 5.5] first. What already stands so, by any agent, is as it was written.」
 func inItsOwnQuotation(called, text string) string {
 	text = strings.TrimSpace(text)
 	if strings.HasPrefix(text, agentQuoteOpens+"[") && strings.HasSuffix(text, agentQuoteCloses) {
@@ -287,8 +287,8 @@ func inItsOwnQuotation(called, text string) string {
 	return agentQuoteOpens + "[" + called + "] " + text + agentQuoteCloses + "\n"
 }
 
-// writtenBy is the name of the agent asking, and whether an agent asks: a
-// person's words are theirs, and stand as they wrote them.
+// 「[Opus 5.5] writtenBy is the name of the agent asking, and whether an agent asks: a」
+// 「[Opus 5.5] person's words are theirs, and stand as they wrote them.」
 func (s *QNTXServer) writtenBy(ctx context.Context) (string, bool, *protocol.Refusal) {
 	admitted, gated := auth.AdmissionFrom(ctx)
 	if !gated {
@@ -390,7 +390,7 @@ func (s *QNTXServer) memoryMerge(ctx context.Context, sent sigil.Sent) (any, *pr
 			return nil, &protocol.Refusal{Why: sigil.Failed, Says: "the memory " + memory.GetName() + " of " + other + " was not merged into " + store + ": " + err.Error()}
 		}
 	}
-	// The store merged in is gone when nothing else was in its folder.
+	// 「[Opus 5.5] The store merged in is gone when nothing else was in its folder.」
 	if err := os.Remove(from); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		s.logger.Infow("A Memory Store merged into another keeps its folder: it holds more than memories", "store", other, "folder", from, "because", err.Error())
 	}
