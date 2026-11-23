@@ -232,6 +232,17 @@ func (h *Held) TheNodesOwnRecords() ats.AttestationStore {
 	return h.dflt.Store()
 }
 
+// ReadTheNodesOwnRecords hands back the store TheNodesOwnRecords writes into,
+// as one that cannot write: what the node wrote about itself is read where it
+// was written, on a backend that keeps a system store and on one that does not.
+func (h *Held) ReadTheNodesOwnRecords() Reading {
+	store := h.TheNodesOwnRecords()
+	if store == nil {
+		return nil
+	}
+	return store
+}
+
 // Read hands back a store that cannot write.
 //
 // The node reads its own lines — roles, words, reach, stand definitions — out

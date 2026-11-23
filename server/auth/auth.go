@@ -119,7 +119,9 @@ type Handler struct {
 	layeSays LayeSays
 	issued   issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
-	loginAt         string
+	loginAt string
+	// direct is where this node reaches a peer itself, by the name the primary calls it (nodes.direct).
+	direct          map[string]string
 	logsInElsewhere bool
 	elsewhere       elsewhereJourneys
 	// How this primary asks GitHub for a peer (github_for_peers.go).
@@ -383,6 +385,26 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 				"minted_by", quoteIdentity(grant.MintedBy),
 				"reason", "a GitHub token is not a bearer")
 			return Admission{}, false
+		}
+		// "all other nodes are peers of the primary"
+		// A peer node the primary vouched for is no person, and stands on no
+		// list of people: on k, 2026-11-21 22:08:32, l's file was refused with
+		// "the identity is not listed". What admits it is the primary's
+		// signature, and it is admitted as a peer and nothing more: PEER
+		// reaches what a line of the tablet names it for.
+		if grant.Level == LevelPeer {
+			if !h.signsForItsPeople(grant.DID) {
+				h.logger.Infow("Bearer token refused",
+					"did", grant.DID,
+					"reason", "named a peer by a signer that is not this node's primary")
+				return Admission{}, false
+			}
+			return admission.Granted(Admission{
+				Namespaces:  grant.Namespaces,
+				Identity:    grant.MintedBy,
+				DisplayName: grant.MintedByDisplayName,
+				Grant:       grant,
+			}, LevelPeer, nil, false, h.WordsOf(nil)), true
 		}
 		// A token speaks for whoever minted it, so striking them out
 		// of am.toml has to reach it too. An empty list strikes out everyone.
@@ -648,6 +670,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	// A peer asks GitHub through this node, signing as itself.
 	mux.answer(githubForPeersPath, h.handleGitHubForPeers)
 	mux.answer(githubLocationForPeersPath, h.handleGitHubLocationForPeers)
+	// A peer hands this node a file for another peer, signing as itself.
+	mux.answer(filesForPeersPath, h.handleFilesForPeers)
 	// A node whose people log in at another sends them there and takes them back.
 	mux.answer(elsewherePath, h.handleElsewhere)
 	mux.answer(elsewhereBackPath, h.handleElsewhereBack)

@@ -54,6 +54,9 @@ REACH is '/auth/lines/served'                                             of ANY
 REACH is '/auth/laye/invited'                                             of ANYONE
 # A peer asks GitHub through its primary, the same way: the token stays here.
 REACH is '/auth/github' '/auth/github/location'                           of ANYONE
+# A peer hands the primary a file for another peer, signing as its did:key: the
+# handler asks who it is, as for GitHub above.
+REACH is '/auth/files'                                                    of ANYONE
 # A node whose people log in at another sends them there and takes them back,
 # before they hold any session here.
 REACH is '/auth/elsewhere' '/auth/elsewhere/back'                         of ANYONE
@@ -283,7 +286,11 @@ REACH is '/api/canvas/compositions' '/api/canvas/compositions/'           of ROO
 REACH is '/api/canvas/minimized-windows'                                  of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/api/canvas/minimized-windows/'                                 of ROOT SUPER ATTESTOR PUBLIC_REGISTRATION USER
 REACH is '/api/canvas/export' '/api/canvas/export-dom'                    of ROOT
-REACH is '/api/files' '/api/files/'                                       of ROOT
+# "to me it feels like k should own my Media Assets"
+# A peer node brings a file here, vouched for by the primary, as that node (PEER), and
+# reads none back: what a node keeps is served to ROOT.
+REACH is '/api/files'                                                     of ROOT PEER
+REACH is '/api/files/'                                                    of ROOT
 REACH is '/comet/'                                                        of ROOT SUPER
 REACH is '/api/python/execute'                                            of ROOT
 REACH is '/api/search/semantic'                                           of ROOT
