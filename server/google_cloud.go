@@ -585,9 +585,9 @@ func googleOutcomeMail(subject, text string, links ...services.MailLink) service
 }
 
 // 「[Opus 5.5] googleConnectCostsMail is a halt only Connect costs ends, with
-// Connect costs in it: one press, where ROOT reads it.」
-// Connect costs not read, the halt is said without it, and still not as one a
-// budget frees up.
+// 「[Opus 5.5] Connect costs in it: one press, where ROOT reads it.」」
+// 「[Opus 5.5] Connect costs not read, the halt is said without it, and still not as one a」
+// 「[Opus 5.5] budget frees up.」
 func googleConnectCostsMail(subject, why, connect string) services.NodeMail {
 	var links []services.MailLink
 	if connect != "" {
