@@ -303,10 +303,10 @@ func (s *QNTXServer) vaultBind(ctx context.Context, sent sigil.Sent) (any, *prot
 	return s.boundAt(ctx, sent, vault, repo.String()+"@"+branch+":"+sent["path"]+"="+place, place)
 }
 
-// "we are missing some bindings like the ground CLAUDE.md, its other markdown document's"
-// "so, perhaps we should introduce another vault binding, which is different from a directory or single file binding, namely;"
-// "- the repository/git binding"
-// "- named as one git repository under one name, like teranos/ground currently is."
+// "「[Opus 5.5] we are missing some bindings like the ground CLAUDE.md, its other markdown document's」"
+// "「[Opus 5.5] so, perhaps we should introduce another vault binding, which is different from a directory or single file binding, namely;」"
+// "「[Opus 5.5] - the repository/git binding」"
+// "「[Opus 5.5] - named as one git repository under one name, like teranos/ground currently is.」"
 func (s *QNTXServer) vaultBindRepository(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	vault, refused := s.vaultNamed(sent["name"])
 	if refused != nil {
@@ -320,13 +320,13 @@ func (s *QNTXServer) vaultBindRepository(ctx context.Context, sent sigil.Sent) (
 	if place == "" {
 		place = repo.Path
 	}
-	// The vault itself is no repository's place: bound there, a send would
-	// carry every note of the vault into the repository.
+	// 「[Opus 5.5] The vault itself is no repository's place: bound there, a send would」
+	// 「[Opus 5.5] carry every note of the vault into the repository.」
 	if cleaned := path.Clean(filepath.ToSlash(place)); cleaned == "." || cleaned == "/" || cleaned == ".." || strings.HasPrefix(cleaned, "../") || strings.HasPrefix(cleaned, "/") {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is the vault itself or outside it; a repository is bound under a folder of the vault"}
 	}
-	// The name is a folder's place; it is written when the repository's notes
-	// are, so it need not be on the box yet.
+	// 「[Opus 5.5] The name is a folder's place; it is written when the repository's notes」
+	// 「[Opus 5.5] are, so it need not be on the box yet.」
 	if strings.HasSuffix(place, noteSuffix) {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: place + " is a note's place; a repository is bound under a folder's"}
 	}
@@ -346,7 +346,7 @@ func (s *QNTXServer) vaultBindRepository(ctx context.Context, sent sigil.Sent) (
 	return s.boundAt(ctx, sent, vault, repo.String()+"@"+branch+":"+forge.Root+"="+place, place)
 }
 
-// boundAt keeps folder beside the vault's others, and fills it.
+// 「[Opus 5.5] boundAt keeps folder beside the vault's others, and fills it.」
 func (s *QNTXServer) boundAt(ctx context.Context, sent sigil.Sent, vault Vault, folder, place string) (any, *protocol.Refusal) {
 	folders, err := vaultFoldersOf(append(slices.Clone(vault.Folders), folder))
 	if err != nil {

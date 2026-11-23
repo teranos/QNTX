@@ -85,9 +85,9 @@ type vaultBinding struct {
 	place  string
 	// 「[Opus 5.5] note is a binding naming one file: its path, and its place, are a note.」
 	note bool
-	// "- the repository/git binding"
-	// repository is a binding of the repository whole, its path being its top:
-	// every note of it, in every folder of it, is the binding's.
+	// "「[Opus 5.5] - the repository/git binding」"
+	// 「[Opus 5.5] repository is a binding of the repository whole, its path being its top:」
+	// 「[Opus 5.5] every note of it, in every folder of it, is the binding's.」
 	repository bool
 }
 
