@@ -55,114 +55,61 @@ type a2aOperation struct {
 // a2aOperations are A2AService's operations that answer once. SendStreamingMessage
 // and SubscribeToTask answer as a stream, which a sigil does not.
 var a2aOperations = []a2aOperation{
-	{"SendMessage", func() proto.Message { return &a2apb.SendMessageRequest{} },
-		func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
-			req, err := pbconv.FromProtoSendMessageRequest(m.(*a2apb.SendMessageRequest))
-			if err != nil {
-				return nil, err
-			}
-			result, err := c.SendMessage(ctx, req)
-			if err != nil {
-				return nil, err
-			}
-			return pbconv.ToProtoSendMessageResponse(result)
-		}},
-	{"GetTask", func() proto.Message { return &a2apb.GetTaskRequest{} },
-		func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
-			req, err := pbconv.FromProtoGetTaskRequest(m.(*a2apb.GetTaskRequest))
-			if err != nil {
-				return nil, err
-			}
-			task, err := c.GetTask(ctx, req)
-			if err != nil {
-				return nil, err
-			}
-			return pbconv.ToProtoTask(task)
-		}},
-	{"ListTasks", func() proto.Message { return &a2apb.ListTasksRequest{} },
-		func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
-			req, err := pbconv.FromProtoListTasksRequest(m.(*a2apb.ListTasksRequest))
-			if err != nil {
-				return nil, err
-			}
-			listed, err := c.ListTasks(ctx, req)
-			if err != nil {
-				return nil, err
-			}
-			return pbconv.ToProtoListTasksResponse(listed)
-		}},
-	{"CancelTask", func() proto.Message { return &a2apb.CancelTaskRequest{} },
-		func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
-			req, err := pbconv.FromProtoCancelTaskRequest(m.(*a2apb.CancelTaskRequest))
-			if err != nil {
-				return nil, err
-			}
-			task, err := c.CancelTask(ctx, req)
-			if err != nil {
-				return nil, err
-			}
-			return pbconv.ToProtoTask(task)
-		}},
-	{"CreateTaskPushNotificationConfig", func() proto.Message { return &a2apb.TaskPushNotificationConfig{} },
-		func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
-			req, err := pbconv.FromProtoTaskPushConfig(m.(*a2apb.TaskPushNotificationConfig))
-			if err != nil {
-				return nil, err
-			}
-			config, err := c.CreateTaskPushConfig(ctx, req)
-			if err != nil {
-				return nil, err
-			}
-			return pbconv.ToProtoTaskPushConfig(config)
-		}},
-	{"GetTaskPushNotificationConfig", func() proto.Message { return &a2apb.GetTaskPushNotificationConfigRequest{} },
-		func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
-			req, err := pbconv.FromProtoGetTaskPushConfigRequest(m.(*a2apb.GetTaskPushNotificationConfigRequest))
-			if err != nil {
-				return nil, err
-			}
-			config, err := c.GetTaskPushConfig(ctx, req)
-			if err != nil {
-				return nil, err
-			}
-			return pbconv.ToProtoTaskPushConfig(config)
-		}},
-	{"ListTaskPushNotificationConfigs", func() proto.Message { return &a2apb.ListTaskPushNotificationConfigsRequest{} },
-		func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
-			req, err := pbconv.FromProtoListTaskPushConfigRequest(m.(*a2apb.ListTaskPushNotificationConfigsRequest))
-			if err != nil {
-				return nil, err
-			}
-			// a2a-go's client gives the configs and not next_page_token.
-			configs, err := c.ListTaskPushConfigs(ctx, req)
-			if err != nil {
-				return nil, err
-			}
+	a2aSpeaks("SendMessage", pbconv.FromProtoSendMessageRequest,
+		(*a2aclient.Client).SendMessage, pbconv.ToProtoSendMessageResponse),
+	a2aSpeaks("GetTask", pbconv.FromProtoGetTaskRequest,
+		(*a2aclient.Client).GetTask, pbconv.ToProtoTask),
+	a2aSpeaks("ListTasks", pbconv.FromProtoListTasksRequest,
+		(*a2aclient.Client).ListTasks, pbconv.ToProtoListTasksResponse),
+	a2aSpeaks("CancelTask", pbconv.FromProtoCancelTaskRequest,
+		(*a2aclient.Client).CancelTask, pbconv.ToProtoTask),
+	a2aSpeaks("CreateTaskPushNotificationConfig", pbconv.FromProtoTaskPushConfig,
+		(*a2aclient.Client).CreateTaskPushConfig, pbconv.ToProtoTaskPushConfig),
+	a2aSpeaks("GetTaskPushNotificationConfig", pbconv.FromProtoGetTaskPushConfigRequest,
+		(*a2aclient.Client).GetTaskPushConfig, pbconv.ToProtoTaskPushConfig),
+	// a2a-go's client gives the configs and not next_page_token.
+	a2aSpeaks("ListTaskPushNotificationConfigs", pbconv.FromProtoListTaskPushConfigRequest,
+		(*a2aclient.Client).ListTaskPushConfigs,
+		func(configs []*a2asdk.PushConfig) (*a2apb.ListTaskPushNotificationConfigsResponse, error) {
 			return pbconv.ToProtoListTaskPushConfigResponse(&a2asdk.ListTaskPushConfigResponse{Configs: configs})
-		}},
-	{"DeleteTaskPushNotificationConfig", func() proto.Message { return &a2apb.DeleteTaskPushNotificationConfigRequest{} },
-		func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
-			req, err := pbconv.FromProtoDeleteTaskPushConfigRequest(m.(*a2apb.DeleteTaskPushNotificationConfigRequest))
+		}),
+	// Answers nothing but whether it was done.
+	a2aSpeaks("DeleteTaskPushNotificationConfig", pbconv.FromProtoDeleteTaskPushConfigRequest,
+		func(c *a2aclient.Client, ctx context.Context, req *a2asdk.DeleteTaskPushConfigRequest) (*emptypb.Empty, error) {
+			return &emptypb.Empty{}, c.DeleteTaskPushConfig(ctx, req)
+		},
+		func(done *emptypb.Empty) (*emptypb.Empty, error) { return done, nil }),
+	a2aSpeaks("GetExtendedAgentCard", pbconv.FromProtoGetExtendedAgentCardRequest,
+		(*a2aclient.Client).GetExtendedAgentCard, pbconv.ToProtoAgentCard),
+}
+
+// a2aSpeaks is the operation that reads its request into the pb type from
+// from, speaks it through a2a-go's client with call, and answers what to
+// makes of what came back.
+func a2aSpeaks[T any, In interface {
+	*T
+	proto.Message
+}, Req, Resp any, Out proto.Message](
+	rpc string,
+	from func(In) (Req, error),
+	call func(*a2aclient.Client, context.Context, Req) (Resp, error),
+	to func(Resp) (Out, error),
+) a2aOperation {
+	return a2aOperation{
+		rpc:     rpc,
+		request: func() proto.Message { return In(new(T)) },
+		call: func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
+			req, err := from(m.(In))
 			if err != nil {
 				return nil, err
 			}
-			if err := c.DeleteTaskPushConfig(ctx, req); err != nil {
-				return nil, err
-			}
-			return &emptypb.Empty{}, nil
-		}},
-	{"GetExtendedAgentCard", func() proto.Message { return &a2apb.GetExtendedAgentCardRequest{} },
-		func(ctx context.Context, c *a2aclient.Client, m proto.Message) (proto.Message, error) {
-			req, err := pbconv.FromProtoGetExtendedAgentCardRequest(m.(*a2apb.GetExtendedAgentCardRequest))
+			got, err := call(c, ctx, req)
 			if err != nil {
 				return nil, err
 			}
-			card, err := c.GetExtendedAgentCard(ctx, req)
-			if err != nil {
-				return nil, err
-			}
-			return pbconv.ToProtoAgentCard(card)
-		}},
+			return to(got)
+		},
+	}
 }
 
 // a2aSpec is the pinned A2AService and what the spec says of each of its
