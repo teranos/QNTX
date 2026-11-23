@@ -79,6 +79,15 @@ review.
 The person decides on the whole or on one item, in a pack and in a
 collection.
 
+"CAN WE PLEASE STOP EXPECTING AN AGENT TO REQUEST IT OWN PERMISSIONS AND ALSO BE PERFECT?"
+
+"yeah, it jus tfeels like this should happen for sure"
+
+A key a node holds nothing for, signing as itself, is an item in the pack of
+each of the node's ROOT: admit that key. Approved, the primary carries the
+person to the node's `/auth/admit`, and the key is held at the level the
+person was carried at.
+
 ## How long it stands
 
 "SO THE 6H CADENCE STAYS FOR 6H"
