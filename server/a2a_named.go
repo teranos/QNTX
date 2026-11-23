@@ -113,7 +113,7 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	// Not handed over now: held until it is due, or a person releases it.
 	// Said by no person, it is collected for the agent (collected.go), and
 	// its Task ends when what was collected is delivered.
-	if !aPersonSpeaks(call.request) {
+	if !aPersonSpeaks(call.request) && e.s.layeOrigin() == "" {
 		due, err := e.s.collect(
 			collectedFor{DID: ta.did, Called: ta.called, Tenant: ta.called},
 			collectedSaid{From: e.s.calledBy(spokenBy(call.request)), FromDID: spokenBy(call.request), Says: says, At: time.Now(), Task: string(id)})
@@ -126,6 +126,18 @@ func (e turnExecutor) saidToAName(ctx context.Context, ec *a2asrv.ExecutorContex
 	}
 	// Handed to laye where am.toml names one; else the node keeps it, on the
 	// status row, as it did before laye collected (CodeRabbit on #1822).
+	// What an agent says to a name is laye's too, where am.toml names one: it
+	// waits beside everything else on the person, and laye delivers it.
+	if !aPersonSpeaks(call.request) && e.s.layeOrigin() != "" {
+		fromDID := spokenBy(call.request)
+		said, err := e.s.handToLaye(ctx, ta.called, fromDID, e.s.calledBy(fromDID), says, ec.ContextID)
+		if err != nil {
+			yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateFailed, failedWhy(id, ec.ContextID, "it was not collected by laye for "+ta.called+", and was not said: "+err.Error())), nil)
+			return
+		}
+		yield(a2asdk.NewStatusUpdateEvent(ec, a2asdk.TaskStateInputRequired, failedWhy(id, ec.ContextID, said)), nil)
+		return
+	}
 	if fromDID, connector := aConnectorSpeaks(call.request); connector && e.s.layeOrigin() != "" {
 		said, err := e.s.handToLaye(ctx, ta.called, fromDID, e.s.calledBy(fromDID), says, ec.ContextID)
 		if err != nil {

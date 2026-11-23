@@ -1,10 +1,12 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/server/auth"
 )
 
@@ -42,4 +44,19 @@ func TestLayeIsReachedOverHTTPSOrOnThisMachine(t *testing.T) {
 	for _, origin := range []string{"http://laye.ground.institute", "ftp://laye.ground.institute", "laye.ground.institute"} {
 		assert.Error(t, layeReachable(origin), origin)
 	}
+}
+
+// What laye is handed for the Node Agent names it by key, whose it is, and
+// that laye hands it back (laye-front ConnectorSaid: to_did, person, node,
+// quiet); what is said to a name carries none of them.
+func TestWhatLayeIsHandedForTheNodesAgentSaysItIsTheNodes(t *testing.T) {
+	forNode, err := json.Marshal(layeSaid{To: "Lamplighter", ToDID: "did:key:zL", FromDID: "did:key:zA", From: "Alder", Says: "hi", Person: "google:1", Node: true})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"to":"Lamplighter","to_did":"did:key:zL","from_did":"did:key:zA","from":"Alder","says":"hi","context":"","person":"google:1","node":true}`, string(forNode))
+	toAName, err := json.Marshal(layeSaid{To: "Cumulus", FromDID: "did:key:zA", From: "Alder", Says: "hi", Context: "c1"})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"to":"Cumulus","from_did":"did:key:zA","from":"Alder","says":"hi","context":"c1"}`, string(toAName))
+	quiet, err := json.Marshal(layeSaid{To: "Cumulus", ToDID: "did:key:zC", FromDID: "did:key:zN", From: "GitHub", Says: "merged", Quiet: true})
+	require.NoError(t, err)
+	assert.Contains(t, string(quiet), `"quiet":true`)
 }

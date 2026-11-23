@@ -988,6 +988,11 @@
         "ANYONE"
       ]
     },
+    "/auth/laye/delivered": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/laye/invited": {
       "x-qntx-reach": [
         "ANYONE"

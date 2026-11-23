@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
@@ -124,7 +125,9 @@ type Handler struct {
 	// is held nothing for, so admitting it waits on a person (unknown_key.go). Nil tells nobody.
 	unknownKey  func(did, label string)
 	unknownKeys unknownKeys
-	issued      issuedAnswers
+	// layeDelivered runs what laye hands for this node's agent (laye_delivered.go). Nil runs nothing.
+	layeDelivered func(ctx context.Context, delivered LayeDelivered) (string, error)
+	issued        issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt         string
 	logsInElsewhere bool
@@ -622,6 +625,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(layeReachPath, h.handleLayeReach)
 	// laye has the node admit a key its person approved on a peer (laye_admit.go).
 	mux.answer(layeAdmitPath, h.handleLayeAdmit)
+	// laye hands what was released for this node's agent (laye_delivered.go).
+	mux.answer(layeDeliveredPath, h.handleLayeDelivered)
 	// The ceremony: the element asks what can be linked, starts one, and collects
 	// the result. Everything the provider requires happens on this side of the
 	// wire, so no page holds a secret and no page holds logic.

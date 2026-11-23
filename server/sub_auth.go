@@ -354,6 +354,8 @@ func (authSubsystem) Init(s *QNTXServer) error {
 		authHandler.SetOutOfReach(s.tellLayeOutOfReach)
 		// A key signing for this node that it holds nothing for waits on its ROOT to be admitted.
 		authHandler.SetUnknownKey(s.tellLayeUnknownKey)
+		// What laye releases for the Node Agent is its turn (laye_delivered.go).
+		authHandler.SetLayeDelivered(s.layeDelivered)
 	}
 	// "AND LAYE OWNS IDENTITY": the names agents hold, in the etcd am.toml names.
 	s.names = namesAtLaye(s.deps.cfg.Etcd.Endpoint)
