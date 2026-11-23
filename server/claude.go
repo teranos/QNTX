@@ -42,8 +42,8 @@ type rootAgent struct {
 	// (agent_door.go). Empty on a node with no gate to open one at.
 	door string
 	home string
-	// instructions is the file of what the node's own repository tells its
-	// Node Agent (am.toml, [agent.root] instructions). Empty when it names none.
+	// 「[Opus 5.5] instructions is the file of what the node's own repository tells its」
+	// 「[Opus 5.5] Node Agent (am.toml, [agent.root] instructions). Empty when it names none.」
 	instructions string
 	// sessions is its session in each harness, by the harness's name.
 	sessions   map[string]*inHarness
@@ -208,14 +208,14 @@ func (a *rootAgent) isSaidToBe() string {
 		a.instructed()
 }
 
-// "the Node Agent system prompt"
-// "should live with the Node repo"
-// "we dont know what other people want to use QNTX for"
-// "I NEED TO BE ABLE TO EDIT SYSTEM PROMPTS IN MY OBSIDIAN"
+// "「[Opus 5.5] the Node Agent system prompt」"
+// "「[Opus 5.5] should live with the Node repo」"
+// "「[Opus 5.5] we dont know what other people want to use QNTX for」"
+// "「[Opus 5.5] I NEED TO BE ABLE TO EDIT SYSTEM PROMPTS IN MY OBSIDIAN」"
 //
-// instructed is what the node's own file tells its Node Agent, read at every
-// turn so that what was written there last is what it is told. A file that
-// cannot be read is said to the agent, to say to whoever it answers.
+// 「[Opus 5.5] instructed is what the node's own file tells its Node Agent, read at every」
+// 「[Opus 5.5] turn so that what was written there last is what it is told. A file that」
+// 「[Opus 5.5] cannot be read is said to the agent, to say to whoever it answers.」
 func (a *rootAgent) instructed() string {
 	if a.instructions == "" {
 		return ""

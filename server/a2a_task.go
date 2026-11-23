@@ -109,8 +109,8 @@ func (s *QNTXServer) taskAgentAt(r *http.Request, tenant string) (taskAgent, err
 		switch {
 		case nameErr != nil:
 			err = a2aRefusal(a2asdk.ErrInternalError, nameErr.Error())
-		// The Node Agent's own name is the Node Agent: the node runs its
-		// turns, and no ground stands by to take what is said off a row.
+		// 「[Opus 5.5] The Node Agent's own name is the Node Agent: the node runs its」
+		// 「[Opus 5.5] turns, and no ground stands by to take what is said off a row.」
 		case held && s.nodeAgent != nil && named.did == s.nodeAgent.did:
 			ta, err = s.nodeTaskAgent()
 		case held:

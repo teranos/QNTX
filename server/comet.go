@@ -95,9 +95,9 @@ func (s *QNTXServer) groundAgent(home string) {
 		return
 	}
 	// A ground that stands holds the sand its grove checkout's rituals make now, or is built again.
-	// Its sand is built to reach the node at the agent's door, as its ground
-	// is: built to reach the node itself, what the ground says there is
-	// nobody's, and Lamplighter's ground say was answered 401.
+	// 「[Opus 5.5] Its sand is built to reach the node at the agent's door, as its ground」
+	// 「[Opus 5.5] is: built to reach the node itself, what the ground says there is」
+	// 「[Opus 5.5] nobody's, and Lamplighter's ground say was answered 401.」
 	if err := comet.SandStands(home, reach); err != nil {
 		s.logger.Named("comet").Infow("An agent's ground is built again: its sand does not stand", "home", home, "because", err.Error())
 		build()
