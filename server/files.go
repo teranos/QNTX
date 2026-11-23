@@ -163,7 +163,7 @@ func (s *QNTXServer) filesDir() (string, error) {
 //
 //	POST /api/files      - Upload a file (multipart form)
 //	GET  /api/files/     - What this node holds, newest first, with what was read in each
-//	GET  /api/files/{id} - Serve a stored file
+//	GET  /api/files/{id} - Serve a stored file, by its id or by its sha256: name
 func (s *QNTXServer) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -179,6 +179,20 @@ func (s *QNTXServer) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		if id == "" || id == r.URL.Path {
 			http.Error(w, "file ID required", http.StatusBadRequest)
 			return
+		}
+		// "i want it to be directly accesible"
+		// A file is asked for by the name its bytes have, the same on every node.
+		if strings.HasPrefix(id, assetNamePrefix) {
+			fileID, found, err := s.fileIDOf(id)
+			if err != nil {
+				writeWrappedError(w, s.logger, err, "what this node holds did not read", http.StatusInternalServerError)
+				return
+			}
+			if !found {
+				http.Error(w, "this node holds no "+id, http.StatusNotFound)
+				return
+			}
+			id = fileID
 		}
 		s.handleFileServe(w, r, id)
 	default:
