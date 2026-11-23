@@ -124,8 +124,8 @@ const jobsKeptFor = 7 * 24 * time.Hour
 // jobsCleanedEvery is how often completed and failed jobs past jobsKeptFor go.
 const jobsCleanedEvery = time.Hour
 
-// forwardBodiesPerPass is how many forwards' bodies one pass empties: a body is
-// about 17 KB on q, so a pass rewrites under 2 MB while it holds the queue.
+// 「[Opus 5.5] forwardBodiesPerPass is how many forwards' bodies one pass empties: a body is」
+// 「[Opus 5.5] about 17 KB on q, so a pass rewrites under 2 MB while it holds the queue.」
 const forwardBodiesPerPass = 100
 
 // jobsRemovedPerPass is how many rows one cleanup statement takes, so the
@@ -193,9 +193,9 @@ func (s *QNTXServer) cleanJobsOnce(log *zap.SugaredLogger) {
 	}
 	// "anything that isnt operational in operational db, just needs to get out of there probably"
 	//
-	// A forward's row refuses its redelivery; the webhook body it carried is
-	// not needed once it reached the far node or was dropped. On q the bodies
-	// were 721 MB of the operational db (2026-11-12).
+	// 「[Opus 5.5] A forward's row refuses its redelivery; the webhook body it carried is」
+	// 「[Opus 5.5] not needed once it reached the far node or was dropped. On q the bodies」
+	// 「[Opus 5.5] were 721 MB of the operational db (2026-11-12).」
 	forgotten := 0
 	for {
 		n, err := s.daemon.GetQueue().ForgetPayloads(s.ctx, forwardHandlerName, forwardBodiesPerPass)

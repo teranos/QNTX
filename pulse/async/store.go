@@ -396,9 +396,9 @@ func (s *Store) FailedHandlersSince(since time.Time, limit int) (_ []HandlerFail
 	return failed, nil
 }
 
-// ForgetPayloads empties the payload of at most atMost of handler's jobs that
-// are done or dropped, and says how many. Their rows stay; what they were run
-// with is not needed again.
+// 「[Opus 5.5] ForgetPayloads empties the payload of at most atMost of handler's jobs that」
+// 「[Opus 5.5] are done or dropped, and says how many. Their rows stay; what they were run」
+// 「[Opus 5.5] with is not needed again.」
 func (s *Store) ForgetPayloads(ctx context.Context, handler string, atMost int) (int, error) {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE async_ix_jobs SET payload = NULL

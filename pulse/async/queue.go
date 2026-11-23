@@ -473,8 +473,8 @@ func (q *Queue) Cleanup(ctx context.Context, olderThan time.Duration, atMost int
 	return q.store.CleanupOldJobs(olderThan, atMost, keep...)
 }
 
-// ForgetPayloads empties the payloads of at most atMost of handler's done or
-// dropped jobs, and says how many. A caller forgetting more calls again.
+// 「[Opus 5.5] ForgetPayloads empties the payloads of at most atMost of handler's done or」
+// 「[Opus 5.5] dropped jobs, and says how many. A caller forgetting more calls again.」
 func (q *Queue) ForgetPayloads(ctx context.Context, handler string, atMost int) (int, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
