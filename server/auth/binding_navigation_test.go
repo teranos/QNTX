@@ -162,7 +162,7 @@ func TestAPageIsAPathOnTheDoorsOrigin(t *testing.T) {
 		assert.Equal(t, want, onPage("https://garden.example", page), page)
 	}
 	assert.Empty(t, onPage("", "/branch/x/"), "no door, nowhere to return")
-	// An app's scheme has no pages: it is returned to whole, whatever page is named.
+	// 「[Opus 5.5] An app's scheme has no pages: it is returned to whole, whatever page is named.」
 	for _, page := range []string{"/", "/branch/x/", "/index.html"} {
 		assert.Equal(t, "qntx://door", onPage("qntx://door", page), page)
 	}
