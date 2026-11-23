@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
@@ -117,7 +118,16 @@ type Handler struct {
 	// What laye's etcd says a key is: the person whose passkey said yes to it
 	// (laye_says.go). Nil asks nobody.
 	layeSays LayeSays
-	issued   issuedAnswers
+	// outOfReach is told of each request refused for reach, the route and who
+	// was refused, so the reach it lacked waits on a person (out_of_reach.go). Nil tells nobody.
+	outOfReach func(admitted Admission, route string)
+	// unknownKey is told of each key that signed as itself for this node and
+	// is held nothing for, so admitting it waits on a person (unknown_key.go). Nil tells nobody.
+	unknownKey  func(did, label string)
+	unknownKeys unknownKeys
+	// layeDelivered runs what laye hands for this node's agent (laye_delivered.go). Nil runs nothing.
+	layeDelivered func(ctx context.Context, delivered LayeDelivered) (string, error)
+	issued        issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt string
 	// direct is where this node reaches a peer itself, by the name the primary calls it (nodes.direct).
@@ -309,6 +319,17 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 		span.SetName(r.Method + " " + route)
 		span.SetAttributes(attribute.String("http.route", route))
 
+		// The node asking itself in process presents nothing: it is admitted
+		// as it asked, and held to the reach table as anyone is (in_process.go).
+		if admitted, inside := inProcessAdmission(r.Context()); inside {
+			if !reach.Admits(admitted) {
+				refusedOn(r, "out-of-reach")
+				h.rejectOutOfReach(w, r, admitted, route, reach)
+				return
+			}
+			next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
+			return
+		}
 		p := h.presented(r)
 		if p.turnedAway {
 			refusedOn(r, "turned-away")
@@ -633,6 +654,12 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer("/auth/laye/verify", h.handleLayeVerify)
 	// laye has the node mail an invitation laye holds (laye_mail.go).
 	mux.answer(layeInvitedPath, h.handleLayeInvited)
+	// laye has the node write a reach line its person approved on a peer (laye_reach.go).
+	mux.answer(layeReachPath, h.handleLayeReach)
+	// laye has the node admit a key its person approved on a peer (laye_admit.go).
+	mux.answer(layeAdmitPath, h.handleLayeAdmit)
+	// laye hands what was released for this node's agent (laye_delivered.go).
+	mux.answer(layeDeliveredPath, h.handleLayeDelivered)
 	// The ceremony: the element asks what can be linked, starts one, and collects
 	// the result. Everything the provider requires happens on this side of the
 	// wire, so no page holds a secret and no page holds logic.
@@ -889,6 +916,9 @@ func (h *Handler) rejectOutOfReach(w http.ResponseWriter, r *http.Request, admit
 		measure.String(measure.AttrLevel, admitted.LevelName()),
 		measure.String(measure.AttrRoute, route),
 	)
+	if h.outOfReach != nil {
+		h.outOfReach(admitted, route)
+	}
 	h.refuse(w, r, http.StatusForbidden, "this route is not yours")
 }
 

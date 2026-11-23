@@ -93,6 +93,30 @@ var toLaye = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) er
 // handToLaye hands what a connector said to the agent called to laye, which
 // collects it. It answers what laye said of it.
 func (s *QNTXServer) handToLaye(ctx context.Context, to, fromDID, from, says, contextID string) (string, error) {
+	return s.handToLayeAs(ctx, layeSaid{To: to, FromDID: fromDID, From: from, Says: says, Context: contextID})
+}
+
+// layeSaid is what laye is handed of one thing said to an agent (laye-front
+// ConnectorSaid): who to, by name and, for this node's own agent, by key;
+// whose it is; and whether it wakes the agent.
+type layeSaid struct {
+	To      string `json:"to"`
+	ToDID   string `json:"to_did,omitempty"`
+	FromDID string `json:"from_did"`
+	From    string `json:"from"`
+	Says    string `json:"says"`
+	Context string `json:"context"`
+	// The person who sees what waits for this node's own agent, which laye
+	// hands back to this node when it is released (laye_delivered.go).
+	Person string `json:"person,omitempty"`
+	Node   bool   `json:"node,omitempty"`
+	Quiet  bool   `json:"quiet,omitempty"`
+}
+
+// handToLayeAs hands one thing said to laye, which collects it, and answers
+// what laye said of it.
+func (s *QNTXServer) handToLayeAs(ctx context.Context, said layeSaid) (string, error) {
+	to, fromDID := said.To, said.FromDID
 	origin := s.layeOrigin()
 	if origin == "" {
 		return "", errors.New("am.toml names no [laye] origin to hand it to")
@@ -107,7 +131,7 @@ func (s *QNTXServer) handToLaye(ctx context.Context, to, fromDID, from, says, co
 	if err != nil {
 		return "", err
 	}
-	body, err := json.Marshal(map[string]string{"to": to, "from_did": fromDID, "from": from, "says": says, "context": contextID})
+	body, err := json.Marshal(said)
 	if err != nil {
 		return "", errors.Wrap(err, "what was said did not serialize")
 	}
@@ -135,10 +159,11 @@ func (s *QNTXServer) handToLaye(ctx context.Context, to, fromDID, from, says, co
 	if err := json.Unmarshal(answered, &got); err != nil {
 		return "", errors.Wrapf(err, "laye's answer is not a Task: %s", answered)
 	}
-	said := ""
+	answered = nil
+	text := ""
 	for _, p := range got.Task.Status.Message.Parts {
-		said += p.Text
+		text += p.Text
 	}
-	s.logger.Infow("what a connector said to a named agent is collected by laye", "to", to, "from", fromDID, "laye_task", got.Task.ID)
-	return said + " (laye task " + got.Task.ID + ")", nil
+	s.logger.Infow("what was said to an agent is collected by laye", "to", to, "from", fromDID, "node", said.Node, "laye_task", got.Task.ID)
+	return text + " (laye task " + got.Task.ID + ")", nil
 }
