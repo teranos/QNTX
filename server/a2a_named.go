@@ -275,7 +275,7 @@ type askedInProcess struct {
 func (a askedInProcess) RoundTrip(r *http.Request) (*http.Response, error) {
 	// What the binding writes is read as it writes it: a stream's events and
 	// its keep-alives reach the one who asks as they are sent.
-	ctx, cancel := context.WithCancel(auth.WithAdmission(r.Context(), a.as))
+	ctx, cancel := context.WithCancel(auth.InProcess(r.Context(), a.as))
 	reads, writes := io.Pipe()
 	answered := &answeredInProcess{header: http.Header{}, status: http.StatusOK, body: writes, began: make(chan struct{})}
 	sacred.Go("an agent of this node, asked in process", func() {

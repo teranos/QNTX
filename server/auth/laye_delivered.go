@@ -61,6 +61,6 @@ func (h *Handler) handleLayeDelivered(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	h.logger.Infow("What laye released for this node's agent is its turn", "to", delivered.To, "by", delivered.From, "task", task)
+	h.logger.Infow("What laye released for this node's agent is said to it, as a Task", "to", delivered.To, "by", delivered.From, "task", task)
 	h.writeJSON(w, http.StatusOK, map[string]string{"task": task})
 }
