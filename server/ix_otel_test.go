@@ -132,8 +132,8 @@ func refusedWith(t *testing.T, rec *httptest.ResponseRecorder, code int) *status
 	return said
 }
 
-// otlpRefusedAs is refusedWith for an export sent as encoding: the refusal must be
-// written in that encoding, so a JSON export answered in protobuf fails.
+// 「[Opus 5.5] otlpRefusedAs is refusedWith for an export sent as encoding: the refusal must be」
+// 「[Opus 5.5] written in that encoding, so a JSON export answered in protobuf fails.」
 func otlpRefusedAs(t *testing.T, rec *httptest.ResponseRecorder, code int, encoding string) *status.Status {
 	t.Helper()
 	if got := rec.Header().Get("Content-Type"); got != encoding {
@@ -310,7 +310,7 @@ func TestIxOtelIsReachedAsAWriteOfAttestations(t *testing.T) {
 	}
 }
 
-// One export is one JSON value: something after it is no export.
+// 「[Opus 5.5] One export is one JSON value: something after it is no export.」
 func TestJSONWithSomethingAfterTheExportIs400(t *testing.T) {
 	s, _, markets := standServer(t, "pond")
 	body := `{"resourceSpans":[]} {"resourceSpans":[]}`
@@ -320,7 +320,7 @@ func TestJSONWithSomethingAfterTheExportIs400(t *testing.T) {
 	}
 }
 
-// A field the schema does not know is discarded, whatever it is named.
+// 「[Opus 5.5] A field the schema does not know is discarded, whatever it is named.」
 func TestAnUnknownFieldNamedLikeAnIdIsDiscarded(t *testing.T) {
 	s, _, markets := standServer(t, "pond")
 	body := `{"resourceSpans":[{"resource":{"attributes":[],"spanId":"not hex"},` +
@@ -334,8 +334,8 @@ func TestAnUnknownFieldNamedLikeAnIdIsDiscarded(t *testing.T) {
 	}
 }
 
-// An all-zero trace or span id is invalid in OTLP, and would make every such
-// span one attestation.
+// 「[Opus 5.5] An all-zero trace or span id is invalid in OTLP, and would make every such」
+// 「[Opus 5.5] span one attestation.」
 func TestASpanWithAZeroIdIsRejected(t *testing.T) {
 	s, _, markets := standServer(t, "pond")
 	export := oneSpan(t)
@@ -349,7 +349,7 @@ func TestASpanWithAZeroIdIsRejected(t *testing.T) {
 	}
 }
 
-// A start past int64's nanoseconds is kept at its own time, not wrapped into the past.
+// 「[Opus 5.5] A start past int64's nanoseconds is kept at its own time, not wrapped into the past.」
 func TestAStartPastInt64NanosecondsIsNotWrapped(t *testing.T) {
 	s, _, markets := standServer(t, "pond")
 	export := oneSpan(t)
