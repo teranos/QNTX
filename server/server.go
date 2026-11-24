@@ -46,6 +46,8 @@ type QNTXServer struct {
 	deps                  *serverDependencies // Initialization dependencies (available during subsystem init)
 	store                 string              // Configured storage backend, "sqlite" or "parquet" (ADR-023)
 	held                  *namespaces.Held    // The node's universes, and the only way to reach one
+	carrier               fileCarrier         // Files kept here that a peer is to hold, and the one worker bringing them
+	looking               lookingAt           // The picture the reader is looking at now, and since when
 	bindAddress           string              // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	port                  int                 // The port am.toml says the node listens on
 	authHandler           *auth.Handler       // nil when auth.enabled = false

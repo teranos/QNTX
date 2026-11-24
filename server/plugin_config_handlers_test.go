@@ -74,4 +74,9 @@ func TestAPutKeepsTheKeysItDoesNotName(t *testing.T) {
 		"namespace": "Clean",
 		"bucket":    "media.cleanamsterdam.nl",
 	}, held(), "build.core sent holding nothing")
+
+	// "so its a way to utlize unused compute if you will."
+	// Whether it yields is the node's, held like namespace.
+	put(`{"config":{"yield":"true"}}`)
+	assert.Equal(t, "true", held()["yield"], "yield kept on the record")
 }

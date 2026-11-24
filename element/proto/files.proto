@@ -11,4 +11,8 @@ message FileUploadResult {
   string filename = 2;
   string content_type = 3;
   int64 size = 4;
+  // "i never wanted twelvelabs to be the source of truth"
+  // 「[Fable 5.2] The name its bytes have, sha256:<hex> (ADR-058). Any copy that hashes to it」
+  // 「[Fable 5.2] is the original.」
+  string asset = 5;
 }

@@ -446,7 +446,8 @@
     },
     "/api/files": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "PEER"
       ]
     },
     "/api/files/": {
@@ -861,6 +862,11 @@
         "SUPER"
       ]
     },
+    "/auth/admit": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/authorize": {
       "x-qntx-reach": [
         "ANYONE"
@@ -936,6 +942,11 @@
         "ANYONE"
       ]
     },
+    "/auth/files": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/forget": {
       "x-qntx-reach": [
         "ANYONE"
@@ -973,12 +984,27 @@
       ],
       "x-qntx-prefix": true
     },
+    "/auth/laye/admit": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/laye/challenge": {
       "x-qntx-reach": [
         "ANYONE"
       ]
     },
+    "/auth/laye/delivered": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/laye/invited": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/laye/reach": {
       "x-qntx-reach": [
         "ANYONE"
       ]

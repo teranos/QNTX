@@ -47,15 +47,9 @@ func (h *Handler) handleAdmit(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusUnauthorized, "the signing key is not admitted")
 		return
 	}
-	// The same key `i name` names: its own client, said yes to at the passkey.
-	// A token issued through another client, or a person's session, admits none.
-	if admitting.Grant != nil || admitting.TokenDID == "" || admitting.TokenDID != admitting.ClientDID {
-		h.writeError(w, http.StatusForbidden, "only a key the person said yes to admits a session's key")
-		return
-	}
-	held, live := h.askingToken(admitting.TokenDID)
-	if !live {
-		h.writeError(w, http.StatusUnauthorized, "this node holds no live grant for "+admitting.TokenDID)
+	held, asThePerson, status, why := h.admitter(admitting)
+	if why != "" {
+		h.writeError(w, status, why)
 		return
 	}
 	did := strings.TrimSpace(r.PostForm.Get("did"))
@@ -86,6 +80,12 @@ func (h *Handler) handleAdmit(w http.ResponseWriter, r *http.Request) {
 		}
 		until = &ends
 	}
+	// A session's key is its own client, and stands as the person who said
+	// yes; a key the person admitted stands at its own level.
+	client := did
+	if !asThePerson {
+		client = ""
+	}
 	id, err := h.tokens.Issue(IssuedToken{
 		Hash:                signedOnly(did),
 		DID:                 did,
@@ -96,7 +96,7 @@ func (h *Handler) handleAdmit(w http.ResponseWriter, r *http.Request) {
 		Level:               held.Level,
 		Namespaces:          held.Namespaces,
 		ExpiresAt:           until,
-		ClientDID:           did,
+		ClientDID:           client,
 	})
 	if err != nil {
 		h.attest(PredicateUnanswered, held.MintedBy, map[string]any{
@@ -114,4 +114,40 @@ func (h *Handler) handleAdmit(w http.ResponseWriter, r *http.Request) {
 		"token_type": strings.TrimSpace(signedScheme),
 		"expires_in": int(time.Until(*until) / time.Second),
 	})
+}
+
+// admitter is who admits a key, and the grant it is held on: a key the
+// person said yes to, signing as itself, or the person, carried by this
+// node's primary from where they approved it (laye_admit.go). Whether the
+// key admitted stands as the person, as a session's key does.
+//
+// "CAN WE PLEASE STOP EXPECTING AN AGENT TO REQUEST IT OWN PERMISSIONS AND ALSO BE PERFECT?"
+func (h *Handler) admitter(admitting Admission) (TokenInfo, bool, int, string) {
+	// The person, carried: ROOT here, by the word of this node's primary. The
+	// key is theirs at SUPER, as the primary carried them (LevelSuper in
+	// handleLayeAdmit), until it is revoked.
+	if admitting.Grant == nil && admitting.TokenDID != "" && admitting.TokenDID != admitting.ClientDID &&
+		h.signsForItsPeople(admitting.TokenDID) {
+		if !admitting.IsRoot() {
+			return TokenInfo{}, false, http.StatusForbidden, admitting.Identity + " is not ROOT here, and admitting a key is ROOT's"
+		}
+		return TokenInfo{
+			DID:                 admitting.TokenDID,
+			MintedBy:            admitting.Identity,
+			MintedByUser:        admitting.UserID,
+			MintedByDisplayName: admitting.DisplayName,
+			Level:               LevelSuper,
+			Namespaces:          admitting.Namespaces,
+		}, false, 0, ""
+	}
+	// The same key `i name` names: its own client, said yes to at the passkey.
+	// A token issued through another client, or a person's session, admits none.
+	if admitting.Grant != nil || admitting.TokenDID == "" || admitting.TokenDID != admitting.ClientDID {
+		return TokenInfo{}, false, http.StatusForbidden, "only a key the person said yes to admits a session's key"
+	}
+	held, live := h.askingToken(admitting.TokenDID)
+	if !live {
+		return TokenInfo{}, false, http.StatusUnauthorized, "this node holds no live grant for " + admitting.TokenDID
+	}
+	return held, true, 0, ""
 }

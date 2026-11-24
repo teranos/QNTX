@@ -22,6 +22,7 @@ type Config struct {
 	Agent      AgentConfig      `mapstructure:"agent"`
 	Collected  CollectedConfig  `mapstructure:"collected"`
 	Etcd       EtcdConfig       `mapstructure:"etcd"`
+	Files      FilesConfig      `mapstructure:"files"`
 
 	// said is the keys something said, recorded as the config is read.
 	said map[string]bool
@@ -38,6 +39,17 @@ type EtcdConfig struct {
 	// it keeps; PasswordFile holds its password. Empty asks as nobody.
 	User         string `mapstructure:"user"`
 	PasswordFile string `mapstructure:"password_file"`
+}
+
+// "and have a read on everything"
+// FilesConfig is what the node does with the files it holds. ReadWith names
+// the provider that reads its pictures at night, e.g. "gaze"; empty reads none.
+type FilesConfig struct {
+	ReadWith string `mapstructure:"read_with"`
+	// "to me it feels like k should own my Media Assets"
+	// LetGoOnceBrought removes this node's copy of a file once the peer it was
+	// meant for holds the same bytes. Off: every copy stays.
+	LetGoOnceBrought bool `mapstructure:"let_go_once_brought"`
 }
 
 // AgentConfig is the agents this node runs (ADR-048).
@@ -207,6 +219,11 @@ type NodesConfig struct {
 	// While it is down this node keeps going, and nobody new logs in.
 	Primary string       `mapstructure:"primary"`
 	Peers   []PeerConfig `mapstructure:"peers"` // On the primary: its peers, one line each.
+	// "just for clarification, the bytes dont go through Q to K but L to K right?"
+	// Direct is, on a peer, where it reaches another peer itself, by the name
+	// the primary calls it: k = "http://k.example.net:8770". What it brings
+	// there goes that way and not by the primary.
+	Direct map[string]string `mapstructure:"direct"`
 }
 
 // "LAYE IN FRONT OF QNTX"
@@ -215,6 +232,9 @@ type NodesConfig struct {
 // are laye's own. Empty is no laye in front.
 type LayeConfig struct {
 	DID string `mapstructure:"did"` // laye's did:key, which carries a session to this node.
+	// Origin is where laye answers. What a connector says to a session is
+	// handed there, and collected by laye. Empty, the node keeps it.
+	Origin string `mapstructure:"origin"`
 }
 
 // PeerConfig is one peer of the primary.
