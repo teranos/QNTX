@@ -171,7 +171,7 @@ func (s *QNTXServer) keepNumbers(admitted auth.Admission, store ats.AttestationS
 						Attributes: attributes,
 					})
 					switch {
-					case err == nil, ats.AlreadyExists(err):
+					case err == nil, ats.AlreadyExists(err), keptMeanwhile(store, id, err):
 					case ats.Unwritable(err):
 						reject(1, err.Error())
 					default:
