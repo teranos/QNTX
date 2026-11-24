@@ -33,12 +33,12 @@ What holds there holds here:
 
 ## Side by side
 
-- A machine has its node: "A comet lands from its machine's node" ([[ADR-050-comet]]). The laptop's, the desktop's and the server's are three nodes, and each knows the others as its peers (`a2a Peers`).
+- A machine has its node: "A comet lands from its machine's node" ([[ADR-050-Comet]]). The laptop's, the desktop's and the server's are three nodes, and each knows the others as its peers (`a2a Peers`).
 - A session a person starts on their machine is already seen by that machine's node: 「[Fable] what ground sees is written to a node.」 ([[ADR-055-Agent-Memory]]), and `am ground` answers the sessions started and left (`server/am_ground.go`).
 - A session the node starts is the node's: "The node hosts the process. It starts it, resumes it and stops it" ([[ADR-048-Node-Agent]]).
 - The harness plugin of a node is where both kinds are one thing: every session of that harness on that machine, each its own agent to A2A, "reached by its tenant" ([[ADR-048-Node-Agent]]).
 - A session on another machine is its node's, and is spoken to as a peer's agent is.
-- "The node reaches no machine" ([[ADR-050-comet]]), so a session is spoken to where it looks: "Say an Agent session is still a session as you know, but it communicates with the room, or rather it has access to it", "Say you can wake a specific Agent so it will check the room", "Say all your Node Agents are all in the Node Room" ([[ADR-057-Agent-Rooms]]).
+- "The node reaches no machine" ([[ADR-050-Comet]]), so a session is spoken to where it looks: "Say an Agent session is still a session as you know, but it communicates with the room, or rather it has access to it", "Say you can wake a specific Agent so it will check the room", "Say all your Node Agents are all in the Node Room" ([[ADR-057-Agent-Rooms]]).
 - "In a QNTX Cluster, only one Node is ever responsible for Rooms Services cluster-wide" ([[ADR-057-Agent-Rooms]]): the sessions of every machine's harness meet there.
 
 ## How a session on a machine is told
