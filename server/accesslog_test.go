@@ -3,6 +3,9 @@ package server
 import (
 	"fmt"
 	"github.com/teranos/QNTX/plugin"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -311,4 +314,33 @@ func TestASecondPollOfAHeldPathDoesNotKeepItsRequestLineEither(t *testing.T) {
 		}
 		return true
 	})
+}
+
+// What a client polls on purpose is not a span. A request for anything else,
+// and a POST that builds a comet, is.
+func TestThePollsTheNodeIsAskedForOnPurposeAreNotSpans(t *testing.T) {
+	recorder := tracetest.NewSpanRecorder()
+	handler := otelhttp.NewHandler(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}), "served",
+		otelhttp.WithFilter(traced),
+		otelhttp.WithTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))),
+	)
+	ask := func(method, path string) {
+		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(method, path, nil))
+	}
+
+	ask(http.MethodGet, "/am/statusline")
+	ask(http.MethodGet, "/am/version")
+	ask(http.MethodGet, "/api/plugins")
+	ask(http.MethodGet, "/comet/teranos/QNTX/aarch64-darwin/1")
+	ask(http.MethodHead, "/comet/teranos/QNTX/aarch64-darwin/1")
+	if got := len(recorder.Ended()); got != 0 {
+		t.Fatalf("polls made %d spans, want none", got)
+	}
+
+	ask(http.MethodGet, "/api/collected")
+	ask(http.MethodPost, "/comet/teranos/QNTX/aarch64-darwin")
+	if got := len(recorder.Ended()); got != 2 {
+		t.Fatalf("a request and a build made %d spans, want 2", got)
+	}
 }

@@ -162,8 +162,9 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		// net/http/pprof's init, or a route someone forgot to declare — is not
 		// on this one and answers 404.
 		// Every request served is a span, so a caller's journey through the
-		// node is read in Sentry; the gate names it by its route.
-		Handler:           otelhttp.NewHandler(strictTransport(s.served), "served"),
+		// node is read in Sentry; the gate names it by its route. What a client
+		// polls on purpose is not a journey (traced).
+		Handler:           otelhttp.NewHandler(strictTransport(s.served), "served", otelhttp.WithFilter(traced)),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill
