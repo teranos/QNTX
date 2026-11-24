@@ -72,9 +72,11 @@ func polled(r *http.Request, status int) bool {
 // traced is whether a request is a span. The version, plugins and statusline
 // polls and a ground reading its comet are asked for on purpose and often, and
 // were two thirds of the spans the node shipped in a week; their latency is not
-// a question anyone asks Sentry. A refusal is still a line in the access log.
+// a question anyone asks Sentry. Only the reading is a poll: a POST to the same
+// path, which adds a plugin, is a request. A refusal is still a line in the access log.
 func traced(r *http.Request) bool {
-	return !heartbeatPaths[r.URL.Path] && !asksForComet(r)
+	reads := r.Method == http.MethodGet || r.Method == http.MethodHead
+	return !(reads && heartbeatPaths[r.URL.Path]) && !asksForComet(r)
 }
 
 // asksForComet is a GET or HEAD under /comet/: a ground reading, not a build.

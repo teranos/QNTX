@@ -340,7 +340,8 @@ func TestThePollsTheNodeIsAskedForOnPurposeAreNotSpans(t *testing.T) {
 
 	ask(http.MethodGet, "/api/collected")
 	ask(http.MethodPost, "/comet/teranos/QNTX/aarch64-darwin")
-	if got := len(recorder.Ended()); got != 2 {
-		t.Fatalf("a request and a build made %d spans, want 2", got)
+	ask(http.MethodPost, "/api/plugins")
+	if got := len(recorder.Ended()); got != 3 {
+		t.Fatalf("a request, a build and a plugin added made %d spans, want 3", got)
 	}
 }
