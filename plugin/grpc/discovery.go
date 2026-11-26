@@ -1140,6 +1140,14 @@ func (m *PluginManager) launchPlugin(ctx context.Context, pluginCfg PluginConfig
 		err = errors.Wrapf(err, "failed to start plugin %s (cmd=%v)", pluginCfg.Name, cmd.Args)
 		return nil, 0, sqlclose.With(err, logFile.Close(), logPath)
 	}
+	// "so its like a deprioritised plugin, they will run, but they will get out of the way more than they want to be active,"
+	if Yields(pluginCfg.Name) {
+		if err := giveWay(cmd.Process.Pid); err != nil {
+			m.logger.Warnw("A plugin that yields is not at the lowest priority", "name", pluginCfg.Name, "pid", cmd.Process.Pid, "error", err)
+		} else {
+			m.logger.Infow("A plugin that yields runs at the lowest priority", "name", pluginCfg.Name, "pid", cmd.Process.Pid)
+		}
+	}
 
 	// Wait for the port announcement with a short timeout (2 seconds)
 	// The plugin should announce its port almost immediately after binding

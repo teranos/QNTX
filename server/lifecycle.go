@@ -54,6 +54,7 @@ func (s *QNTXServer) startBackgroundServices() {
 	s.wg.Go("rooms.githubWakes", s.tellDueAgents)
 	s.wg.Go("memory.inStep", s.keepMemoriesInStep)
 	s.wg.Go("collected.deliver", s.keepDeliveringCollected)
+	s.wg.Go("passkeys.kept", s.keepLayesPasskeys)
 	// On its own: a phone Apple is slow to reach holds up nothing that is delivered.
 	s.wg.Go("waits.shown", s.keepShowingWhatWaits)
 	// Pulse runs because the node runs. It is not separate enough from the node
@@ -237,12 +238,6 @@ func (s *QNTXServer) Stop() error {
 	for _, engine := range s.allEngines() {
 		engine.Stop()
 	}
-	if s.watcherDB != nil {
-		sqlclose.Log(s.watcherDB.Close(), s.logger, "the watcher db")
-	}
-	if s.pulseReadDB != nil && s.pulseReadDB != s.nodeDB {
-		sqlclose.Log(s.pulseReadDB.Close(), s.logger, "the pulse read db")
-	}
 	// The embeddings handler reads the node's own db, which its opener closes
 	// after Stop returns. Closed here, every reader after this line failed.
 
@@ -324,6 +319,15 @@ waiting:
 				"timeout", ShutdownTimeout, "running", s.wg.Running())
 			break waiting
 		}
+	}
+
+	// Closed after the requests and goroutines that read them have stopped, and
+	// before the node's own db, which its opener closes last, after Stop returns.
+	if s.watcherDB != nil {
+		sqlclose.Log(s.watcherDB.Close(), s.logger, "the watcher db")
+	}
+	if s.pulseReadDB != nil && s.pulseReadDB != s.nodeDB {
+		sqlclose.Log(s.pulseReadDB.Close(), s.logger, "the pulse read db")
 	}
 
 	// Every namespace sends what its landing file holds before the process

@@ -30,6 +30,11 @@ const (
 	// LevelUser is the normal user. It reaches no store and sees no system on
 	// its own, and belongs to no door.
 	LevelUser Level = "USER"
+	// "all other nodes are peers of the primary"
+	// LevelPeer is a peer node the primary brought something from, as that
+	// node and as no person: the primary signs which peer it is. It reaches
+	// what a line names it for, and nothing on its own.
+	LevelPeer Level = "PEER"
 	// LevelConnector is a token issued through a minted client (ADR-038). No
 	// line names it: it reaches by a role its client's label holds, and nothing on its own.
 	LevelConnector Level = "CONNECTOR"

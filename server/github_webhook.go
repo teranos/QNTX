@@ -202,11 +202,10 @@ func (g *gitHub) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 		g.dispatchApp(tag)
 	}
 	names := g.host.buildsMovedBy(landed)
-	filling := g.host.vaultsMovedBy(landed)
 	dispatching := g.followsMovedBy(landed)
 	rebuilding := g.host.cometsMovedBy(landed)
 	fixed := g.fixturesOf(r.Context(), event, body)
-	answer := map[string]any{"building": names, "filling": filling, "dispatching": dispatching, "rebuilding": rebuilding, "fixtures": fixed}
+	answer := map[string]any{"building": names, "dispatching": dispatching, "rebuilding": rebuilding, "fixtures": fixed}
 	g.deliveredInto(answer, r.Context(), event, body)
 	respond(w, g.host.log(), http.StatusOK, answer)
 }

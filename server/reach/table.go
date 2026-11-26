@@ -68,6 +68,8 @@ var levels = map[auth.Level]bool{
 	auth.LevelAttestor:           true,
 	auth.LevelPublicRegistration: true,
 	auth.LevelUser:               true,
+	// A peer node, in the tablet only: no runtime line names it.
+	auth.LevelPeer: true,
 }
 
 // runtimeLevels is every level a runtime line may name, and only on a plugin's

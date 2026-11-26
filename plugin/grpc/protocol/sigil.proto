@@ -440,6 +440,9 @@ message NodeGoogle {
   repeated GoogleSpendItem items = 24;
   // 「[Opus 5.5] Where ROOT goes to make a namespace's key, by saying yes at Google once: namespace appended.」
   string key_connect = 25;
+  // "I got this from you, not from the mail"
+  // 「[Opus 5.5] Connect key for each namespace the node serves that has no key yet, by namespace.」
+  map<string, string> key_connects = 26;
 }
 
 // 「[Opus 5.5] GoogleSpendItem is one thing that spends at Google, in its own project, halted on its own.」

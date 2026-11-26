@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	errors "github.com/teranos/sacred-error"
@@ -25,7 +26,18 @@ var mimeByExtension = map[string]string{
 	".webp": "image/webp",
 	".svg":  "image/svg+xml",
 	".txt":  "text/plain",
+	".m4a":  "audio/mp4",
+	".webm": "audio/webm",
+	".wav":  "audio/wav",
+	".mp3":  "audio/mpeg",
+	".ogg":  "audio/ogg",
+	".heic": "image/heic",
+	".dng":  "image/x-adobe-dng",
 }
+
+// KeepFileMost is the largest KeepFile message the node takes: a file as
+// large as /api/files takes (50 MiB), and room for the rest of the message.
+const KeepFileMost = 51 << 20
 
 // FileServiceServer implements the FileService gRPC server.
 // It reads files from the core server's filesystem and returns them as base64.
@@ -34,6 +46,81 @@ type FileServiceServer struct {
 	filesDir  string
 	authToken string
 	logger    *zap.SugaredLogger
+	keep      FileKeeper
+	// Set after the service is serving, while plugins may already be calling.
+	plugins atomic.Pointer[PluginNames]
+}
+
+// SetPluginNames hands the service which plugin each token the node handed out
+// is for (ADR-046). A plugin standing in a namespace is handed a token of its
+// own and not the shared one, and reaches this service with it.
+func (s *FileServiceServer) SetPluginNames(plugins PluginNames) {
+	s.plugins.Store(&plugins)
+}
+
+// calling is who a token is: a plugin by the name the node minted its token
+// for, or nobody named for the shared token. Any other token is refused.
+func (s *FileServiceServer) calling(token string) (plugin string, err error) {
+	if sameToken(token, s.authToken) {
+		return "", nil
+	}
+	if names := s.plugins.Load(); names != nil {
+		if plugin, minted := (*names)(token); minted {
+			return plugin, nil
+		}
+	}
+	return "", errors.New("invalid authentication token")
+}
+
+// KeptFile is what the node says of a file it kept.
+type KeptFile struct {
+	ID          string // where the node serves the bytes
+	Asset       string // "sha256:<hex>" of the bytes
+	ContentType string
+	Size        int64
+	// BroughtTo is the peer the file was brought to and BroughtID the id that
+	// peer serves it under. NotBrought is why a file meant for a peer is not
+	// there: this node still keeps it.
+	BroughtTo  string
+	BroughtID  string
+	NotBrought string
+}
+
+// FileKeeper keeps a file for who brought it, as the node keeps one a person brings.
+// bringTo names the peer that is to hold it, or nothing.
+type FileKeeper func(by, filename string, content []byte, bringTo string) (KeptFile, error)
+
+// KeepWith hands the service how the node keeps a file. Until it is handed
+// one, KeepFile answers that this node keeps none for a plugin.
+func (s *FileServiceServer) KeepWith(keep FileKeeper) { s.keep = keep }
+
+// KeepFile hands the node a file to keep.
+func (s *FileServiceServer) KeepFile(ctx context.Context, req *protocol.KeepFileRequest) (*protocol.KeepFileResponse, error) {
+	plugin, err := s.calling(req.AuthToken)
+	if err != nil {
+		return &protocol.KeepFileResponse{Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
+	}
+	// Who brought it is the plugin the node minted the token for, whatever the
+	// call says of itself. Only the shared token leaves that to the call.
+	by := plugin
+	if by == "" {
+		by = req.By
+	}
+	if by == "" {
+		return &protocol.KeepFileResponse{Error: "a file is kept for the one who brought it, and this names nobody"}, nil
+	}
+	if s.keep == nil {
+		return &protocol.KeepFileResponse{Error: "this node keeps no file for a plugin"}, nil
+	}
+	kept, err := s.keep(by, req.Filename, req.Content, req.BringTo)
+	if err != nil {
+		return &protocol.KeepFileResponse{Error: err.Error()}, nil //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
+	}
+	s.logger.Debugw("File kept via gRPC", "by", by, "filename", req.Filename, "file_id", kept.ID, "asset", kept.Asset, "size", kept.Size)
+	return &protocol.KeepFileResponse{
+		Success: true, FileId: kept.ID, Asset: kept.Asset, ContentType: kept.ContentType, Size: kept.Size,
+		BroughtTo: kept.BroughtTo, BroughtFileId: kept.BroughtID, NotBrought: kept.NotBrought,
+	}, nil
 }
 
 // NewFileServiceServer creates a new file service gRPC server.
@@ -47,7 +134,7 @@ func NewFileServiceServer(filesDir string, authToken string, logger *zap.Sugared
 
 // ReadFileBase64 reads a stored file and returns its MIME type and base64-encoded content.
 func (s *FileServiceServer) ReadFileBase64(ctx context.Context, req *protocol.ReadFileRequest) (*protocol.ReadFileResponse, error) {
-	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+	if _, err := s.calling(req.AuthToken); err != nil {
 		return &protocol.ReadFileResponse{ //nolint:nilerr // the failure travels in the response payload; a transport error would discard it
 			Success: false,
 			Error:   err.Error(),

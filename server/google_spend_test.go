@@ -6,6 +6,7 @@ import (
 	"html"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -28,6 +29,8 @@ type standInKeys struct {
 	projects map[string]map[string]any
 	keys     map[string]map[string]any
 	strings  map[string]string
+	// 「[Opus 5.5] refusingKeys is API Keys refusing to mint, after the project and its meter were made.」
+	refusingKeys bool
 }
 
 func keysStandingIn(t *testing.T) *standInKeys {
@@ -67,6 +70,9 @@ func (k *standInKeys) answer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		write(map[string]any{"name": "projects/9" + id[len(id)-6:], "projectId": id})
+	case strings.HasSuffix(path, "/locations/global/keys") && r.Method == http.MethodPost && k.refusingKeys:
+		w.WriteHeader(http.StatusForbidden)
+		write(map[string]any{"error": map[string]any{"message": "the stand-in refuses to mint"}})
 	case strings.HasSuffix(path, "/locations/global/keys") && r.Method == http.MethodPost:
 		name := strings.TrimPrefix(path, "/v2/") + "/k" + string(rune('0'+len(k.keys)+1))
 		k.keys[name] = sent
@@ -134,9 +140,10 @@ func TestConnectingCostsMetersTheNodeInItsOwnProject(t *testing.T) {
 	assert.Equal(t, theProject.ProjectID, node.GetProjectId())
 	assert.Equal(t, "billingAccounts/0-1/budgets/"+id, node.GetBudget())
 
-	// Pressed again, the node's meter is kept, not made twice.
-	_, err := s.connectGoogleCosts(context.Background(), "root-token-3", "google:root-sub")
+	// Pressed again, the node's meter is kept, not made twice, and counted once.
+	said, err := s.connectGoogleCosts(context.Background(), "root-token-3", "google:root-sub")
 	require.NoError(t, err)
+	assert.Contains(t, said, "from 2 budgets")
 	b.mu.Lock()
 	assert.Len(t, b.order, 1)
 	b.mu.Unlock()
@@ -307,7 +314,8 @@ func TestAnUnmeteredHaltIsMailedWithConnectCosts(t *testing.T) {
 	require.Len(t, m.Bodies, 2)
 	text, page := m.Bodies[0].Content, m.Bodies[1].Content
 	assert.Contains(t, text, connect, "the mail goes where the element's Connect costs goes")
-	assert.Contains(t, page, `href="`+html.EscapeString(connect)+`">Connect costs</a>`)
+	assert.Contains(t, page, `href="`+html.EscapeString(connect)+`"`)
+	assert.Contains(t, page, `>Connect costs</a>`)
 	assert.NotContains(t, text, "resumes by itself", "no budget frees up a halt the node does not meter")
 }
 
@@ -321,4 +329,91 @@ func TestAnUnmeteredHaltWithoutConnectCostsSaysNoResume(t *testing.T) {
 		assert.NotContains(t, body.Content, "href=")
 		assert.Contains(t, body.Content, "presses Connect costs again")
 	}
+}
+
+// "I got this from you, not from the mail": the node offers Connect key itself, one press
+// for each namespace it serves that has no key yet.
+func TestTheNodeOffersAKeyForEachNamespaceWithoutOne(t *testing.T) {
+	s, _, _ := wiredForCosts(t)
+	keysStandingIn(t)
+	served := namespacesOfferedAKey(t, s)
+	require.Contains(t, served, "garden")
+	assert.NotContains(t, served, auth.NamespaceSystem, "the node's own namespace spends as the node")
+	at, err := url.Parse(served["garden"])
+	require.NoError(t, err)
+	assert.Equal(t, "key", at.Query().Get("thing"))
+	assert.Equal(t, "garden", at.Query().Get("namespace"))
+	assert.Equal(t, theProject.ProjectID, at.Query().Get("project"))
+
+	_, err = s.connectGoogleKey(context.Background(), "root-token-4", "google:root-sub", "garden")
+	require.NoError(t, err)
+	assert.NotContains(t, namespacesOfferedAKey(t, s), "garden", "a namespace with its key is offered none")
+}
+
+// 「[Opus 5.5] Before costs are connected, no key is offered: a key is metered on the node's billing.」
+func TestNoKeyIsOfferedBeforeCostsAreConnected(t *testing.T) {
+	s, _ := connectedToGoogle(t)
+	assert.Empty(t, rootAsksGoogle(t, s).GetKeyConnects())
+}
+
+// 「[Opus 5.5] The mail saying the node reads its costs carries a Connect key press for each namespace.」
+func TestTheCostsMailOffersTheKeys(t *testing.T) {
+	s, _ := connectedToGoogle(t)
+	billingStandingIn(t, s, "billingAccounts/0-1", "monthly")
+	proved := make(chan services.NodeMail, 8)
+	s.googleOutcome = func(m services.NodeMail) { proved <- m }
+	_, err := s.connectGoogleCosts(context.Background(), "root-token-2", "google:root-sub")
+	require.NoError(t, err)
+	var m services.NodeMail
+	select {
+	case m = <-proved:
+	case <-time.After(10 * time.Second):
+		t.Fatal("wiring the costs never said how it ended")
+	}
+	require.Contains(t, m.Subject, "reads what Google Cloud costs")
+	press := namespacesOfferedAKey(t, s)["garden"]
+	require.NotEmpty(t, press)
+	page, err := services.BodyOf(m.Bodies, services.MailHTML)
+	require.NoError(t, err)
+	assert.Contains(t, page, `href="`+html.EscapeString(press)+`"`)
+	assert.Contains(t, page, ">Connect a key for garden</a>")
+	text, err := services.BodyOf(m.Bodies, services.MailText)
+	require.NoError(t, err)
+	assert.Contains(t, text, press)
+}
+
+// 「[Opus 5.5] After Connect costs, the page that says so offers the keys too.」
+func TestTheNextPressesAreTheKeysToConnect(t *testing.T) {
+	s, _, _ := wiredForCosts(t)
+	next := s.googleNext()
+	require.NotEmpty(t, next)
+	var labels []string
+	for _, press := range next {
+		labels = append(labels, press.Label)
+	}
+	assert.Contains(t, labels, "Connect a key for garden")
+}
+
+func namespacesOfferedAKey(t *testing.T, s *QNTXServer) map[string]string {
+	t.Helper()
+	return rootAsksGoogle(t, s).GetKeyConnects()
+}
+
+// 「[Opus 5.5] A namespace whose project was made and metered but whose key was not kept is still」
+// 「[Opus 5.5] offered its Connect key, and pressing it again finishes in the same project.」
+func TestAKeyNotKeptIsStillOffered(t *testing.T) {
+	s, _, _ := wiredForCosts(t)
+	k := keysStandingIn(t)
+	k.refusingKeys = true
+	_, err := s.connectGoogleKey(context.Background(), "root-token-4", "google:root-sub", "garden")
+	require.Error(t, err)
+	assert.Contains(t, namespacesOfferedAKey(t, s), "garden", "the key was never kept")
+
+	k.mu.Lock()
+	k.refusingKeys = false
+	k.mu.Unlock()
+	_, err = s.connectGoogleKey(context.Background(), "root-token-5", "google:root-sub", "garden")
+	require.NoError(t, err)
+	assert.Len(t, k.projects, 1, "the same project, not a second")
+	assert.NotContains(t, namespacesOfferedAKey(t, s), "garden")
 }

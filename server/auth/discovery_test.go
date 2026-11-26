@@ -51,6 +51,22 @@ func TestTheProtectedResourceDocumentNamesThisNode(t *testing.T) {
 	assert.Equal(t, []string{"header"}, doc.BearerMethodsSupported)
 }
 
+// A node whose people sign in at laye names laye as who issues tokens for it:
+// a connector signs in there, and this node asks laye who its token is.
+func TestTheProtectedResourceDocumentNamesThePrimary(t *testing.T) {
+	h, _, _ := authorizingHandler(t)
+	require.NoError(t, h.SetPrimary("https://laye.example"))
+
+	w := httptest.NewRecorder()
+	h.handleProtectedResourceMetadata(w, httptest.NewRequest(http.MethodGet, protectedResourcePath, nil))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var doc protectedResourceMetadata
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &doc))
+	assert.Equal(t, nodeOrigin, doc.Resource)
+	assert.Equal(t, []string{"https://laye.example"}, doc.AuthorizationServers)
+}
+
 // An MCP client that has never seen this node starts at a 401 and reads where
 // to authenticate off it (RFC 9728 §5.1). A redirect to the login page is a
 // page for a person, and the client cannot read it.

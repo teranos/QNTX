@@ -51,6 +51,7 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 	// Services that did not start are held with why: each plugin asking for
 	// one in its Initialize is refused with it, and the node boots without.
 	var endpoints grpcplugin.Endpoints
+	servicesManager.KeepFilesWith(s.KeepFileForPlugin)
 	if err := servicesManager.Start(s.ctx, s.held.Served(), queue, s.scheduleStore, filesDir); err != nil {
 		endpoints = grpcplugin.UnservedEndpoints(errors.Wrap(err, "the node's plugin services did not start, so no plugin has ATS, queue or schedule access"))
 	} else {
@@ -93,6 +94,11 @@ func (pluginServicesSubsystem) Init(s *QNTXServer) error {
 
 	// "a schedule remembers who created it and where", and each run goes there.
 	servicesManager.SetCallers(s.callerOf)
+
+	// "and slowly": what this node kept for a peer before it last stopped is brought now.
+	s.carryWhatWaits()
+	// "so its a way to utlize unused compute if you will."
+	s.wg.Go("plugins.yield", s.yieldLoop)
 	servicesManager.SetOpenRun(s.openRun)
 
 	// Mail to a User on a plugin's behalf (ADR-041): the Users exist once auth

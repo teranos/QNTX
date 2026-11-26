@@ -446,7 +446,8 @@
     },
     "/api/files": {
       "x-qntx-reach": [
-        "ROOT"
+        "ROOT",
+        "PEER"
       ]
     },
     "/api/files/": {
@@ -762,66 +763,6 @@
       ],
       "x-qntx-prefix": true
     },
-    "/api/vault": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/bind": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/dirs": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/disable": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/enable": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/owners": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/repos": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/repository": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/send": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/states": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/subdirs": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
-    "/api/vault/unbind": {
-      "x-qntx-reach": [
-        "ROOT"
-      ]
-    },
     "/api/vectors/{index}": {
       "x-qntx-reach": [
         "ROOT"
@@ -859,6 +800,11 @@
       "x-qntx-reach": [
         "ROOT",
         "SUPER"
+      ]
+    },
+    "/auth/admit": {
+      "x-qntx-reach": [
+        "ANYONE"
       ]
     },
     "/auth/authorize": {
@@ -936,6 +882,11 @@
         "ANYONE"
       ]
     },
+    "/auth/files": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/forget": {
       "x-qntx-reach": [
         "ANYONE"
@@ -973,12 +924,27 @@
       ],
       "x-qntx-prefix": true
     },
+    "/auth/laye/admit": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/laye/challenge": {
       "x-qntx-reach": [
         "ANYONE"
       ]
     },
+    "/auth/laye/delivered": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
     "/auth/laye/invited": {
+      "x-qntx-reach": [
+        "ANYONE"
+      ]
+    },
+    "/auth/laye/reach": {
       "x-qntx-reach": [
         "ANYONE"
       ]

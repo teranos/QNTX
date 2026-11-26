@@ -412,6 +412,66 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
     Ok(())
 }
 
+impl SqliteStore {
+    // "if k took the list in memory and wrote it in one transaction, the drain would go far faster"
+    //
+    /// Many attestations in one transaction: one commit, so one sync of the
+    /// WAL for the whole list where a put each is several. Each is answered as
+    /// `put` would answer it, in the order given: one the store refuses, one
+    /// it holds already (or that came earlier in the list) and one whose write
+    /// failed leave the others written, each in a savepoint of its own.
+    pub fn put_many(
+        &mut self,
+        attestations: Vec<Attestation>,
+    ) -> StoreResult<Vec<StoreResult<()>>> {
+        let before = self.put_count;
+        let mut tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(SqliteError::from)?;
+        let mut seen = std::collections::HashSet::new();
+        let mut answers = Vec::with_capacity(attestations.len());
+        for attestation in attestations {
+            if let Err(e) = attestation.writable() {
+                answers.push(Err(StoreError::from(e)));
+                continue;
+            }
+            let held = !seen.insert(attestation.id.clone())
+                || tx
+                    .query_row(
+                        "SELECT 1 FROM attestations WHERE id = ? LIMIT 1",
+                        [&attestation.id],
+                        |_| Ok(()),
+                    )
+                    .optional()
+                    .map_err(SqliteError::from)?
+                    .is_some();
+            if held {
+                answers.push(Err(StoreError::AlreadyExists(attestation.id.clone())));
+                continue;
+            }
+            let one = tx.savepoint().map_err(SqliteError::from)?;
+            match put_attestation(&one, &attestation) {
+                Ok(()) => {
+                    one.commit().map_err(SqliteError::from)?;
+                    self.put_count += 1;
+                    answers.push(Ok(()));
+                }
+                // Dropped, the savepoint rolls back what this one wrote.
+                Err(e) => answers.push(Err(e)),
+            }
+        }
+        tx.commit().map_err(SqliteError::from)?;
+        // The periodic checkpoint `put` keeps, for every 5000 crossed.
+        if before / 5000 != self.put_count / 5000 {
+            self.conn
+                .execute_batch("PRAGMA wal_checkpoint(PASSIVE)")
+                .map_err(|e| StoreError::Backend(format!("wal_checkpoint(PASSIVE) failed: {e}")))?;
+        }
+        Ok(answers)
+    }
+}
+
 impl AttestationStore for SqliteStore {
     fn put(&mut self, attestation: Attestation) -> StoreResult<()> {
         attestation.writable()?;

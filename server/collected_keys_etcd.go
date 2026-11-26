@@ -15,7 +15,7 @@ import (
 func (s *QNTXServer) collectedKeysOfNode() collectedKeeper {
 	cfg, err := appcfg.Load()
 	if err != nil || cfg.Etcd.Endpoint == "" {
-		// 「[Opus 5.5] am.toml that does not read refuses the node elsewhere first (the etcd window).」
+		// 「[Opus 5.5] am.toml that does not read refuses the node elsewhere first (etcd_named_off.go).」
 		return nil
 	}
 	keeper := &etcdCollectedKeys{endpoint: cfg.Etcd.Endpoint}
@@ -45,7 +45,7 @@ func (e *etcdCollectedKeys) Set(whole map[string][]byte) error {
 		return e.noPrefix
 	}
 	if e.keys == nil {
-		keys, err := etcdcgo.OpenKeys(e.endpoint, e.prefix)
+		keys, err := openEtcdKeys(e.endpoint, e.prefix)
 		if err != nil {
 			return errors.Wrapf(err, "what is collected was not kept in etcd at %s", e.endpoint)
 		}

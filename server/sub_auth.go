@@ -338,6 +338,9 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	// different hosts, and a real one does.
 	authHandler.SetPublicOrigin(s.deps.cfg.Auth.PublicOrigin)
 	// The primary node: people log in there, and its tokens are accepted here.
+	if err := authHandler.SetDirect(s.deps.cfg.Nodes.Direct); err != nil {
+		return err
+	}
 	if err := authHandler.SetPrimary(s.deps.cfg.Nodes.Primary); err != nil {
 		return err
 	}
@@ -349,6 +352,16 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	if s.deps.cfg.Laye.DID != "" {
 		authHandler.SetLayeSays(layeSays())
 	}
+	// A request refused for reach puts the reach it lacked before its person at laye.
+	if s.deps.cfg.Laye.Origin != "" {
+		authHandler.SetOutOfReach(s.tellLayeOutOfReach)
+		// A key signing for this node that it holds nothing for waits on its ROOT to be admitted.
+		authHandler.SetUnknownKey(s.tellLayeUnknownKey)
+		// What laye releases for the Node Agent is its turn (laye_delivered.go).
+		authHandler.SetLayeDelivered(s.layeDelivered)
+	}
+	// "AND LAYE OWNS IDENTITY": the names agents hold, in the etcd am.toml names.
+	s.names = namesAtLaye(s.deps.cfg.Etcd.Endpoint)
 	// On the primary, its peers.
 	for _, peer := range s.deps.cfg.Nodes.Peers {
 		if err := authHandler.DeclarePeer(peer.Name, peer.DID, peer.Namespaces, peer.Origin, peer.ReturnAddress); err != nil {
@@ -408,6 +421,7 @@ func (authSubsystem) Init(s *QNTXServer) error {
 	authHandler.SetGoogleCosts(s.connectGoogleCosts)
 	authHandler.SetGoogleAgy(s.connectGoogleAgy)
 	authHandler.SetGoogleKey(s.connectGoogleKey)
+	authHandler.SetGoogleNext(s.googleNext)
 	sacred.Go("google.costs", s.watchGoogleCosts)
 	if through, locate, hasPrimary := authHandler.GitHubThroughThePrimary(); hasPrimary {
 		s.ciGitHubGet = githubThroughThePrimary(through)
