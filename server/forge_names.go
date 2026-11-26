@@ -61,9 +61,6 @@ func (s *QNTXServer) nameForges() error {
 	if err := s.namePluginForges(); err != nil {
 		return err
 	}
-	if err := s.nameVaultForges(); err != nil {
-		return err
-	}
 	return s.nameFollowForges()
 }
 
@@ -97,29 +94,6 @@ func (s *QNTXServer) namePluginForges() error {
 			return errors.Wrapf(err, "plugin %s was not given the forge of its build's repositories", record.Name)
 		}
 		s.logger.Infow("A plugin's build repositories are named by their forge", "plugin", record.Name, "core", record.Config[buildCore])
-	}
-	return nil
-}
-
-func (s *QNTXServer) nameVaultForges() error {
-	vaults, err := s.nodeRecords().Vaults()
-	if err != nil {
-		return errors.Wrap(err, "the vaults were not read, so their repositories were not given their forge")
-	}
-	for _, vault := range vaults {
-		changed := false
-		for i, folder := range vault.Folders {
-			if named, legacy := legacySource(folder); legacy {
-				vault.Folders[i], changed = named, true
-			}
-		}
-		if !changed {
-			continue
-		}
-		if err := s.nodeRecords().SetVault(forgeNamer, vault); err != nil {
-			return errors.Wrapf(err, "vault %s was not given the forge of its folders' repositories", vault.Name)
-		}
-		s.logger.Infow("A vault's folder repositories are named by their forge", "vault", vault.Name)
 	}
 	return nil
 }

@@ -168,3 +168,78 @@ func (r NodeRecords) SetGitHub(actor string, settings GitHubSettings) error {
 		"webhook_path":   settings.WebhookPath,
 	})
 }
+
+// texts is a line's attribute that is a list of text.
+func texts(as map[string]any, attribute, subject, id, name string) ([]string, error) {
+	out := []string{}
+	held, ok := as[attribute].([]any)
+	if !ok {
+		return out, nil
+	}
+	for _, item := range held {
+		text, ok := item.(string)
+		if !ok {
+			return nil, errors.Newf("%s line %s about %s: one of %s is %v, not text", subject, id, name, attribute, item)
+		}
+		out = append(out, text)
+	}
+	return out, nil
+}
+
+// anyOf is a list of text as a line keeps it.
+func anyOf(items []string) []any {
+	out := make([]any, len(items))
+	for i, item := range items {
+		out[i] = item
+	}
+	return out
+}
+
+// A MEMORY line says which vault backs agents' memory (ADR-055), and where
+// in it. Before the vault was a subsystem's, its VAULT line said so; a node
+// that wrote no MEMORY line reads it there.
+const (
+	memorySubject  = "MEMORY"
+	memoryKeptLine = "kept"
+	vaultSubject   = "VAULT"
+)
+
+// memoryVault is the vault that backs memory: its name, where its copy is on
+// the box, and the place in it memory is kept.
+type memoryVault struct {
+	Name, Path, Memory string
+}
+
+// MemoryVault is the vault that backs memory, or one with no Memory.
+func (r NodeRecords) MemoryVault() (memoryVault, error) {
+	newest, err := r.newest(memorySubject)
+	if err != nil {
+		return memoryVault{}, err
+	}
+	if as, ok := newest[memoryKeptLine]; ok {
+		vault, _ := as.Attributes["vault"].(string)
+		path, _ := as.Attributes["path"].(string)
+		place, _ := as.Attributes["place"].(string)
+		return memoryVault{Name: vault, Path: path, Memory: place}, nil
+	}
+	vaults, err := newestLines(r.s, vaultSubject, "vaults")
+	if err != nil {
+		return memoryVault{}, err
+	}
+	for name, as := range vaults {
+		place, _ := as.Attributes["memory"].(string)
+		if place == "" {
+			continue
+		}
+		path, _ := as.Attributes["path"].(string)
+		return memoryVault{Name: name, Path: path, Memory: place}, nil
+	}
+	return memoryVault{}, nil
+}
+
+// SetMemoryVault writes which vault backs memory, and where in it.
+func (r NodeRecords) SetMemoryVault(actor string, vault memoryVault) error {
+	return r.nodeRecord(actor, memorySubject, memoryKeptLine, "_", map[string]any{
+		"vault": vault.Name, "path": vault.Path, "place": vault.Memory,
+	})
+}

@@ -114,17 +114,15 @@ func (s *QNTXServer) memorySignum() sigil.Signum {
 
 // memoryKept is the vault that backs memory and the folder on the box the
 // stores are under.
-func (s *QNTXServer) memoryKept() (Vault, string, *protocol.Refusal) {
-	vaults, err := s.nodeRecords().Vaults()
+func (s *QNTXServer) memoryKept() (memoryVault, string, *protocol.Refusal) {
+	vault, err := s.nodeRecords().MemoryVault()
 	if err != nil {
-		return Vault{}, "", &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+		return memoryVault{}, "", &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
-	for _, vault := range vaults {
-		if vault.Memory != "" {
-			return vault, filepath.Join(vault.Path, filepath.FromSlash(vault.Memory)), nil
-		}
+	if vault.Memory == "" {
+		return memoryVault{}, "", &protocol.Refusal{Why: sigil.NotFound, Says: "no vault backs memory on this node: memory keep says the vault and the place in it"}
 	}
-	return Vault{}, "", &protocol.Refusal{Why: sigil.NotFound, Says: "no vault backs memory on this node: memory keep says the vault and the place in it"}
+	return vault, filepath.Join(vault.Path, filepath.FromSlash(vault.Memory)), nil
 }
 
 // aNoteName is whether name is one note's or one folder's own name: no path,
@@ -211,34 +209,50 @@ func (s *QNTXServer) memoryStores(context.Context, sigil.Sent) (any, *protocol.R
 }
 
 func (s *QNTXServer) memoryKeep(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	vault, refused := s.vaultNamed(strings.TrimSpace(sent["name"]))
-	if refused != nil {
-		return nil, refused
-	}
 	place := strings.TrimSpace(sent["place"])
 	if place == "" || filepath.IsAbs(place) || !filepath.IsLocal(place) {
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "place", Says: "where memory is kept is a place inside the vault, and this said " + place}
 	}
 	place = filepath.ToSlash(filepath.Clean(place))
-	vaults, err := s.nodeRecords().Vaults()
-	if err != nil {
-		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
+	name := strings.TrimSpace(sent["name"])
+	path, refused := s.vaultPathOf(ctx, name)
+	if refused != nil {
+		return nil, refused
 	}
-	// One vault backs memory: a store is in one place.
-	for _, other := range vaults {
-		if other.Name == vault.Name || other.Memory == "" {
-			continue
-		}
-		other.Memory = ""
-		if err := s.nodeRecords().SetVault(actorOf(ctx), other); err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
-		}
-	}
-	vault.Memory = place
-	if err := s.nodeRecords().SetVault(actorOf(ctx), vault); err != nil {
+	// One vault backs memory: a store is in one place, and the newest line holds.
+	if err := s.nodeRecords().SetMemoryVault(actorOf(ctx), memoryVault{Name: name, Path: path, Memory: place}); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return s.memoryStores(ctx, sent)
+}
+
+// vaultPathOf is where the vault named keeps its copy on the box, as the vault
+// signum says: the vault is a linked subsystem's (Provenance), not the node's.
+func (s *QNTXServer) vaultPathOf(ctx context.Context, name string) (string, *protocol.Refusal) {
+	for _, served := range s.checkedSigna() {
+		if served.GetName() != "vault" {
+			continue
+		}
+		list, answers := served.Answers["list"]
+		if !answers {
+			break
+		}
+		got, refused := list(ctx, sigil.Sent{})
+		if refused != nil {
+			return "", refused
+		}
+		vaults, ok := got.(*protocol.Vaults)
+		if !ok {
+			return "", &protocol.Refusal{Why: sigil.Failed, Says: "vault list answered something that is no vaults"}
+		}
+		for _, vault := range vaults.GetVaults() {
+			if vault.GetName() == name {
+				return vault.GetPath(), nil
+			}
+		}
+		return "", &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "the node keeps no vault named " + name}
+	}
+	return "", &protocol.Refusal{Why: sigil.NotFound, Param: "name", Says: "this node serves no vault list, so no vault backs memory"}
 }
 
 func (s *QNTXServer) memoryList(_ context.Context, sent sigil.Sent) (any, *protocol.Refusal) {

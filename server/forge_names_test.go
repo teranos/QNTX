@@ -28,7 +28,7 @@ func TestOnlyOwnerSlashRepoIsAGitHubRepositoryWrittenBeforeForgesWereNamed(t *te
 }
 
 func TestAPluginsBuildRepositoriesAreNamedByTheirForgeOnce(t *testing.T) {
-	s, _ := vaultBindingServer(t)
+	s := githubKnowingServer(t)
 	records := s.pluginRecords()
 	require.NoError(t, records.pluginLine(rootAccount, grpcplugin.PluginRecord{
 		Name: "datapunt", Repo: "https://github.com/teranos/datapunt", Enabled: true,
@@ -66,21 +66,8 @@ func TestAPluginsBuildRepositoriesAreNamedByTheirForgeOnce(t *testing.T) {
 	assert.Equal(t, namedAfter["datapunt"].ID, again["datapunt"].ID, "naming a second time wrote a second line")
 }
 
-func TestAVaultsFoldersAreNamedByTheirForge(t *testing.T) {
-	s, vault := vaultBindingServer(t)
-	vault.Folders = []string{"abcd-nl/clean@main:docs/adr=Course Material", "github.com/abcd-nl/q@main:docs=ABCD/docs"}
-	require.NoError(t, s.nodeRecords().SetVault(rootAccount, vault))
-
-	require.NoError(t, s.nameForges())
-
-	vaults, err := s.nodeRecords().Vaults()
-	require.NoError(t, err)
-	require.Len(t, vaults, 1)
-	assert.Equal(t, []string{"github.com/abcd-nl/clean@main:docs/adr=Course Material", "github.com/abcd-nl/q@main:docs=ABCD/docs"}, vaults[0].Folders)
-}
-
 func TestAFollowIsNamedByItsForgeAndTheOldLineIsRetired(t *testing.T) {
-	s, _ := vaultBindingServer(t)
+	s := githubKnowingServer(t)
 	require.NoError(t, s.nodeRecords().SetFollow(rootAccount, GitHubFollow{
 		Repo: "teranos/QNTX", Branch: "main", Dispatches: "sbvh-nl/q.sbvh.nl", Workflow: "deploy.yml", Ref: "master", Enabled: true,
 	}))
@@ -105,7 +92,7 @@ func TestAFollowIsNamedByItsForgeAndTheOldLineIsRetired(t *testing.T) {
 // "k should follow QNTX main through webhooks"
 // One push dispatches every workflow that follows its repo and branch.
 func TestARepoAndBranchIsFollowedByEachWorkflowItDispatches(t *testing.T) {
-	s, _ := vaultBindingServer(t)
+	s := githubKnowingServer(t)
 	for _, f := range []GitHubFollow{
 		{Repo: "github.com/teranos/QNTX", Branch: "main", Dispatches: "github.com/sbvh-nl/q.sbvh.nl", Workflow: "deploy.yml", Ref: "master", Enabled: true},
 		{Repo: "github.com/teranos/QNTX", Branch: "main", Dispatches: "github.com/sbvh-nl/k.sbvh.nl", Workflow: "kapteyn-switch.yml", Ref: "main", Enabled: true},
@@ -122,7 +109,7 @@ func TestARepoAndBranchIsFollowedByEachWorkflowItDispatches(t *testing.T) {
 // A follow kept under the line it had before it named what it dispatches is
 // kept under its new line, and the old one retired, so it dispatches once.
 func TestAFollowIsNamedByWhatItDispatchesAndTheOldLineIsRetired(t *testing.T) {
-	s, _ := vaultBindingServer(t)
+	s := githubKnowingServer(t)
 	require.NoError(t, s.nodeRecords().nodeRecord(rootAccount, githubSubject, "follow:github.com/teranos/QNTX@main", "_", map[string]any{
 		"repo": "github.com/teranos/QNTX", "branch": "main", "dispatches": "github.com/sbvh-nl/q.sbvh.nl",
 		"workflow": "deploy.yml", "ref": "master", "inputs": map[string]any{}, "enabled": true,
