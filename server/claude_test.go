@@ -437,9 +437,9 @@ func TestTheNodeAgentIsItself(t *testing.T) {
 
 	nodePub, _ := node.Public().(ed25519.PublicKey)
 	assert.NotEqual(t, access.EncodeDIDKey(nodePub), agent.did)
-	_, did, err := access.DeriveToken(node, nodeAgentPurpose)
+	derived, err := access.DeriveKey(node, nodeAgentPurpose)
 	require.NoError(t, err)
-	assert.Equal(t, did, agent.did)
+	assert.Equal(t, access.EncodeDIDKey(derived.Public().(ed25519.PublicKey)), agent.did)
 }
 
 func TestTheClaudeSignumSaysWhatItHolds(t *testing.T) {

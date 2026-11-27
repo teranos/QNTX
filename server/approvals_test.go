@@ -202,19 +202,19 @@ func TestAPushMovesTheApprovalToItsNewHead(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, status, "%v", answered)
 }
 
-// "Approvals is human only" "approvals is ROOT only for now": a token is
+// "Approvals is human only" "approvals is ROOT only for now": an agent is
 // refused however ROOT it is, and so is a session below ROOT.
 func TestOnlyTheHumanAtROOTAnswers(t *testing.T) {
 	s, _ := approvingServer(t)
 	delivered(t, s, "pull_request", pullRequest("opened", 29, "abe92a9", ""))
 	checksPass(t, s, "abe92a9")
 
-	token := auth.Admitted(auth.LevelRoot, "garden")
-	token.Identity = rootAccount
-	token.Grant = &auth.Grant{Label: "Node Agent", DID: "did:key:z6Mkagent", MintedBy: rootAccount}
-	status, answered := press(s, auth.WithAdmission(context.Background(), token), "teranos/elements#29", "abe92a9", optionMerge, saysForceMerge)
+	agent := auth.Admitted(auth.LevelRoot, "garden")
+	agent.Identity = rootAccount
+	agent.Grant = &auth.Grant{Label: "Node Agent", DID: "did:key:z6Mkagent", MintedBy: rootAccount}
+	status, answered := press(s, auth.WithAdmission(context.Background(), agent), "teranos/elements#29", "abe92a9", optionMerge, saysForceMerge)
 	assert.Equal(t, http.StatusForbidden, status)
-	assert.Contains(t, answered["error"], "token")
+	assert.Contains(t, answered["error"], "not by did:key:z6Mkagent")
 
 	user := auth.Admitted(auth.LevelUser, "garden")
 	user.Identity = "google:1"

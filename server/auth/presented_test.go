@@ -85,3 +85,23 @@ func TestAPendingIsNotASession(t *testing.T) {
 	_, signedIn := p.Admitted()
 	assert.False(t, signedIn)
 }
+
+// A session beside a client's bearer is still a session past the gate: what the
+// gate read is read once, the session with it.
+func TestASessionBesideABearerIsStillASessionPastTheGate(t *testing.T) {
+	h := handlerAdmitting(t, mastodonAccount)
+	store := newMemTokenStore()
+	h.tokens = store
+	raw, _, err := store.issueThroughClient(NewToken{Label: "connector", MintedBy: mastodonAccount, Level: LevelToken, ExpiresAt: NeverEnds()})
+	require.NoError(t, err)
+	session, err := h.sessions.create(mastodonAccount, User{})
+	require.NoError(t, err)
+
+	reached := false
+	gate := h.Middleware("/auth/tokens", everyLevel, h.sessionOnly(func(http.ResponseWriter, *http.Request, Presented) { reached = true }))
+	req := carrying(t, session, "")
+	req.Header.Set("Authorization", "Bearer "+raw)
+	rec := httptest.NewRecorder()
+	gate(rec, req)
+	assert.True(t, reached, "the session was not a session past the gate: %d %s", rec.Code, rec.Body.String())
+}

@@ -129,7 +129,7 @@ func TestAPluginsSigilIsServedOnItsPath(t *testing.T) {
 	w = httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/stub/observe",
 		strings.NewReader(`{"kind":"competitor","value":"true","extra":"dropped"}`))
-	req.Header.Set("Authorization", "Bearer "+tokens[auth.LevelRoot])
+	req.Header.Set("Authorization", authorizationFor(tokens[auth.LevelRoot]))
 	srv.served.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.Len(t, p.handed, 2)

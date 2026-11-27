@@ -370,7 +370,9 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 			measure.String(measure.AttrRoute, route),
 		)
 		span.SetAttributes(attribute.String("qntx.level", admitted.LevelName()))
-		next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
+		ctx := WithAdmission(r.Context(), admitted)
+		ctx = context.WithValue(ctx, gatedKey{}, p)
+		next(w, r.WithContext(ctx))
 	}
 }
 
@@ -468,20 +470,6 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		}
 		// 「[Opus 5.5] A token holds roles by its label, its name.」
 		holder := grant.Label
-		// 「[Opus 5.5] An agent's token is the token it runs under, under a DID of its own」
-		// 「[Opus 5.5] Its level, its namespaces and its roles are that token's,」
-		// 「[Opus 5.5] read now, and it stands while that token does.」
-		if asking, isAgents, stands := h.runsUnder(grant.Label, grant.DID); isAgents {
-			if !stands {
-				h.logger.Infow("Bearer token refused",
-					"did", grant.DID,
-					"reason", "named as an agent's token, and not one this node derived for a token that is live")
-				return Admission{}, false
-			}
-			agents := *grant
-			agents.Level, agents.Namespaces = asking.Level, asking.Namespaces
-			grant, holder = &agents, asking.Label
-		}
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
 		admitted := Admission{
@@ -875,6 +863,12 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 	said, why := "no session", "no-session"
 	if p.bearerPresented {
 		said, why = "the token is not held here", "token-not-held"
+	}
+	if p.signatureRefused != "" {
+		said, why = "the signature was not admitted: "+p.signatureRefused, "signature-refused"
+	}
+	if p.notThroughAClient {
+		said, why = "the bearer presented was issued through no client", "bearer-through-no-client"
 	}
 	if p.Bearer != nil {
 		said, why = "the identity is not listed", "identity-not-listed"

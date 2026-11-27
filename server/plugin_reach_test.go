@@ -2,11 +2,18 @@ package server
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/teranos/QNTX/internal/access"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,9 +52,10 @@ func pluginServingServer(t *testing.T, name string) (*QNTXServer, map[auth.Level
 
 	logger := zaptest.NewLogger(t).Sugar()
 	tokens := &heldTokens{grants: map[string]auth.Grant{}}
+	users := testUsers(t)
 	h, err := auth.New(nil, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
 		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		tokens, testUsers(t), false, []string{rootAccount}, nil)
+		tokens, users, false, []string{rootAccount}, nil)
 	require.NoError(t, err)
 
 	registry := plugin.NewRegistry("0.1.0", logger)
@@ -71,29 +79,101 @@ func pluginServingServer(t *testing.T, name string) (*QNTXServer, map[auth.Level
 	srv.setupHTTPRoutes()
 	require.NoError(t, srv.open())
 
-	raw := map[auth.Level]string{}
+	callers := map[auth.Level]string{}
 	for _, level := range []auth.Level{auth.LevelRoot, auth.LevelSuper} {
-		raw[level] = tokens.mint(level)
+		callers[level] = tokens.caller(t, level, h.PublicOrigin())
 	}
-	return srv, raw
+	return srv, callers
 }
 
-func asBearer(method, path, token string) *http.Request {
+func asBearer(method, path, caller string) *http.Request {
 	req := httptest.NewRequest(method, path, nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", authorizationFor(caller))
 	return req
 }
 
-// heldTokens is a TokenStore holding what this test minted and nothing else.
-type heldTokens struct {
-	grants map[string]auth.Grant
+// "I WANT TO KILL THIS IDEA, I DONT WANT TO MAINTAIN TOKENS, AGENNTS KEEP REACHING FOR IT AND CREATING MORE TOKENS, THIS ISNT SECURE"
+// 「[Opus 5.5] A caller is a person's key, said yes to as a device sign-in says yes: the node」
+// 「[Opus 5.5] holds a grant for its DID, and each request it makes is signed once, for the」
+// 「[Opus 5.5] node's origin. Nothing is presented that could be presented again.」
+type signingCaller struct {
+	key    ed25519.PrivateKey
+	origin string
 }
 
-func (h *heldTokens) mint(level auth.Level) string {
-	raw := "qntx_test_" + string(level)
-	sum := sha256.Sum256([]byte(raw))
-	h.grants[hex.EncodeToString(sum[:])] = auth.Grant{MintedBy: rootAccount, Level: level}
-	return raw
+// callers is every caller a test made, by the name its request helpers are handed.
+var callers sync.Map
+
+// authorizationFor is a request's Authorization from caller: its signature, made for
+// this one request, or what was named as it is when no caller is named so.
+func authorizationFor(caller string) string {
+	held, ok := callers.Load(caller)
+	if !ok {
+		return "Bearer " + caller
+	}
+	c := held.(signingCaller)
+	did := access.EncodeDIDKey(c.key.Public().(ed25519.PublicKey))
+	jti := make([]byte, 16)
+	if _, err := rand.Read(jti); err != nil {
+		panic(err)
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.RegisteredClaims{
+		Issuer: did, Subject: did, Audience: jwt.ClaimStrings{c.origin},
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)), ID: hex.EncodeToString(jti),
+	}).SignedString(c.key)
+	if err != nil {
+		panic(err)
+	}
+	return "Signed " + signed
+}
+
+// heldTokens is a TokenStore holding the grants of this test's callers and nothing else.
+type heldTokens struct {
+	grants map[string]auth.Grant
+	held   []auth.TokenInfo
+}
+
+// rootsClient is ROOT's own client: what ROOT's connector, claude.ai's or ChatGPT's,
+// signs in through (ADR-038).
+const rootsClient = "did:key:zroots-client"
+
+// caller is who asks at level. ROOT is ROOT's connector: a bearer its sign-in issued
+// through ROOT's client, which the gate admits as the person. SUPER is no person's
+// rung: it is a key granted SUPER, as auth.grants in am.toml grants one, signing each
+// request it makes.
+func (h *heldTokens) caller(t *testing.T, level auth.Level, origin string) string {
+	t.Helper()
+	never := "2999-01-01T00:00:00Z"
+	if level == auth.LevelRoot {
+		if _, held := h.ByDID(rootsClient); !held {
+			h.held = append(h.held, auth.TokenInfo{ID: "AT-roots-client", Label: "ROOT's client", DID: rootsClient,
+				MintedBy: rootAccount, Level: auth.LevelOAuth, Root: true, ExpiresAt: &never})
+		}
+		raw := "qntx_roots_connector_" + t.Name()
+		sum := sha256.Sum256([]byte(raw))
+		h.grants[hex.EncodeToString(sum[:])] = auth.Grant{MintedBy: rootAccount, Level: auth.LevelRoot,
+			DID: "did:key:zroots-connector", ClientDID: rootsClient}
+		return raw
+	}
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	did := access.EncodeDIDKey(key.Public().(ed25519.PublicKey))
+	h.held = append(h.held, auth.TokenInfo{ID: "AT-" + string(level), Label: "caller " + string(level), DID: did,
+		MintedBy: rootAccount, Level: level, ExpiresAt: &never})
+	name := "caller:" + string(level) + ":" + did
+	callers.Store(name, signingCaller{key: key, origin: origin})
+	t.Cleanup(func() { callers.Delete(name) })
+	return name
+}
+
+// ByDID is the caller whose key this is.
+func (h *heldTokens) ByDID(did string) (auth.TokenInfo, bool) {
+	for _, info := range h.held {
+		if info.DID == did {
+			return info, true
+		}
+	}
+	return auth.TokenInfo{}, false
 }
 
 func (h *heldTokens) Lookup(hash string) (auth.Grant, bool) {
@@ -110,7 +190,7 @@ func (h *heldTokens) LookupSpent(hash string) (auth.Grant, bool, bool) {
 
 func (h *heldTokens) Create(auth.NewToken) (string, string, error) { return "", "", nil }
 func (h *heldTokens) Issue(auth.IssuedToken) (string, error)       { return "", nil }
-func (h *heldTokens) List() ([]auth.TokenInfo, error)              { return nil, nil }
+func (h *heldTokens) List() ([]auth.TokenInfo, error)              { return h.held, nil }
 func (h *heldTokens) Revoke(string) error                          { return nil }
 func (h *heldTokens) Enable(string) error                          { return nil }
 func (h *heldTokens) Touch(string) error                           { return nil }

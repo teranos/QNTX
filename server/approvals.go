@@ -345,7 +345,7 @@ func (s *QNTXServer) HandleApprovalAnswer(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusUnauthorized, "an approval is answered by the logged-in human, and nobody is logged in")
 		return
 	case aToken(admitted):
-		writeError(w, http.StatusForbidden, "an approval is answered by the logged-in human, not by a token ("+admitted.ActsAs()+")")
+		writeError(w, http.StatusForbidden, "an approval is answered by the logged-in human, not by "+admitted.ActsAs())
 		return
 	case !admitted.IsRoot():
 		writeError(w, http.StatusForbidden, "approvals are ROOT's, and this session is "+admitted.LevelName())
