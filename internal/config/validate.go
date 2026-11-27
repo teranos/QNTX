@@ -114,9 +114,6 @@ func (c *Config) Validate() error {
 		if !slices.Contains(CodexSandboxes, codex.Sandbox) {
 			return errors.Newf("agent.root.codex.sandbox must be one of [%s], got %q", strings.Join(CodexSandboxes, ", "), codex.Sandbox)
 		}
-		if err := secretref.Validate(codex.TokenRef); err != nil {
-			return errors.Wrap(err, "agent.root.codex.token is invalid")
-		}
 	}
 
 	// Plugin access tokens are references, never secrets. am.toml ships as a

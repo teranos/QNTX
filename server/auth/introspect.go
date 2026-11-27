@@ -58,7 +58,7 @@ func (h *Handler) handleIntrospect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	grant, live := h.tokens.Lookup(sha256Hex(r.PostForm.Get("token")))
-	if !live {
+	if !live || !throughAClient(grant) {
 		h.writeJSON(w, http.StatusOK, introspection{})
 		return
 	}

@@ -331,6 +331,19 @@ func (m *memTokenStore) Create(spec NewToken) (string, string, error) {
 	return raw, id, nil
 }
 
+// issueThroughClient writes spec as a token a client's flow issued: the one kind of
+// bearer the gate takes. Create is a minted one, which the gate does not.
+func (m *memTokenStore) issueThroughClient(spec NewToken) (string, string, error) {
+	raw, id, err := m.Create(spec)
+	if err != nil {
+		return "", "", err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.tokens[sha256Hex(raw)].grant.ClientDID = "did:key:zclient-of-" + id
+	return raw, id, nil
+}
+
 func (m *memTokenStore) Issue(spec IssuedToken) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -488,7 +501,7 @@ func (m *memTokenStore) setRevoked(id string, revoked bool) error {
 
 func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 	store := newMemTokenStore()
-	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: mastodonAccount, Level: LevelAttestor})
+	rawToken, _, err := store.issueThroughClient(NewToken{Label: "laptop-cron", ExpiresAt: nil, MintedBy: mastodonAccount, Level: LevelAttestor})
 	require.NoError(t, err)
 
 	h := &Handler{users: &memUsers{},
@@ -513,7 +526,7 @@ func TestMiddlewareAllowsValidBearerToken(t *testing.T) {
 // Presenting a live token records the use, off the request's path.
 func TestPresentingABearerRecordsItsUse(t *testing.T) {
 	store := newMemTokenStore()
-	rawToken, _, err := store.Create(NewToken{Label: "laptop-cron", MintedBy: mastodonAccount, Level: LevelAttestor})
+	rawToken, _, err := store.issueThroughClient(NewToken{Label: "laptop-cron", MintedBy: mastodonAccount, Level: LevelAttestor})
 	require.NoError(t, err)
 
 	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: store, logger: testLogger()}
@@ -762,4 +775,36 @@ func TestEnableDoesNotResurrectAnExpiredToken(t *testing.T) {
 	require.NoError(t, store.Enable(id))
 
 	assert.False(t, store.lookupOK(sha256Hex(raw)))
+}
+
+// "Tokens are to be removed from QNTX except for third-party OAuth clients"
+// "I WANT TO KILL THIS IDEA, I DONT WANT TO MAINTAIN TOKENS, AGENNTS KEEP REACHING FOR IT AND CREATING MORE TOKENS, THIS ISNT SECURE"
+// 「[Opus 5.5] A bearer is taken only when a client's flow issued it: one a person or」
+// 「[Opus 5.5] an agent minted is not held here, whatever store still has it.」
+func TestABearerIsTakenOnlyFromAClientsFlow(t *testing.T) {
+	store := newMemTokenStore()
+	minted, _, err := store.Create(NewToken{Label: "laptop-cron", MintedBy: mastodonAccount, Level: LevelAttestor})
+	require.NoError(t, err)
+	issued := "qntx_issued_through_a_client"
+	_, err = store.Issue(IssuedToken{Hash: sha256Hex(issued), DID: "did:key:z6Mkissued", Label: "claude.ai",
+		MintedBy: mastodonAccount, Level: LevelAttestor, ClientDID: "did:key:z6Mkclient"})
+	require.NoError(t, err)
+
+	h := &Handler{users: &memUsers{}, sessions: newSessionStore(1), tokens: store, logger: testLogger()}
+	h.SetIdentities([]string{mastodonAccount}, nil)
+	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	present := func(raw string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/api/pulse/jobs", nil)
+		req.Header.Set("Authorization", "Bearer "+raw)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	assert.Equal(t, http.StatusOK, present(issued).Code, "a token a client's flow issued is taken")
+	refused := present(minted)
+	assert.Equal(t, http.StatusUnauthorized, refused.Code, "a minted token is taken")
+	assert.Contains(t, refused.Body.String(), "the bearer presented was issued through no client")
 }

@@ -140,7 +140,7 @@ func TestAVaultThatIsNotThereForgetsNothing(t *testing.T) {
 
 // A node whose vault backs no memory keeps nothing in step and writes nowhere.
 func TestNoVaultBackingMemoryMovesNothing(t *testing.T) {
-	s, _ := vaultBindingServer(t)
+	s := githubKnowingServer(t)
 	home := t.TempDir()
 	s.underGround.add(home)
 	harness := filepath.Join(home, "claude", "projects", claudeProjectOf(filepath.Join(home, "work")), "memory")

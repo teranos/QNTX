@@ -144,6 +144,8 @@ func TestWhatOnlyLooksLikeARecordingIsRefused(t *testing.T) {
 	notRecordings := map[string][]byte{
 		// An ftyp box whose brands are a picture's.
 		"picture.m4a": append([]byte{0, 0, 0, 24}, []byte("ftypheic\x00\x00\x00\x00heicmif1 a picture")...),
+		// An ftyp box that ends at its major brand, with no minor version.
+		"broken.m4a": append([]byte{0, 0, 0, 12}, []byte("ftypM4A ")...),
 		// The sync bits of a frame, and a layer no MP3 has.
 		"noise.mp3": []byte("\xFF\xFF\x90\x00 not a frame"),
 		// The sync bits of a frame, and a bitrate the format has none of.

@@ -202,19 +202,19 @@ func TestAPushMovesTheApprovalToItsNewHead(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, status, "%v", answered)
 }
 
-// "Approvals is human only" "approvals is ROOT only for now": a token is
+// "Approvals is human only" "approvals is ROOT only for now": an agent is
 // refused however ROOT it is, and so is a session below ROOT.
 func TestOnlyTheHumanAtROOTAnswers(t *testing.T) {
 	s, _ := approvingServer(t)
 	delivered(t, s, "pull_request", pullRequest("opened", 29, "abe92a9", ""))
 	checksPass(t, s, "abe92a9")
 
-	token := auth.Admitted(auth.LevelRoot, "garden")
-	token.Identity = rootAccount
-	token.Grant = &auth.Grant{Label: "Node Agent", DID: "did:key:z6Mkagent", MintedBy: rootAccount}
-	status, answered := press(s, auth.WithAdmission(context.Background(), token), "teranos/elements#29", "abe92a9", optionMerge, saysForceMerge)
+	agent := auth.Admitted(auth.LevelRoot, "garden")
+	agent.Identity = rootAccount
+	agent.Grant = &auth.Grant{Label: "Node Agent", DID: "did:key:z6Mkagent", MintedBy: rootAccount}
+	status, answered := press(s, auth.WithAdmission(context.Background(), agent), "teranos/elements#29", "abe92a9", optionMerge, saysForceMerge)
 	assert.Equal(t, http.StatusForbidden, status)
-	assert.Contains(t, answered["error"], "token")
+	assert.Contains(t, answered["error"], "not by did:key:z6Mkagent")
 
 	user := auth.Admitted(auth.LevelUser, "garden")
 	user.Identity = "google:1"
@@ -346,4 +346,28 @@ func TestTheApprovalsSignumIsServed(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, signum.Check())
 	holds(t, s.approvalsSignum(), "list", &protocol.Approvals{Approvals: []*protocol.Approval{{Subject: "teranos/elements#29"}}})
+}
+
+// A check run is about one head: it touches the pull requests asked at that
+// head and reads the lines of no other. On q, reading every approval line for
+// each check_run ran the node out of memory (2026-11-23).
+func TestACheckRunTouchesOnlyThePullRequestsAtItsHead(t *testing.T) {
+	s, _ := approvingServer(t)
+	delivered(t, s, "pull_request", pullRequest("opened", 29, "abe92a9", ""))
+	delivered(t, s, "pull_request", pullRequest("opened", 30, "c0ffee1", ""))
+
+	assert.Equal(t, []string{"teranos/elements#30"}, delivered(t, s, "check_run", checkRun("TypeScript", "c0ffee1", "completed", "success")))
+	assert.Empty(t, delivered(t, s, "check_run", checkRun("TypeScript", "f00d", "completed", "success")), "a head no pull request is asked at")
+
+	for _, open := range listed(t, s) {
+		if open.GetSubject() == "teranos/elements#29" {
+			assert.Empty(t, open.GetChecks(), "a check at another head was written on #29")
+		} else {
+			require.Len(t, open.GetChecks(), 1)
+		}
+	}
+
+	// Closed, a pull request at that head is touched no more.
+	delivered(t, s, "pull_request", pullRequest("closed", 30, "c0ffee1", ""))
+	assert.Empty(t, delivered(t, s, "check_run", checkRun("Browser", "c0ffee1", "completed", "success")))
 }

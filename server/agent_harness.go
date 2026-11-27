@@ -356,6 +356,20 @@ func (s *QNTXServer) sayTo(ctx context.Context, h *harness, agent *rootAgent, sp
 	// What is said to the Node Agent by no person is collected (collected.go):
 	// an agent's words, a room's wake, a delivery of GitHub's.
 	if s.collectsFor(agent, caller) {
+		// "yeah, because right now, i dont even see the outgoing towards node agent in ag right? yeah thats fucked up as well"
+		// Where am.toml names a laye, laye collects it, and hands it back to be
+		// the Node Agent's turn once released (laye_delivered.go).
+		if s.layeOrigin() != "" {
+			said, err := s.handToLayeAs(ctx, layeSaid{
+				To: s.calledInMemory(agent.home), ToDID: agent.did,
+				FromDID: spokenBy(caller), From: s.calledBy(spokenBy(caller)), Says: sent["says"],
+				Person: s.nodesPerson(), Node: true,
+			})
+			if err != nil {
+				return nil, &protocol.Refusal{Why: sigil.Failed, Says: "what was said to " + agent.called + " by no person was not collected by laye, and was not said: " + err.Error()}
+			}
+			return nil, &protocol.Refusal{Why: sigil.NotAllowed, Says: said}
+		}
 		due, err := s.collect(
 			collectedFor{DID: agent.did, Called: s.calledInMemory(agent.home), Model: spec.Model},
 			collectedSaid{From: s.calledBy(spokenBy(caller)), FromDID: spokenBy(caller), Says: sent["says"], At: time.Now(), Room: roomOf(caller)})

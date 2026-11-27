@@ -118,3 +118,33 @@ func TestAGrantHeldForASignatureAdmitsNoBearer(t *testing.T) {
 		assert.False(t, ok, presented)
 	}
 }
+
+// 「[Opus 5.5] A request the gate admitted on a signature is the same caller when it is」
+// 「[Opus 5.5] asked through the gate again inside the node (an A2A turn asks its sigil with」
+// 「[Opus 5.5] the request it came in on): the grant it stood on goes with it, and the」
+// 「[Opus 5.5] signature, presented once, is not presented again.」
+func TestARequestTheGateAdmittedPassesItAgainAsTheSameCaller(t *testing.T) {
+	h, _, key, did, _ := signingNode(t)
+	var inside *http.Request
+	outer := h.Middleware("/outer", everyLevel, func(_ http.ResponseWriter, r *http.Request) { inside = r })
+	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	req.Header.Set("Authorization", signedScheme+signature(t, key, did, signedNodeOrigin, time.Minute))
+	outer(httptest.NewRecorder(), req)
+	require.NotNil(t, inside, "the signature was not admitted the first time")
+
+	var again Admission
+	rec := httptest.NewRecorder()
+	h.Middleware("/inner", everyLevel, func(_ http.ResponseWriter, r *http.Request) {
+		again, _ = AdmissionFrom(r.Context())
+	})(rec, inside)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, did, again.ActsAs())
+	assert.Equal(t, string(LevelAttestor), again.LevelName())
+
+	// What carries the grant is the gate's own pass: a new request with the
+	// same signature is still the signature presented twice.
+	replay := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
+	replay.Header = inside.Header.Clone()
+	_, ok := h.admissionOf(h.presented(replay))
+	assert.False(t, ok, "a signature presented again on a new request was admitted")
+}

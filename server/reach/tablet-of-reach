@@ -57,6 +57,8 @@ REACH is '/auth/laye/invited'                                             of ANY
 REACH is '/auth/laye/reach'                                               of ANYONE
 # laye has the node admit a key its person approved on a peer, the same way.
 REACH is '/auth/laye/admit'                                               of ANYONE
+# laye hands what was released for the node's agent, the same way.
+REACH is '/auth/laye/delivered'                                           of ANYONE
 # A key the person said yes to, or the person carried by the primary, admits
 # a key: the signature is the credential, checked at the endpoint (admit.go).
 REACH is '/auth/admit'                                                    of ANYONE
@@ -194,14 +196,6 @@ REACH is '/api/parity/hold' '/api/parity/storage' '/api/parity/follows'   of ROO
 
 # What was said and done in each agent session Ground recorded (transcripts).
 REACH is '/api/transcripts'                                               of ROOT SUPER
-
-# The Obsidian vaults the node keeps a copy of, and the folders each holds (ADR-049).
-REACH is '/api/vault'                                                     of ROOT
-REACH is '/api/vault/dirs' '/api/vault/states' '/api/vault/bind'          of ROOT
-REACH is '/api/vault/unbind' '/api/vault/disable' '/api/vault/enable'     of ROOT
-REACH is '/api/vault/send'                                                of ROOT
-REACH is '/api/vault/repository'                                          of ROOT
-REACH is '/api/vault/owners' '/api/vault/repos' '/api/vault/subdirs'      of ROOT
 
 # The Memory Store the node holds for each agent, a folder of the vault (ADR-055).
 REACH is '/api/memory' '/api/memory/keep' '/api/memory/{store}'           of ROOT

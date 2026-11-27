@@ -55,7 +55,7 @@ is added. `am.not_ready` reports missing prerequisites. The pinned executable
 is fetched on the first authorized turn, or reused if the Node Agent already
 holds it.
 
-Codex receives the agent's instructions and MCP token. Its lifecycle hooks run
+Codex receives the agent's instructions, and its DID as the key its gateway is asked with. Its lifecycle hooks run
 that agent's Ground executable. QNTX persists its transcript UUID in
 `codex-session` before starting the process and the CLI thread ID in
 `codex-thread` on `thread.started`. They are distinct: transcript lookup uses

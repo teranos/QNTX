@@ -25,7 +25,7 @@ func bearerRequest(t *testing.T, h *Handler, mintedBy string) *http.Request {
 	t.Helper()
 	store := newMemTokenStore()
 	h.tokens = store
-	raw, _, err := store.Create(NewToken{Label: "dev", MintedBy: mintedBy})
+	raw, _, err := store.issueThroughClient(NewToken{Label: "dev", MintedBy: mintedBy})
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/status", nil)

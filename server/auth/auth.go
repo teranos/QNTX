@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
@@ -124,7 +125,9 @@ type Handler struct {
 	// is held nothing for, so admitting it waits on a person (unknown_key.go). Nil tells nobody.
 	unknownKey  func(did, label string)
 	unknownKeys unknownKeys
-	issued      issuedAnswers
+	// layeDelivered runs what laye hands for this node's agent (laye_delivered.go). Nil runs nothing.
+	layeDelivered func(ctx context.Context, delivered LayeDelivered) (string, error)
+	issued        issuedAnswers
 	// nodes.primary: where this node's people log in, and who is on their way there.
 	loginAt string
 	// direct is where this node reaches a peer itself, by the name the primary calls it (nodes.direct).
@@ -316,6 +319,17 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 		span.SetName(r.Method + " " + route)
 		span.SetAttributes(attribute.String("http.route", route))
 
+		// The node asking itself in process presents nothing: it is admitted
+		// as it asked, and held to the reach table as anyone is (in_process.go).
+		if admitted, inside := inProcessAdmission(r.Context()); inside {
+			if !reach.Admits(admitted) {
+				refusedOn(r, "out-of-reach")
+				h.rejectOutOfReach(w, r, admitted, route, reach)
+				return
+			}
+			next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
+			return
+		}
 		p := h.presented(r)
 		if p.turnedAway {
 			refusedOn(r, "turned-away")
@@ -356,7 +370,9 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 			measure.String(measure.AttrRoute, route),
 		)
 		span.SetAttributes(attribute.String("qntx.level", admitted.LevelName()))
-		next(w, r.WithContext(WithAdmission(r.Context(), admitted)))
+		ctx := WithAdmission(r.Context(), admitted)
+		ctx = context.WithValue(ctx, gatedKey{}, p)
+		next(w, r.WithContext(ctx))
 	}
 }
 
@@ -454,20 +470,6 @@ func (h *Handler) admissionOf(p Presented) (Admission, bool) {
 		}
 		// 「[Opus 5.5] A token holds roles by its label, its name.」
 		holder := grant.Label
-		// 「[Opus 5.5] An agent's token is the token it runs under, under a DID of its own」
-		// 「[Opus 5.5] Its level, its namespaces and its roles are that token's,」
-		// 「[Opus 5.5] read now, and it stands while that token does.」
-		if asking, isAgents, stands := h.runsUnder(grant.Label, grant.DID); isAgents {
-			if !stands {
-				h.logger.Infow("Bearer token refused",
-					"did", grant.DID,
-					"reason", "named as an agent's token, and not one this node derived for a token that is live")
-				return Admission{}, false
-			}
-			agents := *grant
-			agents.Level, agents.Namespaces = asking.Level, asking.Namespaces
-			grant, holder = &agents, asking.Label
-		}
 		// What kind of token this is was decided when it was minted, so it is
 		// read off the record rather than settled here for all of them.
 		admitted := Admission{
@@ -644,6 +646,8 @@ func (h *Handler) Routes() map[string]http.HandlerFunc {
 	mux.answer(layeReachPath, h.handleLayeReach)
 	// laye has the node admit a key its person approved on a peer (laye_admit.go).
 	mux.answer(layeAdmitPath, h.handleLayeAdmit)
+	// laye hands what was released for this node's agent (laye_delivered.go).
+	mux.answer(layeDeliveredPath, h.handleLayeDelivered)
 	// The ceremony: the element asks what can be linked, starts one, and collects
 	// the result. Everything the provider requires happens on this side of the
 	// wire, so no page holds a secret and no page holds logic.
@@ -859,6 +863,12 @@ func (h *Handler) rejectUnauthenticated(w http.ResponseWriter, r *http.Request, 
 	said, why := "no session", "no-session"
 	if p.bearerPresented {
 		said, why = "the token is not held here", "token-not-held"
+	}
+	if p.signatureRefused != "" {
+		said, why = "the signature was not admitted: "+p.signatureRefused, "signature-refused"
+	}
+	if p.notThroughAClient {
+		said, why = "the bearer presented was issued through no client", "bearer-through-no-client"
 	}
 	if p.Bearer != nil {
 		said, why = "the identity is not listed", "identity-not-listed"
