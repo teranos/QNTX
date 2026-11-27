@@ -41,7 +41,9 @@ func TestARelayAsksTheNodeThatHoldsTheAppAsItself(t *testing.T) {
 	answered, err := linkedHost{s}.AskGitHub(context.Background(), "CreateAPullRequest", map[string]any{"owner": "o", "repo": "r"})
 	require.NoError(t, err)
 
-	assert.JSONEq(t, `{"html_url":"https://github.com/o/r/pull/9"}`, string(answered))
+	// 「[Opus 5.5] What came back through the relay reads as what this node's own GitHubService」
+	// 「[Opus 5.5] answers: devkq's org binding, on 2026-11-27, read q's answer as a failure saying nothing.」
+	assert.JSONEq(t, `{"success":true,"html_url":"https://github.com/o/r/pull/9"}`, string(answered))
 	assert.Equal(t, "CreateAPullRequest", asked["operation"])
 	assert.JSONEq(t, `{"owner":"o","repo":"r"}`, asked["request"].(string))
 
