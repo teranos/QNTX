@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -39,6 +40,11 @@ type Presented struct {
 	// Whether the bearer is a caller the node is turning away while it is
 	// slow. Nothing about the token was looked up.
 	turnedAway bool
+	// Whether the bearer presented was issued through no client: the store
+	// holds it, and the gate does not take it.
+	notThroughAClient bool
+	// Why the signature presented was not admitted, when one was and it was not.
+	signatureRefused string
 
 	// Who the session belongs to, resolved when it was made rather than now.
 	UserID      string
@@ -61,6 +67,14 @@ type Presented struct {
 // presented reads the request. Nothing else in this package should.
 func (h *Handler) presented(r *http.Request) Presented {
 	var p Presented
+
+	// 「[Opus 5.5] A request this gate admitted already, asked through it again inside the」
+	// 「[Opus 5.5] node: the grant it stood on, and nothing presented a second time.」
+	if grant, passed := gatedGrant(r.Context()); passed {
+		p.bearerPresented = true
+		p.Bearer = &grant
+		return p
+	}
 
 	// An agent the node runs, at the door the node opened for it alone.
 	if grant, through := doorGrant(r.Context()); through {
@@ -90,6 +104,7 @@ func (h *Handler) presented(r *http.Request) Presented {
 		grant, err := h.signedGrant(signed, time.Now())
 		if err != nil {
 			h.logger.Infow("a signature was refused at the gate", "error", err)
+			p.signatureRefused = err.Error()
 			return p
 		}
 		p.Bearer = &grant
@@ -117,7 +132,13 @@ func (h *Handler) presented(r *http.Request) Presented {
 				p.turnedAway = true
 				return p
 			}
-			if grant, live := h.tokens.Lookup(hash); live {
+			// "Tokens are to be removed from QNTX except for third-party OAuth clients"
+			// 「[Opus 5.5] A bearer is taken only when a client's flow issued it. One a person or」
+			// 「[Opus 5.5] an agent minted, whatever store still holds it, is not held here.」
+			if grant, live := h.tokens.Lookup(hash); live && grant.ClientDID == "" && grant.Level != LevelOAuth && grant.Level != LevelRefresh {
+				p.notThroughAClient = true
+				h.logger.Infow("a bearer issued through no client was presented, and is not taken", "did", grant.DID, "label", grant.Label)
+			} else if live {
 				p.Bearer = &grant
 				if h.shed != nil {
 					h.shed.named(hash, grant.Label)
@@ -178,4 +199,13 @@ func (p Presented) Enrolling() (string, bool) {
 func (h *Handler) spend(p Presented, w http.ResponseWriter) {
 	h.pendingLogins.close(p.pendingToken)
 	h.clearPendingCookie(w)
+}
+
+// gatedKey is the grant a request stood on when this gate admitted it.
+type gatedKey struct{}
+
+// gatedGrant is the grant ctx's request stood on at this gate, and whether it passed it.
+func gatedGrant(ctx context.Context) (Grant, bool) {
+	grant, ok := ctx.Value(gatedKey{}).(Grant)
+	return grant, ok
 }

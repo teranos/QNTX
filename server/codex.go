@@ -11,7 +11,6 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	appcfg "github.com/teranos/QNTX/internal/config"
 	"github.com/teranos/QNTX/internal/codex"
-	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/comet"
 	"github.com/teranos/QNTX/server/sigil"
@@ -99,15 +98,6 @@ func (s *QNTXServer) codexPart(named appcfg.CodexConfig, agent *rootAgent) (aTur
 	return aTurn{
 		ready: func(ctx context.Context, _ string, kept bool) (bool, *protocol.Refusal) {
 			var err error
-			if named.TokenRef != "" {
-				if key, err = secretref.Resolve(ctx, named.TokenRef); err != nil || key == "" {
-					why := "it resolved to nothing"
-					if err != nil {
-						why = err.Error()
-					}
-					return false, &protocol.Refusal{Why: sigil.Failed, Says: "the token am.toml names for codex's gateway did not resolve: " + why}
-				}
-			}
 			if binary, err = s.harnessHeldBy("codex").Path(ctx); err != nil {
 				return false, &protocol.Refusal{Why: sigil.Failed, Says: "this node has no codex to run: " + err.Error()}
 			}

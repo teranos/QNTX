@@ -170,12 +170,12 @@ func TestTheModeNamedIsTheModeRunIn(t *testing.T) {
 	}
 }
 
-// What an agent is beyond Claude Code, its git identity and the token it is
-// to the node, reaches it as environment, and what it runs inherits it.
+// What an agent is beyond Claude Code, its git identity and its name, reaches
+// it as environment, and what it runs inherits it.
 func TestSaidHandsOverTheEnvironmentItWasGiven(t *testing.T) {
 	binary, ran := standIn(t, answered, 0, "")
 	said := Said{Started: noted, Binary: binary, Home: t.TempDir(), Session: "s-1", Says: "hello", Model: "m", Effort: "low", Mode: "dontAsk",
-		Env: []string{"GIT_CONFIG_GLOBAL=/agents/root/gitconfig", "QNTX_TOKEN=qntx_its_own"}}
+		Env: []string{"GIT_CONFIG_GLOBAL=/agents/root/gitconfig", "GROUND_NAME=its_own"}}
 	if _, err := said.Run(context.Background(), func(Message) {}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}

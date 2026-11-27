@@ -60,7 +60,7 @@ Status: Implemented
 
 "why cant we make q relay it"
 
-- 「[Opus 5.5] A subsystem on a node that does not hold the App asks GitHub through the node that does: ROOT's `GITHUB relay` line (`POST /api/github/relay`) names that node and where the token for its `github ask` is kept, never the token.」
+- 「[Opus 5.5] A subsystem on a node that does not hold the App asks GitHub through the node that does: ROOT's `GITHUB relay` line (`POST /api/github/relay`) names that node, and this node asks its `github ask` as itself, signed by its own key. No token is held for it.」
 
 ## What the contract does not carry
 

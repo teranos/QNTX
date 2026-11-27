@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/internal/secretref"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -27,11 +26,12 @@ const (
 	relayWait = 2 * time.Minute
 )
 
-// 「[Opus 5.5] GitHubRelay is the node this one asks GitHub through, and where the token it」
-// 「[Opus 5.5] asks with is kept.」
+// "I WANT TO KILL THIS IDEA, I DONT WANT TO MAINTAIN TOKENS, AGENNTS KEEP REACHING FOR IT AND CREATING MORE TOKENS, THIS ISNT SECURE"
+
+// 「[Opus 5.5] GitHubRelay is the node this one asks GitHub through. It asks as itself,」
+// 「[Opus 5.5] signed by its own key (auth.SignedAsNode), so it holds nothing to ask with.」
 type GitHubRelay struct {
-	URL      string `json:"url"`
-	TokenRef string `json:"token_ref"`
+	URL string `json:"url"`
 }
 
 // 「[Opus 5.5] Relay is the node's relay, and whether it has one. An empty URL is one turned off.」
@@ -46,28 +46,21 @@ func (r NodeRecords) Relay() (GitHubRelay, bool, error) {
 	}
 	relay := GitHubRelay{}
 	relay.URL, _ = as.Attributes["url"].(string)
-	relay.TokenRef, _ = as.Attributes["token_ref"].(string)
 	return relay, relay.URL != "", nil
 }
 
 // 「[Opus 5.5] SetRelay writes the relay whole.」
 func (r NodeRecords) SetRelay(actor string, relay GitHubRelay) error {
-	return r.nodeRecord(actor, githubSubject, githubRelayLine, "_", map[string]any{"url": relay.URL, "token_ref": relay.TokenRef})
+	return r.nodeRecord(actor, githubSubject, githubRelayLine, "_", map[string]any{"url": relay.URL})
 }
 
-// 「[Opus 5.5] relayTokenRef is whether ref says where a token is, rather than being one.」
-func relayTokenRef(ref string) error {
-	if !secretref.IsReference(ref) {
-		return errors.New("token_ref says where the token is kept, as env:NAME or ssm:///path, and never is the token")
-	}
-	return nil
-}
-
-// 「[Opus 5.5] relayAsk asks the far node one operation and hands back GitHub's answer.」
-func relayAsk(ctx context.Context, relay GitHubRelay, operation string, request []byte) ([]byte, error) {
-	token, err := secretref.Resolve(ctx, relay.TokenRef)
+// 「[Opus 5.5] relayAsk asks the far node one operation, as this node, and hands back」
+// 「[Opus 5.5] GitHub's answer. signAs is this node's signature for an origin.」
+func relayAsk(ctx context.Context, signAs func(origin string) (string, error), relay GitHubRelay, operation string, request []byte) ([]byte, error) {
+	origin := strings.TrimRight(relay.URL, "/")
+	signed, err := signAs(origin)
 	if err != nil {
-		return nil, errors.Wrapf(err, "the token for the relay to %s was not read", relay.URL)
+		return nil, errors.Wrapf(err, "the ask of %s to %s was not signed", operation, relay.URL)
 	}
 	body, err := json.Marshal(map[string]string{"operation": operation, "request": string(request)})
 	if err != nil {
@@ -75,12 +68,12 @@ func relayAsk(ctx context.Context, relay GitHubRelay, operation string, request 
 	}
 	ctx, cancel := context.WithTimeout(ctx, relayWait)
 	defer cancel()
-	r, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(relay.URL, "/")+githubPath+"/ask", bytes.NewReader(body))
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, origin+githubPath+"/ask", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "the relay to %s is not a request", relay.URL)
 	}
 	r.Header.Set("Content-Type", "application/json")
-	r.Header.Set("Authorization", "Bearer "+token)
+	r.Header.Set("Authorization", signed)
 	answer, err := http.DefaultClient.Do(r)
 	if err != nil {
 		return nil, errors.Wrapf(err, "%s did not reach %s", operation, relay.URL)
@@ -107,8 +100,7 @@ func githubRelaySigil() *protocol.Sigil {
 		Name: "relay",
 		Does: "Set the node this node's subsystems ask GitHub through, for a node that does not hold the App. An empty url turns it off.",
 		Takes: []*protocol.Param{
-			{Name: "url", Says: "The origin of the node holding the App. Empty turns the relay off."},
-			{Name: "token_ref", Says: "Where a token ROOT on that node minted is kept: env:NAME or ssm:///path."},
+			{Name: "url", Says: "The origin of the node holding the App, which this node asks as itself. Empty turns the relay off."},
 		},
 		Gives: []*protocol.Field{{Name: "relay", Says: "The relay as it now stands."}},
 		Http:  &protocol.Endpoint{Method: http.MethodPost, Path: githubPath + "/relay"},
@@ -116,13 +108,10 @@ func githubRelaySigil() *protocol.Sigil {
 }
 
 func (g *gitHub) githubRelay(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
-	relay := GitHubRelay{URL: sent["url"], TokenRef: sent["token_ref"]}
+	relay := GitHubRelay{URL: sent["url"]}
 	if relay.URL != "" {
 		if err := forwardURL(relay.URL); err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "url", Says: err.Error()}
-		}
-		if err := relayTokenRef(relay.TokenRef); err != nil {
-			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "token_ref", Says: err.Error()}
 		}
 	}
 	if err := g.host.nodeRecords().SetRelay(actorOf(ctx), relay); err != nil {

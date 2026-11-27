@@ -70,7 +70,7 @@ func TestATokenStillNamesItsOwnNamespace(t *testing.T) {
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{
+	raw, _, err := store.issueThroughClient(NewToken{
 		Label:      "ci",
 		MintedBy:   mastodonAccount,
 		Level:      LevelAttestor,
@@ -88,32 +88,6 @@ func TestATokenStillNamesItsOwnNamespace(t *testing.T) {
 	guarded(httptest.NewRecorder(), req)
 
 	assert.Equal(t, []string{"pond"}, seen.Namespaces)
-}
-
-// A token arrives at the kind it was minted as. The middleware reads that off
-// the record rather than settling one level for every bearer.
-func TestABearerTokenArrivesAtTheKindItWasMintedAs(t *testing.T) {
-	h := testHandler()
-	store := newMemTokenStore()
-	h.tokens = store
-
-	for _, kind := range []Level{LevelSuper, LevelAttestor} {
-		raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: kind})
-		require.NoError(t, err)
-
-		var seen Admission
-		guarded := h.Middleware("/test", everyLevel, func(_ http.ResponseWriter, r *http.Request) {
-			seen, _ = AdmissionFrom(r.Context())
-		})
-
-		req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
-		req.Header.Set("Authorization", "Bearer "+raw)
-		guarded(httptest.NewRecorder(), req)
-
-		assert.Equal(t, string(kind), seen.LevelName())
-		assert.Equal(t, mastodonAccount, seen.Identity)
-		assert.NotNil(t, seen.Grant, "a session carries no grant; a token does")
-	}
 }
 
 // The one thing a token may never do, and it is the credential type that stops
@@ -177,7 +151,7 @@ func TestATokenDiesWithTheIdentityThatMintedIt(t *testing.T) {
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{
+	raw, _, err := store.issueThroughClient(NewToken{
 		Label:    "ci",
 		MintedBy: "https://mastodon.example/@tim",
 		Level:    LevelAttestor,
