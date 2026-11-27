@@ -123,10 +123,11 @@ func vouching(t *testing.T, client string) *Handler {
 func TestANodeDoesNotAdmitABearerItsIssuerVouchesForThroughNoClient(t *testing.T) {
 	token := "qntx_" + strings.Repeat("b", 64)
 
-	_, admitted := vouching(t, "did:key:zconnector").admissionOf(vouching(t, "did:key:zconnector").presented(bearing(token)))
+	node := vouching(t, "did:key:zconnector")
+	_, admitted := node.admissionOf(node.presented(bearing(token)))
 	require.True(t, admitted, "an issuer's bearer through a client was not admitted")
 
-	node := vouching(t, "")
+	node = vouching(t, "")
 	_, admitted = node.admissionOf(node.presented(bearing(token)))
 	assert.False(t, admitted, "an issuer's bearer through no client was admitted")
 }

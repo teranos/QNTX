@@ -88,15 +88,19 @@ func TestGitHubListsItsOperations(t *testing.T) {
 func TestGitHubIsAskedAsTheInstallationNamed(t *testing.T) {
 	s, asked := appHoldingServer(t, "write")
 
-	_, _ = answer(t, s, "ask", sigil.Sent{
+	got, refused := answer(t, s, "ask", sigil.Sent{
 		"operation":    "ListRepositoriesAccessibleToTheAppInstallation",
 		"request":      `{}`,
 		"installation": "7",
 	})
+	require.Nil(t, refused)
+	answered, ok := got.(map[string]any)["answer"].(map[string]any)
+	require.True(t, ok, "answer is %T", got)
+	assert.NotEmpty(t, answered["repositories"])
 
-	require.NotEmpty(t, *asked)
+	require.Len(t, *asked, 2)
 	assert.Equal(t, "POST /app/installations/7/access_tokens", (*asked)[0].Route)
-	assert.Equal(t, "GET /installation/repositories", (*asked)[len(*asked)-1].Route)
+	assert.Equal(t, "GET /installation/repositories", (*asked)[1].Route)
 }
 
 // 「[Opus 5.5] An installation that is not a number is said by its param.」

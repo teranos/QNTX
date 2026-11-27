@@ -202,7 +202,10 @@ func TestARelaySignsForItsOrigin(t *testing.T) {
 func TestARelayCarriesTheInstallationItIsAskedAs(t *testing.T) {
 	var asked map[string]any
 	q := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&asked))
+		// Each request read on its own: decoding into a map keeps what the one before left.
+		this := map[string]any{}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&this))
+		asked = this
 		_ = json.NewEncoder(w).Encode(map[string]any{"answer": map[string]any{}})
 	}))
 	defer q.Close()
