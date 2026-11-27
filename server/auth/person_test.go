@@ -96,41 +96,6 @@ func TestAPublicRegistrationIsAnsweredWithItsDoorAndNamespace(t *testing.T) {
 	assert.Equal(t, "session", body["via"])
 }
 
-// A token speaks for whoever minted it. The answer is that person's
-// User, and it says the request came in on a token rather than a session.
-func TestATokenIsAnsweredWithTheMintersUserAndSaysSo(t *testing.T) {
-	h := testHandler()
-	store := &memUsers{held: []User{{
-		ID:          "US-TIM",
-		DisplayName: "tim",
-		Level:       LevelRoot,
-		Accounts:    []UserAccount{{Provider: "mastodon", CanonicalID: mastodonAccount}},
-	}}}
-	h.users = store
-	tokens := newMemTokenStore()
-	h.tokens = tokens
-
-	raw, _, err := tokens.Create(NewToken{
-		Label:        "ci",
-		MintedBy:     mastodonAccount,
-		MintedByUser: "US-TIM",
-		Level:        LevelAttestor,
-		Namespaces:   []string{"pond"},
-	})
-	require.NoError(t, err)
-
-	req := httptest.NewRequest(http.MethodGet, "/i/", nil)
-	req.Header.Set("Authorization", "Bearer "+raw)
-	rec, body := asked(t, h, req)
-
-	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "US-TIM", body["user"])
-	assert.Equal(t, "token", body["via"])
-	assert.Equal(t, "ATTESTOR", body["level"])
-	assert.Equal(t, mastodonAccount, body["identity"])
-	assert.Equal(t, []any{"pond"}, body["namespaces"])
-}
-
 // A role is what lets a person further than their rung (ADR-034), so a surface
 // drawing them has to know which they hold, and the person may know it.
 func TestTheRolesAnAdmissionHoldsAreAnswered(t *testing.T) {

@@ -303,7 +303,6 @@ func TestNodeAgentCodexNamedByHalfIsRefused(t *testing.T) {
 		"both or neither":           "[agent.root.codex]\ngateway = \"g\"\nsandbox = \"read-only\"\n",
 		"agent.root.codex.sandbox":  "[agent.root.codex]\nmodel = \"m\"\ngateway = \"g\"\n",
 		"agent.root.codex.sandbox ": "[agent.root.codex]\nmodel = \"m\"\ngateway = \"g\"\nsandbox = \"everything\"\n",
-		"agent.root.codex.token":    "[agent.root.codex]\nmodel = \"m\"\ngateway = \"g\"\nsandbox = \"read-only\"\ntoken = \"a-literal\"\n",
 	} {
 		cfg, err := LoadFromFile(writeConfig(t, body))
 		if err != nil {

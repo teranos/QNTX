@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/server/auth"
 )
@@ -24,11 +26,51 @@ func NoPeers(context.Context, auth.Admission, string) []auth.PeerAnswer { return
 // caller item off: the primary drew the person already, leftmost.
 const forPrimary = "primary"
 
+// "it should just not render for did not answer nodes that have been like that for 30+ minutes"
+// A peer that has not answered for this long is left off the row: a fleet
+// that is away takes no place on it, and is on it again the moment it answers.
+const peerAwayAfter = 30 * time.Minute
+
+// peersAway is since when each peer has not answered, by name. A node that
+// started a moment ago knows of no peer how long it has been away.
+type peersAway struct {
+	mu    sync.Mutex
+	since map[string]time.Time
+}
+
+// leftOff notes whether the peer answered now, and says whether it has not
+// answered for peerAwayAfter.
+func (p *peersAway) leftOff(name string, answered bool, now time.Time) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if answered {
+		delete(p.since, name)
+		return false
+	}
+	since, away := p.since[name]
+	if !away {
+		if p.since == nil {
+			p.since = map[string]time.Time{}
+		}
+		p.since[name] = now
+		return false
+	}
+	return now.Sub(since) >= peerAwayAfter
+}
+
 // peerItems is every peer's row after the primary's: one item naming the
-// peer, then the peer's items as the peer spelled them.
+// peer, then the peer's items as the peer spelled them. A peer long away is
+// left off.
 func (h *StatusLineHandler) peerItems(ctx context.Context, a auth.Admission) []StatusItem {
+	now := time.Now()
+	if h.clock != nil {
+		now = h.clock()
+	}
 	var items []StatusItem
 	for _, answer := range h.Peers(ctx, a, "/am/statusline?format="+FormatJSON+"&for="+forPrimary) {
+		if h.away.leftOff(answer.Name, answer.Err == nil, now) {
+			continue
+		}
 		items = append(items, peerRow(answer)...)
 	}
 	return items

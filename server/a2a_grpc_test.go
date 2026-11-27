@@ -46,7 +46,7 @@ func a2aOverGRPCAsked(t *testing.T) (a2apb.A2AServiceClient, map[auth.Level]stri
 // as is ctx carrying token as gRPC carries a credential: the authorization
 // metadata, which is the HTTP header the gate reads.
 func asOverGRPC(token string) context.Context {
-	return metadata.AppendToOutgoingContext(context.Background(), "authorization", "Bearer "+token, "a2a-version", "1.0")
+	return metadata.AppendToOutgoingContext(context.Background(), "authorization", authorizationFor(token), "a2a-version", "1.0")
 }
 
 func saidOverGRPC(text string) *a2apb.SendMessageRequest {

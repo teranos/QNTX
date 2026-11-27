@@ -144,6 +144,10 @@ type StatusLineHandler struct {
 	tmux *rowAsks
 	// The peers' rows, asked as the caller (peers.go). Nil draws none.
 	Peers PeerRows
+	// Since when each peer has not answered (peers.go).
+	away peersAway
+	// What time it is, where a test says: nil is time.Now.
+	clock func() time.Time
 	// Each plugin's newest deploy (plugin_deploy.go). Nil draws none.
 	// Every deploy, and whether one is in flight: the carousel waits while one is.
 	Deploys func() ([]DeployData, bool)

@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -374,16 +376,23 @@ func TestAWaitROOTWasNotMailedAboutMailsNothingWhenItEnds(t *testing.T) {
 // "a stall under load should shed or throttle the heaviest caller, not end
 // the process." — "Yes"
 //
-// While the store is slow the token that sent the most is turned away, and it
-// is let back in, and ROOT told so, once the store answers in time again.
-func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
+// While the store is slow the connector that sent the most is turned away, and
+// it is let back in, and ROOT told so, once the store answers in time again.
+func TestTheHeaviestConnectorIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
 	s, box, tokens := watchedNodeWithTokens(t)
-	heavy, _, err := tokens.Create(auth.NewToken{Label: "ground", MintedBy: rootAccount, Level: auth.LevelAttestor, ExpiresAt: auth.NeverEnds()})
-	require.NoError(t, err)
-	light, _, err := tokens.Create(auth.NewToken{Label: "laptop-cron", MintedBy: rootAccount, Level: auth.LevelAttestor, ExpiresAt: auth.NeverEnds()})
-	require.NoError(t, err)
+	// 「[Opus 5.5] Two clients' own tokens, each issued through its client by the」
+	// 「[Opus 5.5] client_credentials grant (RFC 6749 §4.4): a bearer the gate takes.」
+	signedIn := func(label, raw string) string {
+		sum := sha256.Sum256([]byte(raw))
+		_, err := tokens.Issue(auth.IssuedToken{Hash: hex.EncodeToString(sum[:]), DID: "did:key:z" + label, Label: label,
+			MintedBy: rootAccount, Level: auth.LevelToken, ExpiresAt: auth.NeverEnds(), ClientDID: "did:key:zclient-" + label})
+		require.NoError(t, err)
+		return raw
+	}
+	heavy := signedIn("chatgpt", "qntx_chatgpt_signed_in")
+	light := signedIn("claude.ai", "qntx_claude_ai_signed_in")
 
-	gated := s.authHandler.Middleware("/api/attestations", auth.Also(auth.LevelAttestor), func(w http.ResponseWriter, r *http.Request) {
+	gated := s.authHandler.Middleware("/api/attestations", auth.Also(auth.LevelToken), func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	send := func(raw string) int {
@@ -407,8 +416,8 @@ func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return send(heavy) == http.StatusTooManyRequests
-	}, 10*time.Second, time.Millisecond, "the heaviest token was not turned away while the store was slow")
-	assert.Equal(t, http.StatusOK, send(light), "a token that was not the heaviest was turned away")
+	}, 10*time.Second, time.Millisecond, "the heaviest connector was not turned away while the store was slow")
+	assert.Equal(t, http.StatusOK, send(light), "a connector that was not the heaviest was turned away")
 
 	// Past a mail about the wait, which is what a mail about its end answers.
 	clock.step(t, shortPatience.mailEvery-shortPatience.sentry)
@@ -417,13 +426,13 @@ func TestTheHeaviestTokenIsTurnedAwayWhileTheStoreIsSlow(t *testing.T) {
 	clock.step(t, shortPatience.every)
 	if !assert.Eventually(t, func() bool {
 		for _, text := range box.texts(t) {
-			if strings.Contains(text, "Let back in: ground") {
+			if strings.Contains(text, "Let back in: chatgpt") {
 				return true
 			}
 		}
 		return false
 	}, 10*time.Second, time.Millisecond) {
-		t.Fatalf("ROOT was not told the heaviest token was let back in: %v", box.subjects())
+		t.Fatalf("ROOT was not told the heaviest connector was let back in: %v", box.subjects())
 	}
-	assert.Equal(t, http.StatusOK, send(heavy), "the heaviest token was still turned away once the store answered in time")
+	assert.Equal(t, http.StatusOK, send(heavy), "the heaviest connector was still turned away once the store answered in time")
 }
