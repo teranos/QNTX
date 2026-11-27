@@ -70,10 +70,8 @@ func (h *Handler) presented(r *http.Request) Presented {
 
 	// 「[Opus 5.5] A request this gate admitted already, asked through it again inside the」
 	// 「[Opus 5.5] node: the grant it stood on, and nothing presented a second time.」
-	if grant, passed := gatedGrant(r.Context()); passed {
-		p.bearerPresented = true
-		p.Bearer = &grant
-		return p
+	if read, passed := gatedRead(r.Context()); passed {
+		return read
 	}
 
 	// An agent the node runs, at the door the node opened for it alone.
@@ -135,7 +133,7 @@ func (h *Handler) presented(r *http.Request) Presented {
 			// "Tokens are to be removed from QNTX except for third-party OAuth clients"
 			// 「[Opus 5.5] A bearer is taken only when a client's flow issued it. One a person or」
 			// 「[Opus 5.5] an agent minted, whatever store still holds it, is not held here.」
-			if grant, live := h.tokens.Lookup(hash); live && grant.ClientDID == "" && grant.Level != LevelOAuth && grant.Level != LevelRefresh {
+			if grant, live := h.tokens.Lookup(hash); live && !throughAClient(grant) {
 				p.notThroughAClient = true
 				h.logger.Infow("a bearer issued through no client was presented, and is not taken", "did", grant.DID, "label", grant.Label)
 			} else if live {
@@ -146,7 +144,10 @@ func (h *Handler) presented(r *http.Request) Presented {
 				// Last used is what a revocation is watched by, and
 				// nothing wrote it.
 				h.touch(hash, grant.DID)
-			} else if grant, live := h.issuedElsewhere(raw); live {
+			} else if grant, live := h.issuedElsewhere(raw); live && !throughAClient(grant) {
+				p.notThroughAClient = true
+				h.logger.Infow("a bearer an issuer vouched for was issued through no client, and is not taken", "did", grant.DID, "label", grant.Label)
+			} else if live {
 				// Issued by auth.issuer, which said so; this node's own lines admit it.
 				p.Bearer = &grant
 			}
@@ -201,11 +202,18 @@ func (h *Handler) spend(p Presented, w http.ResponseWriter) {
 	h.clearPendingCookie(w)
 }
 
-// gatedKey is the grant a request stood on when this gate admitted it.
+// gatedKey is what this gate read of a request it admitted.
 type gatedKey struct{}
 
-// gatedGrant is the grant ctx's request stood on at this gate, and whether it passed it.
-func gatedGrant(ctx context.Context) (Grant, bool) {
-	grant, ok := ctx.Value(gatedKey{}).(Grant)
-	return grant, ok
+// 「[Opus 5.5] gatedRead is what this gate read of ctx's request when it admitted it, and」
+// 「[Opus 5.5] whether it did: the session and the grant together, nothing presented twice.」
+func gatedRead(ctx context.Context) (Presented, bool) {
+	read, ok := ctx.Value(gatedKey{}).(Presented)
+	return read, ok
+}
+
+// 「[Opus 5.5] throughAClient is whether a client's flow issued the grant: the one kind of」
+// 「[Opus 5.5] bearer taken, here and at every node that asks this one.」
+func throughAClient(g Grant) bool {
+	return g.ClientDID != "" || g.Level == LevelOAuth || g.Level == LevelRefresh
 }

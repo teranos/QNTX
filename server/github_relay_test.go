@@ -41,7 +41,9 @@ func TestARelayAsksTheNodeThatHoldsTheAppAsItself(t *testing.T) {
 	answered, err := linkedHost{s}.AskGitHub(context.Background(), "CreateAPullRequest", map[string]any{"owner": "o", "repo": "r"})
 	require.NoError(t, err)
 
-	assert.JSONEq(t, `{"html_url":"https://github.com/o/r/pull/9"}`, string(answered))
+	// 「[Opus 5.5] What came back through the relay reads as what this node's own GitHubService」
+	// 「[Opus 5.5] answers: devkq's org binding, on 2026-11-27, read q's answer as a failure saying nothing.」
+	assert.JSONEq(t, `{"success":true,"html_url":"https://github.com/o/r/pull/9"}`, string(answered))
 	assert.Equal(t, "CreateAPullRequest", asked["operation"])
 	assert.JSONEq(t, `{"owner":"o","repo":"r"}`, asked["request"].(string))
 
@@ -121,4 +123,75 @@ func TestANodeWithNoRelayHasNone(t *testing.T) {
 	_, found, err := s.nodeRecords().Relay()
 	require.NoError(t, err)
 	assert.False(t, found)
+}
+
+// 「[Opus 5.5] A relay is an origin, over HTTPS or on this machine: the node signs what it」
+// 「[Opus 5.5] hands over and sends it nowhere a path or plain HTTP across a network takes it.」
+func TestARelayIsAnOriginOverHTTPSOrThisMachine(t *testing.T) {
+	g := &gitHub{host: githubKnowingServer(t)}
+	for _, refused := range []string{"http://q.example.com", "https://q.example.com/api", "https://q.example.com/?x=1"} {
+		_, refusal := g.githubRelay(context.Background(), map[string]string{"url": refused})
+		assert.NotNil(t, refusal, "the relay %s was taken", refused)
+	}
+	for _, taken := range []string{"https://api.q.sbvh.nl", "https://api.q.sbvh.nl/", "http://127.0.0.1:8791", "http://localhost:8791"} {
+		_, refusal := g.githubRelay(context.Background(), map[string]string{"url": taken})
+		assert.Nil(t, refusal, "the relay %s was refused", taken)
+	}
+}
+
+// 「[Opus 5.5] A relay written before the rule is held to it when asked, before anything is signed.」
+func TestARelayOverPlainHTTPElsewhereIsNotAsked(t *testing.T) {
+	s := githubKnowingServer(t)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	s.nodeDID = &nodedid.Handler{PrivateKey: key}
+	require.NoError(t, s.nodeRecords().SetRelay(rootAccount, GitHubRelay{URL: "http://q.example.com"}))
+
+	_, err = linkedHost{s}.AskGitHub(context.Background(), "GetAPullRequest", map[string]any{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not HTTPS")
+}
+
+// 「[Opus 5.5] The signature goes to the relay and nowhere it is sent on to.」
+func TestARelayFollowsNoRedirect(t *testing.T) {
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		t.Errorf("the relay's signature followed a redirect: %s", r.Header.Get("Authorization"))
+	}))
+	defer elsewhere.Close()
+	q := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, elsewhere.URL+r.URL.Path, http.StatusTemporaryRedirect)
+	}))
+	defer q.Close()
+	s := githubKnowingServer(t)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	s.nodeDID = &nodedid.Handler{PrivateKey: key}
+	require.NoError(t, s.nodeRecords().SetRelay(rootAccount, GitHubRelay{URL: q.URL}))
+
+	_, err = linkedHost{s}.AskGitHub(context.Background(), "GetAPullRequest", map[string]any{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "307")
+}
+
+// 「[Opus 5.5] A relay written with a trailing slash signs for the origin all the same.」
+func TestARelaySignsForItsOrigin(t *testing.T) {
+	var authorization string
+	q := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization = r.Header.Get("Authorization")
+		_ = json.NewEncoder(w).Encode(map[string]any{"answer": map[string]any{}})
+	}))
+	defer q.Close()
+	s := githubKnowingServer(t)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	s.nodeDID = &nodedid.Handler{PrivateKey: key}
+	require.NoError(t, s.nodeRecords().SetRelay(rootAccount, GitHubRelay{URL: q.URL + "/"}))
+
+	_, err = linkedHost{s}.AskGitHub(context.Background(), "GetAPullRequest", map[string]any{})
+	require.NoError(t, err)
+	var claims jwt.RegisteredClaims
+	_, err = jwt.ParseWithClaims(strings.TrimPrefix(authorization, "Signed "), &claims,
+		func(*jwt.Token) (any, error) { return key.Public(), nil }, jwt.WithValidMethods([]string{jwt.SigningMethodEdDSA.Alg()}))
+	require.NoError(t, err)
+	assert.Equal(t, jwt.ClaimStrings{q.URL}, claims.Audience)
 }

@@ -10,7 +10,9 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -58,7 +60,10 @@ func (r NodeRecords) SetRelay(actor string, relay GitHubRelay) error {
 // 「[Opus 5.5] relayAsk asks the far node one operation, as this node, and hands back」
 // 「[Opus 5.5] GitHub's answer. signAs is this node's signature for an origin.」
 func relayAsk(ctx context.Context, signAs func(origin string) (string, error), relay GitHubRelay, operation string, request []byte) ([]byte, error) {
-	origin := strings.TrimRight(relay.URL, "/")
+	origin, err := relayOrigin(relay.URL)
+	if err != nil {
+		return nil, errors.Wrapf(err, "%s was not asked through the relay", operation)
+	}
 	signed, err := signAs(origin)
 	if err != nil {
 		return nil, errors.Wrapf(err, "the ask of %s to %s was not signed", operation, relay.URL)
@@ -75,7 +80,7 @@ func relayAsk(ctx context.Context, signAs func(origin string) (string, error), r
 	}
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Authorization", signed)
-	answer, err := http.DefaultClient.Do(r)
+	answer, err := toRelay.Do(r)
 	if err != nil {
 		return nil, errors.Wrapf(err, "%s did not reach %s", operation, relay.URL)
 	}
@@ -88,12 +93,44 @@ func relayAsk(ctx context.Context, signAs func(origin string) (string, error), r
 		return nil, errors.Newf("%s answered %s with %s: %s", relay.URL, operation, strconv.Itoa(answer.StatusCode), raw)
 	}
 	var given struct {
-		Answer json.RawMessage `json:"answer"`
+		Answer map[string]json.RawMessage `json:"answer"`
 	}
 	if err := json.Unmarshal(raw, &given); err != nil {
 		return nil, errors.Wrapf(err, "what %s answered %s did not read", relay.URL, operation)
 	}
-	return given.Answer, nil
+	// 「[Opus 5.5] The far node answered GitHub's answer alone, success said by answering at」
+	// 「[Opus 5.5] all; here it is said again, as this node's own GitHubService answers it.」
+	if given.Answer == nil {
+		given.Answer = map[string]json.RawMessage{}
+	}
+	given.Answer["success"] = json.RawMessage("true")
+	answered, err := json.Marshal(given.Answer)
+	if err != nil {
+		return nil, errors.Wrapf(err, "what %s answered %s did not encode", relay.URL, operation)
+	}
+	return answered, nil
+}
+
+// 「[Opus 5.5] toRelay follows no redirect: the node's signature goes to the relay it」
+// 「[Opus 5.5] names and nowhere it is sent on to, as toLaye's does.」
+var toRelay = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+
+// 「[Opus 5.5] relayOrigin is the origin raw names, which the node signs for: over HTTPS, or」
+// 「[Opus 5.5] over HTTP to this machine alone, with no path to it.」
+func relayOrigin(raw string) (string, error) {
+	at, err := url.Parse(raw)
+	if err != nil {
+		return "", errors.Wrapf(err, "the relay %q does not read", raw)
+	}
+	if at.Host == "" || at.User != nil || strings.TrimRight(at.Path, "/") != "" || at.RawQuery != "" || at.Fragment != "" {
+		return "", errors.Newf("the relay %q is not an origin: the node signs for scheme and host alone", raw)
+	}
+	host := at.Hostname()
+	local := host == "localhost" || net.ParseIP(host) != nil && net.ParseIP(host).IsLoopback()
+	if at.Scheme != "https" && !(at.Scheme == "http" && local) {
+		return "", errors.Newf("the relay %q is not HTTPS: the node signs what it hands over, and sends it over HTTPS or to this machine alone", raw)
+	}
+	return at.Scheme + "://" + at.Host, nil
 }
 
 func githubRelaySigil() *protocol.Sigil {
@@ -111,9 +148,11 @@ func githubRelaySigil() *protocol.Sigil {
 func (g *gitHub) githubRelay(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
 	relay := GitHubRelay{URL: sent["url"]}
 	if relay.URL != "" {
-		if err := forwardURL(relay.URL); err != nil {
+		origin, err := relayOrigin(relay.URL)
+		if err != nil {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "url", Says: err.Error()}
 		}
+		relay.URL = origin
 	}
 	if err := g.host.nodeRecords().SetRelay(actorOf(ctx), relay); err != nil {
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
