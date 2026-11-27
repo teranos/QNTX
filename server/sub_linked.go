@@ -191,7 +191,7 @@ func (h linkedHost) AskGitHub(ctx context.Context, operation string, request any
 		return nil, errors.Wrapf(err, "whether %s goes through another node was not read", operation)
 	}
 	if relayed {
-		return relayAsk(ctx, h.s.authHandler.SignedAsNode, relay, operation, raw)
+		return relayAsk(ctx, h.s.signedAsNode, relay, operation, raw)
 	}
 	answered, err := h.s.gitHubService().Ask(services.AsInstallation(ctx), operation, raw)
 	if err != nil {
