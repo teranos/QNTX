@@ -82,3 +82,30 @@ func TestGitHubListsItsOperations(t *testing.T) {
 	assert.Contains(t, names, "ListWorkflowRunsForARepository")
 	holds(t, s.githubSignum(), "operations", got)
 }
+
+// 「[Opus 5.5] What an installation reaches is asked as that installation, named by its id:」
+// 「[Opus 5.5] devkq's org binding, through q on 2026-11-27, named no repository to find it by.」
+func TestGitHubIsAskedAsTheInstallationNamed(t *testing.T) {
+	s, asked := appHoldingServer(t, "write")
+
+	_, _ = answer(t, s, "ask", sigil.Sent{
+		"operation":    "ListRepositoriesAccessibleToTheAppInstallation",
+		"request":      `{}`,
+		"installation": "7",
+	})
+
+	require.NotEmpty(t, *asked)
+	assert.Equal(t, "POST /app/installations/7/access_tokens", (*asked)[0].Route)
+	assert.Equal(t, "GET /installation/repositories", (*asked)[len(*asked)-1].Route)
+}
+
+// 「[Opus 5.5] An installation that is not a number is said by its param.」
+func TestAnInstallationThatIsNoNumberIsRefused(t *testing.T) {
+	s, asked := appHoldingServer(t, "write")
+	_, refused := answer(t, s, "ask", sigil.Sent{
+		"operation": "ListRepositoriesAccessibleToTheAppInstallation", "request": `{}`, "installation": "seven",
+	})
+	require.NotNil(t, refused)
+	assert.Equal(t, "installation", refused.GetParam())
+	assert.Empty(t, *asked)
+}
