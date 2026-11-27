@@ -204,7 +204,7 @@ to Pi by itself: what Claude Code answers then has not been seen.
 
 "another thing i want is that rituals run on the box from now on, not locally on my machine per se."
 
-- [[ADR-050-comet]]: the box's own ground, the readiness of a hosted agent, and a ritual's performer on the box.
+- [[ADR-050-Comet]]: the box's own ground, the readiness of a hosted agent, and a ritual's performer on the box.
 - The namespace agent: its own DID derived from the node's key for that
   namespace and model, its own home, session and token, signed in through claude login (ADR-051), a sandbox around the turn, and one test of the whole
   claim: it fails to reach the node's environment, its config, another

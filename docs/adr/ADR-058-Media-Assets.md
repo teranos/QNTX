@@ -16,8 +16,6 @@ From: [[2026-11-11-eleven-i-meant-twelve-labs]]
 
 ## 「[Fable 5.2] An asset is its bytes」
 
-"i never wanted twelvelabs to be the source of truth"
-
 - 「[Fable 5.2] An asset is named by the SHA-256 of its bytes: `sha256:<hex>`. Nobody issues the name, and nobody can take it back.」
 - 「[Fable 5.2] Any copy that hashes to the name is the original. So no service is the source of truth: the bytes are, wherever they sit.」
 - 「[Fable 5.2] Everything else about an asset is an attestation with that name as its subject: who brought it, who holds it, what it was called, what a model heard in it, which quote points at it.」
@@ -27,11 +25,33 @@ From: [[2026-11-11-eleven-i-meant-twelve-labs]]
 
 ## 「[Fable 5.2] Holding is said, not built」
 
-"k would be storing media assets"
-
 - 「[Fable 5.2] A node that keeps an asset's bytes attests that it holds them. K holds. A node that receives bytes and does not keep them hands them to one that does, and the name is unchanged by the trip.」
 - 「[Fable 5.2] Where an asset is, is read from who attests holding it. A holder that is lost loses a copy and no identity.」
 - 「[Fable 5.2] TwelveLabs is a holder that cannot give the bytes back: its asset carries a stream and a thumbnail, and no way to the file that was sent. What it holds is a copy to search, never the one to keep.」
+
+## 「[Fable 5.2] Per person」
+
+"also, isnt media also like, per user or per person"
+"everyone get's to hold some amount of assets"
+
+- 「[Fable 5.2] The bytes are nobody's. The bringing is a person's: each attestation of an asset says who brought it.」
+- 「[Fable 5.2] What a person holds is the sum of the sizes of what they brought and is still kept. Their amount is a bound on that sum.」
+- 「[Fable 5.2] The same bytes brought by two people count for both. Bringing a file tells nobody whether another already has it.」
+
+"the allowance is a type of grant line i would say"
+"like PUBLIC_REGISTRATION never gets any"
+
+- 「[Fable 5.2] A person's amount is granted, on a line as a role is. Nobody holds an amount by default, and no line is none.」
+- 「[Fable 5.2] The node adds up what a person brought when they bring more, and refuses what would pass their newest grant.」
+
+"and your personal media assets, you may place them on a canvas of yours if you have one"
+
+- 「[Fable 5.2] Placing an asset on a canvas is the canvas naming it. Nothing is copied, and what a person may place is what they brought.」
+
+"it kind of ties into this idea of variable or per user rate limits"
+"which is still doable since we are small"
+
+- 「[Fable 5.2] How much a person may hold and how often a person may ask are one kind of line: a bound granted to one person, with what it measures named on it.」
 
 ## 「[Fable 5.2] TwelveLabs shaped」
 
@@ -79,6 +99,9 @@ From: [[2026-11-11-eleven-i-meant-twelve-labs]]
 
 ## 「[Fable 5.2] After」
 
+"like, in the QNTX-App, you would be able to add a file to QNTX as a media asset"
+
+- [ ] 「[Fable 5.2] The app adds a file: it brings it to the node and is answered with its name.」
 - [ ] 「[Fable 5.2] A node hands what it received to the node that holds.」
 - [ ] 「[Fable 5.2] A provider plugin hands a copy to TwelveLabs and attests the id it was given.」
 - [ ] 「[Fable 5.2] A Room message names an asset, and plays it.」
