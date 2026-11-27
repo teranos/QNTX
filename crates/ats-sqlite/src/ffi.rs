@@ -30,6 +30,14 @@ const SURFACE: &str = "ats-sqlite";
 const MAX_ID_LENGTH: usize = 256;
 const MAX_JSON_LENGTH: usize = 1_000_000; // 1MB
 
+// "if ground is a recording device, it needs to miss not a single sounds"
+//
+// An attestation is as large as the request that carries it: the node takes a
+// body of 10 MB (server/attestation_handlers.go, maxAttestationBody), and a
+// store that kept only a megabyte of it refused what the node had let in. A
+// line of a transcript ran to 1.08 MB on 2026-11-21 and was refused here.
+const MAX_ATTESTATION_JSON_LENGTH: usize = 10 * 1024 * 1024;
+
 /// C-compatible result wrapper
 #[repr(C)]
 pub struct StorageResultC {
@@ -848,7 +856,7 @@ pub extern "C" fn storage_put(
             Err(e) => return StorageResultC::error(e),
         };
 
-        if json_str.len() > MAX_JSON_LENGTH {
+        if json_str.len() > MAX_ATTESTATION_JSON_LENGTH {
             return StorageResultC::error("attestation JSON exceeds maximum length");
         }
 
