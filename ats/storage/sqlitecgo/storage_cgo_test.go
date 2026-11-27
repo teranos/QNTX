@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -373,5 +374,90 @@ func TestRustStore_WALCheckpoint_PassiveUntilTheLimit(t *testing.T) {
 	}
 	if got := wal(); got != 0 {
 		t.Errorf("TRUNCATE left the WAL at %d bytes, want 0", got)
+	}
+}
+
+// "if ground is a recording device, it needs to miss not a single sounds"
+//
+// A line of a transcript ran to 1.08 MB and the store refused it, though the
+// node had taken the request: an attestation is kept as large as it may arrive.
+func TestRustStore_KeepsAnAttestationPastAMegabyte(t *testing.T) {
+	store, err := NewMemoryStore()
+	if err != nil {
+		t.Fatalf("NewMemoryStore() error: %v", err)
+	}
+	defer store.Close()
+
+	line := strings.Repeat("x", 1_200_000)
+	as := &types.As{
+		ID:         "ground:transcript:/t/a.jsonl:0",
+		Subjects:   []string{"session:s"},
+		Predicates: []string{"transcript:line"},
+		Contexts:   []string{"session:s"},
+		Actors:     []string{"ground"},
+		Timestamp:  time.Now(),
+		Source:     "ground",
+		Attributes: map[string]any{"line": line},
+	}
+	if err := store.CreateAttestation(as); err != nil {
+		t.Fatalf("CreateAttestation() of a 1.2 MB attestation: %v", err)
+	}
+	kept, err := store.GetAttestation(as.ID)
+	if err != nil || kept == nil {
+		t.Fatalf("GetAttestation() = %v, %v", kept, err)
+	}
+	if kept.Attributes["line"] != line {
+		t.Errorf("the line came back %d bytes, and went in %d", len(fmt.Sprint(kept.Attributes["line"])), len(line))
+	}
+}
+
+// "i mean, it should right?"
+// Every read connection says who holds it while it is held, and "free" once
+// it is given back; a read waiting on all of them gets one when one is freed.
+func TestRustStore_ReadConnectionsNameTheirHolders(t *testing.T) {
+	store, err := NewFileStore(filepath.Join(t.TempDir(), "landing.db"))
+	if err != nil {
+		t.Fatalf("NewFileStore() error: %v", err)
+	}
+	defer store.Close()
+
+	held := make([]*readConnEntry, 0, readPoolSize)
+	for i := range readPoolSize {
+		held = append(held, store.acquireReadConn(fmt.Sprintf("query-%d", i)))
+	}
+	for _, said := range store.ReadHolders() {
+		if !strings.HasPrefix(said, "query-") || !strings.Contains(said, " for ") {
+			t.Fatalf("a held connection said %q, want its holder and for how long: %v", said, store.ReadHolders())
+		}
+	}
+
+	got := make(chan *readConnEntry)
+	go func() { got <- store.acquireReadConn("exists") }()
+	select {
+	case <-got:
+		t.Fatal("a read got a connection while every one was held")
+	case <-time.After(50 * time.Millisecond):
+	}
+	for _, entry := range held {
+		store.releaseReadConn(entry)
+	}
+	waiter := <-got
+	saidExists := 0
+	for _, said := range store.ReadHolders() {
+		switch {
+		case strings.HasPrefix(said, "exists for "):
+			saidExists++
+		case said != "free":
+			t.Fatalf("a given-back connection said %q: %v", said, store.ReadHolders())
+		}
+	}
+	if saidExists != 1 {
+		t.Fatalf("the waiting read is named by %d connections, want 1: %v", saidExists, store.ReadHolders())
+	}
+	store.releaseReadConn(waiter)
+	for _, said := range store.ReadHolders() {
+		if said != "free" {
+			t.Fatalf("after every read is done a connection said %q", said)
+		}
 	}
 }

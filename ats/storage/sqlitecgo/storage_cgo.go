@@ -53,6 +53,24 @@ import (
 type readConnEntry struct {
 	mu   sync.Mutex
 	conn *C.ReadConn
+	// "i mean, it should right?"
+	// 「[Opus 5.5] Who holds this connection and since when, as writeHolder says it」
+	// 「[Opus 5.5] for the write lock: on k an existence check waited 2m56s for a」
+	// 「[Opus 5.5] read connection, and nothing said who held all four.」
+	holder atomic.Value // string: who holds mu (empty = free)
+	since  atomic.Int64 // unix nanos when mu was taken
+}
+
+// hold says who took the connection.
+func (e *readConnEntry) hold(caller string) {
+	e.holder.Store(caller)
+	e.since.Store(time.Now().UnixNano())
+}
+
+// free says nobody holds the connection.
+func (e *readConnEntry) free() {
+	e.holder.Store("")
+	e.since.Store(0)
 }
 
 // RustStore wraps the Rust SqliteStore via CGO.
@@ -205,22 +223,51 @@ func (rs *RustStore) WriteHolderInfo() (holder string, held time.Duration) {
 // PauseReaders locks all pooled read connections, blocking until each is free.
 // Returns an unlock function. Used by WAL checkpoint to get exclusive access.
 func (rs *RustStore) PauseReaders() func() {
+	rs.holdEveryReadConn("pause-readers")
+	return rs.freeEveryReadConn
+}
+
+// holdEveryReadConn takes every pooled read connection, each once it is free.
+func (rs *RustStore) holdEveryReadConn(caller string) {
 	for _, entry := range rs.readPool {
 		entry.mu.Lock()
-	}
-	return func() {
-		for _, entry := range rs.readPool {
-			entry.mu.Unlock()
-		}
+		entry.hold(caller)
 	}
 }
 
-// acquireReadConn picks a pooled read connection.
+// freeEveryReadConn gives back what holdEveryReadConn took.
+func (rs *RustStore) freeEveryReadConn() {
+	for _, entry := range rs.readPool {
+		entry.free()
+		entry.mu.Unlock()
+	}
+}
+
+// ReadHolders says who holds each pooled read connection and for how long, a
+// free one as "free".
+func (rs *RustStore) ReadHolders() []string {
+	held := make([]string, 0, len(rs.readPool))
+	for _, entry := range rs.readPool {
+		holder, _ := entry.holder.Load().(string)
+		since := entry.since.Load()
+		if holder == "" || since == 0 {
+			held = append(held, "free")
+			continue
+		}
+		held = append(held, holder+" for "+time.Since(time.Unix(0, since)).Round(time.Millisecond).String())
+	}
+	return held
+}
+
+// acquireReadConn picks a pooled read connection for caller, who is named as
+// its holder until it is released.
 // Returns nil for in-memory stores (no pool) — caller must fall back to muWrite + store.
 //
 // Strategy: try every slot once without blocking. If all are occupied,
-// block-wait on the round-robin slot rather than falling back to muWrite.
-func (rs *RustStore) acquireReadConn() *readConnEntry {
+// block-wait on the round-robin slot rather than falling back to muWrite. A
+// wait of mutexWaitThreshold or longer is logged with who held every slot
+// when it began.
+func (rs *RustStore) acquireReadConn(caller string) *readConnEntry {
 	n := len(rs.readPool)
 	if n == 0 {
 		return nil
@@ -231,19 +278,27 @@ func (rs *RustStore) acquireReadConn() *readConnEntry {
 	for i := range n {
 		entry := rs.readPool[(base+uint64(i))%uint64(n)]
 		if entry.mu.TryLock() {
+			entry.hold(caller)
 			return entry
 		}
 	}
 
 	// All occupied — block on the round-robin slot.
+	heldBy := rs.ReadHolders()
+	waitStart := time.Now()
 	entry := rs.readPool[base%uint64(n)]
 	entry.mu.Lock()
+	entry.hold(caller)
+	if waited := time.Since(waitStart); waited >= mutexWaitThreshold {
+		logReadWait(rs.dbPath, caller, waited, heldBy)
+	}
 	return entry
 }
 
 // releaseReadConn unlocks a previously acquired pooled connection.
 func (rs *RustStore) releaseReadConn(entry *readConnEntry) {
 	if entry != nil {
+		entry.free()
 		entry.mu.Unlock()
 	}
 }
@@ -252,9 +307,7 @@ func (rs *RustStore) releaseReadConn(entry *readConnEntry) {
 // Safe to call multiple times.
 func (rs *RustStore) Close() error {
 	// Lock all pooled read connections to ensure no in-flight reads
-	for _, entry := range rs.readPool {
-		entry.mu.Lock()
-	}
+	rs.holdEveryReadConn("close")
 	rs.muWrite.Lock()
 	rs.muRead.Lock()
 	defer rs.muRead.Unlock()
@@ -266,6 +319,7 @@ func (rs *RustStore) Close() error {
 	for i, entry := range rs.readPool {
 		C.read_conn_free(entry.conn)
 		entry.conn = nil
+		entry.free()
 		entry.mu.Unlock()
 		rs.readPool[i] = nil
 	}
@@ -434,7 +488,7 @@ func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
 	defer C.free(unsafe.Pointer(cID))
 
 	var result C.AttestationResultC
-	entry := rs.acquireReadConn()
+	entry := rs.acquireReadConn("get")
 	if entry != nil {
 		result = C.read_conn_get(entry.conn, cID)
 		rs.releaseReadConn(entry)
@@ -473,7 +527,7 @@ func (rs *RustStore) AttestationExists(id string) bool {
 	defer C.free(unsafe.Pointer(cID))
 
 	var result C.StorageResultC
-	entry := rs.acquireReadConn()
+	entry := rs.acquireReadConn("exists")
 	if entry != nil {
 		result = C.read_conn_exists(entry.conn, cID)
 		rs.releaseReadConn(entry)
@@ -521,7 +575,7 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 // ListAttestationIDs returns all attestation IDs.
 func (rs *RustStore) ListAttestationIDs() ([]string, error) {
 	var result C.StringArrayResultC
-	entry := rs.acquireReadConn()
+	entry := rs.acquireReadConn("ids")
 	if entry != nil {
 		result = C.read_conn_ids(entry.conn)
 		rs.releaseReadConn(entry)
@@ -558,7 +612,7 @@ func (rs *RustStore) ListAttestationIDs() ([]string, error) {
 // CountAttestations returns the total count of attestations.
 func (rs *RustStore) CountAttestations() (int, error) {
 	var result C.CountResultC
-	entry := rs.acquireReadConn()
+	entry := rs.acquireReadConn("count")
 	if entry != nil {
 		result = C.read_conn_count(entry.conn)
 		rs.releaseReadConn(entry)
@@ -584,7 +638,7 @@ func (rs *RustStore) CountAttestations() (int, error) {
 // HoldsAny says whether any attestation is held, reading one row where a count reads them all.
 func (rs *RustStore) HoldsAny() (bool, error) {
 	var result C.CountResultC
-	entry := rs.acquireReadConn()
+	entry := rs.acquireReadConn("holds-any")
 	if entry != nil {
 		result = C.read_conn_holds_any(entry.conn)
 		rs.releaseReadConn(entry)
@@ -795,7 +849,7 @@ func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string, resolved 
 
 	start := time.Now()
 	var result C.AttestationResultC
-	entry := rs.acquireReadConn()
+	entry := rs.acquireReadConn(slowKey)
 	if entry != nil {
 		if resolved {
 			result = C.read_conn_query_resolved(entry.conn, cFilterJSON)
@@ -855,7 +909,7 @@ func (rs *RustStore) query(rustFilter rustQueryFilter, slowKey string, resolved 
 // GetStorageStats returns storage statistics from Rust.
 func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
 	var result C.AttestationResultC
-	entry := rs.acquireReadConn()
+	entry := rs.acquireReadConn("stats")
 	if entry != nil {
 		result = C.read_conn_stats(entry.conn)
 		rs.releaseReadConn(entry)
@@ -892,7 +946,7 @@ func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
 
 // GetAllPredicates returns all distinct predicates via Rust FFI.
 func (rs *RustStore) GetAllPredicates() ([]string, error) {
-	values, err := rs.readStrings(
+	values, err := rs.readStrings("predicates",
 		func(conn *C.ReadConn) C.StringArrayResultC { return C.read_conn_predicates(conn) },
 		func(store *C.SqliteStore) C.StringArrayResultC { return C.storage_predicates(store) },
 	)
@@ -904,7 +958,7 @@ func (rs *RustStore) GetAllPredicates() ([]string, error) {
 
 // GetAllContexts returns all distinct contexts via Rust FFI.
 func (rs *RustStore) GetAllContexts() ([]string, error) {
-	values, err := rs.readStrings(
+	values, err := rs.readStrings("contexts",
 		func(conn *C.ReadConn) C.StringArrayResultC { return C.read_conn_contexts(conn) },
 		func(store *C.SqliteStore) C.StringArrayResultC { return C.storage_contexts(store) },
 	)
@@ -917,7 +971,7 @@ func (rs *RustStore) GetAllContexts() ([]string, error) {
 // IntegrityCheck runs PRAGMA integrity_check via Rust FFI.
 // A healthy database returns []string{"ok"}.
 func (rs *RustStore) IntegrityCheck() ([]string, error) {
-	values, err := rs.readStrings(
+	values, err := rs.readStrings("integrity-check",
 		func(conn *C.ReadConn) C.StringArrayResultC { return C.read_conn_integrity_check(conn) },
 		func(store *C.SqliteStore) C.StringArrayResultC { return C.storage_integrity_check(store) },
 	)
@@ -930,11 +984,12 @@ func (rs *RustStore) IntegrityCheck() ([]string, error) {
 // readStrings asks a read connection when one is free, else the store under
 // the write lock, and copies the string array Rust answers with.
 func (rs *RustStore) readStrings(
+	caller string,
 	onConn func(*C.ReadConn) C.StringArrayResultC,
 	onStore func(*C.SqliteStore) C.StringArrayResultC,
 ) ([]string, error) {
 	var result C.StringArrayResultC
-	entry := rs.acquireReadConn()
+	entry := rs.acquireReadConn(caller)
 	if entry != nil {
 		result = onConn(entry.conn)
 		rs.releaseReadConn(entry)
@@ -1015,7 +1070,7 @@ func (rs *RustStore) QueryAttestationsRaw(sql string, params []any) ([]*types.As
 
 	start := time.Now()
 	var result C.AttestationResultC
-	entry := rs.acquireReadConn()
+	entry := rs.acquireReadConn("storage_query_raw")
 	if entry != nil {
 		result = C.read_conn_query_raw(entry.conn, cSQL, cParams)
 		rs.releaseReadConn(entry)
@@ -1079,9 +1134,7 @@ func (rs *RustStore) WALCheckpointTruncate() (busy, walPages, checkpointedPages 
 	n := len(rs.readPool)
 
 	// Lock all read pool entries so no Go code is using them
-	for _, entry := range rs.readPool {
-		entry.mu.Lock()
-	}
+	rs.holdEveryReadConn("wal-checkpoint")
 
 	// Build C array of read conn pointers
 	var conns **C.ReadConn
@@ -1100,9 +1153,7 @@ func (rs *RustStore) WALCheckpointTruncate() (busy, walPages, checkpointedPages 
 		}
 
 		// Unlock all read pool entries
-		for _, entry := range rs.readPool {
-			entry.mu.Unlock()
-		}
+		rs.freeEveryReadConn()
 
 		if !result.success {
 			errMsg := C.GoString(result.error_msg)
@@ -1114,9 +1165,7 @@ func (rs *RustStore) WALCheckpointTruncate() (busy, walPages, checkpointedPages 
 	}
 
 	// No read pool (in-memory store) — just unlock and return
-	for _, entry := range rs.readPool {
-		entry.mu.Unlock()
-	}
+	rs.freeEveryReadConn()
 	return 0, 0, 0, nil
 }
 
