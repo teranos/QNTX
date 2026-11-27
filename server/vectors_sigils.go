@@ -43,7 +43,7 @@ func (s *QNTXServer) vectorsSignum() sigil.Signum {
 					Name: "add",
 					Does: "Put vectors into an index, each under its id. An id added again is replaced, not doubled.",
 					Takes: []*protocol.Param{index,
-						{Name: "vectors", Required: true, Kind: sigil.List, Says: "The vectors, each an object with its id and its vector, a list of numbers."}},
+						{Name: "vectors", Required: true, Kind: sigil.List, Says: "The vectors, each an object with its id, its vector, a list of numbers, and the revision kept beside it, a number holds answers back."}},
 					Answer:   "protocol.AddVectorsResponse",
 					Http:     &protocol.Endpoint{Method: http.MethodPost, Path: vectorsPath + "/add"},
 					Surfaces: providedSurfaces,
@@ -55,6 +55,15 @@ func (s *QNTXServer) vectorsSignum() sigil.Signum {
 						{Name: "ids", Required: true, Kind: sigil.List, Says: "The ids of the vectors to take out."}},
 					Answer:   "protocol.DeleteVectorsResponse",
 					Http:     &protocol.Endpoint{Method: http.MethodPost, Path: vectorsPath + "/delete"},
+					Surfaces: providedSurfaces,
+				},
+				{
+					Name: "holds",
+					Does: "Which of some ids an index holds, each with the revision it was added with. An index that is not there holds none.",
+					Takes: []*protocol.Param{index,
+						{Name: "ids", Required: true, Kind: sigil.List, Says: "The ids asked about."}},
+					Answer:   "protocol.HoldsResponse",
+					Http:     &protocol.Endpoint{Method: http.MethodPost, Path: vectorsPath + "/holds"},
 					Surfaces: providedSurfaces,
 				},
 				{
@@ -73,6 +82,7 @@ func (s *QNTXServer) vectorsSignum() sigil.Signum {
 			"create index": s.vectorsCreateIndex,
 			"add":          s.vectorsAdd,
 			"delete":       s.vectorsDelete,
+			"holds":        s.vectorsHolds,
 			"search":       s.vectorsSearch,
 		},
 	}
@@ -145,8 +155,9 @@ func (s *QNTXServer) vectorsCreateIndex(ctx context.Context, sent sigil.Sent) (a
 
 // vectorEntry is one vector as the add sigil takes it.
 type vectorEntry struct {
-	ID     string    `json:"id"`
-	Vector []float32 `json:"vector"`
+	ID       string    `json:"id"`
+	Vector   []float32 `json:"vector"`
+	Revision int64     `json:"revision"`
 }
 
 func (s *QNTXServer) vectorsAdd(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -159,7 +170,7 @@ func (s *QNTXServer) vectorsAdd(ctx context.Context, sent sigil.Sent) (any, *pro
 		if entry.ID == "" {
 			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "vectors", Says: "a vector was sent with no id"}
 		}
-		vectors = append(vectors, &protocol.VectorEntry{Id: entry.ID, Vector: entry.Vector})
+		vectors = append(vectors, &protocol.VectorEntry{Id: entry.ID, Vector: entry.Vector, Revision: entry.Revision})
 	}
 	router, token, refused := s.vectorRouter()
 	if refused != nil {
@@ -182,6 +193,22 @@ func (s *QNTXServer) vectorsDelete(ctx context.Context, sent sigil.Sent) (any, *
 		return nil, refused
 	}
 	answered, err := router.DeleteVectors(ctx, &protocol.DeleteVectorsRequest{AuthToken: token, Index: sent["index"], Ids: ids})
+	if err != nil {
+		return nil, failedProvided("vector search", err)
+	}
+	return answered, nil
+}
+
+func (s *QNTXServer) vectorsHolds(ctx context.Context, sent sigil.Sent) (any, *protocol.Refusal) {
+	var ids []string
+	if refused := listOf(sent, "ids", &ids); refused != nil {
+		return nil, refused
+	}
+	router, token, refused := s.vectorRouter()
+	if refused != nil {
+		return nil, refused
+	}
+	answered, err := router.Holds(ctx, &protocol.HoldsRequest{AuthToken: token, Index: sent["index"], Ids: ids})
 	if err != nil {
 		return nil, failedProvided("vector search", err)
 	}
