@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
 )
@@ -118,4 +119,13 @@ func (g *gitHub) githubRelay(ctx context.Context, sent sigil.Sent) (any, *protoc
 		return nil, &protocol.Refusal{Why: sigil.Failed, Says: err.Error()}
 	}
 	return map[string]GitHubRelay{"relay": relay}, nil
+}
+
+// 「[Opus 5.5] signedAsNode is this node's signature for origin, made with its own key,」
+// 「[Opus 5.5] which every node holds whether or not it runs login.」
+func (s *QNTXServer) signedAsNode(origin string) (string, error) {
+	if s.nodeDID == nil {
+		return "", errors.New("this node holds no key of its own to sign with")
+	}
+	return auth.SignAs(s.nodeDID.PrivateKey, origin)
 }

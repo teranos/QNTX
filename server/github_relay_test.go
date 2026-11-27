@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/teranos/QNTX/internal/access"
+	"github.com/teranos/QNTX/internal/nodedid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,7 @@ func TestARelayAsksTheNodeThatHoldsTheAppAsItself(t *testing.T) {
 	s := githubKnowingServer(t)
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
-	s.authHandler.SetNodeKey(key)
+	s.nodeDID = &nodedid.Handler{PrivateKey: key}
 	require.NoError(t, s.nodeRecords().SetRelay(rootAccount, GitHubRelay{URL: q.URL}))
 
 	answered, err := linkedHost{s}.AskGitHub(context.Background(), "CreateAPullRequest", map[string]any{"owner": "o", "repo": "r"})
@@ -63,13 +64,35 @@ func TestARelaysRefusalIsTheAskersError(t *testing.T) {
 	s := githubKnowingServer(t)
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
-	s.authHandler.SetNodeKey(key)
+	s.nodeDID = &nodedid.Handler{PrivateKey: key}
 	require.NoError(t, s.nodeRecords().SetRelay(rootAccount, GitHubRelay{URL: q.URL}))
 
 	_, err = linkedHost{s}.AskGitHub(context.Background(), "GetAPullRequest", map[string]any{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "403")
 	assert.Contains(t, err.Error(), "not ROOT")
+}
+
+// 「[Opus 5.5] A node that runs without login holds its own key all the same, and asks」
+// 「[Opus 5.5] as itself with it: devkq, on 2026-11-27, ran with auth off and the relay」
+// 「[Opus 5.5] reached for the auth handler it did not have.」
+func TestANodeWithoutLoginAsksAsItself(t *testing.T) {
+	var authorization string
+	q := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization = r.Header.Get("Authorization")
+		_ = json.NewEncoder(w).Encode(map[string]any{"answer": map[string]any{}})
+	}))
+	defer q.Close()
+	s := githubKnowingServer(t)
+	require.NoError(t, s.nodeRecords().SetRelay(rootAccount, GitHubRelay{URL: q.URL}))
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	s.nodeDID = &nodedid.Handler{PrivateKey: key}
+	s.authHandler = nil
+
+	_, err = linkedHost{s}.AskGitHub(context.Background(), "GetAPullRequest", map[string]any{})
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(authorization, "Signed "), "a node without login asked with %q", authorization)
 }
 
 // 「[Opus 5.5] A node with no key of its own asks through no relay: it has nothing to ask as.」
