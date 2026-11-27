@@ -112,8 +112,8 @@ type Host interface {
 	Logger() *zap.SugaredLogger
 }
 
-// GitCredential is a short-lived credential git takes over HTTPS for one
-// repository (Host.GitCredential).
+// 「[Opus 5.5] GitCredential is a short-lived credential git takes over HTTPS for one」
+// 「[Opus 5.5] repository (Host.GitCredential).」
 type GitCredential struct {
 	Username string
 	Password string
