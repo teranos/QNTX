@@ -193,7 +193,7 @@
     "pull_request": {
       "branches": [
         "main",
-        "q-stack"
+        "qq-stack"
       ],
       "paths": [
         "**/*.go",
