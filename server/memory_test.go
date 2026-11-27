@@ -16,14 +16,38 @@ import (
 // "I EDIT"
 // "ITS IN MEMORY"
 
-// memoryServer is a node keeping a vault that backs memory at Minds.
-func memoryServer(t *testing.T) (*QNTXServer, Vault) {
+// memoryServer is a node whose vault backs memory at Minds. The vault is a
+// linked subsystem's, so its line is written as memory keep writes it.
+func memoryServer(t *testing.T) (*QNTXServer, memoryVault) {
 	t.Helper()
-	s, vault := vaultBindingServer(t)
-	got, refused := askMemory(t, s, asRoot(), "keep", sigil.Sent{"name": vault.Name, "place": "Minds"})
+	s := githubKnowingServer(t)
+	vault := memoryVault{Name: "abcd", Path: t.TempDir(), Memory: "Minds"}
+	require.NoError(t, s.nodeRecords().SetMemoryVault(rootAccount, vault))
+	got, refused := askMemory(t, s, asRoot(), "stores", sigil.Sent{})
 	require.Nil(t, refused, refused.GetSays())
 	assert.Equal(t, "Minds", got.(*protocol.MemoryStores).GetPlace())
 	return s, vault
+}
+
+// Where memory is kept is said of a vault the vault signum keeps: a node
+// serving none keeps memory nowhere.
+func TestMemoryIsKeptInAVaultTheNodeServes(t *testing.T) {
+	s := githubKnowingServer(t)
+	_, refused := askMemory(t, s, asRoot(), "keep", sigil.Sent{"name": "abcd", "place": "Minds"})
+	require.NotNil(t, refused)
+	assert.Equal(t, sigil.NotFound, refused.GetWhy())
+	assert.Contains(t, refused.GetSays(), "serves no vault list")
+}
+
+// A node that wrote no MEMORY line reads where memory is kept off the VAULT
+// line that said it before the vault was a subsystem's.
+func TestMemoryIsReadWhereTheVaultLineSaidIt(t *testing.T) {
+	s := githubKnowingServer(t)
+	path := t.TempDir()
+	require.NoError(t, s.nodeRecords().nodeRecord(rootAccount, vaultSubject, "abcd", "_", map[string]any{"path": path, "memory": "Minds"}))
+	got, refused := askMemory(t, s, asRoot(), "stores", sigil.Sent{})
+	require.Nil(t, refused, refused.GetSays())
+	assert.Equal(t, []string{"abcd", "Minds"}, []string{got.(*protocol.MemoryStores).GetVault(), got.(*protocol.MemoryStores).GetPlace()})
 }
 
 func askMemory(t *testing.T, s *QNTXServer, ctx context.Context, name string, sent sigil.Sent) (any, *protocol.Refusal) {
@@ -172,7 +196,7 @@ func TestAMemoryStaysInItsStore(t *testing.T) {
 
 // A node whose vault backs no memory says so, and says what does.
 func TestNoVaultBacksMemoryUntilOneIsSaid(t *testing.T) {
-	s, _ := vaultBindingServer(t)
+	s := githubKnowingServer(t)
 	_, refused := askMemory(t, s, asRoot(), "stores", sigil.Sent{})
 	require.NotNil(t, refused)
 	assert.Equal(t, sigil.NotFound, refused.GetWhy())
