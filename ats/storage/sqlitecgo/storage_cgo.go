@@ -57,20 +57,25 @@ type readConnEntry struct {
 	// 「[Opus 5.5] Who holds this connection and since when, as writeHolder says it」
 	// 「[Opus 5.5] for the write lock: on k an existence check waited 2m56s for a」
 	// 「[Opus 5.5] read connection, and nothing said who held all four.」
-	holder atomic.Value // string: who holds mu (empty = free)
-	since  atomic.Int64 // unix nanos when mu was taken
+	// 「[Opus 5.5] Who and since when are one record, read whole: two loads could pair one」
+	// 「[Opus 5.5] holder's name with the next holder's time across a handoff.」
+	held atomic.Pointer[heldBy] // nil = free
+}
+
+// heldBy is who took a connection, and when.
+type heldBy struct {
+	caller string
+	since  time.Time
 }
 
 // hold says who took the connection.
 func (e *readConnEntry) hold(caller string) {
-	e.holder.Store(caller)
-	e.since.Store(time.Now().UnixNano())
+	e.held.Store(&heldBy{caller: caller, since: time.Now()})
 }
 
 // free says nobody holds the connection.
 func (e *readConnEntry) free() {
-	e.holder.Store("")
-	e.since.Store(0)
+	e.held.Store(nil)
 }
 
 // RustStore wraps the Rust SqliteStore via CGO.
@@ -248,13 +253,12 @@ func (rs *RustStore) freeEveryReadConn() {
 func (rs *RustStore) ReadHolders() []string {
 	held := make([]string, 0, len(rs.readPool))
 	for _, entry := range rs.readPool {
-		holder, _ := entry.holder.Load().(string)
-		since := entry.since.Load()
-		if holder == "" || since == 0 {
+		by := entry.held.Load()
+		if by == nil || by.caller == "" {
 			held = append(held, "free")
 			continue
 		}
-		held = append(held, holder+" for "+time.Since(time.Unix(0, since)).Round(time.Millisecond).String())
+		held = append(held, by.caller+" for "+time.Since(by.since).Round(time.Millisecond).String())
 	}
 	return held
 }
