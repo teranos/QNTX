@@ -113,6 +113,12 @@ func AsInstallationOf(ctx context.Context, installationID int64) context.Context
 	return context.WithValue(ctx, githubInstallationID{}, installationID)
 }
 
+// 「[Opus 5.5] InstallationOf is the installation ctx is a call as, and whether it names one.」
+func InstallationOf(ctx context.Context) (int64, bool) {
+	id, of := ctx.Value(githubInstallationID{}).(int64)
+	return id, of
+}
+
 // installationTokenOf is a token of the installation over all it holds. One
 // minted before and still good is given again.
 func (s *GitHubServer) installationTokenOf(ctx context.Context, installationID int64) (string, string, error) {

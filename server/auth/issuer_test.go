@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,7 +43,7 @@ func bearing(token string) *http.Request {
 // A token the issuer minted for ground is admitted at the node, by the node.
 func TestANodeAdmitsATokenItsIssuerVouchesFor(t *testing.T) {
 	_, store, node := issuerAndNode(t)
-	token := mintedIn(t, store, "ground-writer", NamespaceDefault)
+	token := issuedIn(t, store, "ground-writer", NamespaceDefault)
 
 	admission, admitted := node.admissionOf(node.presented(bearing(token)))
 	require.True(t, admitted, "the issuer's token was not admitted at the node")
@@ -54,7 +56,7 @@ func TestANodeAdmitsATokenItsIssuerVouchesFor(t *testing.T) {
 // What the issuer revoked, the node does not admit.
 func TestANodeDoesNotAdmitWhatItsIssuerRevoked(t *testing.T) {
 	_, store, node := issuerAndNode(t)
-	token := mintedIn(t, store, "ground-writer", NamespaceDefault)
+	token := issuedIn(t, store, "ground-writer", NamespaceDefault)
 	grant, live := store.Lookup(sha256Hex(token))
 	require.True(t, live)
 	require.NoError(t, store.Revoke(grant.ID))
@@ -66,7 +68,7 @@ func TestANodeDoesNotAdmitWhatItsIssuerRevoked(t *testing.T) {
 // A token for another namespace is not the node's to know of.
 func TestANodeDoesNotAdmitATokenForElsewhere(t *testing.T) {
 	_, store, node := issuerAndNode(t)
-	token := mintedIn(t, store, "vak-writer", "vakconnectie")
+	token := issuedIn(t, store, "vak-writer", "vakconnectie")
 
 	_, admitted := node.admissionOf(node.presented(bearing(token)))
 	assert.False(t, admitted)
@@ -76,7 +78,7 @@ func TestANodeDoesNotAdmitATokenForElsewhere(t *testing.T) {
 // this node does not admit is not enough.
 func TestTheNodesOwnListDecides(t *testing.T) {
 	_, store, node := issuerAndNode(t)
-	token := mintedIn(t, store, "ground-writer", NamespaceDefault)
+	token := issuedIn(t, store, "ground-writer", NamespaceDefault)
 	node.SetIdentities(nil, nil)
 
 	_, admitted := node.admissionOf(node.presented(bearing(token)))
@@ -88,8 +90,44 @@ func TestANodeTheIssuerDoesNotKnowAdmitsNothing(t *testing.T) {
 	_, store, node := issuerAndNode(t)
 	stranger, _ := otherNode(t)
 	node.nodeKey = stranger
-	token := mintedIn(t, store, "ground-writer", NamespaceDefault)
+	token := issuedIn(t, store, "ground-writer", NamespaceDefault)
 
 	_, admitted := node.admissionOf(node.presented(bearing(token)))
 	assert.False(t, admitted)
+}
+
+// vouching is an issuer that answers every token active, as itself, through
+// the client named, or through none when client is empty.
+func vouching(t *testing.T, client string) *Handler {
+	t.Helper()
+	var origin string
+	served := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(introspection{
+			Active: true, Issuer: origin, Subject: mastodonAccount, ClientID: client,
+			Level: string(LevelAttestor), Namespaces: []string{NamespaceDefault}, Label: "ground-writer",
+		}))
+	}))
+	t.Cleanup(served.Close)
+	origin = served.URL
+	key, _ := otherNode(t)
+	node := handlerWithDoors(t)
+	node.tokens = newMemTokenStore()
+	node.nodeKey = key
+	require.NoError(t, node.SetPrimary(served.URL))
+	return node
+}
+
+// An issuer vouching for a bearer issued through no client is not taken at
+// its word: the node takes a bearer only from a client's flow, wherever it
+// was issued.
+func TestANodeDoesNotAdmitABearerItsIssuerVouchesForThroughNoClient(t *testing.T) {
+	token := "qntx_" + strings.Repeat("b", 64)
+
+	node := vouching(t, "did:key:zconnector")
+	_, admitted := node.admissionOf(node.presented(bearing(token)))
+	require.True(t, admitted, "an issuer's bearer through a client was not admitted")
+
+	node = vouching(t, "")
+	_, admitted = node.admissionOf(node.presented(bearing(token)))
+	assert.False(t, admitted, "an issuer's bearer through no client was admitted")
 }

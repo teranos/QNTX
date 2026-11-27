@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -144,4 +145,44 @@ func TestAnItemOnAPeersRowIsAnsweredThroughThePrimary(t *testing.T) {
 
 	_, refusal = h.Item(ctx, "nowhere")
 	require.NotNil(t, refusal)
+}
+
+// "it should just not render for did not answer nodes that have been like that for 30+ minutes"
+func TestAPeerThatHasNotAnsweredForThirtyMinutesIsLeftOffTheRow(t *testing.T) {
+	now := time.Date(2026, 11, 26, 19, 0, 0, 0, time.UTC)
+	answers := []auth.PeerAnswer{{Name: "f42d", Err: errors.New("f42d did not answer: context deadline exceeded")}}
+	h := aNodeWithPeers(func(context.Context, auth.Admission, string) []auth.PeerAnswer { return answers })
+	h.clock = func() time.Time { return now }
+	named := func() []StatusItem {
+		var of []StatusItem
+		for _, it := range drawRow(t, h, "format=json").Items {
+			if it.Name == "f42d" {
+				of = append(of, it)
+			}
+		}
+		return of
+	}
+
+	// It stops answering: said on the row, as it was.
+	require.Len(t, named(), 1)
+	assert.Equal(t, SymbolUnwell, named()[0].Symbol)
+	now = now.Add(29 * time.Minute)
+	assert.Len(t, named(), 1, "not yet thirty minutes away")
+
+	// Thirty minutes away: it takes no place on the row.
+	now = now.Add(time.Minute)
+	assert.Empty(t, named())
+	now = now.Add(24 * time.Hour)
+	assert.Empty(t, named())
+
+	// It answers again: on the row at once.
+	answers = []auth.PeerAnswer{{Name: "f42d", Status: http.StatusOK, Body: peerRowBody(t)}}
+	require.Len(t, named(), 1)
+	assert.Equal(t, SymbolWell, named()[0].Symbol)
+
+	// Away again, it is said again, from that moment.
+	answers = []auth.PeerAnswer{{Name: "f42d", Err: errors.New("f42d did not answer")}}
+	assert.Len(t, named(), 1)
+	now = now.Add(30 * time.Minute)
+	assert.Empty(t, named())
 }

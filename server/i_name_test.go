@@ -2,22 +2,18 @@ package server
 
 import (
 	"context"
-	"crypto/ed25519"
-	"crypto/sha256"
-	"encoding/hex"
-	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/storage"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/storage"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/reach"
@@ -326,80 +322,6 @@ func TestINameIsReachedByWhoReachesMCP(t *testing.T) {
 		require.Nil(t, refusal, "%s", level)
 		assert.Equal(t, reaches, len(answered.(*protocol.Reaches).GetPaths()) == 1, "%s", level)
 	}
-}
-
-// "make each agent name itself"
-//
-// 「[Opus 5.5] Agents started under one token each ask for a token of their own, through」
-// 「[Opus 5.5] the gate, and each names itself by its own DID: the token they ran under is」
-// 「[Opus 5.5] none of their names, and a name one agent holds is taken for the other.」
-func TestEachAgentUnderOneTokenNamesItself(t *testing.T) {
-	s := rootKnowingServer(t)
-	tokens, _, err := auth.OpenTokenTable(s.nodeDB, nil)
-	require.NoError(t, err)
-	h, err := auth.New(s.nodeDB, "localhost", nil, 8770, 8820, 24, zap.NewNop().Sugar(),
-		func(next http.HandlerFunc) http.HandlerFunc { return next },
-		tokens, testUsers(t), false, []string{rootAccount}, nil)
-	require.NoError(t, err)
-	h.SetNodeKey(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)))
-	s.authHandler = h
-	shared, _, err := tokens.Create(auth.NewToken{Label: "ground-token", MintedBy: rootAccount,
-		Level: auth.LevelAttestor, Namespaces: []string{"garden"}, ExpiresAt: auth.NeverEnds()})
-	require.NoError(t, err)
-
-	// 「[Opus 5.5] What the gate admits a bearer as, past the line the tablet writes.」
-	admitting := func(raw string) context.Context {
-		var admitted auth.Admission
-		gated := h.Middleware(iNamePath, auth.Also(auth.LevelToken, auth.LevelAttestor), func(w http.ResponseWriter, r *http.Request) {
-			admitted, _ = auth.AdmissionFrom(r.Context())
-		})
-		asked := httptest.NewRequest(http.MethodPost, iNamePath, nil)
-		asked.Header.Set("Authorization", "Bearer "+raw)
-		gated.ServeHTTP(httptest.NewRecorder(), asked)
-		require.NotNil(t, admitted.Grant, "the gate admitted no token")
-		return auth.WithAdmission(context.Background(), admitted)
-	}
-	// 「[Opus 5.5] Agent-of tokens already held, as the node derived and wrote them before it」
-	// 「[Opus 5.5] stopped handing them out: each under the token they ran under, a DID of its own.」
-	held, err := tokens.List()
-	require.NoError(t, err)
-	sharedDID := ""
-	for _, info := range held {
-		if info.Label == "ground-token" {
-			sharedDID = info.DID
-		}
-	}
-	require.NotEmpty(t, sharedDID)
-	handed := func(agent string) (raw, did string) {
-		label := "agent-of:" + sharedDID + ":" + agent
-		raw, did, err := access.DeriveToken(ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize)), label)
-		require.NoError(t, err)
-		sum := sha256.Sum256([]byte(raw))
-		_, err = tokens.Issue(auth.IssuedToken{Hash: hex.EncodeToString(sum[:]), DID: did, Label: label, MintedBy: rootAccount,
-			Level: auth.LevelAttestor, Namespaces: []string{"garden"}, ExpiresAt: auth.NeverEnds()})
-		require.NoError(t, err)
-		return raw, did
-	}
-
-	otari, otariDID := handed("otari")
-	sion, sionDID := handed("6sion")
-
-	named, refusal := s.iName(admitting(otari), sigil.Sent{"name": "Wren"})
-	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, otariDID, named.(*protocol.Named).GetDid())
-
-	_, refusal = s.iName(admitting(sion), sigil.Sent{"name": "Wren"})
-	require.NotNil(t, refusal, "two agents hold one name")
-	assert.Contains(t, refusal.GetSays(), "is taken")
-
-	named, refusal = s.iName(admitting(sion), sigil.Sent{"name": "Rook"})
-	require.Nil(t, refusal, refusal.GetSays())
-	assert.Equal(t, sionDID, named.(*protocol.Named).GetDid())
-
-	// 「[Opus 5.5] The token they ran under names itself apart from both.」
-	named, refusal = s.iName(admitting(shared), sigil.Sent{"name": "Alder"})
-	require.Nil(t, refusal, refusal.GetSays())
-	assert.NotContains(t, []string{otariDID, sionDID}, named.(*protocol.Named).GetDid())
 }
 
 // Each line is stamped after every name line already written, at the

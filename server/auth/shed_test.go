@@ -18,9 +18,9 @@ import (
 // still let in; and lifting lets both in.
 func TestTheHeaviestTokenIsTurnedAwayAndLetBackIn(t *testing.T) {
 	store := newMemTokenStore()
-	heavy, _, err := store.Create(NewToken{Label: "ground", MintedBy: mastodonAccount, Level: LevelAttestor})
+	heavy, _, err := store.issueThroughClient(NewToken{Label: "ground", MintedBy: mastodonAccount, Level: LevelAttestor})
 	require.NoError(t, err)
-	light, _, err := store.Create(NewToken{Label: "laptop-cron", MintedBy: mastodonAccount, Level: LevelAttestor})
+	light, _, err := store.issueThroughClient(NewToken{Label: "laptop-cron", MintedBy: mastodonAccount, Level: LevelAttestor})
 	require.NoError(t, err)
 
 	shed := NewShed(5 * time.Second)

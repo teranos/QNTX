@@ -19,7 +19,7 @@ func TestALineGrantingOnlyRootLetsInOnlyRoot(t *testing.T) {
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: LevelToken})
+	raw, _, err := store.issueThroughClient(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: LevelToken})
 	require.NoError(t, err)
 
 	reached := false
@@ -41,7 +41,7 @@ func TestBeingTurnedAwayFromARouteIsNotBeingTurnedAwayFromTheNode(t *testing.T) 
 	store := newMemTokenStore()
 	h.tokens = store
 
-	raw, _, err := store.Create(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: LevelToken})
+	raw, _, err := store.issueThroughClient(NewToken{Label: "ci", MintedBy: mastodonAccount, Level: LevelToken})
 	require.NoError(t, err)
 
 	guarded := h.Middleware("/test", Also(), func(http.ResponseWriter, *http.Request) {})
@@ -78,9 +78,9 @@ func TestALevelGoesThroughTheRouteThatNamesIt(t *testing.T) {
 	store := newMemTokenStore()
 	h.tokens = store
 
-	forToken, _, err := store.Create(NewToken{Label: "writer", MintedBy: mastodonAccount, Level: LevelToken})
+	forToken, _, err := store.issueThroughClient(NewToken{Label: "writer", MintedBy: mastodonAccount, Level: LevelToken})
 	require.NoError(t, err)
-	forSuper, _, err := store.Create(NewToken{Label: "operator", MintedBy: mastodonAccount, Level: LevelSuper})
+	forSuper, _, err := store.issueThroughClient(NewToken{Label: "operator", MintedBy: mastodonAccount, Level: LevelSuper})
 	require.NoError(t, err)
 
 	onlySuper := Also(LevelSuper)

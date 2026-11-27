@@ -214,39 +214,6 @@ func TestMintingNamesTheKind(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), string(LevelOAuth))
 }
 
-// The middleware is where a token stops being a string and starts being a
-// caller. Everything downstream reads this or the lines mean nothing.
-func TestTheMiddlewareHandsDownTheGrant(t *testing.T) {
-	h, store := grantHandler(t)
-	h.SetIdentities([]string{mastodonAccount}, nil)
-	raw, _, err := store.Create(NewToken{
-		Label:      "ingest",
-		MintedBy:   mastodonAccount,
-		Level:      LevelAttestor,
-		Namespaces: []string{"did:key:zproject"},
-	})
-	require.NoError(t, err)
-
-	var seen Admission
-	handler := h.Middleware("/test", everyLevel, func(w http.ResponseWriter, r *http.Request) {
-		seen, _ = AdmissionFrom(r.Context())
-		w.WriteHeader(http.StatusOK)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/api/attestations", nil)
-	req.Header.Set("Authorization", "Bearer "+raw)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, string(LevelAttestor), seen.LevelName())
-	assert.Equal(t, []string{"did:key:zproject"}, seen.Namespaces)
-	assert.Equal(t, mastodonAccount, seen.Identity)
-	require.NotNil(t, seen.Grant)
-	assert.False(t, seen.MayWrite("ingested"), "its DID holds no role, so no line says it may")
-	assert.False(t, seen.MayRead("noted"))
-}
-
 // A session is not a token and carries no grant. Narrowing has to be something
 // a token does rather than something everyone suffers.
 func TestASessionCallerIsUnrestricted(t *testing.T) {

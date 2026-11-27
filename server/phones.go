@@ -232,7 +232,7 @@ func (s *QNTXServer) HandlePhone(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "a phone is named by the logged-in human, and nobody is logged in")
 		return
 	case !theHumanThemselves(r, admitted):
-		writeError(w, http.StatusForbidden, "a phone is named by the logged-in human, not by a token or an agent ("+admitted.ActsAs()+")")
+		writeError(w, http.StatusForbidden, "a phone is named by the logged-in human, not by "+admitted.ActsAs())
 		return
 	case !admitted.IsRoot():
 		writeError(w, http.StatusForbidden, "what waits on ROOT stands on ROOT's phone, and this session is "+admitted.LevelName())

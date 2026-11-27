@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -39,6 +40,11 @@ type Presented struct {
 	// Whether the bearer is a caller the node is turning away while it is
 	// slow. Nothing about the token was looked up.
 	turnedAway bool
+	// Whether the bearer presented was issued through no client: the store
+	// holds it, and the gate does not take it.
+	notThroughAClient bool
+	// Why the signature presented was not admitted, when one was and it was not.
+	signatureRefused string
 
 	// Who the session belongs to, resolved when it was made rather than now.
 	UserID      string
@@ -61,6 +67,12 @@ type Presented struct {
 // presented reads the request. Nothing else in this package should.
 func (h *Handler) presented(r *http.Request) Presented {
 	var p Presented
+
+	// 「[Opus 5.5] A request this gate admitted already, asked through it again inside the」
+	// 「[Opus 5.5] node: the grant it stood on, and nothing presented a second time.」
+	if read, passed := gatedRead(r.Context()); passed {
+		return read
+	}
 
 	// An agent the node runs, at the door the node opened for it alone.
 	if grant, through := doorGrant(r.Context()); through {
@@ -90,6 +102,7 @@ func (h *Handler) presented(r *http.Request) Presented {
 		grant, err := h.signedGrant(signed, time.Now())
 		if err != nil {
 			h.logger.Infow("a signature was refused at the gate", "error", err)
+			p.signatureRefused = err.Error()
 			return p
 		}
 		p.Bearer = &grant
@@ -117,7 +130,13 @@ func (h *Handler) presented(r *http.Request) Presented {
 				p.turnedAway = true
 				return p
 			}
-			if grant, live := h.tokens.Lookup(hash); live {
+			// "Tokens are to be removed from QNTX except for third-party OAuth clients"
+			// 「[Opus 5.5] A bearer is taken only when a client's flow issued it. One a person or」
+			// 「[Opus 5.5] an agent minted, whatever store still holds it, is not held here.」
+			if grant, live := h.tokens.Lookup(hash); live && !throughAClient(grant) {
+				p.notThroughAClient = true
+				h.logger.Infow("a bearer issued through no client was presented, and is not taken", "did", grant.DID, "label", grant.Label)
+			} else if live {
 				p.Bearer = &grant
 				if h.shed != nil {
 					h.shed.named(hash, grant.Label)
@@ -125,7 +144,10 @@ func (h *Handler) presented(r *http.Request) Presented {
 				// Last used is what a revocation is watched by, and
 				// nothing wrote it.
 				h.touch(hash, grant.DID)
-			} else if grant, live := h.issuedElsewhere(raw); live {
+			} else if grant, live := h.issuedElsewhere(raw); live && !throughAClient(grant) {
+				p.notThroughAClient = true
+				h.logger.Infow("a bearer an issuer vouched for was issued through no client, and is not taken", "did", grant.DID, "label", grant.Label)
+			} else if live {
 				// Issued by auth.issuer, which said so; this node's own lines admit it.
 				p.Bearer = &grant
 			}
@@ -178,4 +200,20 @@ func (p Presented) Enrolling() (string, bool) {
 func (h *Handler) spend(p Presented, w http.ResponseWriter) {
 	h.pendingLogins.close(p.pendingToken)
 	h.clearPendingCookie(w)
+}
+
+// gatedKey is what this gate read of a request it admitted.
+type gatedKey struct{}
+
+// 「[Opus 5.5] gatedRead is what this gate read of ctx's request when it admitted it, and」
+// 「[Opus 5.5] whether it did: the session and the grant together, nothing presented twice.」
+func gatedRead(ctx context.Context) (Presented, bool) {
+	read, ok := ctx.Value(gatedKey{}).(Presented)
+	return read, ok
+}
+
+// 「[Opus 5.5] throughAClient is whether a client's flow issued the grant: the one kind of」
+// 「[Opus 5.5] bearer taken, here and at every node that asks this one.」
+func throughAClient(g Grant) bool {
+	return g.ClientDID != "" || g.Level == LevelOAuth || g.Level == LevelRefresh
 }

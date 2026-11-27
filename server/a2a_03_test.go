@@ -131,7 +131,7 @@ func TestAClientSpeaking03IsAnsweredOverGRPC(t *testing.T) {
 	t.Cleanup(node.Close)
 	ctx := context.Background()
 	bearer := grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-		return invoker(metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+tokens[auth.LevelRoot]), method, req, reply, cc, opts...)
+		return invoker(metadata.AppendToOutgoingContext(ctx, "authorization", authorizationFor(tokens[auth.LevelRoot])), method, req, reply, cc, opts...)
 	})
 	client, err := a2aclient.NewFromEndpoints(ctx,
 		[]*a2asdk.AgentInterface{{URL: strings.TrimPrefix(node.URL, "http://"), ProtocolBinding: a2asdk.TransportProtocolGRPC, ProtocolVersion: a2av0.Version}},
