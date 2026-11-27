@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
 	errors "github.com/teranos/sacred-error"
@@ -68,7 +69,12 @@ func relayAsk(ctx context.Context, signAs func(origin string) (string, error), r
 	if err != nil {
 		return nil, errors.Wrapf(err, "the ask of %s to %s was not signed", operation, relay.URL)
 	}
-	body, err := json.Marshal(map[string]string{"operation": operation, "request": string(request)})
+	asking := map[string]string{"operation": operation, "request": string(request)}
+	// 「[Opus 5.5] An ask made as one installation is that installation at the far node too.」
+	if installation, of := services.InstallationOf(ctx); of {
+		asking["installation"] = strconv.FormatInt(installation, 10)
+	}
+	body, err := json.Marshal(asking)
 	if err != nil {
 		return nil, errors.Wrapf(err, "what %s takes did not encode", operation)
 	}
