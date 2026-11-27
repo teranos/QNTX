@@ -38,11 +38,12 @@ func introspected(t *testing.T, h *Handler, key ed25519.PrivateKey, did, jti, to
 	return answer
 }
 
-// issuedIn is an ATTESTOR token a client's flow issued here, acting in one namespace.
+// issuedIn is a client's own token, issued here by the client_credentials grant
+// and acting in one namespace: the one client-issued token that is not its person.
 func issuedIn(t *testing.T, store *memTokenStore, label, namespace string) string {
 	t.Helper()
 	raw, _, err := store.issueThroughClient(NewToken{
-		Label: label, MintedBy: mastodonAccount, Level: LevelAttestor,
+		Label: label, MintedBy: mastodonAccount, Level: LevelToken,
 		Namespaces: []string{namespace}, ExpiresAt: NeverEnds(),
 	})
 	require.NoError(t, err)
@@ -60,7 +61,7 @@ func TestANodeLearnsWhoATokenInItsNamespaceIs(t *testing.T) {
 	assert.Equal(t, mastodonAccount, answer.Subject)
 	assert.Equal(t, []string{NamespaceDefault}, answer.Namespaces)
 	assert.Equal(t, "ground-writer", answer.Label)
-	assert.Equal(t, string(LevelAttestor), answer.Level)
+	assert.Equal(t, string(LevelToken), answer.Level)
 	assert.Equal(t, "Bearer", answer.TokenType)
 }
 
