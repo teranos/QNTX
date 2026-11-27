@@ -21,6 +21,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/services"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/sigil"
+	"github.com/teranos/QNTX/server/subsystem"
 	errors "github.com/teranos/sacred-error"
 )
 
@@ -115,6 +116,54 @@ func relayAsk(ctx context.Context, signAs func(origin string) (string, error), r
 		return nil, errors.Wrapf(err, "what %s answered %s did not encode", relay.URL, operation)
 	}
 	return answered, nil
+}
+
+// 「[Opus 5.5] relayCredential asks the relay for a git credential for one repository, as」
+// 「[Opus 5.5] this node, held to what relayAsk is held to.」
+func relayCredential(ctx context.Context, signAs func(origin string) (string, error), relay GitHubRelay, owner, repo string) (subsystem.GitCredential, error) {
+	origin, err := relayOrigin(relay.URL)
+	if err != nil {
+		return subsystem.GitCredential{}, errors.Wrapf(err, "no credential for %s/%s was asked of the relay", owner, repo)
+	}
+	signed, err := signAs(origin)
+	if err != nil {
+		return subsystem.GitCredential{}, errors.Wrapf(err, "the ask for a credential for %s/%s to %s was not signed", owner, repo, relay.URL)
+	}
+	body, err := json.Marshal(map[string]string{"owner": owner, "repo": repo})
+	if err != nil {
+		return subsystem.GitCredential{}, errors.Wrapf(err, "the repository %s/%s did not encode", owner, repo)
+	}
+	ctx, cancel := context.WithTimeout(ctx, relayWait)
+	defer cancel()
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, origin+githubCredentialPath, bytes.NewReader(body))
+	if err != nil {
+		return subsystem.GitCredential{}, errors.Wrapf(err, "the ask for a credential to %s is not a request", relay.URL)
+	}
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", signed)
+	answer, err := toRelay.Do(r)
+	if err != nil {
+		return subsystem.GitCredential{}, errors.Wrapf(err, "%s was not reached for a credential for %s/%s", relay.URL, owner, repo)
+	}
+	defer answer.Body.Close()
+	raw, err := io.ReadAll(answer.Body)
+	if err != nil {
+		return subsystem.GitCredential{}, errors.Wrapf(err, "what %s answered for %s/%s did not read", relay.URL, owner, repo)
+	}
+	if answer.StatusCode != http.StatusOK {
+		return subsystem.GitCredential{}, errors.Newf("%s answered the credential for %s/%s with %s: %s", relay.URL, owner, repo, strconv.Itoa(answer.StatusCode), raw)
+	}
+	var given struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.Unmarshal(raw, &given); err != nil {
+		return subsystem.GitCredential{}, errors.Wrapf(err, "what %s answered for %s/%s did not read", relay.URL, owner, repo)
+	}
+	if given.Username == "" || given.Password == "" {
+		return subsystem.GitCredential{}, errors.Newf("%s answered the credential for %s/%s with no username or password", relay.URL, owner, repo)
+	}
+	return subsystem.GitCredential{Username: given.Username, Password: given.Password}, nil
 }
 
 // 「[Opus 5.5] toRelay follows no redirect: the node's signature goes to the relay it」

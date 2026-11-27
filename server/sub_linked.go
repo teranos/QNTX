@@ -210,6 +210,23 @@ func (h linkedHost) AskGitHub(ctx context.Context, operation string, request any
 	return answered, nil
 }
 
+// 「[Opus 5.5] GitCredential is minted here when this node holds the App, else asked of」
+// 「[Opus 5.5] the relay it asks GitHub through, as itself.」
+func (h linkedHost) GitCredential(ctx context.Context, owner, repo string) (subsystem.GitCredential, error) {
+	relay, relayed, err := h.s.nodeRecords().Relay()
+	if err != nil {
+		return subsystem.GitCredential{}, errors.Wrapf(err, "whether a credential for %s/%s is asked of another node was not read", owner, repo)
+	}
+	if relayed {
+		return relayCredential(ctx, h.s.signedAsNode, relay, owner, repo)
+	}
+	minted, err := h.s.gitHubService().InstallationToken(ctx, owner, repo)
+	if err != nil {
+		return subsystem.GitCredential{}, errors.Wrapf(err, "no credential for %s/%s was minted", owner, repo)
+	}
+	return subsystem.GitCredential{Username: gitCredentialUser, Password: minted.Token}, nil
+}
+
 func (h linkedHost) Logger() *zap.SugaredLogger { return h.s.logger }
 
 // Ask is a sigil the node serves, asked by a subsystem from inside the node:
