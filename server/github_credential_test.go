@@ -57,6 +57,8 @@ func appHoldingServer(t *testing.T, contents string) (*QNTXServer, *[]askedOfGit
 				"token": "ghs_minted", "expires_at": "2099-01-01T00:00:00Z",
 				"permissions": map[string]string{"contents": contents, "metadata": "read"},
 			})
+		case r.Method+" "+r.URL.Path == "GET /installation/repositories":
+			_ = json.NewEncoder(w).Encode(map[string]any{"total_count": 1, "repositories": []map[string]any{{"full_name": "teranos/QNTX"}}})
 		default:
 			refuse(http.StatusNotFound, "Not Found")
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/teranos/QNTX/internal/access"
 	"github.com/teranos/QNTX/internal/nodedid"
+	"github.com/teranos/QNTX/plugin/grpc/services"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -194,4 +195,33 @@ func TestARelaySignsForItsOrigin(t *testing.T) {
 		func(*jwt.Token) (any, error) { return key.Public(), nil }, jwt.WithValidMethods([]string{jwt.SigningMethodEdDSA.Alg()}))
 	require.NoError(t, err)
 	assert.Equal(t, jwt.ClaimStrings{q.URL}, claims.Audience)
+}
+
+// 「[Opus 5.5] An ask made as one installation is relayed as that installation: the far node」
+// 「[Opus 5.5] otherwise finds it by a repository the request does not name.」
+func TestARelayCarriesTheInstallationItIsAskedAs(t *testing.T) {
+	var asked map[string]any
+	q := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Each request read on its own: decoding into a map keeps what the one before left.
+		this := map[string]any{}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&this))
+		asked = this
+		_ = json.NewEncoder(w).Encode(map[string]any{"answer": map[string]any{}})
+	}))
+	defer q.Close()
+	s := githubKnowingServer(t)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	s.nodeDID = &nodedid.Handler{PrivateKey: key}
+	require.NoError(t, s.nodeRecords().SetRelay(rootAccount, GitHubRelay{URL: q.URL}))
+
+	_, err = linkedHost{s}.AskGitHub(services.AsInstallationOf(context.Background(), 42),
+		"ListRepositoriesAccessibleToTheAppInstallation", map[string]any{})
+	require.NoError(t, err)
+	assert.Equal(t, "42", asked["installation"])
+
+	_, err = linkedHost{s}.AskGitHub(context.Background(), "GetAPullRequest", map[string]any{})
+	require.NoError(t, err)
+	_, named := asked["installation"]
+	assert.False(t, named, "an ask made as no installation named one")
 }

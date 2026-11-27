@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/plugin/grpc/services"
@@ -23,6 +24,7 @@ func githubAskSigils() []*protocol.Sigil {
 			Takes: []*protocol.Param{
 				{Name: "operation", Required: true, Says: "The operation, by its name: CreateAPullRequest."},
 				{Name: "request", Required: true, Says: "What the operation takes, as a JSON object with GitHub's own names: {\"owner\": \"...\", \"repo\": \"...\"}, and {} for an operation that takes nothing."},
+				{Name: "installation", Says: "The App's installation to ask as, by its id, for what it reaches without a repository named. Empty asks as the installation where the repository is."},
 			},
 			Gives: []*protocol.Field{
 				{Name: "answer", Says: "What GitHub answered, as the operation gives it."},
@@ -54,7 +56,15 @@ func (g *gitHub) githubAsk(ctx context.Context, sent sigil.Sent) (any, *protocol
 	if named {
 		untold = g.wasInvolved(ctx, operation, pull)
 	}
-	raw, err := g.gitHubService().Ask(services.AsInstallation(ctx), operation, []byte(sent["request"]))
+	as := services.AsInstallation(ctx)
+	if named := sent["installation"]; named != "" {
+		installation, err := strconv.ParseInt(named, 10, 64)
+		if err != nil {
+			return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "installation", Says: "the installation " + strconv.Quote(named) + " is not an id"}
+		}
+		as = services.AsInstallationOf(ctx, installation)
+	}
+	raw, err := g.gitHubService().Ask(as, operation, []byte(sent["request"]))
 	var noSuch services.NoSuchOperation
 	var notTaken services.NotWhatItTakes
 	switch {
