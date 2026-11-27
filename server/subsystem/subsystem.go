@@ -101,12 +101,22 @@ type Host interface {
 	// AskGitHub asks GitHubService one operation as the App's installation,
 	// and hands back GitHub's answer as JSON.
 	AskGitHub(ctx context.Context, operation string, request any) ([]byte, error)
+	// 「[Opus 5.5] GitCredential is what git fetches one repository with: minted by the node」
+	// 「[Opus 5.5] holding the App, or asked of the node it relays through, signed as itself.」
+	GitCredential(ctx context.Context, owner, repo string) (GitCredential, error)
 	// Ask is a sigil the node serves, asked from inside it over the subsystem
 	// surface: the node's own, a linked subsystem's, a ready plugin's. What
 	// arrived is read as every surface reads it (sigil.Within).
 	Ask(ctx context.Context, signum, sigil string, arrived map[string]any) (any, *protocol.Refusal)
 	// Logger is the node's, for the subsystem to name its own under.
 	Logger() *zap.SugaredLogger
+}
+
+// GitCredential is a short-lived credential git takes over HTTPS for one
+// repository (Host.GitCredential).
+type GitCredential struct {
+	Username string
+	Password string
 }
 
 // Held is a DuckDB a subsystem holds for itself (Host.Held).
