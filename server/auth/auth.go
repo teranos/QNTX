@@ -371,9 +371,7 @@ func (h *Handler) Middleware(route string, reach Reach, next http.HandlerFunc) h
 		)
 		span.SetAttributes(attribute.String("qntx.level", admitted.LevelName()))
 		ctx := WithAdmission(r.Context(), admitted)
-		if p.Bearer != nil {
-			ctx = context.WithValue(ctx, gatedKey{}, *p.Bearer)
-		}
+		ctx = context.WithValue(ctx, gatedKey{}, p)
 		next(w, r.WithContext(ctx))
 	}
 }
