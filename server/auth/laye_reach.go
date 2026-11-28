@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -77,6 +78,12 @@ func (h *Handler) handleLayeReach(w http.ResponseWriter, r *http.Request) {
 	}
 	h.logger.Infow("A reach line approved at laye was written on a peer",
 		"by", asked.Person, "peer", peer.Label, "path", asked.Path, "to", asked.To, "status", status)
+	// "it means threaded through"
+	// "each adding things only they can now"
+	// 「[Opus 5.5] What the peer refused is passed on as it came, with this node's one line.」
+	if status >= http.StatusBadRequest {
+		said = passedOn(said, status, peer.Label, "carried the reach line "+asked.Person+" approved to "+peer.Label)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if _, err := w.Write(said); err != nil {
@@ -107,4 +114,42 @@ func (h *Handler) writeOnPeer(r *http.Request, peer Client, signed string, asked
 		return 0, nil, errors.Wrap(err, "the peer's answer did not arrive")
 	}
 	return resp.StatusCode, said, nil
+}
+
+// 「[Opus 5.5] passedOn is a peer's refusal passed on: its Error as it came, with hop added to」
+// 「[Opus 5.5] its trace. An answer that is no Error becomes one here, once, kept whole as」
+// 「[Opus 5.5] its raw, and is passed on with the same line.」
+func passedOn(said []byte, status int, peer, hop string) []byte {
+	var received errors.Error
+	var older struct {
+		ID    string `json:"id"`
+		Error string `json:"error"`
+	}
+	if decoded, isError := errors.Decode(string(said)).(*errors.Error); isError && decoded.Title != "" {
+		received = *decoded
+	} else if json.Unmarshal(said, &older) == nil && older.Error != "" {
+		// 「[Opus 5.5] A node not yet answering as an Error: its sentence and its id, verbatim.」
+		received = errors.Error{
+			ID:       older.ID,
+			Severity: errors.Warn,
+			Context:  errors.Context{Surface: peer},
+			Title:    older.Error,
+			Raw:      string(said),
+			At:       time.Now().UTC().Format(time.RFC3339),
+		}
+	} else {
+		received = errors.Error{
+			ID:       fmt.Sprintf("%s-%d", peer, time.Now().UnixMilli()),
+			Severity: errors.Err,
+			Context:  errors.Context{Surface: peer},
+			Title:    fmt.Sprintf("%s answered %d with no Error", peer, status),
+			Raw:      string(said),
+			At:       time.Now().UTC().Format(time.RFC3339),
+		}
+	}
+	out, err := json.Marshal(errors.Pass(received, hop))
+	if err != nil {
+		return said
+	}
+	return out
 }
