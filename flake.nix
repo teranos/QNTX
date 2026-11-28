@@ -211,6 +211,28 @@
             # Rust formatting
             rustfmt.enable = true;
 
+            # "right, this is another source of pain, the fucking wasm"
+            # 「[Opus 5.5] ats.wasm is embedded at compile time (ats/wasm/engine.go), so every checkout」
+            # 「[Opus 5.5] needs it as a file of its own, and a new worktree has none. git runs」
+            # 「[Opus 5.5] post-checkout in a worktree it has just added: where the environment names」
+            # 「[Opus 5.5] a built one in ATS_WASM, it is copied in. Without ATS_WASM nothing happens.」
+            ats-wasm-into-checkout = {
+              enable = true;
+              name = "ats.wasm into this checkout";
+              entry = toString (pkgs.writeShellScript "ats-wasm-into-checkout" ''
+                if [ -z "''${ATS_WASM:-}" ] || [ -e ats/wasm/ats.wasm ]; then
+                  exit 0
+                fi
+                if ! cp "$ATS_WASM" ats/wasm/ats.wasm || ! chmod u+w ats/wasm/ats.wasm; then
+                  echo "ats.wasm was not copied from ATS_WASM=$ATS_WASM into $PWD/ats/wasm" >&2
+                  exit 1
+                fi
+              '');
+              stages = [ "post-checkout" ];
+              always_run = true;
+              pass_filenames = false;
+            };
+
             # Nix container workflow verification
             verify-nix-workflows = {
               enable = true;
