@@ -162,7 +162,7 @@ type forwardSilence struct {
 }
 
 // 「[Opus 5.5] went says a delivery to `to` was not taken, and whether `to` answered the」
-// 「[Opus 5.5] one before.」
+// 「[Opus 5[1m]] one before.」
 func (f *forwardSilence) went(to string) (wasAnswering bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
