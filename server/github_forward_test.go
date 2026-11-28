@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -153,9 +154,10 @@ func TestANodeTakesTheSecretOfTheNodeThatForwardsToIt(t *testing.T) {
 // 「[Opus 5.5] A node that does not answer is said once, not once a delivery, and its」
 // 「[Opus 5.5] answering again is said once, with how many it missed.」
 func TestAForwardNodeThatStoppedAnsweringIsSaidOnceAndItsReturnOnce(t *testing.T) {
-	down := true
+	var down atomic.Bool
+	down.Store(true)
 	far := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if down {
+		if down.Load() {
 			w.WriteHeader(http.StatusBadGateway)
 			return
 		}
@@ -173,7 +175,7 @@ func TestAForwardNodeThatStoppedAnsweringIsSaidOnceAndItsReturnOnce(t *testing.T
 	for _, guid := range []string{"a", "b", "c"} {
 		require.Error(t, deliver(guid))
 	}
-	down = false
+	down.Store(false)
 	require.NoError(t, deliver("d"))
 	require.NoError(t, deliver("e"))
 

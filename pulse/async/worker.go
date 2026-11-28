@@ -603,7 +603,7 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	if otlp.SaidIsSentry() {
 		if own, recording := startOTelRootJobSpan(ctx, job); recording {
 			traceparent, _ := traceparentOf(own)
-			ctx, cause, unsent = own, continueFrom(traceparent, ""), true
+			ctx, cause, unsent = own, continueFrom(traceparent, job.TraceBaggage), true
 		}
 	}
 	options := []sentry.SpanOption{
