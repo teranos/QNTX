@@ -3,12 +3,10 @@ package logger
 import (
 	"context"
 	"fmt"
-	"maps"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/cockroachdb/errors/report"
 	"github.com/getsentry/sentry-go"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -46,11 +44,6 @@ type SentryOptions struct {
 	// stays in the console and the log file.
 	MinLevel zapcore.Level
 
-	// CaptureErrors raises an issue, and not only a log line, for Error and
-	// above. A log line is one entry in a stream; an issue is grouped across
-	// occurrences, counted, and carries the stack of the error that caused it.
-	CaptureErrors bool
-
 	// Debug prints what the SDK itself is doing to stderr. It answers "did the
 	// log leave" without guessing.
 	Debug bool
@@ -87,7 +80,11 @@ func AddSentryOutput(opt SentryOptions) error {
 		return errors.New("AddSentryOutput called twice — the second client would replace the first and every entry would ship twice")
 	}
 
-	if err := sentry.Init(sentry.ClientOptions{
+	// "sacred-error should be the main owner of what we see as an error, the way an end user would experience it."
+	// 「[Opus 5.5] The client is sacred-error's: it is the one that reports an error, as the」
+	// 「[Opus 5.5] person met it, within this node's own budget a day. This logger ships log」
+	// 「[Opus 5.5] lines on it and raises no issue of its own.」
+	if err := errors.Report(errors.Reporting{PerDay: issuesPerDay, Client: sentry.ClientOptions{
 		Dsn:         opt.DSN,
 		EnableLogs:  true,
 		Environment: opt.Environment,
@@ -105,16 +102,14 @@ func AddSentryOutput(opt SentryOptions) error {
 		// session live. false is also the SDK's default; it is written out
 		// because it is a decision, not an omission.
 		SendDefaultPII: false,
-	}); err != nil {
+	}}); err != nil {
 		return errors.Wrapf(err, "failed to start Sentry (environment=%q, release=%q, min_level=%s)",
 			opt.Environment, opt.Release, opt.MinLevel)
 	}
 
 	core := &sentryCore{
-		LevelEnabler:  opt.MinLevel,
-		log:           sentry.NewLogger(context.Background()),
-		captureErrors: opt.CaptureErrors,
-		issues:        issues,
+		LevelEnabler: opt.MinLevel,
+		log:          sentry.NewLogger(context.Background()),
 	}
 
 	combined := zapcore.NewTee(Logger.Desugar().Core(), core)
@@ -153,10 +148,8 @@ func SentryRunning() bool {
 // drains it.
 type sentryCore struct {
 	zapcore.LevelEnabler
-	log           sentry.Logger
-	fields        []zapcore.Field
-	captureErrors bool
-	issues        *issueLedger // says which errors are raised; nil raises every one
+	log    sentry.Logger
+	fields []zapcore.Field
 }
 
 func (c *sentryCore) With(fields []zapcore.Field) zapcore.Core {
@@ -187,19 +180,7 @@ func (c *sentryCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	}
 	entry.Emit(ent.Message)
 
-	if c.captureErrors && ent.Level >= zapcore.ErrorLevel && faced(c.fields, fields) && c.mayRaise(ent, fields) {
-		c.captureIssue(ent, attrs, fields)
-	}
 	return nil
-}
-
-// mayRaise asks the ledger whether this error is raised as an issue. The log
-// line above ships either way, and the ledger counts it either way.
-func (c *sentryCore) mayRaise(ent zapcore.Entry, fields []zapcore.Field) bool {
-	if c.issues == nil {
-		return true
-	}
-	return c.issues.raise(ent, append(c.fields[:len(c.fields):len(c.fields)], fields...))
 }
 
 // Sync is where zap asks a core to flush. Sentry's batch is drained on a timer
@@ -222,10 +203,6 @@ func (c *sentryCore) attributes(ent zapcore.Entry, fields []zapcore.Field) map[s
 	attrs := make(map[string]any, len(enc.Fields)+2)
 	for key, value := range enc.Fields {
 		attrs[key] = value
-	}
-	// 「[Opus 5.5] A faced entry says so by its mark; the mark itself is no attribute.」
-	if faced(c.fields, fields) {
-		attrs[facedKey] = true
 	}
 
 	if ent.LoggerName != "" {
@@ -255,50 +232,6 @@ func (c *sentryCore) entryFor(level zapcore.Level) sentry.LogEntry {
 	default:
 		return c.log.LFatal()
 	}
-}
-
-// captureIssue raises the entry as an issue alongside the log line. When a
-// field carries the error itself the exception is captured from it, which is
-// what carries the type and the stack; otherwise the message is all there is.
-func (c *sentryCore) captureIssue(ent zapcore.Entry, attrs map[string]any, fields []zapcore.Field) {
-	hub := sentry.CurrentHub().Clone()
-	hub.WithScope(func(scope *sentry.Scope) {
-		scope.SetLevel(sentryLevel(ent.Level))
-		if ent.LoggerName != "" {
-			scope.SetTag("logger", ent.LoggerName)
-		}
-		// 「[Opus 5.5] The id the person was shown, so what they report finds the issue.」
-		if id, ok := attrs["error_id"].(string); ok && id != "" {
-			scope.SetTag("error_id", id)
-		}
-
-		// The message travels in the context too. CaptureException groups on
-		// the error, and the message is what says which call site raised it.
-		payload := make(sentry.Context, len(attrs)+1)
-		for key, value := range attrs {
-			payload[key] = value
-		}
-		payload["message"] = ent.Message
-		scope.SetContext("log", payload)
-
-		if err := firstError(c.fields, fields); err != nil {
-			// CaptureException titles from reflect.TypeOf(err) alone, always
-			// *withstack.withStack once errors.Wrap/Wrapf has run.
-			event, extras := report.BuildSentryReport(err)
-			maps.Copy(event.Extra, extras)
-			hub.CaptureEvent(event)
-			return
-		}
-		// A message groups on the stack of the capture site — the log
-		// statement itself — so one statement reporting on N subjects is one
-		// issue, and a new subject failing raises no new issue and no alert.
-		// A "plugin" field is the subject: it splits the grouping, while
-		// "{{ default }}" keeps the statement's identity in it.
-		if plugin, ok := attrs["plugin"].(string); ok {
-			scope.SetFingerprint([]string{"{{ default }}", plugin})
-		}
-		hub.CaptureMessage(ent.Message)
-	})
 }
 
 // firstError finds the error a zap.Error field carries. The flattened map holds

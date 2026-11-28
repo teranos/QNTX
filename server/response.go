@@ -48,16 +48,16 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	sendEnvelope(w, logger.Logger, envelope, status)
 }
 
-// "only the thing that is also shown to a user"
-// "4000 errors is wrong no matter what"
+// "and what get's sent to sentry or anything else , is the user experience of an error,"
+// "something that makes it easy for us to see and fix, because the experience being bad is immediatly clear and why"
 // 「[Opus 5.5] sayAnswered says what a person was answered with. Failed on the node's」
-// 「[Opus 5.5] side, a 5xx other than 503, it is an error they faced, and the one kind that raises an」
-// 「[Opus 5.5] issue (logger.Faced). Refused, a 4xx, it is an answer, said at info.」
+// 「[Opus 5.5] side, a 5xx other than 503, the Error they saw is reported as they saw it」
+// 「[Opus 5.5] (sacred-error's Shown). Refused, a 4xx, is an answer; a 503 is a state.」
 func sayAnswered(log *zap.SugaredLogger, envelope ErrorEnvelope, surface string, err error, status int) {
-	// 「[Opus 5.5] A 503 says the node is not ready yet, a state as a node being down is.」
 	if status >= http.StatusInternalServerError && status != http.StatusServiceUnavailable {
-		logger.Faced(log, "A request failed on the node's side", envelope.ID,
-			"surface", surface, "status", status, "error", err, "details", errors.FlattenDetails(err))
+		seen := envelope.seen()
+		errors.Shown(&seen, err)
+		log.Infow("A request failed on the node's side", "error_id", envelope.ID, "surface", surface, "status", status, "error", err)
 		return
 	}
 	log.Infow("A request was refused", "error_id", envelope.ID, "surface", surface, "status", status, "error", err)

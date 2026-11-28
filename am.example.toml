@@ -95,8 +95,8 @@ backup_interval_seconds = 3600
 #
 # Metrics ride this same switch. min_level and the levels below are
 # about log lines; the numbers are emitted whenever a DSN is set.
-# Left out, nothing is shipped. Said, min_level, capture_errors,
-# flush_seconds and debug are said with it.
+# Left out, nothing is shipped. Said, min_level, flush_seconds and
+# debug are said with it.
 # dsn = "https://<key>@<org>.ingest.<region>.sentry.io/<project>"
 
 # Which node this is, in Sentry's own vocabulary. Where it runs, not
@@ -112,10 +112,8 @@ backup_interval_seconds = 3600
 # console and the log file. One of: debug, info, warn, error.
 # min_level = "info"
 
-# Raise an issue, and not only a log line, at error and above. An
-# issue is grouped across occurrences and carries the error's stack;
-# a log line is one entry in a stream.
-# capture_errors = true
+# An issue is the error a person was shown, as they saw it, and
+# sacred-error alone raises one (docs/sentry.md). No log line does.
 
 # Nothing is redacted on the way out. A value on a log line is
 # already in the console, the file and journald, so replacing it at

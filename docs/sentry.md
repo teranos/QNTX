@@ -31,16 +31,16 @@ Request bodies, headers and cookies never leave: `SendDefaultPII` is off.
 
 ## Logs and issues
 
-"only the thing that is also shown to a user"
-"only things worth solving"
-"i havent faced 4000 + issues in my manual usage of my software"
+"sacred-error should be the main owner of what we see as an error, the way an end user would experience it."
+"and what get's sent to sentry or anything else , is the user experience of an error,"
+"something that makes it easy for us to see and fix, because the experience being bad is immediatly clear and why"
 
-「[Opus 5.5] An issue is what a person faced: their request, failed on the node's side」
-「[Opus 5.5] and answered with a 5xx other than 503. It is raised through」
-「[Opus 5.5] `logger.Faced` alone, tagged with the `error_id` the person was shown, and a」
-「[Opus 5.5] test fails when anything else calls Sentry's capture. Every other entry, at」
-「[Opus 5.5] error too, is a log line: a node down by design, a peer's request, the」
-「[Opus 5.5] node stopping.」
+「[Opus 5.5] sacred-error starts the node's Sentry client, and an issue is raised there」
+「[Opus 5.5] alone (`errors.Shown`): the Error a person was answered with, over HTTP」
+「[Opus 5.5] (a 5xx other than 503) or over the websocket, as they saw it, once by the id」
+「[Opus 5.5] they were shown, within the node's own budget a day. Every log line, at」
+「[Opus 5.5] error too, is a log line. A test fails when anything in QNTX calls Sentry's」
+「[Opus 5.5] capture itself.」
 
 An issue is grouped across occurrences, counted, and — when a field carries the
 error itself — carries the stack of where it came from. That last part is why
