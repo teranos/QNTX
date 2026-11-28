@@ -135,8 +135,8 @@ func (h *Handler) admitter(admitting Admission) (TokenInfo, bool, int, string) {
 	// The person, carried: ROOT here, by the word of this node's primary.
 	//
 	// "which should be obvious considereing it uses my finger and considering i am ROOT for real"
-	// 「[Opus 5.5] The key stands as the person who approved it, as a key they approve at the」
-	// 「[Opus 5.5] passkey does, until it is revoked.」
+	// 「[Opus 5.5] The key is held by its own name at the level of the person who approved it,」
+	// 「[Opus 5.5] ROOT, until it is revoked.」
 	if h.carriedByPrimary(admitting) {
 		if !admitting.IsRoot() {
 			return TokenInfo{}, false, http.StatusForbidden, admitting.Identity + " is not ROOT here, and admitting a key is ROOT's"
@@ -148,7 +148,7 @@ func (h *Handler) admitter(admitting Admission) (TokenInfo, bool, int, string) {
 			MintedByDisplayName: admitting.DisplayName,
 			Level:               LevelRoot,
 			Namespaces:          admitting.Namespaces,
-		}, true, 0, ""
+		}, false, 0, ""
 	}
 	// The same key `i name` names: its own client, said yes to at the passkey.
 	// A token issued through another client, or a person's session, admits none.
