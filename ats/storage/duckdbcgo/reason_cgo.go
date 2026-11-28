@@ -17,6 +17,11 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
+// "each adding things only they can now"
+// 「[Fable 5.2] here is this side of the FFI. What the crate answered is received as the」
+// 「[Fable 5.2] crate made it; an answer that is no Error is this side's finding, kept whole.」
+var here = errors.From("ats/storage/duckdbcgo")
+
 // readBack parses a record the crate answered with, refusing a field no Go
 // struct names.
 //
@@ -51,7 +56,7 @@ func crossed(said *C.char) error {
 		return nil
 	}
 	defer C.duckdb_string_free(said)
-	return errors.Decode(C.GoString(said))
+	return here.Receive("ats-duckdb", C.GoString(said))
 }
 
 // reasonf is crossed with context for a constructor that answered NULL. A
@@ -78,5 +83,5 @@ func failed(said *C.char, format string, args ...any) error {
 	if said == nil {
 		return errors.Newf(format+", and the reason was not recorded", args...)
 	}
-	return errors.Wrapf(errors.Decode(C.GoString(said)), format, args...)
+	return errors.Wrapf(here.Receive("ats-duckdb", C.GoString(said)), format, args...)
 }

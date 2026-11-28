@@ -30,6 +30,11 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
+// "each adding things only they can now"
+// 「[Fable 5.2] here is this side of the FFI. What the crate answered is received as the」
+// 「[Fable 5.2] crate made it; an answer that is no Error is this side's finding, kept whole.」
+var here = errors.From("ats/storage/etcdcgo")
+
 // 「[Opus 5.5] Store is one namespace's window in etcd, held by Rust. One
 // 「[Opus 5.5] client, so one mutex serializes every call.」」
 type Store struct {
@@ -40,7 +45,7 @@ type Store struct {
 }
 
 func failed(said *C.char, format string, args ...any) error {
-	return errors.Wrapf(errors.Decode(C.GoString(said)), format, args...)
+	return errors.Wrapf(here.Receive("ats-etcd", C.GoString(said)), format, args...)
 }
 
 // 「[Opus 5.5] Open connects to the etcd at endpoint, for one namespace.」

@@ -8,40 +8,62 @@ import (
 )
 
 // "each step in the thread should only say their thing, nothing more"
-// 「[Opus 5.5] What the peer refused leaves this node as it came, and one line of this node's.」
+// 「[Fable 5.2] What the peer refused leaves this node as the peer made it, and one line of」
+// 「[Fable 5.2] this node's. The test every hop has: out is in, plus that line.」
 func TestAPeersRefusalIsPassedOnWithThisNodesLineAlone(t *testing.T) {
-	refused := errors.Error{ID: "ERR-1", Severity: errors.Warn, Context: errors.Context{Surface: "reach:grant"}, Title: "http:vault:list: a runtime line opens only a plugin's route the compiled table does not name to a level", Why: "not allowed, path", At: "2026-11-28T12:00:00Z"}
+	refused := errors.From("kapteyn").Make(errors.What{
+		Severity: errors.Warn,
+		Context:  errors.Context{Surface: "reach:grant"},
+		Title:    "http:vault:list: a runtime line opens only a plugin's route the compiled table does not name to a level",
+		Why:      "not allowed, path",
+	})
 	said, err := json.Marshal(refused)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := passedOn(said, 403, "kapteyn", "carried the reach line google:1 approved to kapteyn")
 
-	got, isError := errors.Decode(string(out)).(*errors.Error)
-	if !isError {
-		t.Fatalf("what left is no Error: %s", out)
+	out, err := json.Marshal(errors.Pass(here.Receive("kapteyn POST /api/reach", string(said)), "carried the reach line google:1 approved to kapteyn"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	want := errors.Pass(refused, "carried the reach line google:1 approved to kapteyn")
-	if got.Title != want.Title || got.Why != want.Why || got.ID != want.ID || got.Context != want.Context || len(got.Trace) != 1 || got.Trace[0] != want.Trace[0] {
-		t.Errorf("passed on as %+v, want %+v", got, want)
+
+	var was, is map[string]any
+	if err := json.Unmarshal(said, &was); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(out, &is); err != nil {
+		t.Fatal(err)
+	}
+	trace, _ := is["trace"].([]any)
+	if len(trace) != 1 || trace[0] != "carried the reach line google:1 approved to kapteyn" {
+		t.Errorf("the trace is %v, want this node's one line", trace)
+	}
+	delete(is, "trace")
+	for field, want := range was {
+		if got, _ := json.Marshal(is[field]); string(got) != mustJSON(t, want) {
+			t.Errorf("%s left as %s, came as %s", field, got, mustJSON(t, want))
+		}
+	}
+	if len(is) != len(was) {
+		t.Errorf("this node added %d fields of its own to the peer's Error", len(is)-len(was))
 	}
 }
 
-// 「[Opus 5.5] An answer that is no Error becomes one here, once, kept whole, with the same line.」
-func TestAnAnswerThatIsNoErrorIsKeptWhole(t *testing.T) {
-	out := passedOn([]byte("<html>Bad gateway</html>"), 502, "kapteyn", "carried it to kapteyn")
-	got, isError := errors.Decode(string(out)).(*errors.Error)
-	if !isError || got.Raw != "<html>Bad gateway</html>" || len(got.Trace) != 1 {
-		t.Errorf("not kept whole: %s", out)
+// 「[Fable 5.2] An answer that is no Error is this node's finding, and the peer's answer is」
+// 「[Fable 5.2] kept whole: nothing is made in the peer's name.」
+func TestAnAnswerThatIsNoErrorIsThisNodesFinding(t *testing.T) {
+	answered := `{"id":"ERR-1795867972986-86","error":"http:vault:list: a runtime line opens only a plugin's route the compiled table does not name to a level","timestamp":1795867972}`
+	received := here.Receive("kapteyn POST /api/reach", answered)
+	if received.Source() != "qntx" || received.Raw() != answered || received.Title() != "kapteyn POST /api/reach did not answer with an Error" {
+		t.Errorf("received as %+v", received)
 	}
 }
 
-// 「[Opus 5.5] A node answering in QNTX's older shape: its sentence and id, verbatim, and the line.」
-func TestAnOlderAnswerKeepsItsWordsAndID(t *testing.T) {
-	said := []byte(`{"id":"ERR-1795867972986-86","error":"http:vault:list: a runtime line opens only a plugin's route the compiled table does not name to a level","timestamp":1795867972}`)
-	out := passedOn(said, 403, "kapteyn", "carried the reach line google:1 approved to kapteyn")
-	got, isError := errors.Decode(string(out)).(*errors.Error)
-	if !isError || got.ID != "ERR-1795867972986-86" || got.Title != "http:vault:list: a runtime line opens only a plugin's route the compiled table does not name to a level" || len(got.Trace) != 1 || got.Raw != string(said) {
-		t.Errorf("not kept as said: %s", out)
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
 	}
+	return string(b)
 }

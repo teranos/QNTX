@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -11,6 +10,9 @@ import (
 
 	errors "github.com/teranos/sacred-error"
 )
+
+// 「[Fable 5.2] here is this node, as the layer that makes and receives Errors in auth.」
+var here = errors.From("qntx")
 
 // "i dont want to do it. i am pleasing begging for it to be via ag and live activity via laye"
 //
@@ -80,9 +82,22 @@ func (h *Handler) handleLayeReach(w http.ResponseWriter, r *http.Request) {
 		"by", asked.Person, "peer", peer.Label, "path", asked.Path, "to", asked.To, "status", status)
 	// "it means threaded through"
 	// "each adding things only they can now"
-	// 「[Opus 5.5] What the peer refused is passed on as it came, with this node's one line.」
+	// 「[Fable 5.2] What the peer refused is received as the peer made it and passed on with」
+	// 「[Fable 5.2] this node's one line. This is every hop: Receive, Pass, write.」
 	if status >= http.StatusBadRequest {
-		said = passedOn(said, status, peer.Label, "carried the reach line "+asked.Person+" approved to "+peer.Label)
+		passed := errors.Pass(
+			here.Receive(peer.Label+" POST /api/reach", string(said)),
+			"carried the reach line "+asked.Person+" approved to "+peer.Label)
+		said, err = json.Marshal(passed)
+		if err != nil {
+			// 「[Wren] An Error that is not written is not dropped: it is kept whole in the」
+			// 「[Wren] log, and the person is answered with its id.」
+			h.logger.Errorw("A peer's refusal was not passed on to laye",
+				"peer", peer.Label, "passed", passed.Error(), "error", err)
+			h.writeError(w, http.StatusInternalServerError,
+				"what "+peer.Label+" refused ("+passed.ID()+") was not passed on: "+err.Error())
+			return
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -114,42 +129,4 @@ func (h *Handler) writeOnPeer(r *http.Request, peer Client, signed string, asked
 		return 0, nil, errors.Wrap(err, "the peer's answer did not arrive")
 	}
 	return resp.StatusCode, said, nil
-}
-
-// 「[Opus 5.5] passedOn is a peer's refusal passed on: its Error as it came, with hop added to」
-// 「[Opus 5.5] its trace. An answer that is no Error becomes one here, once, kept whole as」
-// 「[Opus 5.5] its raw, and is passed on with the same line.」
-func passedOn(said []byte, status int, peer, hop string) []byte {
-	var received errors.Error
-	var older struct {
-		ID    string `json:"id"`
-		Error string `json:"error"`
-	}
-	if decoded, isError := errors.Decode(string(said)).(*errors.Error); isError && decoded.Title != "" {
-		received = *decoded
-	} else if json.Unmarshal(said, &older) == nil && older.Error != "" {
-		// 「[Opus 5.5] A node not yet answering as an Error: its sentence and its id, verbatim.」
-		received = errors.Error{
-			ID:       older.ID,
-			Severity: errors.Warn,
-			Context:  errors.Context{Surface: peer},
-			Title:    older.Error,
-			Raw:      string(said),
-			At:       time.Now().UTC().Format(time.RFC3339),
-		}
-	} else {
-		received = errors.Error{
-			ID:       fmt.Sprintf("%s-%d", peer, time.Now().UnixMilli()),
-			Severity: errors.Err,
-			Context:  errors.Context{Surface: peer},
-			Title:    fmt.Sprintf("%s answered %d with no Error", peer, status),
-			Raw:      string(said),
-			At:       time.Now().UTC().Format(time.RFC3339),
-		}
-	}
-	out, err := json.Marshal(errors.Pass(received, hop))
-	if err != nil {
-		return said
-	}
-	return out
 }
