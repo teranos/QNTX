@@ -321,8 +321,8 @@ func TestASecondPollOfAHeldPathDoesNotKeepItsRequestLineEither(t *testing.T) {
 }
 
 // "Where is all of our spans usage going towards?"
-// A poll or a routine job that ended well and quickly is not sent; one that
-// failed or was slow is, and so is every other request, a POST to a polled path among them.
+// 「[Sonnet 5.5, Opus 5.5] A poll or a routine job that ended well and quickly is not sent; one that」
+// 「[Sonnet 5.5, Opus 5.5] failed or was slow is, and so is every other request, a POST to a polled path among them.」
 func TestARoutineSpanIsNotSentAndAFailedOrSlowOneIs(t *testing.T) {
 	recorder := tracetest.NewSpanRecorder()
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
