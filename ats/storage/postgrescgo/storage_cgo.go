@@ -35,6 +35,11 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
+// "each adding things only they can now"
+// 「[Fable 5.2] here is this side of the FFI. What the crate answered is received as the」
+// 「[Fable 5.2] crate made it; an answer that is no Error is this side's finding, kept whole.」
+var here = errors.From("ats/storage/postgrescgo")
+
 // PostgresStore wraps the Rust-owned Postgres attestation store of one
 // namespace. One connection, so one mutex serializes every call.
 type PostgresStore struct {
@@ -47,7 +52,7 @@ type PostgresStore struct {
 // failed reads the error slot of a result that said success=false, which the
 // crate always writes; the caller still frees the struct.
 func failed(said *C.char, format string, args ...any) error {
-	return errors.Wrapf(errors.Decode(C.GoString(said)), format, args...)
+	return errors.Wrapf(here.Receive("ats-postgres", C.GoString(said)), format, args...)
 }
 
 // NewPostgresStore connects to url, over TLS against the CA file ca unless the
