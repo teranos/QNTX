@@ -58,8 +58,8 @@ func (h *Handler) handleLayeAdmit(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusNotFound, "no peer is called "+asked.Peer)
 		return
 	}
-	// The key is held on the peer at the level the person is carried at.
-	signed, err := h.carriedSignature(asked.Person, "", LevelSuper, peer, peer.Namespaces, now)
+	// 「[Opus 5.5] The person is carried at their own level, ROOT; the peer holds the key as them.」
+	signed, err := h.carriedSignature(asked.Person, "", LevelRoot, peer, peer.Namespaces, now)
 	if err != nil {
 		h.writeError(w, http.StatusInternalServerError, err.Error())
 		return

@@ -52,6 +52,7 @@ func (h *Handler) handleAdmit(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, status, why)
 		return
 	}
+	carried := h.carriedByPrimary(admitting)
 	did := strings.TrimSpace(r.PostForm.Get("did"))
 	if _, err := DecodeUserDID(did); err != nil {
 		h.writeError(w, http.StatusBadRequest, "did is no did:key: "+err.Error())
@@ -61,9 +62,17 @@ func (h *Handler) handleAdmit(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "a key does not admit itself")
 		return
 	}
-	if _, already := h.tokenOf(did); already {
-		h.writeError(w, http.StatusConflict, did+" is already held")
-		return
+	if was, already := h.tokenOf(did); already {
+		// 「[Opus 5.5] The person, approving a key again, is its newest word: what it was held」
+		// 「[Opus 5.5] as goes, and it is held as they approve it now.」
+		if !carried {
+			h.writeError(w, http.StatusConflict, did+" is already held")
+			return
+		}
+		if err := h.tokens.Revoke(was.ID); err != nil {
+			h.writeError(w, http.StatusInternalServerError, "what "+did+" was held as was not let go: "+err.Error())
+			return
+		}
 	}
 	label := strings.TrimSpace(r.PostForm.Get("label"))
 	if label == "" {
@@ -123,11 +132,12 @@ func (h *Handler) handleAdmit(w http.ResponseWriter, r *http.Request) {
 //
 // "CAN WE PLEASE STOP EXPECTING AN AGENT TO REQUEST IT OWN PERMISSIONS AND ALSO BE PERFECT?"
 func (h *Handler) admitter(admitting Admission) (TokenInfo, bool, int, string) {
-	// The person, carried: ROOT here, by the word of this node's primary. The
-	// key is theirs at SUPER, as the primary carried them (LevelSuper in
-	// handleLayeAdmit), until it is revoked.
-	if admitting.Grant == nil && admitting.TokenDID != "" && admitting.TokenDID != admitting.ClientDID &&
-		h.signsForItsPeople(admitting.TokenDID) {
+	// 「[Opus 5.5] The person, carried: ROOT here, by the word of this node's primary.」
+	//
+	// "which should be obvious considereing it uses my finger and considering i am ROOT for real"
+	// 「[Opus 5.5] The key is held by its own name at the level of the person who approved it,」
+	// 「[Opus 5.5] ROOT, until it is revoked.」
+	if h.carriedByPrimary(admitting) {
 		if !admitting.IsRoot() {
 			return TokenInfo{}, false, http.StatusForbidden, admitting.Identity + " is not ROOT here, and admitting a key is ROOT's"
 		}
@@ -136,7 +146,7 @@ func (h *Handler) admitter(admitting Admission) (TokenInfo, bool, int, string) {
 			MintedBy:            admitting.Identity,
 			MintedByUser:        admitting.UserID,
 			MintedByDisplayName: admitting.DisplayName,
-			Level:               LevelSuper,
+			Level:               LevelRoot,
 			Namespaces:          admitting.Namespaces,
 		}, false, 0, ""
 	}
@@ -150,4 +160,11 @@ func (h *Handler) admitter(admitting Admission) (TokenInfo, bool, int, string) {
 		return TokenInfo{}, false, http.StatusUnauthorized, "this node holds no live grant for " + admitting.TokenDID
 	}
 	return held, true, 0, ""
+}
+
+// 「[Opus 5.5] carriedByPrimary is whether the one admitting is the person, carried by this」
+// 「[Opus 5.5] node's primary from where they approved the key (laye_admit.go).」
+func (h *Handler) carriedByPrimary(admitting Admission) bool {
+	return admitting.Grant == nil && admitting.TokenDID != "" && admitting.TokenDID != admitting.ClientDID &&
+		h.signsForItsPeople(admitting.TokenDID)
 }
