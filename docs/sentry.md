@@ -31,15 +31,21 @@ Request bodies, headers and cookies never leave: `SendDefaultPII` is off.
 
 ## Logs and issues
 
-At error and above the entry becomes two things: a log line in the stream, and
-an issue.
+"only the thing that is also shown to a user"
+"only things worth solving"
+"i havent faced 4000 + issues in my manual usage of my software"
+
+「[Opus 5.5] An issue is what a person faced: their request, failed on the node's side」
+「[Opus 5.5] and answered with a 5xx other than 503. It is raised through」
+「[Opus 5.5] `logger.Faced` alone, tagged with the `error_id` the person was shown, and a」
+「[Opus 5.5] test fails when anything else calls Sentry's capture. Every other entry, at」
+「[Opus 5.5] error too, is a log line: a node down by design, a peer's request, the」
+「[Opus 5.5] node stopping.」
 
 An issue is grouped across occurrences, counted, and — when a field carries the
 error itself — carries the stack of where it came from. That last part is why
 the error goes in as an error and not as a string.
 
-Below error there is only the log line. An issue that fires on every info line
-is an inbox nobody reads.
 
 ## Issues are capped, and kept in QNTX
 

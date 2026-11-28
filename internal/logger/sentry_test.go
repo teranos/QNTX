@@ -240,6 +240,7 @@ func TestCaptureIssueRaisesAnEvent(t *testing.T) {
 	}, []zapcore.Field{
 		zap.Error(failure),
 		zap.String("namespace", "acme"),
+		zap.Any(facedKey, facedMark{}),
 	}); err != nil {
 		t.Fatalf("Write returned %v", err)
 	}
@@ -299,13 +300,13 @@ func TestCaptureIssueFingerprintsOnThePluginField(t *testing.T) {
 	if err := core.Write(zapcore.Entry{
 		Level:   zapcore.ErrorLevel,
 		Message: "Plugin failed consecutive health checks, restarting",
-	}, []zapcore.Field{zap.String("plugin", "duif")}); err != nil {
+	}, []zapcore.Field{zap.String("plugin", "duif"), zap.Any(facedKey, facedMark{})}); err != nil {
 		t.Fatalf("Write returned %v", err)
 	}
 	if err := core.Write(zapcore.Entry{
 		Level:   zapcore.ErrorLevel,
 		Message: "the store is gone",
-	}, nil); err != nil {
+	}, []zapcore.Field{zap.Any(facedKey, facedMark{})}); err != nil {
 		t.Fatalf("Write returned %v", err)
 	}
 
@@ -350,5 +351,38 @@ func TestCaptureIssueStaysBelowError(t *testing.T) {
 	}
 	if got := len(transport.Events()); got != 0 {
 		t.Errorf("a warn entry raised %d events, want 0", got)
+	}
+}
+
+// "i havent faced 4000 + issues in my manual usage of my software"
+// 「[Opus 5.5] An error line no person faced is a line, and raises no issue. What a」
+// 「[Opus 5.5] person faced raises one, found by the id they were shown.」
+func TestOnlyWhatAPersonFacedRaisesAnIssue(t *testing.T) {
+	transport := &sentry.MockTransport{}
+	if err := sentry.Init(sentry.ClientOptions{
+		Dsn:       "https://tim@example.com/1",
+		Transport: transport,
+	}); err != nil {
+		t.Fatalf("sentry.Init returned %v", err)
+	}
+	defer func() { sentry.CurrentHub().BindClient(nil) }()
+
+	core, _ := coreWith(t, zapcore.InfoLevel)
+	core.captureErrors = true
+	said := zap.New(core).Sugar()
+
+	said.Errorw("A delivery did not reach the node it is forwarded to", "error", errors.New("i/o timeout"))
+	said.Errorw("faced", "faced", true)
+	if got := len(transport.Events()); got != 0 {
+		t.Fatalf("error lines no person faced raised %d issues, want 0", got)
+	}
+
+	Faced(said, "A request failed on the node's side", "7f3a", "status", 500, "error", errors.New("the store is gone"))
+	events := transport.Events()
+	if len(events) != 1 {
+		t.Fatalf("what a person faced raised %d issues, want 1", len(events))
+	}
+	if events[0].Tags["error_id"] != "7f3a" {
+		t.Errorf("the issue is tagged error_id %q, want the id the person was shown", events[0].Tags["error_id"])
 	}
 }

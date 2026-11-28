@@ -187,7 +187,7 @@ func (c *sentryCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	}
 	entry.Emit(ent.Message)
 
-	if c.captureErrors && ent.Level >= zapcore.ErrorLevel && c.mayRaise(ent, fields) {
+	if c.captureErrors && ent.Level >= zapcore.ErrorLevel && faced(c.fields, fields) && c.mayRaise(ent, fields) {
 		c.captureIssue(ent, attrs, fields)
 	}
 	return nil
@@ -222,6 +222,10 @@ func (c *sentryCore) attributes(ent zapcore.Entry, fields []zapcore.Field) map[s
 	attrs := make(map[string]any, len(enc.Fields)+2)
 	for key, value := range enc.Fields {
 		attrs[key] = value
+	}
+	// 「[Opus 5.5] A faced entry says so by its mark; the mark itself is no attribute.」
+	if faced(c.fields, fields) {
+		attrs[facedKey] = true
 	}
 
 	if ent.LoggerName != "" {
@@ -262,6 +266,10 @@ func (c *sentryCore) captureIssue(ent zapcore.Entry, attrs map[string]any, field
 		scope.SetLevel(sentryLevel(ent.Level))
 		if ent.LoggerName != "" {
 			scope.SetTag("logger", ent.LoggerName)
+		}
+		// 「[Opus 5.5] The id the person was shown, so what they report finds the issue.」
+		if id, ok := attrs["error_id"].(string); ok && id != "" {
+			scope.SetTag("error_id", id)
 		}
 
 		// The message travels in the context too. CaptureException groups on

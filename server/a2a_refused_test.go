@@ -149,8 +149,10 @@ func TestAUserAgentIsWrittenBounded(t *testing.T) {
 	assert.LessOrEqual(t, len([]rune(agent)), saidUserAgentMost+1)
 }
 
-// The node failing what it should answer is a Sentry issue, grouped by operation and reason, and not a log.
-func TestAnA2ADefectIsASentryIssue(t *testing.T) {
+// "only the thing that is also shown to a user"
+// 「[Opus 5.5] The node failing what a peer asked is a line in the node's own log, and no」
+// 「[Opus 5.5] issue: a peer is no person.」
+func TestAnA2ADefectIsALineAndNoIssue(t *testing.T) {
 	srv, _, _ := nodeAgentOverA2A(t, "")
 	core, written := observer.New(zapcore.DebugLevel)
 	srv.logger = zap.New(core).Sugar()
@@ -160,9 +162,7 @@ func TestAnA2ADefectIsASentryIssue(t *testing.T) {
 	srv.a2aRefused(r, a2aRefusalSaid{Operation: "SendMessage", Status: http.StatusInternalServerError, Reason: "INVALID_AGENT_RESPONSE", Message: "the store did not answer"})
 
 	logs, issues := sent.said()
-	require.Len(t, issues, 1)
-	assert.Equal(t, []string{"a2a-defect", "SendMessage", "INVALID_AGENT_RESPONSE"}, issues[0].Fingerprint)
-	assert.Equal(t, "defect", issues[0].Tags["a2a.kind"])
+	assert.Empty(t, issues, "a defect a peer met raised an issue")
 	for _, l := range logs {
 		assert.NotEqual(t, "An A2A request was refused", l.Body, "a defect was written as an expected refusal")
 	}

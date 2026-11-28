@@ -182,7 +182,7 @@ func TestTheCollectorCountsWhatItFolds(t *testing.T) {
 	}
 }
 
-// The Sentry core asks the ledger before it raises.
+// The Sentry core asks the ledger before it raises what a person faced.
 func TestSentryRaisesWhatTheLedgerLets(t *testing.T) {
 	transport := &sentry.MockTransport{}
 	if err := sentry.Init(sentry.ClientOptions{Dsn: "https://tim@example.com/1", Transport: transport}); err != nil {
@@ -197,7 +197,7 @@ func TestSentryRaisesWhatTheLedgerLets(t *testing.T) {
 
 	for i := range 20 {
 		ledger.seen(forwardFailed(), forwardFields(i))
-		if err := core.Write(forwardFailed(), forwardFields(i)); err != nil {
+		if err := core.Write(forwardFailed(), append(forwardFields(i), zap.Any(facedKey, facedMark{}))); err != nil {
 			t.Fatalf("Write returned %v", err)
 		}
 	}

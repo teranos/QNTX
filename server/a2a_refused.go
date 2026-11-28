@@ -131,25 +131,12 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 	entry.Int("a2a.status", status).Emit("An A2A request was refused")
 }
 
-// a2aDefect is a Sentry issue per operation and reason, and a line in the node's own log.
+// a2aDefect is a line in the node's own log.
 // The words it was answered with are the node's own, so they are said.
 func (s *QNTXServer) a2aDefect(ctx context.Context, refusal a2aRefusalSaid, status int, said map[string]string) {
-	hub := sentry.GetHubFromContext(ctx)
-	if hub == nil {
-		hub = sentry.CurrentHub()
-	}
-	hub = hub.Clone()
-	hub.WithScope(func(scope *sentry.Scope) {
-		scope.SetLevel(sentry.LevelError)
-		scope.SetFingerprint([]string{"a2a-defect", refusal.Operation, said["a2a.reason"]})
-		for key, value := range said {
-			if value != "" {
-				scope.SetTag(key, value)
-			}
-		}
-		scope.SetContext("a2a", sentry.Context{"status": status, "says": bounded(refusal.Message, saidDefectMost)})
-		hub.CaptureMessage("An A2A request failed on the node's side")
-	})
+	// "only the thing that is also shown to a user"
+	// 「[Opus 5.5] A peer is no person: what it was answered with is a line in the node's」
+	// 「[Opus 5.5] own log, and no issue.」
 	s.logger.Warnw("An A2A request failed on the node's side",
 		"operation", refusal.Operation, "reason", said["a2a.reason"], "status", status,
 		"request_id", said["request_id"], "says", bounded(refusal.Message, saidDefectMost))
