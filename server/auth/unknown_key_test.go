@@ -73,7 +73,7 @@ func admitAs(node *Handler, authorization, did, label string) *httptest.Response
 }
 
 // The person approved the key at laye: the primary carries them to the node,
-// and the node holds the key as theirs, at their level.
+// 「[Opus 5.5] and the node holds the key as theirs, at their level.」
 //
 // "which should be obvious considereing it uses my finger and considering i am ROOT for real"
 func TestThePersonThePrimaryCarriesAdmitsAKey(t *testing.T) {
@@ -97,7 +97,7 @@ func TestThePersonThePrimaryCarriesAdmitsAKey(t *testing.T) {
 	require.True(t, ok, "the key the person admitted is not admitted")
 	assert.Equal(t, mastodonAccount, admitted.Identity)
 	assert.Equal(t, string(LevelRoot), admitted.LevelName())
-	// It stands by its own name, at the level of the person who approved it.
+	// 「[Opus 5.5] It stands by its own name, at the level of the person who approved it.」
 	require.NotNil(t, admitted.Grant)
 	assert.Equal(t, "ramen", admitted.Grant.Label)
 	assert.Equal(t, ramenDID, admitted.Grant.DID)
