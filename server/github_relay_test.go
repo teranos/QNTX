@@ -58,6 +58,27 @@ func TestARelayAsksTheNodeThatHoldsTheAppAsItself(t *testing.T) {
 	assert.Equal(t, jwt.ClaimStrings{q.URL}, claims.Audience)
 }
 
+// 「[Opus 5.5] GitHub's refusal, relayed, is said as this node's own GitHubService says it,」
+// 「[Opus 5.5] "operation: what GitHub said": k's vault, on 2026-11-28, read q's relayed 404 for」
+// 「[Opus 5.5] obsidian-syncbvh as q failing, and so never made the branch it sends to.」
+func TestGitHubsRefusalThroughARelayIsSaidAsTheNodesOwn(t *testing.T) {
+	said := "GetABranch: GitHub GET /repos/o/r/branches/obsidian-syncbvh answered 404: Branch not found"
+	q := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "ERR-1", "error": said, "timestamp": 1})
+	}))
+	defer q.Close()
+	s := githubKnowingServer(t)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	s.nodeDID = &nodedid.Handler{PrivateKey: key}
+	require.NoError(t, s.nodeRecords().SetRelay(rootAccount, GitHubRelay{URL: q.URL}))
+
+	_, err = linkedHost{s}.AskGitHub(context.Background(), "GetABranch", map[string]any{})
+	require.Error(t, err)
+	assert.Equal(t, said, err.Error())
+}
+
 func TestARelaysRefusalIsTheAskersError(t *testing.T) {
 	q := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

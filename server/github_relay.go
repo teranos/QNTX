@@ -97,6 +97,14 @@ func relayAsk(ctx context.Context, signAs func(origin string) (string, error), r
 		return nil, errors.Wrapf(err, "what %s answered %s did not read", relay.URL, operation)
 	}
 	if answer.StatusCode != http.StatusOK {
+		// 「[Opus 5.5] The far node says GitHub's refusal as its GitHubService does,」
+		// 「[Opus 5.5] "operation: what GitHub said"; it is that refusal here too (AskGitHub).」
+		var refused struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(raw, &refused) == nil && strings.HasPrefix(refused.Error, operation+": ") {
+			return nil, errors.New(refused.Error)
+		}
 		return nil, errors.Newf("%s answered %s with %s: %s", relay.URL, operation, strconv.Itoa(answer.StatusCode), raw)
 	}
 	var given struct {
