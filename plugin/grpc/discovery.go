@@ -207,6 +207,9 @@ type running interface {
 	// logs is the ring of its recent output, for live streaming, or why
 	// there is none.
 	logs() (*LogBuffer, error)
+	// gone is closed once the process has exited and been reaped, also when
+	// that happens after stop gave up waiting.
+	gone() <-chan struct{}
 }
 
 // attachedPlugin is a plugin something else runs: QNTX reaches it at its
@@ -221,6 +224,11 @@ func (attachedPlugin) logs() (*LogBuffer, error) {
 	return nil, errors.New("QNTX did not launch it, so its output is not kept here")
 }
 
+// attachedGone is closed: a plugin QNTX did not launch has no process to wait for.
+var attachedGone = func() chan struct{} { c := make(chan struct{}); close(c); return c }()
+
+func (attachedPlugin) gone() <-chan struct{} { return attachedGone }
+
 // launchedPlugin is a plugin process QNTX started, its output kept in its own
 // log file and a ring for live streaming.
 type launchedPlugin struct {
@@ -231,7 +239,26 @@ type launchedPlugin struct {
 	stderrLogger  *pluginLogger
 	logBuffer     *LogBuffer
 	logFile       *os.File
+
+	reapOnce sync.Once
+	reapErr  error
+	waited   chan struct{}
 }
+
+// reap waits for the process once, and closes waited when it is gone. The
+// wait keeps going when stop stops waiting for it.
+func (p *launchedPlugin) reap() <-chan struct{} {
+	p.reapOnce.Do(func() {
+		p.waited = make(chan struct{})
+		go func() {
+			p.reapErr = p.cmd.Wait()
+			close(p.waited)
+		}()
+	})
+	return p.waited
+}
+
+func (p *launchedPlugin) gone() <-chan struct{} { return p.reap() }
 
 // exited is what reaping a stopped plugin says. Its exit, the stop itself, is
 // not a failure; a wait that fails otherwise is.
@@ -250,8 +277,7 @@ func exited(pid int, waitErr error) error {
 func (p *launchedPlugin) stop() error {
 	proc := p.cmd.Process
 	pid := proc.Pid
-	reaped := make(chan error, 1)
-	go func() { reaped <- p.cmd.Wait() }()
+	reaped := p.reap()
 
 	// SIGTERM the entire process group first. If the process was launched with
 	// Setpgid (its own group leader), this kills it and all children.
@@ -267,8 +293,8 @@ func (p *launchedPlugin) stop() error {
 
 	// Wait up to 3s for graceful exit
 	select {
-	case err := <-reaped:
-		return exited(pid, err)
+	case <-reaped:
+		return exited(pid, p.reapErr)
 	case <-time.After(3 * time.Second):
 	}
 
@@ -279,8 +305,8 @@ func (p *launchedPlugin) stop() error {
 		}
 	}
 	select {
-	case err := <-reaped:
-		return exited(pid, err)
+	case <-reaped:
+		return exited(pid, p.reapErr)
 	case <-time.After(2 * time.Second):
 		return alongside(errors.Newf("plugin pid %d did not exit within 5s of being stopped", pid), termErr)
 	}
@@ -293,7 +319,8 @@ func (p *launchedPlugin) abandon() error {
 	if err := p.cmd.Process.Kill(); err != nil {
 		return alongside(errors.Wrapf(err, "the abandoned plugin pid %d was not killed; it may keep its port", pid), p.closeLog())
 	}
-	return alongside(exited(pid, p.cmd.Wait()), p.closeLog())
+	<-p.reap()
+	return alongside(exited(pid, p.reapErr), p.closeLog())
 }
 
 // interrupt signals the process to exit, and kills it when the signal does not reach it.
@@ -1419,12 +1446,25 @@ func (m *PluginManager) takeLoaded(name string) (*managedPlugin, bool, error) {
 
 // relaunchLoaded launches a plugin taken out by takeLoaded again, and joins it.
 func (m *PluginManager) relaunchLoaded(ctx context.Context, name string, p *managedPlugin, stopErr error, registry *plugin.Registry, services plugin.ServiceRegistry) error {
+	pluginCfg := p.pluginCfg
 	if stopErr != nil {
-		stopErr = errors.Wrapf(stopErr, "plugin %s did not stop, so it was not launched again", name)
+		stopErr = errors.Wrapf(stopErr, "plugin %s did not stop in time; it is launched again once its process is gone", name)
+		m.mu.Lock()
+		m.failedPlugins[name] = stopErr.Error()
+		m.mu.Unlock()
 		registry.MarkFailed(name, stopErr.Error())
+		// A second copy is not launched beside one that still holds its port
+		// and DB locks; the plugin is not left down either.
+		m.onceGone(name, p.proc.gone(), func(ctx context.Context) {
+			m.logger.Infow("A plugin that stopped late is gone, and is launched again", "plugin", name)
+			if err := p.client.Close(); err != nil {
+				m.logger.Warnw("The old connection to a plugin did not close", "plugin", name, "error", err)
+			}
+			registry.Unregister(name)
+			m.retryPluginForever(ctx, pluginCfg, registryComeback{m: m, registry: registry, services: services})
+		})
 		return stopErr
 	}
-	pluginCfg := p.pluginCfg
 
 	// Close the old gRPC connection; its process is gone.
 	closeErr := errors.Wrapf(p.client.Close(), "the old connection to plugin %s did not close", name)
@@ -1453,6 +1493,31 @@ func (m *PluginManager) relaunchLoaded(ctx context.Context, name string, p *mana
 	m.restarted(pluginCfg.Name)
 
 	return alongside(initErr, closeErr)
+}
+
+// onceGone runs then when gone is closed, unless the node shuts down or a
+// restart takes the plugin over first. The wait is held where a retry loop is:
+// an enable leaves it to the wait, and a restart cancels it.
+func (m *PluginManager) onceGone(name string, gone <-chan struct{}, then func(ctx context.Context)) {
+	ctx, cancel := context.WithCancel(m.shutdownCtx)
+	m.mu.Lock()
+	if prev, ok := m.retryCancels[name]; ok {
+		prev()
+	}
+	m.retryCancels[name] = cancel
+	m.mu.Unlock()
+	go func() {
+		defer cancel()
+		select {
+		case <-gone:
+		case <-ctx.Done():
+			return
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		then(ctx)
+	}()
 }
 
 // killStalePluginProcesses finds and kills any OS process running a plugin binary
