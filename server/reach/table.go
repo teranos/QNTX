@@ -5,6 +5,7 @@
 package reach
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -151,6 +152,21 @@ func (l Line) Unopenable(plugin func(path string) bool) []string {
 		}
 	}
 	return outside
+}
+
+// "Errors without context. An Error that does not say where it came from"
+// 「[Opus 5.5] WhyUnopenable says, for one path Unopenable refused, why: the reach the」
+// 「[Opus 5.5] compiled table gives it, or that it is no plugin's route on this node.」
+func WhyUnopenable(path string, plugin func(path string) bool) string {
+	compiled, err := readReaches(tablet)
+	if err != nil {
+		return fmt.Sprintf("'%s' was not weighed: this node's compiled reach table did not read (%v)", path, err)
+	}
+	if row, named := compiled[path]; named {
+		return fmt.Sprintf("'%s' is %s's in this node's compiled reach table, and a runtime line does not change what the table names",
+			path, strings.Join(row.named, " "))
+	}
+	return fmt.Sprintf("'%s' is no plugin's route on this node, and a runtime line opens only a plugin's route to a level; what the node has compiled in is reached as its compiled reach table says", path)
 }
 
 // opensAtRuntime is whether a runtime line may open a path to a level: a

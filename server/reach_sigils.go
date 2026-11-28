@@ -165,8 +165,11 @@ func (s *QNTXServer) writeReachLine(ctx context.Context, path, to string, revoke
 		return nil, &protocol.Refusal{Why: sigil.Invalid, Param: "to", Says: err.Error()}
 	}
 	if outside := line.Unopenable(s.pluginRoute); len(outside) > 0 {
-		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "path",
-			Says: strings.Join(outside, ", ") + ": a runtime line opens only a plugin's route the compiled table does not name to a level"}
+		why := make([]string, 0, len(outside))
+		for _, path := range outside {
+			why = append(why, reach.WhyUnopenable(path, s.pluginRoute))
+		}
+		return nil, &protocol.Refusal{Why: sigil.NotAllowed, Param: "path", Says: strings.Join(why, "; ")}
 	}
 
 	if s.held == nil {

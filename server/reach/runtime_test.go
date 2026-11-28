@@ -229,3 +229,11 @@ func TestTheTabletReadsAloneWithNoRuntime(t *testing.T) {
 		assert.Empty(t, row.reach.Roles())
 	}
 }
+
+// "Errors without context. An Error that does not say where it came from"
+// 「[Opus 5.5] A refused line says, per path, why: what the compiled table gives it, or」
+// 「[Opus 5.5] that it is no plugin's route on this node.」
+func TestARefusedLineSaysWhyPerPath(t *testing.T) {
+	assert.Contains(t, WhyUnopenable("/am/node", nil), "'/am/node' is ROOT's in this node's compiled reach table")
+	assert.Contains(t, WhyUnopenable("http:vault:list", nil), "'http:vault:list' is no plugin's route on this node")
+}
