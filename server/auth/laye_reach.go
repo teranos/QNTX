@@ -90,7 +90,12 @@ func (h *Handler) handleLayeReach(w http.ResponseWriter, r *http.Request) {
 			"carried the reach line "+asked.Person+" approved to "+peer.Label)
 		said, err = json.Marshal(passed)
 		if err != nil {
-			h.writeError(w, http.StatusInternalServerError, err.Error())
+			// 「[Wren] An Error that is not written is not dropped: it is kept whole in the」
+			// 「[Wren] log, and the person is answered with its id.」
+			h.logger.Errorw("A peer's refusal was not passed on to laye",
+				"peer", peer.Label, "passed", passed.Error(), "error", err)
+			h.writeError(w, http.StatusInternalServerError,
+				"what "+peer.Label+" refused ("+passed.ID()+") was not passed on: "+err.Error())
 			return
 		}
 	}
