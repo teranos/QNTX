@@ -131,7 +131,7 @@ func (s *QNTXServer) a2aRefused(r *http.Request, refusal a2aRefusalSaid) {
 	entry.Int("a2a.status", status).Emit("An A2A request was refused")
 }
 
-// a2aDefect is a line in the node's own log.
+// 「[Opus 5.5] a2aDefect is a line in the node's own log.」
 // The words it was answered with are the node's own, so they are said.
 func (s *QNTXServer) a2aDefect(ctx context.Context, refusal a2aRefusalSaid, status int, said map[string]string) {
 	// "only the thing that is also shown to a user"
