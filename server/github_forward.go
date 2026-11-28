@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -146,6 +147,55 @@ func (s *QNTXServer) enqueueForward(job *async.Job) error {
 type forwardHandler struct {
 	client *http.Client
 	logger *zap.SugaredLogger
+	silent forwardSilence
+}
+
+// "another FUCK is how we abuse the sentry error budget, i dont think all 1900 of them are truly separate ones if you get me"
+// 「[Opus 5.5] A node deliveries are forwarded to can be down most of the time, as a」
+// 「[Opus 5.5] fleet node is. Every delivery it did not take was an error of its own:」
+// 「[Opus 5.5] 3,634 of qntx-go's 4,854 in 30 days. That it stopped answering is said」
+// 「[Opus 5.5] once, and that it answers again once, with how many it missed meanwhile;」
+// 「[Opus 5.5] each delivery between is the sweep's to send again, and said at debug.」
+type forwardSilence struct {
+	mu     sync.Mutex
+	missed map[string]int
+}
+
+// 「[Opus 5.5] went says a delivery to `to` was not taken, and whether `to` answered the」
+// 「[Opus 5.5] one before.」
+func (f *forwardSilence) went(to string) (wasAnswering bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.missed == nil {
+		f.missed = map[string]int{}
+	}
+	n, silent := f.missed[to]
+	f.missed[to] = n + 1
+	return !silent
+}
+
+// 「[Opus 5.5] answered says `to` took a delivery, and how many it had not taken since」
+// 「[Opus 5.5] it went silent; silent is false when it had answered all along.」
+func (f *forwardSilence) answered(to string) (missed int, silent bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	missed, silent = f.missed[to]
+	delete(f.missed, to)
+	return missed, silent
+}
+
+func (h *forwardHandler) notTaken(p forwardPayload, why string) {
+	if h.silent.went(p.URL) {
+		h.logger.Warnw("The node deliveries are forwarded to stopped answering; what it misses is sent again once it answers", "url", p.URL, "event", p.Event, "delivery", p.Delivery, "error", why)
+		return
+	}
+	h.logger.Debugw("A delivery did not reach the node it is forwarded to", "url", p.URL, "event", p.Event, "delivery", p.Delivery, "error", why)
+}
+
+func (h *forwardHandler) taken(p forwardPayload) {
+	if missed, silent := h.silent.answered(p.URL); silent {
+		h.logger.Infow("The node deliveries are forwarded to answers again", "url", p.URL, "missed", missed)
+	}
 }
 
 func (h *forwardHandler) Name() string { return forwardHandlerName }
@@ -165,13 +215,15 @@ func (h *forwardHandler) Execute(ctx context.Context, job *async.Job) error {
 	r.Header.Set("X-Hub-Signature-256", p.Signature)
 	answer, err := h.client.Do(r)
 	if err != nil {
-		h.logger.Errorw("A delivery did not reach the node it is forwarded to", "url", p.URL, "event", p.Event, "delivery", p.Delivery, "error", err)
+		h.notTaken(p, err.Error())
 		return errors.Wrapf(err, "%s: %s", forwardUnanswered, p.URL)
 	}
 	defer answer.Body.Close()
 	if unanswered(int64(answer.StatusCode)) {
+		h.notTaken(p, answer.Status)
 		return errors.Newf("%s: %s gave %d", forwardUnanswered, p.URL, answer.StatusCode)
 	}
+	h.taken(p)
 	if answer.StatusCode >= http.StatusMultipleChoices {
 		return errors.Newf("%s answered %s with %d", p.URL, p.Event, answer.StatusCode)
 	}

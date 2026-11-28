@@ -45,6 +45,38 @@ func startOTelJobSpan(span *sentry.Span, job *Job) context.Context {
 		SpanID:     trace.SpanID(span.SpanID),
 		TraceFlags: trace.FlagsSampled,
 	})
+	attrs := jobAttributes(job)
+	ctx, opened := otel.Tracer(tracerName).Start(
+		trace.ContextWithSpanContext(span.Context(), parent),
+		"process "+job.HandlerName,
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(attrs...),
+	)
+	if !opened.IsRecording() {
+		return span.Context()
+	}
+	return ctx
+}
+
+// 「[Opus 5.5] startOTelRootJobSpan opens the job's OpenTelemetry span as the head of」
+// 「[Opus 5.5] the job, continuing the traceparent the row holds: under the parent」
+// 「[Opus 5.5] job's span when it has one, the head of a trace of its own when not.」
+// 「[Opus 5.5] Recording is false when no provider records, and then nothing opened.」
+func startOTelRootJobSpan(ctx context.Context, job *Job) (context.Context, bool) {
+	cause := propagation.TraceContext{}.Extract(ctx, propagation.MapCarrier{"traceparent": job.TraceContext})
+	opened, span := otel.Tracer(tracerName).Start(cause,
+		"process "+job.HandlerName,
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(jobAttributes(job)...),
+	)
+	if !span.IsRecording() {
+		return ctx, false
+	}
+	return opened, true
+}
+
+// 「[Opus 5.5] jobAttributes are what a job's OpenTelemetry span carries.」
+func jobAttributes(job *Job) []attribute.KeyValue {
 	attrs := []attribute.KeyValue{
 		attribute.String("messaging.system", "pulse"),
 		attribute.String("messaging.operation.type", "process"),
@@ -60,16 +92,7 @@ func startOTelJobSpan(span *sentry.Span, job *Job) context.Context {
 	if job.PluginVersion != "" {
 		attrs = append(attrs, attribute.String("job.plugin_version", job.PluginVersion))
 	}
-	ctx, opened := otel.Tracer(tracerName).Start(
-		trace.ContextWithSpanContext(span.Context(), parent),
-		"process "+job.HandlerName,
-		trace.WithSpanKind(trace.SpanKindConsumer),
-		trace.WithAttributes(attrs...),
-	)
-	if !opened.IsRecording() {
-		return span.Context()
-	}
-	return ctx
+	return attrs
 }
 
 // 「[Opus 5.5] traceparentOf is the W3C traceparent of the innermost span in ctx, and」
