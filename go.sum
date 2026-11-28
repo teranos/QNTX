@@ -509,6 +509,10 @@ github.com/teranos/sacred-error v0.0.0-20261010164404-b510f6387028 h1:MADOqm3t4A
 github.com/teranos/sacred-error v0.0.0-20261010164404-b510f6387028/go.mod h1:Q36Bvhy9slmYtt+u5vUs/5qERAGwMfcpfaMMM5pRsCc=
 github.com/teranos/sacred-error v0.0.0-20261128123902-a71a5150d976 h1:0Bj/bm5DaI/oW3NueuCcjoCqZL7XTw/X+L5z0jtuniI=
 github.com/teranos/sacred-error v0.0.0-20261128123902-a71a5150d976/go.mod h1:zYimbAEJMg8EcYmxGTbwMniD0PDQse0OWdwGh5UOiqU=
+github.com/teranos/sacred-error v0.0.0-20261128151806-8dae414dabe8 h1:4JUGtsYiJSAf2n8cxVx+auWgz6YKOdDq7jbsS998YmQ=
+github.com/teranos/sacred-error v0.0.0-20261128151806-8dae414dabe8/go.mod h1:zYimbAEJMg8EcYmxGTbwMniD0PDQse0OWdwGh5UOiqU=
+github.com/teranos/sacred-error v0.0.0-20261128152222-0a76de988f51 h1:0Brr6DoXJpKKn9ukLXmWt4Jep30W9xkxkgmUJebo3xk=
+github.com/teranos/sacred-error v0.0.0-20261128152222-0a76de988f51/go.mod h1:zYimbAEJMg8EcYmxGTbwMniD0PDQse0OWdwGh5UOiqU=
 github.com/tetratelabs/wazero v1.11.0 h1:+gKemEuKCTevU4d7ZTzlsvgd1uaToIDtlQlmNbwqYhA=
 github.com/tetratelabs/wazero v1.11.0/go.mod h1:eV28rsN8Q+xwjogd7f4/Pp4xFxO7uOGbLcD/LzB1wiU=
 github.com/tidwall/gjson v1.14.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=

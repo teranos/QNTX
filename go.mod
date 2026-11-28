@@ -36,7 +36,7 @@ require (
 	github.com/cockroachdb/errors v1.12.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/ory/fosite v0.49.0
-	github.com/teranos/sacred-error v0.0.0-20261128123902-a71a5150d976
+	github.com/teranos/sacred-error v0.0.0-20261128152222-0a76de988f51
 )
 
 require (

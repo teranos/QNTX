@@ -47,6 +47,11 @@ import (
 	errors "github.com/teranos/sacred-error"
 )
 
+// "each adding things only they can now"
+// 「[Fable 5.2] here is this side of the FFI. What the store answered is received as the」
+// 「[Fable 5.2] store made it; an answer that is no Error is this side's finding, kept whole.」
+var here = errors.From("ats/storage/sqlitecgo")
+
 // readConnEntry is a pooled read connection with its own mutex.
 // Each connection can serve one reader at a time; multiple entries
 // allow concurrent reads without blocking each other.
@@ -370,7 +375,7 @@ func (rs *RustStore) createAttestationWithPriority(as *types.As, high bool) erro
 		result := C.storage_put(rs.store, cJSON)
 		defer C.storage_result_free(result)
 		if !result.success {
-			return errors.Decode(C.GoString(result.error_msg))
+			return here.Receive("storage_put", C.GoString(result.error_msg))
 		}
 		return nil
 	})
@@ -410,7 +415,7 @@ func (rs *RustStore) CreateAttestations(attestations []*types.As) ([]error, erro
 		result := C.storage_put_many(rs.store, cJSON)
 		defer C.attestation_result_free(result)
 		if !result.success {
-			return errors.Decode(C.GoString(result.error_msg))
+			return here.Receive("storage_put_many", C.GoString(result.error_msg))
 		}
 		return json.Unmarshal([]byte(C.GoString(result.attestation_json)), &said)
 	})
@@ -423,7 +428,7 @@ func (rs *RustStore) CreateAttestations(attestations []*types.As) ([]error, erro
 	answers := make([]error, len(said))
 	for i, one := range said {
 		if one != nil {
-			answers[i] = errors.Decode(*one)
+			answers[i] = here.Receive("storage_put_many", *one)
 		}
 	}
 	return answers, nil
@@ -570,7 +575,7 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 	defer C.storage_result_free(result)
 
 	if !result.success {
-		return errors.Decode(C.GoString(result.error_msg))
+		return here.Receive("storage_update", C.GoString(result.error_msg))
 	}
 
 	return nil
@@ -670,7 +675,7 @@ func (rs *RustStore) putLocked(jsonBytes []byte) error {
 	result := C.storage_put(rs.store, cJSON)
 	defer C.storage_result_free(result)
 	if !result.success {
-		return errors.Decode(C.GoString(result.error_msg))
+		return here.Receive("storage_put", C.GoString(result.error_msg))
 	}
 	return nil
 }

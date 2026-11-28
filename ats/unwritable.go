@@ -24,6 +24,6 @@ func AlreadyExists(err error) bool {
 }
 
 func refusedIn(err error, region string) bool {
-	var said *errors.Error
-	return errors.As(err, &said) && said.Context.Region == region
+	var said errors.Error
+	return errors.As(err, &said) && said.Context().Region == region
 }
