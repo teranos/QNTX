@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -179,31 +178,6 @@ func TestTheCollectorCountsWhatItFolds(t *testing.T) {
 	kept := ledger.take()
 	if len(kept) != 1 || kept[0].Occurrences != 10 {
 		t.Errorf("the ledger kept %+v, want one issue with 10 occurrences", kept)
-	}
-}
-
-// The Sentry core asks the ledger before it raises.
-func TestSentryRaisesWhatTheLedgerLets(t *testing.T) {
-	transport := &sentry.MockTransport{}
-	if err := sentry.Init(sentry.ClientOptions{Dsn: "https://tim@example.com/1", Transport: transport}); err != nil {
-		t.Fatalf("sentry.Init returned %v", err)
-	}
-	defer func() { sentry.CurrentHub().BindClient(nil) }()
-
-	ledger, _ := ledgerAt(time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC), 100)
-	core, _ := coreWith(t, zapcore.InfoLevel)
-	core.captureErrors = true
-	core.issues = ledger
-
-	for i := range 20 {
-		ledger.seen(forwardFailed(), forwardFields(i))
-		if err := core.Write(forwardFailed(), forwardFields(i)); err != nil {
-			t.Fatalf("Write returned %v", err)
-		}
-	}
-	// 1, 4, 16
-	if got := len(transport.Events()); got != 3 {
-		t.Errorf("20 occurrences raised %d events, want 3", got)
 	}
 }
 

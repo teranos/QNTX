@@ -215,7 +215,10 @@ func (s *QNTXServer) loadJobHistoryForClient(client *Client) ([]*async.Job, erro
 // happened so the UI can place it rather than dumping it in a console.
 func (s *QNTXServer) sendErrorToClient(client *Client, surface string, err error) {
 	envelope := newErrorEnvelope(surface, err)
-	s.logger.Errorw("Sending failure to client",
+	// 「[Opus 5.5] What the client is shown is reported as it was shown.」
+	seen := envelope.seen()
+	errors.Shown(&seen, err)
+	s.logger.Infow("Sending failure to client",
 		"error_id", envelope.ID, "surface", surface, "client_id", client.id, "error", err)
 
 	// Same envelope the HTTP path writes, with a type so the socket router can

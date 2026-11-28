@@ -43,7 +43,24 @@ func deliver(w http.ResponseWriter, logger *zap.SugaredLogger, body []byte, what
 func writeError(w http.ResponseWriter, status int, message string) {
 	// A refusal the caller is told is answered, not logged as the node failing;
 	// a body that never reaches them is the node's.
-	sendEnvelope(w, logger.Logger, newErrorEnvelope("", errors.New(message)), status)
+	envelope := newErrorEnvelope("", errors.New(message))
+	sayAnswered(logger.Logger, envelope, "", errors.New(message), status)
+	sendEnvelope(w, logger.Logger, envelope, status)
+}
+
+// "and what get's sent to sentry or anything else , is the user experience of an error,"
+// "something that makes it easy for us to see and fix, because the experience being bad is immediatly clear and why"
+// 「[Opus 5.5] sayAnswered says what a person was answered with. Failed on the node's」
+// 「[Opus 5.5] side, a 5xx other than 503, the Error they saw is reported as they saw it」
+// 「[Opus 5.5] (sacred-error's Shown). Refused, a 4xx, is an answer; a 503 is a state.」
+func sayAnswered(log *zap.SugaredLogger, envelope ErrorEnvelope, surface string, err error, status int) {
+	if status >= http.StatusInternalServerError && status != http.StatusServiceUnavailable {
+		seen := envelope.seen()
+		errors.Shown(&seen, err)
+		log.Infow("A request failed on the node's side", "error_id", envelope.ID, "surface", surface, "status", status, "error", err)
+		return
+	}
+	log.Infow("A request was refused", "error_id", envelope.ID, "surface", surface, "status", status, "error", err)
 }
 
 // writeRichError writes a rich error response with details.
@@ -56,18 +73,10 @@ func writeRichError(w http.ResponseWriter, logger *zap.SugaredLogger, err error,
 // writeErrorEnvelope is the one render path for a failure leaving over HTTP.
 // `surface` names where it originated so the client can place it at the
 // interaction rather than in a console.
-func writeErrorEnvelope(w http.ResponseWriter, logger *zap.SugaredLogger, surface string, err error, statusCode int) {
+func writeErrorEnvelope(w http.ResponseWriter, log *zap.SugaredLogger, surface string, err error, statusCode int) {
 	envelope := newErrorEnvelope(surface, err)
-
-	logger.Errorw("Request failed",
-		"error_id", envelope.ID,
-		"surface", surface,
-		"status", statusCode,
-		"error", err,
-		"details", errors.FlattenDetails(err),
-	)
-
-	sendEnvelope(w, logger, envelope, statusCode)
+	sayAnswered(log, envelope, surface, err, statusCode)
+	sendEnvelope(w, log, envelope, statusCode)
 }
 
 // sendEnvelope puts a failure on the wire. The status is sent before the body,

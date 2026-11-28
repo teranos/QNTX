@@ -31,15 +31,21 @@ Request bodies, headers and cookies never leave: `SendDefaultPII` is off.
 
 ## Logs and issues
 
-At error and above the entry becomes two things: a log line in the stream, and
-an issue.
+"sacred-error should be the main owner of what we see as an error, the way an end user would experience it."
+"and what get's sent to sentry or anything else , is the user experience of an error,"
+"something that makes it easy for us to see and fix, because the experience being bad is immediatly clear and why"
+
+「[Opus 5.5] sacred-error starts the node's Sentry client, and an issue is raised there」
+「[Opus 5.5] alone (`errors.Shown`): the Error a person was answered with, over HTTP」
+「[Opus 5.5] (a 5xx other than 503) or over the websocket, as they saw it, once by the id」
+「[Opus 5.5] they were shown, within the node's own budget a day. Every log line, at」
+「[Opus 5.5] error too, is a log line. A test fails when anything in QNTX calls Sentry's」
+「[Opus 5.5] capture itself.」
 
 An issue is grouped across occurrences, counted, and — when a field carries the
 error itself — carries the stack of where it came from. That last part is why
 the error goes in as an error and not as a string.
 
-Below error there is only the log line. An issue that fires on every info line
-is an inbox nobody reads.
 
 ## Issues are capped, and kept in QNTX
 

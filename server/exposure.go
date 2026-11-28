@@ -70,7 +70,7 @@ func RefuseUnsaid(cfg *appcfg.Config) error {
 		keys = append(keys, "auth.session_expiry_hours")
 	}
 	if cfg.Said("sentry.dsn") {
-		keys = append(keys, "sentry.min_level", "sentry.capture_errors", "sentry.flush_seconds", "sentry.debug")
+		keys = append(keys, "sentry.min_level", "sentry.flush_seconds", "sentry.debug")
 	}
 	return cfg.RefuseUnsaid("the node does not run on what it was not told", keys...)
 }

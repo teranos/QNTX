@@ -267,13 +267,12 @@ type ApnsConfig struct {
 //
 // An empty DSN is off. Every other field here is read only when one is set.
 type SentryConfig struct {
-	DSN           string `mapstructure:"dsn"`            // Where logs go. Empty = nothing is shipped. A DSN is an ingest key, not a secret: it can only write, and it is meant to travel with the build.
-	Environment   string `mapstructure:"environment"`    // Which node this is, in Sentry's own vocabulary (e.g. "production", "laptop"). Empty = Sentry reads SENTRY_ENVIRONMENT, then nothing.
-	ServerName    string `mapstructure:"server_name"`    // Names the node inside the environment. Empty = the hostname.
-	MinLevel      string `mapstructure:"min_level"`      // Lowest level that leaves the process: debug, info, warn, error. Below it stays local.
-	CaptureErrors bool   `mapstructure:"capture_errors"` // Raise an issue, and not only a log line, at error and above. An issue is grouped across occurrences and carries the error's stack.
-	FlushSeconds  int    `mapstructure:"flush_seconds"`  // How long the process waits at exit for the batch to drain.
-	Debug         bool   `mapstructure:"debug"`          // Print what the SDK is doing to stderr. Answers "did it leave" without guessing.
+	DSN          string `mapstructure:"dsn"`           // Where logs go. Empty = nothing is shipped. A DSN is an ingest key, not a secret: it can only write, and it is meant to travel with the build.
+	Environment  string `mapstructure:"environment"`   // Which node this is, in Sentry's own vocabulary (e.g. "production", "laptop"). Empty = Sentry reads SENTRY_ENVIRONMENT, then nothing.
+	ServerName   string `mapstructure:"server_name"`   // Names the node inside the environment. Empty = the hostname.
+	MinLevel     string `mapstructure:"min_level"`     // Lowest level that leaves the process: debug, info, warn, error. Below it stays local.
+	FlushSeconds int    `mapstructure:"flush_seconds"` // How long the process waits at exit for the batch to drain.
+	Debug        bool   `mapstructure:"debug"`         // Print what the SDK is doing to stderr. Answers "did it leave" without guessing.
 
 	// TracesSampleRate is the share of job executions shipped as spans, 0 to 1.
 	// A span carries a duration as a number, which is what makes "is this

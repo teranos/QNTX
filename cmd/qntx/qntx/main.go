@@ -159,7 +159,6 @@ func init() {
 				"environment", opt.Environment,
 				"release", opt.Release,
 				"min_level", opt.MinLevel.String(),
-				"capture_errors", opt.CaptureErrors,
 				"traces_sample_rate", opt.TracesSampleRate)
 		}
 	}
@@ -744,7 +743,7 @@ func findTauriBinary() string {
 // issue in Sentry names the commit that produced it.
 func sentryOptions(cfg *config.Config) (logger.SentryOptions, error) {
 	if err := cfg.RefuseUnsaid("sentry.dsn is said, and Sentry ships as am.toml says or not at all",
-		"sentry.min_level", "sentry.capture_errors", "sentry.flush_seconds", "sentry.debug"); err != nil {
+		"sentry.min_level", "sentry.flush_seconds", "sentry.debug"); err != nil {
 		return logger.SentryOptions{}, err
 	}
 	level, err := zapcore.ParseLevel(cfg.Sentry.MinLevel)
@@ -760,7 +759,6 @@ func sentryOptions(cfg *config.Config) (logger.SentryOptions, error) {
 		Release:          version.VersionTag,
 		ServerName:       cfg.Sentry.ServerName,
 		MinLevel:         level,
-		CaptureErrors:    cfg.Sentry.CaptureErrors,
 		Debug:            cfg.Sentry.Debug,
 		FlushTimeout:     time.Duration(cfg.Sentry.FlushSeconds) * time.Second,
 		TracesSampleRate: cfg.Sentry.TracesSampleRate,
