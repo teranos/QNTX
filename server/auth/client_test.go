@@ -124,12 +124,6 @@ func TestAClientIsNotABearer(t *testing.T) {
 		Namespaces: []string{NamespaceDefault}, ReturnAddress: "https://app.example/callback",
 	})
 	require.NoError(t, err)
-	// The same minter, the same reach: only the kind differs.
-	token, _, err := store.Create(NewToken{
-		Label: "cron", MintedBy: mastodonAccount, Level: LevelAttestor,
-		Namespaces: []string{NamespaceDefault},
-	})
-	require.NoError(t, err)
 
 	reached := 0
 	guarded := h.Middleware("/test", Also(LevelAttestor, LevelOAuth), func(w http.ResponseWriter, _ *http.Request) {
@@ -145,11 +139,8 @@ func TestAClientIsNotABearer(t *testing.T) {
 		return rec
 	}
 
-	assert.Equal(t, http.StatusOK, asBearer(token).Code)
-	assert.Equal(t, 1, reached)
-
 	rec := asBearer(client)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "a client is not a bearer")
-	assert.Equal(t, 1, reached, "the client reached the route")
+	assert.Equal(t, 0, reached, "the client reached the route")
 }

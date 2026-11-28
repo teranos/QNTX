@@ -214,7 +214,7 @@ func TestAStreamToANameArrivesAsItIsWritten(t *testing.T) {
 	body := `{"tenant": "Birch", "message": "{\"messageId\": \"m1\", \"role\": \"ROLE_USER\", \"parts\": [{\"text\": \"are you there\"}]}"}`
 	r, err := http.NewRequest(http.MethodPost, node.URL+"/api/a2a/SendStreamingMessage", strings.NewReader(body))
 	require.NoError(t, err)
-	r.Header.Set("Authorization", "Bearer "+root)
+	r.Header.Set("Authorization", authorizationFor(root))
 	r.Header.Set("Content-Type", "application/json")
 	asked := time.Now()
 	answered, err := http.DefaultClient.Do(r)

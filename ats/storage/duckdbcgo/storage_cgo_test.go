@@ -4,6 +4,7 @@ package duckdbcgo
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -332,5 +333,36 @@ func TestGetMissingReturnsNil(t *testing.T) {
 	}
 	if got != nil {
 		t.Errorf("GetAttestation of missing ID returned %+v, want nil", got)
+	}
+}
+
+// "if ground is a recording device, it needs to miss not a single sounds"
+//
+// k refused a 1.08 MB line of a transcript on 2026-11-21, though the node had
+// taken the request: an attestation is kept as large as it may arrive.
+func TestKeepsAnAttestationPastAMegabyte(t *testing.T) {
+	store, err := NewDuckdbStore("file://"+filepath.Join(t.TempDir(), "qntx-parquet"), NamespaceDefault)
+	if err != nil {
+		t.Fatalf("NewDuckdbStore failed: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	line := strings.Repeat("x", 1_200_000)
+	as := &types.As{
+		ID:         "ground:transcript:/t/a.jsonl:0",
+		Subjects:   []string{"session:s"},
+		Predicates: []string{"transcript:line"},
+		Contexts:   []string{"session:s"},
+		Actors:     []string{"ground"},
+		Timestamp:  time.UnixMilli(1_700_000_000_000),
+		Source:     "ground",
+		CreatedAt:  time.UnixMilli(1_700_000_000_000),
+		Attributes: map[string]any{"line": line},
+	}
+	if err := store.CreateAttestation(as); err != nil {
+		t.Fatalf("CreateAttestation() of a 1.2 MB attestation: %v", err)
+	}
+	if !store.AttestationExists(as.ID) {
+		t.Errorf("the 1.2 MB attestation is not there after it was created")
 	}
 }

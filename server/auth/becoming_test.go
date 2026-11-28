@@ -76,7 +76,7 @@ func (n becomingNode) mintedFor(t *testing.T, raw, label string) {
 	_, err := n.h.tokens.Issue(IssuedToken{
 		Hash: sha256Hex(raw), DID: "did:key:z" + label, Label: label,
 		MintedBy: "did:key:zOther", MintedByUser: n.other.ID, Level: LevelAttestor, Namespaces: []string{"the-app"},
-		ExpiresAt: NeverEnds(),
+		ExpiresAt: NeverEnds(), ClientDID: "did:key:zclient-of-" + label,
 	})
 	require.NoError(t, err)
 }

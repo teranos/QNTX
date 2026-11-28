@@ -65,7 +65,6 @@ type gitHubHost interface {
 	// What each linked subsystem reading the event answered, by name (ADR-056).
 	deliveries(ctx context.Context, event string, body []byte) map[string]any
 	buildsMovedBy(forge.Push) []string
-	vaultsMovedBy(forge.Push) []string
 	cometsMovedBy(forge.Push) []string
 	enqueueForward(*async.Job) error
 	keepRoomComment(context.Context, *roomcomments.Comment) error
