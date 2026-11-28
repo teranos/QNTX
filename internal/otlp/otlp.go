@@ -95,10 +95,14 @@ func Start(ctx context.Context, release string, also ...sdktrace.SpanProcessor) 
 			// The other processors still start: an endpoint that fails is no reason Sentry gets no spans.
 			unexported = errors.Wrapf(err, "failed to start the OTLP trace exporter (endpoint=%q); spans go to the other processors alone", endpoint)
 		} else {
-			options = append(options, sdktrace.WithBatcher(exporter))
+			also = append([]sdktrace.SpanProcessor{sdktrace.NewBatchSpanProcessor(exporter)}, also...)
 		}
 	}
+	isRoutine := keepingAll()
 	for _, processor := range also {
+		if isRoutine != nil {
+			processor = notRoutine{next: processor, isRoutine: isRoutine}
+		}
 		options = append(options, sdktrace.WithSpanProcessor(processor))
 	}
 	// 「[Fable 5.1] The last value of a key wins, so what the environment says of the」

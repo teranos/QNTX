@@ -11,6 +11,10 @@ import (
 
 	"github.com/teranos/QNTX/server/auth"
 	errors "github.com/teranos/sacred-error"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // statusRecorder remembers what was written, because a 502 nobody recorded is
@@ -68,6 +72,54 @@ func polled(r *http.Request, status int) bool {
 	}
 	return asksForComet(r) && status == http.StatusNotFound
 }
+
+// RoutineSpan is whether an ended span is routine, and so not sent: a poll a
+// client asks for on purpose (the version, plugins and statusline, or a ground
+// reading its comet), or a plugin update or a forward the worker ran, that
+// ended well and within a second. Those were most of the spans the node
+// shipped in a week. One that failed, or was slow, is sent: that is when
+// someone asks Sentry about it. Only the reading is a poll: a POST to the same
+// path, which adds a plugin or builds a comet, is a request.
+func RoutineSpan(s sdktrace.ReadOnlySpan) bool {
+	if s.Status().Code == codes.Error || s.EndTime().Sub(s.StartTime()) >= routineWithin {
+		return false
+	}
+	switch s.SpanKind() {
+	case trace.SpanKindServer:
+		var method, path string
+		var status int64
+		for _, kv := range s.Attributes() {
+			switch kv.Key {
+			case attrMethod:
+				method = kv.Value.AsString()
+			case attrPath:
+				path = kv.Value.AsString()
+			case attrStatus:
+				status = kv.Value.AsInt64()
+			}
+		}
+		if status >= http.StatusInternalServerError || (method != http.MethodGet && method != http.MethodHead) {
+			return false
+		}
+		return heartbeatPaths[path] || strings.HasPrefix(path, "/comet/")
+	case trace.SpanKindConsumer:
+		return routineJobs[s.Name()]
+	}
+	return false
+}
+
+// The attributes otelhttp names a server span's request and answer by.
+const (
+	attrMethod attribute.Key = "http.request.method"
+	attrPath   attribute.Key = "url.path"
+	attrStatus attribute.Key = "http.response.status_code"
+)
+
+// routineWithin is how long a routine span may take and still be routine.
+const routineWithin = time.Second
+
+// routineJobs are the jobs the worker runs most, by their span's name.
+var routineJobs = map[string]bool{"process plugin.update": true, "process github.forward": true}
 
 // asksForComet is a GET or HEAD under /comet/: a ground reading, not a build.
 func asksForComet(r *http.Request) bool {

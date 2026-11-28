@@ -9,6 +9,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/teranos/QNTX/internal/config"
+	"github.com/teranos/QNTX/internal/otlp"
 	"github.com/teranos/QNTX/internal/sacred"
 	errors "github.com/teranos/sacred-error"
 	"go.uber.org/zap"
@@ -591,12 +592,30 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	// stored — every job enqueued outside a span, and every row written before
 	// the trace columns existed — passes an empty header, which the SDK reads
 	// as no cause to inherit and leaves the span head of its own trace.
-	span := sentry.StartTransaction(ctx, job.HandlerName,
+	cause := continueFrom(job.TraceContext, job.TraceBaggage)
+	// "Where is all of our spans usage going towards?"
+	// 「[Opus 5.5] When the spans OTLP ships go to Sentry's own ingest, the job's」
+	// 「[Opus 5.5] OpenTelemetry span is its one span there: it continues the trace the」
+	// 「[Opus 5.5] row holds, and the Sentry transaction continues under it unsent. Its」
+	// 「[Opus 5.5] scope still links a job's errors to that trace, and a routine job is」
+	// 「[Opus 5.5] dropped as a whole once it ended (otlp.DropRoutine).」
+	unsent := false
+	if otlp.SaidIsSentry() {
+		if own, recording := startOTelRootJobSpan(ctx, job); recording {
+			traceparent, _ := traceparentOf(own)
+			ctx, cause, unsent = own, continueFrom(traceparent, job.TraceBaggage), true
+		}
+	}
+	options := []sentry.SpanOption{
 		sentry.WithOpName("queue.process"),
 		sentry.WithDescription(job.HandlerName),
 		sentry.WithTransactionSource(sentry.SourceTask),
-		continueFrom(job.TraceContext, job.TraceBaggage),
-	)
+		cause,
+	}
+	if unsent {
+		options = append(options, sentry.WithSpanSampled(sentry.SampledFalse))
+	}
+	span := sentry.StartTransaction(ctx, job.HandlerName, options...)
 
 	span.SetData("messaging.message.id", job.ID)
 	span.SetData("messaging.destination.name", job.HandlerName)
@@ -620,7 +639,11 @@ func (wp *WorkerPool) startJobSpan(job *Job) (*sentry.Span, context.Context) {
 	// worth a write, and every job would pay for an UPDATE nobody reads.
 	// 「[Fable 5.1] Or when the OpenTelemetry span is recorded: a child then inherits」
 	// 「[Fable 5.1] this trace id whether or not Sentry sampled it.」
-	ctx = startOTelJobSpan(span, job)
+	if unsent {
+		ctx = span.Context()
+	} else {
+		ctx = startOTelJobSpan(span, job)
+	}
 	if span.Sampled == sentry.SampledTrue || recordingOTel(ctx) {
 		traceparent, bag := traceparentOf(ctx)
 		if err := wp.queue.store.SetExecutionTrace(job.ID, traceparent, bag); err != nil {
