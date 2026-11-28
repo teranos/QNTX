@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,7 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // 「[Opus 5.5] signedDelivery is a delivery as GitHub would hand it to the node.」
@@ -146,4 +148,42 @@ func TestANodeTakesTheSecretOfTheNodeThatForwardsToIt(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, active)
 	assert.Equal(t, "the secret q holds", secret)
+}
+
+// "another FUCK is how we abuse the sentry error budget, i dont think all 1900 of them are truly separate ones if you get me"
+// 「[Opus 5.5] A node that does not answer is said once, not once a delivery, and its」
+// 「[Opus 5.5] answering again is said once, with how many it missed.」
+func TestAForwardNodeThatStoppedAnsweringIsSaidOnceAndItsReturnOnce(t *testing.T) {
+	var down atomic.Bool
+	down.Store(true)
+	far := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if down.Load() {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer far.Close()
+	core, said := observer.New(zap.DebugLevel)
+	handler := &forwardHandler{client: far.Client(), logger: zap.New(core).Sugar()}
+	deliver := func(guid string) error {
+		job, err := forwardJob(far.URL, "push", guid, "sha256=abc", []byte(`{}`))
+		require.NoError(t, err)
+		return handler.Execute(context.Background(), job)
+	}
+
+	for _, guid := range []string{"a", "b", "c"} {
+		require.Error(t, deliver(guid))
+	}
+	down.Store(false)
+	require.NoError(t, deliver("d"))
+	require.NoError(t, deliver("e"))
+
+	assert.Equal(t, 1, said.FilterLevelExact(zap.WarnLevel).Len(), "the node's silence is said once")
+	assert.Equal(t, 2, said.FilterLevelExact(zap.DebugLevel).Len(), "each delivery after the first is said at debug")
+	assert.Zero(t, said.FilterLevelExact(zap.ErrorLevel).Len(), "a node that is down is no error of this node's")
+	back := said.FilterLevelExact(zap.InfoLevel).All()
+	if assert.Len(t, back, 1, "the node's return is said once") {
+		assert.EqualValues(t, 3, back[0].ContextMap()["missed"])
+	}
 }

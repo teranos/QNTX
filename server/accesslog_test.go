@@ -1,14 +1,21 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"github.com/teranos/QNTX/plugin"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 	"unsafe"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/teranos/QNTX/server/auth"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -311,4 +318,58 @@ func TestASecondPollOfAHeldPathDoesNotKeepItsRequestLineEither(t *testing.T) {
 		}
 		return true
 	})
+}
+
+// "Where is all of our spans usage going towards?"
+// 「[Sonnet 5.5, Opus 5.5] A poll or a routine job that ended well and quickly is not sent; one that」
+// 「[Sonnet 5.5, Opus 5.5] failed or was slow is, and so is every other request, a POST to a polled path among them.」
+func TestARoutineSpanIsNotSentAndAFailedOrSlowOneIs(t *testing.T) {
+	recorder := tracetest.NewSpanRecorder()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+	tracer := provider.Tracer("test")
+	served := func(method, path string, status int, took time.Duration, failed bool) sdktrace.ReadOnlySpan {
+		start := time.Now()
+		_, span := tracer.Start(context.Background(), method+" "+path, trace.WithSpanKind(trace.SpanKindServer), trace.WithTimestamp(start),
+			trace.WithAttributes(attrMethod.String(method), attrPath.String(path), attrStatus.Int(status)))
+		if failed {
+			span.SetStatus(codes.Error, "failed")
+		}
+		span.End(trace.WithTimestamp(start.Add(took)))
+		ended := recorder.Ended()
+		return ended[len(ended)-1]
+	}
+	job := func(name string, took time.Duration, failed bool) sdktrace.ReadOnlySpan {
+		start := time.Now()
+		_, span := tracer.Start(context.Background(), name, trace.WithSpanKind(trace.SpanKindConsumer), trace.WithTimestamp(start))
+		if failed {
+			span.SetStatus(codes.Error, "failed")
+		}
+		span.End(trace.WithTimestamp(start.Add(took)))
+		ended := recorder.Ended()
+		return ended[len(ended)-1]
+	}
+
+	for _, routine := range []sdktrace.ReadOnlySpan{
+		served(http.MethodGet, "/am/statusline", 200, 20*time.Millisecond, false),
+		served(http.MethodGet, "/am/version", 200, time.Millisecond, false),
+		served(http.MethodGet, "/api/plugins", 200, time.Millisecond, false),
+		served(http.MethodGet, "/comet/teranos/QNTX/aarch64-darwin/1", 404, time.Millisecond, false),
+		served(http.MethodHead, "/comet/teranos/QNTX/aarch64-darwin/1", 200, time.Millisecond, false),
+		job("process plugin.update", 300*time.Millisecond, false),
+		job("process github.forward", 50*time.Millisecond, false),
+	} {
+		assert.True(t, RoutineSpan(routine), "%s was sent", routine.Name())
+	}
+	for _, sent := range []sdktrace.ReadOnlySpan{
+		served(http.MethodGet, "/am/statusline", 500, 20*time.Millisecond, true),
+		served(http.MethodGet, "/am/statusline", 200, 3*time.Second, false),
+		served(http.MethodGet, "/api/collected", 200, time.Millisecond, false),
+		served(http.MethodPost, "/comet/teranos/QNTX/aarch64-darwin", 200, time.Millisecond, false),
+		served(http.MethodPost, "/api/plugins", 200, time.Millisecond, false),
+		job("process plugin.update", 300*time.Millisecond, true),
+		job("process github.forward", 2*time.Second, false),
+		job("process vault.sync", time.Millisecond, false),
+	} {
+		assert.False(t, RoutineSpan(sent), "%s was dropped", sent.Name())
+	}
 }

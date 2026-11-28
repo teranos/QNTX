@@ -67,8 +67,48 @@ func TestAKeyApprovedAtLayeIsAdmittedOnThePeer(t *testing.T) {
 	admitted, ok := presentedSigned(node, calling(t, ramen, ramenDID, "ramen", node.publicOrigin()))
 	require.True(t, ok, "the key approved at laye is not admitted on the peer")
 	assert.Equal(t, mastodonAccount, admitted.Identity)
-	assert.Equal(t, string(LevelSuper), admitted.LevelName())
-	assert.Equal(t, []string{"ground"}, admitted.Namespaces)
+	// "it is approved, get it the permission it needs"
+	// 「[Opus 5.5] The key stands as the person who approved it, at their level: ROOT, as」
+	// 「[Opus 5.5] their approve at the passkey would have made it.」
+	assert.Equal(t, string(LevelRoot), admitted.LevelName())
+}
+
+// "ok, but the fix can you please do it now"
+// 「[Opus 5.5] A key already held, approved again by the person at laye, is held as the」
+// 「[Opus 5.5] person from then on: on kapteyn on 2026-11-28 Keeper's key stood at SUPER and」
+// 「[Opus 5.5] the vault, ROOT's, said "this route is not yours"; the approve came back 409.」
+func TestAKeyApprovedAgainAtLayeIsHeldAsThePerson(t *testing.T) {
+	primary, _, _ := authorizingHandler(t)
+	primaryURL := servedNode(t, primary)
+	primary.configuredOrigin = primaryURL
+	_, laye, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	layeDID := EncodeDIDKey(laye.Public().(ed25519.PublicKey))
+	require.NoError(t, primary.SetLaye(layeDID))
+
+	nodeKey, nodeDID := otherNode(t)
+	node := handlerWithDoors(t)
+	node.tokens = newMemTokenStore()
+	node.nodeKey = nodeKey
+	require.NoError(t, node.SetPrimary(primaryURL))
+	nodeURL := servedNode(t, node)
+	require.NoError(t, primary.DeclarePeer(peerName, nodeDID, []string{"ground"}, nodeURL, nodeURL))
+
+	keeper, keeperDID := aSessionsKey(t)
+	_, err = node.tokens.Issue(IssuedToken{Hash: signedOnly(keeperDID), DID: keeperDID, Label: "Keeper",
+		MintedBy: mastodonAccount, Level: LevelSuper, Namespaces: []string{"ground"}, ExpiresAt: NeverEnds()})
+	require.NoError(t, err)
+	held, ok := presentedSigned(node, calling(t, keeper, keeperDID, "Keeper", node.publicOrigin()))
+	require.True(t, ok)
+	require.Equal(t, string(LevelSuper), held.LevelName())
+
+	w := layeAsks(t, primary, laye, layeDID, layeAdmit{Person: mastodonAccount, Peer: nodeDID, DID: keeperDID, Label: "Keeper"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	admitted, ok := presentedSigned(node, calling(t, keeper, keeperDID, "Keeper", node.publicOrigin()))
+	require.True(t, ok, "the key approved again is not admitted")
+	assert.Equal(t, mastodonAccount, admitted.Identity)
+	assert.Equal(t, string(LevelRoot), admitted.LevelName())
 }
 
 // Only ROOT here admits a key on a peer.

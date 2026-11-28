@@ -124,10 +124,15 @@ func init() {
 		// 「[Fable 5.1] (internal/otlp). Like Sentry, failing to start it is said on the」
 		// 「[Fable 5.1] terminal and is not a reason for a node not to run.」
 		// Spans go to Sentry too when it traces: sentry-go's own span processor.
+		// 「[Sonnet 5.5, Opus 5.5] Not when the endpoint OTLP ships to is Sentry's own: then every span」
+		// 「[Sonnet 5.5, Opus 5.5] reached Sentry twice, once over OTLP and once by its processor, under」
+		// 「[Sonnet 5.5, Opus 5.5] two names ("Where is all of our spans usage going towards?").」
 		var toSentry []sdktrace.SpanProcessor
-		if logger.SentryRunning() && opt.TracesSampleRate > 0 {
+		if logger.SentryRunning() && opt.TracesSampleRate > 0 && !otlp.SaidIsSentry() {
 			toSentry = append(toSentry, sentryotel.NewSentrySpanProcessor())
 		}
+		// 「[Sonnet 5.5, Opus 5.5] What ended routine, a poll or a job that went as it always does, is not sent.」
+		otlp.DropRoutine(server.RoutineSpan)
 		exported := otlp.Start(context.Background(), version.VersionTag, toSentry...)
 		if exported != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to start OTLP span export: %v\n", exported)
