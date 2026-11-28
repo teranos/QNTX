@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
-// What the rule calls routine never reaches the processor; the rest does.
+// 「[Sonnet 5.5, Opus 5.5] What the rule calls routine never reaches the processor; the rest does.」
 func TestARoutineSpanNeverReachesTheProcessor(t *testing.T) {
 	recorder := tracetest.NewSpanRecorder()
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(notRoutine{
@@ -27,7 +27,7 @@ func TestARoutineSpanNeverReachesTheProcessor(t *testing.T) {
 	}
 }
 
-// Spans that go to Sentry's OTLP ingest need not go to Sentry again.
+// 「[Sonnet 5.5, Opus 5.5] Spans that go to Sentry's OTLP ingest need not go to Sentry again.」
 func TestSentrysOwnIngestIsKnownByItsHost(t *testing.T) {
 	for _, c := range []struct {
 		endpoint string
