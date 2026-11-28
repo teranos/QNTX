@@ -132,7 +132,7 @@ func (h *Handler) handleAdmit(w http.ResponseWriter, r *http.Request) {
 //
 // "CAN WE PLEASE STOP EXPECTING AN AGENT TO REQUEST IT OWN PERMISSIONS AND ALSO BE PERFECT?"
 func (h *Handler) admitter(admitting Admission) (TokenInfo, bool, int, string) {
-	// The person, carried: ROOT here, by the word of this node's primary.
+	// 「[Opus 5.5] The person, carried: ROOT here, by the word of this node's primary.」
 	//
 	// "which should be obvious considereing it uses my finger and considering i am ROOT for real"
 	// 「[Opus 5.5] The key is held by its own name at the level of the person who approved it,」
@@ -162,8 +162,8 @@ func (h *Handler) admitter(admitting Admission) (TokenInfo, bool, int, string) {
 	return held, true, 0, ""
 }
 
-// carriedByPrimary is whether the one admitting is the person, carried by this
-// node's primary from where they approved the key (laye_admit.go).
+// 「[Opus 5.5] carriedByPrimary is whether the one admitting is the person, carried by this」
+// 「[Opus 5.5] node's primary from where they approved the key (laye_admit.go).」
 func (h *Handler) carriedByPrimary(admitting Admission) bool {
 	return admitting.Grant == nil && admitting.TokenDID != "" && admitting.TokenDID != admitting.ClientDID &&
 		h.signsForItsPeople(admitting.TokenDID)
